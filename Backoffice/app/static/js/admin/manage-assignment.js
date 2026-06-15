@@ -25,6 +25,36 @@
             '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'
         };
 
+        const yearFields = [
+            singleYearField,
+            startYearField,
+            endYearField,
+            startMonthYearField,
+            endMonthYearField
+        ].filter(Boolean);
+
+        function initYearPickers(scope) {
+            if (window.YearPicker && typeof window.YearPicker.init === 'function') {
+                window.YearPicker.init(scope || document);
+            }
+        }
+
+        function setDefaultYearsIfEmpty() {
+            const currentYear = String(new Date().getFullYear());
+            yearFields.forEach(function(el) {
+                if (!el) return;
+                if (String(el.value || '').trim()) return;
+                el.value = currentYear;
+            });
+            initYearPickers();
+        }
+
+        function bindYearFieldListeners(field) {
+            if (!field) return;
+            field.addEventListener('input', generatePeriodName);
+            field.addEventListener('change', generatePeriodName);
+        }
+
         // Function to show/hide period fields based on type
         function togglePeriodFields() {
             const periodType = periodTypeSelect.value;
@@ -38,13 +68,13 @@
             if (periodType === 'single-year') {
                 document.getElementById('single-year-fields').classList.remove('hidden');
             } else if (periodType === 'year-range') {
-                document.getElementById('year-range-start').classList.remove('hidden');
-                document.getElementById('year-range-end').classList.remove('hidden');
+                document.getElementById('year-range-fields').classList.remove('hidden');
             } else if (periodType === 'month-range') {
                 document.getElementById('month-range-start').classList.remove('hidden');
                 document.getElementById('month-range-end').classList.remove('hidden');
             }
 
+            setDefaultYearsIfEmpty();
             generatePeriodName();
         }
 
@@ -176,12 +206,8 @@
 
         // Event listeners
         periodTypeSelect.addEventListener('change', togglePeriodFields);
-        singleYearField.addEventListener('input', generatePeriodName);
-        startYearField.addEventListener('input', generatePeriodName);
-        endYearField.addEventListener('input', generatePeriodName);
-        startMonthYearField.addEventListener('input', generatePeriodName);
+        yearFields.forEach(bindYearFieldListeners);
         startMonthSelect.addEventListener('change', generatePeriodName);
-        endMonthYearField.addEventListener('input', generatePeriodName);
         endMonthSelect.addEventListener('change', generatePeriodName);
 
         // Remove required attribute from hidden period_name field to prevent browser validation
@@ -190,10 +216,19 @@
             hiddenPeriodNameField.removeAttribute('required');
         }
 
+        initYearPickers();
+
         // Initialize with existing period name if editing
         const existingPeriodName = cfg.periodName;
         if (existingPeriodName) {
             parseExistingPeriodName(existingPeriodName);
+            initYearPickers();
+        } else {
+            setDefaultYearsIfEmpty();
+            if (startMonthSelect) startMonthSelect.value = '01';
+            if (endMonthSelect) endMonthSelect.value = '12';
+            togglePeriodFields();
+            generatePeriodName();
         }
 
         // --- Modal Handling ---
@@ -2421,6 +2456,14 @@
                 });
             }
 
+            function resetEditSubmitGuard() {
+                try {
+                    if (window.FormSubmitGuard && typeof window.FormSubmitGuard.reset === 'function') {
+                        window.FormSubmitGuard.reset(mainForm);
+                    }
+                } catch (_) { /* no-op */ }
+            }
+
             // Use capture phase to ensure we run before any other handlers
             mainForm.addEventListener('submit', async function(e) {
                 // Validate period name first - prevent default immediately if validation fails
@@ -2428,6 +2471,7 @@
                     e.preventDefault();
                     e.stopPropagation();
                     e.stopImmediatePropagation();
+                    resetEditSubmitGuard();
                     return false;
                 }
 
@@ -2438,6 +2482,7 @@
                 if (hasEntityChanges) {
                     e.preventDefault();
                     e.stopPropagation();
+                    resetEditSubmitGuard();
 
                     const submitBtn = mainForm.querySelector('button[type="submit"], input[type="submit"]') ||
                         document.getElementById('manageAssignmentSubmitBtn');
@@ -2466,6 +2511,7 @@
                             submitBtn.innerHTML = originalHTML;
                             submitBtn.disabled = originalDisabled;
                         }
+                        resetEditSubmitGuard();
                     }
                 }
                 // If no entity changes, let form submit normally
@@ -2584,6 +2630,14 @@
                 }
             }
 
+            function resetSubmitGuard() {
+                try {
+                    if (window.FormSubmitGuard && typeof window.FormSubmitGuard.reset === 'function') {
+                        window.FormSubmitGuard.reset(mainForm);
+                    }
+                } catch (_) { /* no-op */ }
+            }
+
             // Use capture phase to ensure we run before any other handlers
             mainForm.addEventListener('submit', async function(e) {
                 // Validate period name first - prevent default immediately if validation fails
@@ -2591,6 +2645,7 @@
                     e.preventDefault();
                     e.stopPropagation();
                     e.stopImmediatePropagation();
+                    resetSubmitGuard();
                     return false;
                 }
 
@@ -2598,6 +2653,8 @@
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
+                // stopPropagation blocks FormSubmitGuard's bubble-phase reset; clear stale state now.
+                resetSubmitGuard();
 
                 window.__clientLog && window.__clientLog('[DEBUG] Form submit event triggered');
 
@@ -2700,6 +2757,7 @@
 
                 const dup = await preflightDuplicateIfNeeded();
                 if (!dup.ok) {
+                    resetSubmitGuard();
                     return false;
                 }
 
@@ -2717,7 +2775,14 @@
                     HTMLFormElement.prototype.submit.call(mainForm);
                 }
                 if (window.showConfirmation) {
-                    window.showConfirmation(confirmMsg, doSubmit, function() {}, confirmContinue, confirmCancel, confirmTitle);
+                    window.showConfirmation(
+                        confirmMsg,
+                        doSubmit,
+                        resetSubmitGuard,
+                        confirmContinue,
+                        confirmCancel,
+                        confirmTitle
+                    );
                 } else {
                     doSubmit();
                 }

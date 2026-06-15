@@ -42,9 +42,11 @@ from app.utils.api_pagination import (
     validate_pagination_params,
     build_pagination_queries, get_paginated_data_ids, fetch_paginated_rows,
     build_paginated_response, query_filter_in_batches,
+    MAX_USER_AUTH_ROWS,
 )
 from app.utils.form_localization import get_translation_key
 from app.utils.api_formatting import format_answer_value, format_form_data_response, serialize_form_data_item
+from app.utils.api_serialization import _wrap_disagg_dict as _normalize_disagg_payload_util
 from app.utils.sql_utils import safe_ilike_pattern
 from app.services import query_form_data, get_form_data_queries, TemplateService, query_dynamic_indicator_data, query_repeat_group_data
 from app.services.data_retrieval_shared import (
@@ -56,20 +58,16 @@ from app.services.data_retrieval_shared import (
 
 def _normalize_disagg_payload(disagg_data):
     """
-    Normalize disagg_data for API response so the frontend always receives
-    { mode, values }. Matrix data is stored as a flat dict (e.g. {"10_SP2": 4107000});
-    age/sex disaggregation uses nested { "mode": "...", "values": { ... } }.
+    Normalize disagg_data for API response.
+    Delegates to the shared _wrap_disagg_dict in api_serialization, which handles
+    all three on-disk formats: standard disagg, flat matrix, and plugin/arbitrary JSON.
+    Returns {'mode': None, 'values': {}} when disagg_data is None/empty rather than None,
+    so callers that always expect a dict still work.
     """
-    if not isinstance(disagg_data, dict):
+    result = _normalize_disagg_payload_util(disagg_data)
+    if result is None:
         return {'mode': None, 'values': {}}
-    if 'values' in disagg_data:
-        return {
-            'mode': disagg_data.get('mode'),
-            'values': disagg_data.get('values') or {}
-        }
-    # Flat matrix format: use the whole dict as values, exclude reserved keys
-    values = {k: v for k, v in disagg_data.items() if not k.startswith('_')}
-    return {'mode': 'matrix', 'values': values}
+    return result
 
 
 def _resolve_matrix_entity_labels(form_item_id_to_prefix_ids, form_items_orm_list):
@@ -193,7 +191,7 @@ def _fetch_extended_data(
     template_id, submission_id, item_id, country_id, period_name,
     indicator_bank_id, submission_type,
     include_dynamic, include_repeat,
-    include_disagg, minimal_country_info,
+    minimal_country_info,
     elevated_access, auth_user,
     date_from=None, date_to=None,
 ):
@@ -295,7 +293,6 @@ def _fetch_extended_data(
                     dynamic_rows.append(
                         serialize_dynamic_data_item(
                             row,
-                            include_disagg=include_disagg,
                             minimal_country_info=minimal_country_info,
                             aes_countries=aes_countries,
                         )
@@ -339,7 +336,6 @@ def _fetch_extended_data(
                     repeat_rows.append(
                         serialize_repeat_data_item(
                             row,
-                            include_disagg=include_disagg,
                             minimal_country_info=minimal_country_info,
                             aes_countries=aes_countries,
                         )
@@ -482,7 +478,6 @@ def get_all_data():
         - submission_type: Filter by submission type ('assigned' or 'public')
         - period_name: Filter by period name (e.g., FY2023, Q1 2024)
         - indicator_bank_id: Filter by indicator bank ID
-        - disagg: Include disaggregation data (true/false)
         - include_full_info: Include detailed form item info (true/false, default: false for performance)
         - include_dynamic: Include DynamicIndicatorData rows (true/false). Adds ``dynamic_data`` array.
         - include_repeat: Include RepeatGroupData rows (true/false). Adds ``repeat_data`` array.
@@ -594,7 +589,26 @@ def get_all_data():
             if resolved_id:
                 country_id = resolved_id
 
-        # Build queries via service layer for consistency
+        # Determine pagination mode and include_full_info early so we can skip
+        # unused joinedloads in the query builder below.
+        should_paginate = elevated_access
+        if should_paginate:
+            validated_params = validate_data_endpoint_params(request.args)
+            page = validated_params['page']
+            per_page = validated_params['per_page']
+            include_full_info = validated_params['include_full_info']
+        else:
+            full_info_param = request.args.get('include_full_info', default=None, type=str)
+            include_full_info = False
+            if full_info_param is not None:
+                include_full_info = str(full_info_param).strip().lower() in ['1', 'true', 'yes', 'y']
+            page = 1
+            per_page = None
+
+        # Build queries via service layer for consistency.
+        # Only eager-load form_item relations when include_full_info is requested;
+        # this avoids 2–3 extra JOINs per query on the common case where form_item_info
+        # is not needed (default: false).
         queries = query_form_data(
             template_id=template_id,
             submission_id=submission_id,
@@ -605,6 +619,7 @@ def get_all_data():
             indicator_bank_id=indicator_bank_id,
             submission_type=submission_type,
             preload=True,
+            full_preload=include_full_info,
         )
         assigned_form_data_query, public_form_data_query = get_form_data_queries(queries)
 
@@ -632,32 +647,6 @@ def get_all_data():
             # Public query already has joins
             if public_form_data_query is not None:
                 public_form_data_query = public_form_data_query.filter(FormData.submitted_at <= date_to)
-
-        # Determine if we should paginate based on authentication type
-        # API key auth → paginated, User auth → no pagination (return all accessible data)
-        should_paginate = elevated_access
-
-        # Validate and sanitize parameters
-        if should_paginate:
-            # API key auth: use pagination parameters
-            validated_params = validate_data_endpoint_params(request.args)
-            page = validated_params['page']
-            per_page = validated_params['per_page']
-            include_disagg = validated_params['include_disagg']
-            include_full_info = validated_params['include_full_info']
-        else:
-            # User auth: no pagination, but still validate disagg and full_info parameters
-            disagg_param = request.args.get('disagg', default=None, type=str)
-            include_disagg = False
-            if disagg_param is not None:
-                include_disagg = str(disagg_param).strip().lower() in ['1', 'true', 'yes', 'y']
-            full_info_param = request.args.get('include_full_info', default=None, type=str)
-            include_full_info = False
-            if full_info_param is not None:
-                include_full_info = str(full_info_param).strip().lower() in ['1', 'true', 'yes', 'y']
-            # Set defaults for user auth (not used but needed for response structure)
-            page = 1
-            per_page = None
 
         # ---------- RBAC: if user-authenticated, restrict to templates the user owns or that are shared with them ----------
         if not elevated_access and auth_user is not None:
@@ -705,7 +694,8 @@ def get_all_data():
             submission_type
         )
 
-        # Get data IDs (paginated for API key, all for user auth) with sorting
+        # Get data IDs (paginated for API key, capped for user auth) with sorting.
+        # MAX_USER_AUTH_ROWS prevents runaway unbounded fetches on the session path.
         page_rows, total_items = get_paginated_data_ids(
             assigned_ids_q,
             public_ids_q,
@@ -713,7 +703,8 @@ def get_all_data():
             per_page if should_paginate else None,
             paginate=should_paginate,
             sort_field=sort_field,
-            sort_order=sort_order
+            sort_order=sort_order,
+            max_rows=None if should_paginate else MAX_USER_AUTH_ROWS,
         )
 
         # Fetch full ORM rows for the current page
@@ -749,7 +740,6 @@ def get_all_data():
                     continue
                 item_payload = serialize_assigned_data_item(
                     data_item,
-                    include_disagg=include_disagg,
                     include_full_info=include_full_info,
                     minimal_country_info=use_minimal_country_info,
                     aes_countries=aes_countries,
@@ -761,7 +751,6 @@ def get_all_data():
                     continue
                 item_payload = serialize_public_data_item(
                     data_item,
-                    include_disagg=include_disagg,
                     include_full_info=include_full_info,
                     minimal_country_info=use_minimal_country_info
                 )
@@ -779,7 +768,6 @@ def get_all_data():
             submission_type=submission_type,
             include_dynamic=include_dynamic,
             include_repeat=include_repeat,
-            include_disagg=include_disagg,
             minimal_country_info=use_minimal_country_info,
             elevated_access=elevated_access,
             auth_user=auth_user,
@@ -883,7 +871,6 @@ def _build_star_tables_response(
     form_items_table,
     countries_table,
     *,
-    include_disagg,
     should_paginate,
     total_items,
     page,
@@ -896,7 +883,6 @@ def _build_star_tables_response(
         data_rows,
         form_items_table,
         countries_table,
-        include_disagg=include_disagg,
     )
     if should_paginate:
         total_pages = (total_items + per_page - 1) // per_page if per_page > 0 else 1
@@ -935,7 +921,6 @@ def get_data_tables():
       - HTTP Basic auth or session (user-scoped access, no pagination)
     Query Parameters:
         - template_id, submission_id, item_id, item_type, country_id, submission_type, period_name, indicator_bank_id: filters
-        - disagg: include disaggregation data (true/false)
         - date_from: Filter by submission date from (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
         - date_to: Filter by submission date to (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
         - sort: Sort field (default: 'submitted_at', options: 'submitted_at', 'template_id', 'country_id', 'period_name')
@@ -1081,13 +1066,7 @@ def get_data_tables():
             validated_params = validate_data_endpoint_params(request.args)
             page = validated_params['page']
             per_page = validated_params['per_page']
-            include_disagg = validated_params['include_disagg']
         else:
-            # User auth: no pagination by default, but still validate disagg parameter
-            disagg_param = request.args.get('disagg', default=None, type=str)
-            include_disagg = False
-            if disagg_param is not None:
-                include_disagg = str(disagg_param).strip().lower() in ['1', 'true', 'yes', 'y']
             page = 1
             per_page = None
             per_page_raw = request.args.get('per_page', default=None, type=int)
@@ -1115,7 +1094,9 @@ def get_data_tables():
                 current_app.logger.debug("published_version_id resolution failed: %s", e)
                 published_version_id = None
 
-        # Build queries via service layer for consistency
+        # Build queries via service layer for consistency.
+        # form_item_info is never included in the star-schema response, so skip the
+        # deep form_item joinedloads to avoid unnecessary joins on large datasets.
         queries = query_form_data(
             template_id=template_id,
             submission_id=submission_id,
@@ -1127,6 +1108,7 @@ def get_data_tables():
             indicator_bank_ids=indicator_bank_ids,
             submission_type=submission_type,
             preload=True,
+            full_preload=False,
         )
         assigned_form_data_query, public_form_data_query = get_form_data_queries(queries)
 
@@ -1209,7 +1191,6 @@ def get_data_tables():
                             if layout == 'star':
                                 return _build_star_tables_response(
                                     [], [], [],
-                                    include_disagg=include_disagg,
                                     should_paginate=should_paginate,
                                     total_items=0,
                                     page=page,
@@ -1243,7 +1224,6 @@ def get_data_tables():
                             if layout == 'star':
                                 return _build_star_tables_response(
                                     [], [], [],
-                                    include_disagg=include_disagg,
                                     should_paginate=should_paginate,
                                     total_items=0,
                                     page=page,
@@ -1271,7 +1251,8 @@ def get_data_tables():
             submission_type
         )
 
-        # Get data IDs (paginated for API key, all for user auth) with sorting
+        # Get data IDs (paginated for API key, capped for user auth) with sorting.
+        # MAX_USER_AUTH_ROWS prevents runaway unbounded fetches on the session path.
         page_rows, total_items = get_paginated_data_ids(
             assigned_ids_q,
             public_ids_q,
@@ -1279,7 +1260,8 @@ def get_data_tables():
             per_page if should_paginate else None,
             paginate=should_paginate,
             sort_field=sort_field,
-            sort_order=sort_order
+            sort_order=sort_order,
+            max_rows=None if should_paginate else MAX_USER_AUTH_ROWS,
         )
 
         # Fetch full ORM rows using helper
@@ -1348,13 +1330,14 @@ def get_data_tables():
                 num_value = extract_numeric_value(value)
                 submitted_at = data_item.submitted_at.isoformat() if data_item.submitted_at else None
                 disagg_data_saved = _normalize_disagg_raw(getattr(data_item, "disagg_data", None))
-                disagg_data = disagg_data_saved if include_disagg else None
 
                 # Exclude non-reported rows (no value, no disagg, no flags, no imputed) unless explicitly requested.
                 if (not include_non_reported) and data_status == "available":
                     if (value is None) and (disagg_data_saved is None) and (not _has_any_aux_value(data_item)):
                         continue
 
+                pdd = _normalize_disagg_raw(getattr(data_item, "prefilled_disagg_data", None))
+                idd = _normalize_disagg_raw(getattr(data_item, "imputed_disagg_data", None))
                 payload = {
                     'id': data_item.id,
                     'submission_type': 'assigned',
@@ -1372,14 +1355,16 @@ def get_data_tables():
                     'data_status': data_status,
                     'date_collected': submitted_at,
                     'submitted_at': submitted_at,
+                    'disaggregation_data': (
+                        _normalize_disagg_payload(disagg_data_saved) if disagg_data_saved else None
+                    ),
+                    'prefilled_disaggregation_data': (
+                        _normalize_disagg_payload(pdd) if pdd else None
+                    ),
+                    'imputed_disaggregation_data': (
+                        _normalize_disagg_payload(idd) if idd else None
+                    ),
                 }
-                if include_disagg and disagg_data:
-                    payload['disaggregation_data'] = _normalize_disagg_payload(disagg_data)
-                if include_disagg:
-                    pdd = _normalize_disagg_raw(getattr(data_item, "prefilled_disagg_data", None))
-                    idd = _normalize_disagg_raw(getattr(data_item, "imputed_disagg_data", None))
-                    payload['prefilled_disaggregation_data'] = _normalize_disagg_payload(pdd) if pdd else None
-                    payload['imputed_disaggregation_data'] = _normalize_disagg_payload(idd) if idd else None
                 data_rows.append(payload)
             else:
                 data_item = public_map.get(row.id)
@@ -1408,13 +1393,14 @@ def get_data_tables():
                 num_value = extract_numeric_value(value)
                 submitted_at = submission.submitted_at.isoformat() if submission and submission.submitted_at else None
                 disagg_data_saved = _normalize_disagg_raw(getattr(data_item, "disagg_data", None))
-                disagg_data = disagg_data_saved if include_disagg else None
 
                 # Exclude non-reported rows (no value, no disagg, no flags, no imputed) unless explicitly requested.
                 if (not include_non_reported) and data_status == "available":
                     if (value is None) and (disagg_data_saved is None) and (not _has_any_aux_value(data_item)):
                         continue
 
+                pdd = _normalize_disagg_raw(getattr(data_item, "prefilled_disagg_data", None))
+                idd = _normalize_disagg_raw(getattr(data_item, "imputed_disagg_data", None))
                 payload = {
                     'id': data_item.id,
                     'submission_type': 'public',
@@ -1433,14 +1419,16 @@ def get_data_tables():
                     'data_status': data_status,
                     'date_collected': submitted_at,
                     'submitted_at': submitted_at,
+                    'disaggregation_data': (
+                        _normalize_disagg_payload(disagg_data_saved) if disagg_data_saved else None
+                    ),
+                    'prefilled_disaggregation_data': (
+                        _normalize_disagg_payload(pdd) if pdd else None
+                    ),
+                    'imputed_disaggregation_data': (
+                        _normalize_disagg_payload(idd) if idd else None
+                    ),
                 }
-                if include_disagg and disagg_data:
-                    payload['disaggregation_data'] = _normalize_disagg_payload(disagg_data)
-                if include_disagg:
-                    pdd = _normalize_disagg_raw(getattr(data_item, "prefilled_disagg_data", None))
-                    idd = _normalize_disagg_raw(getattr(data_item, "imputed_disagg_data", None))
-                    payload['prefilled_disaggregation_data'] = _normalize_disagg_payload(pdd) if pdd else None
-                    payload['imputed_disaggregation_data'] = _normalize_disagg_payload(idd) if idd else None
                 data_rows.append(payload)
 
         # Optionally include non-reported (missing) form items as virtual rows (assigned submissions only).
@@ -1593,22 +1581,21 @@ def get_data_tables():
 
         # Collect matrix row prefixes (entity IDs) per form_item_id for entity name resolution
         matrix_row_prefixes = {}
-        if include_disagg:
-            for row in data_rows:
-                disagg = row.get('disaggregation_data')
-                if not disagg or disagg.get('mode') != 'matrix':
+        for row in data_rows:
+            disagg = row.get('disaggregation_data')
+            if not disagg or disagg.get('mode') != 'matrix':
+                continue
+            form_item_id = row.get('form_item_id')
+            if not form_item_id:
+                continue
+            values = disagg.get('values') or {}
+            for key in values:
+                if not isinstance(key, str) or key.startswith('_'):
                     continue
-                form_item_id = row.get('form_item_id')
-                if not form_item_id:
-                    continue
-                values = disagg.get('values') or {}
-                for key in values:
-                    if not isinstance(key, str) or key.startswith('_'):
-                        continue
-                    idx = key.find('_')
-                    prefix = key[:idx] if idx >= 0 else key
-                    if prefix not in (None, ''):
-                        matrix_row_prefixes.setdefault(form_item_id, set()).add(prefix)
+                idx = key.find('_')
+                prefix = key[:idx] if idx >= 0 else key
+                if prefix not in (None, ''):
+                    matrix_row_prefixes.setdefault(form_item_id, set()).add(prefix)
 
         # Optionally expand related tables to cover the full filtered dataset (not only the current page)
         expansion_failed = False
@@ -1687,7 +1674,6 @@ def get_data_tables():
             submission_type=submission_type,
             include_dynamic=include_dynamic,
             include_repeat=include_repeat,
-            include_disagg=include_disagg,
             minimal_country_info=(per_page and per_page > 1000) or (not should_paginate),
             elevated_access=elevated_access,
             auth_user=auth_user,
@@ -1758,7 +1744,6 @@ def get_data_tables():
                 data_rows,
                 form_items_table,
                 countries_table,
-                include_disagg=include_disagg,
                 should_paginate=should_paginate,
                 total_items=total_items,
                 page=page,

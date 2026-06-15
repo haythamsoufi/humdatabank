@@ -193,6 +193,47 @@ def _extract_group_and_label(header: str) -> Tuple[Optional[str], str]:
     return group, label
 
 
+def _has_kobo_structural_markers(headers: List[Any]) -> Tuple[bool, bool]:
+    """Return (has_kobo_meta, has_group_headers) for KoBo structural fingerprinting.
+
+    has_kobo_meta:    at least one underscore-prefixed column (_id, _uuid …),
+                      an exact KOBO_SYSTEM_EXACT match (start, end, today …),
+                      or a meta/ column.
+    has_group_headers: at least one header uses the "Group/Question" path format.
+    """
+    non_empty = [_s(h) for h in headers if h is not None and _s(h)]
+
+    meta_triggers = [
+        h for h in non_empty
+        if h.startswith('_') or h.lower() in KOBO_SYSTEM_EXACT or h.lower().startswith('meta/')
+    ]
+    group_triggers = [h for h in non_empty if '/' in h]
+
+    has_kobo_meta = bool(meta_triggers)
+    has_group_headers = bool(group_triggers)
+
+    _logger.debug(
+        'kobo structural check: %d non-empty headers; '
+        'meta_triggers=%r; group_triggers=%r',
+        len(non_empty),
+        meta_triggers[:10],
+        group_triggers[:10],
+    )
+    return has_kobo_meta, has_group_headers
+
+
+_KOBO_STRUCTURE_ERROR = (
+    'This file does not look like a KoBo data export. '
+    'KoBo exports include metadata columns (e.g. _id, _uuid, start, end) '
+    'or use "Group/Question" path headers. '
+    'Export submission data from KoBo: Data \u2192 Downloads \u2192 XLS.'
+)
+_KOBO_STRUCTURE_ERROR_DETAIL = (
+    'No KoBo structural markers detected \u2014 no underscore-prefixed metadata '
+    'columns (_id, _uuid, start, end \u2026) and no "Group/Question" path headers.'
+)
+
+
 def _find_validation_status_column(headers: List[Any]) -> Optional[int]:
     """Column index for KoBo / ODK validation status (metadata), if present."""
     for i, h in enumerate(headers):
@@ -717,31 +758,170 @@ class KoboDataImportService:
     """Import submission data from KoBo Toolbox data export Excel files."""
 
     @classmethod
+    def validate_data_export(cls, file_bytes: bytes) -> Dict[str, Any]:
+        """Validate a KoBo data export before the import wizard analyzes it.
+
+        Returns dict with keys: valid, message, errors, preview
+        (preview: sheet_name, total_rows, total_columns).
+        """
+        _logger.debug('validate_data_export: called, file_size=%d bytes', len(file_bytes))
+
+        preview: Dict[str, Any] = {
+            'sheet_name': None,
+            'total_rows': 0,
+            'total_columns': 0,
+        }
+
+        if openpyxl is None:
+            _logger.error('validate_data_export: openpyxl not installed')
+            return {
+                'valid': False,
+                'message': 'openpyxl is required',
+                'errors': ['openpyxl not installed'],
+                'preview': preview,
+            }
+
+        try:
+            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+        except Exception as e:
+            _logger.warning('validate_data_export: cannot open file – %s', e)
+            return {
+                'valid': False,
+                'message': f'Cannot open Excel file: {e}',
+                'errors': [str(e)],
+                'preview': preview,
+            }
+
+        sheet_names = wb.sheetnames
+        _logger.debug('validate_data_export: sheets=%r', sheet_names)
+
+        sheet_names_lower = {name.lower() for name in sheet_names}
+        if 'survey' in sheet_names_lower:
+            wb.close()
+            _logger.info('validate_data_export: REJECTED – XLSForm detected (sheets=%r)', sheet_names)
+            return {
+                'valid': False,
+                'message': (
+                    'This file looks like a Kobo XLSForm (form definition), not a data export. '
+                    'Export submission data from KoBo: Data → Downloads → XLS.'
+                ),
+                'errors': ['File contains a "survey" worksheet (XLSForm format)'],
+                'preview': preview,
+            }
+
+        ws = wb.worksheets[0]
+        sheet_name = wb.sheetnames[0]
+        preview['sheet_name'] = sheet_name
+
+        rows_iter = ws.iter_rows(values_only=True)
+        try:
+            header_row = next(rows_iter)
+        except StopIteration:
+            wb.close()
+            _logger.info('validate_data_export: REJECTED – file is empty (sheet=%r)', sheet_name)
+            return {
+                'valid': False,
+                'message': 'File is empty',
+                'errors': ['No header row found'],
+                'preview': preview,
+            }
+
+        headers = list(header_row)
+        preview['total_columns'] = len(headers)
+        _logger.debug(
+            'validate_data_export: sheet=%r, %d raw header cells, first 30=%r',
+            sheet_name, len(headers), [_s(h) for h in headers[:30]],
+        )
+
+        if not any(_s(h) for h in headers if h is not None):
+            wb.close()
+            _logger.info('validate_data_export: REJECTED – header row is blank (sheet=%r)', sheet_name)
+            return {
+                'valid': False,
+                'message': 'No column headers found',
+                'errors': ['Header row is empty'],
+                'preview': preview,
+            }
+
+        total_rows = 0
+        for row in rows_iter:
+            if any(v is not None for v in row):
+                total_rows += 1
+        preview['total_rows'] = total_rows
+        wb.close()
+
+        if total_rows == 0:
+            _logger.info('validate_data_export: REJECTED – no data rows (sheet=%r)', sheet_name)
+            return {
+                'valid': False,
+                'message': 'No data rows found',
+                'errors': ['File contains only headers'],
+                'preview': preview,
+            }
+
+        has_kobo_meta, has_group_headers = _has_kobo_structural_markers(headers)
+        if not has_kobo_meta and not has_group_headers:
+            _logger.info(
+                'validate_data_export: REJECTED – no KoBo markers '
+                '(sheet=%r, rows=%d, cols=%d, headers_sample=%r)',
+                sheet_name, total_rows, len(headers),
+                [_s(h) for h in headers[:20]],
+            )
+            return {
+                'valid': False,
+                'message': _KOBO_STRUCTURE_ERROR,
+                'errors': [_KOBO_STRUCTURE_ERROR_DETAIL],
+                'preview': preview,
+            }
+
+        _logger.info(
+            'validate_data_export: ACCEPTED (sheet=%r, rows=%d, cols=%d, '
+            'has_kobo_meta=%s, has_group_headers=%s)',
+            sheet_name, total_rows, len(headers), has_kobo_meta, has_group_headers,
+        )
+        return {
+            'valid': True,
+            'message': 'Valid KoBo data export',
+            'errors': [],
+            'preview': preview,
+        }
+
+    @classmethod
     def analyze(cls, file_bytes: bytes) -> Dict[str, Any]:
         """Analyze a KoBo data export and return its detected structure.
 
         Returns dict with: success, groups, skipped_columns, entity_candidates,
         total_rows, total_columns, sheet_name, etc.
         """
+        _logger.debug('analyze: called, file_size=%d bytes', len(file_bytes))
+
         if openpyxl is None:
+            _logger.error('analyze: openpyxl not installed')
             return {'success': False, 'message': 'openpyxl is required', 'errors': ['openpyxl not installed']}
 
         try:
             wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
         except Exception as e:
+            _logger.warning('analyze: cannot open file – %s', e)
             return {'success': False, 'message': f'Cannot open Excel file: {e}', 'errors': [str(e)]}
 
         ws = wb.worksheets[0]
         sheet_name = wb.sheetnames[0]
+        _logger.debug('analyze: sheet=%r', sheet_name)
 
         rows_iter = ws.iter_rows(values_only=True)
         try:
             header_row = next(rows_iter)
         except StopIteration:
+            _logger.info('analyze: REJECTED – file is empty (sheet=%r)', sheet_name)
             return {'success': False, 'message': 'File is empty', 'errors': ['No header row found']}
 
         headers = list(header_row)
         total_columns = len(headers)
+        _logger.debug(
+            'analyze: sheet=%r, %d header cells, first 30=%r',
+            sheet_name, total_columns, [_s(h) for h in headers[:30]],
+        )
 
         data_rows: List[Tuple] = []
         for row in rows_iter:
@@ -750,7 +930,29 @@ class KoboDataImportService:
         total_rows = len(data_rows)
 
         if total_rows == 0:
+            _logger.info('analyze: REJECTED – no data rows (sheet=%r)', sheet_name)
             return {'success': False, 'message': 'No data rows found', 'errors': ['File contains only headers']}
+
+        has_kobo_meta, has_group_headers = _has_kobo_structural_markers(headers)
+        if not has_kobo_meta and not has_group_headers:
+            wb.close()
+            _logger.info(
+                'analyze: REJECTED – no KoBo markers '
+                '(sheet=%r, rows=%d, cols=%d, headers_sample=%r)',
+                sheet_name, total_rows, total_columns,
+                [_s(h) for h in headers[:20]],
+            )
+            return {
+                'success': False,
+                'message': _KOBO_STRUCTURE_ERROR,
+                'errors': [_KOBO_STRUCTURE_ERROR_DETAIL],
+            }
+
+        _logger.debug(
+            'analyze: structural check passed (sheet=%r, rows=%d, cols=%d, '
+            'has_kobo_meta=%s, has_group_headers=%s)',
+            sheet_name, total_rows, total_columns, has_kobo_meta, has_group_headers,
+        )
 
         groups: Dict[str, Dict] = OrderedDict()
         skipped_columns: List[Dict] = []
@@ -856,6 +1058,13 @@ class KoboDataImportService:
 
         vs_idx = _find_validation_status_column(headers)
 
+        _logger.info(
+            'analyze: ACCEPTED (sheet=%r, rows=%d, total_cols=%d, data_cols=%d, '
+            'skipped_cols=%d, groups=%d, entity_candidates=%d, has_validation_status=%s)',
+            sheet_name, total_rows, total_columns, len(all_data_cols),
+            len(skipped_columns), len(groups), len(entity_candidates), vs_idx is not None,
+        )
+
         return {
             'success': True,
             'sheet_name': sheet_name,
@@ -869,6 +1078,8 @@ class KoboDataImportService:
             'entity_candidates': entity_candidates,
             'validation_status_column_index': vs_idx,
             'validation_status_header': _s(headers[vs_idx]) if vs_idx is not None else None,
+            'has_kobo_meta': has_kobo_meta,
+            'has_group_headers': has_group_headers,
         }
 
     @classmethod

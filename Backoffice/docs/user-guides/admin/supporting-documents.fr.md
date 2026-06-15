@@ -57,4 +57,4 @@ Lors de l'examen d'une soumission :
 
 - [Recettes de rôles](role-recipes.md)
 - [Examiner et approuver les soumissions](review-approve-submissions.md)
-- [Gestion des données et confidentialité](../common/data-handling-and-privacy.md)
+- [Gestion des données et confidentialité](../../data-reporting/data-handling-and-privacy.md)

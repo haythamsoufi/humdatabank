@@ -33,23 +33,30 @@ Step-by-step workflows and tutorials for using the Humanitarian Databank Backoff
 
 - [View your assignments](focal-point/view-assignments.md)
 - [Fill and submit a form](focal-point/submit-data.md)
-- [Supporting documents (Focal point)](focal-point/supporting-documents.md)
-- [Troubleshooting (Focal point)](focal-point/troubleshooting.md)
-- [Troubleshooting submission issues (Focal point)](focal-point/troubleshooting-submission.md)
-- [Data guidance for unified planning and reporting](focal-point/unified-planning-and-reporting-data-guidance.md)
+- [Troubleshooting](focal-point/troubleshooting.md)
+- [Quality Index](focal-point/data-quality-index.md)
 
 ### Common
 
-- [Start here](common/start-here.md)
-- [Navigation basics](common/navigation.md)
-- [Account settings](common/account-settings.md)
-- [Submission statuses and what you can do](common/submission-statuses-and-permissions.md)
-- [Troubleshooting basics (everyone)](common/troubleshooting-basics.md)
+- [Submission Status](common/submission-statuses-and-permissions.md)
 - [AI Use Policy](common/ai-use-policy.md)
 - [AI Chatbot](common/ai-chatbot.md) – How the chatbot works, access levels, document privacy, and available tools
-- [Data handling and privacy](common/data-handling-and-privacy.md)
 - [Data governance: how the system supports it](common/data-governance.md)
 - [Getting help](common/getting-help.md)
+
+### Getting Started
+
+- [Start here](../getting-started/start-here.md)
+- [How the platform works](../getting-started/how-it-works.md)
+- [Glossary](../getting-started/glossary.md)
+- [Account settings](../getting-started/account-settings.md)
+
+### Data Reporting
+
+- [Data Guidance, Unified Planning and Reporting (UPR)](../data-reporting/data-guidance-upr.md)
+- [Data Guidance, FDRS](../data-reporting/data-guidance-fdrs.md)
+- [Supporting documents (Focal point)](../data-reporting/supporting-documents.md)
+- [Data handling and privacy](../data-reporting/data-handling-and-privacy.md)
 
 ## Language
 

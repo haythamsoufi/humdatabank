@@ -60,4 +60,4 @@ Before sharing the link:
 
 - [Manage assignments](manage-assignments.md)
 - [Create new assignment](create-assignment.md)
-- [Data handling and privacy](../common/data-handling-and-privacy.md)
+- [Data handling and privacy](../../data-reporting/data-handling-and-privacy.md)

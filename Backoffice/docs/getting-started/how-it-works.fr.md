@@ -11,16 +11,28 @@ Cette page explique les principaux éléments du Backoffice en termes simples.
 ## Flux de travail typique
 
 1. Un **administrateur** crée ou met à jour un **modèle**.
-2. L'administrateur crée une **mission** en utilisant ce modèle et sélectionne le(s) pays.
+2. L'administrateur crée une **mission** à partir de ce modèle et sélectionne le(s) pays.
 3. Un **point focal** ouvre la mission, remplit le formulaire, corrige les messages de validation et clique sur **Soumettre**.
-4. Les administrateurs peuvent surveiller la progression (par exemple : en attente / en cours / soumis).
+4. Les administrateurs peuvent suivre la progression (par exemple : en attente / en cours / soumis).
 
-## Où aller ensuite
+## Principaux endroits que vous utiliserez
 
-- Si vous êtes un point focal : commencez par **Guides utilisateur → Point focal → Voir vos missions**.
-- Si vous êtes administrateur : commencez par **Guides utilisateur → Administrateur → Créer et gérer les missions**.
+### Tableau de bord (tous les utilisateurs)
+
+Votre page d'accueil. Elle affiche généralement votre travail en attente et des liens rapides.
+
+### Paramètres du compte (tous les utilisateurs)
+
+Utilisez **Paramètres du compte** pour mettre à jour votre profil, changer votre mot de passe et sélectionner votre langue préférée.
+
+## Conseils
+
+- Utilisez la barre latérale pour naviguer entre les sections.
+- Si vous ne trouvez pas une page, utilisez la recherche de la plateforme (si activée) ou demandez à votre administrateur.
+
+Maintenant que vous comprenez les bases, le Guide utilisateur explique chaque tâche étape par étape.
 
 ## Liens connexes
 
 - [Glossaire](glossary.md)
-- [Guides utilisateur](../user-guides/README.md)
+- [Obtenir de l'aide](../user-guides/common/getting-help.md)

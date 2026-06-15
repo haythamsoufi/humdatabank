@@ -159,6 +159,7 @@ def get_category_icon(category_name: str) -> str:
     """Return icon class for category."""
     icons = {
         "getting-started": "fas fa-rocket",
+        "data-reporting": "fas fa-chart-line",
         "user-guides": "fas fa-book-open",
         "common": "fas fa-users",
         "focal-point": "fas fa-user-check",
@@ -184,6 +185,7 @@ def get_category_display_name(category_name: str) -> str:
     """Get localized display name for documentation category."""
     display_names = {
         "getting-started": _("Getting Started"),
+        "data-reporting": _("Data Reporting"),
         "user-guides": _("User Guides"),
         "workflows": _("Workflows"),
         "api": _("API"),
@@ -351,7 +353,34 @@ def user_guides_common_doc_requires_admin(base_rel: str) -> bool:
 
 
 # Landing page for users who must not see docs/README.md (full internal index).
-DOCS_NON_ADMIN_LANDING_REL = "user-guides/common/start-here.md"
+DOCS_NON_ADMIN_LANDING_REL = "getting-started/start-here.md"
+
+# Curated help-docs navigation (focal-point users and shared Getting Started order).
+GETTING_STARTED_NAV_ORDER: Tuple[str, ...] = (
+    "getting-started/README.md",
+    "getting-started/start-here.md",
+    "getting-started/how-it-works.md",
+    "getting-started/glossary.md",
+    "getting-started/account-settings.md",
+)
+
+FOCAL_POINT_USER_GUIDE_NAV_ORDER: Tuple[str, ...] = (
+    "user-guides/focal-point/view-assignments.md",
+    "user-guides/focal-point/submit-data.md",
+    "user-guides/common/submission-statuses-and-permissions.md",
+    "user-guides/common/getting-help.md",
+    "user-guides/focal-point/troubleshooting.md",
+    "user-guides/focal-point/data-quality-index.md",
+    "user-guides/common/ai-chatbot.md",
+    "user-guides/common/ai-use-policy.md",
+)
+
+DATA_REPORTING_NAV_ORDER: Tuple[str, ...] = (
+    "data-reporting/data-guidance-upr.md",
+    "data-reporting/data-guidance-fdrs.md",
+    "data-reporting/supporting-documents.md",
+    "data-reporting/data-handling-and-privacy.md",
+)
 
 
 def _is_root_readme_request(raw: str) -> bool:
@@ -491,6 +520,62 @@ def _should_merge_user_guides_common_focal_nav(allowed_groups: set) -> bool:
     return allowed_groups == {"common", "focal-point"}
 
 
+def _sort_doc_items_by_rel_order(
+    items: List[DocItem],
+    rel_order: Tuple[str, ...],
+    *,
+    include_extras: bool = False,
+) -> List[DocItem]:
+    """Return items in rel_order; optionally append any items not listed."""
+    order_index = {rel: idx for idx, rel in enumerate(rel_order)}
+    known = [item for item in items if item.rel_path in order_index]
+    known.sort(key=lambda item: order_index[item.rel_path])
+    if not include_extras:
+        return known
+    known_rels = {item.rel_path for item in known}
+    extras = [item for item in items if item.rel_path not in known_rels]
+    extras.sort(key=lambda x: x.rel_path.lower())
+    return known + extras
+
+
+def _collect_doc_items(category_groups: Dict[str, Dict[str, List[DocItem]]]) -> Dict[str, DocItem]:
+    items_by_rel: Dict[str, DocItem] = {}
+    for groups in category_groups.values():
+        for group_items in groups.values():
+            for item in group_items:
+                items_by_rel[item.rel_path] = item
+    return items_by_rel
+
+
+def _build_curated_nav_category(
+    *,
+    name: str,
+    display_name: str,
+    rel_order: Tuple[str, ...],
+    items_by_rel: Dict[str, DocItem],
+    group_display_name: Optional[str] = None,
+) -> Optional[NavCategory]:
+    items = _sort_doc_items_by_rel_order(
+        [items_by_rel[rel] for rel in rel_order if rel in items_by_rel],
+        rel_order,
+    )
+    if not items:
+        return None
+    group_label = group_display_name or display_name
+    return NavCategory(
+        name=name,
+        display_name=display_name,
+        groups=[
+            NavGroup(
+                name=name,
+                display_name=group_label,
+                items=items,
+            )
+        ],
+        icon=get_category_icon(name),
+    )
+
+
 def build_hierarchical_nav(
     *,
     root: Path,
@@ -607,31 +692,15 @@ def build_hierarchical_nav(
         return (1, group.lower())
 
     # Process categories
+    items_by_rel = _collect_doc_items(category_groups)
+    use_focal_help_nav = _should_merge_user_guides_common_focal_nav(allowed_user_guide_groups)
+
     for cat_name in sorted(category_groups.keys()):
+        if use_focal_help_nav and cat_name in {"getting-started", "user-guides", "data-reporting"}:
+            continue
+
         # Special handling for user-guides: promote groups to top-level categories
         if cat_name == "user-guides":
-            if _should_merge_user_guides_common_focal_nav(allowed_user_guide_groups):
-                merged_items: List[DocItem] = []
-                for g in ("common", "focal-point"):
-                    merged_items.extend(category_groups[cat_name].get(g, []))
-                merged_items.sort(key=lambda x: (x.title.lower(), x.rel_path.lower()))
-                if merged_items:
-                    nav_categories.append(
-                        NavCategory(
-                            name="user-guides",
-                            display_name=_("User Guides"),
-                            groups=[
-                                NavGroup(
-                                    name="all-guides",
-                                    display_name=_("User Guides"),
-                                    items=merged_items,
-                                )
-                            ],
-                            icon=get_category_icon("user-guides"),
-                        )
-                    )
-                continue
-
             for group_name in sorted(
                 category_groups[cat_name].keys(),
                 key=lambda g: _group_sort_key(cat_name, g),
@@ -703,11 +772,18 @@ def build_hierarchical_nav(
                 category_groups[cat_name].keys(),
                 key=lambda g: _group_sort_key(cat_name, g),
             ):
+                group_items = category_groups[cat_name][group_name]
+                if cat_name == "getting-started":
+                    group_items = _sort_doc_items_by_rel_order(
+                        group_items,
+                        GETTING_STARTED_NAV_ORDER,
+                        include_extras=True,
+                    )
                 groups.append(
                     NavGroup(
                         name=group_name,
                         display_name=_group_display(cat_name, group_name),
-                        items=category_groups[cat_name][group_name],
+                        items=group_items,
                     )
                 )
 
@@ -719,6 +795,32 @@ def build_hierarchical_nav(
                     icon=get_category_icon(cat_name),
                 )
             )
+
+    if use_focal_help_nav:
+        focal_nav: List[NavCategory] = []
+        for cat in (
+            _build_curated_nav_category(
+                name="getting-started",
+                display_name=_("Getting Started"),
+                rel_order=GETTING_STARTED_NAV_ORDER,
+                items_by_rel=items_by_rel,
+            ),
+            _build_curated_nav_category(
+                name="user-guides",
+                display_name=_("User Guide"),
+                rel_order=FOCAL_POINT_USER_GUIDE_NAV_ORDER,
+                items_by_rel=items_by_rel,
+            ),
+            _build_curated_nav_category(
+                name="data-reporting",
+                display_name=_("Data Reporting"),
+                rel_order=DATA_REPORTING_NAV_ORDER,
+                items_by_rel=items_by_rel,
+            ),
+        ):
+            if cat is not None:
+                focal_nav.append(cat)
+        nav_categories = focal_nav + nav_categories
 
     return nav_categories
 

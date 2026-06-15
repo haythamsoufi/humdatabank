@@ -60,4 +60,4 @@
 
 - [إدارة المهام](manage-assignments.md)
 - [إنشاء مهمة جديدة](create-assignment.md)
-- [التعامل مع البيانات والخصوصية](../common/data-handling-and-privacy.md)
+- [التعامل مع البيانات والخصوصية](../../data-reporting/data-handling-and-privacy.md)

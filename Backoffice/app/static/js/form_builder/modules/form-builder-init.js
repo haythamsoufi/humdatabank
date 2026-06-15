@@ -217,18 +217,32 @@ export function initExcelModal() {
             initExcelIoModal(excelModal, {
                 openTrigger: excelBtn,
                 onClose: function() {
+                    if (importForm?.dataset?.excelImportSubmitting === '1') {
+                        return;
+                    }
                     if (importForm) importForm.reset();
                 },
             });
 
             initExcelImportDropzone('#excel-import-dropzone', {
-                autoSubmitOnSelect: true,
-                acceptExtensions: ['.xlsx', '.xls'],
-                onFileSelected: function() {
-                    if (importForm) submitBuilderForm(importForm);
-                },
+                validateUrl: document.getElementById('excel-import-dropzone')?.dataset?.validateUrl,
+                fileFieldName: 'excel_file',
+                submitBtn: importForm?.querySelector('button[type="submit"]'),
+                requireValidation: true,
                 resetOnModalClose: excelModal,
+                importingLabel: 'Importing template…',
             });
+
+            if (importForm) {
+                importForm.addEventListener('submit', () => {
+                    importForm.dataset.excelImportSubmitting = '1';
+                    const submitBtn = importForm.querySelector('button[type="submit"]');
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Importing template…';
+                    }
+                });
+            }
         }
     };
 

@@ -60,4 +60,4 @@ Antes de compartir el enlace:
 
 - [Gestionar asignaciones](manage-assignments.md)
 - [Crear nueva asignación](create-assignment.md)
-- [Manejo de datos y privacidad](../common/data-handling-and-privacy.md)
+- [Manejo de datos y privacidad](../../data-reporting/data-handling-and-privacy.md)

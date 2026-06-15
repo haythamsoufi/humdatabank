@@ -1,4 +1,4 @@
-# Submission statuses and what you can do (permissions guide)
+# Submission Status
 
 Use this guide to understand why a button is missing/disabled (for example **Edit**, **Submit**, **Approve**, or **Reopen**).
 

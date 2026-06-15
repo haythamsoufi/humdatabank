@@ -149,5 +149,5 @@ To filter for AI DLP events, look for:
 - [AI Use Policy](../common/ai-use-policy.md) — User-facing policy (acceptable use, responsibilities)
 - [AI Chatbot](../common/ai-chatbot.md) — Chatbot usage, access levels, RBAC, and document privacy
 - [AI Document Library and embeddings](ai-document-library-and-embeddings.md)
-- [Data handling and privacy](../common/data-handling-and-privacy.md)
+- [Data handling and privacy](../../data-reporting/data-handling-and-privacy.md)
 

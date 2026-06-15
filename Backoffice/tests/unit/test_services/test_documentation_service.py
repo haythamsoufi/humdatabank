@@ -226,7 +226,7 @@ class TestUserGuidesCommonDocRequiresAdmin:
         assert self._call("user-guides/common/data-governance.md") is True
 
     def test_non_restricted(self):
-        assert self._call("user-guides/common/start-here.md") is False
+        assert self._call("getting-started/start-here.md") is False
 
     def test_too_few_parts(self):
         assert self._call("user-guides/data-governance.md") is False
@@ -252,7 +252,7 @@ class TestUserGuidesAiDocRequiresBetaAccess:
         assert self._call("user-guides/admin/ai-system-security-and-privacy.md") is True
 
     def test_non_ai_doc(self):
-        assert self._call("user-guides/common/start-here.md") is False
+        assert self._call("getting-started/start-here.md") is False
 
     def test_focal_point_not_ai_topic(self):
         assert self._call("user-guides/focal-point/view-assignments.md") is False
@@ -847,10 +847,10 @@ class TestResolveDocPath:
         with app.app_context():
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
-                landing_parts = ("user-guides", "common")
+                landing_parts = ("getting-started",)
                 for p in landing_parts:
                     (root / p).mkdir(parents=True, exist_ok=True)
-                landing = root / "user-guides" / "common" / "start-here.md"
+                landing = root / "getting-started" / "start-here.md"
                 landing.write_text("# Start Here", encoding="utf-8")
                 with patch("app.services.documentation_service._get_user_language", return_value="en"):
                     with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=False):
@@ -885,7 +885,7 @@ class TestResolveDocPath:
         with app.app_context():
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
-                landing = root / "user-guides" / "common"
+                landing = root / "getting-started"
                 landing.mkdir(parents=True)
                 (landing / "start-here.md").write_text("# Start", encoding="utf-8")
                 with patch("app.services.documentation_service._get_user_language", return_value="en"):
@@ -962,10 +962,16 @@ class TestBuildHierarchicalNav:
                 root = Path(tmpdir)
                 common_dir = root / "user-guides" / "common"
                 common_dir.mkdir(parents=True)
-                (common_dir / "start-here.md").write_text("# Start", encoding="utf-8")
+                (common_dir / "getting-help.md").write_text("# Getting help", encoding="utf-8")
                 fp_dir = root / "user-guides" / "focal-point"
                 fp_dir.mkdir(parents=True)
-                (fp_dir / "how-to-submit.md").write_text("# Submit", encoding="utf-8")
+                (fp_dir / "view-assignments.md").write_text("# View Your Assignments", encoding="utf-8")
+                gs_dir = root / "getting-started"
+                gs_dir.mkdir(parents=True)
+                (gs_dir / "start-here.md").write_text("# Start here", encoding="utf-8")
+                dr_dir = root / "data-reporting"
+                dr_dir.mkdir(parents=True)
+                (dr_dir / "data-guidance-fdrs.md").write_text("# Data Guidance, FDRS", encoding="utf-8")
                 with patch("app.services.documentation_service._get_user_language", return_value="en"):
                     with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common", "focal-point"}):
                         from app.services.documentation_service import build_hierarchical_nav
@@ -973,9 +979,11 @@ class TestBuildHierarchicalNav:
                             root=root,
                             doc_url_builder=lambda r: f"/docs/{r}",
                         )
-                        # Merged into single user-guides category
-                        ug_cats = [c for c in nav if c.name == "user-guides"]
-                        assert len(ug_cats) == 1
+                        # Curated focal-point help nav: Getting Started, User Guide, Data Reporting
+                        cat_names = [c.name for c in nav]
+                        assert "getting-started" in cat_names
+                        assert "user-guides" in cat_names
+                        assert "data-reporting" in cat_names
 
     def test_language_variant_deduplication(self, app):
         with app.app_context():
@@ -1007,7 +1015,7 @@ class TestBuildHierarchicalNav:
                 root = Path(tmpdir)
                 common_dir = root / "user-guides" / "common"
                 common_dir.mkdir(parents=True)
-                (common_dir / "start-here.md").write_text("# Start", encoding="utf-8")
+                (common_dir / "getting-help.md").write_text("# Getting help", encoding="utf-8")
                 (common_dir / "ai-chatbot.md").write_text("# AI Chatbot", encoding="utf-8")
                 with patch("app.services.documentation_service._get_user_language", return_value="en"):
                     with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
@@ -1025,7 +1033,7 @@ class TestBuildHierarchicalNav:
                                 for grp in cat.groups
                                 for item in grp.items
                             ]
-                            assert "user-guides/common/start-here.md" in rel_paths
+                            assert "user-guides/common/getting-help.md" in rel_paths
                             assert "user-guides/common/ai-chatbot.md" not in rel_paths
 
     def test_ai_docs_shown_with_beta_access(self, app):

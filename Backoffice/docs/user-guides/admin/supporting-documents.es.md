@@ -57,4 +57,4 @@ Al revisar un envío:
 
 - [Recetas de roles](role-recipes.md)
 - [Revisar y aprobar envíos](review-approve-submissions.md)
-- [Manejo de datos y privacidad](../common/data-handling-and-privacy.md)
+- [Manejo de datos y privacidad](../../data-reporting/data-handling-and-privacy.md)

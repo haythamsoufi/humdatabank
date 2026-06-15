@@ -111,6 +111,16 @@ def init_transaction_middleware(app):
             if force_rollback:
                 safe_rollback(reason="manual_request")
             elif status_code >= 400:
+                try:
+                    logger.debug(
+                        "Transaction rollback: %s %s → %d [endpoint=%s]",
+                        request.method,
+                        request.path,
+                        status_code,
+                        request.endpoint or "unknown",
+                    )
+                except Exception:
+                    pass
                 safe_rollback(reason=f"response_status_{status_code}")
             else:
                 db.session.commit()

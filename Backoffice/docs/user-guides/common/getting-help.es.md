@@ -32,5 +32,5 @@ Al contactar soporte, incluye:
 
 ## Relacionado
 
-- [Configuración de cuenta](account-settings.md)
-- [Conceptos básicos de navegación](navigation.md)
+- [Configuración de cuenta](../../getting-started/account-settings.md)
+- [Cómo funciona la plataforma](../../getting-started/how-it-works.md)

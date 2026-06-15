@@ -26,8 +26,11 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.formatting.rule import FormulaRule
 import io
 import json
+import logging
 import re
+import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 
 
@@ -313,6 +316,7 @@ class TemplateExcelService:
             )
             return {}, True, errors
 
+        row = next(sheet.iter_rows(min_row=2, values_only=True), None)
         if not row or all(cell is None for cell in row):
             return {}, True, []
 
@@ -338,9 +342,47 @@ class TemplateExcelService:
         )
 
     @classmethod
+    def _format_sheet_header_error(
+        cls,
+        sheet_name: str,
+        *,
+        summary: str,
+        got: Optional[List[str]] = None,
+        missing: Optional[List[str]] = None,
+        unrecognized: Optional[List[str]] = None,
+    ) -> str:
+        parts = [f"{sheet_name} sheet: {summary}"]
+        if missing:
+            parts.append(f"Missing column(s): {', '.join(missing)}")
+        if unrecognized:
+            parts.append(f"Unrecognized column(s): {', '.join(unrecognized)}")
+        if got:
+            parts.append(f"Found ({len(got)}): {', '.join(got)}")
+        return ' '.join(parts)
+
+    @classmethod
+    def _sheet_uses_legacy_translation_columns(cls, sheet_name: str, header_set: set) -> bool:
+        legacy_json_cols = {
+            'Template': ['name_translations'],
+            'Pages': ['name_translations'],
+            'Sections': ['name_translations'],
+            'Items': ['label_translations', 'definition_translations', 'description_translations'],
+        }.get(sheet_name, [])
+        return any(col in header_set for col in legacy_json_cols)
+
+    @classmethod
     def _resolve_sheet_headers(cls, sheet_name: str, headers: List[Any]) -> Tuple[List[str], bool, Optional[str]]:
-        """Return (expected_headers, legacy_format, error_message)."""
-        normalized = [h for h in headers if h is not None]
+        """Return (expected_headers, legacy_format, error_message).
+
+        Column order is ignored; only required columns, recognized names, and format matter.
+        """
+        normalized = [str(h).strip() for h in headers if h is not None and str(h).strip()]
+        if not normalized:
+            return [], False, cls._format_sheet_header_error(
+                sheet_name, summary='no column headers found'
+            )
+
+        header_set = set(normalized)
         layouts = {
             'Template': (cls.get_template_columns(), cls.TEMPLATE_LEGACY_COLUMNS),
             'Pages': (cls.get_page_columns(), cls.PAGE_LEGACY_COLUMNS),
@@ -348,13 +390,50 @@ class TemplateExcelService:
             'Items': (cls.get_item_columns(), cls.ITEM_LEGACY_COLUMNS),
         }
         current, legacy = layouts[sheet_name]
-        if normalized == current:
+        current_set = set(current)
+        legacy_set = set(legacy)
+        required = set(cls.REQUIRED_COLUMNS.get(sheet_name, []))
+
+        missing_required = sorted(required - header_set)
+        if missing_required:
+            return current, False, cls._format_sheet_header_error(
+                sheet_name,
+                summary='missing required column(s)',
+                missing=missing_required,
+                got=normalized,
+            )
+
+        known_set = current_set | legacy_set
+        unrecognized = sorted(header_set - known_set)
+        if unrecognized:
+            return current, False, cls._format_sheet_header_error(
+                sheet_name,
+                summary='unrecognized column(s)',
+                unrecognized=unrecognized,
+                got=normalized,
+            )
+
+        legacy_format = cls._sheet_uses_legacy_translation_columns(sheet_name, header_set)
+        if legacy_format:
+            if header_set <= legacy_set:
+                return legacy, True, None
+            missing_legacy = sorted(legacy_set - header_set)
+            return legacy, True, cls._format_sheet_header_error(
+                sheet_name,
+                summary='legacy export format but missing expected column(s)',
+                missing=missing_legacy,
+                got=normalized,
+            )
+
+        if header_set <= current_set:
             return current, False, None
-        if normalized == legacy:
-            return legacy, True, None
-        return current, False, (
-            f"{sheet_name} sheet headers don't match expected columns. "
-            f"Expected: {current}, Got: {normalized}"
+
+        missing_optional = sorted(current_set - header_set)
+        return current, False, cls._format_sheet_header_error(
+            sheet_name,
+            summary='missing expected column(s) for the current export format',
+            missing=missing_optional,
+            got=normalized,
         )
 
     @classmethod
@@ -504,6 +583,455 @@ class TemplateExcelService:
                 return json.dumps(normalized, ensure_ascii=False, default=str, indent=2)
             except (TypeError, ValueError):
                 return str(normalized)
+
+    _MATRIX_CONFIG_KEYS = frozenset({
+        'type', 'columns', 'column_groups', 'rows', 'row_mode', 'show_row_totals',
+        'show_column_totals', 'auto_load_entities', 'highlight_manual_rows',
+        'legend_text', 'legend_text_translations', 'legend_hide', 'lookup_list_id',
+        'list_display_column', 'list_filters', 'group_by_column', 'group_dropdown_enabled',
+        'group_table_enabled', 'search_placeholder', 'search_placeholder_translations',
+        'plugin_config',
+    })
+
+    _MATRIX_IMPORT_LOG_PREFIX = '[excel-import:matrix]'
+    _matrix_import_logger: Optional[logging.Logger] = None
+
+    @classmethod
+    def _get_matrix_import_logger(cls) -> logging.Logger:
+        """Dedicated logger: always writes to stdout and instance/logs/excel_matrix_import.log."""
+        if cls._matrix_import_logger is not None:
+            return cls._matrix_import_logger
+
+        logger = logging.getLogger('excel_matrix_import')
+        logger.setLevel(logging.DEBUG)
+        logger.propagate = False
+
+        if not logger.handlers:
+            formatter = logging.Formatter(
+                '[%(asctime)s] %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S',
+            )
+            stdout_handler = logging.StreamHandler(sys.stdout)
+            stdout_handler.setFormatter(formatter)
+            logger.addHandler(stdout_handler)
+
+            try:
+                log_dir = Path(__file__).resolve().parents[2] / 'instance' / 'logs'
+                log_dir.mkdir(parents=True, exist_ok=True)
+                file_handler = logging.FileHandler(
+                    log_dir / 'excel_matrix_import.log',
+                    encoding='utf-8',
+                )
+                file_handler.setFormatter(formatter)
+                logger.addHandler(file_handler)
+            except OSError as exc:
+                logger.warning(
+                    '%s Could not open excel_matrix_import.log: %s',
+                    cls._MATRIX_IMPORT_LOG_PREFIX,
+                    exc,
+                )
+
+        cls._matrix_import_logger = logger
+        return logger
+
+    @classmethod
+    def matrix_import_entry_log(cls, message: str) -> None:
+        """High-visibility entry point log (routes, import start)."""
+        cls._matrix_import_log(message)
+
+    @classmethod
+    def _matrix_import_log(cls, message: str, *, level: str = 'info') -> None:
+        """Log matrix Excel import diagnostics to dedicated logger, app logger, and log file."""
+        text = f"{cls._MATRIX_IMPORT_LOG_PREFIX} {message}"
+        logger = cls._get_matrix_import_logger()
+        log_fn = getattr(logger, level, logger.info)
+        log_fn(text)
+        try:
+            app_log_fn = getattr(current_app.logger, level, current_app.logger.info)
+            app_log_fn(text)
+        except RuntimeError:
+            pass
+
+    @classmethod
+    def _scan_workbook_matrix_items(cls, workbook, *, stage: str) -> int:
+        """Scan Items sheet for matrix rows and log config/group hints (validate or import)."""
+        if 'Items' not in workbook.sheetnames:
+            cls._matrix_import_log(f"{stage}: Items sheet missing in workbook", level='warning')
+            return 0
+
+        sheet = workbook['Items']
+        headers = [cell.value for cell in sheet[1]]
+        if 'config' not in headers or 'item_type' not in headers:
+            cls._matrix_import_log(
+                f"{stage}: Items sheet missing config or item_type column (headers={headers})",
+                level='warning',
+            )
+            return 0
+
+        matrix_count = 0
+        for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+            if not row or all(cell is None for cell in row):
+                continue
+            row_data = cls._row_dict_from_sheet(headers, row)
+            item_type = str(row_data.get('item_type') or '').strip().lower()
+            if item_type != 'matrix':
+                continue
+            matrix_count += 1
+            parsed = cls._parse_json(row_data.get('config'))
+            normalized = cls._normalize_matrix_item_config('matrix', parsed) if parsed else None
+            cls._matrix_import_log(
+                f"{stage} Items row {row_idx} export_id={row_data.get('id')!r} "
+                f"label={row_data.get('label')!r}: "
+                f"raw={cls._summarize_raw_config_cell(row_data.get('config'))}; "
+                f"normalized={cls._summarize_matrix_config_for_log(normalized if isinstance(normalized, dict) else {})}"
+            )
+
+        cls._matrix_import_log(f"{stage}: found {matrix_count} matrix row(s) in workbook")
+        return matrix_count
+
+    @classmethod
+    def _summarize_matrix_config_for_log(cls, config: Any) -> str:
+        if not isinstance(config, dict):
+            return f"type={type(config).__name__}, value={config!r}"
+
+        mc = config.get('matrix_config')
+        if not isinstance(mc, dict):
+            if config.get('type') == 'matrix' or isinstance(config.get('columns'), list):
+                mc = config
+            else:
+                return "no matrix_config key"
+
+        columns = mc.get('columns') if isinstance(mc.get('columns'), list) else []
+        column_groups = mc.get('column_groups') if isinstance(mc.get('column_groups'), dict) else {}
+        grouped = [
+            f"{col.get('name')}→{col.get('group')}"
+            for col in columns
+            if isinstance(col, dict) and col.get('group')
+        ]
+        ungrouped = [
+            str(col.get('name', col))
+            for col in columns
+            if isinstance(col, dict) and not col.get('group')
+        ]
+        grouped_preview = grouped[:10]
+        if len(grouped) > 10:
+            grouped_preview.append(f"...+{len(grouped) - 10} more")
+        return (
+            f"columns={len(columns)}, "
+            f"column_group_keys={list(column_groups.keys())}, "
+            f"grouped={grouped_preview or 'none'}, "
+            f"ungrouped={ungrouped[:5]}{'...' if len(ungrouped) > 5 else ''}"
+        )
+
+    @classmethod
+    def _summarize_raw_config_cell(cls, raw: Any) -> str:
+        if raw is None or raw == '' or raw == 'None':
+            return 'empty'
+        if isinstance(raw, dict):
+            return cls._summarize_matrix_config_for_log(raw)
+        text = str(raw).strip()
+        has_column_groups = 'column_groups' in text
+        has_group_key = '"group"' in text or "'group'" in text
+        preview = text[:160].replace('\n', '\\n')
+        if len(text) > 160:
+            preview += '...'
+        return (
+            f"text_len={len(text)}, has_column_groups={has_column_groups}, "
+            f"has_group_key={has_group_key}, preview={preview!r}"
+        )
+
+    @classmethod
+    def _log_matrix_items_in_version(cls, template_id: int, version_id: int, stage: str) -> None:
+        """Log all matrix items currently in the target version."""
+        matrix_items = (
+            FormItem.query.join(FormSection, FormItem.section_id == FormSection.id)
+            .filter(
+                FormItem.template_id == template_id,
+                FormSection.version_id == version_id,
+                FormItem.item_type == 'matrix',
+            )
+            .order_by(FormItem.order, FormItem.id)
+            .all()
+        )
+        cls._matrix_import_log(
+            f"{stage}: found {len(matrix_items)} matrix item(s) in version_id={version_id}"
+        )
+        for item in matrix_items:
+            cls._matrix_import_log(
+                f"{stage}: item db_id={item.id} label={item.label!r} "
+                f"section_id={item.section_id} order={item.order} "
+                f"config={cls._summarize_matrix_config_for_log(item.config)}"
+            )
+
+    @classmethod
+    def _deep_copy_json(cls, value: Any) -> Any:
+        try:
+            return json.loads(json.dumps(value))
+        except (TypeError, ValueError):
+            import copy
+            return copy.deepcopy(value)
+
+    @classmethod
+    def _clean_imported_matrix_config(cls, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Remove legacy matrix keys duplicated at config root; keep matrix_config canonical."""
+        out = cls._deep_copy_json(config)
+        if not isinstance(out, dict):
+            return out
+        if isinstance(out.get('matrix_config'), dict):
+            for key in cls._MATRIX_CONFIG_KEYS:
+                out.pop(key, None)
+            out.pop('column_groups', None)
+        return out
+
+    @classmethod
+    def _find_existing_item_for_import(
+        cls,
+        *,
+        section_id: int,
+        item_type: str,
+        item_label: str,
+        item_order: float,
+        export_id: Optional[int],
+        export_id_to_existing: Dict[int, FormItem],
+        existing_items_lookup: Dict[Tuple, FormItem],
+    ) -> Tuple[Optional[FormItem], Optional[str]]:
+        """Resolve an existing FormItem for an imported row (matrix: label match wins over export id)."""
+        existing_item: Optional[FormItem] = None
+        match_method: Optional[str] = None
+
+        if item_label:
+            label_key = (section_id, item_type, item_label)
+            existing_item = existing_items_lookup.get(label_key)
+            if existing_item:
+                return existing_item, f'label_key={label_key!r}'
+
+            for key, candidate in existing_items_lookup.items():
+                if key[0] == section_id and key[2] == item_type and key[3] == item_label:
+                    return candidate, f'label={item_label!r} section_id={section_id}'
+
+        if export_id and export_id in export_id_to_existing:
+            candidate = export_id_to_existing[export_id]
+            if candidate.section_id == section_id:
+                candidate_label = str(candidate.label or '').strip()
+                if not item_label or not candidate_label or candidate_label == item_label:
+                    return candidate, f'export_id={export_id}'
+                cls._matrix_import_log(
+                    f"export_id={export_id} label mismatch: excel={item_label!r} "
+                    f"db_id={candidate.id} db_label={candidate_label!r}; skipping export_id match",
+                    level='warning',
+                )
+
+        item_key = (section_id, item_order, item_type, item_label)
+        existing_item = existing_items_lookup.get(item_key)
+        if existing_item:
+            return existing_item, f'order_key={item_key!r}'
+
+        return None, None
+
+    @classmethod
+    def _normalize_matrix_item_config(cls, item_type: str, config: Any) -> Any:
+        """Ensure matrix items store grouped columns under config.matrix_config."""
+        if item_type != 'matrix' or config is None:
+            return config
+        if isinstance(config, str):
+            config = cls._parse_json(config)
+        if not isinstance(config, dict):
+            cls._matrix_import_log(
+                f"normalize skipped: config is {type(config).__name__}, not dict",
+                level='warning',
+            )
+            return config
+
+        cls._matrix_import_log(
+            f"normalize input: {cls._summarize_matrix_config_for_log(config)}"
+        )
+
+        out = dict(config)
+        matrix_config = out.get('matrix_config')
+        if isinstance(matrix_config, str):
+            matrix_config = cls._parse_json(matrix_config)
+
+        root_column_groups = out.pop('column_groups', None)
+
+        if isinstance(matrix_config, dict):
+            mc = dict(matrix_config)
+        elif out.get('type') == 'matrix' or isinstance(out.get('columns'), list):
+            mc = {k: out.pop(k) for k in list(out.keys()) if k in cls._MATRIX_CONFIG_KEYS}
+        else:
+            cls._matrix_import_log(
+                "normalize: no matrix_config/columns found in config; leaving unchanged",
+                level='warning',
+            )
+            return out
+
+        if root_column_groups is not None and 'column_groups' not in mc:
+            cls._matrix_import_log(
+                f"normalize: hoisted root column_groups keys={list(root_column_groups.keys()) if isinstance(root_column_groups, dict) else root_column_groups!r}"
+            )
+            mc['column_groups'] = root_column_groups
+
+        columns = mc.get('columns')
+        if isinstance(columns, list):
+            normalized_columns = []
+            for col in columns:
+                if isinstance(col, dict):
+                    normalized_columns.append(dict(col))
+                elif isinstance(col, str) and col.strip():
+                    normalized_columns.append({'name': col.strip(), 'type': 'number'})
+            mc['columns'] = normalized_columns
+
+        mc = cls._repair_matrix_column_groups(mc)
+        out['matrix_config'] = mc
+        cls._matrix_import_log(
+            f"normalize output: {cls._summarize_matrix_config_for_log(out)}"
+        )
+        return out
+
+    @classmethod
+    def _repair_matrix_column_groups(cls, matrix_config: Any) -> Dict[str, Any]:
+        """Keep column_groups translations and per-column group keys in sync."""
+        if not isinstance(matrix_config, dict):
+            return matrix_config
+
+        before = cls._summarize_matrix_config_for_log({'matrix_config': matrix_config})
+
+        mc = dict(matrix_config)
+        columns = mc.get('columns')
+        if not isinstance(columns, list):
+            return mc
+
+        columns = [dict(col) if isinstance(col, dict) else col for col in columns]
+        raw_groups = mc.get('column_groups')
+        column_groups: Dict[str, Any] = raw_groups if isinstance(raw_groups, dict) else {}
+
+        repaired_groups: Dict[str, Any] = {}
+        for group_label, group_value in column_groups.items():
+            group_key = str(group_label).strip()
+            if not group_key:
+                continue
+            if isinstance(group_value, list):
+                for col_name in group_value:
+                    target_name = str(col_name).strip()
+                    for col in columns:
+                        if isinstance(col, dict) and str(col.get('name', '')).strip() == target_name:
+                            col['group'] = group_key
+                repaired_groups[group_key] = {}
+            elif isinstance(group_value, dict):
+                repaired_groups[group_key] = group_value
+            else:
+                repaired_groups[group_key] = {}
+
+        for col in columns:
+            if not isinstance(col, dict):
+                continue
+            if 'group' not in col and col.get('group_label'):
+                col['group'] = str(col.pop('group_label')).strip()
+            elif 'group' not in col and col.get('groupName'):
+                col['group'] = str(col.pop('groupName')).strip()
+            group_name = col.get('group')
+            if group_name and str(group_name).strip() and str(group_name).strip() not in repaired_groups:
+                repaired_groups[str(group_name).strip()] = {}
+
+        # Infer groups from column_groups keys when columns share a name prefix (e.g. "SP1 Planned" -> "SP1")
+        for group_key in list(repaired_groups.keys()):
+            prefix = f"{group_key} "
+            for col in columns:
+                if not isinstance(col, dict) or col.get('group'):
+                    continue
+                name = str(col.get('name', '')).strip()
+                if name == group_key or name.startswith(prefix):
+                    col['group'] = group_key
+
+        mc['columns'] = columns
+        mc['column_groups'] = repaired_groups
+        after = cls._summarize_matrix_config_for_log({'matrix_config': mc})
+        if before != after:
+            cls._matrix_import_log(f"repair changed config: before={before} after={after}")
+        else:
+            cls._matrix_import_log(f"repair unchanged: {after}")
+        return mc
+
+    @classmethod
+    def _apply_item_config_from_import(
+        cls,
+        item: FormItem,
+        item_type: str,
+        raw_config: Any,
+        *,
+        keep_existing_on_failure: bool = True,
+    ) -> None:
+        """Parse, normalize, and persist imported item config without wiping on parse failure."""
+        from sqlalchemy.orm.attributes import flag_modified
+
+        item_id = getattr(item, 'id', None)
+        item_label = getattr(item, 'label', None)
+        log_matrix = item_type == 'matrix'
+
+        if raw_config is None or raw_config == '' or raw_config == 'None':
+            if log_matrix:
+                cls._matrix_import_log(
+                    f"item id={item_id} label={item_label!r}: config cell empty; keeping existing config "
+                    f"({cls._summarize_matrix_config_for_log(item.config if isinstance(item.config, dict) else {})})"
+                )
+            return
+
+        if log_matrix:
+            cls._matrix_import_log(
+                f"item id={item_id} label={item_label!r}: raw config cell "
+                f"{cls._summarize_raw_config_cell(raw_config)}"
+            )
+
+        parsed = cls._parse_json(raw_config)
+        if parsed is None:
+            if keep_existing_on_failure and log_matrix:
+                cls._matrix_import_log(
+                    f"item id={item_id} label={item_label!r}: JSON parse FAILED; keeping existing config "
+                    f"({cls._summarize_matrix_config_for_log(item.config if isinstance(item.config, dict) else {})})",
+                    level='warning',
+                )
+            return
+
+        before_summary = cls._summarize_matrix_config_for_log(
+            item.config if isinstance(item.config, dict) else {}
+        ) if log_matrix else ''
+
+        normalized = cls._normalize_matrix_item_config(item_type, parsed)
+        if normalized is None:
+            if log_matrix:
+                cls._matrix_import_log(
+                    f"item id={item_id} label={item_label!r}: normalize returned None; config not updated",
+                    level='warning',
+                )
+            return
+
+        if item_type == 'matrix' and isinstance(normalized, dict):
+            item.config = cls._clean_imported_matrix_config(normalized)
+            cls._sync_matrix_item_fields_from_config(item)
+        else:
+            item.config = cls._deep_copy_json(normalized) if isinstance(normalized, dict) else normalized
+
+        flag_modified(item, 'config')
+        if log_matrix:
+            cls._matrix_import_log(
+                f"item id={item_id} label={item_label!r}: config applied "
+                f"before={before_summary} after={cls._summarize_matrix_config_for_log(item.config)}"
+            )
+
+    @classmethod
+    def _sync_matrix_item_fields_from_config(cls, item: FormItem) -> None:
+        """Mirror matrix_config list-library fields onto FormItem columns."""
+        if item.item_type != 'matrix' or not isinstance(item.config, dict):
+            return
+        matrix_config = item.config.get('matrix_config')
+        if not isinstance(matrix_config, dict):
+            return
+        if matrix_config.get('row_mode') == 'list_library':
+            if 'lookup_list_id' in matrix_config:
+                item.lookup_list_id = matrix_config['lookup_list_id']
+            if matrix_config.get('list_display_column'):
+                item.list_display_column = matrix_config['list_display_column']
+            if matrix_config.get('list_filters') is not None:
+                item.list_filters_json = matrix_config['list_filters']
 
     @classmethod
     def _write_data_row(cls, sheet, row_idx: int, headers: List[str], row_data: List[Any]) -> None:
@@ -928,7 +1456,9 @@ class TemplateExcelService:
                     'order': item.order,
                     'relevance_condition': cls._rewrite_rule_json_item_ids(item.relevance_condition, item_db_to_export),
                     'archived': item.archived,
-                    'config': cls._format_json_for_excel(item.config),
+                    'config': cls._format_json_for_excel(
+                        cls._normalize_matrix_item_config(item.item_type, item.config)
+                    ),
                     'indicator_bank_id': item.indicator_bank_id,
                     'type': item.type,
                     'unit': item.unit,
@@ -1505,6 +2035,7 @@ class TemplateExcelService:
             workbook = openpyxl.load_workbook(io.BytesIO(excel_file.read()), data_only=True)
         except Exception as e:
             current_app.logger.error(f"Failed to load Excel file for validation: {e}", exc_info=True)
+            cls._matrix_import_log(f"validate: failed to load workbook: {e}", level='error')
             return {
                 'valid': False,
                 'message': 'Invalid Excel file. Check the file format and try again.',
@@ -1556,6 +2087,8 @@ class TemplateExcelService:
         if not any(e.startswith('Items sheet') for e in errors):
             preview['items'] = cls._count_nonempty_data_rows(items_sheet)
 
+        cls._scan_workbook_matrix_items(workbook, stage='validate')
+
         valid = len(errors) == 0
         if valid:
             message = (
@@ -1563,7 +2096,10 @@ class TemplateExcelService:
                 f"{preview['sections']} sections, {preview['items']} items."
             )
         else:
-            message = errors[0] if len(errors) == 1 else f"Found {len(errors)} validation errors."
+            if len(errors) == 1:
+                message = errors[0]
+            else:
+                message = f"Found {len(errors)} validation errors."
 
         return {
             'valid': valid,
@@ -1586,6 +2122,9 @@ class TemplateExcelService:
         Returns:
             Dict with 'success', 'message', 'errors', 'created_count' keys
         """
+        cls.matrix_import_entry_log(
+            f"import_template START template_id={template_id} version_id={version_id}"
+        )
         current_app.logger.info(f"=== TEMPLATE EXCEL IMPORT START ===")
         current_app.logger.info(f"Template ID: {template_id}, Version ID: {version_id}")
 
@@ -1600,6 +2139,7 @@ class TemplateExcelService:
             current_app.logger.info("Loading Excel workbook...")
             workbook = openpyxl.load_workbook(io.BytesIO(excel_file.read()), data_only=True)
             current_app.logger.info(f"Workbook loaded. Sheets found: {workbook.sheetnames}")
+            cls._scan_workbook_matrix_items(workbook, stage='import-pre-scan')
 
             # Validate required sheets exist (ignore Instructions, _Metadata and any other unrecognized sheets)
             required_sheets = ['Template', 'Pages', 'Sections', 'Items']
@@ -1687,6 +2227,9 @@ class TemplateExcelService:
                 db.session.flush()
 
                 current_app.logger.info(f"Created new draft version: ID={new_draft.id}, Version #={new_draft.version_number}")
+                cls._matrix_import_log(
+                    f"Published import: cloned version {target_version.id} -> new draft {new_draft.id}"
+                )
 
                 # Clone structure from published version to draft
                 cls._clone_template_structure(template.id, target_version.id, new_draft.id)
@@ -1770,6 +2313,7 @@ class TemplateExcelService:
 
             current_app.logger.info("Committing database changes...")
             db.session.commit()
+            cls._log_matrix_items_in_version(template.id, target_version.id, stage='after-commit')
             current_app.logger.info("=== TEMPLATE EXCEL IMPORT SUCCESS ===")
             current_app.logger.info(f"Final counts - Pages: {created_counts['pages']}, Sections: {created_counts['sections']}, Items: {created_counts['items']}")
 
@@ -2220,7 +2764,13 @@ class TemplateExcelService:
 
         # Get existing items for this version (for matching)
         existing_items_lookup = cls._get_existing_items_lookup(template.id, version.id)
-        current_app.logger.info(f"Found {len(existing_items_lookup)} existing items to match against")
+        ordered_existing_items = cls._get_items_for_version(template, version)
+        export_id_to_existing = {idx + 1: item for idx, item in enumerate(ordered_existing_items)}
+        cls._matrix_import_log(
+            f"Starting items import for version_id={version.id}; "
+            f"existing_items={len(existing_items_lookup)}, export_order_items={len(export_id_to_existing)}"
+        )
+        cls._log_matrix_items_in_version(template.id, version.id, stage='before-import')
 
         # Pre-scan rows for indicator_bank_id values so we can validate in one DB query.
         # If an indicator references a missing IndicatorBank ID, we will import the item with
@@ -2278,21 +2828,41 @@ class TemplateExcelService:
                     errors.append(error_msg)
                     continue
 
-                item_type = row_data['item_type'] or 'indicator'
-                item_label = row_data['label'] or ''
+                item_type = str(row_data.get('item_type') or 'indicator').strip().lower()
+                item_label = str(row_data.get('label') or '').strip()
                 item_order = float(row_data['order']) if row_data['order'] is not None else 0.0
                 current_app.logger.info(f"Processing item row {row_idx}: export_id={export_id}, type={item_type}, label='{item_label[:50]}...', order={item_order}, section_export_id={section_export_id}")
 
-                # Check if item already exists (match by section_id + order + item_type + label)
-                item_key = (section_id, item_order, item_type, item_label)
-                existing_item = existing_items_lookup.get(item_key)
+                existing_item, match_method = cls._find_existing_item_for_import(
+                    section_id=section_id,
+                    item_type=item_type,
+                    item_label=item_label,
+                    item_order=item_order,
+                    export_id=export_id,
+                    export_id_to_existing=export_id_to_existing,
+                    existing_items_lookup=existing_items_lookup,
+                )
+
+                if item_type == 'matrix':
+                    target_db_id = existing_item.id if existing_item else None
+                    parsed_preview = cls._parse_json(row_data.get('config'))
+                    normalized_preview = cls._normalize_matrix_item_config(item_type, parsed_preview)
+                    cls._matrix_import_log(
+                        f"import row {row_idx} export_id={export_id} label={item_label!r} "
+                        f"match={match_method or 'CREATE NEW'} target_db_id={target_db_id}; "
+                        f"raw={cls._summarize_raw_config_cell(row_data.get('config'))}; "
+                        f"normalized={cls._summarize_matrix_config_for_log(normalized_preview if isinstance(normalized_preview, dict) else {})}"
+                    )
 
                 if existing_item:
                     # Update existing item
                     current_app.logger.info(f"Updating existing item: db_id={existing_item.id}, section_id={section_id}, order={item_order}, type={item_type}")
+                    existing_item.label = item_label
+                    existing_item.order = item_order
+                    existing_item.item_type = item_type
                     existing_item.relevance_condition = row_data.get('relevance_condition')
                     existing_item.archived = bool(row_data.get('archived', False))
-                    existing_item.config = cls._parse_json(row_data.get('config'))
+                    cls._apply_item_config_from_import(existing_item, item_type, row_data.get('config'))
 
                     # Validate indicator_bank_id (only meaningful for indicator items)
                     if item_type == 'indicator':
@@ -2342,6 +2912,15 @@ class TemplateExcelService:
                     cls._apply_item_translations_from_row(existing_item, row_data, legacy=legacy_format)
                     existing_item.options_translations = cls._parse_json(row_data.get('options_translations'))
                     existing_item.description = row_data.get('description')
+                    if item_type == 'matrix':
+                        cls._sync_matrix_item_fields_from_config(existing_item)
+                        from sqlalchemy.orm.attributes import flag_modified
+                        flag_modified(existing_item, 'config')
+                        cls._matrix_import_log(
+                            f"import updated matrix db_id={existing_item.id} label={item_label!r} "
+                            f"via {match_method}: "
+                            f"{cls._summarize_matrix_config_for_log(existing_item.config)}"
+                        )
                     items_updated += 1
                     current_app.logger.info(f"Item updated: db_id={existing_item.id}, label='{item_label[:50]}...'")
                     if export_id is not None:
@@ -2349,7 +2928,15 @@ class TemplateExcelService:
                 else:
                     # Parse and validate indicator bank reference up-front (so we never violate FK constraints)
                     parsed_indicator_bank_id: Optional[int] = None
-                    config_payload = cls._parse_json(row_data.get('config'))
+                    parsed_config = cls._parse_json(row_data.get('config'))
+                    config_payload = cls._normalize_matrix_item_config(item_type, parsed_config)
+                    if item_type == 'matrix' and isinstance(config_payload, dict):
+                        config_payload = cls._clean_imported_matrix_config(config_payload)
+                    if item_type == 'matrix':
+                        cls._matrix_import_log(
+                            f"row {row_idx} CREATE NEW label={item_label!r}: "
+                            f"parsed_config={cls._summarize_matrix_config_for_log(config_payload if isinstance(config_payload, dict) else {})}"
+                        )
                     if item_type == 'indicator':
                         raw_ib = row_data.get('indicator_bank_id')
                         parsed_ib = _parse_int_like(raw_ib)
@@ -2404,6 +2991,9 @@ class TemplateExcelService:
                     )
                     cls._apply_item_translations_from_row(new_item, row_data, legacy=legacy_format)
 
+                    if item_type == 'matrix':
+                        cls._sync_matrix_item_fields_from_config(new_item)
+
                     db.session.add(new_item)
                     items_created += 1
                     if export_id is not None:
@@ -2417,6 +3007,7 @@ class TemplateExcelService:
                 errors.append(f"Items row {row_idx}: Validation error.")
 
         current_app.logger.info(f"Items import complete: {row_count} rows processed, {items_created} created, {items_updated} updated, {len(errors)} errors")
+        cls._log_matrix_items_in_version(template.id, version.id, stage='after-import-pre-commit')
 
         # Rewrite rule JSON item IDs from export IDs -> new DB IDs so relevance/validation rules survive imports.
         try:
@@ -2587,20 +3178,30 @@ class TemplateExcelService:
         # Using label as part of key since it's more stable than just order
         items_lookup = {}
         for item in existing_items:
-            key = (item.section_id, item.order, item.item_type, item.label or '')
+            key = (
+                item.section_id,
+                float(item.order) if item.order is not None else 0.0,
+                str(item.item_type or 'indicator').strip().lower(),
+                str(item.label or '').strip(),
+            )
             items_lookup[key] = item
 
         return items_lookup
 
     @classmethod
     def _parse_json(cls, value) -> Optional[Any]:
-        """Parse JSON string to object, return None if invalid or empty."""
-        if not value or value == '' or value == 'None':
+        """Parse JSON string to object; return None only when empty or invalid."""
+        if value is None or value == '' or value == 'None':
             return None
         if isinstance(value, (dict, list)):
             return value
         try:
-            parsed = json.loads(str(value))
-            return parsed if parsed else None
+            text = str(value).strip()
+            if text.startswith('\ufeff'):
+                text = text[1:]
+            parsed = json.loads(text)
+            if isinstance(parsed, (dict, list)):
+                return parsed
+            return None
         except (json.JSONDecodeError, TypeError):
             return None

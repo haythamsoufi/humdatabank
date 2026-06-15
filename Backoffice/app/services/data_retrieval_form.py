@@ -554,6 +554,7 @@ def query_form_data(
     indicator_bank_ids: Optional[List[int]] = None,
     submission_type: Optional[str] = None,
     preload: bool = False,
+    full_preload: bool = True,
 ) -> Dict[str, Any]:
     """
     Centralized FormData query builder for API usage. Does not enforce RBAC (API uses API key),
@@ -636,19 +637,30 @@ def query_form_data(
             public_q = public_q.filter(FormData.form_item_id.in_(_fi_ids_sq))
 
         if preload:
-            # Eager-load common relationships to avoid N+1 during serialization
-            # Note: AssignedForm.template and PublicSubmission.country are backrefs,
-            # so we can't use joinedload on them. They'll be loaded when accessed.
-            assigned_q = assigned_q.options(
-                joinedload(FormData.form_item).joinedload(FormItem.form_section).joinedload(FormSection.template),
-                joinedload(FormData.form_item).joinedload(FormItem.indicator_bank),
+            # Core eager-loads needed for every serialization path
+            # (AES/assigned_form for assigned rows, public_submission/assigned_form for public rows).
+            # Note: AssignedForm.template and PublicSubmission.country are backrefs loaded on access.
+            assigned_opts = [
                 joinedload(FormData.assignment_entity_status).joinedload(AssignmentEntityStatus.assigned_form),
-            )
-            public_q = public_q.options(
-                joinedload(FormData.form_item).joinedload(FormItem.form_section).joinedload(FormSection.template),
-                joinedload(FormData.form_item).joinedload(FormItem.indicator_bank),
+            ]
+            public_opts = [
                 joinedload(FormData.public_submission).joinedload(PublicSubmission.assigned_form),
-            )
+            ]
+
+            if full_preload:
+                # Additional joins for form_item_info (only when include_full_info=True).
+                # These add 2–3 extra JOINs per query and are skipped on the common path.
+                assigned_opts += [
+                    joinedload(FormData.form_item).joinedload(FormItem.form_section).joinedload(FormSection.template),
+                    joinedload(FormData.form_item).joinedload(FormItem.indicator_bank),
+                ]
+                public_opts += [
+                    joinedload(FormData.form_item).joinedload(FormItem.form_section).joinedload(FormSection.template),
+                    joinedload(FormData.form_item).joinedload(FormItem.indicator_bank),
+                ]
+
+            assigned_q = assigned_q.options(*assigned_opts)
+            public_q = public_q.options(*public_opts)
 
         # ---------- Privacy gating ----------
         # Public callers (including API key / website / mobile) should see ONLY FormItem privacy='public'.

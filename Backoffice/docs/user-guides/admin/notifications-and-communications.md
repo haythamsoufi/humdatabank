@@ -32,8 +32,7 @@ Ask for:
 - screenshot of the error (if any)
 
 Then route them to:
-- [Troubleshooting basics (everyone)](../common/troubleshooting-basics.md)
-- [Troubleshooting submission issues (Focal point)](../focal-point/troubleshooting-submission.md)
+- [Troubleshooting (Focal point)](../focal-point/troubleshooting.md)
 - [Troubleshooting templates and assignments (admin)](troubleshooting-templates-and-assignments.md)
 
 ## Best practices

@@ -37,7 +37,7 @@ from app.utils.activity_endpoint_catalog.generated.partials.rbac_management impo
 from app.utils.activity_endpoint_catalog.generated.partials.security import SPECS as _S_security
 from app.utils.activity_endpoint_catalog.generated.partials.settings import SPECS as _S_settings
 from app.utils.activity_endpoint_catalog.generated.partials.system_admin import SPECS as _S_system_admin
-from app.utils.activity_endpoint_catalog.generated.partials.template_special import SPECS as _S_template_special
+from app.utils.activity_endpoint_catalog.generated.partials.data_sync_imputation import SPECS as _S_data_sync_imputation
 from app.utils.activity_endpoint_catalog.generated.partials.user_management import SPECS as _S_user_management
 from app.utils.activity_endpoint_catalog.generated.partials.utilities import SPECS as _S_utilities
 
@@ -72,7 +72,7 @@ GENERATED_ACTIVITY_SPECS: dict[tuple[str, str], ActivityEndpointSpec] = merge_ac
     _S_security,
     _S_settings,
     _S_system_admin,
-    _S_template_special,
+    _S_data_sync_imputation,
     _S_user_management,
     _S_utilities,
     allow_override=False,

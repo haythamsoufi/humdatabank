@@ -16,7 +16,7 @@ from app.models.core import Country
 from app.forms.form_builder import (FormTemplateForm, FormSectionForm, IndicatorForm, QuestionForm, DocumentFieldForm)
 from app.forms.base import int_or_none
 from app.routes.admin.shared import (admin_required, admin_permission_required, permission_required,
-    system_manager_required, check_template_access)
+    permission_required_any, system_manager_required, check_template_access)
 from app.utils.request_utils import is_json_request, get_request_data, _is_json_body
 from app.services.security.api_authentication import get_user_allowed_template_ids
 from app.services.user_analytics_service import log_admin_action
@@ -244,7 +244,7 @@ def _build_template_grid_row_dict(template, *, template_data_counts=None, templa
         "name": localized_name,
         "add_to_self_report": bool(version.add_to_self_report) if version else False,
         "version_count": version_count,
-        "status": _gettext("Deployed") if is_deployed else _gettext("Not Yet"),
+        "status": _gettext("Deployed") if is_deployed else _gettext("Draft"),
         "is_deployed": is_deployed,
         "owner": _user_dict(owner),
         "shared_with_users": [_user_dict(u) for u in shared_users if u],
@@ -252,7 +252,6 @@ def _build_template_grid_row_dict(template, *, template_data_counts=None, templa
         "edit_url": url_for("form_builder.edit_template", template_id=template.id) if can_edit else "",
         "duplicate_url": url_for("form_builder.duplicate_template", template_id=template.id) if can_duplicate else "",
         "preview_url": url_for("forms.preview_template", template_id=template.id),
-        "special_url": url_for("template_special.special_template_view", template_id=template.id) if template.id == 21 else "",
         "delete_url": url_for("form_builder.delete_template", template_id=template.id) if can_delete else "",
         "delete_info_url": url_for("form_builder.get_template_delete_info", template_id=template.id) if can_delete else "",
         "data_count": data_count,
@@ -284,7 +283,7 @@ def template_grid_row(template_id):
 
 
 @bp.route("/templates/validate_excel_import", methods=["POST"])
-@permission_required('admin.templates.create')
+@permission_required_any('admin.templates.create', 'admin.templates.import_excel')
 def validate_excel_import():
     """Validate a Humanitarian Databank Excel export before creating a template."""
     if 'excel_file' not in request.files:
@@ -302,6 +301,10 @@ def validate_excel_import():
             errors=[error_msg or _('Invalid file type.')],
             preview={'name': None, 'pages': 0, 'sections': 0, 'items': 0},
         )
+
+    TemplateExcelService.matrix_import_entry_log(
+        f"validate_excel_import route file={excel_file.filename!r}"
+    )
 
     try:
         result = TemplateExcelService.validate_import_file(excel_file)
@@ -1729,6 +1732,11 @@ def import_template_excel(template_id):
     if not excel_file.filename.lower().endswith(('.xlsx', '.xls')):
         flash("Invalid file type. Please upload an Excel file (.xlsx or .xls).", "danger")
         return redirect(url_for("form_builder.edit_template", template_id=template_id, version_id=version_id))
+
+    TemplateExcelService.matrix_import_entry_log(
+        f"import_template_excel route template_id={template_id} version_id={version_id} "
+        f"file={excel_file.filename!r}"
+    )
 
     try:
         # Import template from Excel

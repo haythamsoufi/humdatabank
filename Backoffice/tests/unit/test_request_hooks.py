@@ -191,6 +191,14 @@ class TestJwtAuthHook:
                         pass  # Hook registered, JWT would be called in real flow
 
 
+def _find_before_request_hook(flask_app, name):
+    """Return the named before_request hook registered on flask_app, or None."""
+    for fn in flask_app.before_request_funcs.get(None, []):
+        if fn.__name__ == name:
+            return fn
+    return None
+
+
 class TestUpdateActivityHook:
     """update_activity before_request hook."""
 
@@ -199,17 +207,76 @@ class TestUpdateActivityHook:
         with app.test_request_context('/static/main.css'):
             with patch('app.request_hooks.is_static_asset_request', return_value=True):
                 with patch('app.request_hooks.update_session_activity') as mock_update:
-                    # The hook returns early without calling update_session_activity
-                    pass
+                    hook = _find_before_request_hook(app, 'update_activity')
+                    assert hook is not None, "update_activity hook not registered"
+                    hook()
+                    mock_update.assert_not_called()
 
     def test_authenticated_user_updates_activity(self, app):
-        """Authenticated non-static requests should call update_session_activity."""
+        """Authenticated non-static page nav should call update_session_activity."""
         with app.test_request_context('/dashboard'):
-            with patch('app.request_hooks.is_static_asset_request', return_value=False):
-                with patch('app.request_hooks.update_session_activity') as mock_update:
-                    mock_user = MagicMock(is_authenticated=True)
-                    with patch('flask_login.utils._get_user', return_value=mock_user):
-                        pass  # Hook is registered; would call update_session_activity
+            with patch('app.request_hooks.is_static_asset_request', return_value=False), \
+                 patch('app.request_hooks.should_skip_activity_path', return_value=False), \
+                 patch('app.request_hooks.should_skip_activity_endpoint', return_value=False), \
+                 patch('app.request_hooks.update_session_activity') as mock_update:
+                mock_user = MagicMock(is_authenticated=True)
+                with patch('flask_login.utils._get_user', return_value=mock_user):
+                    hook = _find_before_request_hook(app, 'update_activity')
+                    assert hook is not None
+                    hook()
+                    mock_update.assert_called_once()
+
+    def test_api_v1_path_skips_activity_update(self, app):
+        """Requests under /api/v1/ must not reset last_activity (background polls)."""
+        with app.test_request_context('/api/v1/some/endpoint'):
+            with patch('app.request_hooks.is_static_asset_request', return_value=False), \
+                 patch('app.request_hooks.update_session_activity') as mock_update:
+                mock_user = MagicMock(is_authenticated=True)
+                with patch('flask_login.utils._get_user', return_value=mock_user):
+                    hook = _find_before_request_hook(app, 'update_activity')
+                    assert hook is not None
+                    hook()
+                    mock_update.assert_not_called()
+
+    def test_api_mobile_path_skips_activity_update(self, app):
+        """Requests under /api/mobile/ must not reset last_activity."""
+        with app.test_request_context('/api/mobile/device/heartbeat'):
+            with patch('app.request_hooks.is_static_asset_request', return_value=False), \
+                 patch('app.request_hooks.update_session_activity') as mock_update:
+                mock_user = MagicMock(is_authenticated=True)
+                with patch('flask_login.utils._get_user', return_value=mock_user):
+                    hook = _find_before_request_hook(app, 'update_activity')
+                    assert hook is not None
+                    hook()
+                    mock_update.assert_not_called()
+
+    def test_poll_endpoint_skips_activity_update(self, app):
+        """Endpoints in the skip list (e.g. presence heartbeat) must not reset last_activity."""
+        with app.test_request_context('/presence/assignment/1/heartbeat'):
+            with patch('app.request_hooks.is_static_asset_request', return_value=False), \
+                 patch('app.request_hooks.should_skip_activity_path', return_value=False), \
+                 patch('app.request_hooks.should_skip_activity_endpoint', return_value=True), \
+                 patch('app.request_hooks.update_session_activity') as mock_update:
+                mock_user = MagicMock(is_authenticated=True)
+                with patch('flask_login.utils._get_user', return_value=mock_user):
+                    hook = _find_before_request_hook(app, 'update_activity')
+                    assert hook is not None
+                    hook()
+                    mock_update.assert_not_called()
+
+    def test_unauthenticated_user_does_not_update_activity(self, app):
+        """Unauthenticated requests never call update_session_activity."""
+        with app.test_request_context('/dashboard'):
+            with patch('app.request_hooks.is_static_asset_request', return_value=False), \
+                 patch('app.request_hooks.should_skip_activity_path', return_value=False), \
+                 patch('app.request_hooks.should_skip_activity_endpoint', return_value=False), \
+                 patch('app.request_hooks.update_session_activity') as mock_update:
+                mock_user = MagicMock(is_authenticated=False)
+                with patch('flask_login.utils._get_user', return_value=mock_user):
+                    hook = _find_before_request_hook(app, 'update_activity')
+                    assert hook is not None
+                    hook()
+                    mock_update.assert_not_called()
 
 
 class TestMemoryAndSystemTracking:

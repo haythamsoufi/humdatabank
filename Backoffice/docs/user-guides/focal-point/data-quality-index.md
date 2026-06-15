@@ -1,4 +1,4 @@
-# Data Quality Index (focal point)
+# Quality Index
 
 The **Data Quality Index** (QoD) shows how complete and reliable your reported data is for an assignment. When your organization enables it, you will see a **Quality of Data** tab on the dashboard for each eligible template.
 
@@ -45,6 +45,6 @@ Answering validation questions improves the **validation questions** pillar. Una
 ## Related
 
 - [View your assignments](view-assignments.md)
-- [Supporting documents](supporting-documents.md)
+- [Supporting documents](../../data-reporting/supporting-documents.md)
 - [Submit form data](submit-data.md)
-- [Troubleshooting submission issues](troubleshooting-submission.md)
+- [Troubleshooting](troubleshooting.md)

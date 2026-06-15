@@ -60,4 +60,4 @@ Avant de partager le lien :
 
 - [Gérer les missions](manage-assignments.md)
 - [Créer une nouvelle mission](create-assignment.md)
-- [Gestion des données et confidentialité](../common/data-handling-and-privacy.md)
+- [Gestion des données et confidentialité](../../data-reporting/data-handling-and-privacy.md)

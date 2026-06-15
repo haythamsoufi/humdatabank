@@ -1441,7 +1441,10 @@ export const MatrixItem = {
         }
         if (itemData.config) {
             try {
-                const matrixConfig = typeof itemData.config === 'string' ? JSON.parse(itemData.config) : itemData.config;
+                let matrixConfig = typeof itemData.config === 'string' ? JSON.parse(itemData.config) : itemData.config;
+                if (matrixConfig && matrixConfig.matrix_config && typeof matrixConfig.matrix_config === 'object') {
+                    matrixConfig = matrixConfig.matrix_config;
+                }
                 const rowMode = matrixConfig.row_mode || 'manual';
                 const rowModeRadio = modalElement.querySelector(`input[name="matrix_row_mode"][value="${rowMode}"]`);
                 if (rowModeRadio) {

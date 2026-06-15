@@ -21,7 +21,7 @@ from jwt.algorithms import RSAAlgorithm
 from app.utils.datetime_helpers import utcnow, ensure_utc
 from app.services.user_analytics_service import (
     log_login_attempt, log_logout, start_user_session, log_user_activity, log_user_activity_for_user,
-    create_security_event, get_client_ip
+    create_security_event, get_client_ip, add_session_to_blacklist,
 )
 from app.utils.redirect_utils import safe_redirect, is_safe_redirect_url
 from app.utils.rate_limiting import auth_rate_limit, password_reset_rate_limit
@@ -823,6 +823,7 @@ def azure_callback():
 def logout():
     # Calculate session duration
     session_duration = None
+    _sid = session.get('session_id')
     if 'session_start' in session:
         with suppress(Exception):
             session_start = datetime.fromisoformat(session['session_start'])
@@ -847,6 +848,11 @@ def logout():
 
     # Grab the B2C id_token before wiping the session (needed for id_token_hint)
     b2c_id_token = session.get('b2c_id_token')
+
+    # Blacklist the session server-side so a replayed cookie is rejected immediately
+    # even across workers and after server restarts (DB fallback in is_session_blacklisted).
+    if _sid:
+        add_session_to_blacklist(_sid)
 
     logout_user()
 

@@ -118,11 +118,14 @@ function defaultBuildValidPreviewHtml(preview, dropzone, labels) {
 function defaultBuildInvalidPreviewHtml(data, labels) {
     const message = data.message || labels.validationFailedLabel || 'Validation failed';
     const errors = (data.errors && data.errors.length) ? data.errors : [message];
+    const showAllErrors = errors.length > 1 || (errors.length === 1 && errors[0] !== message);
     let html = `<div class="${CLASS_PREFIX}__preview">`;
     html += `<p class="${CLASS_PREFIX}__preview-line ${CLASS_PREFIX}__preview-line--error">`
         + `<i class="fas fa-exclamation-circle" aria-hidden="true"></i><span>${escapeHtml(message)}</span></p>`;
-    if (errors.length > 1) {
+    if (showAllErrors) {
         html += `<ul class="${CLASS_PREFIX}__preview-errors">${errors.map((err) => `<li>${escapeHtml(err)}</li>`).join('')}</ul>`;
+    } else if (errors.length === 1 && errors[0].length > message.length) {
+        html += `<p class="${CLASS_PREFIX}__preview-detail">${escapeHtml(errors[0])}</p>`;
     }
     html += '</div>';
     return html;
@@ -200,6 +203,7 @@ export function initExcelImportDropzone(root, options = {}) {
         templateNameLabel: options.templateNameLabel || 'Template name',
         invalidFileTypeLabel: options.invalidFileTypeLabel || 'Please upload a valid Excel file (.xlsx or .xls)',
         maxSizeLabel: options.maxSizeLabel || 'File is too large',
+        importingLabel: options.importingLabel || 'Importing template…',
     };
 
     const validateUrl = options.validateUrl ?? dataOpts.validateUrl;
@@ -317,6 +321,19 @@ export function initExcelImportDropzone(root, options = {}) {
             }
             renderValidationStatus(data);
             if (data.valid && autoSubmitOnSelect && fileInput.form) {
+                if (fileInput.form.dataset.excelImportSubmitting === '1') {
+                    return;
+                }
+                fileInput.form.dataset.excelImportSubmitting = '1';
+                renderDropzoneStatus(
+                    dropzone,
+                    'pending',
+                    `<div class="${CLASS_PREFIX}__preview">`
+                        + `<p class="${CLASS_PREFIX}__preview-line ${CLASS_PREFIX}__preview-line--pending">`
+                        + `<i class="fas fa-spinner fa-spin" aria-hidden="true"></i>`
+                        + `<span>${escapeHtml(labels.importingLabel || 'Importing template…')}</span></p></div>`
+                );
+                if (submitBtn) submitBtn.disabled = true;
                 fileInput.form.requestSubmit?.() || fileInput.form.submit();
             }
         } catch (err) {
@@ -336,6 +353,15 @@ export function initExcelImportDropzone(root, options = {}) {
         fileInput.addEventListener('change', () => {
             if (submitBtn && requireValidation) submitBtn.disabled = true;
             runValidation();
+        });
+    }
+
+    const filePanel = dropzone.querySelector(`.${CLASS_PREFIX}__file-panel`);
+    if (filePanel && fileInput) {
+        filePanel.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.click();
         });
     }
 

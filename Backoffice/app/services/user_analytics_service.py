@@ -923,8 +923,9 @@ def is_session_blacklisted(session_id):
     global _blacklisted_sessions
     if session_id in _blacklisted_sessions:
         return True
-    # DB fallback: treat admin-ended sessions as blacklisted regardless of which
-    # worker originally called add_session_to_blacklist.
+    # DB fallback: any session that has been ended (logout, timeout, admin force)
+    # is treated as blacklisted so that replayed cookies are rejected across all
+    # workers and after server restarts, regardless of who ended the session.
     try:
         row = (
             UserSessionLog.query
@@ -932,7 +933,7 @@ def is_session_blacklisted(session_id):
             .filter_by(session_id=session_id)
             .first()
         )
-        if row and not row.is_active and row.ended_by == 'admin_action':
+        if row and not row.is_active:
             # Warm the in-process cache so subsequent calls are fast.
             _blacklisted_sessions.add(session_id)
             return True

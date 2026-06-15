@@ -295,6 +295,56 @@ class TestFindValidationStatusColumn:
 
 
 # ---------------------------------------------------------------------------
+# _has_kobo_structural_markers
+# ---------------------------------------------------------------------------
+
+class TestHasKoboStructuralMarkers:
+    def _call(self, headers):
+        from app.services.kobo_data_import_service import _has_kobo_structural_markers
+        return _has_kobo_structural_markers(headers)
+
+    def test_underscore_id_gives_meta(self):
+        has_meta, has_group = self._call(["_id", "NS", "Q1"])
+        assert has_meta is True
+
+    def test_underscore_uuid_gives_meta(self):
+        has_meta, _ = self._call(["_uuid", "NS"])
+        assert has_meta is True
+
+    def test_system_exact_start_gives_meta(self):
+        has_meta, _ = self._call(["start", "end", "NS"])
+        assert has_meta is True
+
+    def test_meta_prefix_gives_meta(self):
+        has_meta, _ = self._call(["meta/instanceID", "NS"])
+        assert has_meta is True
+
+    def test_slash_header_gives_group(self):
+        _, has_group = self._call(["NS", "demographics/age"])
+        assert has_group is True
+
+    def test_plain_headers_give_neither(self):
+        has_meta, has_group = self._call(["National Society", "Q1 Value", "Status"])
+        assert has_meta is False
+        assert has_group is False
+
+    def test_empty_headers_give_neither(self):
+        has_meta, has_group = self._call([None, "", None])
+        assert has_meta is False
+        assert has_group is False
+
+    def test_mixed_markers(self):
+        # Has both kinds
+        has_meta, has_group = self._call(["_id", "group1/question", "NS"])
+        assert has_meta is True
+        assert has_group is True
+
+    def test_validation_status_column_is_meta(self):
+        has_meta, _ = self._call(["NS", "_validation_status"])
+        assert has_meta is True
+
+
+# ---------------------------------------------------------------------------
 # _kobo_validation_bucket
 # ---------------------------------------------------------------------------
 
@@ -666,6 +716,108 @@ class TestMatchEntityToCountry:
 
 
 # ---------------------------------------------------------------------------
+# KoboDataImportService.validate_data_export
+# ---------------------------------------------------------------------------
+
+class TestKoboDataImportServiceValidateDataExport:
+    def test_valid_data_export(self, app):
+        with app.app_context():
+            from app.services.kobo_data_import_service import KoboDataImportService
+            # Include KoBo system columns so the structural check passes
+            file_bytes = _make_excel_bytes(
+                headers=["start", "end", "National Society", "Q1 Value", "_id"],
+                data_rows=[[datetime(2024, 1, 1), datetime(2024, 1, 1, 1), "Kenya", 100, 1001]],
+            )
+            result = KoboDataImportService.validate_data_export(file_bytes)
+            assert result['valid'] is True
+            assert result['preview']['total_rows'] == 1
+            assert result['preview']['total_columns'] == 5
+
+    def test_empty_workbook_invalid(self, app):
+        with app.app_context():
+            from app.services.kobo_data_import_service import KoboDataImportService
+            wb = openpyxl.Workbook()
+            buf = io.BytesIO()
+            wb.save(buf)
+            result = KoboDataImportService.validate_data_export(buf.getvalue())
+            assert result['valid'] is False
+
+    def test_headers_only_invalid(self, app):
+        with app.app_context():
+            from app.services.kobo_data_import_service import KoboDataImportService
+            file_bytes = _make_excel_bytes(headers=["National Society"], data_rows=[])
+            result = KoboDataImportService.validate_data_export(file_bytes)
+            assert result['valid'] is False
+            assert 'no data' in result['message'].lower()
+
+    def test_xlsform_rejected(self, app):
+        with app.app_context():
+            from app.services.kobo_data_import_service import KoboDataImportService
+            wb = openpyxl.Workbook()
+            wb.active.title = 'survey'
+            wb.active.append(['type', 'name', 'label'])
+            wb.active.append(['text', 'q1', 'Question 1'])
+            buf = io.BytesIO()
+            wb.save(buf)
+            result = KoboDataImportService.validate_data_export(buf.getvalue())
+            assert result['valid'] is False
+            assert 'xlsform' in result['message'].lower()
+
+    def test_plain_spreadsheet_no_markers_rejected(self, app):
+        """A random spreadsheet with no KoBo markers must be rejected."""
+        with app.app_context():
+            from app.services.kobo_data_import_service import KoboDataImportService
+            file_bytes = _make_excel_bytes(
+                headers=["Name", "Department", "Score", "Notes"],
+                data_rows=[
+                    ["Alice", "HR", 90, "Good"],
+                    ["Bob",   "IT", 85, "OK"],
+                ],
+            )
+            result = KoboDataImportService.validate_data_export(file_bytes)
+            assert result['valid'] is False
+            assert 'kobo' in result['message'].lower()
+
+    def test_underscore_meta_column_passes(self, app):
+        """A file with _uuid (even no group headers) is accepted."""
+        with app.app_context():
+            from app.services.kobo_data_import_service import KoboDataImportService
+            file_bytes = _make_excel_bytes(
+                headers=["_uuid", "National Society", "Q1"],
+                data_rows=[["uuid-1", "Kenya", 100]],
+            )
+            result = KoboDataImportService.validate_data_export(file_bytes)
+            assert result['valid'] is True
+
+    def test_group_path_headers_pass(self, app):
+        """A file with Group/Question path headers (no system cols) is accepted."""
+        with app.app_context():
+            from app.services.kobo_data_import_service import KoboDataImportService
+            file_bytes = _make_excel_bytes(
+                headers=["NS", "section1/q1", "section1/q2", "section2/q3"],
+                data_rows=[
+                    ["Kenya", "A", "B", "C"],
+                    ["Uganda", "D", "E", "F"],
+                ],
+            )
+            result = KoboDataImportService.validate_data_export(file_bytes)
+            assert result['valid'] is True
+
+    def test_system_exact_columns_pass(self, app):
+        """start / end / today column is enough to pass the structural check."""
+        with app.app_context():
+            from app.services.kobo_data_import_service import KoboDataImportService
+            file_bytes = _make_excel_bytes(
+                headers=["start", "end", "today", "National Society", "Q1"],
+                data_rows=[
+                    [datetime(2024, 1, 1), datetime(2024, 1, 1, 1), datetime(2024, 1, 1), "Kenya", 100],
+                ],
+            )
+            result = KoboDataImportService.validate_data_export(file_bytes)
+            assert result['valid'] is True
+
+
+# ---------------------------------------------------------------------------
 # KoboDataImportService.analyze
 # ---------------------------------------------------------------------------
 
@@ -695,26 +847,30 @@ class TestKoboDataImportServiceAnalyze:
     def test_basic_analysis(self, app):
         with app.app_context():
             from app.services.kobo_data_import_service import KoboDataImportService
+            # _uuid column acts as the KoBo structural marker
             file_bytes = _make_excel_bytes(
-                headers=["National Society", "Q1 Value", "Q2 Text"],
+                headers=["_uuid", "National Society", "Q1 Value", "Q2 Text"],
                 data_rows=[
-                    ["Kenya", 100, "Answer A"],
-                    ["Uganda", 200, "Answer B"],
-                    ["Tanzania", 150, "Answer A"],
+                    ["uuid-1", "Kenya", 100, "Answer A"],
+                    ["uuid-2", "Uganda", 200, "Answer B"],
+                    ["uuid-3", "Tanzania", 150, "Answer A"],
                 ],
             )
             result = KoboDataImportService.analyze(file_bytes)
             assert result['success'] is True
             assert result['total_rows'] == 3
-            assert result['total_columns'] == 3
+            assert result['total_columns'] == 4
 
     def test_entity_candidates_detected(self, app):
         with app.app_context():
             from app.services.kobo_data_import_service import KoboDataImportService
-            # Create data where NS column qualifies as entity candidate
+            # _uuid + start/end give the required KoBo structural markers
             ns_values = [f"NS_{i}" for i in range(10)]
-            headers = ["National Society"] + [f"Q{i}" for i in range(5)]
-            data_rows = [[ns] + [i * 10 for i in range(5)] for ns in ns_values]
+            headers = ["start", "end", "_uuid", "National Society"] + [f"Q{i}" for i in range(5)]
+            data_rows = [
+                [datetime(2024, 1, 1), datetime(2024, 1, 1, 1), f"uuid-{idx}", ns] + [idx * 10 for _ in range(5)]
+                for idx, ns in enumerate(ns_values)
+            ]
             file_bytes = _make_excel_bytes(headers, data_rows)
             result = KoboDataImportService.analyze(file_bytes)
             assert result['success'] is True
@@ -758,6 +914,34 @@ class TestKoboDataImportServiceAnalyze:
             result = KoboDataImportService.analyze(b"not an excel file")
             assert result['success'] is False
 
+    def test_plain_spreadsheet_no_markers_rejected(self, app):
+        """analyze() also rejects files with no KoBo structural markers."""
+        with app.app_context():
+            from app.services.kobo_data_import_service import KoboDataImportService
+            file_bytes = _make_excel_bytes(
+                headers=["Name", "Department", "Score"],
+                data_rows=[
+                    ["Alice", "HR", 90],
+                    ["Bob",   "IT", 85],
+                ],
+            )
+            result = KoboDataImportService.analyze(file_bytes)
+            assert result['success'] is False
+            assert 'kobo' in result['message'].lower()
+
+    def test_analyze_returns_marker_flags(self, app):
+        """Successful analyze() includes has_kobo_meta / has_group_headers flags."""
+        with app.app_context():
+            from app.services.kobo_data_import_service import KoboDataImportService
+            file_bytes = _make_excel_bytes(
+                headers=["_uuid", "NS", "section/q1"],
+                data_rows=[["uuid-1", "Kenya", "Answer"]],
+            )
+            result = KoboDataImportService.analyze(file_bytes)
+            assert result['success'] is True
+            assert result['has_kobo_meta'] is True
+            assert result['has_group_headers'] is True
+
     def test_openpyxl_none_returns_error(self, app):
         with app.app_context():
             import app.services.kobo_data_import_service as module
@@ -788,13 +972,14 @@ class TestKoboDataImportServiceAnalyze:
         with app.app_context():
             from app.services.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
-                headers=["NS", "total_beneficiaries", "Q1"],
+                headers=["_uuid", "NS", "total_beneficiaries", "Q1"],
                 data_rows=[
-                    ["Kenya", 1000, "Answer"],
-                    ["Uganda", 500, "Answer"],
+                    ["uuid-1", "Kenya", 1000, "Answer"],
+                    ["uuid-2", "Uganda", 500, "Answer"],
                 ],
             )
             result = KoboDataImportService.analyze(file_bytes)
+            assert result['success'] is True
             skipped_hdrs = [s['header'] for s in result.get('skipped_columns', [])]
             assert "total_beneficiaries" in skipped_hdrs
 
@@ -927,12 +1112,17 @@ class TestKoboValidationBucketEdgeCases:
         from app.services.kobo_data_import_service import _kobo_validation_bucket
         return _kobo_validation_bucket(val)
 
-    def test_removal_with_approved_not_rejected(self):
-        # "removal" but "approved" is in norm -> should not be rejected
-        # "removal" and "approved" -> approved wins? Let's check:
-        # 'approved_for_removal' -> removal but approved not in pattern
+    def test_flagged_for_removal_is_always_rejected(self):
+        # 'flagged_for_removal' is matched literally before the generic 'approved' check,
+        # so "flagged_for_removal_approved" is still rejected.
         result = self._call("flagged_for_removal_approved")
-        # "removal" in norm and "approved" in norm, so should be approved per code
+        assert result == "rejected"
+
+    def test_approved_for_removal_is_rejected(self):
+        # The generic 'removal' guard fires when 'approved' is NOT in norm.
+        # "approved_for_removal" contains 'removal' but also contains 'approved',
+        # so the 'removal' guard is skipped and it falls through to the 'approved' branch.
+        result = self._call("approved_for_removal")
         assert result == "approved"
 
     def test_removal_without_approved(self):

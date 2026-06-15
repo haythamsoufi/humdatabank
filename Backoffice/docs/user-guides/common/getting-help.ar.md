@@ -32,5 +32,5 @@
 
 ## ذات صلة
 
-- [إعدادات الحساب](account-settings.md)
-- [أساسيات التنقل](navigation.md)
+- [إعدادات الحساب](../../getting-started/account-settings.md)
+- [كيف يعمل النظام](../../getting-started/how-it-works.md)

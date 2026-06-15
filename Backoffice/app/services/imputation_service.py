@@ -1,7 +1,7 @@
 """
-Imputation service for template-specific admin actions.
+Imputation service for template imputation admin actions.
 
-Currently supports Template ID 2: carry-forward imputation from previous year.
+Supports carry-forward imputation from previous year for any template.
 """
 
 import logging
@@ -221,7 +221,7 @@ class ImputationService:
                     if not form_item:
                         continue
 
-                    imputation_method = form_item.config.get('imputation_method', 'last_year') if form_item.config else 'last_year'
+                    imputation_method = form_item.config.get('imputation_method', 'no_imputation') if form_item.config else 'no_imputation'
 
                     # Skip items that should not be imputed
                     if imputation_method == 'no_imputation':
@@ -417,11 +417,12 @@ class ImputationService:
         }
 
     @staticmethod
-    def impute_template_2_filtered(target_year: str, country_filter: Optional[str] = None, item_filter: Optional[str] = None, type_filter: Optional[str] = None, imputation_mode: str = 'missing_only') -> Dict[str, Any]:
+    def impute_template_filtered(template_id: int, target_year: str, source_period: Optional[str] = None, country_filter: Optional[str] = None, item_filter: Optional[str] = None, type_filter: Optional[str] = None, imputation_mode: str = 'missing_only') -> Dict[str, Any]:
         """
-        Impute data for Template ID 2 for the given year with optional filters.
+        Impute data for any template for the given year with optional filters.
 
         Args:
+            template_id: The template to impute data for
             target_year: The year to impute data for
             country_filter: Optional country name to filter by
             item_filter: Optional item label to filter by
@@ -435,18 +436,20 @@ class ImputationService:
             - For numeric values: always store as whole numbers (integers)
             - For text/single_choice values: store as strings (e.g., "male", "female")
         """
-        template_id = 2
         year_str = str(target_year)
-        try:
-            prev_year_str = str(int(year_str) - 1)
-        except Exception as e:
-            logger.debug("Could not parse year for prev_year_str, using suffix fallback: %s", e)
-            parts = year_str.split()
-            if parts and parts[0].isdigit():
-                parts[0] = str(int(parts[0]) - 1)
-                prev_year_str = " ".join(parts)
-            else:
-                prev_year_str = year_str  # fallback no-op
+        if source_period:
+            prev_year_str = str(source_period)
+        else:
+            try:
+                prev_year_str = str(int(year_str) - 1)
+            except Exception as e:
+                logger.debug("Could not parse year for prev_year_str, using suffix fallback: %s", e)
+                parts = year_str.split()
+                if parts and parts[0].isdigit():
+                    parts[0] = str(int(parts[0]) - 1)
+                    prev_year_str = " ".join(parts)
+                else:
+                    prev_year_str = year_str  # fallback no-op
 
         # Validate template exists
         template = FormTemplate.query.get(template_id)
@@ -580,7 +583,7 @@ class ImputationService:
                     if item_filter and form_item.label != item_filter:
                         continue
 
-                    imputation_method = form_item.config.get('imputation_method', 'last_year') if form_item.config else 'last_year'
+                    imputation_method = form_item.config.get('imputation_method', 'no_imputation') if form_item.config else 'no_imputation'
 
                     # Skip items that should not be imputed
                     if imputation_method == 'no_imputation':
@@ -792,3 +795,15 @@ class ImputationService:
             "rows_created": total_rows_created,
             "rows_updated": total_rows_updated,
         }
+
+    @staticmethod
+    def impute_template_2_filtered(target_year: str, country_filter=None, item_filter=None, type_filter=None, imputation_mode: str = 'missing_only'):
+        '''Backward-compatible shim for Template ID 2. Delegates to impute_template_filtered.'''
+        return ImputationService.impute_template_filtered(
+            template_id=2,
+            target_year=target_year,
+            country_filter=country_filter,
+            item_filter=item_filter,
+            type_filter=type_filter,
+            imputation_mode=imputation_mode,
+        )

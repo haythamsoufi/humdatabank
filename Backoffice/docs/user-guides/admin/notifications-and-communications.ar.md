@@ -32,8 +32,8 @@
 - لقطة شاشة للخطأ (إن وجدت)
 
 ثم وجههم إلى:
-- [أساسيات استكشاف الأخطاء (للجميع)](../common/troubleshooting-basics.md)
-- [استكشاف أخطاء مشاكل الإرسال (نقطة الاتصال)](../focal-point/troubleshooting-submission.md)
+- [أساسيات استكشاف الأخطاء (للجميع)](../user-guides/focal-point/troubleshooting.md)
+- [استكشاف أخطاء مشاكل الإرسال (نقطة الاتصال)](../focal-point/troubleshooting.md)
 - [استكشاف أخطاء القوالب والمهام (المسؤول)](troubleshooting-templates-and-assignments.md)
 
 ## أفضل الممارسات

@@ -5,8 +5,10 @@ This section helps you use the Humanitarian Databank Backoffice.
 ## Getting started
 
 - [Getting started](getting-started/README.md)
+- [Start here](getting-started/start-here.md)
 - [How the platform works](getting-started/how-it-works.md)
 - [Glossary](getting-started/glossary.md)
+- [Account settings](getting-started/account-settings.md)
 
 ## In-app admin tools (feature overview)
 
@@ -49,23 +51,24 @@ Detailed setup for optional features and production:
 ### Focal point
 
 - [View your assignments](user-guides/focal-point/view-assignments.md)
-- [Data Quality Index](user-guides/focal-point/data-quality-index.md)
-- [Fill and submit a form](user-guides/focal-point/submit-data.md)
-- [Supporting documents (Focal point)](user-guides/focal-point/supporting-documents.md)
-- [Troubleshooting (Focal point)](user-guides/focal-point/troubleshooting.md)
-- [Troubleshooting submission issues (Focal point)](user-guides/focal-point/troubleshooting-submission.md)
-
-### Common
-
-- [Start here](user-guides/common/start-here.md)
-- [Navigation basics](user-guides/common/navigation.md)
-- [Account settings](user-guides/common/account-settings.md)
-- [Submission statuses and what you can do](user-guides/common/submission-statuses-and-permissions.md)
-- [Troubleshooting basics (everyone)](user-guides/common/troubleshooting-basics.md)
-- [AI Use Policy](user-guides/common/ai-use-policy.md)
-- [Data handling and privacy](user-guides/common/data-handling-and-privacy.md)
-- [Data governance: how the system supports it](user-guides/common/data-governance.md)
+- [Submit Form Data](user-guides/focal-point/submit-data.md)
+- [Submission Status](user-guides/common/submission-statuses-and-permissions.md)
 - [Getting help](user-guides/common/getting-help.md)
+- [Troubleshooting](user-guides/focal-point/troubleshooting.md)
+- [Quality Index](user-guides/focal-point/data-quality-index.md)
+- [AI Chatbot](user-guides/common/ai-chatbot.md)
+- [AI Use Policy](user-guides/common/ai-use-policy.md)
+
+### Data Reporting
+
+- [Data Guidance, Unified Planning and Reporting (UPR)](data-reporting/data-guidance-upr.md)
+- [Data Guidance, FDRS](data-reporting/data-guidance-fdrs.md)
+- [Supporting documents (Focal point)](data-reporting/supporting-documents.md)
+- [Data handling and privacy](data-reporting/data-handling-and-privacy.md)
+
+### Common (admin-only or shared reference)
+
+- [Data governance: how the system supports it](user-guides/common/data-governance.md)
 
 ## Language
 

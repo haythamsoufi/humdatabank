@@ -183,8 +183,8 @@ class TestActivityCategoryForEndpoint:
     def test_system_admin(self):
         assert activity_category_for_endpoint("system_admin.settings") == "admin_system"
 
-    def test_template_special(self):
-        assert activity_category_for_endpoint("template_special.view") == "admin_system"
+    def test_data_sync_imputation(self):
+        assert activity_category_for_endpoint("data_sync_imputation.view") == "admin_system"
 
     def test_user_management(self):
         assert activity_category_for_endpoint("user_management.list") == "admin_users"

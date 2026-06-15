@@ -4,6 +4,7 @@ Assignment management forms for the platform.
 """
 
 from flask_wtf import FlaskForm
+from flask_login import current_user
 from wtforms import StringField, SubmitField, SelectField, SelectMultipleField, DateField, BooleanField, HiddenField
 from wtforms.validators import DataRequired, Optional
 from wtforms.widgets import ListWidget, CheckboxInput
@@ -88,6 +89,10 @@ class AssignedFormForm(BaseForm):
         self.data_owner_id.choices = [("", "— Select data owner —")] + [
             (u.id, f"{u.name} ({u.email})") for u in admin_users
         ]
+        if not self.is_submitted() and current_user.is_authenticated:
+            valid_owner_ids = {owner_id for owner_id, _ in self.data_owner_id.choices if owner_id}
+            if current_user.id in valid_owner_ids:
+                self.data_owner_id.data = current_user.id
 
 
 class AssignmentEntityStatusForm(BaseForm):

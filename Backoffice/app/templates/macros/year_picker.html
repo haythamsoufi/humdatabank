@@ -1,0 +1,26 @@
+{# Compact year stepper: calendar icon, prev/next, direct year entry. #}
+{% macro year_picker(input_id, min=2000, max=2100, label=None, label_class='block text-gray-700 text-sm font-semibold mb-2') %}
+{% if label %}
+<label for="{{ input_id }}" class="{{ label_class }}">{{ label }}</label>
+{% endif %}
+<div class="year-picker" data-year-picker data-year-min="{{ min }}" data-year-max="{{ max }}">
+    <button type="button" class="year-picker-btn" data-year-picker-decrement aria-label="{{ _('Previous year') }}">
+        <i class="fas fa-chevron-left" aria-hidden="true"></i>
+    </button>
+    <div class="year-picker-input-wrap">
+        <i class="fas fa-calendar-alt year-picker-icon" aria-hidden="true"></i>
+        <input type="number"
+               id="{{ input_id }}"
+               class="year-picker-input"
+               min="{{ min }}"
+               max="{{ max }}"
+               inputmode="numeric"
+               data-year-min="{{ min }}"
+               data-year-max="{{ max }}"
+               aria-label="{{ label or _('Year') }}">
+    </div>
+    <button type="button" class="year-picker-btn" data-year-picker-increment aria-label="{{ _('Next year') }}">
+        <i class="fas fa-chevron-right" aria-hidden="true"></i>
+    </button>
+</div>
+{% endmacro %}

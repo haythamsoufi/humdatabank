@@ -411,6 +411,19 @@
             merged.getLocaleText = custom.getLocaleText;
         }
 
+        // When the grid body reaches its scroll limit, continue scrolling the page (or nearest scroll parent).
+        var userOnGridReady = merged.onGridReady;
+        merged.onGridReady = function(params) {
+            var gridEl = null;
+            if (params && params.api && typeof params.api.getGridElement === 'function') {
+                gridEl = params.api.getGridElement();
+            }
+            AgGridHelper.enablePageScrollChaining(gridEl || (params && params.api) || params);
+            if (typeof userOnGridReady === 'function') {
+                userOnGridReady(params);
+            }
+        };
+
         return merged;
     };
 
@@ -637,6 +650,11 @@
 
             // Custom right-click context menu (Copy cell, Export table to Excel) – works in Community edition
             this.setupContextMenuFallback();
+
+            // Page scroll chaining — use gridDiv directly (more reliable than resolving from api in onGridReady).
+            setTimeout(function() {
+                AgGridHelper.enablePageScrollChaining(self.gridDiv);
+            }, 200);
 
             // Set dynamic height after a short delay to ensure:
             // 1. Grid is fully rendered and positioned in the DOM
@@ -3762,6 +3780,134 @@
 
             checkContainer();
         });
+    };
+
+    /**
+     * Resolve the AG Grid root DOM element from an element or API reference.
+     * @param {HTMLElement|Object} gridRootOrApi
+     * @returns {HTMLElement|null}
+     * @private
+     */
+    AgGridHelper._resolveGridElement = function(gridRootOrApi) {
+        if (!gridRootOrApi) {
+            return null;
+        }
+        if (gridRootOrApi.nodeType === 1) {
+            return gridRootOrApi;
+        }
+        if (typeof gridRootOrApi.getGridElement === 'function') {
+            return gridRootOrApi.getGridElement();
+        }
+        if (gridRootOrApi.eGridDiv) {
+            return gridRootOrApi.eGridDiv;
+        }
+        return null;
+    };
+
+    /**
+     * Find the nearest scrollable ancestor above an element (e.g. main.admin-scroll-main).
+     * @param {HTMLElement} element
+     * @returns {HTMLElement}
+     * @private
+     */
+    AgGridHelper._findScrollableAncestor = function(element) {
+        var el = element && element.parentElement;
+        while (el) {
+            if (el === document.body || el === document.documentElement) {
+                break;
+            }
+            try {
+                var style = window.getComputedStyle(el);
+                var overflowY = style.overflowY;
+                if ((overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') &&
+                    el.scrollHeight > el.clientHeight + 1) {
+                    return el;
+                }
+            } catch (e) {
+                // Ignore getComputedStyle failures and keep walking up.
+            }
+            el = el.parentElement;
+        }
+        return document.scrollingElement || document.documentElement;
+    };
+
+    /** Pixels from top/bottom of grid body before wheel scroll chains to the page. */
+    AgGridHelper.SCROLL_CHAIN_EDGE_TOLERANCE = 8;
+
+    /**
+     * Viewport edge state for scroll chaining (handles sub-pixel gaps at scroll end).
+     * @param {HTMLElement} viewport
+     * @returns {{ atTop: boolean, atBottom: boolean, maxScroll: number }}
+     * @private
+     */
+    AgGridHelper._scrollChainViewportEdges = function(viewport) {
+        var tolerance = AgGridHelper.SCROLL_CHAIN_EDGE_TOLERANCE || 8;
+        var scrollTop = viewport.scrollTop;
+        var clientHeight = viewport.clientHeight;
+        var scrollHeight = viewport.scrollHeight;
+        var maxScroll = scrollHeight - clientHeight;
+        var gapToBottom = scrollHeight - (scrollTop + clientHeight);
+        return {
+            maxScroll: maxScroll,
+            atTop: scrollTop <= tolerance,
+            atBottom: maxScroll <= 0 || gapToBottom <= tolerance
+        };
+    };
+
+    /**
+     * Allow vertical wheel scrolling to continue on the page once the grid body hits its limit.
+     * Applies to all grids initialized via AgGridHelper; call manually for direct agGrid.createGrid().
+     *
+     * @param {HTMLElement|Object} gridRootOrApi - Grid container element or AG Grid API
+     */
+    AgGridHelper.enablePageScrollChaining = function(gridRootOrApi) {
+        var gridRoot = AgGridHelper._resolveGridElement(gridRootOrApi);
+        if (!gridRoot || gridRoot.getAttribute('data-ag-scroll-chain') === '1') {
+            return;
+        }
+
+        function attachScrollChain() {
+            var viewport = gridRoot.querySelector('.ag-body-viewport');
+            if (!viewport || viewport.getAttribute('data-ag-scroll-chain') === '1') {
+                return !!viewport;
+            }
+
+            viewport.setAttribute('data-ag-scroll-chain', '1');
+            var pageScroller = AgGridHelper._findScrollableAncestor(gridRoot);
+
+            // Capture on the grid root so chaining works over pinned columns, cells, headers, etc.
+            gridRoot.addEventListener('wheel', function(e) {
+                var deltaY = e.deltaY;
+                if (!deltaY) {
+                    return;
+                }
+
+                var edges = AgGridHelper._scrollChainViewportEdges(viewport);
+                if (edges.maxScroll <= 0) {
+                    return;
+                }
+
+                if ((deltaY < 0 && edges.atTop) || (deltaY > 0 && edges.atBottom)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    pageScroller.scrollBy({ top: deltaY, left: 0, behavior: 'auto' });
+                }
+            }, { capture: true, passive: false });
+
+            return true;
+        }
+
+        if (!attachScrollChain()) {
+            var attempts = 0;
+            var timer = setInterval(function() {
+                attempts += 1;
+                if (attachScrollChain() || attempts >= 20) {
+                    clearInterval(timer);
+                }
+            }, 50);
+        }
+
+        gridRoot.setAttribute('data-ag-scroll-chain', '1');
     };
 
     /**

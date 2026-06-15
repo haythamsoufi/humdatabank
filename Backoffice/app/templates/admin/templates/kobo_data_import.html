@@ -4,6 +4,7 @@
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
 {% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
+{% from "components/_page_header.html" import page_header %}
 {% block title %}Import KoBo Data{% endblock %}
 
 {% block head %}
@@ -90,42 +91,11 @@
 
     <!-- ===== Step 1: Upload ===== -->
     <div id="step-1-content" class="step-content bg-white p-6 rounded-lg shadow-md border border-gray-200">
-        <h2 class="text-lg font-semibold text-gray-800 mb-2">Upload KoBo Data Export</h2>
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Upload KoBo Data Export</h2>
+
         <p class="text-sm text-gray-600 mb-4">Upload an Excel file exported from KoBoToolbox. The wizard will detect the form structure, questions, and data types automatically.</p>
 
-        <!-- Template mode selection -->
-        <div class="mb-5 border border-gray-200 rounded-lg overflow-hidden">
-            <div class="flex">
-                <label class="flex-1 flex items-center gap-3 p-4 cursor-pointer border-r border-gray-200 transition-colors" id="mode-new-label"
-                       style="background: #eff6ff;">
-                    <input type="radio" name="template_mode" value="new" checked
-                           class="form-radio h-4 w-4 text-blue-600" id="mode-new">
-                    <div>
-                        <span class="font-medium text-sm text-gray-800">Create New Template</span>
-                        <p class="text-xs text-gray-500 mt-0.5">Build a new template from the KoBo data structure</p>
-                    </div>
-                </label>
-                <label class="flex-1 flex items-center gap-3 p-4 cursor-pointer transition-colors" id="mode-existing-label">
-                    <input type="radio" name="template_mode" value="existing"
-                           class="form-radio h-4 w-4 text-blue-600" id="mode-existing">
-                    <div>
-                        <span class="font-medium text-sm text-gray-800">Use Existing Template</span>
-                        <p class="text-xs text-gray-500 mt-0.5">Map KoBo columns to an existing template's items</p>
-                    </div>
-                </label>
-            </div>
-            <div id="existing-template-picker" class="hidden border-t border-gray-200 bg-gray-50 p-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Select Template</label>
-                <select id="existing-template-select" class="w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-blue-500 focus:border-blue-500">
-                    <option value="">-- Choose a template --</option>
-                    {% for t in template_choices %}
-                    <option value="{{ t.id }}">{{ t.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
-
-        <div class="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+        <div class="bg-blue-50 border border-blue-200 rounded-md p-3 mb-6">
             <div class="flex items-start">
                 <i class="fas fa-info-circle text-blue-600 mt-0.5 mr-2"></i>
                 <div class="text-sm text-blue-800">
@@ -140,22 +110,65 @@
             </div>
         </div>
 
-        {% set _kobo_progress_overlay %}
-        <div class="excel-io-dropzone__overlay" id="upload-progress" hidden>
-            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div>
-            <p class="text-sm text-gray-600">Analyzing file structure...</p>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+            <!-- Left: template mode options -->
+            <div>
+                <h3 class="text-sm font-semibold text-gray-700 mb-3">Import mode</h3>
+                <div class="border border-gray-200 rounded-lg overflow-hidden">
+                    <label class="flex items-start gap-3 p-4 cursor-pointer border-b border-gray-200 transition-colors" id="mode-new-label"
+                           style="background: #eff6ff;">
+                        <input type="radio" name="template_mode" value="new" checked
+                               class="form-radio h-4 w-4 text-blue-600 mt-0.5" id="mode-new">
+                        <div>
+                            <span class="font-medium text-sm text-gray-800">Create New Template</span>
+                            <p class="text-xs text-gray-500 mt-0.5">Build a new template from the KoBo data structure</p>
+                        </div>
+                    </label>
+                    <label class="flex items-start gap-3 p-4 cursor-pointer transition-colors" id="mode-existing-label">
+                        <input type="radio" name="template_mode" value="existing"
+                               class="form-radio h-4 w-4 text-blue-600 mt-0.5" id="mode-existing">
+                        <div>
+                            <span class="font-medium text-sm text-gray-800">Use Existing Template</span>
+                            <p class="text-xs text-gray-500 mt-0.5">Map KoBo columns to an existing template's items</p>
+                        </div>
+                    </label>
+                    <div id="existing-template-picker" class="hidden border-t border-gray-200 bg-gray-50 p-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Select Template</label>
+                        <select id="existing-template-select" class="w-full border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">-- Choose a template --</option>
+                            {% for t in template_choices %}
+                            <option value="{{ t.id }}">{{ t.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: upload -->
+            <div class="flex flex-col">
+                <h3 class="text-sm font-semibold text-gray-700 mb-3">Upload file</h3>
+                {% set _kobo_progress_overlay %}
+                <div class="excel-io-dropzone__overlay" id="upload-progress" hidden>
+                    <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div>
+                    <p class="text-sm text-gray-600">Analyzing file structure...</p>
+                </div>
+                {% endset %}
+                {% call excel_import_dropzone(
+                    'kobo-upload-dropzone',
+                    input_id='kobo-data-file',
+                    input_name='file',
+                    variant='neutral',
+                    title=_('Click or drag an Excel file here'),
+                    hint=_('.xlsx or .xls (max 50 MB)'),
+                    validate_url=url_for('form_builder.kobo_data_import_validate'),
+                    file_field_name='file',
+                    max_size_bytes=52428800,
+                    filename_id='kobo-upload-filename',
+                    overlay=_kobo_progress_overlay
+                ) %}{% endcall %}
+                <div id="upload-error" class="mt-3 text-sm text-red-600 hidden"></div>
+            </div>
         </div>
-        {% endset %}
-        {% call excel_import_dropzone(
-            'kobo-upload-dropzone',
-            input_id='kobo-data-file',
-            input_name='file',
-            variant='neutral',
-            title=_('Click or drag an Excel file here'),
-            hint=_('.xlsx or .xls (max 50 MB)'),
-            overlay=_kobo_progress_overlay
-        ) %}{% endcall %}
-        <div id="upload-error" class="mt-3 text-sm text-red-600 hidden"></div>
     </div>
 
     <!-- ===== Step 2: Review Structure ===== -->
@@ -455,6 +468,7 @@
 
 <script nonce="{{ csp_nonce() }}">
 document.addEventListener('DOMContentLoaded', function() {
+    const VALIDATE_URL      = {{ url_for('form_builder.kobo_data_import_validate') | tojson | safe }};
     const ANALYZE_URL       = {{ url_for('form_builder.kobo_data_import_analyze') | tojson | safe }};
     const MATCH_URL         = {{ url_for('form_builder.kobo_data_import_match') | tojson | safe }};
     const PREVIEW_URL       = {{ url_for('form_builder.kobo_data_import_preview') | tojson | safe }};
@@ -616,9 +630,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function goToWizardStep(target) {
         if (!canNavigateToStep(target)) return;
         if (target === 1 && currentStep > 1) {
-            uploadPlaceholder.classList.remove('hidden');
-            uploadProgress.classList.add('hidden');
-            fileInput.value = '';
+            if (koboDropzoneReset) koboDropzoneReset();
+            if (uploadProgress) uploadProgress.hidden = true;
+            uploadError.classList.add('hidden');
         }
         setStep(target);
         if (target === 3) enterConfigureStep();
@@ -1134,23 +1148,95 @@ document.addEventListener('DOMContentLoaded', function() {
     var fileInput = document.getElementById('kobo-data-file');
     var uploadProgress = document.getElementById('upload-progress');
     var uploadError = document.getElementById('upload-error');
+    var koboDropzoneMod = null;
+    var koboDropzoneCtrl = null;
     var koboDropzoneReset = null;
 
+    var dropzoneLabels = {
+        validatingLabel: {{ _('Validating file…') | tojson }},
+        validationFailedLabel: {{ _('Validation failed. Please fix the file and try again.') | tojson }},
+        networkErrorLabel: {{ _('Could not validate the file. Please try again.') | tojson }},
+        extractedDetailsLabel: {{ _('Extracted details') | tojson }},
+        validExportLabel: {{ _('Valid KoBo data export') | tojson }},
+        invalidFileTypeLabel: {{ _('Please upload a valid Excel file (.xlsx or .xls)') | tojson }},
+        maxSizeLabel: {{ _('File is too large (max 50 MB)') | tojson }},
+        rowsLabel: {{ _('rows') | tojson }},
+        columnsLabel: {{ _('columns') | tojson }},
+        sheetLabel: {{ _('Sheet') | tojson }},
+    };
+
+    function showDropzoneError(message) {
+        uploadError.textContent = message;
+        uploadError.classList.remove('hidden');
+        if (!koboDropzoneMod || !koboDropzoneCtrl) return;
+        koboDropzoneMod.updateImportDropzone(koboDropzoneCtrl.dropzone, koboDropzoneCtrl.fileInput, 'invalid');
+        var statusEl = koboDropzoneCtrl.dropzone.querySelector('.excel-io-dropzone__status');
+        if (!statusEl) return;
+        statusEl.className = 'excel-io-dropzone__status excel-io-dropzone__status--invalid';
+        statusEl.innerHTML = '<div class="excel-io-dropzone__preview">'
+            + '<p class="excel-io-dropzone__preview-line excel-io-dropzone__preview-line--error">'
+            + '<i class="fas fa-exclamation-circle" aria-hidden="true"></i>'
+            + '<span>' + koboDropzoneMod.escapeHtml(message) + '</span></p></div>';
+    }
+
     import('{{ static_url('js/components/excel-import-dropzone.js') }}').then(function(mod) {
-        var ctrl = mod.initExcelImportDropzone('#kobo-upload-dropzone', {
-            variant: 'neutral',
+        koboDropzoneMod = mod;
+        koboDropzoneCtrl = mod.initExcelImportDropzone('#kobo-upload-dropzone', {
+            validateUrl: VALIDATE_URL,
+            fileFieldName: 'file',
             maxSizeBytes: 50 * 1024 * 1024,
-            onFileSelected: function(file) {
+            csrfToken: csrfToken,
+            requireValidation: true,
+            variant: 'neutral',
+            validatingLabel: dropzoneLabels.validatingLabel,
+            validationFailedLabel: dropzoneLabels.validationFailedLabel,
+            networkErrorLabel: dropzoneLabels.networkErrorLabel,
+            extractedDetailsLabel: dropzoneLabels.extractedDetailsLabel,
+            validExportLabel: dropzoneLabels.validExportLabel,
+            invalidFileTypeLabel: dropzoneLabels.invalidFileTypeLabel,
+            maxSizeLabel: dropzoneLabels.maxSizeLabel,
+            buildValidPreviewHtml: function(preview) {
+                var esc = mod.escapeHtml;
+                var parts = [];
+                if (preview.total_rows != null) {
+                    parts.push(preview.total_rows + ' ' + dropzoneLabels.rowsLabel);
+                }
+                if (preview.total_columns != null) {
+                    parts.push(preview.total_columns + ' ' + dropzoneLabels.columnsLabel);
+                }
+                var html = '<div class="excel-io-dropzone__preview">';
+                html += '<p class="excel-io-dropzone__preview-heading">' + esc(dropzoneLabels.extractedDetailsLabel) + '</p>';
+                html += '<p class="excel-io-dropzone__preview-line excel-io-dropzone__preview-line--success">'
+                    + '<i class="fas fa-check-circle" aria-hidden="true"></i>'
+                    + '<span>' + esc(dropzoneLabels.validExportLabel) + '</span></p>';
+                if (parts.length) {
+                    html += '<p class="excel-io-dropzone__preview-line">' + esc(parts.join(' · ')) + '</p>';
+                }
+                if (preview.sheet_name) {
+                    html += '<p class="excel-io-dropzone__preview-line excel-io-dropzone__preview-line--name">'
+                        + '<span class="excel-io-dropzone__preview-meta-label">' + esc(dropzoneLabels.sheetLabel) + '</span>'
+                        + '<span class="excel-io-dropzone__preview-meta-value">' + esc(preview.sheet_name) + '</span></p>';
+                }
+                html += '</div>';
+                return html;
+            },
+            onValidated: function(data) {
+                uploadError.classList.add('hidden');
+                if (!data.valid) return;
+                if (templateMode === 'existing' && !existingTemplateId) {
+                    showDropzoneError('Please select an existing template first.');
+                    return;
+                }
+                var file = koboDropzoneCtrl.fileInput && koboDropzoneCtrl.fileInput.files[0];
                 if (file) analyzeFile(file);
             },
         });
-        koboDropzoneReset = ctrl.reset;
+        koboDropzoneReset = koboDropzoneCtrl.reset;
     });
 
     function analyzeFile(file) {
         if (templateMode === 'existing' && !existingTemplateId) {
-            uploadError.textContent = 'Please select an existing template first.';
-            uploadError.classList.remove('hidden');
+            showDropzoneError('Please select an existing template first.');
             return;
         }
         if (uploadProgress) uploadProgress.hidden = false;
@@ -1163,9 +1249,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(function(data) {
             if (uploadProgress) uploadProgress.hidden = true;
             if (!data.success) {
-                if (koboDropzoneReset) koboDropzoneReset();
-                uploadError.textContent = data.message || 'Analysis failed';
-                uploadError.classList.remove('hidden');
+                showDropzoneError(data.message || 'Analysis failed');
                 return;
             }
             analysisData = data;
@@ -1185,9 +1269,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(function(err) {
             if (uploadProgress) uploadProgress.hidden = true;
-            if (koboDropzoneReset) koboDropzoneReset();
-            uploadError.textContent = 'Upload failed: ' + err.message;
-            uploadError.classList.remove('hidden');
+            showDropzoneError('Upload failed: ' + err.message);
         });
     }
 
@@ -1572,6 +1654,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         previewGridApi = agGrid.createGrid(gridEl, gridOptions);
+        if (typeof AgGridHelper !== 'undefined' && typeof AgGridHelper.enablePageScrollChaining === 'function') {
+            AgGridHelper.enablePageScrollChaining(previewGridApi);
+        }
     }
 
     // ── Navigation ──────────────────────────────────────────────────────
@@ -1660,8 +1745,7 @@ document.addEventListener('DOMContentLoaded', function() {
         templateItemById = {};
         document.getElementById('import-submission-filter').value = 'all';
         document.getElementById('import-dup-strategy').value = 'latest';
-        fileInput.value = '';
-        uploadPlaceholder.classList.remove('hidden');
+        if (koboDropzoneReset) koboDropzoneReset();
         uploadError.classList.add('hidden');
         document.getElementById('import-results').classList.add('hidden');
         document.getElementById('import-success').classList.add('hidden');

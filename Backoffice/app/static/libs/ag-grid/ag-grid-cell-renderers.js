@@ -111,14 +111,14 @@
         },
 
         /**
-         * Deployed/Not Yet status badge
+         * Deployed/Draft status badge
          * Expects params.data.is_deployed to be boolean
          */
         deployedStatus: function(params) {
             var isDeployed = params.data && params.data.is_deployed;
             var deployedText = getTranslation('deployed', 'Deployed');
-            var notYetText = getTranslation('notYet', 'Not Yet');
-            var displayText = params.value || (isDeployed ? deployedText : notYetText);
+            var draftText = getTranslation('draft', 'Draft');
+            var displayText = params.value || (isDeployed ? deployedText : draftText);
 
             if (isDeployed) {
                 return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">' +

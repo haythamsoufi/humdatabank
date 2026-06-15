@@ -441,6 +441,54 @@ class TestLogoutAndDevicesDirect:
                 resp = logout()
         assert resp.status_code in (301, 302, 303, 307, 308)
 
+    def test_logout_blacklists_session_id(self, app):
+        """logout() must add session_id to blacklist so replayed cookies are rejected."""
+        from app.routes.auth import logout
+        from flask import session
+
+        mock_user = MagicMock()
+        mock_user.id = 999
+        mock_user.email = 'test@example.com'
+        mock_user.is_authenticated = True
+        mock_user.is_active = True
+        mock_user.get_id.return_value = '999'
+
+        with app.test_request_context('/logout'):
+            with patch('flask_login.utils._get_user', return_value=mock_user):
+                session['session_id'] = 'test-sid-blacklist'
+                session['session_start'] = '2026-01-01T00:00:00+00:00'
+                with patch('app.routes.auth.log_user_activity'), \
+                     patch('app.routes.auth.log_logout'), \
+                     patch('app.routes.auth._b2c_get_required_config', return_value=None), \
+                     patch('app.routes.auth.clear_mobile_app_embed_cookie', side_effect=lambda r: r), \
+                     patch('app.routes.auth.add_session_to_blacklist') as mock_blacklist:
+                    logout()
+        mock_blacklist.assert_called_once_with('test-sid-blacklist')
+
+    def test_logout_skips_blacklist_when_no_session_id(self, app):
+        """logout() must not error and must not call add_session_to_blacklist when session has no session_id."""
+        from app.routes.auth import logout
+        from flask import session
+
+        mock_user = MagicMock()
+        mock_user.id = 999
+        mock_user.email = 'test@example.com'
+        mock_user.is_authenticated = True
+        mock_user.is_active = True
+        mock_user.get_id.return_value = '999'
+
+        with app.test_request_context('/logout'):
+            with patch('flask_login.utils._get_user', return_value=mock_user):
+                # Intentionally no session['session_id']
+                with patch('app.routes.auth.log_user_activity'), \
+                     patch('app.routes.auth.log_logout'), \
+                     patch('app.routes.auth._b2c_get_required_config', return_value=None), \
+                     patch('app.routes.auth.clear_mobile_app_embed_cookie', side_effect=lambda r: r), \
+                     patch('app.routes.auth.add_session_to_blacklist') as mock_blacklist:
+                    resp = logout()
+        mock_blacklist.assert_not_called()
+        assert resp.status_code in (301, 302, 303, 307, 308)
+
     def test_kickout_own_device_success(self, app, admin_user, db_session):
         from app.models.system import UserDevice
         from app.routes.auth import kickout_own_device

@@ -27,9 +27,10 @@ from app.services import documentation_service as docs
 bp = Blueprint("admin_docs", __name__, url_prefix="/admin/docs")
 
 VISIBLE_TOP_LEVEL_DIRS = {
-    # Keep the admin docs UI user-focused. Only user guides are shown here.
+    # Keep the admin docs UI user-focused.
     "getting-started",
     "user-guides",
+    "data-reporting",
 }
 
 def _canonical_doc_path_for_url(doc_path: str) -> str:

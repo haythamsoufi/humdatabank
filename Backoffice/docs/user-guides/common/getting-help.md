@@ -32,5 +32,5 @@ When contacting support, include:
 
 ## Related
 
-- [Account settings](account-settings.md)
-- [Navigation basics](navigation.md)
+- [Account settings](../../getting-started/account-settings.md)
+- [How the platform works](../../getting-started/how-it-works.md)

@@ -32,8 +32,8 @@ Pide:
 - captura de pantalla del error (si hay alguna)
 
 Luego dirígelos a:
-- [Conceptos básicos de solución de problemas (todos)](../common/troubleshooting-basics.md)
-- [Solución de problemas de envío (Punto focal)](../focal-point/troubleshooting-submission.md)
+- [Conceptos básicos de solución de problemas (todos)](../user-guides/focal-point/troubleshooting.md)
+- [Solución de problemas de envío (Punto focal)](../focal-point/troubleshooting.md)
 - [Solución de problemas de plantillas y asignaciones (administrador)](troubleshooting-templates-and-assignments.md)
 
 ## Mejores prácticas

@@ -29,7 +29,7 @@ from app.routes.admin.system_admin import bp as system_admin_bp
 from app.routes.admin.analytics import bp as analytics_bp
 from app.routes.admin.analytics_api import bp as analytics_api_bp
 from app.routes.admin.utilities import bp as utilities_bp
-from app.routes.admin.template_special import bp as template_special_bp
+from app.routes.admin.data_sync_imputation import bp as data_sync_imputation_bp
 from app.routes.admin.settings import bp as settings_bp
 from app.routes.admin.organization import bp as organization_bp
 from app.routes.admin.monitoring import bp as monitoring_bp
@@ -77,7 +77,7 @@ def register_admin_blueprints(app):
     app.register_blueprint(analytics_api_bp)
     app.register_blueprint(utilities_bp)
     app.register_blueprint(settings_bp)
-    app.register_blueprint(template_special_bp)
+    app.register_blueprint(data_sync_imputation_bp)
     app.register_blueprint(organization_bp)
     app.register_blueprint(monitoring_bp)
     app.register_blueprint(data_exploration_bp)
@@ -143,6 +143,28 @@ def _kobo_data_import_url_for_dashboard():
         return None
 
 
+def _data_sync_url_for_dashboard():
+    """URL for the data sync & imputation tool, or None if the route is not registered."""
+    ep = "admin.fdrs_sync_imputation"
+    if ep not in current_app.view_functions:
+        return None
+    try:
+        return url_for(ep)
+    except BuildError:
+        return None
+
+
+@bp.route("/fdrs-sync-imputation", methods=["GET"])
+@admin_required
+@system_manager_required
+def fdrs_sync_imputation():
+    """FDRS data sync and imputation (Data Integration)."""
+    from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
+    from app.routes.admin.data_sync_imputation import render_data_sync_imputation_page
+
+    return render_data_sync_imputation_page(FDRS_TEMPLATE_ID)
+
+
 # Legacy URL: API key admin UI now lives under /admin/api-management/api-keys
 @bp.route("/api-keys", defaults={"subpath": None}, methods=["GET", "HEAD", "POST", "OPTIONS"])
 @bp.route("/api-keys/<path:subpath>", methods=["GET", "HEAD", "POST", "OPTIONS"])
@@ -164,6 +186,7 @@ def legacy_api_key_admin_redirect(subpath=None):
 def admin_dashboard():
     """Main admin dashboard with overview statistics"""
     kobo_data_import_url = _kobo_data_import_url_for_dashboard()
+    data_sync_url = _data_sync_url_for_dashboard()
     try:
         from app.services.authorization_service import AuthorizationService
 
@@ -347,6 +370,7 @@ def admin_dashboard():
                              security_audit_widget=security_audit_widget,
                              translation_widget=translation_widget,
                              kobo_data_import_url=kobo_data_import_url,
+                             data_sync_url=data_sync_url,
                              title="Admin Dashboard")
 
     except Exception as e:
@@ -373,6 +397,7 @@ def admin_dashboard():
                              security_audit_widget={"high_risk_actions_30d": 0, "suspicious_logins_30d": 0, "failed_login_rate_30d": 0.0},
                              translation_widget={"avg_name_pct": 0.0, "avg_def_pct": 0.0, "by_lang": {}},
                              kobo_data_import_url=kobo_data_import_url,
+                             data_sync_url=data_sync_url,
                              title="Admin Dashboard",
                              dashboard_error="Error loading dashboard statistics")
 

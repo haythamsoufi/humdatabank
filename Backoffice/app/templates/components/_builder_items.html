@@ -1,3 +1,35 @@
+{# Matrix column display labels: English translation when set, otherwise column code (name/variable). #}
+{% macro matrix_column_labels_text(item_instance) -%}
+{%- set config_dict = item_instance.config if item_instance.config is mapping else (item_instance.config | fromjson if item_instance.config else {}) -%}
+{%- set matrix_config = config_dict.get('matrix_config', {}) if config_dict else {} -%}
+{%- set columns = matrix_config.get('columns', []) if matrix_config else [] -%}
+{%- set column_labels = [] -%}
+{%- for column in columns -%}
+  {%- if column is mapping -%}
+    {%- set col_code = (column.get('name') or column.get('variable') or column.get('variable_name') or '') | trim -%}
+    {%- set name_trans = column.get('name_translations', {}) if column.get('name_translations') is mapping else {} -%}
+    {%- set en_label = (name_trans.get('en', '') or '') | trim -%}
+    {%- set display_label = en_label if en_label else col_code -%}
+    {%- if display_label -%}
+      {%- set __ = column_labels.append(display_label) -%}
+    {%- endif -%}
+  {%- elif column is string and column.strip() -%}
+    {%- set __ = column_labels.append(column.strip()) -%}
+  {%- endif -%}
+{%- endfor -%}
+{{- column_labels | join(', ') -}}
+{%- endmacro %}
+
+{% macro item_label_content(item_type, item_instance) %}
+  {{ item_instance.label }}
+  {% if item_type == 'matrix' %}
+    {% set _matrix_col_labels = matrix_column_labels_text(item_instance) %}
+    {% if _matrix_col_labels %}
+      <span class="block text-xs text-gray-500 mt-0.5">{{ _matrix_col_labels }}</span>
+    {% endif %}
+  {% endif %}
+{% endmacro %}
+
 {% macro items_table_header() %}
 <tr>
     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/16">{{ _('Order') }}</th>

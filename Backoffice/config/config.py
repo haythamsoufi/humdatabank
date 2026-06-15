@@ -681,7 +681,7 @@ class Config:
 
     # Session configuration
     SESSION_PERMANENT = True
-    PERMANENT_SESSION_LIFETIME = timedelta(days=7)
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=10)
     SESSION_INACTIVITY_TIMEOUT = timedelta(
         minutes=int(os.environ.get('SESSION_INACTIVITY_TIMEOUT_MINUTES', 30))
     )

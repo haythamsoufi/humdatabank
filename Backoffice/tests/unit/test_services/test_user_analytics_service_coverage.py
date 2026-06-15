@@ -460,6 +460,58 @@ class TestSessionBlacklist:
                 result = _svc.is_session_blacklisted("sess-admin-forced")
                 assert result is True
 
+    def test_db_fallback_logout_blacklists(self, app):
+        """DB row ended_by='logout' with is_active=False should be blacklisted (replayed cookie protection)."""
+        with app.app_context():
+            fake_row = MagicMock()
+            fake_row.is_active = False
+            fake_row.ended_by = "logout"
+            with patch(
+                "app.services.user_analytics_service.UserSessionLog"
+            ) as MockSL:
+                MockSL.query.with_entities.return_value.filter_by.return_value.first.return_value = fake_row
+                assert _svc.is_session_blacklisted("sess-logout") is True
+
+    def test_db_fallback_timeout_blacklists(self, app):
+        """DB row ended_by='timeout' with is_active=False should be blacklisted."""
+        with app.app_context():
+            fake_row = MagicMock()
+            fake_row.is_active = False
+            fake_row.ended_by = "timeout"
+            with patch(
+                "app.services.user_analytics_service.UserSessionLog"
+            ) as MockSL:
+                MockSL.query.with_entities.return_value.filter_by.return_value.first.return_value = fake_row
+                assert _svc.is_session_blacklisted("sess-timeout") is True
+
+    def test_db_fallback_active_session_not_blacklisted(self, app):
+        """DB row with is_active=True must never be treated as blacklisted."""
+        with app.app_context():
+            fake_row = MagicMock()
+            fake_row.is_active = True
+            fake_row.ended_by = None
+            with patch(
+                "app.services.user_analytics_service.UserSessionLog"
+            ) as MockSL:
+                MockSL.query.with_entities.return_value.filter_by.return_value.first.return_value = fake_row
+                assert _svc.is_session_blacklisted("sess-still-active") is False
+
+    def test_db_fallback_warms_in_memory_cache(self, app):
+        """After a DB hit, the session_id is added to the in-memory set (no second DB query)."""
+        import app.services.user_analytics_service as m
+        m._blacklisted_sessions.discard("sess-warm")
+        with app.app_context():
+            fake_row = MagicMock()
+            fake_row.is_active = False
+            fake_row.ended_by = "logout"
+            with patch(
+                "app.services.user_analytics_service.UserSessionLog"
+            ) as MockSL:
+                MockSL.query.with_entities.return_value.filter_by.return_value.first.return_value = fake_row
+                _svc.is_session_blacklisted("sess-warm")
+            # In-memory cache should now contain it — second call never needs DB
+            assert "sess-warm" in m._blacklisted_sessions
+
     def test_db_fallback_exception_returns_false(self, app):
         """DB error during blacklist check should return False (safe default)."""
         with app.app_context():

@@ -14,7 +14,7 @@ This page maps **administrator-facing screens** in the Backoffice to what they d
 
 **Who:** Anyone with assignment access (`assignment.view` and related focal-point roles).
 
-**What you get:** Your focal-point landing view (assignments, tasks, and org context). Described in [Navigation basics](user-guides/common/navigation.md) and [View your assignments](user-guides/focal-point/view-assignments.md).
+**What you get:** Your focal-point landing view (assignments, tasks, and org context). Described in [How the platform works](getting-started/how-it-works.md) and [View your assignments](user-guides/focal-point/view-assignments.md).
 
 ---
 
@@ -32,7 +32,7 @@ This page maps **administrator-facing screens** in the Backoffice to what they d
 - **Items requiring attention** — Pending public submissions, overdue country assignments, unresolved security alerts with **View** jumps to the right list.
 - **Recent activity (7 days)** — Successful logins, user activity events, active sessions.
 - **Most active users (30 days)** — Ranked list with links to per-user analytics.
-- **Data import tools** (System Manager, when KoBo route is registered) — KoBo Toolbox import wizard entry point.
+- **Data integration** (System Manager, when KoBo or FDRS routes are registered) — KoBo Toolbox import (`/admin/kobo-data-import`) and FDRS sync/imputation (`/admin/fdrs-sync-imputation`).
 
 ---
 

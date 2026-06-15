@@ -6,13 +6,18 @@ Extracted from routes/api.py for better organization and reusability.
 
 from datetime import datetime
 from flask import request, current_app
-from sqlalchemy import desc, asc, literal
+from sqlalchemy import desc, asc, literal, func, select
 from app import db
 from app.models import FormData, PublicSubmission
 from app.utils.api_helpers import MAX_PER_PAGE, DEFAULT_PER_PAGE, DEFAULT_PAGE
 
 # SQL Server allows at most 2100 bound parameters per query; keep IN batches below that.
 SQL_IN_BATCH_SIZE = 2000
+
+# Safety cap for the user-auth (unpaginated) path.  If a session-authenticated
+# caller does not provide explicit pagination, we return at most this many rows to
+# avoid runaway memory usage.  API-key callers are unaffected (they always paginate).
+MAX_USER_AUTH_ROWS = 50_000
 
 
 def query_filter_in_batches(base_query, column, ids, batch_size=SQL_IN_BATCH_SIZE):
@@ -178,13 +183,6 @@ def validate_data_endpoint_params(request_args):
     except (ValueError, TypeError):
         per_page = 20
 
-    # Validate disagg parameter - only allow specific values
-    disagg_param = request_args.get('disagg', default=None, type=str)
-    include_disagg = False
-    if disagg_param is not None:
-        disagg_str = str(disagg_param).strip().lower()
-        include_disagg = disagg_str in ['1', 'true', 'yes', 'y']
-
     # Validate include_full_info parameter (default False for performance with large datasets)
     full_info_param = request_args.get('include_full_info', default=None, type=str)
     include_full_info = False
@@ -195,7 +193,6 @@ def validate_data_endpoint_params(request_args):
     return {
         'page': page,
         'per_page': per_page,
-        'include_disagg': include_disagg,
         'include_full_info': include_full_info
     }
 
@@ -232,7 +229,7 @@ def build_pagination_queries(assigned_form_data_query, public_form_data_query, s
     return assigned_ids_q, public_ids_q
 
 
-def get_paginated_data_ids(assigned_ids_q, public_ids_q, page, per_page, paginate=True, sort_field='submitted_at', sort_order='desc'):
+def get_paginated_data_ids(assigned_ids_q, public_ids_q, page, per_page, paginate=True, sort_field='submitted_at', sort_order='desc', max_rows=None):
     """Get paginated data IDs from UNION queries.
 
     Args:
@@ -247,12 +244,19 @@ def get_paginated_data_ids(assigned_ids_q, public_ids_q, page, per_page, paginat
     Returns:
         tuple: (page_rows, total_items)
     """
-    # Compute total count cheaply per-branch
-    total_items = 0
-    if assigned_ids_q is not None:
-        total_items += assigned_ids_q.order_by(None).count()
-    if public_ids_q is not None:
-        total_items += public_ids_q.order_by(None).count()
+    # Compute total count in a single query via UNION ALL subquery.
+    # This replaces two separate COUNT queries with one round-trip:
+    #   SELECT COUNT(*) FROM (assigned_q UNION ALL public_q) AS _count_subq
+    _count_branches = [q for q in (assigned_ids_q, public_ids_q) if q is not None]
+    if not _count_branches:
+        total_items = 0
+    elif len(_count_branches) == 1:
+        total_items = _count_branches[0].order_by(None).count()
+    else:
+        _union_sq = _count_branches[0].union_all(_count_branches[1]).subquery()
+        total_items = db.session.execute(
+            select(func.count()).select_from(_union_sq)
+        ).scalar() or 0
 
     # Determine sort column and order
     # For UNION queries, we can only sort by fields that exist in both queries
@@ -267,27 +271,31 @@ def get_paginated_data_ids(assigned_ids_q, public_ids_q, page, per_page, paginat
     order_func = desc if sort_order == 'desc' else asc
 
     if not paginate:
-        # Return all rows without pagination
+        # Return rows without explicit pagination, but apply max_rows as a safety cap.
+        # When max_rows is set (user-auth path) we limit the query to avoid runaway
+        # memory usage on large datasets.  API-key callers always use paginate=True.
+        row_limit = max_rows  # may be None → no limit
+
         if assigned_ids_q is not None and public_ids_q is not None:
             combined = assigned_ids_q.union_all(public_ids_q).subquery()
-            page_rows = (
+            q = (
                 db.session.query(
                     combined.c.id, combined.c.submitted_at, combined.c.submission_type
                 )
                 .order_by(order_func(getattr(combined.c, sort_column)))
-                .all()
             )
+            page_rows = q.limit(row_limit).all() if row_limit else q.all()
         else:
             only_q = assigned_ids_q or public_ids_q
             if only_q is None:
                 page_rows = []
             else:
                 subq = only_q.subquery()
-                page_rows = (
+                q = (
                     db.session.query(subq.c.id, subq.c.submitted_at, subq.c.submission_type)
                     .order_by(order_func(getattr(subq.c, sort_column)))
-                    .all()
                 )
+                page_rows = q.limit(row_limit).all() if row_limit else q.all()
         return page_rows, total_items
 
     # Build combined ordered page of ids

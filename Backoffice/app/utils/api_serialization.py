@@ -5,11 +5,15 @@ Extracted from routes/api.py for better organization and reusability.
 """
 
 import logging
+from typing import Any
 
 from app.utils.form_localization import get_localized_indicator_name
 from app.utils.api_formatting import format_answer_value
 from app.utils.api_helpers import extract_numeric_value
 from flask import current_app
+from sqlalchemy.orm import joinedload as _joinedload_impl
+from app.models import FormTemplate, AssignedForm
+from app.models.assignments import AssignmentEntityStatus, PublicSubmission
 
 logger = logging.getLogger(__name__)
 
@@ -279,9 +283,83 @@ def format_indicator_details(form_item):
     }
 
 
+def _resolve_matrix_cell(v: Any) -> Any:
+    """
+    Resolve a single matrix cell value to its effective scalar.
+
+    Variable-column (lookup-enabled, non-read-only) cells are stored as
+    {"original": <db value>, "modified": <user edit>, "isModified": bool}.
+    The API only needs the final value: modified if non-null, else original.
+
+    Because variable-column values are always submitted as strings from form
+    inputs, the resolved value is coerced to int/float when it represents a
+    valid number — consistent with how plain numeric matrix cells are stored.
+    Thousands-separator commas are stripped before coercion.
+
+    Plain scalars (int, float, bool, None) are returned unchanged.
+    """
+    if isinstance(v, dict) and ('modified' in v or 'original' in v):
+        modified = v.get('modified')
+        effective = modified if modified is not None else v.get('original')
+    else:
+        return v
+
+    if not isinstance(effective, str):
+        return effective
+
+    stripped = effective.strip().replace(',', '')
+    if not stripped:
+        return effective  # preserve empty string as-is
+    try:
+        as_int = int(stripped)
+        # Only return int if the string round-trips cleanly (avoids "1e3" → 1000)
+        if str(as_int) == stripped:
+            return as_int
+    except ValueError:
+        pass
+    try:
+        return float(stripped)
+    except ValueError:
+        pass
+    return effective
+
+
+def _wrap_disagg_dict(dd):
+    """
+    Normalize a raw disagg_data dict for API output, returning None when empty.
+
+    Handles three on-disk formats:
+    - Standard disaggregation: {"mode": "sex|age|sex_age|total", "values": {...}}
+      Returned as-is (mode + values preserved).
+    - Matrix (flat): {"_table": "ns", "10_SP2": 4107000, ...}
+      No "values" key present; wrapped as {"mode": "matrix", "values": {non-_ keys}}.
+      Variable-column cells stored as {"original": ..., "modified": ..., "isModified": bool}
+      are resolved to their effective scalar value (modified ?? original).
+    - Plugin / arbitrary JSON: any other dict that lacks a "values" key.
+      Wrapped as {"mode": null, "values": <whole dict>} so callers always get
+      a consistent shape without silently dropping data.
+    """
+    if not dd or not isinstance(dd, dict):
+        return None
+    if 'values' in dd:
+        values = dd['values']
+        return {
+            'mode': dd.get('mode'),
+            'values': values if isinstance(values, dict) else {},
+        }
+    # Flat matrix or plugin format — no nested "values" key.
+    # Strip internal reserved keys (prefixed with "_") and resolve variable-column cells.
+    values = {
+        k: _resolve_matrix_cell(v)
+        for k, v in dd.items()
+        if not (isinstance(k, str) and k.startswith('_'))
+    }
+    mode = 'matrix' if values else None
+    return {'mode': mode, 'values': values}
+
+
 def serialize_assigned_data_item(
     data_item,
-    include_disagg=False,
     include_full_info=True,
     minimal_country_info=False,
     aes_countries=None,
@@ -306,15 +384,19 @@ def serialize_assigned_data_item(
         data_status = "available"
 
     num_value = extract_numeric_value(value)
-    imputed_val = format_answer_value(data_item.imputed_value) if hasattr(data_item, 'imputed_value') and data_item.imputed_value is not None else None
-    prefilled_val = format_answer_value(data_item.prefilled_value) if hasattr(data_item, 'prefilled_value') and data_item.prefilled_value is not None else None
-    prefilled_disagg = getattr(data_item, "prefilled_disagg_data", None) if hasattr(data_item, "prefilled_disagg_data") else None
-    imputed_disagg = getattr(data_item, "imputed_disagg_data", None) if hasattr(data_item, "imputed_disagg_data") else None
+    _raw_imputed = getattr(data_item, 'imputed_value', None)
+    imputed_val = format_answer_value(_raw_imputed) if _raw_imputed is not None else None
+    _raw_prefilled = getattr(data_item, 'prefilled_value', None)
+    prefilled_val = format_answer_value(_raw_prefilled) if _raw_prefilled is not None else None
+    prefilled_disagg = getattr(data_item, 'prefilled_disagg_data', None)
+    imputed_disagg = getattr(data_item, 'imputed_disagg_data', None)
 
     # Get template name efficiently (already eager loaded)
     template_name = None
     if assigned_form and assigned_form.template:
         template_name = assigned_form.template.name
+
+    submitted_at_str = data_item.submitted_at.isoformat() if data_item.submitted_at is not None else None
 
     item_payload = {
         'id': data_item.id,
@@ -332,12 +414,15 @@ def serialize_assigned_data_item(
         'prefilled_disagg_data': prefilled_disagg,
         'imputed_value': imputed_val,
         'imputed_disagg_data': imputed_disagg,
+        'disaggregation_data': _wrap_disagg_dict(getattr(data_item, 'disagg_data', None)),
+        'prefilled_disaggregation_data': _wrap_disagg_dict(prefilled_disagg) if prefilled_disagg else None,
+        'imputed_disaggregation_data': _wrap_disagg_dict(imputed_disagg) if imputed_disagg else None,
         'data_status': data_status,
         'data_not_available': data_not_avail,
         'not_applicable': not_applic,
-        'date_collected': data_item.submitted_at.isoformat() if data_item.submitted_at is not None else None,
-        'submitted_at': data_item.submitted_at.isoformat() if data_item.submitted_at is not None else None,
-        'created_at': data_item.submitted_at.isoformat() if data_item.submitted_at is not None else None,
+        'date_collected': submitted_at_str,
+        'submitted_at': submitted_at_str,
+        'created_at': submitted_at_str,
         'updated_at': None,
         'start_date': None,
         'end_date': None
@@ -357,25 +442,10 @@ def serialize_assigned_data_item(
             assignment=assigned_form
         ) if data_item.form_item else None
 
-    if include_disagg:
-        def _wrap_disagg(dd):
-            if not dd:
-                return None
-            if isinstance(dd, dict):
-                return {
-                    'mode': dd.get('mode'),
-                    'values': dd.get('values', {}) if isinstance(dd.get('values', {}), dict) else {},
-                }
-            return None
-
-        item_payload['disaggregation_data'] = _wrap_disagg(getattr(data_item, "disagg_data", None))
-        item_payload['prefilled_disaggregation_data'] = _wrap_disagg(prefilled_disagg)
-        item_payload['imputed_disaggregation_data'] = _wrap_disagg(imputed_disagg)
-
     return item_payload
 
 
-def serialize_public_data_item(data_item, include_disagg=False, include_full_info=True, minimal_country_info=False):
+def serialize_public_data_item(data_item, include_full_info=True, minimal_country_info=False):
     """Serialize a public FormData item."""
     submission = data_item.public_submission
     public_assignment = submission.assigned_form if submission else None
@@ -396,15 +466,22 @@ def serialize_public_data_item(data_item, include_disagg=False, include_full_inf
         data_status = "available"
 
     num_value = extract_numeric_value(value)
-    imputed_val = format_answer_value(data_item.imputed_value) if hasattr(data_item, 'imputed_value') and data_item.imputed_value is not None else None
-    prefilled_val = format_answer_value(data_item.prefilled_value) if hasattr(data_item, 'prefilled_value') and data_item.prefilled_value is not None else None
-    prefilled_disagg = getattr(data_item, "prefilled_disagg_data", None) if hasattr(data_item, "prefilled_disagg_data") else None
-    imputed_disagg = getattr(data_item, "imputed_disagg_data", None) if hasattr(data_item, "imputed_disagg_data") else None
+    _raw_imputed = getattr(data_item, 'imputed_value', None)
+    imputed_val = format_answer_value(_raw_imputed) if _raw_imputed is not None else None
+    _raw_prefilled = getattr(data_item, 'prefilled_value', None)
+    prefilled_val = format_answer_value(_raw_prefilled) if _raw_prefilled is not None else None
+    prefilled_disagg = getattr(data_item, 'prefilled_disagg_data', None)
+    imputed_disagg = getattr(data_item, 'imputed_disagg_data', None)
 
     # Get template name efficiently (already eager loaded)
     template_name = None
     if public_assignment and public_assignment.template:
         template_name = public_assignment.template.name
+
+    submitted_at_str = (
+        submission.submitted_at.isoformat()
+        if submission and submission.submitted_at is not None else None
+    )
 
     item_payload = {
         'id': data_item.id,
@@ -424,12 +501,15 @@ def serialize_public_data_item(data_item, include_disagg=False, include_full_inf
         'prefilled_disagg_data': prefilled_disagg,
         'imputed_value': imputed_val,
         'imputed_disagg_data': imputed_disagg,
+        'disaggregation_data': _wrap_disagg_dict(getattr(data_item, 'disagg_data', None)),
+        'prefilled_disaggregation_data': _wrap_disagg_dict(prefilled_disagg) if prefilled_disagg else None,
+        'imputed_disaggregation_data': _wrap_disagg_dict(imputed_disagg) if imputed_disagg else None,
         'data_status': data_status,
         'data_not_available': data_not_avail,
         'not_applicable': not_applic,
-        'date_collected': submission.submitted_at.isoformat() if submission and submission.submitted_at is not None else None,
-        'submitted_at': submission.submitted_at.isoformat() if submission and submission.submitted_at is not None else None,
-        'created_at': submission.submitted_at.isoformat() if submission and submission.submitted_at is not None else None,
+        'date_collected': submitted_at_str,
+        'submitted_at': submitted_at_str,
+        'created_at': submitted_at_str,
         'updated_at': None,
         'start_date': None,
         'end_date': None
@@ -449,37 +529,11 @@ def serialize_public_data_item(data_item, include_disagg=False, include_full_inf
             public_assignment=public_assignment
         ) if data_item.form_item else None
 
-    if include_disagg:
-        def _wrap_disagg(dd):
-            if not dd:
-                return None
-            if isinstance(dd, dict):
-                return {
-                    'mode': dd.get('mode'),
-                    'values': dd.get('values', {}) if isinstance(dd.get('values', {}), dict) else {},
-                }
-            return None
-
-        item_payload['disaggregation_data'] = _wrap_disagg(getattr(data_item, "disagg_data", None))
-        item_payload['prefilled_disaggregation_data'] = _wrap_disagg(prefilled_disagg)
-        item_payload['imputed_disaggregation_data'] = _wrap_disagg(imputed_disagg)
-
     return item_payload
-
-
-def _wrap_disagg_dict(dd):
-    """Normalize a raw disagg_data dict for API output, returning None when empty."""
-    if not dd or not isinstance(dd, dict):
-        return None
-    return {
-        'mode': dd.get('mode'),
-        'values': dd.get('values', {}) if isinstance(dd.get('values', {}), dict) else {},
-    }
 
 
 def serialize_dynamic_data_item(
     data_item,
-    include_disagg=False,
     minimal_country_info=False,
     aes_countries=None,
 ):
@@ -546,6 +600,9 @@ def serialize_dynamic_data_item(
         'not_applicable': not_applic,
         'prefilled_value': getattr(data_item, 'prefilled_value', None),
         'imputed_value': getattr(data_item, 'imputed_value', None),
+        'disaggregation_data': _wrap_disagg_dict(getattr(data_item, 'disagg_data', None)),
+        'prefilled_disaggregation_data': (lambda d: _wrap_disagg_dict(d) if d else None)(getattr(data_item, 'prefilled_disagg_data', None)),
+        'imputed_disaggregation_data': (lambda d: _wrap_disagg_dict(d) if d else None)(getattr(data_item, 'imputed_disagg_data', None)),
         'date_collected': submitted_at,
         'submitted_at': submitted_at,
     }
@@ -555,17 +612,11 @@ def serialize_dynamic_data_item(
     else:
         payload['country_info'] = format_country_info(country)
 
-    if include_disagg:
-        payload['disaggregation_data'] = _wrap_disagg_dict(getattr(data_item, 'disagg_data', None))
-        payload['prefilled_disaggregation_data'] = _wrap_disagg_dict(getattr(data_item, 'prefilled_disagg_data', None))
-        payload['imputed_disaggregation_data'] = _wrap_disagg_dict(getattr(data_item, 'imputed_disagg_data', None))
-
     return payload
 
 
 def serialize_repeat_data_item(
     data_item,
-    include_disagg=False,
     minimal_country_info=False,
     aes_countries=None,
 ):
@@ -634,6 +685,9 @@ def serialize_repeat_data_item(
         'not_applicable': not_applic,
         'prefilled_value': getattr(data_item, 'prefilled_value', None),
         'imputed_value': getattr(data_item, 'imputed_value', None),
+        'disaggregation_data': _wrap_disagg_dict(getattr(data_item, 'disagg_data', None)),
+        'prefilled_disaggregation_data': (lambda d: _wrap_disagg_dict(d) if d else None)(getattr(data_item, 'prefilled_disagg_data', None)),
+        'imputed_disaggregation_data': (lambda d: _wrap_disagg_dict(d) if d else None)(getattr(data_item, 'imputed_disagg_data', None)),
         'date_collected': submitted_at,
         'submitted_at': submitted_at,
     }
@@ -642,11 +696,6 @@ def serialize_repeat_data_item(
         payload['country_info'] = format_country_info_minimal(country)
     else:
         payload['country_info'] = format_country_info(country)
-
-    if include_disagg:
-        payload['disaggregation_data'] = _wrap_disagg_dict(getattr(data_item, 'disagg_data', None))
-        payload['prefilled_disaggregation_data'] = _wrap_disagg_dict(getattr(data_item, 'prefilled_disagg_data', None))
-        payload['imputed_disaggregation_data'] = _wrap_disagg_dict(getattr(data_item, 'imputed_disagg_data', None))
 
     return payload
 
@@ -781,10 +830,8 @@ def format_bridge_disagg_rows(form_data_id, disagg_payload, source='reported'):
     return rows
 
 
-def build_bridge_disagg_from_flat_rows(data_rows, include_disagg):
+def build_bridge_disagg_from_flat_rows(data_rows):
     """Build bridge_disagg_values from flat /data/tables rows."""
-    if not include_disagg:
-        return []
     bridge = []
     for row in data_rows or []:
         if not isinstance(row, dict):
@@ -807,8 +854,6 @@ def build_star_schema_tables(
     data_rows,
     form_items_table,
     countries_table,
-    *,
-    include_disagg=False,
 ):
     """
     Assemble star-schema table dicts from flat /data/tables intermediate data.
@@ -816,9 +861,6 @@ def build_star_schema_tables(
     Loads dim_template, dim_period, and dim_submission from the database using
     FK references present on the fact rows.
     """
-    from app.models import AssignedForm
-    from app.models.assignments import AssignmentEntityStatus, PublicSubmission
-
     fact_rows = [
         r for r in (format_fact_form_value_row(row) for row in (data_rows or []))
         if r is not None
@@ -831,12 +873,9 @@ def build_star_schema_tables(
     }
     dim_template = []
     if template_ids:
-        from app.models import FormTemplate
-        from sqlalchemy.orm import joinedload
-
         templates = (
             FormTemplate.query
-            .options(joinedload(FormTemplate.published_version))
+            .options(_joinedload_impl(FormTemplate.published_version))
             .filter(FormTemplate.id.in_(template_ids))
             .all()
         )
@@ -905,5 +944,5 @@ def build_star_schema_tables(
         'dim_template': dim_template,
         'dim_period': dim_period,
         'dim_submission': dim_submission,
-        'bridge_disagg_values': build_bridge_disagg_from_flat_rows(data_rows, include_disagg),
+        'bridge_disagg_values': build_bridge_disagg_from_flat_rows(data_rows),
     }

@@ -265,3 +265,14 @@ class TestKoboDataImportUrl:
             url = _kobo_data_import_url_for_dashboard()
         # form_builder.kobo_data_import may or may not be registered; either None or a URL string
         assert url is None or isinstance(url, str)
+
+
+class TestDataSyncUrl:
+    def test_returns_none_or_url(self, app, db_session):
+        from app.routes.admin import _data_sync_url_for_dashboard
+
+        with app.test_request_context("/admin/"):
+            url = _data_sync_url_for_dashboard()
+        assert url is None or isinstance(url, str)
+        if url is not None:
+            assert url.endswith("/admin/fdrs-sync-imputation")

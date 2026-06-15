@@ -28,8 +28,8 @@ In the Backoffice, open the chatbot and ask e.g. “How do I add a user?” or �
 
 ### Common
 
-- [Account settings](common/account-settings.md)
-- [Navigation](common/navigation.md)
+- [Account settings](getting-started/account-settings.md)
+- [How the platform works](getting-started/how-it-works.md)
 
 ## Technical note
 

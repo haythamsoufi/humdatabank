@@ -32,5 +32,5 @@ Lorsque vous contactez le support, incluez :
 
 ## Liens connexes
 
-- [Paramètres du compte](account-settings.md)
-- [Bases de la navigation](navigation.md)
+- [Paramètres du compte](../../getting-started/account-settings.md)
+- [Comment fonctionne la plateforme](../../getting-started/how-it-works.md)

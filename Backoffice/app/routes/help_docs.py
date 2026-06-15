@@ -19,9 +19,10 @@ from app.services import documentation_service as docs
 bp = Blueprint("help_docs", __name__, url_prefix="/help/docs")
 
 VISIBLE_TOP_LEVEL_DIRS = {
-    # Keep the help docs UI user-focused. Only user guides are shown here.
+    # Keep the help docs UI user-focused.
     "getting-started",
     "user-guides",
+    "data-reporting",
 }
 
 def _canonical_doc_path_for_url(doc_path: str) -> str:
@@ -29,7 +30,7 @@ def _canonical_doc_path_for_url(doc_path: str) -> str:
     Convert a docs-relative markdown path into a clean, extensionless URL path.
 
     Examples:
-      - "user-guides/common/navigation.md"   -> "user-guides/common/navigation"
+      - "getting-started/how-it-works.md"   -> "getting-started/how-it-works"
       - "user-guides/admin/add-user.fr.md"   -> "user-guides/admin/add-user.fr"
       - "README.md" / "README" / ""          -> ""
     """

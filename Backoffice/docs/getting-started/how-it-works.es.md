@@ -15,12 +15,24 @@ Esta página explica las piezas principales del Backoffice en términos simples.
 3. Un **punto focal** abre la asignación, completa el formulario, corrige los mensajes de validación y hace clic en **Enviar**.
 4. Los administradores pueden monitorear el progreso (por ejemplo: pendiente / en progreso / enviado).
 
-## Dónde ir a continuación
+## Lugares principales que usarás
 
-- Si eres un punto focal: comienza con **Guías de usuario → Punto focal → Ver tus asignaciones**.
-- Si eres administrador: comienza con **Guías de usuario → Administrador → Crear y gestionar asignaciones**.
+### Panel de control (todos los usuarios)
+
+Tu página de inicio. Normalmente muestra tu trabajo pendiente y enlaces rápidos.
+
+### Configuración de cuenta (todos los usuarios)
+
+Usa **Configuración de cuenta** para actualizar tu perfil, cambiar tu contraseña y seleccionar tu idioma preferido.
+
+## Consejos
+
+- Usa la barra lateral para moverte entre secciones.
+- Si no puedes encontrar una página, usa la búsqueda de la plataforma (si está habilitada) o pregunta a tu administrador.
+
+Ahora que entiendes lo básico, la Guía de usuario explica cada tarea paso a paso.
 
 ## Relacionado
 
 - [Glosario](glossary.md)
-- [Guías de usuario](../user-guides/README.md)
+- [Obtener ayuda](../user-guides/common/getting-help.md)

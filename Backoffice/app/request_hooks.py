@@ -4,6 +4,7 @@ from flask import current_app, redirect, request, session, url_for
 from flask_login import current_user
 
 from app.i18n import update_session_activity
+from app.utils.activity_logging_skip import should_skip_activity_endpoint, should_skip_activity_path
 from app.utils.api_responses import json_ok
 from app.utils.datetime_helpers import utcnow
 from app.utils.request_utils import (
@@ -97,6 +98,14 @@ def register_request_hooks(app):
     @app.before_request
     def update_activity():
         if is_static_asset_request():
+            return
+        # Background polls (heartbeats, presence, CSRF refresh, notifications,
+        # settings checks, etc.) must NOT reset the inactivity timer — they run
+        # silently while the user may be away.  Only genuine user-facing page
+        # navigations and form submissions should count as activity.
+        if should_skip_activity_path(request.path):
+            return
+        if should_skip_activity_endpoint(request.endpoint):
             return
         if current_user.is_authenticated:
             update_session_activity()

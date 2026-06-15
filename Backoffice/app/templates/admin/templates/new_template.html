@@ -900,20 +900,12 @@
 
         if (importExcelForm) {
             importExcelForm.addEventListener('submit', function(e) {
-                if (excelImportSubmitBtn && excelImportSubmitBtn.disabled) {
-                    e.preventDefault();
-                    return;
-                }
                 syncExcelImportFields();
             });
         }
 
         if (importKoboForm) {
             importKoboForm.addEventListener('submit', function(e) {
-                if (koboImportSubmitBtn && koboImportSubmitBtn.disabled) {
-                    e.preventDefault();
-                    return;
-                }
                 syncKoboImportFields();
             });
         }

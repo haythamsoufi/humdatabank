@@ -16,6 +16,32 @@ from app.middleware.session_timeout import (
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# Config assertions — ensure the values that control session length are set
+# correctly and don't silently revert to longer defaults.
+# ────────────────────────────────────────────────────────────────────────────
+
+class TestSessionConfig:
+    """Guard against accidental config regressions for session lifetimes."""
+
+    def test_permanent_session_lifetime_is_ten_hours(self):
+        """PERMANENT_SESSION_LIFETIME must be 10 h (not the old 7-day default)."""
+        from config import Config
+        assert Config.PERMANENT_SESSION_LIFETIME == timedelta(hours=10), (
+            "PERMANENT_SESSION_LIFETIME was changed away from 10 hours. "
+            "Update this test only if you intentionally changed the lifetime."
+        )
+
+    def test_inactivity_timeout_default_is_30_minutes(self):
+        """Default SESSION_INACTIVITY_TIMEOUT must be 30 minutes."""
+        from config import Config
+        assert Config.SESSION_INACTIVITY_TIMEOUT == timedelta(minutes=30)
+
+    def test_permanent_session_lifetime_propagated_to_flask_app(self, app):
+        """The Flask app config must carry the 10-hour lifetime from Config."""
+        assert app.config['PERMANENT_SESSION_LIFETIME'] == timedelta(hours=10)
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # check_session_timeout
 # ────────────────────────────────────────────────────────────────────────────
 

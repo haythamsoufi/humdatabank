@@ -1,4 +1,4 @@
-# Statuts de soumission et ce que vous pouvez faire (guide des permissions)
+# Statut de soumission
 
 Utilisez ce guide pour comprendre pourquoi un bouton est manquant/désactivé (par exemple **Modifier**, **Soumettre**, **Approuver**, ou **Rouvrir**).
 

@@ -4,8 +4,12 @@ Usa esta guía para completar una asignación y enviar tu formulario.
 
 ## Antes de comenzar
 
-- Necesitas una **asignación actual**.
-- Ten tus datos listos (y fuentes, si necesitas agregar comentarios).
+Marca cada elemento antes de empezar:
+
+- [ ] **Una asignación actual** visible en tu Panel de control. Si no aparece ninguna, consulta [Solución de problemas](troubleshooting.md) ("No aparecen asignaciones").
+- [ ] **Tus datos** — las cifras o respuestas de cada sección del formulario.
+- [ ] **Tu fuente de datos**, si el formulario tiene campos de comentarios para documentar fuentes.
+- [ ] **(Si aplica) Documentos de respaldo** — archivos para consultar o subir.
 
 ## Pasos
 
@@ -29,5 +33,5 @@ Usa esta guía para completar una asignación y enviar tu formulario.
 ## Relacionado
 
 - [Ver tus asignaciones](view-assignments.md)
-- [Solución de problemas (Punto focal)](troubleshooting.md)
+- [Solución de problemas](troubleshooting.md)
 - [Glosario](../../getting-started/glossary.md)

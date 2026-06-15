@@ -32,8 +32,8 @@ Demandez :
 - capture d'écran de l'erreur (si présente)
 
 Puis dirigez-les vers :
-- [Bases du dépannage (tout le monde)](../common/troubleshooting-basics.md)
-- [Dépannage des problèmes de soumission (Point focal)](../focal-point/troubleshooting-submission.md)
+- [Bases du dépannage (tout le monde)](../user-guides/focal-point/troubleshooting.md)
+- [Dépannage des problèmes de soumission (Point focal)](../focal-point/troubleshooting.md)
 - [Dépannage des modèles et missions (administrateur)](troubleshooting-templates-and-assignments.md)
 
 ## Meilleures pratiques

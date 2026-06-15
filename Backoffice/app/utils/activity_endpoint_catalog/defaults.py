@@ -176,7 +176,7 @@ def activity_category_for_endpoint(endpoint: str) -> str:
         return "admin_assignments"
     if bp in ("organization",):
         return "admin_organization"
-    if bp in ("system_admin", "template_special"):
+    if bp in ("system_admin", "data_sync_imputation"):
         return "admin_system"
     if bp in ("user_management",):
         return "admin_users"

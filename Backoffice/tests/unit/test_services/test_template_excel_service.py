@@ -1461,7 +1461,67 @@ class TestExportImportRoundTrip:
 
             assert result['success'] is True
 
-    def test_round_trip_with_relevance_conditions(self, db_session, app):
+    def test_round_trip_preserves_matrix_column_groups(self, db_session, app):
+        """Matrix column groups and per-column group keys survive export then import."""
+        matrix_config = {
+            'is_required': False,
+            'layout_column_width': '12',
+            'matrix_config': {
+                'type': 'matrix',
+                'row_mode': 'manual',
+                'columns': [
+                    {'name': 'SP1', 'type': 'number', 'group': 'Funding'},
+                    {'name': 'SP2', 'type': 'number', 'group': 'Funding'},
+                    {'name': 'Other', 'type': 'number'},
+                ],
+                'column_groups': {'Funding': {'fr': 'Financement'}},
+                'rows': [{'text': 'Row 1'}],
+            },
+        }
+        with app.app_context():
+            admin = create_test_admin(db_session)
+            template = create_test_template(db_session, name="Matrix Groups RT")
+            version = db_session.query(FormTemplateVersion).filter_by(
+                id=template.published_version_id
+            ).first()
+            section = create_test_section(
+                db_session, template, version=version, name="Matrix Sec", order=1
+            )
+            create_test_item(
+                db_session,
+                section,
+                template,
+                version=version,
+                item_type='matrix',
+                order=1,
+                label='Funding Matrix',
+                config=matrix_config,
+            )
+
+            with app.test_request_context():
+                login_user(admin)
+                export_buf = TemplateExcelService.export_template(template.id)
+
+            draft = create_test_draft_version(db_session, template, name="Matrix Import Draft")
+            export_buf.seek(0)
+            with app.test_request_context():
+                login_user(admin)
+                result = TemplateExcelService.import_template(
+                    template.id, export_buf, version_id=draft.id
+                )
+
+            assert result['success'] is True
+            imported_item = (
+                db_session.query(FormItem)
+                .filter_by(template_id=template.id, version_id=draft.id, item_type='matrix')
+                .first()
+            )
+            assert imported_item is not None
+            mc = imported_item.config.get('matrix_config') or {}
+            assert mc.get('column_groups', {}).get('Funding', {}).get('fr') == 'Financement'
+            grouped = [c for c in mc.get('columns', []) if c.get('group') == 'Funding']
+            assert len(grouped) == 2
+            assert {c['name'] for c in grouped} == {'SP1', 'SP2'}
         """Rules with item_id references are rewritten correctly."""
         with app.app_context():
             admin = create_test_admin(db_session)
@@ -1696,6 +1756,162 @@ class TestFlatTranslationColumns:
             assert 'label_translations' not in headers
 
 
+class TestResolveSheetHeaders:
+    def test_accepts_reordered_translation_columns(self, app):
+        with app.app_context():
+            pages_cols = TemplateExcelService.get_page_columns()
+            reordered = ['id', 'order', 'name', 'name_fr', 'name_es', 'name_ar']
+            assert reordered != pages_cols or set(reordered) == set(pages_cols)
+            _, legacy, err = TemplateExcelService._resolve_sheet_headers('Pages', reordered)
+            assert err is None
+            assert legacy is False
+
+            items_cols = TemplateExcelService.get_item_columns()
+            got_items = list(items_cols)
+            if 'label_fr' in got_items and 'label_es' in got_items:
+                fr_idx = got_items.index('label_fr')
+                es_idx = got_items.index('label_es')
+                got_items[fr_idx], got_items[es_idx] = got_items[es_idx], got_items[fr_idx]
+            _, legacy, err = TemplateExcelService._resolve_sheet_headers('Items', got_items)
+            assert err is None
+            assert legacy is False
+
+    def test_reports_missing_required_columns(self, app):
+        with app.app_context():
+            _, _, err = TemplateExcelService._resolve_sheet_headers('Pages', ['id', 'order'])
+            assert err is not None
+            assert 'missing required column' in err.lower()
+            assert 'name' in err.lower()
+
+    def test_reports_unrecognized_columns(self, app):
+        with app.app_context():
+            cols = TemplateExcelService.get_page_columns() + ['unexpected_column']
+            _, _, err = TemplateExcelService._resolve_sheet_headers('Pages', cols)
+            assert err is not None
+            assert 'unrecognized column' in err.lower()
+            assert 'unexpected_column' in err
+
+
+class TestNormalizeMatrixItemConfig:
+    def test_wraps_flat_matrix_config(self):
+        flat = {
+            'type': 'matrix',
+            'columns': [
+                {'name': 'SP1', 'type': 'number', 'group': 'Funding'},
+                {'name': 'SP2', 'type': 'number', 'group': 'Funding'},
+            ],
+            'column_groups': {'Funding': {'fr': 'Financement'}},
+            'rows': [{'text': 'Row 1'}],
+        }
+        normalized = TemplateExcelService._normalize_matrix_item_config('matrix', flat)
+        assert 'matrix_config' in normalized
+        mc = normalized['matrix_config']
+        assert mc['column_groups']['Funding']['fr'] == 'Financement'
+        assert mc['columns'][0]['group'] == 'Funding'
+
+    def test_hoists_root_column_groups_into_matrix_config(self):
+        config = {
+            'matrix_config': {
+                'type': 'matrix',
+                'columns': [{'name': 'A', 'type': 'number', 'group': 'G1'}],
+            },
+            'column_groups': {'G1': {'ar': 'مجموعة'}},
+        }
+        normalized = TemplateExcelService._normalize_matrix_item_config('matrix', config)
+        assert normalized['matrix_config']['column_groups']['G1']['ar'] == 'مجموعة'
+
+    def test_non_matrix_items_unchanged(self):
+        config = {'plugin_config': {'x': 1}}
+        assert TemplateExcelService._normalize_matrix_item_config('indicator', config) == config
+
+    def test_repair_column_groups_from_column_name_lists(self):
+        mc = {
+            'type': 'matrix',
+            'columns': [
+                {'name': 'SP1', 'type': 'number'},
+                {'name': 'SP2', 'type': 'number'},
+            ],
+            'column_groups': {'Funding': ['SP1', 'SP2']},
+        }
+        repaired = TemplateExcelService._repair_matrix_column_groups(mc)
+        assert repaired['columns'][0]['group'] == 'Funding'
+        assert repaired['columns'][1]['group'] == 'Funding'
+        assert repaired['column_groups']['Funding'] == {}
+
+    def test_repair_column_groups_from_name_prefix(self):
+        mc = {
+            'type': 'matrix',
+            'columns': [
+                {'name': 'SP1 Planned', 'type': 'tick'},
+                {'name': 'SP1 Supported', 'type': 'tick'},
+            ],
+            'column_groups': {'SP1': {'fr': 'PS1'}},
+        }
+        repaired = TemplateExcelService._repair_matrix_column_groups(mc)
+        assert repaired['columns'][0]['group'] == 'SP1'
+        assert repaired['columns'][1]['group'] == 'SP1'
+
+    def test_parse_json_preserves_empty_object(self):
+        assert TemplateExcelService._parse_json('{}') == {}
+
+
+class TestMatrixImportMatching:
+    def test_label_match_preferred_over_export_id(self):
+        section_id = 10
+        matrix_item = FormItem(
+            section_id=section_id,
+            template_id=1,
+            version_id=1,
+            item_type='matrix',
+            label='Received Support',
+            order=5.0,
+        )
+        matrix_item.id = 100
+
+        wrong_export_item = FormItem(
+            section_id=section_id,
+            template_id=1,
+            version_id=1,
+            item_type='indicator',
+            label='Some Indicator',
+            order=1.0,
+        )
+        wrong_export_item.id = 200
+
+        export_id_to_existing = {40: wrong_export_item}
+        existing_items_lookup = {
+            (section_id, 5.0, 'matrix', 'Received Support'): matrix_item,
+        }
+
+        found, method = TemplateExcelService._find_existing_item_for_import(
+            section_id=section_id,
+            item_type='matrix',
+            item_label='Received Support',
+            item_order=5.0,
+            export_id=40,
+            export_id_to_existing=export_id_to_existing,
+            existing_items_lookup=existing_items_lookup,
+        )
+        assert found is matrix_item
+        assert 'label' in method
+
+    def test_clean_imported_matrix_config_strips_root_duplicates(self):
+        config = {
+            'is_required': False,
+            'matrix_config': {
+                'type': 'matrix',
+                'columns': [{'name': 'A', 'group': 'G1'}],
+                'column_groups': {'G1': {}},
+            },
+            'columns': [{'name': 'stale'}],
+            'column_groups': {'stale': {}},
+        }
+        cleaned = TemplateExcelService._clean_imported_matrix_config(config)
+        assert 'columns' not in cleaned
+        assert 'column_groups' not in cleaned
+        assert cleaned['matrix_config']['columns'][0]['group'] == 'G1'
+
+
 # ---------------------------------------------------------------------------
 # Template sheet row layout
 # ---------------------------------------------------------------------------
@@ -1768,7 +1984,7 @@ class TestTemplateSheetRowLayout:
             assert draft.name == 'Legacy Import Name'
             assert draft.name_translations.get('fr') == 'Nom'
 
-    def test_validate_import_file_accepts_row_layout(self, db_session, app):
+    def test_validate_import_file_accepts_row_layout(self, app):
         buf = _make_export_workbook_bytes(template_name='Valid Row Layout')
         with app.app_context():
             result = TemplateExcelService.validate_import_file(buf)

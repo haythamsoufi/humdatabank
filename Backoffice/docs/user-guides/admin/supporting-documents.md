@@ -57,4 +57,4 @@ When reviewing a submission:
 
 - [Role recipes](role-recipes.md)
 - [Review and approve submissions](review-approve-submissions.md)
-- [Data handling and privacy](../common/data-handling-and-privacy.md)
+- [Data handling and privacy](../../data-reporting/data-handling-and-privacy.md)

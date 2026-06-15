@@ -308,20 +308,7 @@ class TestValidateDataEndpointParams:
         result = validate_data_endpoint_params(args)
         assert result['page'] == 1
         assert result['per_page'] == 20
-        assert result['include_disagg'] is False
         assert result['include_full_info'] is False
-
-    @pytest.mark.parametrize('val', ['1', 'true', 'yes', 'y'])
-    def test_disagg_truthy_values(self, val):
-        args = ImmutableMultiDict([('disagg', val)])
-        result = validate_data_endpoint_params(args)
-        assert result['include_disagg'] is True, f"disagg='{val}' should be True"
-
-    @pytest.mark.parametrize('val', ['0', 'false', 'no', 'n', 'off'])
-    def test_disagg_falsy_values(self, val):
-        args = ImmutableMultiDict([('disagg', val)])
-        result = validate_data_endpoint_params(args)
-        assert result['include_disagg'] is False
 
     @pytest.mark.parametrize('val', ['1', 'true', 'yes', 'y'])
     def test_include_full_info_truthy_values(self, val):
@@ -353,12 +340,6 @@ class TestValidateDataEndpointParams:
         args = ImmutableMultiDict([('per_page', 'nope')])
         result = validate_data_endpoint_params(args)
         assert result['per_page'] == 20
-
-    def test_disagg_none_when_not_provided(self):
-        args = ImmutableMultiDict()
-        result = validate_data_endpoint_params(args)
-        assert result['include_disagg'] is False
-
 
 # ---------------------------------------------------------------------------
 # build_paginated_response
@@ -454,6 +435,7 @@ class TestGetPaginatedDataIds:
     def test_total_from_assigned_only(self, app):
         with app.app_context():
             assigned_q = MagicMock()
+            # Single branch → uses order_by(None).count()
             assigned_q.order_by.return_value.count.return_value = 7
 
             subq = MagicMock()
@@ -465,35 +447,50 @@ class TestGetPaginatedDataIds:
             mock_chain = MagicMock()
             mock_chain.order_by.return_value.offset.return_value.limit.return_value.all.return_value = []
 
-            with patch('app.utils.api_pagination.db') as mock_db:
+            with patch('app.utils.api_pagination.db') as mock_db, \
+                 patch('app.utils.api_pagination.desc') as mock_desc, \
+                 patch('app.utils.api_pagination.asc') as mock_asc:
                 mock_db.session.query.return_value = mock_chain
                 page_rows, total = get_paginated_data_ids(assigned_q, None, page=1, per_page=10)
             assert total == 7
 
     def test_total_sum_from_both_queries(self, app):
+        """Two branches → total computed via UNION ALL subquery + scalar count."""
         with app.app_context():
             assigned_q = MagicMock()
             public_q = MagicMock()
-            assigned_q.order_by.return_value.count.return_value = 5
-            public_q.order_by.return_value.count.return_value = 3
 
+            # Wire up the UNION chain: assigned_q.union_all(public_q).subquery()
             combined = MagicMock()
             assigned_q.union_all.return_value = combined
-            subq = MagicMock()
-            combined.subquery.return_value = subq
-            subq.c.submitted_at = MagicMock()
+            union_subq = MagicMock()
+            combined.subquery.return_value = union_subq
+
+            # Wire up the page query chain
+            page_subq = MagicMock()
+            page_subq.c.id = MagicMock()
+            page_subq.c.submitted_at = MagicMock()
+            page_subq.c.submission_type = MagicMock()
+            combined.subquery.return_value = page_subq
 
             mock_chain = MagicMock()
             mock_chain.order_by.return_value.offset.return_value.limit.return_value.all.return_value = []
 
-            with patch('app.utils.api_pagination.db') as mock_db:
+            with patch('app.utils.api_pagination.db') as mock_db, \
+                 patch('app.utils.api_pagination.desc') as mock_desc, \
+                 patch('app.utils.api_pagination.asc') as mock_asc, \
+                 patch('app.utils.api_pagination.select') as mock_select, \
+                 patch('app.utils.api_pagination.func') as mock_func:
                 mock_db.session.query.return_value = mock_chain
+                # scalar() returns the mocked total count
+                mock_db.session.execute.return_value.scalar.return_value = 8
                 page_rows, total = get_paginated_data_ids(assigned_q, public_q, page=1, per_page=10)
             assert total == 8
 
     def test_no_paginate_returns_all(self, app):
         with app.app_context():
             assigned_q = MagicMock()
+            # Single branch → uses order_by(None).count()
             assigned_q.order_by.return_value.count.return_value = 3
             subq = MagicMock()
             subq.c.id = MagicMock()
@@ -505,7 +502,9 @@ class TestGetPaginatedDataIds:
             mock_chain = MagicMock()
             mock_chain.order_by.return_value.all.return_value = mock_rows
 
-            with patch('app.utils.api_pagination.db') as mock_db:
+            with patch('app.utils.api_pagination.db') as mock_db, \
+                 patch('app.utils.api_pagination.desc') as mock_desc, \
+                 patch('app.utils.api_pagination.asc') as mock_asc:
                 mock_db.session.query.return_value = mock_chain
                 page_rows, total = get_paginated_data_ids(
                     assigned_q, None, page=1, per_page=10, paginate=False
@@ -515,6 +514,7 @@ class TestGetPaginatedDataIds:
     def test_non_default_sort_field_logs_and_falls_back(self, app):
         with app.app_context():
             assigned_q = MagicMock()
+            # Single branch → uses order_by(None).count()
             assigned_q.order_by.return_value.count.return_value = 2
             subq = MagicMock()
             subq.c.submitted_at = MagicMock()
@@ -523,7 +523,9 @@ class TestGetPaginatedDataIds:
             mock_chain = MagicMock()
             mock_chain.order_by.return_value.offset.return_value.limit.return_value.all.return_value = []
 
-            with patch('app.utils.api_pagination.db') as mock_db:
+            with patch('app.utils.api_pagination.db') as mock_db, \
+                 patch('app.utils.api_pagination.desc') as mock_desc, \
+                 patch('app.utils.api_pagination.asc') as mock_asc:
                 mock_db.session.query.return_value = mock_chain
                 # sort_field != 'submitted_at' triggers the fallback log path
                 page_rows, total = get_paginated_data_ids(

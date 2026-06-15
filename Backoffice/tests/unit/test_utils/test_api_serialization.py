@@ -26,6 +26,8 @@ from app.utils.api_serialization import (
     format_bridge_disagg_rows,
     build_bridge_disagg_from_flat_rows,
     build_star_schema_tables,
+    _wrap_disagg_dict,
+    _resolve_matrix_cell,
 )
 
 
@@ -433,39 +435,67 @@ class TestSerializeAssignedDataItem:
                 result = serialize_assigned_data_item(item, include_full_info=True)
         assert result['form_item_info'] == {'field': 'data'}
 
-    def test_include_disagg_adds_disagg_data(self, app):
+    def test_standard_disagg_sex(self, app):
         with app.test_request_context():
             with patch('app.utils.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.disagg_data = {'mode': 'sex', 'values': {'male': 10, 'female': 20}}
-                result = serialize_assigned_data_item(item, include_disagg=True)
+                result = serialize_assigned_data_item(item)
         assert result['disaggregation_data'] is not None
         assert result['disaggregation_data']['mode'] == 'sex'
         assert result['disaggregation_data']['values'] == {'male': 10, 'female': 20}
 
-    def test_include_disagg_none_disagg_data(self, app):
+    def test_none_disagg_data_returns_none(self, app):
         with app.test_request_context():
             with patch('app.utils.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.disagg_data = None
-                result = serialize_assigned_data_item(item, include_disagg=True)
+                result = serialize_assigned_data_item(item)
         assert result['disaggregation_data'] is None
 
-    def test_include_disagg_non_dict_disagg_returns_none(self, app):
+    def test_non_dict_disagg_returns_none(self, app):
         with app.test_request_context():
             with patch('app.utils.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.disagg_data = 'not-a-dict'
-                result = serialize_assigned_data_item(item, include_disagg=True)
+                result = serialize_assigned_data_item(item)
         assert result['disaggregation_data'] is None
 
-    def test_include_disagg_values_not_dict_uses_empty(self, app):
+    def test_bad_values_type_uses_empty_dict(self, app):
         with app.test_request_context():
             with patch('app.utils.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.disagg_data = {'mode': 'sex', 'values': 'bad-values'}
-                result = serialize_assigned_data_item(item, include_disagg=True)
+                result = serialize_assigned_data_item(item)
         assert result['disaggregation_data']['values'] == {}
+
+    def test_matrix_flat_format_normalised(self, app):
+        """Flat matrix disagg_data (no 'values' key) is wrapped as mode='matrix'."""
+        with app.test_request_context():
+            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+                item = self._make_item()
+                item.disagg_data = {'_table': 'ns', '10_SP2': 4107000, '11_SP2': 3000000}
+                result = serialize_assigned_data_item(item)
+        d = result['disaggregation_data']
+        assert d is not None
+        assert d['mode'] == 'matrix'
+        assert d['values'] == {'10_SP2': 4107000, '11_SP2': 3000000}
+        assert '_table' not in d['values']
+
+    def test_disability_merged_disagg(self, app):
+        """Disability questions merged into values dict are preserved."""
+        with app.test_request_context():
+            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+                item = self._make_item()
+                item.disagg_data = {
+                    'mode': 'total',
+                    'values': {'total': 100, 'disability': {'disaggregated_by_disability': True}},
+                }
+                result = serialize_assigned_data_item(item)
+        d = result['disaggregation_data']
+        assert d['mode'] == 'total'
+        assert d['values']['total'] == 100
+        assert d['values']['disability'] == {'disaggregated_by_disability': True}
 
     def test_no_assigned_form_template_name_is_none(self, app):
         with app.test_request_context():
@@ -570,7 +600,7 @@ class TestSerializePublicDataItem:
             with patch('app.utils.api_serialization.format_country_info', return_value=None):
                 item = self._make_item()
                 item.disagg_data = {'mode': 'age', 'values': {'0-18': 3}}
-                result = serialize_public_data_item(item, include_disagg=True)
+                result = serialize_public_data_item(item)
         assert result['disaggregation_data']['mode'] == 'age'
 
     def test_minimal_country_info(self, app):
@@ -788,6 +818,139 @@ class TestFormatFactFormValueRow:
 
 
 # ---------------------------------------------------------------------------
+# _wrap_disagg_dict
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestWrapDisaggDict:
+    def test_none_returns_none(self):
+        assert _wrap_disagg_dict(None) is None
+
+    def test_empty_dict_returns_none(self):
+        assert _wrap_disagg_dict({}) is None
+
+    def test_non_dict_returns_none(self):
+        assert _wrap_disagg_dict('string') is None
+        assert _wrap_disagg_dict(42) is None
+
+    def test_standard_sex_disagg(self):
+        dd = {'mode': 'sex', 'values': {'male': 10, 'female': 20}}
+        result = _wrap_disagg_dict(dd)
+        assert result == {'mode': 'sex', 'values': {'male': 10, 'female': 20}}
+
+    def test_standard_age_disagg(self):
+        dd = {'mode': 'age', 'values': {'0-17': 5, '18+': 95}}
+        result = _wrap_disagg_dict(dd)
+        assert result['mode'] == 'age'
+        assert result['values'] == {'0-17': 5, '18+': 95}
+
+    def test_total_mode_with_disability(self):
+        dd = {'mode': 'total', 'values': {'total': 100, 'disability': {'disaggregated_by_disability': True}}}
+        result = _wrap_disagg_dict(dd)
+        assert result['mode'] == 'total'
+        assert result['values']['disability'] == {'disaggregated_by_disability': True}
+
+    def test_bad_values_type_uses_empty_dict(self):
+        dd = {'mode': 'sex', 'values': 'bad'}
+        result = _wrap_disagg_dict(dd)
+        assert result == {'mode': 'sex', 'values': {}}
+
+    def test_matrix_flat_format(self):
+        """Flat matrix dict (no 'values' key) -> mode='matrix', reserved '_' keys stripped."""
+        dd = {'_table': 'ns', '10_SP2': 4107000, '11_SP2': 3000000}
+        result = _wrap_disagg_dict(dd)
+        assert result['mode'] == 'matrix'
+        assert result['values'] == {'10_SP2': 4107000, '11_SP2': 3000000}
+        assert '_table' not in result['values']
+
+    def test_matrix_all_reserved_keys_returns_none_mode(self):
+        """All keys start with '_' → values empty → mode is None."""
+        dd = {'_table': 'ns', '_meta': 'x'}
+        result = _wrap_disagg_dict(dd)
+        assert result['mode'] is None
+        assert result['values'] == {}
+
+    def test_plugin_arbitrary_json(self):
+        """Arbitrary plugin dict without 'values' key is treated like matrix."""
+        dd = {'field_a': 1, 'field_b': 'hello'}
+        result = _wrap_disagg_dict(dd)
+        assert result['mode'] == 'matrix'
+        assert result['values'] == {'field_a': 1, 'field_b': 'hello'}
+
+    def test_variable_column_cell_modified_resolved_to_int(self):
+        """Variable-column numeric strings are coerced to int."""
+        dd = {
+            '_table': 'ns',
+            '10_SP2': {'original': '1000', 'modified': '1200', 'isModified': True},
+            '11_SP2': {'original': '500', 'modified': '500', 'isModified': False},
+        }
+        result = _wrap_disagg_dict(dd)
+        assert result['mode'] == 'matrix'
+        assert result['values']['10_SP2'] == 1200
+        assert isinstance(result['values']['10_SP2'], int)
+        assert result['values']['11_SP2'] == 500
+        assert '_table' not in result['values']
+
+    def test_variable_column_cell_null_modified_falls_back_to_original(self):
+        """When modified is None/absent, original is used and coerced."""
+        dd = {
+            '10_SP2': {'original': '999', 'modified': None, 'isModified': False},
+        }
+        result = _wrap_disagg_dict(dd)
+        assert result['values']['10_SP2'] == 999
+        assert isinstance(result['values']['10_SP2'], int)
+
+    def test_variable_column_mixed_with_plain_cells(self):
+        """Mix of plain scalar cells and variable-column cells is handled correctly."""
+        dd = {
+            '_table': 'ns',
+            '10_SP2': 4107000,
+            '11_SP2': {'original': '500', 'modified': '600', 'isModified': True},
+        }
+        result = _wrap_disagg_dict(dd)
+        assert result['values']['10_SP2'] == 4107000
+        assert result['values']['11_SP2'] == 600
+        assert isinstance(result['values']['11_SP2'], int)
+
+
+# ---------------------------------------------------------------------------
+# _resolve_matrix_cell
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestResolveMatrixCell:
+    def test_plain_scalar_returned_unchanged(self):
+        assert _resolve_matrix_cell(42) == 42
+        assert _resolve_matrix_cell('hello') == 'hello'
+        assert _resolve_matrix_cell(None) is None
+
+    def test_modified_preferred_and_coerced_to_int(self):
+        assert _resolve_matrix_cell({'original': '100', 'modified': '200', 'isModified': True}) == 200
+        assert isinstance(_resolve_matrix_cell({'original': '100', 'modified': '200', 'isModified': True}), int)
+
+    def test_original_used_when_modified_is_none_and_coerced(self):
+        assert _resolve_matrix_cell({'original': '100', 'modified': None, 'isModified': False}) == 100
+
+    def test_original_used_when_modified_absent_and_coerced(self):
+        assert _resolve_matrix_cell({'original': '100'}) == 100
+
+    def test_float_value_coerced(self):
+        assert _resolve_matrix_cell({'original': '3.14', 'modified': '2.71', 'isModified': True}) == 2.71
+
+    def test_thousands_separator_stripped(self):
+        assert _resolve_matrix_cell({'original': '1,000', 'modified': '4,107,000', 'isModified': True}) == 4107000
+
+    def test_non_numeric_string_returned_as_string(self):
+        assert _resolve_matrix_cell({'original': 'yes', 'modified': 'no', 'isModified': True}) == 'no'
+
+    def test_modified_zero_is_returned_not_skipped(self):
+        assert _resolve_matrix_cell({'original': '100', 'modified': 0, 'isModified': True}) == 0
+
+    def test_modified_empty_string_preserved(self):
+        assert _resolve_matrix_cell({'original': '100', 'modified': '', 'isModified': True}) == ''
+
+
+# ---------------------------------------------------------------------------
 # format_bridge_disagg_rows
 # ---------------------------------------------------------------------------
 
@@ -847,23 +1010,22 @@ class TestFormatBridgeDisaggRows:
 
 @pytest.mark.unit
 class TestBuildBridgeDisaggFromFlatRows:
-    def test_include_disagg_false_returns_empty(self):
+    def test_always_builds_bridge_from_disagg_rows(self):
         rows = [{'id': 1, 'disaggregation_data': {'mode': 'sex', 'values': {'male': 5}}}]
-        result = build_bridge_disagg_from_flat_rows(rows, include_disagg=False)
-        assert result == []
+        result = build_bridge_disagg_from_flat_rows(rows)
+        assert len(result) == 1
 
     def test_none_rows_returns_empty(self):
-        result = build_bridge_disagg_from_flat_rows(None, include_disagg=True)
+        result = build_bridge_disagg_from_flat_rows(None)
         assert result == []
 
     def test_non_dict_row_skipped(self):
-        result = build_bridge_disagg_from_flat_rows(['not-a-dict'], include_disagg=True)
+        result = build_bridge_disagg_from_flat_rows(['not-a-dict'])
         assert result == []
 
     def test_row_without_id_skipped(self):
         result = build_bridge_disagg_from_flat_rows(
             [{'disaggregation_data': {'mode': 'sex', 'values': {'male': 5}}}],
-            include_disagg=True
         )
         assert result == []
 
@@ -874,7 +1036,7 @@ class TestBuildBridgeDisaggFromFlatRows:
             'prefilled_disaggregation_data': None,
             'imputed_disaggregation_data': None,
         }]
-        result = build_bridge_disagg_from_flat_rows(rows, include_disagg=True)
+        result = build_bridge_disagg_from_flat_rows(rows)
         assert len(result) == 2
         sources = {r['source'] for r in result}
         assert sources == {'reported'}
@@ -886,7 +1048,7 @@ class TestBuildBridgeDisaggFromFlatRows:
             'prefilled_disaggregation_data': {'mode': 'sex', 'values': {'male': 4}},
             'imputed_disaggregation_data': {'mode': 'sex', 'values': {'male': 3}},
         }]
-        result = build_bridge_disagg_from_flat_rows(rows, include_disagg=True)
+        result = build_bridge_disagg_from_flat_rows(rows)
         sources = {r['source'] for r in result}
         assert sources == {'reported', 'prefilled', 'imputed'}
 
@@ -899,7 +1061,7 @@ class TestBuildBridgeDisaggFromFlatRows:
 class TestBuildStarSchemaTables:
     def test_empty_data_rows_returns_empty_tables(self, app):
         with app.app_context():
-            result = build_star_schema_tables([], [], [], include_disagg=False)
+            result = build_star_schema_tables([], [], [])
             assert result['fact_form_values'] == []
             assert result['dim_country'] == []
             assert result['dim_template'] == []
@@ -908,7 +1070,7 @@ class TestBuildStarSchemaTables:
 
     def test_none_data_rows_returns_empty(self, app):
         with app.app_context():
-            result = build_star_schema_tables(None, None, None, include_disagg=False)
+            result = build_star_schema_tables(None, None, None)
             assert result['fact_form_values'] == []
 
     def test_fact_rows_formatted(self, app):
@@ -921,20 +1083,20 @@ class TestBuildStarSchemaTables:
                 'data_status': 'available', 'submitted_at': '2024-01-01',
                 'is_missing': False,
             }]
-            result = build_star_schema_tables(rows, [], [], include_disagg=False)
+            result = build_star_schema_tables(rows, [], [])
             assert len(result['fact_form_values']) == 1
             assert result['fact_form_values'][0]['id'] == 1
 
     def test_countries_table_passed_through(self, app):
         with app.app_context():
             countries = [{'id': 1, 'name': 'Country A'}]
-            result = build_star_schema_tables([], [], countries, include_disagg=False)
+            result = build_star_schema_tables([], [], countries)
             assert result['dim_country'] == countries
 
     def test_form_items_table_passed_through(self, app):
         with app.app_context():
             items = [{'id': 10, 'label': 'Item'}]
-            result = build_star_schema_tables([], items, [], include_disagg=False)
+            result = build_star_schema_tables([], items, [])
             assert result['dim_form_item'] == items
 
     def test_include_disagg_builds_bridge(self, app):
@@ -949,7 +1111,7 @@ class TestBuildStarSchemaTables:
                 'prefilled_disaggregation_data': None,
                 'imputed_disaggregation_data': None,
             }]
-            result = build_star_schema_tables(rows, [], [], include_disagg=True)
+            result = build_star_schema_tables(rows, [], [])
             assert len(result['bridge_disagg_values']) == 2
 
     def test_with_template_ids_queries_db(self, app):
@@ -982,7 +1144,8 @@ class TestBuildStarSchemaTables:
             mock_aes.due_date = None
             mock_aes.assigned_form_id = 10
 
-            with patch('app.utils.api_serialization.FormTemplate') as mock_ft_cls, \
+            with patch('app.utils.api_serialization._joinedload_impl') as _mock_jl, \
+                 patch('app.utils.api_serialization.FormTemplate') as mock_ft_cls, \
                  patch('app.utils.api_serialization.AssignedForm') as mock_af_cls, \
                  patch('app.utils.api_serialization.AssignmentEntityStatus') as mock_aes_cls, \
                  patch('app.utils.api_serialization.PublicSubmission') as mock_ps_cls:
@@ -992,6 +1155,6 @@ class TestBuildStarSchemaTables:
                 mock_aes_cls.query.filter.return_value.all.return_value = [mock_aes]
                 mock_ps_cls.query.filter.return_value.all.return_value = []
 
-                result = build_star_schema_tables(rows, [], [], include_disagg=False)
+                result = build_star_schema_tables(rows, [], [])
             assert len(result['dim_template']) == 1
             assert result['dim_template'][0]['name'] == 'T5'

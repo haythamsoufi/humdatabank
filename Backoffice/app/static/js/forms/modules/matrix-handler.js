@@ -60,6 +60,81 @@ function __configFlag(value, defaultWhenMissing = false) {
     return Boolean(value);
 }
 
+function __isEmptyVariableValue(value) {
+    return value == null || value === '' || (typeof value === 'string' && value.trim() === '');
+}
+
+function __parseMatrixNumericValue(raw) {
+    if (__isEmptyVariableValue(raw)) return null;
+    if (typeof raw === 'number' && isFinite(raw)) return raw;
+    const rawString = (typeof window.__numericUnformat === 'function')
+        ? window.__numericUnformat(String(raw))
+        : String(raw).trim().replace(/,/g, '');
+    if (!rawString) return null;
+    const num = parseFloat(rawString);
+    return isFinite(num) ? num : null;
+}
+
+function __normalizeVariableNumericValue(raw) {
+    const num = __parseMatrixNumericValue(raw);
+    return num != null ? num : '';
+}
+
+function __toVariableTickValue(value) {
+    if (value === true || value === 1 || value === '1' || value === 'true') return '1';
+    if (value === false || value === 0 || value === '0' || value === 'false') return '0';
+    return __isEmptyVariableValue(value) ? '' : String(value);
+}
+
+function __normalizeVariableCompareValue(value) {
+    if (__isEmptyVariableValue(value)) return '';
+    const s = String(value);
+    return (typeof window.__numericUnformat === 'function') ? window.__numericUnformat(s) : s.replace(/,/g, '');
+}
+
+function __computeVariableIsModified(currentValue, originalValue, inputType) {
+    if (inputType === 'checkbox') {
+        const originalChecked = originalValue === '1' || originalValue === 1 || originalValue === 'true';
+        const currentChecked = currentValue === '1' || currentValue === 1 || currentValue === true;
+        if (__isEmptyVariableValue(originalValue)) return currentChecked;
+        return currentChecked !== originalChecked;
+    }
+    const normCurrent = __normalizeVariableCompareValue(currentValue);
+    const normOriginal = __normalizeVariableCompareValue(originalValue);
+    if (normOriginal === '' && normCurrent !== '') return true;
+    return normOriginal !== '' && normCurrent !== normOriginal;
+}
+
+/**
+ * Build a variable-column cell payload for persistence, or null when the cell should be omitted.
+ */
+function __buildVariableCellPayload(inputType, originalValue, modifiedValue, isModified, preservedOriginal = null) {
+    const origSource = preservedOriginal != null ? preservedOriginal : originalValue;
+    if (inputType === 'checkbox') {
+        const original = __toVariableTickValue(origSource);
+        const modified = __toVariableTickValue(modifiedValue);
+        if (!isModified && __isEmptyVariableValue(original) && __isEmptyVariableValue(modified)) {
+            return null;
+        }
+        return { original, modified, isModified: !!isModified };
+    }
+    const original = __normalizeVariableNumericValue(origSource);
+    const modified = __normalizeVariableNumericValue(modifiedValue);
+    if (!isModified && __isEmptyVariableValue(original) && __isEmptyVariableValue(modified)) {
+        return null;
+    }
+    return { original, modified, isModified: !!isModified };
+}
+
+function __applyVariableCellToMatrix(matrix, cellKey, inputType, originalValue, modifiedValue, isModified, preservedOriginal = null) {
+    const payload = __buildVariableCellPayload(inputType, originalValue, modifiedValue, isModified, preservedOriginal);
+    if (payload) {
+        matrix.data[cellKey] = payload;
+    } else if (matrix.data[cellKey] !== undefined) {
+        delete matrix.data[cellKey];
+    }
+}
+
 /**
  * Normalize matrix payload before saving.
  * Removes non-cell metadata keys that should not be persisted.
@@ -75,9 +150,16 @@ function __reorderMatrixData(data) {
 
     // Keep insertion order of actual cell keys, but drop internal metadata keys.
     Object.keys(data).forEach(key => {
-        if (!String(key).startsWith('_')) {
-            reordered[key] = data[key];
+        if (String(key).startsWith('_')) return;
+        const value = data[key];
+        if (value && typeof value === 'object' && ('original' in value || 'modified' in value)) {
+            if (!value.isModified
+                && __isEmptyVariableValue(value.original)
+                && __isEmptyVariableValue(value.modified)) {
+                return;
+            }
         }
+        reordered[key] = value;
     });
 
     return reordered;
@@ -657,71 +739,57 @@ class MatrixHandler {
             if (isVariable) {
                 const originalValueAttr = input.getAttribute('data-original-value');
                 const originalValue = originalValueAttr !== null ? originalValueAttr : '';
-                const originalChecked = originalValue === '1' || originalValue === 1 || originalValue === 'true';
-                const isModified = input.checked !== originalChecked && originalValue !== '';
+                const valueStr = input.checked ? '1' : '0';
+                const isModified = __computeVariableIsModified(valueStr, originalValue, 'checkbox');
 
                 debugLog('matrix-handler', `Variable tick modification check: checked=${input.checked}, original="${originalValue}", isModified=${isModified}`);
 
                 // Update visual indicator (always call to ensure styling is correct)
                 this.updateVariableModificationIndicator(input, isModified, originalValue);
 
-                // Store both original and modified values if changed
                 if (cellKey) {
                     const existingData = matrix.data[cellKey];
-                    const valueStr = String(value);
-                    if (existingData && typeof existingData === 'object' && existingData.original !== undefined) {
-                        // Update existing structure
-                        matrix.data[cellKey] = {
-                            original: existingData.original,
-                            modified: valueStr,
-                            isModified: isModified
-                        };
-                    } else {
-                        // Create new structure with original value
-                        matrix.data[cellKey] = {
-                            original: originalValue || valueStr,
-                            modified: valueStr,
-                            isModified: isModified
-                        };
-                    }
+                    const preservedOriginal = (existingData && typeof existingData === 'object' && existingData.original !== undefined)
+                        ? existingData.original
+                        : null;
+                    __applyVariableCellToMatrix(
+                        matrix,
+                        cellKey,
+                        'checkbox',
+                        originalValue,
+                        valueStr,
+                        isModified,
+                        preservedOriginal
+                    );
                 }
             }
         } else if (isVariable) {
-            // For variable number columns, store as string (don't parse as number)
-            value = String(input.value || '').trim();
+            const rawValue = String(input.value || '').trim();
+            value = rawValue;
 
-            // Check if value has been modified from original (normalize so "168711" and "168,711" compare equal)
             const originalValueAttr = input.getAttribute('data-original-value');
             const originalValue = originalValueAttr !== null ? originalValueAttr : '';
-            const normalizeForCompare = (s) => {
-                if (s === '' || s == null) return '';
-                return (typeof window.__numericUnformat === 'function') ? window.__numericUnformat(s) : String(s);
-            };
-            const isModified = normalizeForCompare(value) !== normalizeForCompare(originalValue) && originalValue !== '';
+            const isModified = __computeVariableIsModified(rawValue, originalValue, input.type);
 
-            debugLog('matrix-handler', `Variable modification check: value="${value}", original="${originalValue}", isModified=${isModified}`);
+            debugLog('matrix-handler', `Variable modification check: value="${rawValue}", original="${originalValue}", isModified=${isModified}`);
 
             // Update visual indicator (always call to ensure styling is correct)
             this.updateVariableModificationIndicator(input, isModified, originalValue);
 
-            // Store both original and modified values if changed
             if (cellKey) {
                 const existingData = matrix.data[cellKey];
-                if (existingData && typeof existingData === 'object' && existingData.original !== undefined) {
-                    // Update existing structure
-                    matrix.data[cellKey] = {
-                        original: existingData.original,
-                        modified: value,
-                        isModified: isModified
-                    };
-                } else {
-                    // Create new structure with original value
-                    matrix.data[cellKey] = {
-                        original: originalValue || value,
-                        modified: value,
-                        isModified: isModified
-                    };
-                }
+                const preservedOriginal = (existingData && typeof existingData === 'object' && existingData.original !== undefined)
+                    ? existingData.original
+                    : null;
+                __applyVariableCellToMatrix(
+                    matrix,
+                    cellKey,
+                    input.type,
+                    originalValue,
+                    rawValue,
+                    isModified,
+                    preservedOriginal
+                );
             }
         } else {
             const rawString = (window.__numericUnformat ? window.__numericUnformat(input.value) : String(input.value || ''));
@@ -2451,26 +2519,18 @@ class MatrixHandler {
                 const isUpdatingSavedValue = hasSavedValue && !savedIsModified;
 
                 if (saveValue && cellKey && matrix) {
-                    let storedValue;
-                    if (input.type === 'checkbox') {
-                        storedValue = input.checked ? '1' : '0';
-                    } else {
-                        storedValue = displayValue;
-                    }
-
-                    if (isUpdatingSavedValue && savedOriginalValue !== null) {
-                        matrix.data[cellKey] = {
-                            original: storedValue,
-                            modified: storedValue,
-                            isModified: false
-                        };
-                    } else {
-                        matrix.data[cellKey] = {
-                            original: storedValue,
-                            modified: storedValue,
-                            isModified: false
-                        };
-                    }
+                    const storedValue = input.type === 'checkbox'
+                        ? (input.checked ? '1' : '0')
+                        : displayValue;
+                    __applyVariableCellToMatrix(
+                        matrix,
+                        cellKey,
+                        input.type,
+                        storedValue,
+                        storedValue,
+                        false,
+                        isUpdatingSavedValue && savedOriginalValue !== null ? savedOriginalValue : null
+                    );
 
                     if (matrix.hiddenField) {
                         matrix.hiddenField.value = __serializeMatrixData(matrix.data);
@@ -2658,32 +2718,18 @@ class MatrixHandler {
 
                     // If save_value is enabled, manually update matrix data
                     if (saveValue && cellKey && matrix) {
-                        // For variable columns, store value based on input type
-                        let storedValue;
-                        if (input.type === 'checkbox') {
-                            // For tick inputs, store as '1' or '0'
-                            storedValue = input.checked ? '1' : '0';
-                        } else {
-                            // For number inputs, store as string
-                            storedValue = displayValue;
-                        }
-
-                        // If updating an existing saved value that wasn't modified, update the structure
-                        if (isUpdatingSavedValue && savedOriginalValue !== null) {
-                            // Update the saved value structure with new resolved value
-                            matrix.data[cellKey] = {
-                                original: storedValue, // New resolved value becomes the original
-                                modified: storedValue,
-                                isModified: false
-                            };
-                        } else {
-                            // Store original value structure for tracking modifications
-                            matrix.data[cellKey] = {
-                                original: storedValue,
-                                modified: storedValue,
-                                isModified: false
-                            };
-                        }
+                        const storedValue = input.type === 'checkbox'
+                            ? (input.checked ? '1' : '0')
+                            : displayValue;
+                        __applyVariableCellToMatrix(
+                            matrix,
+                            cellKey,
+                            input.type,
+                            storedValue,
+                            storedValue,
+                            false,
+                            isUpdatingSavedValue && savedOriginalValue !== null ? savedOriginalValue : null
+                        );
 
                         // Update hidden field
                         if (matrix.hiddenField) {
@@ -3180,21 +3226,27 @@ class MatrixHandler {
                 input.classList.remove('opacity-50', 'opacity-75');
                 input.classList.add('variable-modified', 'variable-modified-checkbox');
 
-                // Also style the cell background with orange tint for better visibility
+                // Style the cell (td) background so the highlight fills the full cell height
                 if (cell) {
                     cell.style.setProperty('background-color', '#fff3e0', 'important'); // Light orange background
                 }
 
                 debugLog('matrix-handler', `Applying orange styling to modified editable variable checkbox: ${input.getAttribute('data-cell-key')}, original="${originalValue}", current="${input.checked}"`);
             } else if (isCheckbox && !isEditable) {
-                // For readonly checkboxes: keep existing behavior (green background like number inputs)
-                input.style.setProperty('background-color', '#d4edda', 'important');
+                // For readonly checkboxes: apply green to the cell (td) so it fills the full height
+                if (cell) {
+                    cell.style.setProperty('background-color', '#d4edda', 'important');
+                }
                 input.classList.add('variable-modified');
 
                 debugLog('matrix-handler', `Applying green highlight to modified readonly variable checkbox: ${input.getAttribute('data-cell-key')}, original="${originalValue}", current="${input.checked}"`);
             } else {
-                // For number inputs: light green background (existing behavior)
-                input.style.setProperty('background-color', '#d4edda', 'important');
+                // For number inputs: apply green to the cell (td) so it fills the full height,
+                // and make the input itself transparent so the cell colour shows through.
+                if (cell) {
+                    cell.style.setProperty('background-color', '#d4edda', 'important');
+                }
+                input.style.setProperty('background-color', 'transparent', 'important');
                 input.classList.add('variable-modified');
 
                 debugLog('matrix-handler', `Applying green highlight to modified variable cell: ${input.getAttribute('data-cell-key')}, original="${originalValue}", current="${input.value}"`);
@@ -3311,7 +3363,14 @@ class MatrixHandler {
                         const restoredDisplay = inp.type === 'checkbox' ? (inp.checked ? '1' : '0') : String(inp.value || '').trim();
                         inp.setAttribute('data-original-value', restoredDisplay);
                         if (matrix && cellKey) {
-                            matrix.data[cellKey] = { original: restoredDisplay, modified: restoredDisplay, isModified: false };
+                            __applyVariableCellToMatrix(
+                                matrix,
+                                cellKey,
+                                inp.type,
+                                restoredDisplay,
+                                restoredDisplay,
+                                false
+                            );
                             this.sanitizeMatrixData(matrix);
                             if (matrix.hiddenField) {
                                 matrix.hiddenField.value = __serializeMatrixData(matrix.data);
@@ -3438,9 +3497,12 @@ class MatrixHandler {
                     cell.style.removeProperty('background-color');
                 }
             } else {
-                // Remove number input styling
+                // Remove number input styling — background lives on the cell (td), not the input
                 input.style.removeProperty('background-color');
                 input.classList.remove('variable-modified');
+                if (cell) {
+                    cell.style.removeProperty('background-color');
+                }
             }
 
             // Remove tooltip if it exists

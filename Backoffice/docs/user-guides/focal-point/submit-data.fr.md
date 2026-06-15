@@ -4,8 +4,12 @@ Utilisez ce guide pour compléter une mission et soumettre votre formulaire.
 
 ## Avant de commencer
 
-- Vous avez besoin d'une **mission actuelle**.
-- Ayez vos données prêtes (et sources, si vous devez ajouter des commentaires).
+Cochez chaque élément avant de commencer :
+
+- [ ] **Une mission actuelle** visible sur votre Tableau de bord. Si aucune n'apparaît, consultez [Dépannage](troubleshooting.md) (« Aucune mission n'apparaît »).
+- [ ] **Vos données** — les chiffres ou réponses pour chaque section du formulaire.
+- [ ] **Votre source de données**, si le formulaire comporte des champs de commentaires pour documenter les sources.
+- [ ] **(Le cas échéant) Documents justificatifs** — fichiers à consulter ou à téléverser.
 
 ## Étapes
 
@@ -29,5 +33,5 @@ Utilisez ce guide pour compléter une mission et soumettre votre formulaire.
 ## Liens connexes
 
 - [Voir vos missions](view-assignments.md)
-- [Dépannage (Point focal)](troubleshooting.md)
+- [Dépannage](troubleshooting.md)
 - [Glossaire](../../getting-started/glossary.md)

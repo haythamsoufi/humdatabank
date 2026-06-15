@@ -415,9 +415,9 @@
                                 'plugin': 'fas fa-puzzle-piece text-teal-600'
                             }.get(item_type, 'fas fa-circle text-gray-400') %}
                             {% if is_sub_item or is_subsection_item %}
-                                    <span class="ml-6 flex items-center gap-2"><i class="{{ _item_type_icon }} w-4 h-4 flex-shrink-0" aria-hidden="true"></i><span class="text-gray-600">{{ item_instance.label }}</span></span>
+                                    <span class="ml-6 flex items-center gap-2"><i class="{{ _item_type_icon }} w-4 h-4 flex-shrink-0" aria-hidden="true"></i><span class="text-gray-600">{{ item_label_content(item_type, item_instance) }}</span></span>
                                 {% else %}
-                                    <span class="flex items-center gap-2"><i class="{{ _item_type_icon }} w-4 h-4 flex-shrink-0" aria-hidden="true"></i><span class="font-medium {{ 'text-gray-500' if is_archived else '' }}">{{ item_instance.label }}</span></span>
+                                    <span class="flex items-center gap-2"><i class="{{ _item_type_icon }} w-4 h-4 flex-shrink-0" aria-hidden="true"></i><span class="font-medium {{ 'text-gray-500' if is_archived else '' }}">{{ item_label_content(item_type, item_instance) }}</span></span>
                                 {% endif %}
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/4">

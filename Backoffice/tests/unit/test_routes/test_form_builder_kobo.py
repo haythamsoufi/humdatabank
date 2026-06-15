@@ -3,6 +3,7 @@ Comprehensive pytest tests for app/routes/admin/form_builder/kobo.py
 
 Routes covered (all require admin + system_manager roles):
 - GET  /admin/kobo-data-import                    (kobo_data_import)
+- POST /admin/kobo-data-import/validate           (kobo_data_import_validate)
 - POST /admin/kobo-data-import/analyze            (kobo_data_import_analyze)
 - POST /admin/kobo-data-import/match-entities     (kobo_data_import_match)
 - POST /admin/kobo-data-import/preview            (kobo_data_import_preview)
@@ -87,6 +88,69 @@ class TestKoboDataImport:
         """GET by unauthenticated user redirects to login."""
         resp = client.get('/admin/kobo-data-import')
         assert resp.status_code in (302, 403)
+
+
+# ---------------------------------------------------------------------------
+# kobo_data_import_validate (POST)
+# ---------------------------------------------------------------------------
+
+class TestKoboDataImportValidate:
+
+    def test_no_file_returns_400(self, sm_client, db_session, admin_user, app):
+        with patch(
+            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            return_value=True,
+        ):
+            resp = sm_client.post(
+                '/admin/kobo-data-import/validate',
+                data={},
+                content_type='multipart/form-data',
+            )
+        assert resp.status_code == 400
+
+    def test_invalid_file_type_returns_valid_false(self, sm_client, db_session, admin_user, app):
+        with patch(
+            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            return_value=True,
+        ), patch(
+            'app.routes.admin.form_builder.kobo.validate_upload_extension_and_mime',
+            return_value=(False, 'Invalid file type', None),
+        ):
+            resp = sm_client.post(
+                '/admin/kobo-data-import/validate',
+                data={'file': (io.BytesIO(b'text data'), 'data.txt')},
+                content_type='multipart/form-data',
+            )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data.get('valid') is False
+
+    def test_successful_validate(self, sm_client, db_session, admin_user, app):
+        validate_result = {
+            'valid': True,
+            'message': 'Valid KoBo data export',
+            'errors': [],
+            'preview': {'sheet_name': 'Sheet', 'total_rows': 2, 'total_columns': 3},
+        }
+        with patch(
+            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            return_value=True,
+        ), patch(
+            'app.routes.admin.form_builder.kobo.validate_upload_extension_and_mime',
+            return_value=(True, None, 'xlsx'),
+        ), patch(
+            'app.routes.admin.form_builder.kobo.KoboDataImportService.validate_data_export',
+            return_value=validate_result,
+        ):
+            resp = sm_client.post(
+                '/admin/kobo-data-import/validate',
+                data={'file': (io.BytesIO(b'PK\x03\x04excel-data'), 'data.xlsx')},
+                content_type='multipart/form-data',
+            )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data.get('valid') is True
+        assert data.get('preview', {}).get('total_rows') == 2
 
 
 # ---------------------------------------------------------------------------

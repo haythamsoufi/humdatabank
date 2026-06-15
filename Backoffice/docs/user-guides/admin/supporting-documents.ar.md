@@ -57,4 +57,4 @@
 
 - [وصفات الأدوار](role-recipes.md)
 - [مراجعة والموافقة على الإرسالات](review-approve-submissions.md)
-- [التعامل مع البيانات والخصوصية](../common/data-handling-and-privacy.md)
+- [التعامل مع البيانات والخصوصية](../../data-reporting/data-handling-and-privacy.md)

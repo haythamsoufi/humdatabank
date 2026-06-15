@@ -92,6 +92,14 @@
     position: relative;
 }
 
+/* Allow touch/trackpad scroll to chain to the page once the grid body reaches its edge */
+.ag-theme-alpine .ag-body-viewport,
+.ag-theme-balham .ag-body-viewport,
+.ag-theme-quartz .ag-body-viewport,
+.ag-theme-material .ag-body-viewport {
+    overscroll-behavior-y: auto;
+}
+
 /* Loading Spinner Animation */
 @keyframes ag-grid-spin {
     0% { transform: rotate(0deg); }

@@ -45,6 +45,63 @@ def kobo_data_import():
     )
 
 
+@bp.route("/kobo-data-import/validate", methods=["POST"])
+@admin_required
+@system_manager_required
+def kobo_data_import_validate():
+    """Validate a KoBo data export Excel file before analysis (AJAX)."""
+    if 'file' not in request.files:
+        return json_bad_request('No file provided')
+
+    f = request.files['file']
+    if not f or f.filename == '':
+        return json_bad_request('No file selected')
+
+    valid, error_msg, ext = validate_upload_extension_and_mime(f, EXCEL_EXTENSIONS)
+    if not valid:
+        current_app.logger.info(
+            'kobo_validate: rejected at mime/ext check – filename=%r ext_detected=%r error=%r',
+            f.filename, ext, error_msg,
+        )
+        return json_ok(
+            valid=False,
+            message=error_msg or 'Invalid file type. Please upload an Excel file (.xlsx or .xls).',
+            errors=[error_msg or 'Invalid file type.'],
+            preview={'sheet_name': None, 'total_rows': 0, 'total_columns': 0},
+        )
+
+    file_bytes = f.read()
+    current_app.logger.info(
+        'kobo_validate: filename=%r ext=%r size=%d bytes',
+        f.filename, ext, len(file_bytes),
+    )
+
+    if len(file_bytes) > 50 * 1024 * 1024:
+        current_app.logger.info(
+            'kobo_validate: rejected – file too large (%d bytes) filename=%r',
+            len(file_bytes), f.filename,
+        )
+        return json_ok(
+            valid=False,
+            message='File too large (max 50 MB)',
+            errors=['File too large (max 50 MB)'],
+            preview={'sheet_name': None, 'total_rows': 0, 'total_columns': 0},
+        )
+
+    try:
+        result = KoboDataImportService.validate_data_export(file_bytes)
+        current_app.logger.info(
+            'kobo_validate: result valid=%s message=%r filename=%r',
+            result.get('valid'), result.get('message'), f.filename,
+        )
+        return json_ok(**result)
+    except Exception as e:
+        current_app.logger.error(
+            'kobo_validate: unhandled exception filename=%r – %s', f.filename, e, exc_info=True,
+        )
+        return json_server_error('Validation failed. Please try again.')
+
+
 @bp.route("/kobo-data-import/analyze", methods=["POST"])
 @admin_required
 @system_manager_required
@@ -59,10 +116,23 @@ def kobo_data_import_analyze():
 
     valid, error_msg, ext = validate_upload_extension_and_mime(f, EXCEL_EXTENSIONS)
     if not valid:
+        current_app.logger.info(
+            'kobo_analyze: rejected at mime/ext check – filename=%r ext_detected=%r error=%r',
+            f.filename, ext, error_msg,
+        )
         return json_bad_request(error_msg or 'Invalid file type')
 
     file_bytes = f.read()
+    current_app.logger.info(
+        'kobo_analyze: filename=%r ext=%r size=%d bytes',
+        f.filename, ext, len(file_bytes),
+    )
+
     if len(file_bytes) > 50 * 1024 * 1024:
+        current_app.logger.info(
+            'kobo_analyze: rejected – file too large (%d bytes) filename=%r',
+            len(file_bytes), f.filename,
+        )
         return json_bad_request('File too large (max 50 MB)')
 
     result = KoboDataImportService.analyze(file_bytes)
@@ -77,6 +147,15 @@ def kobo_data_import_analyze():
         session['kobo_data_import_file'] = tmp_path
         session['kobo_data_import_id'] = file_id
         result['file_id'] = file_id
+        current_app.logger.info(
+            'kobo_analyze: file saved as file_id=%s filename=%r',
+            file_id, f.filename,
+        )
+    else:
+        current_app.logger.info(
+            'kobo_analyze: analysis failed – filename=%r message=%r',
+            f.filename, result.get('message'),
+        )
 
     return json_ok(**result)
 

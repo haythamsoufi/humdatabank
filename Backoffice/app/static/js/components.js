@@ -1372,13 +1372,23 @@ document.addEventListener('DOMContentLoaded', function() {
             cache: 'no-cache'
         })
         .then(response => {
+            if (response.status === 401 || response.status === 403) {
+                // Session expired or user logged out — stop polling to avoid
+                // continuous 401 noise in the server logs.
+                if (pollingInterval !== null) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                }
+                return null;
+            }
             if (!response.ok) {
                 throw (window.httpErrorSync && window.httpErrorSync(response)) || new Error(`HTTP ${response.status}`);
             }
             return response.json();
         })
         .then(data => {
-            if (typeof data !== 'object' || data === null) {
+            if (data === null) return;
+            if (typeof data !== 'object') {
                 throw new Error('Invalid response format');
             }
 

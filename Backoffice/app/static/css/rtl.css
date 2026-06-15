@@ -903,6 +903,19 @@ html[dir="rtl"] .excel-io-dropzone__status {
     padding-right: 1.5rem;
 }
 
+html[dir="rtl"] .excel-io-dropzone--invalid .excel-io-dropzone__file-panel {
+    padding-left: 0;
+}
+
+html[dir="rtl"] .excel-io-dropzone--invalid .excel-io-dropzone__status {
+    padding-right: 0;
+}
+
+html[dir="rtl"] .excel-io-dropzone__preview-errors {
+    margin-right: 1.375rem;
+    margin-left: 0;
+}
+
 html[dir="rtl"] #excel-options-modal .flex.items-start {
     flex-direction: row-reverse;
 }

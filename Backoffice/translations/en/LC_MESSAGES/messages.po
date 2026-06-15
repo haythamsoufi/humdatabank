@@ -4498,8 +4498,8 @@ msgid "Data Handling"
 msgstr "Data Handling"
 
 #: app/templates/admin/dashboard.html:350
-msgid "Data Import Tools"
-msgstr "Data Import Tools"
+msgid "Data Integration"
+msgstr "Data Integration"
 
 #: app/templates/components/_ai_policy_modal.html:29
 msgid ""

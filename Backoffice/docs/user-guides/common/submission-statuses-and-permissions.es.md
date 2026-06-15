@@ -1,4 +1,4 @@
-# Estados de envío y qué puedes hacer (guía de permisos)
+# Estado de envío
 
 Usa esta guía para entender por qué falta un botón o está deshabilitado (por ejemplo **Editar**, **Enviar**, **Aprobar** o **Reabrir**).
 

@@ -65,7 +65,7 @@ def _audit_trail_risk_level_for_activity_row(activity_log: UserActivityLog) -> s
     Most such rows default to low; a few endpoints mirror material data / security impact
     comparable to medium admin actions.
     """
-    if (activity_log.endpoint or "") == "template_special.run_fdrs_sync":
+    if (activity_log.endpoint or "") == "data_sync_imputation.run_data_sync":
         return "medium"
     return "low"
 

@@ -120,8 +120,11 @@ class DebugManager:
         # Configure file logging for application logs (for monitoring page)
         # This allows viewing application errors in the system monitoring page
         # Default to True to ensure error logs are captured
+        application_file_handler = None
         if app.config.get('APPLICATION_LOG_FILE_ENABLED', True):
             try:
+                from app.utils.logging_handlers import create_rotating_file_handler
+
                 # Create logs directory if it doesn't exist
                 logs_dir = os.path.join(app.instance_path, 'logs')
                 os.makedirs(logs_dir, exist_ok=True)
@@ -129,23 +132,20 @@ class DebugManager:
                 # Create application log file path
                 app_log_file_path = os.path.join(logs_dir, 'application.log')
 
-                # Use RotatingFileHandler to prevent unbounded log growth and improve performance
-                from logging.handlers import RotatingFileHandler
                 max_bytes = app.config.get('APPLICATION_LOG_MAX_BYTES', 50 * 1024 * 1024)  # 50MB default
                 backup_count = app.config.get('APPLICATION_LOG_BACKUP_COUNT', 5)  # Keep 5 backups
-                file_handler = RotatingFileHandler(
+                application_file_handler = create_rotating_file_handler(
                     app_log_file_path,
-                    maxBytes=max_bytes,
-                    backupCount=backup_count,
-                    encoding='utf-8'
+                    max_bytes=max_bytes,
+                    backup_count=backup_count,
                 )
-                file_handler.setLevel(log_level)
+                application_file_handler.setLevel(log_level)
 
-                file_handler = _mark_managed(file_handler)
-                file_handler.setFormatter(formatter)
+                application_file_handler = _mark_managed(application_file_handler)
+                application_file_handler.setFormatter(formatter)
 
                 # Add file handler to app logger (in addition to stdout handler)
-                app.logger.addHandler(file_handler)
+                app.logger.addHandler(application_file_handler)
 
                 # Store log file path on app for monitoring page access
                 app.application_log_file_path = app_log_file_path
@@ -154,6 +154,7 @@ class DebugManager:
             except Exception as e:
                 app.logger.warning(f"Failed to set up application log file: {e}")
                 app.application_log_file_path = None
+                application_file_handler = None
         else:
             app.application_log_file_path = None
 
@@ -170,21 +171,10 @@ class DebugManager:
             root_stream_handler.setFormatter(formatter)
             root_logger.addHandler(root_stream_handler)
 
-        if app.config.get('APPLICATION_LOG_FILE_ENABLED', True) and app.application_log_file_path:
-            try:
-                from logging.handlers import RotatingFileHandler
-                root_file_handler = RotatingFileHandler(
-                    app.application_log_file_path,
-                    maxBytes=app.config.get('APPLICATION_LOG_MAX_BYTES', 50 * 1024 * 1024),
-                    backupCount=app.config.get('APPLICATION_LOG_BACKUP_COUNT', 5),
-                    encoding='utf-8'
-                )
-                root_file_handler = _mark_managed(root_file_handler)
-                root_file_handler.setLevel(log_level)
-                root_file_handler.setFormatter(formatter)
-                root_logger.addHandler(root_file_handler)
-            except Exception as e:
-                app.logger.warning("Failed to set up root application log file handler: %s", e)
+        # Reuse the same file handler so Windows does not open application.log twice
+        # (two RotatingFileHandlers on one path break rollover with WinError 32).
+        if application_file_handler is not None:
+            root_logger.addHandler(application_file_handler)
 
         # Configure application loggers with pattern matching
         app_loggers = [

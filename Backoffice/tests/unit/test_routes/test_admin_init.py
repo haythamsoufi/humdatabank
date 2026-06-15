@@ -17,6 +17,12 @@ def _mock_render(text="ok"):
     return make_response(text, 200)
 
 
+def _error_status(result):
+    if isinstance(result, tuple):
+        return result[1]
+    return result.status_code
+
+
 def _auth_patches():
     """Common patches to grant admin / system-manager / permission access."""
     return [
@@ -196,8 +202,8 @@ class TestAdminErrorHandlers:
 
         with app.test_request_context("/admin/foo", headers={"Accept": "text/html"}):
             with patch("app.routes.admin.render_template", return_value=_mock_render("forbidden")):
-                resp, status = admin_forbidden(Exception("403"))
-        assert status == 403
+                result = admin_forbidden(Exception("403"))
+        assert _error_status(result) == 403
 
     def test_admin_forbidden_json(self, app, db_session):
         from app.routes.admin import admin_forbidden
@@ -206,16 +212,16 @@ class TestAdminErrorHandlers:
             "/admin/foo",
             headers={"Accept": "application/json", "Content-Type": "application/json"},
         ):
-            resp, status = admin_forbidden(Exception("403"))
-        assert status == 403
+            result = admin_forbidden(Exception("403"))
+        assert _error_status(result) == 403
 
     def test_admin_not_found_html(self, app, db_session):
         from app.routes.admin import admin_not_found
 
         with app.test_request_context("/admin/missing", headers={"Accept": "text/html"}):
             with patch("app.routes.admin.render_template", return_value=_mock_render("not-found")):
-                resp, status = admin_not_found(Exception("404"))
-        assert status == 404
+                result = admin_not_found(Exception("404"))
+        assert _error_status(result) == 404
 
     def test_admin_not_found_json(self, app, db_session):
         from app.routes.admin import admin_not_found
@@ -224,16 +230,16 @@ class TestAdminErrorHandlers:
             "/admin/missing",
             headers={"Accept": "application/json", "Content-Type": "application/json"},
         ):
-            resp, status = admin_not_found(Exception("404"))
-        assert status == 404
+            result = admin_not_found(Exception("404"))
+        assert _error_status(result) == 404
 
     def test_admin_internal_error_html(self, app, db_session):
         from app.routes.admin import admin_internal_error
 
         with app.test_request_context("/admin/err", headers={"Accept": "text/html"}):
             with patch("app.routes.admin.render_template", return_value=_mock_render("500")):
-                resp, status = admin_internal_error(Exception("500"))
-        assert status == 500
+                result = admin_internal_error(Exception("500"))
+        assert _error_status(result) == 500
 
     def test_admin_internal_error_json(self, app, db_session):
         from app.routes.admin import admin_internal_error
@@ -242,8 +248,8 @@ class TestAdminErrorHandlers:
             "/admin/err",
             headers={"Accept": "application/json", "Content-Type": "application/json"},
         ):
-            resp, status = admin_internal_error(Exception("500"))
-        assert status == 500
+            result = admin_internal_error(Exception("500"))
+        assert _error_status(result) == 500
 
 
 # ---------------------------------------------------------------------------

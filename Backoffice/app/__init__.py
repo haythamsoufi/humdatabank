@@ -138,8 +138,11 @@ def create_app(config_name=None):
 
     register_all_blueprints(app, csrf, startup_start)
 
+    if not hasattr(app, 'form_integration'):
+        app.form_integration = None
+
     is_reloading = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
-    if not hasattr(app, 'plugin_manager') and (not app.debug or is_reloading):
+    if not hasattr(app, 'plugin_manager') and (not app.debug or is_reloading or app.config.get('TESTING')):
         from app.plugins import PluginManager
         from app.plugins.form_integration import FormIntegration
         app.plugin_manager = PluginManager(app)
@@ -147,7 +150,7 @@ def create_app(config_name=None):
         app.plugin_manager.load_plugins()
         app.plugin_manager.register_template_loader()
         app.plugin_manager.register_blueprints()
-    elif app.debug and not is_reloading:
+    elif app.debug and not is_reloading and not app.config.get('TESTING'):
         from app.plugins import PluginManager
         from app.plugins.form_integration import FormIntegration
         app.plugin_manager = PluginManager(app)

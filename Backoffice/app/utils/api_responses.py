@@ -60,6 +60,7 @@ from flask import current_app, jsonify
 
 # Re-export for convenience (avoid importing from api_helpers in routes)
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE  # noqa: F401
+from app.utils.transactions import request_transaction_rollback
 
 
 def json_error(message, status=400, **extra):
@@ -69,10 +70,12 @@ def json_error(message, status=400, **extra):
     :param message: Error message string
     :param status: HTTP status code (default 400)
     :param extra: Additional keys to include in the response (e.g. success=False)
-    :return: Flask response tuple (response, status_code)
+    :return: Flask Response with status_code set
     """
     body = {'error': message, **extra}
-    return jsonify(body), status
+    response = jsonify(body)
+    response.status_code = status
+    return response
 
 
 def json_auth_required(message='Authentication required. Please log in.'):
@@ -116,7 +119,9 @@ def json_ok(data=None, **extra):
     body = {'success': True, **(data if isinstance(data, dict) else {}), **extra}
     if data is not None and not isinstance(data, dict):
         body['data'] = data
-    return jsonify(body), 200
+    response = jsonify(body)
+    response.status_code = 200
+    return response
 
 
 def json_ok_result(result, **extra):
@@ -133,13 +138,17 @@ def json_ok_result(result, **extra):
 def json_accepted(**extra):
     """Return 202 Accepted JSON response (e.g. for async job submission)."""
     body = {'success': True, **extra}
-    return jsonify(body), 202
+    response = jsonify(body)
+    response.status_code = 202
+    return response
 
 
 def json_created(**extra):
     """Return 201 Created JSON response (e.g. for resource creation)."""
     body = {'success': True, **extra}
-    return jsonify(body), 201
+    response = jsonify(body)
+    response.status_code = 201
+    return response
 
 
 def require_json_keys(data, keys, message=None):
@@ -217,7 +226,6 @@ def json_error_handler(log_prefix='Error'):
             try:
                 return f(*args, **kwargs)
             except Exception as e:
-                from app.utils.transactions import request_transaction_rollback
                 request_transaction_rollback(reason='json_error_handler')
                 current_app.logger.error(f"{log_prefix}: {e}", exc_info=True)
                 return json_server_error(GENERIC_ERROR_MESSAGE)

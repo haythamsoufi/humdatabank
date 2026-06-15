@@ -23,6 +23,7 @@ from app.models.form_items import FormItem
 def _make_item(**kwargs):
     """Create an unattached FormItem for logic-only tests."""
     item = FormItem.__new__(FormItem)
+    FormItem._sa_class_manager.setup_instance(item)
     item.item_type = kwargs.get("item_type", "indicator")
     item.type = kwargs.get("type", None)
     item.label = kwargs.get("label", "Test Label")

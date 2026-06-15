@@ -299,9 +299,10 @@ def calculate_section_completion_status(all_sections, existing_data_processed, e
 
                 total_items_in_section +=1
 
-                if hasattr(field, 'dynamic_assignment_id'):
-                    item_key = f"field_value[dynamic_{field.dynamic_assignment_id}]"
-                    not_applicable_key = f"dynamic_{field.dynamic_assignment_id}_not_applicable"
+                dynamic_id = getattr(field, 'dynamic_assignment_id', None)
+                if dynamic_id is not None:
+                    item_key = f"field_value[dynamic_{dynamic_id}]"
+                    not_applicable_key = f"dynamic_{dynamic_id}_not_applicable"
                 else:
                     item_key = f"field_value[{field.id}]"
                     if field.is_indicator:

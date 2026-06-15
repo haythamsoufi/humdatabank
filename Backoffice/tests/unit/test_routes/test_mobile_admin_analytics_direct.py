@@ -99,7 +99,7 @@ class TestDashboardActivity:
         body, status = _parse(resp)
         assert status == 200
         data = body.get_json()['data']
-        assert 'activity' in data
+        assert 'recent_activity' in data
 
     def test_with_days_param(self, app, db_session, route_admin):
         from app.routes.api.mobile.admin_analytics import dashboard_activity

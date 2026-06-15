@@ -406,12 +406,16 @@ def _build_template_data_for_js(template, version_id: int):
         changed = 0
         parent_by_order = {}
         for s in all_sections:
-            if s.parent_section_id is None:
-                try:
-                    parent_by_order[int(float(s.order))] = s
-                except Exception as e:
-                    current_app.logger.debug("parent_by_order order parse failed: %s", e)
-                    continue
+            if s.parent_section_id is not None:
+                continue
+            try:
+                raw = float(s.order)
+            except Exception as e:
+                current_app.logger.debug("parent_by_order order parse failed: %s", e)
+                continue
+            if raw != int(raw):
+                continue
+            parent_by_order[int(raw)] = s
 
         for s in all_sections:
             if s.parent_section_id is not None:

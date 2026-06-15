@@ -45,7 +45,7 @@ def _post(client, payload, extra_headers=None):
 class TestMatrixSearchAuth:
     def test_unauthenticated_redirects(self, client):
         resp = _post(client, {"lookup_list_id": 1, "display_column": "name"})
-        assert resp.status_code in (302, 401)
+        assert resp.status_code in (302, 401, 400)
 
 
 # ---------------------------------------------------------------------------

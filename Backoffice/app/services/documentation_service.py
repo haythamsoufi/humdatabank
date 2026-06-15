@@ -16,6 +16,7 @@ It is used by both:
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
@@ -27,6 +28,8 @@ from bs4 import BeautifulSoup
 from flask import abort, current_app, session
 from flask_babel import _
 from markupsafe import Markup
+
+from app.services.workflow_docs_service import WorkflowDocsService
 
 
 @dataclass(frozen=True)
@@ -62,11 +65,27 @@ def docs_root() -> Path:
 
 def _is_within_root(root: Path, candidate: Path) -> bool:
     try:
-        candidate.resolve().relative_to(root.resolve())
-        return True
+        root_norm = os.path.normcase(str(root.resolve()))
+        candidate_norm = os.path.normcase(str(candidate.resolve()))
+        if candidate_norm == root_norm:
+            return True
+        return candidate_norm.startswith(root_norm + os.sep)
     except Exception as e:
         current_app.logger.debug("_is_within_root failed: %s", e)
         return False
+
+
+def _relative_to_root(root: Path, candidate: Path) -> str:
+    """Return docs-relative posix path, tolerating Windows short/long path mismatches."""
+    root_norm = os.path.normcase(str(root.resolve()))
+    candidate_norm = os.path.normcase(str(candidate.resolve()))
+    if candidate_norm == root_norm:
+        return ""
+    prefix = root_norm + os.sep
+    if not candidate_norm.startswith(prefix):
+        raise ValueError(f"{candidate} is not in the subpath of {root}")
+    rel = candidate_norm[len(prefix):]
+    return rel.replace("\\", "/")
 
 
 def _extract_title_from_markdown(text: str, fallback: str) -> str:
@@ -421,7 +440,7 @@ def list_markdown_files(root: Path, subdir: Optional[Path] = None) -> List[Path]
     for p in base.rglob("*.md"):
         if not p.is_file():
             continue
-        rel = p.relative_to(root).as_posix()
+        rel = _relative_to_root(root, p)
         # Skip any files under internal/hidden directories (e.g. docs/_internal/...).
         if any(part.startswith("_") for part in Path(rel).parts):
             continue
@@ -432,7 +451,7 @@ def list_markdown_files(root: Path, subdir: Optional[Path] = None) -> List[Path]
         if "archive" in rel.lower() and "archive" not in str(subdir or ""):
             continue
         files.append(p)
-    return sorted(files, key=lambda x: x.relative_to(root).as_posix().lower())
+    return sorted(files, key=lambda x: _relative_to_root(root, x).lower())
 
 
 def _allowed_user_guides_subdirs_for_user(user) -> set:
@@ -497,7 +516,7 @@ def build_hierarchical_nav(
     # First pass: de-duplicate language variants by grouping them under a base rel path.
     variants: Dict[str, Dict[Optional[str], Path]] = {}
     for p in list_markdown_files(root):
-        rel = p.relative_to(root).as_posix()
+        rel = _relative_to_root(root, p)
         base_rel, rel_lang = _split_rel_lang(rel)
         variants.setdefault(base_rel, {})[rel_lang] = p
 
@@ -879,7 +898,7 @@ def rewrite_relative_links(
             if candidate_md.suffix.lower() != ".md":
                 candidate_md = candidate_md.with_suffix(".md")
             if _is_within_root(root, candidate_md) and candidate_md.exists() and candidate_md.is_file():
-                rel = candidate_md.relative_to(root).as_posix()
+                rel = _relative_to_root(root, candidate_md)
                 a["href"] = doc_url_builder(rel)
             continue
 
@@ -893,7 +912,7 @@ def rewrite_relative_links(
         candidate_md = candidate if candidate.suffix.lower() == ".md" else candidate.with_suffix(".md")
 
         if _is_within_root(root, candidate_md) and candidate_md.exists() and candidate_md.is_file():
-            rel = candidate_md.relative_to(root).as_posix()
+            rel = _relative_to_root(root, candidate_md)
             new_href = doc_url_builder(rel)
             if frag:
                 new_href = f"{new_href}#{frag}"
@@ -910,13 +929,13 @@ def rewrite_relative_links(
                 src_clean = s.lstrip("/")
                 asset_candidate = (root / src_clean).resolve()
                 if _is_within_root(root, asset_candidate) and asset_candidate.exists() and asset_candidate.is_file():
-                    rel_asset = asset_candidate.relative_to(root).as_posix()
+                    rel_asset = _relative_to_root(root, asset_candidate)
                     img["src"] = asset_url_builder(rel_asset)
             continue
 
         asset_candidate = (root / current_dir / s).resolve()
         if _is_within_root(root, asset_candidate) and asset_candidate.exists() and asset_candidate.is_file():
-            rel_asset = asset_candidate.relative_to(root).as_posix()
+            rel_asset = _relative_to_root(root, asset_candidate)
             img["src"] = asset_url_builder(rel_asset)
 
     return str(soup)
@@ -1001,7 +1020,7 @@ def get_workflow_id_for_doc(file_path: Path, root: Path) -> Optional[str]:
         Workflow ID if found, None otherwise
     """
     try:
-        rel_path = file_path.relative_to(root).as_posix()
+        rel_path = _relative_to_root(root, file_path)
         rel = Path(rel_path)
 
         # Skip if it's a README or index file
@@ -1018,8 +1037,6 @@ def get_workflow_id_for_doc(file_path: Path, root: Path) -> Optional[str]:
         # Only return a workflow id when an *interactive tour* exists for it.
         # Some workflow docs are informational (no "### Step N:" sections), so they
         # should not show a "Take the Tour" button.
-        from app.services.workflow_docs_service import WorkflowDocsService
-
         service = WorkflowDocsService()
         workflow = service.get_workflow_by_id(workflow_id)
         if not workflow:

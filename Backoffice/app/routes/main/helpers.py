@@ -8,7 +8,10 @@ from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
 from app.utils.form_localization import (
     get_localized_national_society_name as _get_localized_national_society_name,
     get_localized_template_name as _get_localized_template_name,
+    get_localized_indicator_name,
+    get_translation_key,
 )
+from app.models.assignments import AssignmentEntityStatus
 from app.utils.entity_groups import get_allowed_entity_type_codes, get_enabled_entity_groups
 from flask_babel import _
 from contextlib import suppress

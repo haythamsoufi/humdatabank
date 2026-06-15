@@ -63,11 +63,11 @@ class TestRbacCacheSetError:
     def test_cache_set_swallows_exception(self, app):
         """_rbac_cache_set should not raise when g.attr assignment fails."""
         with app.test_request_context():
-            from flask import g
+            class _FrozenG:
+                def __setattr__(self, name, value):
+                    raise AttributeError("frozen")
 
-            # Simulate a read-only proxy by giving it a frozen __dict__-alike
-            bad_g = MagicMock()
-            bad_g.__setattr__ = MagicMock(side_effect=AttributeError("frozen"))
+            bad_g = _FrozenG()
             _rbac_cache_set(bad_g, "_test_cache", "k", "v")
 
 
@@ -174,10 +174,11 @@ class TestGetScopedGrantDecision:
 
     def test_template_scoped_grant(self, db_session, app):
         from app.models.rbac import RbacAccessGrant
-        from tests.factories import _ensure_permission
+        from tests.factories import _ensure_permission, create_test_template
 
         with app.app_context():
             user = create_test_user(db_session)
+            template = create_test_template(db_session)
             pid = _ensure_permission(db_session, "assignment.template_edit")
             db_session.add(
                 RbacAccessGrant(
@@ -186,11 +187,11 @@ class TestGetScopedGrantDecision:
                     permission_id=pid,
                     scope_kind="template",
                     effect="allow",
-                    template_id=99,
+                    template_id=template.id,
                 )
             )
             db_session.commit()
-            scope = {"template_id": 99}
+            scope = {"template_id": template.id}
             decision = AuthorizationService.get_scoped_grant_decision(
                 user, "assignment.template_edit", scope=scope
             )
@@ -200,10 +201,11 @@ class TestGetScopedGrantDecision:
 
     def test_assignment_scoped_grant(self, db_session, app):
         from app.models.rbac import RbacAccessGrant
-        from tests.factories import _ensure_permission
+        from tests.factories import _ensure_permission, create_test_assignment_entity_status
 
         with app.app_context():
             user = create_test_user(db_session)
+            aes = create_test_assignment_entity_status(db_session)
             pid = _ensure_permission(db_session, "assignment.form_view")
             db_session.add(
                 RbacAccessGrant(
@@ -212,11 +214,11 @@ class TestGetScopedGrantDecision:
                     permission_id=pid,
                     scope_kind="assignment",
                     effect="allow",
-                    assigned_form_id=42,
+                    assigned_form_id=aes.assigned_form_id,
                 )
             )
             db_session.commit()
-            scope = {"assigned_form_id": 42}
+            scope = {"assigned_form_id": aes.assigned_form_id}
             decision = AuthorizationService.get_scoped_grant_decision(
                 user, "assignment.form_view", scope=scope
             )
@@ -262,8 +264,8 @@ class TestAssignmentIsEffectivelyClosed:
         aes = MagicMock()
         aes.reopened_after_close = False
         aes.assigned_form = None
-        with patch.object(type(aes), "is_round_closed_for_entity", side_effect=Exception("no round")):
-            result = AuthorizationService._assignment_is_effectively_closed(aes)
+        aes.is_round_closed_for_entity = MagicMock(side_effect=Exception("no round"))
+        result = AuthorizationService._assignment_is_effectively_closed(aes)
         assert result is False
 
     def test_returns_true_when_round_closed_bool(self, db_session, app):
@@ -375,17 +377,19 @@ class TestCanEditAssignment:
 
     def test_scope_build_exception_fallback(self, db_session, app):
         """Exception during scope build should still complete via fallback scope."""
+        from unittest.mock import PropertyMock
         with app.app_context():
             user, country, aes = create_focal_point_with_country(db_session)
             _grant_role_permission(db_session, "assignment_editor_submitter", "assignment.enter")
-            # Make assigned_form raise on template_id access
-            aes.assigned_form = MagicMock()
-            type(aes.assigned_form).template_id = property(lambda self: (_ for _ in ()).throw(AttributeError("no template_id")))
-            aes.assigned_form.requires_delegation_review = False
-            db_session.commit()
-            # Should not crash
-            result = AuthorizationService.can_edit_assignment(aes, user)
-        # Result can be True or False depending on RBAC state; we just verify no crash
+            with patch.object(
+                type(aes.assigned_form),
+                "template_id",
+                new_callable=PropertyMock,
+                side_effect=AttributeError("no template_id"),
+            ):
+                aes.assigned_form.requires_delegation_review = False
+                db_session.commit()
+                result = AuthorizationService.can_edit_assignment(aes, user)
         assert isinstance(result, bool)
 
 
@@ -712,16 +716,18 @@ class TestHasRbacPermissionDebugPath:
 
 class TestCanAccessAssignmentScopeException:
     def test_scope_build_exception_still_evaluates(self, db_session, app):
+        from unittest.mock import PropertyMock
         with app.app_context():
             user, country, aes = create_focal_point_with_country(db_session)
             _grant_role_permission(db_session, "assignment_editor_submitter", "assignment.view")
-            # Break assigned_form.template_id access
-            af = MagicMock()
-            type(af).template_id = property(lambda self: (_ for _ in ()).throw(AttributeError("no tmpl")))
-            aes.assigned_form = af
-            db_session.commit()
-            result = AuthorizationService.can_access_assignment(aes, user)
-        # Should not raise; result depends on RBAC
+            with patch.object(
+                type(aes.assigned_form),
+                "template_id",
+                new_callable=PropertyMock,
+                side_effect=AttributeError("no tmpl"),
+            ):
+                db_session.commit()
+                result = AuthorizationService.can_access_assignment(aes, user)
         assert isinstance(result, bool)
 
 

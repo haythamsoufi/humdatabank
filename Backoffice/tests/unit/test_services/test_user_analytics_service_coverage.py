@@ -267,19 +267,19 @@ class TestIsAutoManagedRequest:
             assert _svc._is_auto_managed_request() is False
 
     def test_false_when_flag_not_set(self, app):
-        with app.test_request_context("/"):
+        with app.test_request_context("/static/app.js"):
             assert _svc._is_auto_managed_request() is False
 
     def test_true_when_flag_set(self, app):
         from flask import g
-        with app.test_request_context("/"):
+        with app.test_request_context("/static/app.js"):
             g._auto_txn_managed = True
             assert _svc._is_auto_managed_request() is True
 
 
 class TestCommitOrFlush:
     def test_commits_when_not_managed(self, app):
-        with app.test_request_context("/"):
+        with app.test_request_context("/static/app.js"):
             with patch("app.services.user_analytics_service.db") as mock_db:
                 _svc._commit_or_flush()
                 mock_db.session.commit.assert_called_once()
@@ -287,7 +287,7 @@ class TestCommitOrFlush:
 
     def test_flushes_when_managed(self, app):
         from flask import g
-        with app.test_request_context("/"):
+        with app.test_request_context("/static/app.js"):
             g._auto_txn_managed = True
             with patch("app.services.user_analytics_service.db") as mock_db:
                 _svc._commit_or_flush()
@@ -1214,7 +1214,7 @@ class TestLogAdminAction:
         ):
             with patch("app.services.user_analytics_service.current_user", mu):
                 with patch(
-                    "app.services.user_analytics_service.AuthorizationService"
+                    "app.services.authorization_service.AuthorizationService"
                 ) as MockAuth:
                     MockAuth.is_admin.return_value = True
                     with patch("app.services.user_analytics_service.db") as mock_db:
@@ -1234,7 +1234,7 @@ class TestLogAdminAction:
         with app.test_request_context("/"):
             with patch("app.services.user_analytics_service.current_user", mu):
                 with patch(
-                    "app.services.user_analytics_service.AuthorizationService"
+                    "app.services.authorization_service.AuthorizationService"
                 ) as MockAuth:
                     MockAuth.is_admin.return_value = False
                     with patch("app.services.user_analytics_service.AdminActionLog") as MockAL:
@@ -1249,7 +1249,7 @@ class TestLogAdminAction:
         ):
             with patch("app.services.user_analytics_service.current_user", mu):
                 with patch(
-                    "app.services.user_analytics_service.AuthorizationService"
+                    "app.services.authorization_service.AuthorizationService"
                 ) as MockAuth:
                     MockAuth.is_admin.return_value = True
                     with patch("app.services.user_analytics_service.db"):
@@ -1273,7 +1273,7 @@ class TestLogAdminAction:
         ):
             with patch("app.services.user_analytics_service.current_user", mu):
                 with patch(
-                    "app.services.user_analytics_service.AuthorizationService"
+                    "app.services.authorization_service.AuthorizationService"
                 ) as MockAuth:
                     MockAuth.is_admin.return_value = True
                     with patch("app.services.user_analytics_service.db"):
@@ -1294,7 +1294,7 @@ class TestLogAdminAction:
         with app.test_request_context("/"):
             with patch("app.services.user_analytics_service.current_user", mu):
                 with patch(
-                    "app.services.user_analytics_service.AuthorizationService"
+                    "app.services.authorization_service.AuthorizationService"
                 ) as MockAuth:
                     MockAuth.is_admin.return_value = True
                     with patch("app.services.user_analytics_service.db") as mock_db:
@@ -1367,35 +1367,35 @@ class TestCheckSuspiciousLogin:
 
     def test_not_suspicious_when_no_activity(self, app):
         with app.app_context():
-            with patch("app.services.user_analytics_service.UserLoginLog") as MockLL:
-                MockLL.query.filter.return_value.count.return_value = 0
-                with patch("app.services.user_analytics_service.db") as mock_db:
-                    mock_db.session.query.return_value.filter.return_value.scalar.return_value = 0
-                    result = _svc.check_suspicious_login("1.1.1.1", "x@x.com", False)
-                    assert result is None
+            with patch("app.services.user_analytics_service.UserLoginLog.query") as mock_ll_query, \
+                 patch("app.services.user_analytics_service.db.session.query") as mock_db_query:
+                mock_ll_query.filter.return_value.count.return_value = 0
+                mock_db_query.return_value.filter.return_value.scalar.return_value = 0
+                result = _svc.check_suspicious_login("1.1.1.1", "x@x.com", False)
+                assert result is None
 
     def test_brute_force_flagged(self, app):
         with app.app_context():
-            with patch("app.services.user_analytics_service.UserLoginLog") as MockLL:
-                MockLL.query.filter.return_value.count.return_value = 6
+            with patch("app.services.user_analytics_service.UserLoginLog.query") as mock_ll_query:
+                mock_ll_query.filter.return_value.count.return_value = 6
                 result = _svc.check_suspicious_login("2.2.2.2", "x@x.com", False)
                 assert result is not None
                 assert "brute_force" in result
 
     def test_credential_stuffing_flagged(self, app):
         with app.app_context():
-            with patch("app.services.user_analytics_service.UserLoginLog") as MockLL:
-                MockLL.query.filter.return_value.count.return_value = 0
-                with patch("app.services.user_analytics_service.db") as mock_db:
-                    mock_db.session.query.return_value.filter.return_value.scalar.return_value = 12
-                    result = _svc.check_suspicious_login("3.3.3.3", "x@x.com", False)
-                    assert result is not None
-                    assert "credential_stuffing" in result
+            with patch("app.services.user_analytics_service.UserLoginLog.query") as mock_ll_query, \
+                 patch("app.services.user_analytics_service.db.session.query") as mock_db_query:
+                mock_ll_query.filter.return_value.count.return_value = 0
+                mock_db_query.return_value.filter.return_value.scalar.return_value = 12
+                result = _svc.check_suspicious_login("3.3.3.3", "x@x.com", False)
+                assert result is not None
+                assert "credential_stuffing" in result
 
     def test_new_network_on_success_flagged(self, app):
         with app.app_context():
-            with patch("app.services.user_analytics_service.UserLoginLog") as MockLL:
-                MockLL.query.filter.return_value.count.return_value = 0
+            with patch("app.services.user_analytics_service.UserLoginLog.query") as mock_ll_query:
+                mock_ll_query.filter.return_value.count.return_value = 0
 
                 known_ips = [
                     ("10.0.1.100",),
@@ -1448,8 +1448,8 @@ class TestCheckSuspiciousLogin:
     def test_new_ipv6_on_success_flagged(self, app):
         """Covers the non-IPv4 branch for new_ip."""
         with app.app_context():
-            with patch("app.services.user_analytics_service.UserLoginLog") as MockLL:
-                MockLL.query.filter.return_value.count.return_value = 0
+            with patch("app.services.user_analytics_service.UserLoginLog.query") as mock_ll_query:
+                mock_ll_query.filter.return_value.count.return_value = 0
 
                 known_ips = [("::1",), ("::2",), ("::3",)]
                 user_mock = MagicMock()
@@ -1485,8 +1485,8 @@ class TestCheckSuspiciousLogin:
 class TestGetRecentFailedAttempts:
     def test_returns_count(self, app):
         with app.app_context():
-            with patch("app.services.user_analytics_service.UserLoginLog") as MockLL:
-                MockLL.query.filter.return_value.count.return_value = 3
+            with patch("app.services.user_analytics_service.UserLoginLog.query") as mock_ll_query:
+                mock_ll_query.filter.return_value.count.return_value = 3
                 count = _svc.get_recent_failed_attempts("x@x.com", "1.1.1.1")
                 assert count == 3
 
@@ -1597,8 +1597,8 @@ class TestGetUserLoginAnalytics:
                 self._fake_log("login_success"),
                 self._fake_log("login_failed"),
             ]
-            with patch("app.services.user_analytics_service.UserLoginLog") as MockLL:
-                MockLL.query.filter.return_value.all.return_value = logs
+            with patch("app.services.user_analytics_service.UserLoginLog.query") as mock_query:
+                mock_query.filter.return_value.all.return_value = logs
                 result = _svc.get_user_login_analytics(days=30)
                 assert result["total_logins"] == 2
                 assert result["failed_attempts"] == 1
@@ -1606,10 +1606,10 @@ class TestGetUserLoginAnalytics:
 
     def test_filters_by_user_id(self, app):
         with app.app_context():
-            with patch("app.services.user_analytics_service.UserLoginLog") as MockLL:
+            with patch("app.services.user_analytics_service.UserLoginLog.query") as mock_query:
                 q = MagicMock()
                 q.filter.return_value.all.return_value = []
-                MockLL.query.filter.return_value = q
+                mock_query.filter.return_value = q
                 _svc.get_user_login_analytics(user_id=5, days=30)
                 # The second filter call should have been applied
                 q.filter.assert_called_once()
@@ -1620,8 +1620,8 @@ class TestGetUserLoginAnalytics:
                 self._fake_log("login_success", device="Mobile", browser="Chrome"),
                 self._fake_log("login_success", device="desktop", browser="Firefox"),
             ]
-            with patch("app.services.user_analytics_service.UserLoginLog") as MockLL:
-                MockLL.query.filter.return_value.all.return_value = logs
+            with patch("app.services.user_analytics_service.UserLoginLog.query") as mock_query:
+                mock_query.filter.return_value.all.return_value = logs
                 result = _svc.get_user_login_analytics(days=7)
                 assert "Mobile" in result["device_breakdown"]
                 assert "Desktop" in result["device_breakdown"]
@@ -1630,8 +1630,8 @@ class TestGetUserLoginAnalytics:
         with app.app_context():
             ts = datetime(2024, 1, 15, 10, 0, tzinfo=timezone.utc)
             logs = [self._fake_log("login_success", ts=ts)]
-            with patch("app.services.user_analytics_service.UserLoginLog") as MockLL:
-                MockLL.query.filter.return_value.all.return_value = logs
+            with patch("app.services.user_analytics_service.UserLoginLog.query") as mock_query:
+                mock_query.filter.return_value.all.return_value = logs
                 result = _svc.get_user_login_analytics(days=30)
                 assert "2024-01-15" in result["daily_activity"]
                 assert result["daily_activity"]["2024-01-15"]["logins"] == 1
@@ -1656,34 +1656,34 @@ class TestGetUserActivityAnalytics:
                 self._fake_log("page_view", response_time=100),
                 self._fake_log("form_submit", response_time=200),
             ]
-            with patch("app.services.user_analytics_service.UserActivityLog") as MockAL:
-                MockAL.query.filter.return_value.all.return_value = logs
+            with patch("app.services.user_analytics_service.UserActivityLog.query") as mock_query:
+                mock_query.filter.return_value.all.return_value = logs
                 result = _svc.get_user_activity_analytics(days=30)
                 assert result["total_activities"] == 2
                 assert result["average_response_time"] == 150.0
 
     def test_filters_by_user_id(self, app):
         with app.app_context():
-            with patch("app.services.user_analytics_service.UserActivityLog") as MockAL:
+            with patch("app.services.user_analytics_service.UserActivityLog.query") as mock_query:
                 q = MagicMock()
                 q.filter.return_value.all.return_value = []
-                MockAL.query.filter.return_value = q
+                mock_query.filter.return_value = q
                 _svc.get_user_activity_analytics(user_id=3, days=7)
                 q.filter.assert_called_once()
 
     def test_url_path_none_skipped(self, app):
         with app.app_context():
             log = self._fake_log(url=None)
-            with patch("app.services.user_analytics_service.UserActivityLog") as MockAL:
-                MockAL.query.filter.return_value.all.return_value = [log]
+            with patch("app.services.user_analytics_service.UserActivityLog.query") as mock_query:
+                mock_query.filter.return_value.all.return_value = [log]
                 result = _svc.get_user_activity_analytics()
                 assert result["popular_pages"] == {}
 
     def test_no_response_times_average_zero(self, app):
         with app.app_context():
             logs = [self._fake_log(response_time=None)]
-            with patch("app.services.user_analytics_service.UserActivityLog") as MockAL:
-                MockAL.query.filter.return_value.all.return_value = logs
+            with patch("app.services.user_analytics_service.UserActivityLog.query") as mock_query:
+                mock_query.filter.return_value.all.return_value = logs
                 result = _svc.get_user_activity_analytics()
                 assert result["average_response_time"] == 0
 
@@ -1706,8 +1706,8 @@ class TestGetSecurityEventsSummary:
                 self._fake_event("high", "brute_force", resolved=False),
                 self._fake_event("medium", "suspicious_login", resolved=True),
             ]
-            with patch("app.services.user_analytics_service.SecurityEvent") as MockSE:
-                MockSE.query.filter.return_value.all.return_value = events
+            with patch("app.services.user_analytics_service.SecurityEvent.query") as mock_query:
+                mock_query.filter.return_value.all.return_value = events
                 result = _svc.get_security_events_summary(days=30)
                 assert result["total_events"] == 2
                 assert result["unresolved_events"] == 1
@@ -1755,8 +1755,8 @@ class TestGetSessionAnalytics:
 
     def test_empty_sessions_returns_zeros(self, app):
         with app.app_context():
-            with patch("app.services.user_analytics_service.UserSessionLog") as MockSL:
-                MockSL.query.filter.return_value.all.return_value = []
+            with patch("app.services.user_analytics_service.UserSessionLog.query") as mock_query:
+                mock_query.filter.return_value.all.return_value = []
                 result = _svc.get_session_analytics(days=30)
                 assert result["total_sessions"] == 0
 
@@ -1767,8 +1767,8 @@ class TestGetSessionAnalytics:
                 self._fake_session(is_active=False, duration_minutes=25, page_views=3),
                 self._fake_session(is_active=False, duration_minutes=45, page_views=7),
             ]
-            with patch("app.services.user_analytics_service.UserSessionLog") as MockSL:
-                MockSL.query.filter.return_value.all.return_value = sessions
+            with patch("app.services.user_analytics_service.UserSessionLog.query") as mock_query:
+                mock_query.filter.return_value.all.return_value = sessions
                 result = _svc.get_session_analytics(days=30)
                 assert result["total_sessions"] == 3
                 assert result["active_sessions"] == 1
@@ -1779,8 +1779,8 @@ class TestGetSessionAnalytics:
         with app.app_context():
             durations = [5, 20, 45, 90, 150, 300]
             sessions = [self._fake_session(duration_minutes=d) for d in durations]
-            with patch("app.services.user_analytics_service.UserSessionLog") as MockSL:
-                MockSL.query.filter.return_value.all.return_value = sessions
+            with patch("app.services.user_analytics_service.UserSessionLog.query") as mock_query:
+                mock_query.filter.return_value.all.return_value = sessions
                 result = _svc.get_session_analytics(days=30)
                 dd = result["duration_distribution"]
                 assert dd["0-15 min"] == 1
@@ -1901,6 +1901,7 @@ class TestCleanupInactiveSessions:
             old_session = MagicMock()
             old_session.is_active = True
             old_session.session_start = datetime.now(timezone.utc) - timedelta(hours=10)
+            old_session.last_activity = datetime.now(timezone.utc) - timedelta(hours=10)
             old_session.session_end = None
 
             with patch("app.services.user_analytics_service.inspect") as mock_inspect:
@@ -1908,15 +1909,11 @@ class TestCleanupInactiveSessions:
                 with patch("app.services.user_analytics_service.db") as mock_db:
                     mock_db.engine.dialect.name = "sqlite"
 
-                    with patch("app.services.user_analytics_service.UserSessionLog") as MockSL:
-                        MockSL.__tablename__ = "user_session_log"
-                        q = MagicMock()
-                        # inactive_sessions = [old_session], long_sessions = []
-                        q.filter.return_value.all.side_effect = [
-                            [old_session],   # inactive_sessions
-                            [],              # long_sessions
+                    with patch("app.services.user_analytics_service.UserSessionLog.query") as mock_query:
+                        mock_query.filter.return_value.all.side_effect = [
+                            [old_session],
+                            [],
                         ]
-                        MockSL.query = q
 
                         result = _svc.cleanup_inactive_sessions(
                             inactivity_hours=1, max_session_hours=48

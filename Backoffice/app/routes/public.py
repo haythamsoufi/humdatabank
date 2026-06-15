@@ -1,6 +1,8 @@
 # ========== File: app/routes/public.py ==========
 from flask import Blueprint, render_template, redirect, url_for, request, flash, current_app, abort, jsonify, Response
-from app.models import db, Resource
+from flask_login import current_user
+from app.models import db, Resource, SubmittedDocument
+from app.models.enums import DocumentStatus
 from sqlalchemy import inspect, text
 import hmac
 import traceback
@@ -12,6 +14,7 @@ from app.utils.datetime_helpers import utcnow
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_error
 from app.services import storage_service as storage
+from app.services.authorization_service import AuthorizationService
 from contextlib import suppress
 
 from app.services.form_processing_service import slugify_age_group
@@ -88,10 +91,8 @@ def download_resource_thumbnail(resource_id, language):
 @bp.route("/documents/thumbnail/<int:doc_id>", methods=["GET"])
 def download_document_thumbnail_public(doc_id):
     """Serve a public thumbnail for a submitted document."""
-    from app.models import SubmittedDocument
     document = SubmittedDocument.query.get_or_404(doc_id)
 
-    from app.models.enums import DocumentStatus
     if not document.is_public or DocumentStatus.normalize(document.status) != DocumentStatus.APPROVED:
         abort(404)
 
@@ -113,10 +114,8 @@ def download_document_thumbnail_public(doc_id):
 @bp.route("/documents/display/<int:doc_id>", methods=["GET"])
 def display_document_file_public(doc_id):
     """Serve a public document file inline when it's an image (for cover images)."""
-    from app.models import SubmittedDocument
     document = SubmittedDocument.query.get_or_404(doc_id)
 
-    from app.models.enums import DocumentStatus
     if not document.is_public or DocumentStatus.normalize(document.status) != DocumentStatus.APPROVED:
         abort(404)
 
@@ -200,7 +199,11 @@ def health_check():
     except Exception as e:
         # Log the error but still return a response
         current_app.logger.error(f"Health check failed: {e}", exc_info=True)
-        return json_error(GENERIC_ERROR_MESSAGE, 503, status="unhealthy", timestamp=utcnow().isoformat())
+        try:
+            ts = utcnow().isoformat()
+        except Exception:
+            ts = datetime.utcnow().isoformat()
+        return json_error(GENERIC_ERROR_MESSAGE, 503, health_status="unhealthy", timestamp=ts)
 
 
 # =================== TEMPORARY DB DIAGNOSTICS ===================

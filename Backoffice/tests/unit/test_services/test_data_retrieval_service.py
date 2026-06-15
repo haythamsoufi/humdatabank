@@ -162,7 +162,6 @@ class TestGetUserProfile:
             from app.services.data_retrieval_service import get_user_profile
             admin = create_test_admin(db_session)
             target_user = create_test_user(db_session)
-            admin.is_authenticated = True
             with patch("app.services.data_retrieval_service.current_user", admin), \
                  patch("app.services.authorization_service.AuthorizationService.is_system_manager",
                        return_value=True):
@@ -175,7 +174,6 @@ class TestGetUserProfile:
             from app.services.data_retrieval_service import get_user_profile
             user1 = create_test_user(db_session)
             user2 = create_test_user(db_session)
-            user1.is_authenticated = True
             with patch("app.services.data_retrieval_service.current_user", user1), \
                  patch("app.services.authorization_service.AuthorizationService.is_system_manager",
                        return_value=False), \
@@ -471,7 +469,6 @@ class TestGetUserDataContext:
         with app.app_context():
             from app.services.data_retrieval_service import get_user_data_context
             admin = create_test_admin(db_session)
-            admin.is_authenticated = True
             with patch("app.services.data_retrieval_service.current_user", admin), \
                  patch("app.services.authorization_service.AuthorizationService.has_role",
                        return_value=False), \
@@ -486,7 +483,6 @@ class TestGetUserDataContext:
             from app.services.data_retrieval_service import get_user_data_context
             user1 = create_test_user(db_session)
             user2 = create_test_user(db_session)
-            user1.is_authenticated = True
             with patch("app.services.data_retrieval_service.current_user", user1), \
                  patch("app.services.authorization_service.AuthorizationService.is_system_manager",
                        return_value=False), \

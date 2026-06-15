@@ -25,8 +25,8 @@ class TestJsonFormErrors:
         with app.test_request_context():
             form = MagicMock()
             form.errors = {'name': ['Required'], 'email': ['Invalid email']}
-            resp, status = json_form_errors(form)
-            assert status == 400
+            resp = json_form_errors(form)
+            assert resp.status_code == 400
             data = resp.get_json()
             assert data['error'] == 'Validation failed'
             assert data['errors'] == {'name': ['Required'], 'email': ['Invalid email']}
@@ -36,14 +36,14 @@ class TestJsonFormErrors:
         with app.test_request_context():
             form = MagicMock()
             form.errors = {}
-            resp, status = json_form_errors(form, message='Please fix the form.')
+            resp = json_form_errors(form, message='Please fix the form.')
             assert resp.get_json()['error'] == 'Please fix the form.'
 
     def test_form_without_errors_attribute_uses_empty_dict(self, app):
         with app.test_request_context():
             form = object()  # no .errors attribute
-            resp, status = json_form_errors(form)
-            assert status == 400
+            resp = json_form_errors(form)
+            assert resp.status_code == 400
             data = resp.get_json()
             assert data['errors'] == {}
 
@@ -51,7 +51,7 @@ class TestJsonFormErrors:
         with app.test_request_context():
             form = MagicMock()
             form.errors = {'field1': ['Too short', 'Invalid'], 'field2': ['Required']}
-            resp, status = json_form_errors(form)
+            resp = json_form_errors(form)
             data = resp.get_json()
             assert data['errors']['field1'] == ['Too short', 'Invalid']
 
@@ -64,8 +64,8 @@ class TestJsonFormErrors:
 class TestJsonOkResult:
     def test_dict_without_success_key_merged_into_response(self, app):
         with app.test_request_context():
-            resp, status = json_ok_result({'count': 5, 'items': [1, 2]})
-            assert status == 200
+            resp = json_ok_result({'count': 5, 'items': [1, 2]})
+            assert resp.status_code == 200
             data = resp.get_json()
             assert data['success'] is True
             assert data['count'] == 5
@@ -74,8 +74,8 @@ class TestJsonOkResult:
     def test_dict_with_success_key_wrapped_in_data(self, app):
         with app.test_request_context():
             # When result has 'success', goes through json_ok(data=result)
-            resp, status = json_ok_result({'success': True, 'count': 3})
-            assert status == 200
+            resp = json_ok_result({'success': True, 'count': 3})
+            assert resp.status_code == 200
             data = resp.get_json()
             assert data['success'] is True
             # The result dict itself is wrapped under 'data'
@@ -83,34 +83,34 @@ class TestJsonOkResult:
 
     def test_non_dict_result_wrapped_in_data(self, app):
         with app.test_request_context():
-            resp, status = json_ok_result([1, 2, 3])
-            assert status == 200
+            resp = json_ok_result([1, 2, 3])
+            assert resp.status_code == 200
             data = resp.get_json()
             assert data['data'] == [1, 2, 3]
 
     def test_none_result_wrapped_in_data(self, app):
         with app.test_request_context():
-            resp, status = json_ok_result(None)
-            assert status == 200
+            resp = json_ok_result(None)
+            assert resp.status_code == 200
             data = resp.get_json()
             assert data['success'] is True
 
     def test_extra_kwargs_merged_into_merged_response(self, app):
         with app.test_request_context():
-            resp, status = json_ok_result({'count': 1}, page=2, total=10)
+            resp = json_ok_result({'count': 1}, page=2, total=10)
             data = resp.get_json()
             assert data['page'] == 2
             assert data['total'] == 10
 
     def test_extra_kwargs_on_non_dict_result(self, app):
         with app.test_request_context():
-            resp, status = json_ok_result('some string', label='test')
+            resp = json_ok_result('some string', label='test')
             data = resp.get_json()
             assert data['label'] == 'test'
 
 
 # ---------------------------------------------------------------------------
-# json_select_options
+# json_select_options  (still returns (Response, int) tuple — not migrated)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
@@ -171,9 +171,9 @@ class TestJsonErrorHandlerDecorator:
                 raise RuntimeError('boom')
 
             with patch('app.utils.api_responses.request_transaction_rollback') as mock_rb:
-                resp, status = failing_view()
+                resp = failing_view()
                 mock_rb.assert_called_once_with(reason='json_error_handler')
-            assert status == 500
+            assert resp.status_code == 500
             data = resp.get_json()
             assert 'error' in data
 
@@ -191,8 +191,8 @@ class TestJsonErrorHandlerDecorator:
                 raise ValueError('oops')
 
             with patch('app.utils.api_responses.request_transaction_rollback'):
-                resp, status = bad_view()
-            assert status == 500
+                resp = bad_view()
+            assert resp.status_code == 500
 
     def test_view_with_args_and_kwargs(self, app):
         with app.test_request_context():

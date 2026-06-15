@@ -17,18 +17,34 @@ function resolveElements(el) {
     return [el];
 }
 
-const initializedModals = new WeakSet();
+const initializedModals = new WeakMap();
+
+function wireOpenTrigger(modal, openFn, trigger) {
+    if (!trigger || trigger.dataset.excelIoOpenWired === modal.id) return;
+    trigger.dataset.excelIoOpenWired = modal.id;
+    trigger.addEventListener('click', (e) => {
+        e.preventDefault();
+        openFn();
+    });
+}
 
 export function initExcelIoModal(modalId, options = {}) {
     const modal = resolveElement(modalId);
     if (!modal) return { open() {}, close() {} };
-    if (initializedModals.has(modal)) {
-        return {
-            open() { modal.classList.remove('hidden'); },
-            close() { modal.classList.add('hidden'); },
-        };
+
+    const existing = initializedModals.get(modal);
+    if (existing) {
+        resolveElements(options.openTrigger).forEach((trigger) => {
+            wireOpenTrigger(modal, existing.open, trigger);
+        });
+        if (typeof options.onClose === 'function') {
+            existing.onCloseHandlers.add(options.onClose);
+        }
+        if (typeof options.onOpen === 'function') {
+            existing.onOpenHandlers.add(options.onOpen);
+        }
+        return existing;
     }
-    initializedModals.add(modal);
 
     const openTriggers = resolveElements(options.openTrigger);
     const closeTriggers = [
@@ -41,6 +57,10 @@ export function initExcelIoModal(modalId, options = {}) {
     const defaultTab = options.defaultTab
         || modal.querySelector('[data-excel-io-default-tab]')?.dataset.excelIoDefaultTab
         || 'export';
+    const onCloseHandlers = new Set();
+    const onOpenHandlers = new Set();
+    if (typeof options.onClose === 'function') onCloseHandlers.add(options.onClose);
+    if (typeof options.onOpen === 'function') onOpenHandlers.add(options.onOpen);
 
     function setTab(tabName) {
         modal.querySelectorAll('[data-excel-io-tab]').forEach((btn) => {
@@ -58,7 +78,7 @@ export function initExcelIoModal(modalId, options = {}) {
         if (modal.dataset.excelIoLayout === 'tabs') {
             setTab(defaultTab);
         }
-        if (typeof options.onOpen === 'function') options.onOpen();
+        onOpenHandlers.forEach((handler) => handler());
     }
 
     function close() {
@@ -67,22 +87,17 @@ export function initExcelIoModal(modalId, options = {}) {
             resetExcelImportDropzones(modal);
         }
         modal.dispatchEvent(new CustomEvent('excel-io-modal-closed', { bubbles: true }));
-        if (typeof options.onClose === 'function') options.onClose();
+        onCloseHandlers.forEach((handler) => handler());
     }
 
-    openTriggers.forEach((trigger) => {
-        trigger.addEventListener('click', (e) => {
-            e.preventDefault();
-            open();
-        });
-    });
+    const controller = { open, close, setTab, onCloseHandlers, onOpenHandlers };
+    initializedModals.set(modal, controller);
+
+    openTriggers.forEach((trigger) => wireOpenTrigger(modal, open, trigger));
 
     document.querySelectorAll('[data-excel-io-open]').forEach((btn) => {
         if (btn.dataset.excelIoOpen === modal.id) {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                open();
-            });
+            wireOpenTrigger(modal, open, btn);
         }
     });
 
@@ -101,7 +116,7 @@ export function initExcelIoModal(modalId, options = {}) {
         btn.addEventListener('click', () => setTab(btn.dataset.excelIoTab));
     });
 
-    return { open, close, setTab };
+    return controller;
 }
 
 export function initExcelIoModalsFromDom() {

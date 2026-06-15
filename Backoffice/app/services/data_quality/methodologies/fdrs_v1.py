@@ -11,6 +11,7 @@ from typing import Any
 
 from app import db
 from app.models import FormData, FormItem, FormSection, SubmittedDocument
+from app.models.assignments import AssignmentEntityStatus, AssignedForm
 from app.services.data_quality.catalogs import fdrs_v1_catalog as cat
 from app.services.data_quality.helpers import (
     compute_income_sources_ratio,
@@ -44,8 +45,6 @@ class FdrsV1Methodology:
         warnings: list[str] = []
         aes = None
         if assignment_entity_status_id:
-            from app.models.assignments import AssignmentEntityStatus
-
             aes = AssignmentEntityStatus.query.get(assignment_entity_status_id)
         if aes is None:
             aes = get_assignment_aes(template_id, entity_type, entity_id, period_name)

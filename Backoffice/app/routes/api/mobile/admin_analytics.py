@@ -22,6 +22,7 @@ from app.utils.datetime_helpers import utcnow
 from app.routes.api.mobile import mobile_bp
 from app.utils.page_view_paths import distinct_page_view_path_count
 from app.services.audit_trail_display_service import create_consistent_description
+from app.services.notification.push import PushNotificationService
 
 
 def _has_table(table_name):
@@ -210,66 +211,70 @@ def login_logs():
         bot_user_agent_explanation, session_log_device_icon_classes,
     )
 
-    if not _has_table(UserLoginLog.__tablename__):
-        return mobile_paginated(items=[], total=0, page=1, per_page=50)
+    try:
+        if not _has_table(UserLoginLog.__tablename__):
+            return mobile_paginated(items=[], total=0, page=1, per_page=50)
 
-    page, per_page = validate_pagination_params(request.args, default_per_page=50, max_per_page=100)
-    user_filter = request.args.get('user')
-    event_type = request.args.get('event_type')
-    ip_filter = request.args.get('ip')
-    date_from = request.args.get('date_from')
-    date_to = request.args.get('date_to')
+        page, per_page = validate_pagination_params(request.args, default_per_page=50, max_per_page=100)
+        user_filter = request.args.get('user')
+        event_type = request.args.get('event_type')
+        ip_filter = request.args.get('ip')
+        date_from = request.args.get('date_from')
+        date_to = request.args.get('date_to')
 
-    query = UserLoginLog.query.options(joinedload(UserLoginLog.user))
+        query = UserLoginLog.query.options(joinedload(UserLoginLog.user))
 
-    if user_filter:
-        query = query.filter(UserLoginLog.email_attempted.ilike(safe_ilike_pattern(user_filter)))
-    if event_type:
-        query = query.filter(UserLoginLog.event_type == event_type)
-    if ip_filter:
-        query = query.filter(UserLoginLog.ip_address == ip_filter)
-    if date_from:
-        try:
-            query = query.filter(UserLoginLog.timestamp >= datetime.strptime(date_from, '%Y-%m-%d'))
-        except ValueError:
-            pass
-    if date_to:
-        try:
-            query = query.filter(UserLoginLog.timestamp < datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1))
-        except ValueError:
-            pass
+        if user_filter:
+            query = query.filter(UserLoginLog.email_attempted.ilike(safe_ilike_pattern(user_filter)))
+        if event_type:
+            query = query.filter(UserLoginLog.event_type == event_type)
+        if ip_filter:
+            query = query.filter(UserLoginLog.ip_address == ip_filter)
+        if date_from:
+            try:
+                query = query.filter(UserLoginLog.timestamp >= datetime.strptime(date_from, '%Y-%m-%d'))
+            except ValueError:
+                pass
+        if date_to:
+            try:
+                query = query.filter(UserLoginLog.timestamp < datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1))
+            except ValueError:
+                pass
 
-    query = query.order_by(desc(UserLoginLog.timestamp))
-    paginated = query.paginate(page=page, per_page=per_page, error_out=False)
+        query = query.order_by(desc(UserLoginLog.timestamp))
+        paginated = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    items = []
-    for log in paginated.items:
-        u = log.user
-        ua = log.user_agent
-        if ua and len(ua) > 500:
-            ua = ua[:500] + '…'
-        items.append({
-            'id': log.id,
-            'timestamp': log.timestamp.isoformat(),
-            'event_type': log.event_type,
-            'email_attempted': log.email_attempted,
-            'user': {'id': u.id, 'name': u.name, 'email': u.email} if u else None,
-            'ip_address': log.ip_address,
-            'location': log.location,
-            'browser_name': log.browser_name,
-            'device_type': log.device_type,
-            'operating_system': log.operating_system,
-            'is_suspicious': bool(log.is_suspicious),
-            'is_bot_detected': bool(log.is_bot_detected),
-            'bot_detection_detail': bot_user_agent_explanation(log.user_agent) if log.is_bot_detected else None,
-            'failure_reason': log.failure_reason,
-            'failure_reason_display': log.failure_reason_display,
-            'device_icon_classes': session_log_device_icon_classes(
-                log.user_agent, log.device_type, log.operating_system
-            ),
-        })
+        items = []
+        for log in paginated.items:
+            u = log.user
+            ua = log.user_agent
+            if ua and len(ua) > 500:
+                ua = ua[:500] + '…'
+            items.append({
+                'id': log.id,
+                'timestamp': log.timestamp.isoformat(),
+                'event_type': log.event_type,
+                'email_attempted': log.email_attempted,
+                'user': {'id': u.id, 'name': u.name, 'email': u.email} if u else None,
+                'ip_address': log.ip_address,
+                'location': log.location,
+                'browser_name': log.browser_name,
+                'device_type': log.device_type,
+                'operating_system': log.operating_system,
+                'is_suspicious': bool(log.is_suspicious),
+                'is_bot_detected': bool(log.is_bot_detected),
+                'bot_detection_detail': bot_user_agent_explanation(log.user_agent) if log.is_bot_detected else None,
+                'failure_reason': log.failure_reason,
+                'failure_reason_display': log.failure_reason_display,
+                'device_icon_classes': session_log_device_icon_classes(
+                    log.user_agent, log.device_type, log.operating_system
+                ),
+            })
 
-    return mobile_paginated(items=items, total=paginated.total, page=paginated.page, per_page=paginated.per_page)
+        return mobile_paginated(items=items, total=paginated.total, page=paginated.page, per_page=paginated.per_page)
+    except Exception as e:
+        current_app.logger.error("login_logs: %s", e, exc_info=True)
+        return mobile_server_error()
 
 
 @mobile_bp.route('/admin/analytics/session-logs', methods=['GET'])
@@ -285,68 +290,72 @@ def session_logs():
     )
     from app.services.audit_trail_session_query import count_audit_visible_entries_for_session
 
-    if not _has_table(UserSessionLog.__tablename__):
-        return mobile_paginated(items=[], total=0, page=1, per_page=50)
+    try:
+        if not _has_table(UserSessionLog.__tablename__):
+            return mobile_paginated(items=[], total=0, page=1, per_page=50)
 
-    page, per_page = validate_pagination_params(request.args, default_per_page=50, max_per_page=100)
-    user_filter = request.args.get('user')
-    active_only = request.args.get('active_only', type=bool)
-    min_duration = request.args.get('min_duration', type=int)
+        page, per_page = validate_pagination_params(request.args, default_per_page=50, max_per_page=100)
+        user_filter = request.args.get('user')
+        active_only = request.args.get('active_only', type=bool)
+        min_duration = request.args.get('min_duration', type=int)
 
-    query = UserSessionLog.query.options(joinedload(UserSessionLog.user)).join(User)
+        query = UserSessionLog.query.options(joinedload(UserSessionLog.user)).join(User)
 
-    if user_filter:
-        query = query.filter(User.email.ilike(safe_ilike_pattern(user_filter)))
-    if active_only:
-        query = query.filter(UserSessionLog.is_active == True)  # noqa: E712
-    if min_duration and min_duration > 0:
-        cutoff = utcnow() - timedelta(minutes=min_duration)
-        active_min_sql = user_session_log_active_duration_minutes_sql()
-        min_parts = [
-            UserSessionLog.duration_minutes >= min_duration,
-            and_(
-                UserSessionLog.is_active == True,  # noqa: E712
-                UserSessionLog.session_start.isnot(None),
-                UserSessionLog.session_start <= cutoff,
-            ),
-        ]
-        if active_min_sql is not None:
-            min_parts.append(active_min_sql >= min_duration)
-        query = query.filter(or_(*min_parts))
+        if user_filter:
+            query = query.filter(User.email.ilike(safe_ilike_pattern(user_filter)))
+        if active_only:
+            query = query.filter(UserSessionLog.is_active == True)  # noqa: E712
+        if min_duration and min_duration > 0:
+            cutoff = utcnow() - timedelta(minutes=min_duration)
+            active_min_sql = user_session_log_active_duration_minutes_sql()
+            min_parts = [
+                UserSessionLog.duration_minutes >= min_duration,
+                and_(
+                    UserSessionLog.is_active == True,  # noqa: E712
+                    UserSessionLog.session_start.isnot(None),
+                    UserSessionLog.session_start <= cutoff,
+                ),
+            ]
+            if active_min_sql is not None:
+                min_parts.append(active_min_sql >= min_duration)
+            query = query.filter(or_(*min_parts))
 
-    query = query.order_by(desc(UserSessionLog.session_start))
-    paginated = query.paginate(page=page, per_page=per_page, error_out=False)
+        query = query.order_by(desc(UserSessionLog.session_start))
+        paginated = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    items = []
-    for s in paginated.items:
-        u = s.user
-        ua = s.user_agent
-        if ua and len(ua) > 400:
-            ua = ua[:400] + '…'
-        pvc = s.page_view_path_counts if isinstance(s.page_view_path_counts, dict) else {}
-        items.append({
-            'session_id': s.session_id,
-            'session_start': s.session_start.isoformat() if s.session_start else None,
-            'session_end': s.session_end.isoformat() if s.session_end else None,
-            'last_activity': s.last_activity.isoformat() if s.last_activity else None,
-            'duration_minutes': effective_session_duration_minutes(s),
-            'active_duration_minutes': effective_session_active_duration_minutes(s),
-            'page_views': s.page_views or 0,
-            'distinct_page_view_paths': distinct_page_view_path_count(s),
-            'page_view_path_counts': pvc,
-            'activity_count': count_audit_visible_entries_for_session(s),
-            'is_active': bool(s.is_active),
-            'device_type': s.device_type,
-            'browser': s.browser,
-            'operating_system': s.operating_system,
-            'ip_address': s.ip_address,
-            'user': {'id': u.id, 'name': u.name, 'email': u.email} if u else None,
-            'device_icon_classes': session_log_device_icon_classes(
-                s.user_agent, s.device_type, s.operating_system
-            ),
-        })
+        items = []
+        for s in paginated.items:
+            u = s.user
+            ua = s.user_agent
+            if ua and len(ua) > 400:
+                ua = ua[:400] + '…'
+            pvc = s.page_view_path_counts if isinstance(s.page_view_path_counts, dict) else {}
+            items.append({
+                'session_id': s.session_id,
+                'session_start': s.session_start.isoformat() if s.session_start else None,
+                'session_end': s.session_end.isoformat() if s.session_end else None,
+                'last_activity': s.last_activity.isoformat() if s.last_activity else None,
+                'duration_minutes': effective_session_duration_minutes(s),
+                'active_duration_minutes': effective_session_active_duration_minutes(s),
+                'page_views': s.page_views or 0,
+                'distinct_page_view_paths': distinct_page_view_path_count(s),
+                'page_view_path_counts': pvc,
+                'activity_count': count_audit_visible_entries_for_session(s),
+                'is_active': bool(s.is_active),
+                'device_type': s.device_type,
+                'browser': s.browser,
+                'operating_system': s.operating_system,
+                'ip_address': s.ip_address,
+                'user': {'id': u.id, 'name': u.name, 'email': u.email} if u else None,
+                'device_icon_classes': session_log_device_icon_classes(
+                    s.user_agent, s.device_type, s.operating_system
+                ),
+            })
 
-    return mobile_paginated(items=items, total=paginated.total, page=paginated.page, per_page=paginated.per_page)
+        return mobile_paginated(items=items, total=paginated.total, page=paginated.page, per_page=paginated.per_page)
+    except Exception as e:
+        current_app.logger.error("session_logs: %s", e, exc_info=True)
+        return mobile_server_error()
 
 
 @mobile_bp.route('/admin/analytics/sessions/<session_id>/end', methods=['POST'])
@@ -521,7 +530,6 @@ def audit_trail():
 @mobile_auth_required(permission='admin.notifications.manage')
 def admin_send_notification():
     """Send push/email notification to selected users (admin)."""
-    from app.services.notification.push import PushNotificationService
     data = get_json_safe()
 
     title = data.get('title', '').strip()

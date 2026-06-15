@@ -10,7 +10,19 @@ logic inside app.app_context() and app.test_request_context() so db.session work
 import logging
 from typing import Dict, Any, List, Optional, Tuple
 
+from app.models.enums import AIReasoningTraceStatusValue
+
 logger = logging.getLogger(__name__)
+
+# Persisted ``aireasoningtracestatus`` values grouped for analytics queries.
+# Runtime-only statuses (e.g. llm_error, agent_disabled) are normalized before save.
+TRACE_COMPLETED_STATUSES: tuple[str, ...] = (AIReasoningTraceStatusValue.completed.value,)
+TRACE_FAILURE_STATUSES: tuple[str, ...] = (
+    AIReasoningTraceStatusValue.error.value,
+    AIReasoningTraceStatusValue.timeout.value,
+    AIReasoningTraceStatusValue.cost_limit_exceeded.value,
+    AIReasoningTraceStatusValue.max_iterations_exceeded.value,
+)
 
 # Runtime statuses emitted by the agent executor that are not stored verbatim in
 # ``aireasoningtracestatus`` (map them to the closest persisted enum value).
@@ -26,8 +38,6 @@ _TRACE_STATUS_ALIASES = {
 
 def _normalize_trace_status(status: Optional[str]) -> str:
     """Map agent/runtime status strings to a valid ``aireasoningtracestatus`` value."""
-    from app.models.enums import AIReasoningTraceStatusValue
-
     raw = (status or "completed").strip().lower()
     if raw in AIReasoningTraceStatusValue.values():
         return raw

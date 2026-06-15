@@ -4,6 +4,7 @@ API Key Management Module - Admin UI for managing API keys
 
 from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, abort
 from flask_login import current_user
+from werkzeug.exceptions import HTTPException
 from app import db
 from datetime import datetime, timedelta
 from sqlalchemy import func, desc, case
@@ -220,6 +221,8 @@ def view_api_key(key_id):
             now=utcnow(),
             title=f"API Key: {api_key.client_name}"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         current_app.logger.error(f"Error viewing API key: {e}", exc_info=True)
         flash("Error loading API key details. Please try again.", "danger")
@@ -412,7 +415,9 @@ def api_key_usage(key_id):
             ]
         }
 
-        return json_ok_result(result)
+        return json_ok(result=result)
+    except HTTPException:
+        raise
     except Exception as e:
         current_app.logger.error(f"Error getting API key usage: {e}", exc_info=True)
         return json_server_error('Error loading usage statistics')

@@ -10,6 +10,7 @@ from app.models import User
 from app.utils.redirect_utils import get_current_relative_url
 from app.utils.api_responses import json_auth_required, json_error, json_forbidden
 from app.utils.request_utils import is_json_request
+from app.services.authorization_service import AuthorizationService
 
 VALIDATION_DASHBOARD_PERMISSION = "admin.validation.dashboard"
 VALIDATION_QUESTIONS_PERMISSION = "admin.validation.questions"
@@ -95,14 +96,11 @@ def admin_required(f):
                 return redirect(url_for("auth.login", next=get_current_relative_url()))
             # RBAC-only: allow into /admin only if the user is a system manager,
             # or has at least one admin permission (routes still gate specifics).
-            from app.services.authorization_service import AuthorizationService
-
             if not AuthorizationService.is_admin(current_user):
                 flash("Access denied. Admin privileges required.", "warning")
                 return redirect(url_for("main.dashboard"))
         else:  # pragma: no cover -- DEBUG_SKIP_LOGIN
             if current_user.is_authenticated:
-                from app.services.authorization_service import AuthorizationService
                 if not AuthorizationService.is_admin(current_user):
                     flash("Access denied. Admin privileges required even with DEBUG_SKIP_LOGIN if logged in as non-admin.", "warning")
                     return redirect(url_for("main.dashboard"))
@@ -158,8 +156,6 @@ def system_manager_required(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        from app.services.authorization_service import AuthorizationService
-
         is_json_request = _is_json_request()
 
         # Authentication is handled by admin_required / permission_required.
@@ -293,7 +289,6 @@ def user_has_permission(permission_name):
 
     if not isinstance(permission_name, str) or "." not in permission_name:
         return False
-    from app.services.authorization_service import AuthorizationService
     return AuthorizationService.has_rbac_permission(current_user, permission_name.strip())
 
 def check_template_access(template_id, user_id):
@@ -309,7 +304,6 @@ def check_template_access(template_id, user_id):
     """
     # Delegate to the centralized authorization service to avoid drift and
     # correctly evaluate system-manager access for the provided user_id.
-    from app.services.authorization_service import AuthorizationService
     return bool(AuthorizationService.check_template_access(int(template_id), int(user_id)))
 
 

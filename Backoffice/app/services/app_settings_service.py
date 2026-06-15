@@ -82,9 +82,29 @@ def read_settings() -> Dict:
 
     try:
         return SystemSettings.get_all_as_dict()
-    except Exception as e:
-        logger.debug("DB settings read failed, trying JSON fallback: %s", e)
-        return _read_settings_json_file()
+    except Exception as first_exc:
+        # The session may be in an aborted-transaction state caused by an earlier DB
+        # error in this request that was caught and handled without an explicit
+        # rollback (e.g. a bad enum value, constraint violation, etc.).  Attempting
+        # another query on a poisoned session raises PendingRollbackError / similar
+        # and we fall through to the stale JSON file, making ALL DB-backed settings
+        # (branding, languages, AI config, …) silently revert to defaults.
+        #
+        # Explicitly rolling back the session is safe here:
+        # - On a clean session it is a no-op.
+        # - On a poisoned session the original transaction was already aborted by
+        #   PostgreSQL; rolling back merely clears SQLAlchemy's knowledge of that
+        #   failure so the session can be reused.  No committed data is affected.
+        logger.debug("DB settings read failed (attempt 1): %s", first_exc)
+        try:
+            db.session.rollback()
+        except Exception as rb_exc:
+            logger.debug("DB session rollback (settings recovery) failed: %s", rb_exc)
+        try:
+            return SystemSettings.get_all_as_dict()
+        except Exception as retry_exc:
+            logger.debug("DB settings read failed after rollback retry: %s", retry_exc)
+            return _read_settings_json_file()
 
 
 def write_settings(settings: Dict, user_id: Optional[int] = None) -> bool:
@@ -1477,4 +1497,33 @@ def set_all_email_templates(
 
         data["email_templates"][key] = {**content_part, **meta_part}
 
+    return write_settings(data, user_id=user_id)
+
+
+def set_template_metadata(
+    metadata: Dict[str, Dict[str, str]],
+    user_id: Optional[int] = None,
+) -> bool:
+    """Persist notification metadata for email templates without changing HTML content."""
+    if not isinstance(metadata, dict):
+        raise ValueError("metadata must be a dictionary")
+
+    data = read_settings()
+    email_templates = data.get("email_templates") or {}
+    if not isinstance(email_templates, dict):
+        email_templates = {}
+
+    for key, meta in metadata.items():
+        if key not in EMAIL_TEMPLATE_KEYS or not isinstance(meta, dict):
+            continue
+        entry = email_templates.get(key)
+        if not isinstance(entry, dict):
+            entry = {"en": entry} if isinstance(entry, str) and entry.strip() else {}
+        for field in ("label", "notification_title", "notification_message", "priority"):
+            val = meta.get(field)
+            if isinstance(val, str) and val.strip():
+                entry[field] = val.strip()
+        email_templates[key] = entry
+
+    data["email_templates"] = email_templates
     return write_settings(data, user_id=user_id)

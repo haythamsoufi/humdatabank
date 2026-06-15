@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from app import db
-from app.models import FormTemplate
+from app.models import FormData, FormTemplate
+from app.models.assignments import AssignmentEntityStatus, AssignedForm
+from app.models.forms import FormTemplateVersion
+from app.services.data_quality.helpers import get_assignment_aes
 from app.services.data_quality.methodologies import get_methodology
 from app.services.data_quality.types import DataQualityResult
 from app.utils.data_quality_constants import METHODOLOGY_TO_DEFAULT_RULE_PACK
@@ -60,11 +63,6 @@ def list_data_quality_templates_for_entity(
     entity_id: int,
 ) -> list[dict]:
     """Templates with QoD enabled that the entity has assignments for."""
-    from app.models import FormData
-    from app.models.assignments import AssignmentEntityStatus, AssignedForm
-    from app.models.forms import FormTemplateVersion
-    from app.services.data_quality.helpers import get_assignment_aes
-
     rows = (
         db.session.query(FormTemplate.id, AssignedForm.period_name)
         .join(AssignedForm, AssignedForm.template_id == FormTemplate.id)

@@ -17,6 +17,7 @@ from app.utils.constants import DEFAULT_LOOKUP_ROW_LIMIT
 from app.utils.form_localization import get_localized_country_name
 from app.utils.request_validation import enforce_csrf_json
 from app.utils.sql_utils import safe_ilike_pattern
+from app.routes.forms_api import get_plugin_lookup_list_options
 
 
 def register_matrix_api_routes(bp):
@@ -208,7 +209,7 @@ def register_matrix_api_routes(bp):
                         f"Error loading lookup list {list_id} for matrix search: {plugin_exc}",
                         exc_info=True
                     )
-                    err_resp, _ = json_server_error('Failed to load lookup list options', success=False)
+                    err_resp = json_server_error('Failed to load lookup list options', success=False)
                     return None, err_resp
 
             is_system_list = not str(lookup_list_id).isdigit()
@@ -272,55 +273,25 @@ def register_matrix_api_routes(bp):
                     return json_not_found('Lookup list not found')
 
                 query = lookup_list.rows.order_by(LookupListRow.order)
-
-                if filters:
-                    for filter_item in filters:
-                        column = filter_item.get('column')
-                        operator = filter_item.get('operator', 'equals')
-                        value = filter_item.get('value')
-
-                        if not column or not value:
-                            continue
-
-                        if operator == 'equals':
-                            query = query.filter(LookupListRow.data[column].astext == value)
-                        elif operator == 'not_equals':
-                            query = query.filter(LookupListRow.data[column].astext != value)
-                        elif operator == 'contains':
-                            query = query.filter(LookupListRow.data[column].astext.ilike(safe_ilike_pattern(value)))
-                        elif operator == 'not_contains':
-                            query = query.filter(~LookupListRow.data[column].astext.ilike(safe_ilike_pattern(value)))
-
                 rows = query.all()
+                if filters:
+                    rows = [
+                        row for row in rows
+                        if row.data and _row_matches_filters(row.data)
+                    ]
 
-                options = []
+                rows_data = []
                 for row in rows:
-                    if row.data and display_column in row.data:
-                        row_value = str(row.data[display_column]).strip()
+                    if not row.data or not isinstance(row.data, dict):
+                        continue
+                    row_data = dict(row.data)
+                    row_id = row.id if hasattr(row, 'id') else None
+                    if row_id is not None:
+                        row_data['_id'] = row_id
+                        row_data['id'] = row_id
+                    rows_data.append(row_data)
 
-                        if not row_value or row_value in existing_rows:
-                            continue
-
-                        if search_term and search_term.lower() not in row_value.lower():
-                            continue
-
-                        description = None
-                        for desc_field in ['description', 'desc', 'details', 'notes']:
-                            if desc_field in row.data and row.data[desc_field]:
-                                description = str(row.data[desc_field])
-                                break
-
-                        row_id = row.id if hasattr(row, 'id') else None
-                        row_data = row.data if isinstance(row.data, dict) else {}
-                        if row_id is not None:
-                            row_data['_id'] = row_id
-
-                        options.append({
-                            'value': row_value,
-                            'description': description,
-                            'data': row_data,
-                            'id': row_id
-                        })
+                options = _build_options_from_rows(rows_data)
 
             options.sort(key=lambda x: x['value'].lower())
 

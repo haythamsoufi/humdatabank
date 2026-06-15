@@ -2,6 +2,7 @@ from typing import Tuple
 from contextlib import suppress
 from flask import current_app
 from app.models import db, SubmittedDocument
+from app.services.authorization_service import AuthorizationService
 from app.utils.file_paths import resolve_submitted_document_file
 from app.utils.submitted_document_policy import user_may_delete_or_replace_submitted_document_file
 from app.services import storage_service as _storage

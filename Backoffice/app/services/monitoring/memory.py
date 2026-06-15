@@ -53,15 +53,13 @@ class MemoryMonitor:
                 # Create memory log file path
                 self.log_file_path = os.path.join(logs_dir, 'memory.log')
 
-                # Use RotatingFileHandler to prevent unbounded log growth and improve performance
-                from logging.handlers import RotatingFileHandler
+                from app.utils.logging_handlers import create_rotating_file_handler
                 max_bytes = app.config.get('MEMORY_LOG_MAX_BYTES', 10 * 1024 * 1024)  # 10MB default
                 backup_count = app.config.get('MEMORY_LOG_BACKUP_COUNT', 5)  # Keep 5 backups
-                self.file_handler = RotatingFileHandler(
+                self.file_handler = create_rotating_file_handler(
                     self.log_file_path,
-                    maxBytes=max_bytes,
-                    backupCount=backup_count,
-                    encoding='utf-8'
+                    max_bytes=max_bytes,
+                    backup_count=backup_count,
                 )
                 self.file_handler.setLevel(logging.INFO)
 

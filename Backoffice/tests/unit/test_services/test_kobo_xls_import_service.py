@@ -10,6 +10,14 @@ from unittest.mock import MagicMock, patch
 import openpyxl
 import pytest
 
+from tests.factories import create_test_user
+
+
+@pytest.fixture
+def kobo_owner(db_session):
+    """Real user row for Kobo import FK constraints (created_by / owned_by)."""
+    return create_test_user(db_session)
+
 
 def _make_kobo_xls(survey_rows=None, choices_rows=None, settings_rows=None):
     """
@@ -460,7 +468,7 @@ class TestImportKoboXls:
             assert result['success'] is False
             assert "owner" in result['message'].lower() or "authenticated" in result['message'].lower()
 
-    def test_simple_form_import(self, app, db_session):
+    def test_simple_form_import(self, app, db_session, kobo_owner):
         with app.app_context():
             from app.services.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
@@ -471,12 +479,12 @@ class TestImportKoboXls:
             )
             with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
-                mock_cu.id = 1
-                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=1)
+                mock_cu.id = kobo_owner.id
+                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
             # Success is True only if DB is available (unit test may fail without mock)
             assert 'success' in result
 
-    def test_form_with_groups(self, app, db_session):
+    def test_form_with_groups(self, app, db_session, kobo_owner):
         with app.app_context():
             from app.services.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
@@ -489,11 +497,11 @@ class TestImportKoboXls:
             )
             with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
-                mock_cu.id = 1
-                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=1)
+                mock_cu.id = kobo_owner.id
+                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
             assert 'success' in result
 
-    def test_form_with_repeat(self, app, db_session):
+    def test_form_with_repeat(self, app, db_session, kobo_owner):
         with app.app_context():
             from app.services.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
@@ -505,11 +513,11 @@ class TestImportKoboXls:
             )
             with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
-                mock_cu.id = 1
-                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=1)
+                mock_cu.id = kobo_owner.id
+                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
             assert 'success' in result
 
-    def test_form_with_choices(self, app, db_session):
+    def test_form_with_choices(self, app, db_session, kobo_owner):
         with app.app_context():
             from app.services.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
@@ -523,11 +531,11 @@ class TestImportKoboXls:
             )
             with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
-                mock_cu.id = 1
-                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=1)
+                mock_cu.id = kobo_owner.id
+                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
             assert 'success' in result
 
-    def test_form_title_from_settings(self, app, db_session):
+    def test_form_title_from_settings(self, app, db_session, kobo_owner):
         with app.app_context():
             from app.services.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
@@ -536,11 +544,11 @@ class TestImportKoboXls:
             )
             with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
-                mock_cu.id = 1
-                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=1)
+                mock_cu.id = kobo_owner.id
+                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
             assert 'success' in result
 
-    def test_template_name_override(self, app, db_session):
+    def test_template_name_override(self, app, db_session, kobo_owner):
         with app.app_context():
             from app.services.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
@@ -549,13 +557,13 @@ class TestImportKoboXls:
             )
             with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
-                mock_cu.id = 1
+                mock_cu.id = kobo_owner.id
                 result = KoboXlsImportService.import_kobo_xls(
-                    FakeFile(buf), template_name="Override Title", owned_by=1
+                    FakeFile(buf), template_name="Override Title", owned_by=kobo_owner.id
                 )
             assert 'success' in result
 
-    def test_root_level_items_get_main_section(self, app, db_session):
+    def test_root_level_items_get_main_section(self, app, db_session, kobo_owner):
         """Items without a group should be placed in auto-created 'Main' section."""
         with app.app_context():
             from app.services.kobo_xls_import_service import KoboXlsImportService
@@ -566,11 +574,11 @@ class TestImportKoboXls:
             )
             with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
-                mock_cu.id = 1
-                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=1)
+                mock_cu.id = kobo_owner.id
+                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
             assert 'success' in result
 
-    def test_unclosed_group_treated_as_root_section(self, app, db_session):
+    def test_unclosed_group_treated_as_root_section(self, app, db_session, kobo_owner):
         """Unclosed begin_group should still produce a section."""
         with app.app_context():
             from app.services.kobo_xls_import_service import KoboXlsImportService
@@ -583,8 +591,8 @@ class TestImportKoboXls:
             )
             with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
-                mock_cu.id = 1
-                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=1)
+                mock_cu.id = kobo_owner.id
+                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
             assert 'success' in result
 
     def test_openpyxl_none_returns_error(self, app):
@@ -601,7 +609,7 @@ class TestImportKoboXls:
             finally:
                 module.openpyxl = original
 
-    def test_skipped_types_generate_warnings(self, app, db_session):
+    def test_skipped_types_generate_warnings(self, app, db_session, kobo_owner):
         with app.app_context():
             from app.services.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
@@ -612,12 +620,12 @@ class TestImportKoboXls:
             )
             with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
-                mock_cu.id = 1
-                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=1)
+                mock_cu.id = kobo_owner.id
+                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
             if result.get('success'):
                 assert len(result.get('warnings', [])) > 0
 
-    def test_nested_groups(self, app, db_session):
+    def test_nested_groups(self, app, db_session, kobo_owner):
         with app.app_context():
             from app.services.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
@@ -631,6 +639,6 @@ class TestImportKoboXls:
             )
             with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
-                mock_cu.id = 1
-                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=1)
+                mock_cu.id = kobo_owner.id
+                result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
             assert 'success' in result

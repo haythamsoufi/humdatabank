@@ -31,47 +31,84 @@ from tests.factories import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _excel_columns(app=None):
+    if app is not None:
+        with app.app_context():
+            return {
+                'template': TemplateExcelService.get_template_columns(),
+                'pages': TemplateExcelService.get_page_columns(),
+                'sections': TemplateExcelService.get_section_columns(),
+                'items': TemplateExcelService.get_item_columns(),
+            }
+    return {
+        'template': TemplateExcelService.get_template_columns(),
+        'pages': TemplateExcelService.get_page_columns(),
+        'sections': TemplateExcelService.get_section_columns(),
+        'items': TemplateExcelService.get_item_columns(),
+    }
+
+
+def _blank_row(columns):
+    return [None] * len(columns)
+
+
+def _append_template_sheet_row_layout(ws, template_name='Test', extra_values=None):
+    """Write Template sheet using field/value row layout (matches export format)."""
+    fields = TemplateExcelService.get_template_columns()
+    ws.append(TemplateExcelService.TEMPLATE_SHEET_ROW_HEADERS)
+    for field in fields:
+        value = None
+        if extra_values and field in extra_values:
+            value = extra_values[field]
+        elif field == 'name':
+            value = template_name
+        ws.append([field, value])
+
+
+def _append_template_sheet_legacy_columns(ws, template_name='Test', extra_values=None):
+    """Write Template sheet using legacy column layout (header row + data row)."""
+    fields = TemplateExcelService.get_template_columns()
+    ws.append(fields)
+    row = _blank_row(fields)
+    row[fields.index('name')] = template_name
+    if extra_values:
+        for key, val in extra_values.items():
+            if key in fields:
+                row[fields.index(key)] = val
+    ws.append(row)
+
+
 def _make_export_workbook_bytes(
     template_name="Test",
     pages=None,
     sections=None,
     items=None,
     extra_sheets=None,
+    app=None,
 ):
-    """Create a minimal compliant export workbook as bytes.
-
-    Columns are exactly what TemplateExcelService expects.
-    """
+    """Create a minimal compliant export workbook as bytes."""
+    cols = _excel_columns(app)
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
 
-    # Template sheet
     ws_t = wb.create_sheet("Template")
-    ws_t.append(TemplateExcelService.TEMPLATE_COLUMNS)
-    ws_t.append([
-        template_name, "desc", False, False, False,
-        False, False, False, False, None, None,
-    ])
+    _append_template_sheet_row_layout(ws_t, template_name=template_name)
 
-    # Pages sheet
     ws_p = wb.create_sheet("Pages")
-    ws_p.append(TemplateExcelService.PAGE_COLUMNS)
+    ws_p.append(cols['pages'])
     for page in (pages or []):
         ws_p.append(page)
 
-    # Sections sheet
     ws_s = wb.create_sheet("Sections")
-    ws_s.append(TemplateExcelService.SECTION_COLUMNS)
+    ws_s.append(cols['sections'])
     for section in (sections or []):
         ws_s.append(section)
 
-    # Items sheet
     ws_i = wb.create_sheet("Items")
-    ws_i.append(TemplateExcelService.ITEM_COLUMNS)
+    ws_i.append(cols['items'])
     for item in (items or []):
         ws_i.append(item)
 
-    # Any extra sheets (should be ignored during import)
     for sheet_name in (extra_sheets or []):
         wb.create_sheet(sheet_name)
 
@@ -238,6 +275,69 @@ class TestParseJson:
     def test_non_empty_json_object_returned(self):
         result = TemplateExcelService._parse_json('{"x": 1}')
         assert result == {"x": 1}
+
+
+# ---------------------------------------------------------------------------
+# _format_json_for_excel
+# ---------------------------------------------------------------------------
+
+class TestFormatJsonForExcel:
+    def test_pretty_prints_dict_with_line_breaks(self):
+        value = {"is_required": False, "layout_column_width": "12", "matrix_config": {"type": "matrix"}}
+        formatted = TemplateExcelService._format_json_for_excel(value)
+        assert formatted is not None
+        assert ",\n" in formatted
+        assert '"is_required": false' in formatted
+
+    def test_none_returns_none(self):
+        assert TemplateExcelService._format_json_for_excel(None) is None
+
+    def test_compact_json_string_is_reformatted(self):
+        compact = '{"a": 1, "b": 2}'
+        formatted = TemplateExcelService._format_json_for_excel(compact)
+        assert formatted is not None
+        assert ",\n" in formatted
+        assert TemplateExcelService._parse_json(formatted) == {"a": 1, "b": 2}
+
+    def test_non_json_string_passthrough(self):
+        assert TemplateExcelService._format_json_for_excel("plain text") == "plain text"
+
+    def test_compact_json_with_unicode_escapes_renders_readable_text(self):
+        compact = (
+            '{"ar": "\\u062a\\u0645\\u0648\\u064a\\u0644 NS 2025 \\u0627\\u0644\\u0625\\u062c\\u0645\\u0627\\u0644\\u064a", '
+            '"es": "NS 2025 Financiaci\\u00f3n Total", "fr": "Financement total NS 2025"}'
+        )
+        formatted = TemplateExcelService._format_json_for_excel(compact)
+        assert formatted is not None
+        assert '\\u062a' not in formatted
+        assert '\\u00f3' not in formatted
+        assert 'تم' in formatted
+        assert 'Financiación' in formatted
+
+    def test_dict_with_literal_unicode_escapes_in_values(self):
+        value = {
+            "ar": "\\u062a\\u0644\\u0642\\u064a\\u062a \\u0627\\u0644\\u062f\\u0639\\u0645",
+            "es": "Apoyo recibido",
+            "fr": "Soutien re\\u00e7u",
+        }
+        formatted = TemplateExcelService._format_json_for_excel(value)
+        assert formatted is not None
+        assert 'تلقيت الدعم' in formatted
+        assert 'Soutien reçu' in formatted
+        assert '\\u062a' not in formatted
+        assert '\\u00e7' not in formatted
+
+    def test_double_encoded_json_string_is_unwrapped(self):
+        inner = json.dumps(
+            {"ar": "تم", "fr": "Soutien reçu"},
+            ensure_ascii=True,
+        )
+        outer = json.dumps(inner)
+        formatted = TemplateExcelService._format_json_for_excel(outer)
+        assert formatted is not None
+        assert 'تم' in formatted
+        assert 'Soutien reçu' in formatted
+        assert '\\u062a' not in formatted
 
 
 # ---------------------------------------------------------------------------
@@ -446,6 +546,34 @@ class TestBuildItemDbToExportMap:
             ).first()
             mapping = TemplateExcelService._build_item_db_to_export_map(template, version)
             assert mapping == {}
+
+    def test_items_ordered_by_section_then_item_order(self, db_session, app):
+        """Export order must follow section order, then item order within each section."""
+        with app.app_context():
+            template = create_test_template(db_session, name="SectionOrder Template")
+            version = db_session.query(FormTemplateVersion).filter_by(
+                id=template.published_version_id
+            ).first()
+
+            section_first = create_test_section(
+                db_session, template, version=version, name="First Section", order=1
+            )
+            section_second = create_test_section(
+                db_session, template, version=version, name="Second Section", order=2
+            )
+
+            # Lower item.order in the later section must not appear before first section items.
+            item_second_section = create_test_item(
+                db_session, section_second, template, version=version,
+                order=1, label="Second section item"
+            )
+            item_first_section = create_test_item(
+                db_session, section_first, template, version=version,
+                order=100, label="First section item"
+            )
+
+            items = TemplateExcelService._get_items_for_version(template, version)
+            assert [item.id for item in items] == [item_first_section.id, item_second_section.id]
 
 
 # ---------------------------------------------------------------------------
@@ -821,14 +949,13 @@ class TestImportTemplate:
             wb = openpyxl.Workbook()
             wb.remove(wb.active)
             ws_t = wb.create_sheet("Template")
-            ws_t.append(TemplateExcelService.TEMPLATE_COLUMNS)
-            ws_t.append(["Name"] + [None] * (len(TemplateExcelService.TEMPLATE_COLUMNS) - 1))
+            _append_template_sheet_row_layout(ws_t, "Name")
             ws_p = wb.create_sheet("Pages")
             ws_p.append(["wrong", "headers"])  # Bad headers
             ws_s = wb.create_sheet("Sections")
-            ws_s.append(TemplateExcelService.SECTION_COLUMNS)
+            ws_s.append(TemplateExcelService.get_section_columns())
             ws_i = wb.create_sheet("Items")
-            ws_i.append(TemplateExcelService.ITEM_COLUMNS)
+            ws_i.append(TemplateExcelService.get_item_columns())
             buf = io.BytesIO()
             wb.save(buf)
             buf.seek(0)
@@ -850,14 +977,13 @@ class TestImportTemplate:
             wb = openpyxl.Workbook()
             wb.remove(wb.active)
             ws_t = wb.create_sheet("Template")
-            ws_t.append(TemplateExcelService.TEMPLATE_COLUMNS)
-            ws_t.append(["Name"] + [None] * (len(TemplateExcelService.TEMPLATE_COLUMNS) - 1))
+            _append_template_sheet_row_layout(ws_t, "Name")
             ws_p = wb.create_sheet("Pages")
-            ws_p.append(TemplateExcelService.PAGE_COLUMNS)
+            ws_p.append(TemplateExcelService.get_page_columns())
             ws_s = wb.create_sheet("Sections")
             ws_s.append(["wrong", "headers"])  # Bad headers
             ws_i = wb.create_sheet("Items")
-            ws_i.append(TemplateExcelService.ITEM_COLUMNS)
+            ws_i.append(TemplateExcelService.get_item_columns())
             buf = io.BytesIO()
             wb.save(buf)
             buf.seek(0)
@@ -879,12 +1005,11 @@ class TestImportTemplate:
             wb = openpyxl.Workbook()
             wb.remove(wb.active)
             ws_t = wb.create_sheet("Template")
-            ws_t.append(TemplateExcelService.TEMPLATE_COLUMNS)
-            ws_t.append(["Name"] + [None] * (len(TemplateExcelService.TEMPLATE_COLUMNS) - 1))
+            _append_template_sheet_row_layout(ws_t, "Name")
             ws_p = wb.create_sheet("Pages")
-            ws_p.append(TemplateExcelService.PAGE_COLUMNS)
+            ws_p.append(TemplateExcelService.get_page_columns())
             ws_s = wb.create_sheet("Sections")
-            ws_s.append(TemplateExcelService.SECTION_COLUMNS)
+            ws_s.append(TemplateExcelService.get_section_columns())
             ws_i = wb.create_sheet("Items")
             ws_i.append(["bad", "columns"])  # Bad headers
             buf = io.BytesIO()
@@ -912,11 +1037,11 @@ class TestImportTemplate:
             ws_t.append(["description"])  # Missing 'name'
             ws_t.append(["some desc"])
             ws_p = wb.create_sheet("Pages")
-            ws_p.append(TemplateExcelService.PAGE_COLUMNS)
+            ws_p.append(TemplateExcelService.get_page_columns())
             ws_s = wb.create_sheet("Sections")
-            ws_s.append(TemplateExcelService.SECTION_COLUMNS)
+            ws_s.append(TemplateExcelService.get_section_columns())
             ws_i = wb.create_sheet("Items")
-            ws_i.append(TemplateExcelService.ITEM_COLUMNS)
+            ws_i.append(TemplateExcelService.get_item_columns())
             buf = io.BytesIO()
             wb.save(buf)
             buf.seek(0)
@@ -938,16 +1063,15 @@ class TestImportTemplate:
             wb = openpyxl.Workbook()
             wb.remove(wb.active)
             ws_t = wb.create_sheet("Template")
-            ws_t.append(TemplateExcelService.TEMPLATE_COLUMNS)
-            ws_t.append(["Name"] + [None] * (len(TemplateExcelService.TEMPLATE_COLUMNS) - 1))
+            _append_template_sheet_row_layout(ws_t, "Name")
             ws_p = wb.create_sheet("Pages")
-            ws_p.append(TemplateExcelService.PAGE_COLUMNS)
+            ws_p.append(TemplateExcelService.get_page_columns())
             # Page row with None id
             ws_p.append([None, "Page 1", 1, None])
             ws_s = wb.create_sheet("Sections")
-            ws_s.append(TemplateExcelService.SECTION_COLUMNS)
+            ws_s.append(TemplateExcelService.get_section_columns())
             ws_i = wb.create_sheet("Items")
-            ws_i.append(TemplateExcelService.ITEM_COLUMNS)
+            ws_i.append(TemplateExcelService.get_item_columns())
             buf = io.BytesIO()
             wb.save(buf)
             buf.seek(0)
@@ -970,18 +1094,17 @@ class TestImportTemplate:
             wb = openpyxl.Workbook()
             wb.remove(wb.active)
             ws_t = wb.create_sheet("Template")
-            ws_t.append(TemplateExcelService.TEMPLATE_COLUMNS)
-            ws_t.append(["Name"] + [None] * (len(TemplateExcelService.TEMPLATE_COLUMNS) - 1))
+            _append_template_sheet_row_layout(ws_t, "Name")
             ws_p = wb.create_sheet("Pages")
-            ws_p.append(TemplateExcelService.PAGE_COLUMNS)
+            ws_p.append(TemplateExcelService.get_page_columns())
             ws_s = wb.create_sheet("Sections")
-            ws_s.append(TemplateExcelService.SECTION_COLUMNS)
+            ws_s.append(TemplateExcelService.get_section_columns())
             # Section with None id
             ws_s.append([None, "Sec", 1.0, None, None, "standard",
                          None, None, None, False, False, None, None,
                          None, None, None, False])
             ws_i = wb.create_sheet("Items")
-            ws_i.append(TemplateExcelService.ITEM_COLUMNS)
+            ws_i.append(TemplateExcelService.get_item_columns())
             buf = io.BytesIO()
             wb.save(buf)
             buf.seek(0)
@@ -1100,15 +1223,15 @@ class TestImportTemplate:
             wb = openpyxl.Workbook()
             wb.remove(wb.active)
             ws_t = wb.create_sheet("Template")
-            ws_t.append(TemplateExcelService.TEMPLATE_COLUMNS)
-            # Empty row
-            ws_t.append([None] * len(TemplateExcelService.TEMPLATE_COLUMNS))
+            fields = TemplateExcelService.get_template_columns()
+            ws_t.append(fields)
+            ws_t.append([None] * len(fields))
             ws_p = wb.create_sheet("Pages")
-            ws_p.append(TemplateExcelService.PAGE_COLUMNS)
+            ws_p.append(TemplateExcelService.get_page_columns())
             ws_s = wb.create_sheet("Sections")
-            ws_s.append(TemplateExcelService.SECTION_COLUMNS)
+            ws_s.append(TemplateExcelService.get_section_columns())
             ws_i = wb.create_sheet("Items")
-            ws_i.append(TemplateExcelService.ITEM_COLUMNS)
+            ws_i.append(TemplateExcelService.get_item_columns())
             buf = io.BytesIO()
             wb.save(buf)
             buf.seek(0)
@@ -1146,18 +1269,20 @@ class TestImportTemplate:
             wb = openpyxl.Workbook()
             wb.remove(wb.active)
             ws_t = wb.create_sheet("Template")
-            ws_t.append(TemplateExcelService.TEMPLATE_COLUMNS)
-            row = [None] * len(TemplateExcelService.TEMPLATE_COLUMNS)
-            row[TemplateExcelService.TEMPLATE_COLUMNS.index('name')] = "Translated Template"
-            row[TemplateExcelService.TEMPLATE_COLUMNS.index('name_translations')] = json.dumps({"fr": "Modèle"})
-            row[TemplateExcelService.TEMPLATE_COLUMNS.index('variables')] = json.dumps({"v": "1"})
-            ws_t.append(row)
+            _append_template_sheet_row_layout(
+                ws_t,
+                extra_values={
+                    'name': 'Translated Template',
+                    'name_fr': 'Modèle',
+                    'variables': json.dumps({"v": "1"}),
+                },
+            )
             ws_p = wb.create_sheet("Pages")
-            ws_p.append(TemplateExcelService.PAGE_COLUMNS)
+            ws_p.append(TemplateExcelService.get_page_columns())
             ws_s = wb.create_sheet("Sections")
-            ws_s.append(TemplateExcelService.SECTION_COLUMNS)
+            ws_s.append(TemplateExcelService.get_section_columns())
             ws_i = wb.create_sheet("Items")
-            ws_i.append(TemplateExcelService.ITEM_COLUMNS)
+            ws_i.append(TemplateExcelService.get_item_columns())
             buf = io.BytesIO()
             wb.save(buf)
             buf.seek(0)
@@ -1529,6 +1654,129 @@ class TestExportInstructionsSheet:
 
 
 # ---------------------------------------------------------------------------
+# Flat translation columns
+# ---------------------------------------------------------------------------
+
+class TestFlatTranslationColumns:
+    def test_export_flattens_label_translations_into_columns(self, db_session, app):
+        with app.app_context():
+            admin = create_test_admin(db_session)
+            template = create_test_template(db_session, name="Flat Translations Template")
+            version = db_session.query(FormTemplateVersion).filter_by(
+                id=template.published_version_id
+            ).first()
+            section = create_test_section(db_session, template, version=version)
+            item = create_test_item(
+                db_session, section, template, version=version,
+                label="Support received", order=1,
+            )
+            item.label_translations = {
+                'ar': 'تلقيت الدعم',
+                'fr': 'Soutien reçu',
+                'es': 'Apoyo recibido',
+            }
+            db_session.add(item)
+            db_session.commit()
+
+            with app.test_request_context():
+                login_user(admin)
+                result = TemplateExcelService.export_template(template.id)
+
+            result.seek(0)
+            wb = openpyxl.load_workbook(result)
+            items_sheet = wb['Items']
+            headers = [cell.value for cell in items_sheet[1]]
+            assert 'label_ar' in headers
+            assert 'label_fr' in headers
+            row = next(items_sheet.iter_rows(min_row=2, values_only=True))
+            row_data = dict(zip(headers, row))
+            assert row_data['label'] == 'Support received'
+            assert row_data['label_ar'] == 'تلقيت الدعم'
+            assert row_data['label_fr'] == 'Soutien reçu'
+            assert 'label_translations' not in headers
+
+
+# ---------------------------------------------------------------------------
+# Template sheet row layout
+# ---------------------------------------------------------------------------
+
+class TestTemplateSheetRowLayout:
+    def test_export_template_sheet_uses_field_value_rows(self, db_session, app):
+        with app.app_context():
+            admin = create_test_admin(db_session)
+            template = create_test_template(db_session, name="Row Layout Template")
+            version = db_session.query(FormTemplateVersion).filter_by(
+                id=template.published_version_id
+            ).first()
+            version.name_translations = {'fr': 'Modèle'}
+            version.variables = {'key': 'val'}
+            db_session.add(version)
+            db_session.commit()
+
+            with app.test_request_context():
+                login_user(admin)
+                result = TemplateExcelService.export_template(template.id)
+
+            result.seek(0)
+            wb = openpyxl.load_workbook(result)
+            ws = wb['Template']
+            headers = [cell.value for cell in ws[1]]
+            assert headers == ['field', 'value']
+
+            row_data = {
+                str(row[0]): row[1]
+                for row in ws.iter_rows(min_row=2, values_only=True)
+                if row and row[0] is not None
+            }
+            assert row_data['name'] == template.name or row_data['name'] == version.name
+            assert row_data.get('name_fr') == 'Modèle'
+            assert row_data.get('variables') is not None
+
+    def test_import_legacy_column_layout_template_sheet(self, db_session, app):
+        """Older exports with column headers + single data row still import."""
+        with app.app_context():
+            admin = create_test_admin(db_session)
+            template = create_test_template(db_session, name="Legacy Column Template")
+            draft = create_test_draft_version(db_session, template, name="Draft Legacy")
+
+            wb = openpyxl.Workbook()
+            wb.remove(wb.active)
+            ws_t = wb.create_sheet("Template")
+            _append_template_sheet_legacy_columns(
+                ws_t,
+                template_name='Legacy Import Name',
+                extra_values={'name_fr': 'Nom'},
+            )
+            ws_p = wb.create_sheet("Pages")
+            ws_p.append(TemplateExcelService.get_page_columns())
+            ws_s = wb.create_sheet("Sections")
+            ws_s.append(TemplateExcelService.get_section_columns())
+            ws_i = wb.create_sheet("Items")
+            ws_i.append(TemplateExcelService.get_item_columns())
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
+
+            with app.test_request_context():
+                login_user(admin)
+                result = TemplateExcelService.import_template(
+                    template.id, buf, version_id=draft.id
+                )
+
+            assert result['success'] is True
+            db_session.refresh(draft)
+            assert draft.name == 'Legacy Import Name'
+            assert draft.name_translations.get('fr') == 'Nom'
+
+    def test_validate_import_file_accepts_row_layout(self, db_session, app):
+        buf = _make_export_workbook_bytes(template_name='Valid Row Layout')
+        with app.app_context():
+            result = TemplateExcelService.validate_import_file(buf)
+        assert result['valid'] is True
+        assert result['preview']['name'] == 'Valid Row Layout'
+
+
+# ---------------------------------------------------------------------------
 # Class-level constants / configuration
 # ---------------------------------------------------------------------------
 
@@ -1547,10 +1795,44 @@ class TestClassConstants:
         assert 'FALSE' in TemplateExcelService.DROPDOWN_OPTIONS['archived']
 
     def test_column_definitions_defined(self):
-        assert 'name' in TemplateExcelService.TEMPLATE_COLUMNS
-        assert 'id' in TemplateExcelService.PAGE_COLUMNS
-        assert 'id' in TemplateExcelService.SECTION_COLUMNS
-        assert 'id' in TemplateExcelService.ITEM_COLUMNS
+        assert 'name' in TemplateExcelService.get_template_columns()
+        assert 'id' in TemplateExcelService.get_page_columns()
+        assert 'id' in TemplateExcelService.get_section_columns()
+        assert 'id' in TemplateExcelService.get_item_columns()
+        assert 'label_ar' in TemplateExcelService.get_item_columns()
+
+    def test_item_columns_follow_logical_order(self):
+        cols = TemplateExcelService.get_item_columns()
+        langs = TemplateExcelService._get_translatable_languages()
+
+        # Identifiers and placement before display text
+        assert cols.index('id') < cols.index('section_id') < cols.index('item_type')
+        assert cols.index('item_type') < cols.index('label')
+
+        # Each translation block sits immediately after its English/base column
+        for field in ('label', 'definition', 'description'):
+            base_idx = cols.index(field)
+            for lang in langs:
+                lang_col = f'{field}_{lang}'
+                assert lang_col in cols
+                assert cols.index(lang_col) > base_idx
+            next_fields = {
+                'label': 'definition',
+                'definition': 'description',
+                'description': 'options_json',
+            }
+            assert cols.index(next_fields[field]) > base_idx + len(langs)
+
+        # Question/list fields after text, indicator fields next, rules, config last
+        assert cols.index('description') < cols.index('options_json')
+        assert cols.index('options_json') < cols.index('indicator_bank_id')
+        assert cols.index('indicator_bank_id') < cols.index('relevance_condition')
+        assert cols.index('relevance_condition') < cols.index('config')
+        assert cols[-1] == 'config'
+
+    def test_page_columns_place_order_before_name(self):
+        cols = TemplateExcelService.get_page_columns()
+        assert cols.index('id') < cols.index('order') < cols.index('name')
 
     def test_excel_export_version(self):
-        assert TemplateExcelService.EXCEL_EXPORT_VERSION == 'V1'
+        assert TemplateExcelService.EXCEL_EXPORT_VERSION == 'V2'

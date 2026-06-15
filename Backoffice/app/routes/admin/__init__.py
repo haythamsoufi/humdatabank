@@ -18,6 +18,7 @@ from app.utils.request_utils import is_json_request
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_, or_, inspect, select
 from app.services import get_platform_stats
+from app.services.authorization_service import AuthorizationService
 
 # Import all admin module blueprints
 from app.routes.admin.form_builder import bp as form_builder_bp
@@ -350,6 +351,7 @@ def admin_dashboard():
 
     except Exception as e:
         current_app.logger.error(f"Error loading admin dashboard: {e}", exc_info=True)
+        db.session.rollback()
         return render_template("admin/dashboard.html",
                              user_count=0,
                              country_count=0,

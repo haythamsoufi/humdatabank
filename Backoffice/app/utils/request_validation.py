@@ -80,6 +80,9 @@ def enforce_csrf_json(*, methods: Optional[Iterable[str]] = None):
     if request.method.upper() not in allowed_methods:
         return None
 
+    if not current_app.config.get("WTF_CSRF_ENABLED", True):
+        return None
+
     try:
         csrf.protect()
         return None

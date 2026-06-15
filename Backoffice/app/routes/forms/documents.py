@@ -5,6 +5,9 @@ from flask import abort, current_app, flash, redirect, request, url_for
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
 
+from app.services.document_service import DocumentService
+from app.utils.redirect_utils import is_safe_redirect_url
+
 
 def register_document_routes(bp):
     """Register document-related routes onto the forms blueprint."""
@@ -12,7 +15,6 @@ def register_document_routes(bp):
     @bp.route("/download_document/<int:submitted_document_id>", methods=["GET"])
     @login_required
     def download_document(submitted_document_id):
-        from app.services.document_service import DocumentService
         try:
             return DocumentService.stream_download_response(submitted_document_id, current_user)
         except PermissionError as e:
@@ -29,8 +31,6 @@ def register_document_routes(bp):
     @bp.route("/delete_document/<int:submitted_document_id>", methods=["POST"])
     @login_required
     def delete_document(submitted_document_id):
-        from app.services.document_service import DocumentService
-        from app.utils.redirect_utils import is_safe_redirect_url
         from urllib.parse import urlparse as _urlparse
         csrf_form = FlaskForm()
         referrer = request.referrer
@@ -55,7 +55,6 @@ def register_document_routes(bp):
     @bp.route("/public-document/<int:document_id>/download", methods=["GET"])
     def download_public_document_public(document_id):
         """Download a document from a public submission (public access)."""
-        from app.services.document_service import DocumentService
         try:
             return DocumentService.stream_public_download_response(document_id)
         except PermissionError:

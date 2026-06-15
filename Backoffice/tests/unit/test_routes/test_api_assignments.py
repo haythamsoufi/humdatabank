@@ -23,15 +23,8 @@ def _api(path: str) -> str:
 
 def _make_template(db_session):
     """Create a minimal FormTemplate with a published version."""
-    tmpl = FormTemplate(name="Test Template", description="desc")
-    db_session.add(tmpl)
-    db_session.flush()
-    ver = FormTemplateVersion(template_id=tmpl.id, version_number=1, is_published=True)
-    db_session.add(ver)
-    db_session.flush()
-    tmpl.published_version_id = ver.id
-    db_session.flush()
-    return tmpl
+    from tests.factories import create_test_template
+    return create_test_template(db_session, name="Test Template", description="desc")
 
 
 def _make_country(db_session):

@@ -459,6 +459,8 @@ def init_activity_tracking(app):
     def before_request():
         # Always set start_time for all requests
         g.start_time = time.time()
+        g.activity_user_id = None
+        g.activity_session_id = None
 
         # Skip tracking for static files and API routes
         if (is_static_asset_request() or

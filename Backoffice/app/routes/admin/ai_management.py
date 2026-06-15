@@ -523,6 +523,7 @@ def document_library():
 
     except Exception as e:
         logger.error(f"Error loading document library: {e}", exc_info=True)
+        db.session.rollback()
         return render_template(
             "admin/ai/documents.html",
             documents=[],
@@ -2036,10 +2037,13 @@ def reasoning_traces():
         total_traces = db.session.query(AIReasoningTrace).count()
         # Count traces matching current filters (all-time by default when days_filter=0)
         recent_traces = base_filter.count()
-        _TRACE_FAILURE_STATUSES = ('error', 'cost_limit_exceeded', 'max_iterations_exceeded')
-        filtered_completed = base_filter.filter(AIReasoningTrace.status == 'completed').count()
+        from app.services.ai_reasoning_trace import TRACE_COMPLETED_STATUSES, TRACE_FAILURE_STATUSES
+
+        filtered_completed = base_filter.filter(
+            AIReasoningTrace.status.in_(TRACE_COMPLETED_STATUSES)
+        ).count()
         filtered_failed = base_filter.filter(
-            AIReasoningTrace.status.in_(_TRACE_FAILURE_STATUSES)
+            AIReasoningTrace.status.in_(TRACE_FAILURE_STATUSES)
         ).count()
         success_rate_pct = (
             round(100.0 * filtered_completed / recent_traces, 1) if recent_traces else None
@@ -2094,6 +2098,7 @@ def reasoning_traces():
 
     except Exception as e:
         logger.error(f"Error loading reasoning traces: {e}", exc_info=True)
+        db.session.rollback()
         return render_template(
             "admin/ai/reasoning_traces.html",
             traces=[],
@@ -2428,12 +2433,14 @@ def ai_chat_analytics():
         # Failure rate trend (daily error count vs total, last N days)
         try:
             from sqlalchemy import func as _func, case as _case
+            from app.services.ai_reasoning_trace import TRACE_FAILURE_STATUSES
+
             daily_stats = (
                 db.session.query(
                     _func.date(AIReasoningTrace.created_at).label("day"),
                     _func.count(AIReasoningTrace.id).label("total"),
                     _func.sum(
-                        _case((AIReasoningTrace.status.in_(["error", "llm_error"]), 1), else_=0)
+                        _case((AIReasoningTrace.status.in_(TRACE_FAILURE_STATUSES), 1), else_=0)
                     ).label("errors"),
                     _func.avg(AIReasoningTrace.grounding_score).label("avg_grounding"),
                     _func.avg(AIReasoningTrace.total_cost_usd).label("avg_cost"),
@@ -2497,10 +2504,12 @@ def ai_chat_analytics():
 
         # Top failing queries (by error count)
         try:
+            from app.services.ai_reasoning_trace import TRACE_FAILURE_STATUSES
+
             failing = (
                 db.session.query(AIReasoningTrace.query)
                 .filter(
-                    AIReasoningTrace.status.in_(["error", "llm_error"]),
+                    AIReasoningTrace.status.in_(TRACE_FAILURE_STATUSES),
                     AIReasoningTrace.created_at >= cutoff,
                 )
                 .order_by(AIReasoningTrace.created_at.desc())
@@ -2547,18 +2556,18 @@ def ai_dashboard():
 
         # Trace stats (last 30 days)
         thirty_days_ago = utcnow() - timedelta(days=30)
-        success_statuses = ['completed', 'completed_without_tools', 'agent_disabled']
-        error_statuses = ['error', 'llm_error']
+        from app.services.ai_reasoning_trace import TRACE_COMPLETED_STATUSES, TRACE_FAILURE_STATUSES
+
         trace_stats = {
             'total': db.session.query(AIReasoningTrace).count(),
             'last_30_days': db.session.query(AIReasoningTrace).filter(
                 AIReasoningTrace.created_at >= thirty_days_ago
             ).count(),
             'completed': db.session.query(AIReasoningTrace).filter(
-                AIReasoningTrace.status.in_(success_statuses)
+                AIReasoningTrace.status.in_(TRACE_COMPLETED_STATUSES)
             ).count(),
             'errors': db.session.query(AIReasoningTrace).filter(
-                AIReasoningTrace.status.in_(error_statuses)
+                AIReasoningTrace.status.in_(TRACE_FAILURE_STATUSES)
             ).count(),
             'flagged_for_review': db.session.query(AIReasoningTrace).filter(
                 AIReasoningTrace.llm_needs_review.is_(True)
@@ -2629,6 +2638,7 @@ def ai_dashboard():
 
     except Exception as e:
         logger.error(f"Error loading AI dashboard: {e}", exc_info=True)
+        db.session.rollback()
         return render_template(
             "admin/ai/dashboard.html",
             stats=_get_default_stats(),
@@ -2681,6 +2691,7 @@ def trace_compare():
         )
     except Exception as e:
         logger.error("Trace compare failed: %s", e, exc_info=True)
+        db.session.rollback()
         return render_template(
             "admin/ai/trace_compare.html",
             left=None, right=None,
@@ -2724,6 +2735,7 @@ def ai_review_queue():
         )
     except Exception as e:
         logger.error("Error loading AI review queue: %s", e, exc_info=True)
+        db.session.rollback()
         return render_template(
             "admin/ai/review_queue.html",
             reviews=[],

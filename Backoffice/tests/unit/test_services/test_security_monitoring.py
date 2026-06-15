@@ -79,7 +79,8 @@ class TestGetClientInfo:
 
     def test_without_request_context(self):
         from app.services.security.monitoring import SecurityMonitor
-        info = SecurityMonitor._get_client_info()
+        with patch("app.services.security.monitoring.has_request_context", return_value=False):
+            info = SecurityMonitor._get_client_info()
         assert info["ip_address"] == "system"
         assert info["user_agent"] == "unknown"
         assert info["method"] == "N/A"
@@ -163,6 +164,9 @@ class TestLogSecurityEvent:
 
     def test_logs_event_with_explicit_user_id(self, app, db_session):
         from app.services.security.monitoring import SecurityMonitor
+        from tests.factories import create_test_user
+
+        user = create_test_user(db_session)
 
         with app.app_context():
             with patch("app.services.security.monitoring.has_request_context", return_value=False):
@@ -170,20 +174,24 @@ class TestLogSecurityEvent:
                     event_type="user_event",
                     severity="medium",
                     description="user action",
-                    user_id=42,
+                    user_id=user.id,
                     notify_admins=False,
                 )
+            db_session.commit()
             from app.models import SecurityEvent
             event = SecurityEvent.query.filter_by(event_type="user_event").first()
             assert event is not None
-            assert event.user_id == 42
+            assert event.user_id == user.id
 
     def test_logs_event_with_request_context_authenticated_user(self, app, db_session):
         from app.services.security.monitoring import SecurityMonitor
+        from tests.factories import create_test_user
+
+        user = create_test_user(db_session)
 
         with app.app_context():
             mock_user = MagicMock()
-            mock_user.id = 99
+            mock_user.id = user.id
             mock_user.is_authenticated = True
 
             with (
@@ -199,10 +207,11 @@ class TestLogSecurityEvent:
                     notify_admins=False,
                 )
 
+            db_session.commit()
             from app.models import SecurityEvent
             event = SecurityEvent.query.filter_by(event_type="auth_event").first()
             assert event is not None
-            assert event.user_id == 99
+            assert event.user_id == user.id
 
     def test_logs_event_with_request_context_anonymous_user(self, app, db_session):
         from app.services.security.monitoring import SecurityMonitor
@@ -388,10 +397,10 @@ class TestSendSecurityAlert:
             with patch(
                 "app.services.email.service.send_security_alert",
                 side_effect=Exception("email server down"),
-            ):
+            ), patch("app.services.security.monitoring.current_app.logger") as mock_logger:
                 SecurityMonitor._send_security_alert(event)  # Should not raise
 
-        app.logger.error.assert_called()
+        mock_logger.error.assert_called()
 
     def test_timestamp_str_for_events_without_isoformat(self, app, db_session):
         from app.services.security.monitoring import SecurityMonitor
@@ -435,19 +444,20 @@ class TestCheckSuspiciousActivity:
 
         with app.app_context():
             with app.test_request_context("/test"):
-                with patch.object(
-                    SecurityMonitor,
-                    "_check_failed_logins",
-                    side_effect=RuntimeError("check failed"),
+                with (
+                    patch.object(
+                        SecurityMonitor,
+                        "_check_failed_logins",
+                        side_effect=RuntimeError("check failed"),
+                    ),
+                    patch.object(SecurityMonitor, "_check_suspicious_requests"),
+                    patch.object(SecurityMonitor, "_check_admin_activity"),
+                    patch.object(SecurityMonitor, "_check_brute_force_attempts"),
+                    patch("app.services.security.monitoring.current_app.logger") as mock_logger,
                 ):
-                    with (
-                        patch.object(SecurityMonitor, "_check_suspicious_requests"),
-                        patch.object(SecurityMonitor, "_check_admin_activity"),
-                        patch.object(SecurityMonitor, "_check_brute_force_attempts"),
-                    ):
-                        SecurityMonitor.check_suspicious_activity()
+                    SecurityMonitor.check_suspicious_activity()
 
-        app.logger.error.assert_called()
+        mock_logger.error.assert_called()
 
 
 # ===========================================================================
@@ -491,10 +501,10 @@ class TestCheckFailedLogins:
             with patch(
                 "app.services.security.monitoring.SecurityEvent.query",
                 side_effect=RuntimeError("db error"),
-            ):
+            ), patch("app.services.security.monitoring.current_app.logger") as mock_logger:
                 SecurityMonitor._check_failed_logins()
 
-        app.logger.error.assert_called()
+        mock_logger.error.assert_called()
 
 
 # ===========================================================================
@@ -516,9 +526,9 @@ class TestCheckSuspiciousRequests:
 
         with app.app_context():
             with app.test_request_context("/test", headers={"User-Agent": "sqlmap/1.5.8"}):
-                with (
-                    patch.object(SecurityMonitor, "log_security_event") as mock_log,
-                ):
+                with patch.object(SecurityMonitor, "log_security_event") as mock_log, \
+                     patch("app.services.security.monitoring.request") as mock_req:
+                    mock_req.user_agent.string = "sqlmap/1.5.8"
                     SecurityMonitor._check_suspicious_requests()
                 mock_log.assert_called_once()
                 kwargs = mock_log.call_args[1]
@@ -530,7 +540,9 @@ class TestCheckSuspiciousRequests:
 
         with app.app_context():
             with app.test_request_context("/test", headers={"User-Agent": f"{agent}/2.0"}):
-                with patch.object(SecurityMonitor, "log_security_event") as mock_log:
+                with patch.object(SecurityMonitor, "log_security_event") as mock_log, \
+                     patch("app.services.security.monitoring.request") as mock_req:
+                    mock_req.user_agent.string = f"{agent}/2.0"
                     SecurityMonitor._check_suspicious_requests()
                 mock_log.assert_called_once()
 
@@ -542,10 +554,10 @@ class TestCheckSuspiciousRequests:
                 with patch(
                     "app.services.security.monitoring.request",
                     side_effect=RuntimeError("request error"),
-                ):
+                ), patch("app.services.security.monitoring.current_app.logger") as mock_logger:
                     SecurityMonitor._check_suspicious_requests()
 
-        app.logger.error.assert_called()
+        mock_logger.error.assert_called()
 
 
 # ===========================================================================
@@ -645,11 +657,14 @@ class TestCheckAdminActivity:
             with app.test_request_context("/test"):
                 with patch(
                     "app.services.security.monitoring.current_user",
-                    side_effect=RuntimeError("auth error"),
-                ):
-                    SecurityMonitor._check_admin_activity()
+                ) as mock_user:
+                    type(mock_user).is_authenticated = PropertyMock(
+                        side_effect=RuntimeError("auth error")
+                    )
+                    with patch("app.services.security.monitoring.current_app.logger") as mock_logger:
+                        SecurityMonitor._check_admin_activity()
 
-        app.logger.error.assert_called()
+        mock_logger.error.assert_called()
 
 
 # ===========================================================================
@@ -707,14 +722,17 @@ class TestCheckBruteForceAttempts:
         from app.services.security.monitoring import SecurityMonitor
 
         with app.app_context():
-            with app.test_request_context("/test"):
+            with app.test_request_context(
+                "/test",
+                environ_base={"REMOTE_ADDR": "5.5.5.5"},
+            ):
                 with patch(
                     "app.services.security.monitoring.SecurityEvent.query",
                     side_effect=RuntimeError("db error"),
-                ):
+                ), patch("app.services.security.monitoring.current_app.logger") as mock_logger:
                     SecurityMonitor._check_brute_force_attempts()
 
-        app.logger.error.assert_called()
+        mock_logger.error.assert_called()
 
 
 # ===========================================================================
@@ -766,10 +784,11 @@ class TestGetSecurityDashboardData:
         from app.services.security.monitoring import SecurityMonitor
 
         with app.app_context():
-            with patch("app.services.security.monitoring.db.session.query", side_effect=RuntimeError("db error")):
+            with patch("app.services.security.monitoring.db.session.query", side_effect=RuntimeError("db error")), \
+                 patch("app.services.security.monitoring.current_app.logger") as mock_logger:
                 SecurityMonitor.get_security_dashboard_data(days=7)
 
-        app.logger.error.assert_called()
+        mock_logger.error.assert_called()
 
 
 # ===========================================================================

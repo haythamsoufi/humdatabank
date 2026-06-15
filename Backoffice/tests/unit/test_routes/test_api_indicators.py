@@ -30,8 +30,9 @@ def _api(path: str) -> str:
 def _make_indicator(db_session, name="Test Indicator", is_archived=False):
     ind = IndicatorBank(
         name=name,
+        type="number",
         definition="A test indicator",
-        is_archived=is_archived,
+        archived=is_archived,
     )
     db_session.add(ind)
     db_session.flush()
@@ -55,7 +56,7 @@ def _make_subsector(db_session, sector_id, name="Primary Health", is_active=True
 _SUGGESTION_PAYLOAD = {
     "submitter_name": "Alice",
     "submitter_email": "alice@example.com",
-    "suggestion_type": "new",
+    "suggestion_type": "new_indicator",
     "indicator_name": "New Indicator",
     "reason": "It is needed",
 }
@@ -279,7 +280,7 @@ class TestGetIndicatorSuggestions:
             s = IndicatorSuggestion(
                 submitter_name="Bob",
                 submitter_email="bob@example.com",
-                suggestion_type="new",
+                suggestion_type="new_indicator",
                 indicator_name="Filtered",
                 reason="test",
                 status="pending",
@@ -295,14 +296,14 @@ class TestGetIndicatorSuggestions:
             s = IndicatorSuggestion(
                 submitter_name="Carol",
                 submitter_email="carol@example.com",
-                suggestion_type="modify",
+                suggestion_type="correction",
                 indicator_name="Modified",
                 reason="test",
             )
             db_session.add(s)
             db_session.commit()
 
-        resp = client.get(_api("/indicator-suggestions?suggestion_type=modify"), headers=auth_headers)
+        resp = client.get(_api("/indicator-suggestions?suggestion_type=correction"), headers=auth_headers)
         assert resp.status_code == 200
 
     def test_pagination_params(self, client, auth_headers, db_session):
@@ -339,7 +340,7 @@ class TestGetIndicatorSuggestion:
             s = IndicatorSuggestion(
                 submitter_name="Dave",
                 submitter_email="dave@example.com",
-                suggestion_type="new",
+                suggestion_type="new_indicator",
                 indicator_name="Found",
                 reason="test",
             )
@@ -369,7 +370,7 @@ class TestUpdateIndicatorSuggestionStatus:
 
     def test_non_admin_returns_403(self, client, auth_headers, db_session):
         """Non-admin API key caller returns 403."""
-        with patch("app.services.authorization_service.AuthorizationService.is_admin", return_value=False):
+        with patch("app.routes.api.indicators.AuthorizationService.is_admin", return_value=False):
             resp = client.put(
                 _api("/indicator-suggestions/1/status"),
                 json={"status": "approved"},
@@ -382,7 +383,7 @@ class TestUpdateIndicatorSuggestionStatus:
             s = IndicatorSuggestion(
                 submitter_name="Eve",
                 submitter_email="eve@example.com",
-                suggestion_type="new",
+                suggestion_type="new_indicator",
                 indicator_name="Status Update",
                 reason="test",
             )
@@ -390,8 +391,8 @@ class TestUpdateIndicatorSuggestionStatus:
             db_session.commit()
             s_id = s.id
 
-        with patch("app.services.authorization_service.AuthorizationService.is_admin", return_value=True), \
-             patch("flask_login.current_user") as mock_cu:
+        with patch("app.routes.api.indicators.AuthorizationService.is_admin", return_value=True), \
+             patch("app.routes.api.indicators.current_user") as mock_cu:
             mock_cu.is_authenticated = True
             resp = client.put(
                 _api(f"/indicator-suggestions/{s_id}/status"),
@@ -401,8 +402,8 @@ class TestUpdateIndicatorSuggestionStatus:
         assert resp.status_code == 400
 
     def test_not_found_returns_404(self, client, auth_headers, db_session):
-        with patch("app.services.authorization_service.AuthorizationService.is_admin", return_value=True), \
-             patch("flask_login.current_user") as mock_cu:
+        with patch("app.routes.api.indicators.AuthorizationService.is_admin", return_value=True), \
+             patch("app.routes.api.indicators.current_user") as mock_cu:
             mock_cu.is_authenticated = True
             resp = client.put(
                 _api("/indicator-suggestions/999999/status"),
@@ -416,7 +417,7 @@ class TestUpdateIndicatorSuggestionStatus:
             s = IndicatorSuggestion(
                 submitter_name="Frank",
                 submitter_email="frank@example.com",
-                suggestion_type="new",
+                suggestion_type="new_indicator",
                 indicator_name="Update Me",
                 reason="test",
                 status="pending",
@@ -425,8 +426,8 @@ class TestUpdateIndicatorSuggestionStatus:
             db_session.commit()
             s_id = s.id
 
-        with patch("app.services.authorization_service.AuthorizationService.is_admin", return_value=True), \
-             patch("flask_login.current_user") as mock_cu:
+        with patch("app.routes.api.indicators.AuthorizationService.is_admin", return_value=True), \
+             patch("app.routes.api.indicators.current_user") as mock_cu:
             mock_cu.is_authenticated = True
             resp = client.put(
                 _api(f"/indicator-suggestions/{s_id}/status"),
@@ -442,7 +443,7 @@ class TestUpdateIndicatorSuggestionStatus:
             s = IndicatorSuggestion(
                 submitter_name="Greg",
                 submitter_email="greg@example.com",
-                suggestion_type="new",
+                suggestion_type="new_indicator",
                 indicator_name="Fail Update",
                 reason="test",
             )
@@ -450,8 +451,8 @@ class TestUpdateIndicatorSuggestionStatus:
             db_session.commit()
             s_id = s.id
 
-        with patch("app.services.authorization_service.AuthorizationService.is_admin", return_value=True), \
-             patch("flask_login.current_user") as mock_cu, \
+        with patch("app.routes.api.indicators.AuthorizationService.is_admin", return_value=True), \
+             patch("app.routes.api.indicators.current_user") as mock_cu, \
              patch("app.routes.api.indicators.db") as mock_db:
             mock_cu.is_authenticated = True
             mock_db.session.flush.side_effect = Exception("DB error")

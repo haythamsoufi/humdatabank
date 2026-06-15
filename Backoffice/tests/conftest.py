@@ -12,9 +12,16 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / '.env', override=False)
 os.environ.setdefault('FLASK_CONFIG', 'testing')
 
+import logging
+# PostgreSQL NOTICE lines (DROP IF EXISTS, CREATE EXTENSION, etc.) are logged at INFO by
+# sqlalchemy.dialects.postgresql; suppress during tests to reduce noise and avoid touching
+# RotatingFileHandler when a dev server already holds instance/logs/application.log open.
+logging.getLogger('sqlalchemy.dialects.postgresql').setLevel(logging.WARNING)
+
 import pytest
 import tempfile
 import shutil
+from contextlib import suppress
 from unittest.mock import patch, MagicMock
 from flask import Flask
 from sqlalchemy import text
@@ -22,6 +29,201 @@ from sqlalchemy import text
 from app import create_app, db
 from app.extensions import login
 from app.models import User
+
+_PG_NUCLEAR_DROP_SQL = text("""
+DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN (SELECT table_name FROM information_schema.views WHERE table_schema = current_schema()) LOOP
+    EXECUTE 'DROP VIEW IF EXISTS ' || quote_ident(r.table_name) || ' CASCADE';
+  END LOOP;
+  FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = current_schema()) LOOP
+    EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+  END LOOP;
+  FOR r IN (SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = current_schema()) LOOP
+    EXECUTE 'DROP SEQUENCE IF EXISTS ' || quote_ident(r.sequence_name) || ' CASCADE';
+  END LOOP;
+  FOR r IN (
+    SELECT t.typname
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typtype = 'e' AND n.nspname = current_schema()
+  ) LOOP
+    EXECUTE 'DROP TYPE IF EXISTS ' || quote_ident(r.typname) || ' CASCADE';
+  END LOOP;
+END $$;
+""")
+
+_CRITICAL_TEST_TABLES = (
+    "user",
+    "country",
+    "user_entity_permissions",
+    "form_template",
+    "api_keys",
+    "form_data",
+    "dynamic_indicator_data",
+    "indicator_bank",
+    "rbac_role",
+)
+
+
+def _disengage_db_connections():
+    """Roll back, remove the scoped session, and dispose pooled connections."""
+    for action in (
+        lambda: db.session.rollback(),
+        lambda: db.session.remove(),
+        lambda: db.engine.dispose(),
+    ):
+        with suppress(Exception):
+            action()
+
+
+def _drop_legacy_test_artifacts():
+    """Drop objects that sometimes survive generic schema cleanup."""
+    for _ in range(3):
+        try:
+            with db.engine.begin() as conn:
+                conn.execute(text("DROP INDEX IF EXISTS ix_api_key_usage_timestamp CASCADE"))
+                conn.execute(text("DROP TABLE IF EXISTS ix_api_key_usage_timestamp CASCADE"))
+                conn.execute(text("DROP SEQUENCE IF EXISTS ix_api_key_usage_timestamp CASCADE"))
+                conn.execute(text("DROP TABLE IF EXISTS api_key_usage CASCADE"))
+                conn.execute(text("DROP TABLE IF EXISTS indicator_bank CASCADE"))
+                conn.execute(text("DROP TABLE IF EXISTS indicator_bank_history CASCADE"))
+        except Exception:
+            pass
+
+
+def _nuclear_drop_postgres_schema():
+    """Drop all objects in the current PostgreSQL schema."""
+    if db.engine.dialect.name != "postgresql":
+        return
+    last_error = None
+    for _ in range(2):
+        _disengage_db_connections()
+        try:
+            with db.engine.begin() as conn:
+                conn.execute(_PG_NUCLEAR_DROP_SQL)
+            return
+        except Exception as exc:
+            last_error = exc
+    raise RuntimeError(f"Failed to reset PostgreSQL test schema: {last_error}") from last_error
+
+
+def _missing_critical_tables():
+    with db.engine.connect() as conn:
+        missing = []
+        for table_name in _CRITICAL_TEST_TABLES:
+            exists = conn.execute(text(
+                "SELECT EXISTS (SELECT FROM information_schema.tables "
+                "WHERE table_schema=current_schema() AND table_name = :t)"
+            ), {"t": table_name}).scalar()
+            if not exists:
+                missing.append(table_name)
+        return missing
+
+
+def _create_all_test_tables():
+    """Create all ORM tables, retrying once on duplicate-object errors."""
+    try:
+        db.metadata.create_all(bind=db.engine, checkfirst=True)
+    except Exception as create_error:
+        error_str = str(create_error).lower()
+        if 'duplicate' in error_str or 'already exists' in error_str:
+            try:
+                with db.engine.begin() as conn:
+                    conn.execute(text("DROP INDEX IF EXISTS ix_api_key_usage_timestamp CASCADE"))
+            except Exception:
+                pass
+            db.metadata.create_all(bind=db.engine, checkfirst=True)
+        else:
+            raise
+
+
+def _reset_test_schema(app):
+    """Drop and recreate the full test schema from current model metadata."""
+    _disengage_db_connections()
+
+    if db.engine.dialect.name == "postgresql":
+        with db.engine.connect() as conn:
+            conn.execute(text("SELECT pg_advisory_lock(7474242)"))
+            try:
+                _run_test_schema_reset()
+            finally:
+                conn.execute(text("SELECT pg_advisory_unlock(7474242)"))
+                conn.commit()
+        return
+
+    _run_test_schema_reset()
+
+
+def _run_test_schema_reset():
+    """Schema drop/create body (caller holds pg advisory lock when on PostgreSQL)."""
+    with suppress(Exception):
+        db.metadata.drop_all(bind=db.engine, checkfirst=True)
+    with suppress(Exception):
+        db.drop_all()
+
+    _nuclear_drop_postgres_schema()
+    _drop_legacy_test_artifacts()
+
+    if db.engine.dialect.name == "postgresql":
+        with db.engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+
+    _create_all_test_tables()
+
+    missing = _missing_critical_tables()
+    if missing:
+        _disengage_db_connections()
+        _nuclear_drop_postgres_schema()
+        if db.engine.dialect.name == "postgresql":
+            with db.engine.begin() as conn:
+                conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        _create_all_test_tables()
+        missing = _missing_critical_tables()
+
+    if missing:
+        raise RuntimeError(
+            "CRITICAL: expected tables were not created: "
+            + ", ".join(missing)
+        )
+
+
+def _register_error_trigger_routes(app):
+    """Register /test-error/<code> routes for error handler unit tests."""
+    from flask import Blueprint, abort
+
+    bp = Blueprint("_error_triggers", __name__, url_prefix="/test-error")
+
+    @bp.route("/400")
+    def trigger_400():
+        abort(400)
+
+    @bp.route("/401")
+    def trigger_401():
+        abort(401)
+
+    @bp.route("/403")
+    def trigger_403():
+        abort(403)
+
+    @bp.route("/404")
+    def trigger_404():
+        abort(404)
+
+    @bp.route("/500")
+    def trigger_500():
+        abort(500)
+
+    @bp.route("/502")
+    def trigger_502():
+        abort(502)
+
+    @bp.route("/503")
+    def trigger_503():
+        abort(503)
+
+    app.register_blueprint(bp)
 
 
 def _check_test_database_reachable():
@@ -86,16 +288,28 @@ def app():
     app.config['MOBILE_JWT_SECRET'] = 'test-mobile-jwt-secret-for-pytest-32b!'
     app.config['API_KEY'] = os.environ.get('API_KEY') or 'test-api-key'
     app.config['SCHEDULER_ENABLED'] = False
+    # Allow oversized multipart payloads to reach route handlers that enforce their own limits.
+    app.config['MAX_CONTENT_LENGTH'] = 60 * 1024 * 1024
     # Keep logout redirects on the local login route during tests (avoid B2C end_session URLs).
     app.config['AZURE_B2C_POST_LOGOUT_REDIRECT_URI'] = 'http://127.0.0.1/login'
+    # Ensure patch.object(app, "form_integration", ...) works in plugin route tests.
+    app.form_integration = getattr(app, 'form_integration', None)
 
     # Plugin manager is initialized during create_app(); ensure field types are
     # registered even if DEBUG was True at config import time (before FLASK_CONFIG=testing).
     plugin_manager = getattr(app, 'plugin_manager', None)
-    if plugin_manager is not None and not plugin_manager.field_types:
-        plugin_manager.load_plugins()
-        plugin_manager.register_template_loader()
-        plugin_manager.register_blueprints()
+    if plugin_manager is not None:
+        if not plugin_manager.field_types:
+            plugin_manager.load_plugins()
+            plugin_manager.register_template_loader()
+            plugin_manager.register_blueprints()
+        if not getattr(app, 'form_integration', None):
+            from app.plugins.form_integration import FormIntegration
+            app.form_integration = FormIntegration(plugin_manager)
+        elif not getattr(app.form_integration, 'plugin_manager', None):
+            app.form_integration.plugin_manager = plugin_manager
+
+    _register_error_trigger_routes(app)
 
     with app.app_context():
         yield app
@@ -105,6 +319,30 @@ def app():
 def client(app):
     """Create test client."""
     return app.test_client()
+
+
+@pytest.fixture(autouse=True)
+def reset_flask_request_globals(app):
+    """Clear leaked Flask ``g`` transaction/mobile state between tests."""
+    def _clear():
+        try:
+            from flask import g, has_request_context
+            if has_request_context():
+                for key in (
+                    '_auto_txn_managed',
+                    '_auto_txn_force_rollback',
+                    '_mobile_jwt_sid',
+                    '_post_commit_callbacks',
+                ):
+                    with suppress(Exception):
+                        if hasattr(g, key):
+                            delattr(g, key)
+        except Exception:
+            pass
+
+    _clear()
+    yield
+    _clear()
 
 
 @pytest.fixture(autouse=True)
@@ -170,197 +408,7 @@ def db_session(app):
             raise RuntimeError("No tables found in metadata! Models may not be imported correctly.")
 
         try:
-            # Ensure no stale session or connection state leaks in from a previous
-            # test.  An aborted psycopg2 transaction on a pooled connection will
-            # cause every subsequent engine.begin() call to fail silently (the
-            # whole nuclear-drop block is swallowed by its try/except), leaving
-            # schema remnants that trip up _ensure_role and friends.
-            try:
-                db.session.rollback()
-            except Exception:
-                pass
-            try:
-                db.session.remove()
-            except Exception:
-                pass
-            try:
-                db.engine.dispose()
-            except Exception:
-                pass
-
-            # Drop all tables first to ensure clean state
-            # Wrap in try-except to ignore errors about missing constraints/indexes
-            try:
-                db.metadata.drop_all(bind=db.engine, checkfirst=True)
-            except Exception:
-                pass  # Ignore errors about missing constraints/indexes
-            try:
-                db.drop_all()
-            except Exception:
-                pass  # Ignore errors if tables don't exist
-
-            # On some environments, DROP/CREATE via SQLAlchemy can leave behind objects
-            # (e.g., when drop_all fails due to dependency/permission quirks and we ignore
-            # the exception). This can cause schema drift where existing tables miss
-            # newly-added columns. Force-drop all objects in the current schema.
-            try:
-                with db.engine.begin() as conn:
-                    conn.execute(text("""
-DO $$
-DECLARE r RECORD;
-BEGIN
-  -- Drop views first
-  FOR r IN (SELECT table_name FROM information_schema.views WHERE table_schema = current_schema()) LOOP
-    EXECUTE 'DROP VIEW IF EXISTS ' || quote_ident(r.table_name) || ' CASCADE';
-  END LOOP;
-
-  -- Drop tables
-  FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = current_schema()) LOOP
-    EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
-  END LOOP;
-
-  -- Drop sequences
-  FOR r IN (SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = current_schema()) LOOP
-    EXECUTE 'DROP SEQUENCE IF EXISTS ' || quote_ident(r.sequence_name) || ' CASCADE';
-  END LOOP;
-
-  -- Drop enum types (SQLAlchemy creates named ENUM types in PostgreSQL; they
-  -- survive DROP TABLE and prevent a clean create_all on the next test run,
-  -- causing "type already exists" errors that partially fail the DDL batch).
-  FOR r IN (
-    SELECT t.typname
-    FROM pg_type t
-    JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE t.typtype = 'e' AND n.nspname = current_schema()
-  ) LOOP
-    EXECUTE 'DROP TYPE IF EXISTS ' || quote_ident(r.typname) || ' CASCADE';
-  END LOOP;
-END $$;
-                    """))
-            except Exception:
-                # If the database is not PostgreSQL or permissions are restricted,
-                # fall back to best-effort drop_all behavior above.
-                pass
-
-            # Drop problematic index that persists between test runs
-            # Do this multiple times to ensure it's gone
-            for _ in range(3):
-                try:
-                    with db.engine.begin() as conn:
-                        # Drop in correct order: index first, then table.
-                        # In some DBs, a leftover *table* may exist with the same name
-                        # as the index, which also breaks CREATE INDEX.
-                        conn.execute(text("DROP INDEX IF EXISTS ix_api_key_usage_timestamp CASCADE"))
-                        conn.execute(text("DROP TABLE IF EXISTS ix_api_key_usage_timestamp CASCADE"))
-                        conn.execute(text("DROP SEQUENCE IF EXISTS ix_api_key_usage_timestamp CASCADE"))
-                        conn.execute(text("DROP TABLE IF EXISTS api_key_usage CASCADE"))
-                        # Some environments reuse a long-lived database where this table
-                        # might exist with an older schema. Ensure it's dropped so
-                        # create_all can recreate it with current model columns.
-                        conn.execute(text("DROP TABLE IF EXISTS indicator_bank CASCADE"))
-                        conn.execute(text("DROP TABLE IF EXISTS indicator_bank_history CASCADE"))
-                except Exception:
-                    pass  # Ignore if doesn't exist
-
-            if db.engine.dialect.name == "postgresql":
-                with db.engine.begin() as conn:
-                    conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-
-            # Create all tables - handle duplicate index errors gracefully
-            # Use a custom approach that continues even if index creation fails
-            try:
-                # First attempt: try creating all tables at once
-                # Use checkfirst=True to avoid Postgres ENUM/type duplicate errors
-                # if any named types survive best-effort schema cleanup.
-                db.metadata.create_all(bind=db.engine, checkfirst=True)
-            except Exception as create_error:
-                error_str = str(create_error).lower()
-                if 'duplicate' in error_str or 'already exists' in error_str:
-                    # Duplicate index error occurred - drop it and retry, or create tables individually
-                    # Try dropping the index one more time
-                    try:
-                        with db.engine.begin() as conn:
-                            conn.execute(text("DROP INDEX IF EXISTS ix_api_key_usage_timestamp CASCADE"))
-                    except Exception:
-                        pass
-                    # Retry create_all after cleanup (keeps FK dependency ordering correct)
-                    db.metadata.create_all(bind=db.engine, checkfirst=True)
-                else:
-                    # Non-duplicate error - this is serious, re-raise
-                    raise
-
-            # Verify critical tables exist (retry once if schema cleanup was partial)
-            _critical_tables = (
-                "user",
-                "country",
-                "user_entity_permissions",
-                "form_template",
-                "api_keys",
-                "form_data",
-                "dynamic_indicator_data",
-                "indicator_bank",
-                "rbac_role",
-            )
-
-            def _missing_critical_tables():
-                with db.engine.connect() as conn:
-                    missing = []
-                    for table_name in _critical_tables:
-                        exists = conn.execute(text(
-                            "SELECT EXISTS (SELECT FROM information_schema.tables "
-                            "WHERE table_schema=current_schema() AND table_name = :t)"
-                        ), {"t": table_name}).scalar()
-                        if not exists:
-                            missing.append(table_name)
-                    return missing
-
-            missing = _missing_critical_tables()
-            if missing:
-                # A poisoned pooled connection can cause the nuclear-drop block above
-                # to fail silently; dispose and rebuild the schema once more.
-                try:
-                    db.engine.dispose()
-                except Exception:
-                    pass
-                try:
-                    with db.engine.begin() as conn:
-                        conn.execute(text("""
-DO $$
-DECLARE r RECORD;
-BEGIN
-  FOR r IN (SELECT table_name FROM information_schema.views WHERE table_schema = current_schema()) LOOP
-    EXECUTE 'DROP VIEW IF EXISTS ' || quote_ident(r.table_name) || ' CASCADE';
-  END LOOP;
-  FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = current_schema()) LOOP
-    EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
-  END LOOP;
-  FOR r IN (SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = current_schema()) LOOP
-    EXECUTE 'DROP SEQUENCE IF EXISTS ' || quote_ident(r.sequence_name) || ' CASCADE';
-  END LOOP;
-  FOR r IN (
-    SELECT t.typname
-    FROM pg_type t
-    JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE t.typtype = 'e' AND n.nspname = current_schema()
-  ) LOOP
-    EXECUTE 'DROP TYPE IF EXISTS ' || quote_ident(r.typname) || ' CASCADE';
-  END LOOP;
-END $$;
-                        """))
-                except Exception:
-                    pass
-                if db.engine.dialect.name == "postgresql":
-                    with db.engine.begin() as conn:
-                        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-                db.metadata.create_all(bind=db.engine, checkfirst=True)
-                missing = _missing_critical_tables()
-
-            if missing:
-                raise RuntimeError(
-                    "CRITICAL: expected tables were not created: "
-                    + ", ".join(missing)
-                )
-
+            _reset_test_schema(app)
         except RuntimeError:
             raise
         except Exception as e:
@@ -368,28 +416,14 @@ END $$;
             app.logger.error(f"Error creating tables: {e}\n{traceback.format_exc()}")
             raise
 
-        yield db.session
-
-        # Clean up: rollback first so an aborted transaction does not poison the
-        # connection that is returned to the pool, then drop the schema.
+        session_factory = db.session.session_factory
+        prev_expire_on_commit = session_factory.kw.get("expire_on_commit", True)
+        session_factory.configure(expire_on_commit=False)
         try:
-            db.session.rollback()
-        except Exception:
-            pass
-        try:
-            db.session.remove()
-        except Exception:
-            pass
-        try:
-            db.drop_all()
-        except Exception:
-            pass
-        # Dispose all pooled connections after schema teardown so the next test's
-        # db_session gets a fresh connection and does not see stale transaction state.
-        try:
-            db.engine.dispose()
-        except Exception:
-            pass
+            yield db.session
+        finally:
+            session_factory.configure(expire_on_commit=prev_expire_on_commit)
+            _disengage_db_connections()
 
 
 @pytest.fixture(scope='function')
@@ -746,6 +780,53 @@ def pytest_configure(config):
     )
 
 
+def _patch_terminal_progress_count_and_percent(config):
+    """Pytest 9 shows count OR percent; show both in terminal progress lines."""
+    reporter = config.pluginmanager.get_plugin("terminalreporter")
+    if reporter is None:
+        return
+    if reporter._show_progress_info not in ("count", "progress"):
+        return
+
+    original_get_msg = reporter._get_progress_information_message
+
+    def _format_progress_message() -> str:
+        session = reporter._session
+        if session is None:
+            return ""
+        collected = session.testscollected
+        progress = reporter.reported_progress
+        if not collected:
+            return " [100%]"
+        pct = progress * 100 // collected
+        width = len(str(collected))
+        return f" [{progress:{width}d}/{collected} {pct:3d}%]"
+
+    def _get_progress_information_message_both():
+        if reporter._show_progress_info == "times":
+            return original_get_msg()
+        return _format_progress_message()
+
+    def _write_progress_information_if_past_edge_both():
+        w = reporter._width_of_current_line
+        if reporter._show_progress_info in ("count", "progress"):
+            session = reporter._session
+            num_tests = session.testscollected if session else 0
+            progress_length = len(f" [{num_tests}/{num_tests} 100%]")
+        elif reporter._show_progress_info == "times":
+            progress_length = len(" 99h 59m")
+        else:
+            progress_length = len(" [100%]")
+        past_edge = w + progress_length + 1 >= reporter._screen_width
+        if past_edge:
+            main_color, _ = reporter._get_main_color()
+            msg = _format_progress_message()
+            reporter._tw.write(msg + "\n", **{main_color: True})
+
+    reporter._get_progress_information_message = _get_progress_information_message_both
+    reporter._write_progress_information_if_past_edge = _write_progress_information_if_past_edge_both
+
+
 def pytest_collection_modifyitems(config, items):
     """Automatically mark tests based on their location."""
     for item in items:
@@ -774,9 +855,18 @@ _total_collected = 0         # set in pytest_report_collectionfinish
 _session_start_time = None   # set in pytest_sessionstart
 
 
+def _format_progress_label(idx: int, total: int) -> str:
+    """Human-readable progress for test_results.log (matches terminal: n/total + %)."""
+    total = total or 1
+    pct = int(100 * idx / total)
+    width = len(str(total))
+    return f"[{idx:{width}d}/{total} {pct:3d}%]"
+
+
 def pytest_sessionstart(session):
     global _session_start_time
     _session_start_time = _time.time()
+    _patch_terminal_progress_count_and_percent(session.config)
     # Live progress file (updated per test on the controller process).
     with open(_results_log_path, 'w', encoding='utf-8') as f:
         f.write("=" * 120 + " test session starts " + "=" * 10 + "\n")
@@ -797,9 +887,8 @@ def _append_live_progress(outcome, nodeid, duration):
     """Append one completed test line so tail -f shows real progress."""
     total = _total_collected or 1
     idx = len(_test_outcomes)
-    pct = int(100 * idx / total)
     with open(_results_log_path, 'a', encoding='utf-8') as f:
-        f.write(f"{nodeid} {outcome} [{pct:3d}%] ({duration:.2f}s)\n")
+        f.write(f"{nodeid} {outcome} {_format_progress_label(idx, total)} ({duration:.2f}s)\n")
 
 
 def pytest_runtest_logreport(report):
@@ -843,8 +932,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
         # ── per-test lines (mirrors -v output) ─────────────────────────
         for idx, (outcome, nodeid, _longrepr, _dur) in enumerate(_test_outcomes, 1):
-            pct = int(100 * idx / total)
-            f.write(f"{nodeid} {outcome} [{pct:3d}%]\n")
+            f.write(f"{nodeid} {outcome} {_format_progress_label(idx, total)}\n")
 
         f.write("\n")
 

@@ -9,6 +9,7 @@ from unittest.mock import patch, MagicMock, PropertyMock
 
 from app import db
 from app.models import FormSection, FormPage
+from app.models.indicator_bank import IndicatorBank, IndicatorBankType, IndicatorBankUnit
 from app.services.template_preparation_service import TemplatePreparationService
 from tests.factories import (
     create_test_template,
@@ -456,6 +457,27 @@ class TestApplyTemplateTranslations:
 # _prepare_available_indicators
 # ---------------------------------------------------------------------------
 
+def _patch_indicator_bank_query(indicators):
+    """Patch IndicatorBank.query chain while keeping the real model for joinedload()."""
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _cm():
+        with patch.object(IndicatorBankType, "query") as type_query, \
+             patch.object(IndicatorBankUnit, "query") as unit_query, \
+             patch.object(IndicatorBank, "query") as mock_query:
+            type_query.filter_by.return_value.all.return_value = []
+            unit_query.filter_by.return_value.all.return_value = []
+            filter_mock = MagicMock()
+            options_mock = MagicMock()
+            mock_query.filter.return_value = filter_mock
+            filter_mock.options.return_value = options_mock
+            options_mock.order_by.return_value.all.return_value = indicators
+            yield mock_query
+
+    return _cm()
+
+
 @pytest.mark.unit
 class TestPrepareAvailableIndicators:
     def test_standard_section_gets_empty_list(self, db_session, app):
@@ -478,11 +500,7 @@ class TestPrepareAvailableIndicators:
             mock_indicator.sector = None
             mock_indicator.sub_sector = None
 
-            with patch("app.services.template_preparation_service.IndicatorBank") as MockIB:
-                query_mock = MagicMock()
-                MockIB.query.filter.return_value = query_mock
-                query_mock.order_by.return_value.all.return_value = [mock_indicator]
-
+            with _patch_indicator_bank_query([mock_indicator]):
                 with patch(
                     "app.services.template_preparation_service.get_localized_indicator_name",
                     return_value="Indicator Name"
@@ -503,11 +521,13 @@ class TestPrepareAvailableIndicators:
                 {"field": "type", "values": ["Number"]}
             ]
 
-            with patch("app.services.template_preparation_service.IndicatorBank") as MockIB:
+            with patch.object(IndicatorBank, "query") as mock_query:
                 base_q = MagicMock()
-                MockIB.query.filter.return_value = base_q
+                mock_query.filter.return_value = base_q
+                options_q = MagicMock()
+                base_q.options.return_value = options_q
                 type_filtered_q = MagicMock()
-                base_q.filter.return_value = type_filtered_q
+                options_q.filter.return_value = type_filtered_q
                 type_filtered_q.order_by.return_value.all.return_value = []
 
                 result = TemplatePreparationService._prepare_available_indicators([section])
@@ -520,11 +540,13 @@ class TestPrepareAvailableIndicators:
                 {"field": "unit", "values": ["percent"]}
             ]
 
-            with patch("app.services.template_preparation_service.IndicatorBank") as MockIB:
+            with patch.object(IndicatorBank, "query") as mock_query:
                 base_q = MagicMock()
-                MockIB.query.filter.return_value = base_q
+                mock_query.filter.return_value = base_q
+                options_q = MagicMock()
+                base_q.options.return_value = options_q
                 filtered_q = MagicMock()
-                base_q.filter.return_value = filtered_q
+                options_q.filter.return_value = filtered_q
                 filtered_q.order_by.return_value.all.return_value = []
 
                 result = TemplatePreparationService._prepare_available_indicators([section])
@@ -537,11 +559,13 @@ class TestPrepareAvailableIndicators:
                 {"field": "emergency", "values": ["true"]}
             ]
 
-            with patch("app.services.template_preparation_service.IndicatorBank") as MockIB:
+            with patch.object(IndicatorBank, "query") as mock_query:
                 base_q = MagicMock()
-                MockIB.query.filter.return_value = base_q
+                mock_query.filter.return_value = base_q
+                options_q = MagicMock()
+                base_q.options.return_value = options_q
                 filtered_q = MagicMock()
-                base_q.filter.return_value = filtered_q
+                options_q.filter.return_value = filtered_q
                 filtered_q.order_by.return_value.all.return_value = []
 
                 result = TemplatePreparationService._prepare_available_indicators([section])
@@ -554,11 +578,13 @@ class TestPrepareAvailableIndicators:
                 {"field": "archived", "values": ["false"]}
             ]
 
-            with patch("app.services.template_preparation_service.IndicatorBank") as MockIB:
+            with patch.object(IndicatorBank, "query") as mock_query:
                 base_q = MagicMock()
-                MockIB.query.filter.return_value = base_q
+                mock_query.filter.return_value = base_q
+                options_q = MagicMock()
+                base_q.options.return_value = options_q
                 filtered_q = MagicMock()
-                base_q.filter.return_value = filtered_q
+                options_q.filter.return_value = filtered_q
                 filtered_q.order_by.return_value.all.return_value = []
 
                 result = TemplatePreparationService._prepare_available_indicators([section])
@@ -572,11 +598,7 @@ class TestPrepareAvailableIndicators:
                 {"field": "", "values": []}
             ]
 
-            with patch("app.services.template_preparation_service.IndicatorBank") as MockIB:
-                base_q = MagicMock()
-                MockIB.query.filter.return_value = base_q
-                base_q.order_by.return_value.all.return_value = []
-
+            with _patch_indicator_bank_query([]):
                 result = TemplatePreparationService._prepare_available_indicators([section])
                 assert result[10] == []
 
@@ -594,11 +616,7 @@ class TestPrepareAvailableIndicators:
             mock_ind.sector = None
             mock_ind.sub_sector = None
 
-            with patch("app.services.template_preparation_service.IndicatorBank") as MockIB:
-                q = MagicMock()
-                MockIB.query.filter.return_value = q
-                q.order_by.return_value.all.return_value = [mock_ind]
-
+            with _patch_indicator_bank_query([mock_ind]):
                 with patch(
                     "app.services.template_preparation_service.get_localized_indicator_name",
                     return_value="Health Indicator"
@@ -624,11 +642,7 @@ class TestPrepareAvailableIndicators:
             mock_ind.sector = None
             mock_ind.sub_sector = None
 
-            with patch("app.services.template_preparation_service.IndicatorBank") as MockIB:
-                q = MagicMock()
-                MockIB.query.filter.return_value = q
-                q.order_by.return_value.all.return_value = [mock_ind]
-
+            with _patch_indicator_bank_query([mock_ind]):
                 with patch(
                     "app.services.template_preparation_service.get_localized_indicator_name",
                     return_value="Text Ind"
@@ -875,12 +889,7 @@ class TestPrepareTemplateForRendering:
                             "app.services.template_preparation_service.get_localized_section_name",
                             return_value="Dynamic"
                         ):
-                            with patch(
-                                "app.services.template_preparation_service.IndicatorBank"
-                            ) as MockIB:
-                                q = MagicMock()
-                                MockIB.query.filter.return_value = q
-                                q.order_by.return_value.all.return_value = []
+                            with _patch_indicator_bank_query([]):
                                 tmpl, sections, avail = TemplatePreparationService.prepare_template_for_rendering(
                                     template, mock_acs, False
                                 )
@@ -914,12 +923,7 @@ class TestPrepareTemplateForRendering:
                             "app.services.template_preparation_service.get_localized_section_name",
                             return_value="S"
                         ):
-                            with patch(
-                                "app.services.template_preparation_service.IndicatorBank"
-                            ) as MockIB:
-                                q = MagicMock()
-                                MockIB.query.filter.return_value = q
-                                q.order_by.return_value.all.return_value = []
+                            with _patch_indicator_bank_query([]):
                                 # Should not raise
                                 result = TemplatePreparationService.prepare_template_for_rendering(
                                     template, mock_acs, False

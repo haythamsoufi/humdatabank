@@ -25,6 +25,11 @@ from functools import wraps
 from flask import flash, redirect, url_for, current_app, request
 from flask_login import current_user, login_user
 from typing import Any, Dict, List, Optional
+from app.services.assignment_workflow_service import (
+    delegation_review_source_statuses,
+    is_delegation_user,
+    review_enabled,
+)
 from app.models import PublicSubmission, User
 from app.models.assignments import AssignmentEntityStatus
 
@@ -919,7 +924,6 @@ class AuthorizationService:
             return False
 
         from app.models.enums import AssignmentEntityStatusValue
-        from app.services.assignment_workflow_service import is_delegation_user, review_enabled
 
         status = assignment_entity_status.status
         if hasattr(status, 'value'):
@@ -982,12 +986,6 @@ class AuthorizationService:
             return False
 
         from app.models.enums import AssignmentEntityStatusValue
-        from app.services.assignment_workflow_service import (
-            is_delegation_user,
-            delegation_review_source_statuses,
-            review_enabled,
-        )
-
         status = assignment_entity_status.status
         if hasattr(status, 'value'):
             status = status.value
@@ -1016,12 +1014,6 @@ class AuthorizationService:
             return False
 
         from app.models.enums import AssignmentEntityStatusValue
-        from app.services.assignment_workflow_service import (
-            is_delegation_user,
-            delegation_review_source_statuses,
-            review_enabled,
-        )
-
         # Delegation users submit, they don't send for review.
         # Note: system-manager check is intentionally after this — a system manager
         # with an org-domain email acts as delegation and cannot send for review.
@@ -1073,8 +1065,6 @@ class AuthorizationService:
 
         if AuthorizationService.is_system_manager(user):
             return True
-
-        from app.services.assignment_workflow_service import is_delegation_user, review_enabled
 
         if not review_enabled(assignment_entity_status) or not is_delegation_user(user):
             return False
@@ -1358,3 +1348,4 @@ class AuthorizationService:
                 return redirect(url_for("main.dashboard"))
 
         return decorated_function
+

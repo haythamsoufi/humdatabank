@@ -14,7 +14,9 @@ from app.services import get_user_countries
 from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY, SELF_REPORT_PERIOD_NAME
 from app.utils.form_localization import get_localized_country_name, get_localized_national_society_name as _get_localized_national_society_name
 from datetime import datetime
-from app.services.notification.core import get_country_recent_activities
+from app.services.notification.core import get_country_recent_activities, notify_self_report_created
+from app.services.notification.service import NotificationService
+from app.utils.transactions import request_transaction_rollback
 from app.forms.shared import DeleteForm
 from app.forms.assignments import ReopenAssignmentForm, ApproveAssignmentForm
 from app.forms.auth_forms import RequestCountryAccessForm
@@ -211,7 +213,8 @@ def dashboard():
             flash(_("Your user account is not associated with any enabled entities. Please contact an administrator."), "warning")
         current_app.logger.warning(f"User {current_user.email} has no enabled entities assigned.")
         # selected_country remains None, which will hide entity-specific sections
-    else:
+
+    if user_entities:
         # User has one or more countries
         if countries_group_enabled and len(user_countries) > 1:
             # Show country selection dropdown if user has multiple countries
@@ -222,153 +225,153 @@ def dashboard():
         if len(user_entities) > 1:
             show_entity_select = True
 
-        if request.method == "POST":
-            # Check if the POST is for country selection
-            if countries_group_enabled and 'country_select' in request.form:
-                selected_country_id_str = request.form.get('country_select')
-                current_app.logger.debug(f"Dashboard POST request: Country Selection. Selected country ID string from form: {selected_country_id_str}")
-                if selected_country_id_str:
-                    try:
-                        selected_country_id = int(selected_country_id_str)
-                        temp_selected_country = Country.query.get(selected_country_id)
-                        # Validate that the selected country is one of the user's assigned countries
-                        if temp_selected_country and temp_selected_country in user_countries:
-                            session[SELECTED_COUNTRY_ID_SESSION_KEY] = selected_country_id
-                            selected_country = temp_selected_country
-                            current_app.logger.debug(f"User {current_user.email} selected valid country {selected_country.name} (ID: {selected_country.id}) via POST. Session updated.")
-                        else:
-                            # Invalid country selected, clear session and flash message
-                            session.pop(SELECTED_COUNTRY_ID_SESSION_KEY, None)
-                            selected_country = None # Will be set to a default below
-                            flash(_("Invalid country selection or country not assigned to you."), "warning")
-                            current_app.logger.warning(f"User {current_user.email} submitted invalid country ID {selected_country_id_str} via POST.")
-                    except ValueError:
-                        # Invalid ID format, clear session and flash message
+    if request.method == "POST":
+        # Check if the POST is for country selection
+        if countries_group_enabled and 'country_select' in request.form:
+            selected_country_id_str = request.form.get('country_select')
+            current_app.logger.debug(f"Dashboard POST request: Country Selection. Selected country ID string from form: {selected_country_id_str}")
+            if selected_country_id_str:
+                try:
+                    selected_country_id = int(selected_country_id_str)
+                    temp_selected_country = Country.query.get(selected_country_id)
+                    # Validate that the selected country is one of the user's assigned countries
+                    if temp_selected_country and temp_selected_country in user_countries:
+                        session[SELECTED_COUNTRY_ID_SESSION_KEY] = selected_country_id
+                        selected_country = temp_selected_country
+                        current_app.logger.debug(f"User {current_user.email} selected valid country {selected_country.name} (ID: {selected_country.id}) via POST. Session updated.")
+                    else:
+                        # Invalid country selected, clear session and flash message
                         session.pop(SELECTED_COUNTRY_ID_SESSION_KEY, None)
                         selected_country = None # Will be set to a default below
-                        flash(_("Invalid country ID format."), "warning")
-                        current_app.logger.error(f"User {current_user.email} submitted non-integer country ID '{selected_country_id_str}' via POST.")
-                else:
-                     # No country selected in the form, clear session (will default below)
-                     session.pop(SELECTED_COUNTRY_ID_SESSION_KEY, None)
-                     selected_country = None # Will be set to a default below
-                     current_app.logger.warning(f"User {current_user.email} submitted POST without a country selection.")
+                        flash(_("Invalid country selection or country not assigned to you."), "warning")
+                        current_app.logger.warning(f"User {current_user.email} submitted invalid country ID {selected_country_id_str} via POST.")
+                except ValueError:
+                    # Invalid ID format, clear session and flash message
+                    session.pop(SELECTED_COUNTRY_ID_SESSION_KEY, None)
+                    selected_country = None # Will be set to a default below
+                    flash(_("Invalid country ID format."), "warning")
+                    current_app.logger.error(f"User {current_user.email} submitted non-integer country ID '{selected_country_id_str}' via POST.")
+            else:
+                 # No country selected in the form, clear session (will default below)
+                 session.pop(SELECTED_COUNTRY_ID_SESSION_KEY, None)
+                 selected_country = None # Will be set to a default below
+                 current_app.logger.warning(f"User {current_user.email} submitted POST without a country selection.")
 
-            # NEW: Handle POST for entity selection (multi-entity support)
-            elif 'entity_select' in request.form:
-                entity_select_value = request.form.get('entity_select', '')
-                current_app.logger.debug(f"Dashboard POST request: Entity Selection. Raw value: '{entity_select_value}'")
-                if entity_select_value and ':' in entity_select_value:
-                    try:
-                        selected_type, selected_id_str = entity_select_value.split(':', 1)
-                        selected_id = int(selected_id_str)
+        # NEW: Handle POST for entity selection (multi-entity support)
+        elif 'entity_select' in request.form:
+            entity_select_value = request.form.get('entity_select', '')
+            current_app.logger.debug(f"Dashboard POST request: Entity Selection. Raw value: '{entity_select_value}'")
+            if entity_select_value and ':' in entity_select_value:
+                try:
+                    selected_type, selected_id_str = entity_select_value.split(':', 1)
+                    selected_id = int(selected_id_str)
 
-                        # Validate that the selected entity is one of the user's accessible entities
-                        user_entity_pairs = {(e['entity_type'], e['entity_id']) for e in user_entities}
-                        if (selected_type, selected_id) in user_entity_pairs or current_user.has_entity_access(selected_type, selected_id):
-                            session[SELECTED_ENTITY_TYPE_SESSION_KEY] = selected_type
-                            session[SELECTED_ENTITY_ID_SESSION_KEY] = selected_id
+                    # Validate that the selected entity is one of the user's accessible entities
+                    user_entity_pairs = {(e['entity_type'], e['entity_id']) for e in user_entities}
+                    if (selected_type, selected_id) in user_entity_pairs or current_user.has_entity_access(selected_type, selected_id):
+                        session[SELECTED_ENTITY_TYPE_SESSION_KEY] = selected_type
+                        session[SELECTED_ENTITY_ID_SESSION_KEY] = selected_id
 
-                            # Set legacy country session for compatibility
-                            with suppress(Exception):
-                                related_country = EntityService.get_country_for_entity(selected_type, selected_id)
-                                if related_country:
-                                    session[SELECTED_COUNTRY_ID_SESSION_KEY] = related_country.id
+                        # Set legacy country session for compatibility
+                        with suppress(Exception):
+                            related_country = EntityService.get_country_for_entity(selected_type, selected_id)
+                            if related_country:
+                                session[SELECTED_COUNTRY_ID_SESSION_KEY] = related_country.id
 
-                            current_app.logger.debug(f"User {current_user.email} selected entity {selected_type}:{selected_id} via POST. Session updated.")
-                        else:
-                            session.pop(SELECTED_ENTITY_TYPE_SESSION_KEY, None)
-                            session.pop(SELECTED_ENTITY_ID_SESSION_KEY, None)
-                            flash(_("Invalid entity selection or entity not assigned to you."), "warning")
-                            current_app.logger.warning(f"User {current_user.email} submitted invalid entity selection '{entity_select_value}'.")
-                    except ValueError:
-                        flash(_("Invalid entity ID format."), "warning")
-                        current_app.logger.error(f"User {current_user.email} submitted non-integer entity ID in '{entity_select_value}'.")
-                else:
-                    flash(_("Invalid entity selection."), "warning")
-                    current_app.logger.warning(f"User {current_user.email} submitted POST with missing or malformed entity_select value.")
+                        current_app.logger.debug(f"User {current_user.email} selected entity {selected_type}:{selected_id} via POST. Session updated.")
+                    else:
+                        session.pop(SELECTED_ENTITY_TYPE_SESSION_KEY, None)
+                        session.pop(SELECTED_ENTITY_ID_SESSION_KEY, None)
+                        flash(_("Invalid entity selection or entity not assigned to you."), "warning")
+                        current_app.logger.warning(f"User {current_user.email} submitted invalid entity selection '{entity_select_value}'.")
+                except ValueError:
+                    flash(_("Invalid entity ID format."), "warning")
+                    current_app.logger.error(f"User {current_user.email} submitted non-integer entity ID in '{entity_select_value}'.")
+            else:
+                flash(_("Invalid entity selection."), "warning")
+                current_app.logger.warning(f"User {current_user.email} submitted POST with missing or malformed entity_select value.")
 
-            # NEW: Handle POST for self-reporting template selection
-            elif countries_group_enabled and 'self_report_template_id' in request.form and SELECTED_COUNTRY_ID_SESSION_KEY in session:
-                 selected_template_id_str = request.form.get('self_report_template_id')
-                 selected_country_id_from_session = session[SELECTED_COUNTRY_ID_SESSION_KEY]
-                 selected_country = Country.query.get(selected_country_id_from_session)
+        # NEW: Handle POST for self-reporting template selection
+        elif countries_group_enabled and 'self_report_template_id' in request.form and SELECTED_COUNTRY_ID_SESSION_KEY in session:
+             selected_template_id_str = request.form.get('self_report_template_id')
+             selected_country_id_from_session = session[SELECTED_COUNTRY_ID_SESSION_KEY]
+             selected_country = Country.query.get(selected_country_id_from_session)
 
-                 current_app.logger.debug(f"Dashboard POST request: Self-Report. Template ID string: {selected_template_id_str}, Selected Country ID from session: {selected_country_id_from_session}")
+             current_app.logger.debug(f"Dashboard POST request: Self-Report. Template ID string: {selected_template_id_str}, Selected Country ID from session: {selected_country_id_from_session}")
 
 
-                 if selected_template_id_str and selected_country:
-                     try:
-                         selected_template_id = int(selected_template_id_str)
-                         # Check if template is enabled for self-report via published version
-                         template_to_assign = FormTemplate.query.join(
-                             FormTemplateVersion,
-                             and_(
-                                 FormTemplate.id == FormTemplateVersion.template_id,
-                                 FormTemplateVersion.status == 'published'
+             if selected_template_id_str and selected_country:
+                 try:
+                     selected_template_id = int(selected_template_id_str)
+                     # Check if template is enabled for self-report via published version
+                     template_to_assign = FormTemplate.query.join(
+                         FormTemplateVersion,
+                         and_(
+                             FormTemplate.id == FormTemplateVersion.template_id,
+                             FormTemplateVersion.status == 'published'
+                         )
+                     ).filter(
+                         FormTemplate.id == selected_template_id,
+                         FormTemplateVersion.add_to_self_report == True
+                     ).first()
+
+                     if template_to_assign and selected_country in user_countries:
+                             assigned_form = AssignedForm(
+                                 template_id=template_to_assign.id,
+                                 period_name=SELF_REPORT_PERIOD_NAME,
+                                 assigned_at=utcnow() # Use current time for uniqueness
                              )
-                         ).filter(
-                             FormTemplate.id == selected_template_id,
-                             FormTemplateVersion.add_to_self_report == True
-                         ).first()
+                             db.session.add(assigned_form)
+                             db.session.flush() # Flush to get the assigned_form.id
+                             current_app.logger.debug(f"Created new AssignedForm ID {assigned_form.id} for self-report period for template {template_to_assign.id}.")
 
-                         if template_to_assign and selected_country in user_countries:
-                                 assigned_form = AssignedForm(
-                                     template_id=template_to_assign.id,
-                                     period_name=SELF_REPORT_PERIOD_NAME,
-                                     assigned_at=utcnow() # Use current time for uniqueness
-                                 )
-                                 db.session.add(assigned_form)
-                                 db.session.flush() # Flush to get the assigned_form.id
-                                 current_app.logger.debug(f"Created new AssignedForm ID {assigned_form.id} for self-report period for template {template_to_assign.id}.")
+                             # Create the new AssignmentEntityStatus entry
+                             new_acs = AssignmentEntityStatus(
+                                 assigned_form_id=assigned_form.id,
+                                 entity_type='country',
+                                 entity_id=selected_country.id,
+                                 status='pending', # Default status
+                                 due_date=None # No default due date for self-reported forms
+                             )
+                             db.session.add(new_acs)
 
-                                 # Create the new AssignmentEntityStatus entry
-                                 new_acs = AssignmentEntityStatus(
-                                     assigned_form_id=assigned_form.id,
-                                     entity_type='country',
-                                     entity_id=selected_country.id,
-                                     status='pending', # Default status
-                                     due_date=None # No default due date for self-reported forms
-                                 )
-                                 db.session.add(new_acs)
-
-                                 current_app.logger.debug(f"Country {selected_country.id} linked to AssignedForm {assigned_form.id} via AssignmentEntityStatus {new_acs.id}.")
+                             current_app.logger.debug(f"Country {selected_country.id} linked to AssignedForm {assigned_form.id} via AssignmentEntityStatus {new_acs.id}.")
 
 
+                             try:
+                                 db.session.flush()
+
+                                 # Send notification about self-report creation
                                  try:
-                                     db.session.flush()
-
-                                     # Send notification about self-report creation
-                                     try:
-                                         from app.services.notification.core import notify_self_report_created
-                                         notify_self_report_created(new_acs)
-                                     except Exception as e:
-                                         current_app.logger.error(f"Error sending self-report created notification: {e}", exc_info=True)
-
-                                     flash(_("Template '%(template)s' has been added to your assignments for %(country)s.", template=template_to_assign.name, country=selected_country.name), "success")
-                                     current_app.logger.debug(f"Successfully created self-report AssignmentEntityStatus ID {new_acs.id}.")
+                                     from app.services.notification.core import notify_self_report_created
+                                     notify_self_report_created(new_acs)
                                  except Exception as e:
-                                     from app.utils.transactions import request_transaction_rollback
-                                     request_transaction_rollback()
-                                     flash(_("An error occurred. Please try again."), "danger")
-                                     current_app.logger.error(f"Error during DB commit for self-report assignment: {e}", exc_info=True)
+                                     current_app.logger.error(f"Error sending self-report created notification: {e}", exc_info=True)
 
-                         else:
-                              flash(_("Invalid template selection or country not assigned to you."), "warning")
-                              current_app.logger.warning(f"User {current_user.email} submitted invalid self-report template ID {selected_template_id_str} or country {selected_country_id_from_session} is not assigned.")
+                                 flash(_("Template '%(template)s' has been added to your assignments for %(country)s.", template=template_to_assign.name, country=selected_country.name), "success")
+                                 current_app.logger.debug(f"Successfully created self-report AssignmentEntityStatus ID {new_acs.id}.")
+                             except Exception as e:
+                                 from app.utils.transactions import request_transaction_rollback
+                                 request_transaction_rollback()
+                                 flash(_("An error occurred. Please try again."), "danger")
+                                 current_app.logger.error(f"Error during DB commit for self-report assignment: {e}", exc_info=True)
 
-                     except ValueError:
-                          flash(_("Invalid template ID format."), "warning")
-                          current_app.logger.error(f"User {current_user.email} submitted non-integer self-report template ID '{selected_template_id_str}'.")
-                 else:
-                      flash(_("Please select a template to self-report."), "warning")
-                      current_app.logger.warning(f"User {current_user.email} submitted self-report POST without template selection or selected country is missing.")
+                     else:
+                          flash(_("Invalid template selection or country not assigned to you."), "warning")
+                          current_app.logger.warning(f"User {current_user.email} submitted invalid self-report template ID {selected_template_id_str} or country {selected_country_id_from_session} is not assigned.")
 
-            # After handling either country selection or self-report, redirect to GET to show updated state
-            return redirect(url_for("main.dashboard"))
+                 except ValueError:
+                      flash(_("Invalid template ID format."), "warning")
+                      current_app.logger.error(f"User {current_user.email} submitted non-integer self-report template ID '{selected_template_id_str}'.")
+             else:
+                  flash(_("Please select a template to self-report."), "warning")
+                  current_app.logger.warning(f"User {current_user.email} submitted self-report POST without template selection or selected country is missing.")
 
+        # After handling either country selection or self-report, redirect to GET to show updated state
+        return redirect(url_for("main.dashboard"))
 
-                                 # If it's a GET request or POST handling didn't redirect, determine the selected entity
+    if user_entities:
+        # If it's a GET request or POST handling didn't redirect, determine the selected entity
         # Check for entity selection in session (new multi-entity system)
         if SELECTED_ENTITY_TYPE_SESSION_KEY in session and SELECTED_ENTITY_ID_SESSION_KEY in session:
             retrieved_entity_type = session.get(SELECTED_ENTITY_TYPE_SESSION_KEY)

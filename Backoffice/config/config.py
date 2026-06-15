@@ -1154,6 +1154,9 @@ class TestingConfig(Config):
     WTF_CSRF_ENABLED = False
     MEMORY_MONITORING_ENABLED = False
     SYSTEM_MONITORING_ENABLED = False
+    # Avoid RotatingFileHandler on instance/logs/application.log during pytest — on Windows
+    # the file is often locked by a running dev server, causing PermissionError on rollover.
+    APPLICATION_LOG_FILE_ENABLED = False
     # Smaller pool + statement timeout so stuck DDL/locks fail fast instead of hanging.
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,

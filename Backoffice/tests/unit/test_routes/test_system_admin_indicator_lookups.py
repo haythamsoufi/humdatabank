@@ -64,10 +64,12 @@ def _create_unit(db_session, code="testunit", name="Test Unit"):
 
 class TestManageMeasurementLookups:
     def test_get_renders_page(self, logged_in_client, db_session):
-        with _mock_render() as mock_rt:
-            resp = logged_in_client.get("/admin/indicator-bank/measurement-lookups")
-        assert resp.status_code == 200
-        mock_rt.assert_called_once()
+        resp = logged_in_client.get(
+            "/admin/indicator-bank/measurement-lookups",
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+        assert "indicator-bank" in (resp.location or "")
 
     def test_get_adds_missing_ns_unit(self, logged_in_client, db_session, app):
         """If 'ns' unit is missing it should be auto-inserted."""
@@ -78,9 +80,11 @@ class TestManageMeasurementLookups:
             ).delete()
             db_session.commit()
 
-        with _mock_render():
-            resp = logged_in_client.get("/admin/indicator-bank/measurement-lookups")
-        assert resp.status_code == 200
+        resp = logged_in_client.get(
+            "/admin/indicator-bank/measurement-lookups",
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
 
         with app.app_context():
             assert IndicatorBankUnit.query.filter_by(code="ns").first() is not None
@@ -308,18 +312,19 @@ class TestEditMeasurementType:
         from app.models import IndicatorBank
         with app.app_context():
             row = _create_type(db_session, "inusetypechange", "In-Use Type")
+            row_id = row.id
             # Create an IndicatorBank that references this type
             ind = IndicatorBank(
                 name="Type Ref Indicator",
                 type="inusetypechange",
-                indicator_type_id=row.id,
+                indicator_type_id=row_id,
             )
             db_session.add(ind)
             db_session.commit()
 
         with _mock_render() as mock_rt:
             resp = logged_in_client.post(
-                f"/admin/indicator-bank/measurement-lookups/types/{row.id}/edit",
+                f"/admin/indicator-bank/measurement-lookups/types/{row_id}/edit",
                 data={
                     "code": "newcodeinuse",  # Code change while in use
                     "name": "Changed Type",
@@ -485,18 +490,19 @@ class TestEditMeasurementUnit:
         from app.models import IndicatorBank
         with app.app_context():
             row = _create_unit(db_session, "inuseunitchange", "In-Use Unit")
+            row_id = row.id
             ind = IndicatorBank(
                 name="Unit Ref Indicator",
                 type="number",
                 unit="inuseunitchange",
-                indicator_unit_id=row.id,
+                indicator_unit_id=row_id,
             )
             db_session.add(ind)
             db_session.commit()
 
         with _mock_render() as mock_rt:
             resp = logged_in_client.post(
-                f"/admin/indicator-bank/measurement-lookups/units/{row.id}/edit",
+                f"/admin/indicator-bank/measurement-lookups/units/{row_id}/edit",
                 data={
                     "code": "newcodeinuse2",  # Changed code while in use
                     "name": "Changed Unit",
@@ -578,17 +584,18 @@ class TestDeleteMeasurementUnit:
         from app.models import IndicatorBank
         with app.app_context():
             row = _create_unit(db_session, "deletunitinuse", "Delete Unit In Use")
+            row_id = row.id
             ind = IndicatorBank(
                 name="Delete Unit Ref",
                 type="number",
                 unit="deletunitinuse",
-                indicator_unit_id=row.id,
+                indicator_unit_id=row_id,
             )
             db_session.add(ind)
             db_session.commit()
 
         resp = logged_in_client.post(
-            f"/admin/indicator-bank/measurement-lookups/units/{row.id}/delete",
+            f"/admin/indicator-bank/measurement-lookups/units/{row_id}/delete",
             follow_redirects=False,
         )
         assert resp.status_code == 302
@@ -597,17 +604,18 @@ class TestDeleteMeasurementUnit:
         from app.models import IndicatorBank
         with app.app_context():
             row = _create_unit(db_session, "deletunitinusejson", "Delete Unit In Use JSON")
+            row_id = row.id
             ind = IndicatorBank(
                 name="Delete Unit JSON Ref",
                 type="number",
                 unit="deletunitinusejson",
-                indicator_unit_id=row.id,
+                indicator_unit_id=row_id,
             )
             db_session.add(ind)
             db_session.commit()
 
         resp = logged_in_client.post(
-            f"/admin/indicator-bank/measurement-lookups/units/{row.id}/delete",
+            f"/admin/indicator-bank/measurement-lookups/units/{row_id}/delete",
             content_type="application/json",
             follow_redirects=False,
         )

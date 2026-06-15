@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch, call
 
 import pytest
-from flask import g, session
+from flask import g, request, session
 
 from app.middleware.activity_middleware import (
     _should_skip_endpoint,
@@ -30,20 +30,35 @@ from app.middleware.activity_middleware import (
 
 def _activity_before(app):
     funcs = app.before_request_funcs.get(None, [])
-    return next(
-        (fn for fn in funcs if fn.__module__ == "app.middleware.activity_middleware"
-         and fn.__name__ == "before_request"),
-        None,
-    )
+    for fn in funcs:
+        name = getattr(fn, "__name__", None) or getattr(getattr(fn, "func", None), "__name__", None)
+        mod = getattr(fn, "__module__", None) or getattr(getattr(fn, "func", None), "__module__", None)
+        if mod == "app.middleware.activity_middleware" and name == "before_request":
+            return fn
+    return None
 
 
 def _activity_after(app):
     funcs = app.after_request_funcs.get(None, [])
-    return next(
-        (fn for fn in funcs if fn.__module__ == "app.middleware.activity_middleware"
-         and fn.__name__ == "after_request"),
-        None,
-    )
+    for fn in funcs:
+        name = getattr(fn, "__name__", None) or getattr(getattr(fn, "func", None), "__name__", None)
+        mod = getattr(fn, "__module__", None) or getattr(getattr(fn, "func", None), "__module__", None)
+        if mod == "app.middleware.activity_middleware" and name == "after_request":
+            return fn
+    return None
+
+
+def _with_activity_endpoint(endpoint="main.dashboard"):
+    """test_request_context leaves request.endpoint unset; middleware skips those requests."""
+    from flask import request as flask_request
+
+    class _RequestProxy:
+        def __getattr__(self, name):
+            if name == "endpoint":
+                return endpoint
+            return getattr(flask_request, name)
+
+    return patch("app.middleware.activity_middleware.request", _RequestProxy())
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -1012,7 +1027,10 @@ class TestActivityRegisteredHooks:
     def test_before_request_captures_authenticated_user(self, app):
         with app.test_request_context("/dashboard"):
             g.pop("activity_user_id", None)
-            with patch("app.middleware.activity_middleware.is_static_asset_request",
+            with _with_activity_endpoint(), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware.current_user") as mock_user:
                 mock_user.is_authenticated = True
@@ -1022,7 +1040,10 @@ class TestActivityRegisteredHooks:
 
     def test_before_request_clears_user_when_anonymous(self, app):
         with app.test_request_context("/dashboard"):
-            with patch("app.middleware.activity_middleware.is_static_asset_request",
+            with _with_activity_endpoint(), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware.current_user") as mock_user:
                 mock_user.is_authenticated = False
@@ -1033,7 +1054,10 @@ class TestActivityRegisteredHooks:
         from unittest.mock import PropertyMock
 
         with app.test_request_context("/dashboard"):
-            with patch("app.middleware.activity_middleware.is_static_asset_request",
+            with _with_activity_endpoint(), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware.current_user") as mock_user:
                 type(mock_user).is_authenticated = PropertyMock(
@@ -1049,7 +1073,8 @@ class TestActivityRegisteredHooks:
             g.activity_user_id = 1
             g._auto_txn_managed = False
             g.start_time = time.time() - 0.05
-            with patch("app.middleware.activity_middleware.is_static_asset_request",
+            with _with_activity_endpoint(), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
                        return_value=False), \
@@ -1067,7 +1092,8 @@ class TestActivityRegisteredHooks:
             g.activity_user_id = 1
             g._auto_txn_managed = False
             g.start_time = time.time() - 0.05
-            with patch("app.middleware.activity_middleware.is_static_asset_request",
+            with _with_activity_endpoint(), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
                        return_value=False), \
@@ -1084,7 +1110,8 @@ class TestActivityRegisteredHooks:
             g._auto_txn_managed = False
             g.start_time = time.time()
             g.audit_activity_description = "Custom audit text"
-            with patch("app.middleware.activity_middleware.is_static_asset_request",
+            with _with_activity_endpoint(), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
                        return_value=False), \
@@ -1100,7 +1127,11 @@ class TestActivityRegisteredHooks:
         with app.test_request_context("/dashboard"):
             g.activity_user_id = 1
             g._auto_txn_managed = False
-            with patch("app.middleware.activity_middleware.is_static_asset_request",
+            g.start_time = time.time()
+            with _with_activity_endpoint(), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware._determine_activity_type",
                        side_effect=RuntimeError("tracking failed")), \
@@ -1116,7 +1147,8 @@ class TestActivityRegisteredHooks:
             g.activity_session_id = "sess-abc"
             g._auto_txn_managed = True
             g.start_time = time.time() - 0.05
-            with patch("app.middleware.activity_middleware.is_static_asset_request",
+            with _with_activity_endpoint(), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
                        return_value=False), \
@@ -1128,7 +1160,7 @@ class TestActivityRegisteredHooks:
                  patch("app.middleware.activity_middleware._extract_entity_into_context"):
                 from flask import make_response
                 resp = _activity_after(app)(make_response("ok", 200))
-                for callback in getattr(resp, "_close_callbacks", []):
+                for callback in getattr(resp, "_on_close", []):
                     callback()
                 mock_inc.assert_called_once_with("sess-abc", page_view_path_key="/dashboard")
 
@@ -1140,7 +1172,8 @@ class TestActivityRegisteredHooks:
             g.activity_session_id = "sess-abc"
             g._auto_txn_managed = True
             g.start_time = time.time() - 0.05
-            with patch("app.middleware.activity_middleware.is_static_asset_request",
+            with _with_activity_endpoint("forms.submit_entry"), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
                        return_value=False), \
@@ -1150,7 +1183,7 @@ class TestActivityRegisteredHooks:
                  patch("app.middleware.activity_middleware._extract_entity_into_context"):
                 from flask import make_response
                 resp = _activity_after(app)(make_response("ok", 200))
-                for callback in getattr(resp, "_close_callbacks", []):
+                for callback in getattr(resp, "_on_close", []):
                     callback()
                 mock_log.assert_called_once()
 
@@ -1160,7 +1193,8 @@ class TestActivityRegisteredHooks:
             g.activity_session_id = "sess-abc"
             g._auto_txn_managed = True
             g.start_time = time.time() - 0.05
-            with patch("app.middleware.activity_middleware.is_static_asset_request",
+            with _with_activity_endpoint("main.dashboard"), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
                        return_value=False), \
@@ -1172,7 +1206,7 @@ class TestActivityRegisteredHooks:
                  patch("app.middleware.activity_middleware._extract_entity_into_context"):
                 from flask import make_response
                 resp = _activity_after(app)(make_response("ok", 200))
-                for callback in getattr(resp, "_close_callbacks", []):
+                for callback in getattr(resp, "_on_close", []):
                     callback()
                 mock_inc.assert_called_once()
 
@@ -1198,7 +1232,7 @@ class TestActivityRegisteredHooks:
                  patch("app.middleware.activity_middleware.log_user_activity_explicit") as mock_log:
                 from flask import make_response
                 resp = _activity_after(app)(make_response("ok", 200))
-                assert not getattr(resp, "_close_callbacks", [])
+                assert not getattr(resp, "_on_close", [])
                 mock_log.assert_not_called()
 
     def test_after_request_deferred_setup_error_is_swallowed(self, app):
@@ -1206,7 +1240,8 @@ class TestActivityRegisteredHooks:
             g.activity_user_id = 1
             g._auto_txn_managed = True
             g.start_time = time.time()
-            with patch("app.middleware.activity_middleware.is_static_asset_request",
+            with _with_activity_endpoint(), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware.page_view_path_key_from_request",
                        side_effect=RuntimeError("setup failed")), \
@@ -1222,7 +1257,8 @@ class TestActivityRegisteredHooks:
             g.activity_session_id = "sess-abc"
             g._auto_txn_managed = True
             g.start_time = time.time()
-            with patch("app.middleware.activity_middleware.is_static_asset_request",
+            with _with_activity_endpoint("forms.submit_entry"), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
                        return_value=False), \
@@ -1231,9 +1267,10 @@ class TestActivityRegisteredHooks:
                  patch("app.middleware.activity_middleware.log_user_activity_explicit",
                        side_effect=RuntimeError("deferred failed")), \
                  patch("app.middleware.activity_middleware._extract_entity_into_context"), \
+                 patch("flask.current_app._get_current_object", return_value=app), \
                  patch.object(app.logger, "warning") as mock_warn:
                 from flask import make_response
                 resp = _activity_after(app)(make_response("ok", 200))
-                for callback in getattr(resp, "_close_callbacks", []):
+                for callback in getattr(resp, "_on_close", []):
                     callback()
                 mock_warn.assert_called_once()

@@ -34,7 +34,8 @@ from sqlalchemy.orm import joinedload
 from app.forms.system import IndicatorBankForm, CommonWordForm
 from app.routes.admin.shared import permission_required, user_has_permission
 from app.utils.request_utils import get_json_or_form, is_json_request, get_request_data
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, cast, String
+from app.services.indicator_neural_map import build_embedding_scatter, probe_query_embedding
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from io import BytesIO
@@ -106,7 +107,24 @@ def manage_indicator_bank():
         )
 
     if sector_filter:
-        query = query.filter(IndicatorBank.sector.contains(sector_filter))
+        sector_ids = [
+            row[0]
+            for row in db.session.query(Sector.id)
+            .filter(Sector.name.ilike(f"%{sector_filter}%"))
+            .all()
+        ]
+        if sector_ids:
+            query = query.filter(
+                or_(*[
+                    cast(IndicatorBank.sector['primary'], String) == str(sid)
+                    for sid in sector_ids
+                ])
+            )
+        elif sector_filter.isdigit():
+            sid = int(sector_filter)
+            query = query.filter(cast(IndicatorBank.sector['primary'], String) == str(sid))
+        else:
+            query = query.filter(db.false())
 
     if type_filter:
         query = query.filter(IndicatorBank.type == type_filter)
@@ -287,7 +305,6 @@ def indicator_bank_neural_map():
 @permission_required('admin.indicator_bank.view')
 def indicator_bank_neural_map_data():
     """JSON: 2D/3D scatter data for the indicators neural map."""
-    from app.services.indicator_neural_map import build_embedding_scatter
     max_nodes = request.args.get("max_nodes", type=int) or 5000
     n_neighbors = request.args.get("neighbors", type=int) or 8
     method = request.args.get("method", "pca")
@@ -314,7 +331,6 @@ def indicator_bank_neural_map_data():
 @permission_required('admin.indicator_bank.view')
 def indicator_bank_neural_map_probe():
     """Embed a free-text query and return nearest indicator neighbours."""
-    from app.services.indicator_neural_map import probe_query_embedding
     data = get_json_safe()
     query = (data.get("query") or "").strip()
     if not query:
@@ -540,7 +556,6 @@ def edit_indicator_bank(id):
     if form.validate_on_submit():
         try:
             try:
-                from flask import current_app
                 _langs = current_app.config.get("TRANSLATABLE_LANGUAGES") or []
             except Exception as e:
                 current_app.logger.debug("TRANSLATABLE_LANGUAGES config failed: %s", e)

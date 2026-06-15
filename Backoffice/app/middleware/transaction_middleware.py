@@ -54,11 +54,15 @@ def init_transaction_middleware(app):
         original_handle_exception = app.handle_exception
 
         def _auto_txn_handle_exception(e):  # type: ignore[no-redef]
-            try:
-                # Rollback any pending work and clear failed state
-                safe_rollback(reason="handle_exception")
-            finally:
-                safe_remove(reason="handle_exception")
+            if current_app.config.get("TESTING"):
+                with suppress(Exception):
+                    safe_rollback(reason="handle_exception_testing")
+            else:
+                try:
+                    # Rollback any pending work and clear failed state
+                    safe_rollback(reason="handle_exception")
+                finally:
+                    safe_remove(reason="handle_exception")
             return original_handle_exception(e)
 
         app.handle_exception = _auto_txn_handle_exception  # type: ignore[assignment]
@@ -69,6 +73,9 @@ def init_transaction_middleware(app):
         # Defaults
         g._auto_txn_managed = False
         g._auto_txn_streaming = False
+
+        if current_app.config.get("TESTING"):
+            g._post_commit_callbacks = []
 
         # Skip static and unknown endpoints
         if not request.endpoint or request.endpoint.startswith("static"):

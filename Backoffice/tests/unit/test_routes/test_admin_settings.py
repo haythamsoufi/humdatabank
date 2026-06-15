@@ -899,7 +899,7 @@ class TestSettingsInternalHelpers:
     def test_message_for_email_test_send_failure_with_known_key(self, app):
         with app.app_context():
             from app.routes.admin.settings import _message_for_email_test_send_failure
-            msg = _message_for_email_test_send_failure(["recipient_allowlist"])
+            msg = _message_for_email_test_send_failure([{"code": "recipient_allowlist"}])
             assert isinstance(msg, str)
             assert len(msg) > 0
 

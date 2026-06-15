@@ -94,14 +94,19 @@ def safe_rollback(*, reason: Optional[str] = None) -> None:
 def safe_remove(*, reason: Optional[str] = None) -> None:
     """Remove the current scoped session; never raise."""
     try:
-        from flask import has_app_context
+        from flask import has_app_context, current_app
         from app.extensions import db
 
-        # Only remove session if we're in an application context
-        if has_app_context():
-            db.session.remove()
-        else:
-            pass  # Silently skip if outside app context (e.g., in call_on_close after request context is gone)
+        if not has_app_context():
+            return
+
+        # During tests, keep the scoped session bound and preserve committed work.
+        # after_request already committed or rolled back; an extra rollback here
+        # would undo successful writes and detach fixture ORM instances.
+        if current_app.config.get("TESTING"):
+            return
+
+        db.session.remove()
     except Exception as e:
         logger.warning("db.session.remove() failed (%s): %s", reason or "no_reason", e)
 

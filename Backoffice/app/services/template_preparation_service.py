@@ -5,7 +5,7 @@ Centralizes template processing logic to eliminate duplication.
 """
 
 from flask import current_app
-from app.models import FormSection, DynamicIndicatorData, Config, FormItem, FormPage
+from app.models import FormSection, DynamicIndicatorData, Config, FormItem, FormPage, Sector, SubSector, IndicatorBank, IndicatorBankType, IndicatorBankUnit
 from app import db
 from app.utils.form_localization import (
     get_localized_page_name, get_localized_section_name, get_localized_indicator_name,
@@ -193,7 +193,6 @@ class TemplatePreparationService:
     @classmethod
     def _prepare_available_indicators(cls, all_sections: List[FormSection]) -> Dict[int, List]:
         """Prepare available indicators by section for dynamic sections."""
-        from app.models import IndicatorBank, IndicatorBankType, IndicatorBankUnit, Sector, SubSector
         from sqlalchemy.orm import joinedload
 
         available_indicators_by_section = {}
@@ -365,15 +364,28 @@ class TemplatePreparationService:
 
             if hasattr(section, 'fields_ordered'):
                 for field in section.fields_ordered:
+                    if hasattr(field, 'field_type_for_js') and str(field.field_type_for_js).lower() == 'blank':
+                        continue
+
                     total_items_in_section += 1
 
                     # Handle dynamic indicators differently
-                    if hasattr(field, 'dynamic_assignment_id'):
-                        item_key = f"field_value[dynamic_{field.dynamic_assignment_id}]"
+                    dynamic_id = getattr(field, 'dynamic_assignment_id', None)
+                    if dynamic_id is not None:
+                        item_key = f"field_value[dynamic_{dynamic_id}]"
+                        not_applicable_key = f"dynamic_{dynamic_id}_not_applicable"
                     else:
                         item_key = f"field_value[{field.id}]"
+                        if getattr(field, 'is_indicator', False):
+                            not_applicable_key = f"indicator_{field.id}_not_applicable"
+                        elif getattr(field, 'is_question', False):
+                            not_applicable_key = f"question_{field.id}_not_applicable"
+                        else:
+                            not_applicable_key = f"field_{field.id}_not_applicable"
 
-                    if field.is_document_field:
+                    if existing_data_processed.get(not_applicable_key):
+                        filled_items_count += 1
+                    elif field.is_document_field:
                         if field.is_required_for_js and item_key in existing_submitted_documents_dict:
                             filled_items_count += 1
                         elif not field.is_required_for_js and item_key in existing_submitted_documents_dict:
@@ -383,6 +395,13 @@ class TemplatePreparationService:
                         if entry_data is not None:
                             if isinstance(entry_data, dict) and 'values' in entry_data:
                                 if any(str(v).strip() for v in entry_data['values'].values() if v is not None):
+                                    filled_items_count += 1
+                            elif getattr(field, 'is_matrix', False) and isinstance(entry_data, dict):
+                                if any(
+                                    v is not None and str(v).strip() != ''
+                                    for k, v in entry_data.items()
+                                    if not k.startswith('_')
+                                ):
                                     filled_items_count += 1
                             elif field.field_type_for_js == 'CHECKBOX':
                                 if entry_data == 'true' or entry_data is True:
@@ -406,8 +425,6 @@ class TemplatePreparationService:
     @classmethod
     def _get_indicator_sector_name(cls, indicator):
         """Get the primary sector name for an indicator (single-row lookup; prefer _cached variant in loops)."""
-        from app.models import Sector
-
         if not indicator.sector or not indicator.sector.get('primary'):
             return None
 
@@ -419,8 +436,6 @@ class TemplatePreparationService:
     @classmethod
     def _get_indicator_subsector_name(cls, indicator):
         """Get the primary subsector name for an indicator (single-row lookup; prefer _cached variant in loops)."""
-        from app.models import SubSector
-
         if not indicator.sub_sector or not indicator.sub_sector.get('primary'):
             return None
 

@@ -72,14 +72,14 @@ class TestReopenAssignment:
         assert resp.status_code == 404
 
     def test_no_permission_redirects_with_flash(self, client, db_session, app, admin_user):
-        aes = create_test_assignment_entity_status(db_session, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
         _login(client, admin_user)
         with patch(f"{_AUTH_SVC}.can_reopen_assignment", return_value=False):
             resp = client.post(f"/reopen_assignment/{aes.id}", follow_redirects=False)
         assert_redirect(resp, "dashboard")
 
     def test_success_redirects_to_dashboard(self, client, db_session, app, admin_user):
-        aes = create_test_assignment_entity_status(db_session, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
         _login(client, admin_user)
         with patch(f"{_AUTH_SVC}.can_reopen_assignment", return_value=True), \
              patch(f"{_NOTIF_CORE}.notify_assignment_reopened", return_value=None):
@@ -88,7 +88,7 @@ class TestReopenAssignment:
 
     def test_success_with_selected_country_in_session(self, client, db_session, app, admin_user):
         country = create_test_country(db_session)
-        aes = create_test_assignment_entity_status(db_session, country=country, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, country=country, status="sent_for_review")
         _login(client, admin_user)
         with client.session_transaction() as sess:
             sess["selected_country_id"] = country.id
@@ -102,7 +102,7 @@ class TestReopenAssignment:
         assert str(country.id) in location
 
     def test_db_error_flashes_error(self, client, db_session, app, admin_user):
-        aes = create_test_assignment_entity_status(db_session, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
         _login(client, admin_user)
         with patch(f"{_AUTH_SVC}.can_reopen_assignment", return_value=True), \
              patch("app.routes.main.assignments.db.session.flush", side_effect=Exception("DB error")), \
@@ -113,7 +113,7 @@ class TestReopenAssignment:
 
     def test_reopened_after_close_flag_set(self, client, db_session, app, admin_user):
         """When assignment was closed, reopened_after_close should be set to True."""
-        aes = create_test_assignment_entity_status(db_session, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
         _login(client, admin_user)
 
         mock_assigned_form = MagicMock()
@@ -131,7 +131,7 @@ class TestReopenAssignment:
 
     def test_notification_error_does_not_break_route(self, client, db_session, app, admin_user):
         """Notification failure inside reopen should be swallowed."""
-        aes = create_test_assignment_entity_status(db_session, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
         _login(client, admin_user)
         with patch(f"{_AUTH_SVC}.can_reopen_assignment", return_value=True), \
              patch(f"{_NOTIF_CORE}.notify_assignment_reopened", side_effect=Exception("notification failed")):
@@ -155,14 +155,14 @@ class TestApproveAssignment:
         assert resp.status_code == 404
 
     def test_no_permission_redirects_with_flash(self, client, db_session, app, admin_user):
-        aes = create_test_assignment_entity_status(db_session, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
         _login(client, admin_user)
         with patch(f"{_AUTH_SVC}.can_approve_assignment", return_value=False):
             resp = client.post(f"/approve_assignment/{aes.id}", follow_redirects=False)
         assert_redirect(resp, "dashboard")
 
     def test_success_redirects_to_dashboard(self, client, db_session, app, admin_user):
-        aes = create_test_assignment_entity_status(db_session, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
         _login(client, admin_user)
         with patch(f"{_AUTH_SVC}.can_approve_assignment", return_value=True), \
              patch(f"{_NOTIF_CORE}.notify_assignment_approved", return_value=None):
@@ -171,7 +171,7 @@ class TestApproveAssignment:
 
     def test_success_with_selected_country_in_session(self, client, db_session, app, admin_user):
         country = create_test_country(db_session)
-        aes = create_test_assignment_entity_status(db_session, country=country, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, country=country, status="sent_for_review")
         _login(client, admin_user)
         with client.session_transaction() as sess:
             sess["selected_country_id"] = country.id
@@ -185,7 +185,7 @@ class TestApproveAssignment:
         assert str(country.id) in location
 
     def test_db_error_flashes_error(self, client, db_session, app, admin_user):
-        aes = create_test_assignment_entity_status(db_session, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
         _login(client, admin_user)
         with patch(f"{_AUTH_SVC}.can_approve_assignment", return_value=True), \
              patch("app.routes.main.assignments.db.session.flush", side_effect=Exception("DB error")), \
@@ -194,7 +194,7 @@ class TestApproveAssignment:
         assert resp.status_code == 200
 
     def test_notification_error_does_not_break_route(self, client, db_session, app, admin_user):
-        aes = create_test_assignment_entity_status(db_session, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
         _login(client, admin_user)
         with patch(f"{_AUTH_SVC}.can_approve_assignment", return_value=True), \
              patch(f"{_NOTIF_CORE}.notify_assignment_approved", side_effect=Exception("notif fail")):
@@ -218,14 +218,14 @@ class TestReturnAssignmentForRevision:
         assert resp.status_code == 404
 
     def test_no_permission_redirects_with_flash(self, client, db_session, app, admin_user):
-        aes = create_test_assignment_entity_status(db_session, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
         _login(client, admin_user)
         with patch(f"{_AUTH_SVC}.can_return_for_revision", return_value=False):
             resp = client.post(f"/return_assignment_for_revision/{aes.id}", follow_redirects=False)
         assert_redirect(resp, "dashboard")
 
     def test_success_redirects_to_dashboard(self, client, db_session, app, admin_user):
-        aes = create_test_assignment_entity_status(db_session, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
         _login(client, admin_user)
         with patch(f"{_AUTH_SVC}.can_return_for_revision", return_value=True), \
              patch(f"{_NOTIF_CORE}.notify_assignment_returned_for_revision", return_value=None):
@@ -234,7 +234,7 @@ class TestReturnAssignmentForRevision:
 
     def test_success_with_selected_country_in_session(self, client, db_session, app, admin_user):
         country = create_test_country(db_session)
-        aes = create_test_assignment_entity_status(db_session, country=country, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, country=country, status="sent_for_review")
         _login(client, admin_user)
         with client.session_transaction() as sess:
             sess["selected_country_id"] = country.id
@@ -248,7 +248,7 @@ class TestReturnAssignmentForRevision:
         assert str(country.id) in location
 
     def test_db_error_flashes_error(self, client, db_session, app, admin_user):
-        aes = create_test_assignment_entity_status(db_session, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
         _login(client, admin_user)
         with patch(f"{_AUTH_SVC}.can_return_for_revision", return_value=True), \
              patch("app.routes.main.assignments.db.session.flush", side_effect=Exception("DB error")), \
@@ -257,7 +257,7 @@ class TestReturnAssignmentForRevision:
         assert resp.status_code == 200
 
     def test_notification_error_does_not_break_route(self, client, db_session, app, admin_user):
-        aes = create_test_assignment_entity_status(db_session, status="for_review")
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
         _login(client, admin_user)
         with patch(f"{_AUTH_SVC}.can_return_for_revision", return_value=True), \
              patch(f"{_NOTIF_CORE}.notify_assignment_returned_for_revision", side_effect=Exception("notif fail")):

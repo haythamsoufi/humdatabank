@@ -115,7 +115,7 @@ class TestCreateLookupList:
 
     def test_post_exception_flashes_error(self, logged_in_client, db_session):
         with patch(
-            "app.routes.admin.system_admin.lookups.LookupList",
+            "app.routes.admin.system_admin.lookups.db.session.add",
             side_effect=Exception("db error"),
         ), _mock_render() as mock_rt:
             resp = logged_in_client.post(

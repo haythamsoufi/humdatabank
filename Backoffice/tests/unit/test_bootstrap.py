@@ -85,6 +85,14 @@ class TestInitUploadStorage:
 # ---------------------------------------------------------------------------
 
 class TestLoadDynamicSettings:
+    @pytest.fixture(autouse=True)
+    def allow_dynamic_settings_db_load(self, app):
+        """load_dynamic_settings skips DB reads when TESTING=True; disable for these tests."""
+        original = app.config.get('TESTING')
+        app.config['TESTING'] = False
+        yield
+        app.config['TESTING'] = original
+
     def _mock_config_class(self):
         cfg = MagicMock()
         cfg.LANGUAGES = ['en', 'fr']
@@ -116,6 +124,7 @@ class TestLoadDynamicSettings:
              patch('app.services.authorization_service.AuthorizationService') as mock_authsvc:
             mock_authsvc.rbac_enabled.return_value = False
             with app.app_context():
+                app.config['TESTING'] = False
                 load_dynamic_settings(app, config_class, 0.0)
 
         assert app.config['SUPPORTED_LANGUAGES'] == ['en', 'fr', 'ar']
@@ -276,6 +285,7 @@ class TestLoadDynamicSettings:
             mock_auth._permissions_seeded.return_value = False
             with patch.object(app.logger, 'warning') as mock_warn:
                 with app.app_context():
+                    app.config['TESTING'] = False
                     load_dynamic_settings(app, config_class, 0.0)
 
             warning_msgs = [str(c) for c in mock_warn.call_args_list]

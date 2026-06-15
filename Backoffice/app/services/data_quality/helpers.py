@@ -10,6 +10,7 @@ from app import db
 from app.models import Country, FormData, FormItem, IndicatorBank, AssignmentEntityStatus, AssignedForm
 from app.models.enums import DocumentStatus
 from app.models.forms import FormSection
+from app.models.validation import ValidationQuestion
 
 
 def parse_period_year(period_name: str) -> int | None:
@@ -410,8 +411,6 @@ def validation_question_counts(
     entity_id: int,
     period_name: str,
 ) -> dict[str, int]:
-    from app.models.validation import ValidationQuestion
-
     base = ValidationQuestion.query.filter(
         ValidationQuestion.template_id == template_id,
         ValidationQuestion.entity_type == entity_type,

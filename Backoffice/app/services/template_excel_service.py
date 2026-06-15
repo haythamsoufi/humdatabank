@@ -55,8 +55,389 @@ class TemplateExcelService:
         'Items': ['id', 'section_id', 'item_type', 'label', 'order']
     }
 
-    # Excel export version
-    EXCEL_EXPORT_VERSION = 'V1'
+    # Excel export version (V2: per-language translation columns)
+    EXCEL_EXPORT_VERSION = 'V2'
+
+    FALLBACK_TRANSLATABLE_LANGUAGES = ['fr', 'es', 'ar', 'ru', 'zh']
+
+    TRANSLATION_DB_FIELDS = {
+        'name': 'name_translations',
+        'label': 'label_translations',
+        'definition': 'definition_translations',
+        'description': 'description_translations',
+    }
+
+    TEMPLATE_SHEET_ROW_HEADERS = ['field', 'value']
+
+    TEMPLATE_TRANSLATABLE_FIELDS = ['name']
+    PAGE_TRANSLATABLE_FIELDS = ['name']
+    SECTION_TRANSLATABLE_FIELDS = ['name']
+    ITEM_TRANSLATABLE_FIELDS = ['label', 'definition', 'description']
+
+    # Base column definitions (English/base fields only; translation JSON columns removed).
+    # Order: identifiers → display text → type-specific fields → rules → large JSON blobs.
+    TEMPLATE_BASE_COLUMNS = [
+        'name',
+        'description',
+        'is_paginated',
+        'add_to_self_report',
+        'display_order_visible',
+        'enable_export_pdf',
+        'enable_export_excel',
+        'enable_import_excel',
+        'enable_ai_validation',
+        'variables',
+    ]
+
+    PAGE_BASE_COLUMNS = ['id', 'order', 'name']
+
+    SECTION_BASE_COLUMNS = [
+        'id',
+        'order',
+        'name',
+        'page_id',
+        'parent_section_id',
+        'section_type',
+        'archived',
+        'max_dynamic_indicators',
+        'allowed_sectors',
+        'indicator_filters',
+        'allow_data_not_available',
+        'allow_not_applicable',
+        'allowed_disaggregation_options',
+        'data_entry_display_filters',
+        'add_indicator_note',
+        'relevance_condition',
+    ]
+
+    ITEM_BASE_COLUMNS = [
+        'id',
+        'section_id',
+        'item_type',
+        'order',
+        'archived',
+        'label',
+        'definition',
+        'description',
+        'options_json',
+        'options_translations',
+        'lookup_list_id',
+        'list_display_column',
+        'list_filters_json',
+        'indicator_bank_id',
+        'type',
+        'unit',
+        'relevance_condition',
+        'validation_condition',
+        'validation_message',
+        'config',
+    ]
+
+    # Legacy V1 export columns (JSON translation blobs) — accepted on import for backward compatibility
+    TEMPLATE_LEGACY_COLUMNS = [
+        'name', 'description',
+        'add_to_self_report', 'display_order_visible',
+        'is_paginated', 'enable_export_pdf', 'enable_export_excel',
+        'enable_import_excel', 'enable_ai_validation', 'name_translations', 'variables',
+    ]
+
+    PAGE_LEGACY_COLUMNS = ['id', 'name', 'order', 'name_translations']
+
+    SECTION_LEGACY_COLUMNS = [
+        'id', 'name', 'order', 'parent_section_id', 'page_id',
+        'section_type', 'max_dynamic_indicators', 'allowed_sectors',
+        'indicator_filters', 'allow_data_not_available', 'allow_not_applicable',
+        'allowed_disaggregation_options', 'data_entry_display_filters',
+        'add_indicator_note', 'name_translations', 'relevance_condition', 'archived',
+    ]
+
+    ITEM_LEGACY_COLUMNS = [
+        'id', 'section_id', 'item_type', 'label', 'order',
+        'relevance_condition', 'archived', 'config', 'indicator_bank_id',
+        'type', 'unit', 'validation_condition', 'validation_message',
+        'definition', 'options_json', 'lookup_list_id', 'list_display_column',
+        'list_filters_json', 'label_translations', 'definition_translations',
+        'options_translations', 'description_translations', 'description',
+    ]
+
+    JSON_EXPORT_COLUMNS = frozenset({
+        'variables',
+        'allowed_sectors',
+        'indicator_filters',
+        'allowed_disaggregation_options',
+        'data_entry_display_filters',
+        'relevance_condition',
+        'validation_condition',
+        'config',
+        'options_json',
+        'list_filters_json',
+        'options_translations',
+        # Legacy JSON translation columns (import-only)
+        'name_translations',
+        'label_translations',
+        'definition_translations',
+        'description_translations',
+    })
+
+    @classmethod
+    def _get_translatable_languages(cls) -> List[str]:
+        try:
+            langs = current_app.config.get('TRANSLATABLE_LANGUAGES')
+            if langs:
+                return list(langs)
+        except RuntimeError:
+            pass
+        return list(cls.FALLBACK_TRANSLATABLE_LANGUAGES)
+
+    @classmethod
+    def _expand_columns_with_translations(
+        cls, base_columns: List[str], translatable_fields: List[str]
+    ) -> List[str]:
+        """Insert {field}_{lang} columns immediately after each translatable base field."""
+        translatable = set(translatable_fields)
+        expanded: List[str] = []
+        for col in base_columns:
+            expanded.append(col)
+            if col in translatable:
+                for lang in cls._get_translatable_languages():
+                    expanded.append(f"{col}_{lang}")
+        return expanded
+
+    @classmethod
+    def get_template_columns(cls) -> List[str]:
+        """Ordered Template sheet field names (one row per field in export)."""
+        return cls._expand_columns_with_translations(
+            cls.TEMPLATE_BASE_COLUMNS, cls.TEMPLATE_TRANSLATABLE_FIELDS
+        )
+
+    @classmethod
+    def _template_sheet_uses_row_layout(cls, headers: List[Any]) -> bool:
+        if len(headers) < 2:
+            return False
+        first = str(headers[0]).strip().lower() if headers[0] is not None else ''
+        second = str(headers[1]).strip().lower() if headers[1] is not None else ''
+        return first == 'field' and second == 'value'
+
+    @classmethod
+    def _build_template_field_values(
+        cls, template: FormTemplate, version: FormTemplateVersion
+    ) -> Dict[str, Any]:
+        version_name = version.name if version.name else template.name
+        version_name_translations = (
+            version.name_translations if version.name_translations else template.name_translations
+        )
+        version_description = version.description
+        if version_description is None:
+            version_description = getattr(template, 'description', None)
+
+        row_values = cls._build_export_row(
+            cls.TEMPLATE_BASE_COLUMNS,
+            cls.TEMPLATE_TRANSLATABLE_FIELDS,
+            {
+                'name': version_name,
+                'description': version_description,
+                'add_to_self_report': (
+                    version.add_to_self_report
+                    if version.add_to_self_report is not None
+                    else getattr(template, 'add_to_self_report', False)
+                ),
+                'display_order_visible': (
+                    version.display_order_visible
+                    if version.display_order_visible is not None
+                    else getattr(template, 'display_order_visible', False)
+                ),
+                'is_paginated': (
+                    version.is_paginated
+                    if version.is_paginated is not None
+                    else getattr(template, 'is_paginated', False)
+                ),
+                'enable_export_pdf': (
+                    version.enable_export_pdf
+                    if version.enable_export_pdf is not None
+                    else getattr(template, 'enable_export_pdf', False)
+                ),
+                'enable_export_excel': (
+                    version.enable_export_excel
+                    if version.enable_export_excel is not None
+                    else getattr(template, 'enable_export_excel', False)
+                ),
+                'enable_import_excel': (
+                    version.enable_import_excel
+                    if version.enable_import_excel is not None
+                    else getattr(template, 'enable_import_excel', False)
+                ),
+                'enable_ai_validation': (
+                    version.enable_ai_validation
+                    if getattr(version, 'enable_ai_validation', None) is not None
+                    else getattr(template, 'enable_ai_validation', False)
+                ),
+                'variables': cls._format_json_for_excel(
+                    version.variables if version.variables else None
+                ),
+            },
+            {'name': version_name_translations},
+        )
+        return dict(zip(cls.get_template_columns(), row_values))
+
+    @classmethod
+    def _parse_template_sheet(
+        cls, sheet,
+    ) -> Tuple[Dict[str, Any], bool, List[str]]:
+        """Parse Template sheet. Returns (field_values, legacy_column_layout, errors)."""
+        headers = [cell.value for cell in sheet[1]]
+        errors: List[str] = []
+
+        if cls._template_sheet_uses_row_layout(headers):
+            row_data: Dict[str, Any] = {}
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                if not row or all(cell is None for cell in row):
+                    continue
+                field_name = row[0]
+                if field_name is None or str(field_name).strip() == '':
+                    continue
+                value = row[1] if len(row) > 1 else None
+                row_data[str(field_name).strip()] = value
+            if 'name' not in row_data or str(row_data.get('name') or '').strip() == '':
+                errors.append('Template sheet is missing required field: name')
+            return row_data, False, errors
+
+        # Legacy column layout (headers in row 1, values in row 2)
+        header_list = [h for h in headers if h is not None]
+        required_headers = cls.REQUIRED_COLUMNS.get('Template', ['name'])
+        header_set = {h for h in header_list if isinstance(h, str) and h}
+        missing = set(required_headers) - header_set
+        if missing:
+            errors.append(
+                f"Template sheet headers missing required columns. "
+                f"Required: {required_headers}, Missing: {list(missing)}, Got: {headers}"
+            )
+            return {}, True, errors
+
+        if not row or all(cell is None for cell in row):
+            return {}, True, []
+
+        row_data = cls._row_dict_from_sheet(headers, row)
+        return row_data, True, errors
+
+    @classmethod
+    def get_page_columns(cls) -> List[str]:
+        return cls._expand_columns_with_translations(
+            cls.PAGE_BASE_COLUMNS, cls.PAGE_TRANSLATABLE_FIELDS
+        )
+
+    @classmethod
+    def get_section_columns(cls) -> List[str]:
+        return cls._expand_columns_with_translations(
+            cls.SECTION_BASE_COLUMNS, cls.SECTION_TRANSLATABLE_FIELDS
+        )
+
+    @classmethod
+    def get_item_columns(cls) -> List[str]:
+        return cls._expand_columns_with_translations(
+            cls.ITEM_BASE_COLUMNS, cls.ITEM_TRANSLATABLE_FIELDS
+        )
+
+    @classmethod
+    def _resolve_sheet_headers(cls, sheet_name: str, headers: List[Any]) -> Tuple[List[str], bool, Optional[str]]:
+        """Return (expected_headers, legacy_format, error_message)."""
+        normalized = [h for h in headers if h is not None]
+        layouts = {
+            'Template': (cls.get_template_columns(), cls.TEMPLATE_LEGACY_COLUMNS),
+            'Pages': (cls.get_page_columns(), cls.PAGE_LEGACY_COLUMNS),
+            'Sections': (cls.get_section_columns(), cls.SECTION_LEGACY_COLUMNS),
+            'Items': (cls.get_item_columns(), cls.ITEM_LEGACY_COLUMNS),
+        }
+        current, legacy = layouts[sheet_name]
+        if normalized == current:
+            return current, False, None
+        if normalized == legacy:
+            return legacy, True, None
+        return current, False, (
+            f"{sheet_name} sheet headers don't match expected columns. "
+            f"Expected: {current}, Got: {normalized}"
+        )
+
+    @classmethod
+    def _translation_export_values(cls, translations: Any) -> List[Any]:
+        data = cls._normalize_json_for_export(translations)
+        if not isinstance(data, dict):
+            data = {}
+        values: List[Any] = []
+        for lang in cls._get_translatable_languages():
+            val = data.get(lang)
+            if val is None or str(val).strip() == '':
+                values.append(None)
+            elif isinstance(val, str):
+                values.append(cls._decode_unicode_escapes_in_str(val))
+            else:
+                values.append(val)
+        return values
+
+    @classmethod
+    def _build_export_row(
+        cls,
+        base_columns: List[str],
+        translatable_fields: List[str],
+        scalar_values: Dict[str, Any],
+        translation_values: Optional[Dict[str, Any]] = None,
+    ) -> List[Any]:
+        translatable = set(translatable_fields)
+        translation_values = translation_values or {}
+        row: List[Any] = []
+        for col in base_columns:
+            row.append(scalar_values.get(col))
+            if col in translatable:
+                row.extend(cls._translation_export_values(translation_values.get(col)))
+        return row
+
+    @classmethod
+    def _collect_translations_from_row(
+        cls,
+        row_data: Dict[str, Any],
+        base_field: str,
+        *,
+        legacy: bool = False,
+    ) -> Optional[Dict[str, str]]:
+        translations: Dict[str, str] = {}
+        if not legacy:
+            for lang in cls._get_translatable_languages():
+                col = f"{base_field}_{lang}"
+                val = row_data.get(col)
+                if val is not None and str(val).strip() != '':
+                    translations[lang] = cls._decode_unicode_escapes_in_str(str(val).strip())
+        legacy_col = cls.TRANSLATION_DB_FIELDS.get(base_field)
+        if legacy_col:
+            parsed = cls._parse_json(row_data.get(legacy_col))
+            if isinstance(parsed, dict):
+                for lang, val in parsed.items():
+                    if val is not None and str(val).strip() and lang not in translations:
+                        translations[str(lang)] = cls._decode_unicode_escapes_in_str(str(val).strip())
+        return translations or None
+
+    @classmethod
+    def _row_dict_from_sheet(cls, headers: List[Any], row: Tuple[Any, ...]) -> Dict[str, Any]:
+        row_data: Dict[str, Any] = {}
+        for idx, header in enumerate(headers):
+            if header is None:
+                continue
+            row_data[str(header)] = row[idx] if idx < len(row) else None
+        return row_data
+
+    @classmethod
+    def _apply_item_translations_from_row(
+        cls,
+        item: FormItem,
+        row_data: Dict[str, Any],
+        *,
+        legacy: bool = False,
+    ) -> None:
+        for base_field in cls.ITEM_TRANSLATABLE_FIELDS:
+            db_field = cls.TRANSLATION_DB_FIELDS[base_field]
+            setattr(
+                item,
+                db_field,
+                cls._collect_translations_from_row(row_data, base_field, legacy=legacy),
+            )
 
     # Dropdown options for data validation (static options)
     DROPDOWN_OPTIONS = {
@@ -74,52 +455,78 @@ class TemplateExcelService:
         'allow_not_applicable': ['TRUE', 'FALSE'],
     }
 
-    # Columns that should not have duplicate values (for conditional formatting)
-    UNIQUE_COLUMNS = {
-        'Pages': ['id'],
-        'Sections': ['id'],
-        'Items': ['id'],
-    }
+    _UNICODE_ESCAPE_RE = re.compile(r'\\u([0-9a-fA-F]{4})')
 
-    # Column definitions matching database tables (excluding template_id, version_id, and audit fields)
-    TEMPLATE_COLUMNS = [
-        'name', 'description',
-        'add_to_self_report', 'display_order_visible',
-        'is_paginated', 'enable_export_pdf', 'enable_export_excel',
-        'enable_import_excel', 'enable_ai_validation', 'name_translations', 'variables'
-    ]
+    @classmethod
+    def _decode_unicode_escapes_in_str(cls, value: str) -> str:
+        """Convert literal \\uXXXX sequences to real Unicode characters."""
+        if not isinstance(value, str) or '\\u' not in value:
+            return value
 
-    PAGE_COLUMNS = [
-        'id', 'name', 'order', 'name_translations'
-    ]
+        def _repl(match: re.Match[str]) -> str:
+            try:
+                return chr(int(match.group(1), 16))
+            except ValueError:
+                return match.group(0)
 
-    SECTION_COLUMNS = [
-        'id', 'name', 'order', 'parent_section_id', 'page_id',
-        'section_type', 'max_dynamic_indicators', 'allowed_sectors',
-        'indicator_filters', 'allow_data_not_available', 'allow_not_applicable',
-        'allowed_disaggregation_options', 'data_entry_display_filters',
-        'add_indicator_note', 'name_translations', 'relevance_condition', 'archived'
-    ]
+        return cls._UNICODE_ESCAPE_RE.sub(_repl, value)
 
-    ITEM_COLUMNS = [
-        'id', 'section_id', 'item_type', 'label', 'order',
-        'relevance_condition', 'archived', 'config', 'indicator_bank_id',
-        'type', 'unit', 'validation_condition', 'validation_message',
-        'definition', 'options_json', 'lookup_list_id', 'list_display_column',
-        'list_filters_json', 'label_translations', 'definition_translations',
-        'options_translations', 'description_translations', 'description'
-    ]
+    @classmethod
+    def _normalize_json_for_export(cls, value: Any) -> Any:
+        """Normalize JSON payloads so exports show readable Unicode text."""
+        if value is None or value == '' or value == 'None':
+            return None
+        if isinstance(value, str):
+            parsed = cls._parse_json(value)
+            if isinstance(parsed, (dict, list)):
+                return cls._normalize_json_for_export(parsed)
+            if isinstance(parsed, str) and parsed != value:
+                return cls._normalize_json_for_export(parsed)
+            return cls._decode_unicode_escapes_in_str(value)
+        if isinstance(value, dict):
+            return {key: cls._normalize_json_for_export(val) for key, val in value.items()}
+        if isinstance(value, list):
+            return [cls._normalize_json_for_export(item) for item in value]
+        return value
+
+    @classmethod
+    def _format_json_for_excel(cls, value: Any) -> Optional[str]:
+        """Serialize JSON values with line breaks for readable Excel cells."""
+        normalized = cls._normalize_json_for_export(value)
+        if normalized is None:
+            return None
+        if isinstance(normalized, str):
+            return normalized
+        try:
+            return json.dumps(normalized, ensure_ascii=False, indent=2)
+        except (TypeError, ValueError):
+            try:
+                return json.dumps(normalized, ensure_ascii=False, default=str, indent=2)
+            except (TypeError, ValueError):
+                return str(normalized)
+
+    @classmethod
+    def _write_data_row(cls, sheet, row_idx: int, headers: List[str], row_data: List[Any]) -> None:
+        """Write a data row."""
+        for col_idx, value in enumerate(row_data, start=1):
+            sheet.cell(row=row_idx, column=col_idx, value=value)
 
     @classmethod
     def _get_items_for_version(cls, template: FormTemplate, version: FormTemplateVersion) -> List[FormItem]:
         """Get items for a template version in a deterministic order.
 
-        Note: We use a stable secondary sort on FormItem.id to keep export IDs deterministic.
+        Rows are grouped by section display order, then item order within each section.
+        Stable secondary sorts on section/item IDs keep export IDs deterministic.
         """
         return FormItem.query.join(FormSection).filter(
             FormItem.template_id == template.id,
             FormSection.version_id == version.id
-        ).order_by(FormItem.order, FormItem.id).all()
+        ).order_by(
+            FormSection.order,
+            FormSection.id,
+            FormItem.order,
+            FormItem.id,
+        ).all()
 
     @classmethod
     def _build_item_db_to_export_map(cls, template: FormTemplate, version: FormTemplateVersion) -> Dict[int, int]:
@@ -207,7 +614,7 @@ class TemplateExcelService:
 
         parsed = _walk(parsed)
         try:
-            return json.dumps(parsed)
+            return cls._format_json_for_excel(parsed)
         except Exception as e:
             current_app.logger.debug("Rule JSON serialization failed, using original: %s", e)
             # Fall back to the original if serialization fails
@@ -275,91 +682,36 @@ class TemplateExcelService:
 
     @classmethod
     def _export_template_sheet(cls, workbook, template: FormTemplate, version: FormTemplateVersion):
-        """Export template metadata to Template sheet."""
+        """Export template metadata to Template sheet (field/value rows)."""
         sheet = workbook.create_sheet("Template")
 
-        # Write headers with required/optional styling
-        headers = cls.TEMPLATE_COLUMNS
+        headers = cls.TEMPLATE_SHEET_ROW_HEADERS
         required_cols = cls.REQUIRED_COLUMNS.get('Template', [])
+        field_names = cls.get_template_columns()
+        field_values = cls._build_template_field_values(template, version)
+
         for col_idx, header in enumerate(headers, start=1):
             cell = sheet.cell(row=1, column=col_idx, value=header)
-            is_required = header in required_cols
-            cls._style_header_cell(cell, is_required=is_required)
+            cls._style_header_cell(cell, is_required=(header == 'field'))
 
-        # Write data row
-        #
-        # Versioning note:
-        # Template configuration fields (description/etc.) are version-scoped
-        # and live on FormTemplateVersion. Some older DBs may still have legacy columns
-        # on FormTemplate, so we use safe getattr() fallbacks to avoid export crashes.
-        version_name = version.name if version.name else template.name
-        version_name_translations = version.name_translations if version.name_translations else template.name_translations
+        boolean_fields = {
+            'add_to_self_report', 'display_order_visible', 'is_paginated',
+            'enable_export_pdf', 'enable_export_excel', 'enable_import_excel', 'enable_ai_validation',
+        }
 
-        version_description = version.description
-        if version_description is None:
-            version_description = getattr(template, 'description', None)
+        for row_idx, field_name in enumerate(field_names, start=2):
+            field_cell = sheet.cell(row=row_idx, column=1, value=field_name)
+            cls._style_header_cell(field_cell, is_required=(field_name in required_cols))
+            sheet.cell(row=row_idx, column=2, value=field_values.get(field_name))
 
-        version_add_to_self_report = version.add_to_self_report if version.add_to_self_report is not None else getattr(template, 'add_to_self_report', False)
-        version_display_order_visible = version.display_order_visible if version.display_order_visible is not None else getattr(template, 'display_order_visible', False)
-        version_is_paginated = version.is_paginated if version.is_paginated is not None else getattr(template, 'is_paginated', False)
-        version_enable_export_pdf = version.enable_export_pdf if version.enable_export_pdf is not None else getattr(template, 'enable_export_pdf', False)
-        version_enable_export_excel = version.enable_export_excel if version.enable_export_excel is not None else getattr(template, 'enable_export_excel', False)
-        version_enable_import_excel = version.enable_import_excel if version.enable_import_excel is not None else getattr(template, 'enable_import_excel', False)
-        version_enable_ai_validation = version.enable_ai_validation if getattr(version, 'enable_ai_validation', None) is not None else getattr(template, 'enable_ai_validation', False)
+            if field_name in boolean_fields and field_name in cls.DROPDOWN_OPTIONS:
+                cls._add_dropdown_validation(
+                    sheet, 2, cls.DROPDOWN_OPTIONS[field_name],
+                    start_row=row_idx, end_row=row_idx,
+                )
 
-        version_variables = version.variables if version.variables else None
-
-        row_data = [
-            version_name,  # Export version-specific name (or template name as fallback)
-            version_description,  # Export version-specific description
-            version_add_to_self_report,  # Export version-specific add_to_self_report
-            version_display_order_visible,  # Export version-specific display_order_visible
-            version_is_paginated,  # Export version-specific is_paginated
-            version_enable_export_pdf,  # Export version-specific enable_export_pdf
-            version_enable_export_excel,  # Export version-specific enable_export_excel
-            version_enable_import_excel,  # Export version-specific enable_import_excel
-            version_enable_ai_validation,  # Export version-specific enable_ai_validation
-            json.dumps(version_name_translations) if version_name_translations else None,  # Export version-specific translations (or template translations as fallback)
-            json.dumps(version_variables) if version_variables else None,  # Export version-specific template variables
-        ]
-
-        for col_idx, value in enumerate(row_data, start=1):
-            sheet.cell(row=2, column=col_idx, value=value)
-
-        # Auto-size columns
-        cls._auto_size_columns(sheet, len(headers))
-
-        # Add data validation dropdowns
-        add_to_self_report_col = headers.index('add_to_self_report') + 1
-        cls._add_dropdown_validation(sheet, add_to_self_report_col, cls.DROPDOWN_OPTIONS['add_to_self_report'],
-                                    start_row=2, end_row=2)
-
-        display_order_visible_col = headers.index('display_order_visible') + 1
-        cls._add_dropdown_validation(sheet, display_order_visible_col, cls.DROPDOWN_OPTIONS['display_order_visible'],
-                                    start_row=2, end_row=2)
-
-        is_paginated_col = headers.index('is_paginated') + 1
-        cls._add_dropdown_validation(sheet, is_paginated_col, cls.DROPDOWN_OPTIONS['is_paginated'],
-                                    start_row=2, end_row=2)
-
-        enable_export_pdf_col = headers.index('enable_export_pdf') + 1
-        cls._add_dropdown_validation(sheet, enable_export_pdf_col, cls.DROPDOWN_OPTIONS['enable_export_pdf'],
-                                    start_row=2, end_row=2)
-
-        enable_export_excel_col = headers.index('enable_export_excel') + 1
-        cls._add_dropdown_validation(sheet, enable_export_excel_col, cls.DROPDOWN_OPTIONS['enable_export_excel'],
-                                    start_row=2, end_row=2)
-
-        enable_import_excel_col = headers.index('enable_import_excel') + 1
-        cls._add_dropdown_validation(sheet, enable_import_excel_col, cls.DROPDOWN_OPTIONS['enable_import_excel'],
-                                    start_row=2, end_row=2)
-
-        enable_ai_validation_col = headers.index('enable_ai_validation') + 1
-        cls._add_dropdown_validation(sheet, enable_ai_validation_col, cls.DROPDOWN_OPTIONS['enable_ai_validation'],
-                                    start_row=2, end_row=2)
-
-        # Create Excel table
-        cls._create_excel_table(sheet, "TemplateTable", len(headers), 2)  # 1 header row + 1 data row
+        cls._auto_size_columns(sheet, 2)
+        cls._create_excel_table(sheet, "TemplateTable", 2, len(field_names) + 1)
 
     @classmethod
     def _export_pages_sheet(cls, workbook, template: FormTemplate, version: FormTemplateVersion):
@@ -372,7 +724,7 @@ class TemplateExcelService:
         ).order_by(FormPage.order).all()
 
         # Write headers with required/optional styling
-        headers = cls.PAGE_COLUMNS
+        headers = cls.get_page_columns()
         required_cols = cls.REQUIRED_COLUMNS.get('Pages', [])
         for col_idx, header in enumerate(headers, start=1):
             cell = sheet.cell(row=1, column=col_idx, value=header)
@@ -387,14 +739,17 @@ class TemplateExcelService:
             export_id = row_idx - 1  # Sequential ID starting from 1
             page_export_id_map[export_id] = page.id  # Store mapping for reference
 
-            row_data = [
-                export_id,  # Sequential export ID (1, 2, 3...)
-                page.name,
-                page.order,
-                json.dumps(page.name_translations) if page.name_translations else None,
-            ]
-            for col_idx, value in enumerate(row_data, start=1):
-                sheet.cell(row=row_idx, column=col_idx, value=value)
+            row_data = cls._build_export_row(
+                cls.PAGE_BASE_COLUMNS,
+                cls.PAGE_TRANSLATABLE_FIELDS,
+                {
+                    'id': export_id,
+                    'name': page.name,
+                    'order': page.order,
+                },
+                {'name': page.name_translations},
+            )
+            cls._write_data_row(sheet, row_idx, headers, row_data)
 
         # Store mapping in sheet for reference (not visible, but can be used if needed)
         sheet._page_export_id_map = page_export_id_map
@@ -441,7 +796,7 @@ class TemplateExcelService:
             section_db_to_export[section.id] = export_id
 
         # Write headers with required/optional styling
-        headers = cls.SECTION_COLUMNS
+        headers = cls.get_section_columns()
         required_cols = cls.REQUIRED_COLUMNS.get('Sections', [])
         for col_idx, header in enumerate(headers, start=1):
             cell = sheet.cell(row=1, column=col_idx, value=header)
@@ -462,27 +817,30 @@ class TemplateExcelService:
             if section.parent_section_id and section.parent_section_id in section_db_to_export:
                 parent_export_id = section_db_to_export[section.parent_section_id]
 
-            row_data = [
-                export_id,  # Sequential export ID (1, 2, 3...)
-                section.name,
-                section.order,
-                parent_export_id,  # Use export ID instead of database ID
-                page_export_id,  # Use export ID instead of database ID
-                section.section_type,
-                section.max_dynamic_indicators,
-                json.dumps(section.allowed_sectors) if section.allowed_sectors else None,
-                json.dumps(section.indicator_filters) if section.indicator_filters else None,
-                section.allow_data_not_available,
-                section.allow_not_applicable,
-                json.dumps(section.allowed_disaggregation_options) if section.allowed_disaggregation_options else None,
-                json.dumps(section.data_entry_display_filters) if section.data_entry_display_filters else None,
-                section.add_indicator_note,
-                json.dumps(section.name_translations) if section.name_translations else None,
-                cls._rewrite_rule_json_item_ids(section.relevance_condition, item_db_to_export),
-                section.archived,
-            ]
-            for col_idx, value in enumerate(row_data, start=1):
-                sheet.cell(row=row_idx, column=col_idx, value=value)
+            row_data = cls._build_export_row(
+                cls.SECTION_BASE_COLUMNS,
+                cls.SECTION_TRANSLATABLE_FIELDS,
+                {
+                    'id': export_id,
+                    'name': section.name,
+                    'order': section.order,
+                    'parent_section_id': parent_export_id,
+                    'page_id': page_export_id,
+                    'section_type': section.section_type,
+                    'max_dynamic_indicators': section.max_dynamic_indicators,
+                    'allowed_sectors': cls._format_json_for_excel(section.allowed_sectors),
+                    'indicator_filters': cls._format_json_for_excel(section.indicator_filters),
+                    'allow_data_not_available': section.allow_data_not_available,
+                    'allow_not_applicable': section.allow_not_applicable,
+                    'allowed_disaggregation_options': cls._format_json_for_excel(section.allowed_disaggregation_options),
+                    'data_entry_display_filters': cls._format_json_for_excel(section.data_entry_display_filters),
+                    'add_indicator_note': section.add_indicator_note,
+                    'relevance_condition': cls._rewrite_rule_json_item_ids(section.relevance_condition, item_db_to_export),
+                    'archived': section.archived,
+                },
+                {'name': section.name_translations},
+            )
+            cls._write_data_row(sheet, row_idx, headers, row_data)
 
         # Store mapping for items sheet (export_id -> db_id)
         sheet._section_export_id_map = {exp_id: db_id for db_id, exp_id in section_db_to_export.items()}
@@ -543,7 +901,7 @@ class TemplateExcelService:
                 section_db_to_export[db_id] = exp_id
 
         # Write headers with required/optional styling
-        headers = cls.ITEM_COLUMNS
+        headers = cls.get_item_columns()
         required_cols = cls.REQUIRED_COLUMNS.get('Items', [])
         for col_idx, header in enumerate(headers, start=1):
             cell = sheet.cell(row=1, column=col_idx, value=header)
@@ -559,33 +917,38 @@ class TemplateExcelService:
             if item.section_id and item.section_id in section_db_to_export:
                 section_export_id = section_db_to_export[item.section_id]
 
-            row_data = [
-                export_id,  # Sequential export ID (1, 2, 3...)
-                section_export_id,  # Use export ID instead of database ID
-                item.item_type,
-                item.label,
-                item.order,
-                cls._rewrite_rule_json_item_ids(item.relevance_condition, item_db_to_export),
-                item.archived,
-                json.dumps(item.config) if item.config else None,
-                item.indicator_bank_id,
-                item.type,
-                item.unit,
-                cls._rewrite_rule_json_item_ids(item.validation_condition, item_db_to_export),
-                item.validation_message,
-                item.definition,
-                json.dumps(item.options_json) if item.options_json else None,
-                item.lookup_list_id,
-                item.list_display_column,
-                json.dumps(item.list_filters_json) if item.list_filters_json else None,
-                json.dumps(item.label_translations) if item.label_translations else None,
-                json.dumps(item.definition_translations) if item.definition_translations else None,
-                json.dumps(item.options_translations) if item.options_translations else None,
-                json.dumps(item.description_translations) if item.description_translations else None,
-                item.description,
-            ]
-            for col_idx, value in enumerate(row_data, start=1):
-                sheet.cell(row=row_idx, column=col_idx, value=value)
+            row_data = cls._build_export_row(
+                cls.ITEM_BASE_COLUMNS,
+                cls.ITEM_TRANSLATABLE_FIELDS,
+                {
+                    'id': export_id,
+                    'section_id': section_export_id,
+                    'item_type': item.item_type,
+                    'label': item.label,
+                    'order': item.order,
+                    'relevance_condition': cls._rewrite_rule_json_item_ids(item.relevance_condition, item_db_to_export),
+                    'archived': item.archived,
+                    'config': cls._format_json_for_excel(item.config),
+                    'indicator_bank_id': item.indicator_bank_id,
+                    'type': item.type,
+                    'unit': item.unit,
+                    'validation_condition': cls._rewrite_rule_json_item_ids(item.validation_condition, item_db_to_export),
+                    'validation_message': item.validation_message,
+                    'definition': item.definition,
+                    'options_json': cls._format_json_for_excel(item.options_json),
+                    'lookup_list_id': item.lookup_list_id,
+                    'list_display_column': item.list_display_column,
+                    'list_filters_json': cls._format_json_for_excel(item.list_filters_json),
+                    'options_translations': cls._format_json_for_excel(item.options_translations),
+                    'description': item.description,
+                },
+                {
+                    'label': item.label_translations,
+                    'definition': item.definition_translations,
+                    'description': item.description_translations,
+                },
+            )
+            cls._write_data_row(sheet, row_idx, headers, row_data)
 
         # Auto-size columns
         cls._auto_size_columns(sheet, len(headers))
@@ -687,7 +1050,7 @@ class TemplateExcelService:
             "",
             "The file contains the following sheets:",
             "  • Instructions (this sheet) - Ignored during import",
-            "  • Template - Template metadata and configuration",
+            "  • Template - Template metadata and configuration (field/value rows)",
             "  • Pages - Page definitions (if template is paginated)",
             "  • Sections - Section definitions",
             "  • Items - Form items (indicators, questions, document fields, etc.)",
@@ -714,7 +1077,10 @@ class TemplateExcelService:
         row += 1
 
         header_instructions = [
-            "Column headers in each sheet are color-coded to indicate whether they are required or optional:",
+            "Column headers in Pages, Sections, and Items are color-coded to indicate whether they are required or optional:",
+            "",
+            "The Template sheet uses a field/value layout: column A lists field names and column B holds values (one field per row).",
+            "Required Template fields (e.g. name) are shown in red in column A.",
             "",
             "  🔴 RED HEADERS (Required): These columns must have values. They are essential for the template to function.",
             "     Missing values in required columns will cause the import to fail.",
@@ -756,19 +1122,20 @@ class TemplateExcelService:
             "",
             "2. References: When referencing other records (e.g., section_id in Items), use the export IDs from the same file.",
             "",
-            "3. JSON Fields: Fields containing JSON (like name_translations, config, options_json) should be valid JSON strings.",
-            "   Use double quotes for keys and string values.",
+            "3. JSON Fields: Fields such as config, options_json, and options_translations remain JSON. Exports are pretty-printed with line breaks for readability; re-import accepts both compact and formatted JSON.",
             "",
-            "4. Boolean Fields: Use TRUE/FALSE or 1/0 for boolean values.",
+            "4. Translation Fields: English/base text lives in columns like name, label, definition, and description. Other languages use separate columns named {field}_{lang} (e.g. label_ar, label_fr, name_es). Empty translation cells are ignored on import.",
             "",
-            "5. Order Fields: Use numeric values (integers or decimals like 1, 1.1, 1.2) to control display order.",
+            "5. Boolean Fields: Use TRUE/FALSE or 1/0 for boolean values.",
             "",
-            "6. Import Behavior:",
+            "6. Order Fields: Use numeric values (integers or decimals like 1, 1.1, 1.2) to control display order.",
+            "",
+            "7. Import Behavior:",
             "   • If importing into a published version, a new draft version will be created automatically.",
             "   • Existing items/sections with matching order+name will be updated, others will be created.",
             "   • The import will fail if required columns are missing or invalid.",
             "",
-            "7. Do NOT modify the Instructions sheet or add unrecognized sheets if you plan to re-import the file.",
+            "8. Do NOT modify the Instructions sheet or add unrecognized sheets if you plan to re-import the file.",
         ]
 
         for note in notes:
@@ -1088,7 +1455,8 @@ class TemplateExcelService:
             for row in sheet[column_letter]:
                 with suppress(Exception):
                     if row.value:
-                        max_length = max(max_length, len(str(row.value)))
+                        lines = str(row.value).splitlines() or [str(row.value)]
+                        max_length = max(max_length, max(len(line) for line in lines))
             adjusted_width = min(max_length + 2, 50)  # Cap at 50
             sheet.column_dimensions[column_letter].width = adjusted_width
 
@@ -1103,7 +1471,9 @@ class TemplateExcelService:
 
     @classmethod
     def _validate_template_sheet_headers(cls, headers: List[Any]) -> List[str]:
-        """Validate Template sheet headers (required columns must be present)."""
+        """Validate Template sheet headers (row layout or legacy column layout)."""
+        if cls._template_sheet_uses_row_layout(headers):
+            return []
         required_headers = cls.REQUIRED_COLUMNS.get('Template', ['name'])
         header_set = {h for h in headers if isinstance(h, str) and h}
         required_set = set(required_headers)
@@ -1116,16 +1486,9 @@ class TemplateExcelService:
         return []
 
     @classmethod
-    def _validate_strict_sheet_headers(
-        cls, sheet_name: str, headers: List[Any], expected_headers: List[str]
-    ) -> List[str]:
-        """Validate sheet headers match expected export columns exactly."""
-        if headers != expected_headers:
-            return [
-                f"{sheet_name} sheet headers don't match expected columns. "
-                f"Expected: {expected_headers}, Got: {headers}"
-            ]
-        return []
+    def _validate_import_sheet_headers(cls, sheet_name: str, headers: List[Any]) -> List[str]:
+        _, _, error = cls._resolve_sheet_headers(sheet_name, headers)
+        return [error] if error else []
 
     @classmethod
     def validate_import_file(cls, excel_file) -> Dict[str, Any]:
@@ -1163,12 +1526,12 @@ class TemplateExcelService:
         template_sheet = workbook['Template']
         template_headers = [cell.value for cell in template_sheet[1]]
         errors.extend(cls._validate_template_sheet_headers(template_headers))
+        row_data, legacy_column_layout, template_parse_errors = cls._parse_template_sheet(template_sheet)
+        errors.extend(template_parse_errors)
         if not errors:
-            row = next(template_sheet.iter_rows(min_row=2, values_only=True), None)
-            if not row or all(cell is None for cell in row):
+            if not row_data:
                 errors.append('Template sheet has no data row.')
             else:
-                row_data = dict(zip(template_headers, row))
                 template_name = row_data.get('name')
                 if template_name is None or str(template_name).strip() == '':
                     errors.append('Template sheet data row is missing a template name.')
@@ -1177,19 +1540,19 @@ class TemplateExcelService:
 
         pages_sheet = workbook['Pages']
         pages_headers = [cell.value for cell in pages_sheet[1]]
-        errors.extend(cls._validate_strict_sheet_headers('Pages', pages_headers, cls.PAGE_COLUMNS))
+        errors.extend(cls._validate_import_sheet_headers('Pages', pages_headers))
         if not any(e.startswith('Pages sheet') for e in errors):
             preview['pages'] = cls._count_nonempty_data_rows(pages_sheet)
 
         sections_sheet = workbook['Sections']
         sections_headers = [cell.value for cell in sections_sheet[1]]
-        errors.extend(cls._validate_strict_sheet_headers('Sections', sections_headers, cls.SECTION_COLUMNS))
+        errors.extend(cls._validate_import_sheet_headers('Sections', sections_headers))
         if not any(e.startswith('Sections sheet') for e in errors):
             preview['sections'] = cls._count_nonempty_data_rows(sections_sheet)
 
         items_sheet = workbook['Items']
         items_headers = [cell.value for cell in items_sheet[1]]
-        errors.extend(cls._validate_strict_sheet_headers('Items', items_headers, cls.ITEM_COLUMNS))
+        errors.extend(cls._validate_import_sheet_headers('Items', items_headers))
         if not any(e.startswith('Items sheet') for e in errors):
             preview['items'] = cls._count_nonempty_data_rows(items_sheet)
 
@@ -1437,52 +1800,45 @@ class TemplateExcelService:
         current_app.logger.info("Starting template metadata import...")
         errors = []
 
-        # Read headers
-        headers = [cell.value for cell in sheet[1]]
-        current_app.logger.info(f"Template sheet headers: {headers}")
-
-        # Validate headers match expected columns.
-        # Backwards-compatible: allow extra columns (e.g. legacy 'template_type') and ignore them.
-        # Only require columns from REQUIRED_COLUMNS; all others (including 'variables') are optional.
-        required_headers = cls.REQUIRED_COLUMNS.get('Template', ['name'])
-        header_set = {h for h in headers if isinstance(h, str) and h}
-        required_set = set(required_headers)
-
-        # Check if all required columns are present
-        if not required_set.issubset(header_set):
-            missing = required_set - header_set
-            error_msg = f"Template sheet headers missing required columns. Required: {required_headers}, Missing: {list(missing)}, Got: {headers}"
-            current_app.logger.error(error_msg)
-            errors.append(error_msg)
+        row_data_all, legacy_column_layout, parse_errors = cls._parse_template_sheet(sheet)
+        errors.extend(parse_errors)
+        if parse_errors:
             return errors
 
-        # Log if there are extra columns (legacy fields) or missing optional columns
-        expected_headers = cls.TEMPLATE_COLUMNS
-        expected_set = set(expected_headers)
-        extra_columns = header_set - expected_set
-        missing_optional = expected_set - header_set - required_set
-
-        if extra_columns:
-            current_app.logger.info(
-                f"Template sheet contains extra/legacy columns (will be ignored): {list(extra_columns)}"
-            )
-        if missing_optional:
-            current_app.logger.info(
-                f"Template sheet missing optional columns (will use defaults): {list(missing_optional)}"
-            )
-
-        # Read first data row (should only be one row)
-        row = next(sheet.iter_rows(min_row=2, values_only=True), None)
-        if not row or all(cell is None for cell in row):
+        if not row_data_all:
             current_app.logger.warning("Template sheet has no data row")
             return errors
 
-        try:
-            # Map row data to columns (use actual headers, then pick expected fields).
-            # This supports legacy files that include extra columns like 'template_type'.
-            row_data_all = dict(zip(headers, row))
-            row_data = {h: row_data_all.get(h) for h in expected_headers}
+        headers = [cell.value for cell in sheet[1]]
+        current_app.logger.info(f"Template sheet headers: {headers}")
 
+        if legacy_column_layout:
+            _, legacy_format, _ = cls._resolve_sheet_headers('Template', headers)
+            expected_headers = (
+                cls.TEMPLATE_LEGACY_COLUMNS if legacy_format else cls.get_template_columns()
+            )
+        else:
+            legacy_format = False
+            expected_headers = cls.get_template_columns()
+
+        header_set = set(row_data_all.keys())
+        required_headers = cls.REQUIRED_COLUMNS.get('Template', ['name'])
+        expected_set = set(expected_headers)
+        extra_columns = header_set - expected_set
+        missing_optional = expected_set - header_set - set(required_headers)
+
+        if extra_columns:
+            current_app.logger.info(
+                f"Template sheet contains extra/legacy fields (will be ignored): {list(extra_columns)}"
+            )
+        if missing_optional:
+            current_app.logger.info(
+                f"Template sheet missing optional fields (will use defaults): {list(missing_optional)}"
+            )
+
+        row_data = {h: row_data_all.get(h) for h in expected_headers}
+
+        try:
             current_app.logger.info(f"Updating template metadata for template ID {template.id}")
 
             # Update version-specific fields (name is now only stored in versions)
@@ -1522,12 +1878,12 @@ class TemplateExcelService:
                 version.enable_ai_validation = bool(row_data['enable_ai_validation'])
                 current_app.logger.info(f"Updated version/template enable_ai_validation: {version.enable_ai_validation}")
 
-            if 'name_translations' in row_data:
-                name_translations = cls._parse_json(row_data.get('name_translations'))
-                if name_translations:
-                    # Save to version (version-specific translations)
-                    version.name_translations = name_translations
-                    current_app.logger.info(f"Updated version name_translations")
+            name_translations = cls._collect_translations_from_row(
+                row_data_all, 'name', legacy=legacy_format
+            )
+            if name_translations:
+                version.name_translations = name_translations
+                current_app.logger.info("Updated version name_translations")
 
             if 'variables' in row_data:
                 variables = cls._parse_json(row_data.get('variables'))
@@ -1558,11 +1914,10 @@ class TemplateExcelService:
         current_app.logger.info(f"Pages sheet headers: {headers}")
 
         # Validate headers match expected columns
-        expected_headers = cls.PAGE_COLUMNS
-        if headers != expected_headers:
-            error_msg = f"Pages sheet headers don't match expected columns. Expected: {expected_headers}, Got: {headers}"
-            current_app.logger.error(error_msg)
-            errors.append(error_msg)
+        _, legacy_format, header_error = cls._resolve_sheet_headers('Pages', headers)
+        if header_error:
+            current_app.logger.error(header_error)
+            errors.append(header_error)
             return errors
 
         current_app.logger.info("Headers validated. Processing page rows...")
@@ -1575,8 +1930,7 @@ class TemplateExcelService:
 
             row_count += 1
             try:
-                # Map row data to columns
-                row_data = dict(zip(expected_headers, row))
+                row_data = cls._row_dict_from_sheet(headers, row)
 
                 # Get export ID (sequential ID from Excel, e.g., 1, 2, 3...)
                 export_id = int(row_data['id']) if row_data.get('id') else None
@@ -1597,7 +1951,9 @@ class TemplateExcelService:
                     version_id=version.id,
                     name=page_name,
                     order=page_order,
-                    name_translations=cls._parse_json(row_data.get('name_translations'))
+                    name_translations=cls._collect_translations_from_row(
+                        row_data, 'name', legacy=legacy_format
+                    ),
                 )
 
                 db.session.add(new_page)
@@ -1626,12 +1982,10 @@ class TemplateExcelService:
         headers = [cell.value for cell in sheet[1]]
         current_app.logger.info(f"Sections sheet headers: {headers}")
 
-        # Validate headers
-        expected_headers = cls.SECTION_COLUMNS
-        if headers != expected_headers:
-            error_msg = f"Sections sheet headers don't match expected columns. Expected: {expected_headers}, Got: {headers}"
-            current_app.logger.error(error_msg)
-            errors.append(error_msg)
+        _, legacy_format, header_error = cls._resolve_sheet_headers('Sections', headers)
+        if header_error:
+            current_app.logger.error(header_error)
+            errors.append(header_error)
             return errors
 
         # First pass: collect all section data
@@ -1642,7 +1996,7 @@ class TemplateExcelService:
                 continue
 
             try:
-                row_data = dict(zip(expected_headers, row))
+                row_data = cls._row_dict_from_sheet(headers, row)
                 sections_data.append((row_idx, row_data))
             except Exception as e:
                 current_app.logger.error("Sections row %s: %s", row_idx, e)
@@ -1706,7 +2060,9 @@ class TemplateExcelService:
                     existing_section.allowed_disaggregation_options = cls._parse_json(row_data.get('allowed_disaggregation_options'))
                     existing_section.data_entry_display_filters = cls._parse_json(row_data.get('data_entry_display_filters'))
                     existing_section.add_indicator_note = row_data.get('add_indicator_note')
-                    existing_section.name_translations = cls._parse_json(row_data.get('name_translations'))
+                    existing_section.name_translations = cls._collect_translations_from_row(
+                        row_data, 'name', legacy=legacy_format
+                    )
                     existing_section.relevance_condition = row_data.get('relevance_condition')
                     existing_section.archived = bool(row_data.get('archived', False))
                     # Note: parent_section_id will be updated in third pass
@@ -1731,7 +2087,9 @@ class TemplateExcelService:
                         allowed_disaggregation_options=cls._parse_json(row_data.get('allowed_disaggregation_options')),
                         data_entry_display_filters=cls._parse_json(row_data.get('data_entry_display_filters')),
                         add_indicator_note=row_data.get('add_indicator_note'),
-                        name_translations=cls._parse_json(row_data.get('name_translations')),
+                        name_translations=cls._collect_translations_from_row(
+                            row_data, 'name', legacy=legacy_format
+                        ),
                         relevance_condition=row_data.get('relevance_condition'),
                         archived=bool(row_data.get('archived', False))
                     )
@@ -1852,12 +2210,10 @@ class TemplateExcelService:
         headers = [cell.value for cell in sheet[1]]
         current_app.logger.info(f"Items sheet headers: {headers}")
 
-        # Validate headers
-        expected_headers = cls.ITEM_COLUMNS
-        if headers != expected_headers:
-            error_msg = f"Items sheet headers don't match expected columns. Expected: {expected_headers}, Got: {headers}"
-            current_app.logger.error(error_msg)
-            errors.append(error_msg)
+        _, legacy_format, header_error = cls._resolve_sheet_headers('Items', headers)
+        if header_error:
+            current_app.logger.error(header_error)
+            errors.append(header_error)
             return errors
 
         current_app.logger.info("Headers validated. Processing item rows...")
@@ -1874,7 +2230,7 @@ class TemplateExcelService:
         for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
             if not row or all(cell is None for cell in row):
                 continue
-            row_data = dict(zip(expected_headers, row))
+            row_data = cls._row_dict_from_sheet(headers, row)
             rows_buffer.append((row_idx, row_data))
             item_type = (row_data.get('item_type') or 'indicator')
             if item_type == 'indicator':
@@ -1983,10 +2339,8 @@ class TemplateExcelService:
                     existing_item.lookup_list_id = str(row_data['lookup_list_id']) if row_data.get('lookup_list_id') else None
                     existing_item.list_display_column = row_data.get('list_display_column')
                     existing_item.list_filters_json = cls._parse_json(row_data.get('list_filters_json'))
-                    existing_item.label_translations = cls._parse_json(row_data.get('label_translations'))
-                    existing_item.definition_translations = cls._parse_json(row_data.get('definition_translations'))
+                    cls._apply_item_translations_from_row(existing_item, row_data, legacy=legacy_format)
                     existing_item.options_translations = cls._parse_json(row_data.get('options_translations'))
-                    existing_item.description_translations = cls._parse_json(row_data.get('description_translations'))
                     existing_item.description = row_data.get('description')
                     items_updated += 1
                     current_app.logger.info(f"Item updated: db_id={existing_item.id}, label='{item_label[:50]}...'")
@@ -2045,12 +2399,10 @@ class TemplateExcelService:
                         lookup_list_id=str(row_data['lookup_list_id']) if row_data.get('lookup_list_id') else None,
                         list_display_column=row_data.get('list_display_column'),
                         list_filters_json=cls._parse_json(row_data.get('list_filters_json')),
-                        label_translations=cls._parse_json(row_data.get('label_translations')),
-                        definition_translations=cls._parse_json(row_data.get('definition_translations')),
                         options_translations=cls._parse_json(row_data.get('options_translations')),
-                        description_translations=cls._parse_json(row_data.get('description_translations')),
                         description=row_data.get('description')
                     )
+                    cls._apply_item_translations_from_row(new_item, row_data, legacy=legacy_format)
 
                     db.session.add(new_item)
                     items_created += 1

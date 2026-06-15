@@ -184,7 +184,8 @@ class TestDocumentModalEntityChoiceRows:
         from app.routes.main.helpers import _document_modal_entity_choice_rows
         with app.app_context():
             entities = [{"entity_type": "country", "entity_id": 1, "entity": MagicMock()}]
-            with patch("app.routes.main.helpers.EntityService.get_localized_entity_name", return_value="Test Country"), \
+            with patch("app.routes.main.helpers.EntityService.batch_entity_names",
+                       return_value={("country", 1): "Test Country"}), \
                  patch("app.routes.main.helpers.EntityService.sort_document_modal_entity_choice_rows"):
                 rows = _document_modal_entity_choice_rows(entities)
         assert len(rows) == 1
@@ -212,7 +213,7 @@ class TestDocumentModalEntityChoiceRows:
         from app.routes.main.helpers import _document_modal_entity_choice_rows
         with app.app_context():
             entities = [{"entity_type": "country", "entity_id": 5, "entity": MagicMock()}]
-            with patch("app.routes.main.helpers.EntityService.get_localized_entity_name", side_effect=Exception("fail")), \
+            with patch("app.routes.main.helpers.EntityService.batch_entity_names", side_effect=Exception("fail")), \
                  patch("app.routes.main.helpers.EntityService.sort_document_modal_entity_choice_rows"):
                 rows = _document_modal_entity_choice_rows(entities)
         assert rows[0]["label"] == "country #5"

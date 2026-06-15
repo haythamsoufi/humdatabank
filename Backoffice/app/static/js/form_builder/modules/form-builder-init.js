@@ -208,7 +208,7 @@ export function initPageSectionsToggle() {
  * Initialize Excel modal functionality
  */
 export function initExcelModal() {
-    document.addEventListener('DOMContentLoaded', function() {
+    const run = () => {
         const excelBtn = document.getElementById('excel-options-btn');
         const excelModal = document.getElementById('excel-options-modal');
         const importForm = document.getElementById('import-excel-form');
@@ -230,7 +230,13 @@ export function initExcelModal() {
                 resetOnModalClose: excelModal,
             });
         }
-    });
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', run);
+    } else {
+        run();
+    }
 }
 
 /**

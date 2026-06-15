@@ -88,6 +88,15 @@ def _make_aes(
     return aes
 
 
+def _country_patch():
+    """Avoid DB lookups for country when export helpers resolve entity metadata."""
+    country = MagicMock()
+    country.name = "Test Country"
+    country.iso3 = "TST"
+    country.iso2 = "TS"
+    return patch("app.utils.api_serialization._country_for_aes", return_value=country)
+
+
 # ---------------------------------------------------------------------------
 # _export_pdf_impl
 # ---------------------------------------------------------------------------
@@ -101,7 +110,8 @@ class TestExportPdfImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
@@ -135,7 +145,8 @@ class TestExportPdfImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
@@ -174,7 +185,8 @@ class TestExportPdfImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
@@ -215,7 +227,8 @@ class TestExportPdfImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
@@ -283,7 +296,8 @@ class TestExportPdfImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
@@ -358,7 +372,8 @@ class TestExportPdfImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
@@ -438,7 +453,8 @@ class TestExportPdfImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
@@ -514,7 +530,8 @@ class TestExportPdfImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
@@ -587,7 +604,8 @@ class TestExportPdfImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
@@ -654,7 +672,8 @@ class TestExportPdfImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
@@ -714,7 +733,8 @@ class TestExportExcelImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
@@ -740,7 +760,8 @@ class TestExportExcelImpl:
 
             mock_send = _make_mock_response(200)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
@@ -797,7 +818,8 @@ class TestExportExcelImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
@@ -849,7 +871,8 @@ class TestExportExcelImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
@@ -899,7 +922,8 @@ class TestExportExcelImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
@@ -935,7 +959,8 @@ class TestExportExcelImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
@@ -973,7 +998,8 @@ class TestImportExcelImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
@@ -996,7 +1022,8 @@ class TestImportExcelImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
@@ -1024,7 +1051,8 @@ class TestImportExcelImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
@@ -1053,7 +1081,8 @@ class TestImportExcelImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
@@ -1084,7 +1113,8 @@ class TestImportExcelImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
@@ -1115,7 +1145,8 @@ class TestImportExcelImpl:
             from flask_login import login_user
             login_user(mock_user)
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
@@ -1148,7 +1179,8 @@ class TestImportExcelImpl:
             mock_av = MagicMock()
             mock_av.validate_mime_type.return_value = (False, "text/plain")
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
@@ -1183,7 +1215,8 @@ class TestImportExcelImpl:
             mock_av = MagicMock()
             mock_av.validate_mime_type.side_effect = Exception("MIME check failed")
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
@@ -1219,7 +1252,8 @@ class TestImportExcelImpl:
                 True, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
@@ -1257,7 +1291,8 @@ class TestImportExcelImpl:
                 True, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
@@ -1300,7 +1335,8 @@ class TestImportExcelImpl:
             mock_av = MagicMock()
             mock_av.validate_mime_type.return_value = (True, "application/vnd.openxmlformats")
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
@@ -1342,7 +1378,8 @@ class TestImportExcelImpl:
             mock_av = MagicMock()
             mock_av.validate_mime_type.return_value = (True, "application/vnd.openxmlformats")
 
-            with patch("app.routes.forms.export.db"), \
+            with _country_patch(), \
+                 patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
                  patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \

@@ -100,9 +100,9 @@ def validation_questions_list_api():
         )
         for r in rows
     ]
-    response, status_code = json_ok(rows=payload_rows, truncated=truncated)
+    response = json_ok(rows=payload_rows, truncated=truncated)
     response.headers["Cache-Control"] = "no-store"
-    return response, status_code
+    return response
 
 
 @bp.route("/validation-questions/api/<int:question_id>/follow-up", methods=["POST"])

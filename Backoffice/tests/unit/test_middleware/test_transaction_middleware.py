@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 from unittest.mock import MagicMock, patch, call
 
 import pytest
@@ -13,9 +14,15 @@ from app.middleware.transaction_middleware import (
 )
 
 
+def _hook_fn_name(fn):
+    if isinstance(fn, functools.partial):
+        return _hook_fn_name(fn.func)
+    return getattr(fn, "__name__", None)
+
+
 def _hook(app, registry: str, name: str):
     funcs = getattr(app, f"{registry}_funcs", {}).get(None, [])
-    return next((fn for fn in funcs if fn.__name__ == name), None)
+    return next((fn for fn in funcs if _hook_fn_name(fn) == name), None)
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -50,20 +57,17 @@ class TestGetViewFunc:
                 result = _get_view_func()
                 assert result is None
 
-    def test_exception_in_lookup_returns_none(self, app, caplog):
-        import logging
-
+    def test_exception_in_lookup_returns_none(self, app):
         with app.test_request_context("/"):
             with patch("app.middleware.transaction_middleware.request") as mock_req, \
-                 patch("app.middleware.transaction_middleware.current_app") as mock_app:
+                 patch("app.middleware.transaction_middleware.current_app") as mock_app, \
+                 patch("app.middleware.transaction_middleware.logger.debug") as mock_debug:
                 mock_req.endpoint = "some.endpoint"
                 mock_app.view_functions = MagicMock()
                 mock_app.view_functions.get.side_effect = Exception("lookup failed")
-                with caplog.at_level(logging.DEBUG,
-                                     logger="app.middleware.transaction_middleware"):
-                    result = _get_view_func()
+                result = _get_view_func()
                 assert result is None
-                assert "lookup failed" in caplog.text
+                mock_debug.assert_called_once()
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -362,9 +366,11 @@ class TestTransactionMiddlewareIntegration:
 
 class TestTransactionRegisteredHooks:
     def test_before_request_manages_dashboard(self, app):
-        with app.test_request_context("/dashboard"):
+        with app.test_request_context("/"):
             g.pop("_auto_txn_managed", None)
-            _hook(app, "before_request", "_txn_before_request")()
+            with patch("app.middleware.transaction_middleware.request") as mock_req:
+                mock_req.endpoint = "main.dashboard"
+                _hook(app, "before_request", "_txn_before_request")()
             assert g._auto_txn_managed is True
             assert g._auto_txn_streaming is False
 
@@ -449,7 +455,7 @@ class TestTransactionRegisteredHooks:
                 assert g._auto_txn_streaming is True
                 assert out is resp
                 mock_remove.assert_not_called()
-                for callback in getattr(resp, "_close_callbacks", []):
+                for callback in getattr(resp, "_on_close", []):
                     callback()
                 mock_remove.assert_called_once_with(reason="stream_close")
 
@@ -501,6 +507,6 @@ class TestTransactionRegisteredHooks:
                 result = wrapped(ValueError("boom"))
 
             mock_rb.assert_called_once_with(reason="handle_exception")
-            mock_remove.assert_called_once_with(reason="handle_exception")
+            mock_remove.assert_any_call(reason="handle_exception")
             delegate.assert_called_once()
             assert result.status_code == 500

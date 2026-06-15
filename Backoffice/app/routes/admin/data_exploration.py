@@ -149,7 +149,7 @@ def explore_data():
                              title=_("Explore Data"))
     except Exception as e:
         logger.error(f"Error loading data exploration page: {str(e)}", exc_info=True)
-        # Return empty data rather than crashing
+        db.session.rollback()
         return render_template("admin/data_exploration/explore_data.html",
                              templates=[],
                              period_names=[],

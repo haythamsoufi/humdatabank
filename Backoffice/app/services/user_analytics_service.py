@@ -16,6 +16,7 @@ from flask_login import current_user
 from sqlalchemy import and_, or_, func, inspect, text, Integer
 from app import db
 from app.utils.datetime_helpers import utcnow, ensure_utc
+from app.utils.transactions import atomic, request_transaction_rollback
 from app.models import (
     UserLoginLog, UserActivityLog, UserSessionLog,
     AdminActionLog, SecurityEvent, User
@@ -24,7 +25,6 @@ import json
 import re
 from urllib.parse import urlparse
 from user_agents import parse
-from app.utils.transactions import request_transaction_rollback
 from app.utils.constants import DEFAULT_SESSION_CLEANUP_LOCK_ID
 from app.utils.activity_types import normalize_activity_type
 from app.utils.page_view_paths import (
@@ -113,7 +113,9 @@ def get_client_info():
 
 def _is_auto_managed_request() -> bool:
     """Check whether the request lifecycle is auto-managed by the transaction middleware."""
-    return has_request_context() and bool(getattr(g, "_auto_txn_managed", False))
+    if not has_request_context():
+        return False
+    return bool(getattr(g, "_auto_txn_managed", False))
 
 
 def _commit_or_flush():

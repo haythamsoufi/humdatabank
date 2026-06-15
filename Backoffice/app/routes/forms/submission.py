@@ -15,7 +15,9 @@ from app.models import (
     db, AssignedForm, AssignmentEntityStatus, Country, FormItem, FormPage,
     FormSection, PublicSubmission, PublicSubmissionStatus, QuestionType,
 )
+from app.services.authorization_service import AuthorizationService
 from app.services.entity_service import EntityService
+from app.services.form_data_service import FormDataService
 from app.services.form_processing_service import get_form_items_for_section, slugify_age_group
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
@@ -203,7 +205,6 @@ def register_submission_routes(bp):
     @login_required
     def delete_self_report_assignment(aes_id):
         assignment_entity_status = AssignmentEntityStatus.query.get_or_404(aes_id)
-        from app.services.authorization_service import AuthorizationService
         if not AuthorizationService.check_self_report_access(assignment_entity_status, current_user):
             flash("Access denied.", "warning"); return redirect(url_for("main.dashboard"))
         if assignment_entity_status.assigned_form.period_name != SELF_REPORT_PERIOD_NAME:
@@ -240,7 +241,6 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
         db.joinedload(PublicSubmission.country)
     ).get_or_404(submission_id)
 
-    from app.services.authorization_service import AuthorizationService
     if AuthorizationService.is_system_manager(current_user) or AuthorizationService.has_rbac_permission(current_user, 'admin.assignments.public_submissions.manage'):
         can_edit = True
     elif AuthorizationService.has_country_access(current_user, submission.country_id) and AuthorizationService.has_rbac_permission(current_user, 'assignment.enter'):
@@ -306,8 +306,6 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
                             flash(f'Country changed to {new_country.name}', 'success')
                     except (ValueError, TypeError):
                         flash('Invalid country selection', 'danger')
-
-                from app.services.form_data_service import FormDataService
 
                 sections = all_sections
 
@@ -598,8 +596,6 @@ def _fill_public_form_impl(public_token):
                     )
                     db.session.add(submission)
                     db.session.flush()
-
-                    from app.services.form_data_service import FormDataService
 
                     submission_result = FormDataService.process_form_submission(
                         submission, sections, csrf_form=None

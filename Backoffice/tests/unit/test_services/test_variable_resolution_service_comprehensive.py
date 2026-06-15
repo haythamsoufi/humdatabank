@@ -855,7 +855,7 @@ class TestResolveEntitiesContaining:
         entity_statuses = self._aes_list([10])
         mock_fd_cls.query.filter_by.return_value.order_by.return_value.first.return_value = None
         config = {'source_form_item_id': 5, 'return_format': 'names_comma'}
-        with patch('app.services.entity_service.EntityService.get_localized_entity_name', return_value='France'):
+        with patch('app.services.entity_service.EntityService.batch_entity_names', return_value={("country", 10): "France"}):
             result = VariableResolutionService._resolve_entities_containing(entity_statuses, config)
         assert result == 'France'
 
@@ -864,7 +864,7 @@ class TestResolveEntitiesContaining:
         entity_statuses = self._aes_list([10])
         mock_fd_cls.query.filter_by.return_value.order_by.return_value.first.return_value = None
         config = {'source_form_item_id': 5, 'return_format': 'names_comma'}
-        with patch('app.services.entity_service.EntityService.get_localized_entity_name', return_value=None):
+        with patch('app.services.entity_service.EntityService.batch_entity_names', return_value={}):
             result = VariableResolutionService._resolve_entities_containing(entity_statuses, config)
         assert result == 'Entity 10'
 
@@ -873,7 +873,7 @@ class TestResolveEntitiesContaining:
         entity_statuses = self._aes_list([10])
         mock_fd_cls.query.filter_by.return_value.order_by.return_value.first.return_value = None
         config = {'source_form_item_id': 5, 'return_format': 'ids_and_names_comma'}
-        with patch('app.services.entity_service.EntityService.get_localized_entity_name', return_value='France'):
+        with patch('app.services.entity_service.EntityService.batch_entity_names', return_value={("country", 10): "France"}):
             result = VariableResolutionService._resolve_entities_containing(entity_statuses, config)
         assert result == '10 (France)'
 
@@ -882,7 +882,7 @@ class TestResolveEntitiesContaining:
         entity_statuses = self._aes_list([10])
         mock_fd_cls.query.filter_by.return_value.order_by.return_value.first.return_value = None
         config = {'source_form_item_id': 5, 'return_format': 'ids_and_names_comma'}
-        with patch('app.services.entity_service.EntityService.get_localized_entity_name', return_value=None):
+        with patch('app.services.entity_service.EntityService.batch_entity_names', return_value={}):
             result = VariableResolutionService._resolve_entities_containing(entity_statuses, config)
         assert result == '10'
 

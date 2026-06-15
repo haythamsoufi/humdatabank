@@ -10,55 +10,6 @@ Strategy:
 
 import pytest
 from unittest.mock import patch, MagicMock
-from flask import abort, Blueprint
-
-
-# ---------------------------------------------------------------------------
-# Session-scoped fixture: register trigger routes once on the shared app
-# ---------------------------------------------------------------------------
-
-_ERROR_ROUTES_REGISTERED = False
-
-
-@pytest.fixture(scope="session", autouse=True)
-def register_error_trigger_routes(app):
-    """Register /test-error/<code> routes on the session-scoped app once."""
-    global _ERROR_ROUTES_REGISTERED
-    if _ERROR_ROUTES_REGISTERED:
-        return
-
-    bp = Blueprint("_error_triggers", __name__, url_prefix="/test-error")
-
-    @bp.route("/400")
-    def trigger_400():
-        abort(400)
-
-    @bp.route("/401")
-    def trigger_401():
-        abort(401)
-
-    @bp.route("/403")
-    def trigger_403():
-        abort(403)
-
-    @bp.route("/404")
-    def trigger_404():
-        abort(404)
-
-    @bp.route("/500")
-    def trigger_500():
-        abort(500)
-
-    @bp.route("/502")
-    def trigger_502():
-        abort(502)
-
-    @bp.route("/503")
-    def trigger_503():
-        abort(503)
-
-    app.register_blueprint(bp)
-    _ERROR_ROUTES_REGISTERED = True
 
 
 # ---------------------------------------------------------------------------

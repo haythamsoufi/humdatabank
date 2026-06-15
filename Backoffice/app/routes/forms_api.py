@@ -70,6 +70,7 @@ def _presence_rate_limit_key():
     return f"presence_ip{get_remote_address()}_aes{aes_id or 'x'}"
 
 
+from app.models.assignments import AssignmentEntityStatus
 from app.services.form_processing_service import slugify_age_group
 
 

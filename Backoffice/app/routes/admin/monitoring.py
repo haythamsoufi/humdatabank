@@ -11,6 +11,8 @@ from app.utils.api_responses import json_error, json_error_handler, json_not_fou
 from app.utils.constants import MAX_LOG_ROTATION_KEEP_LINES, MAX_LOG_TAIL_LINES
 from app.services.monitoring.memory import memory_monitor
 from app.services.monitoring.system import system_monitor
+from app.services.security.monitoring import SecurityMonitor
+from app.services.email.service import send_security_alert
 from flask_babel import gettext as _
 import os
 import re
@@ -552,8 +554,6 @@ def test_error_notification():
     WARNING: This will send actual email notifications to system managers.
     Only use this for testing the notification system.
     """
-    from app.services.security.monitoring import SecurityMonitor
-    from app.services.email.service import send_security_alert
     from app.models import User
     from app.utils.datetime_helpers import utcnow
 
@@ -640,4 +640,5 @@ def test_error_notification():
     # Note: The notification was already sent above (bypassing DEBUG check),
     # so even if DEBUG=True, the email was sent. The 500 handler won't send
     # another email in DEBUG mode, but that's fine since we already sent it.
-    raise Exception(error_message)
+    from werkzeug.exceptions import InternalServerError
+    raise InternalServerError(description=error_message)

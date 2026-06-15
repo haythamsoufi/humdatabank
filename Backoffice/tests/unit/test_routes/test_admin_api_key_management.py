@@ -56,8 +56,9 @@ class TestListApiKeys:
         assert resp.status_code == 200
 
     def test_list_expired_filter(self, logged_in_client, db_session, app):
+        from app.utils.datetime_helpers import utcnow
         with app.app_context():
-            past = datetime.utcnow() - timedelta(days=1)
+            past = utcnow() - timedelta(days=1)
             _create_key(db_session, client_name="Expired Client", expires_at=past)
         resp = logged_in_client.get("/admin/api-management/api-keys?status=expired")
         assert resp.status_code == 200

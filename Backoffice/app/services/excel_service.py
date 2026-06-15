@@ -10,8 +10,11 @@ from openpyxl.styles import Alignment, Font, PatternFill
 
 from app.services import get_formdata_map
 from app.services.form_data_service import FormDataService
+from app.services.variable_resolution_service import VariableResolutionService
 from app.utils.route_helpers import get_unified_form_item_id
 from app.models.forms import FormData
+from app.models.assignments import PublicSubmission
+from app import db
 
 
 class ExcelService:
@@ -342,13 +345,19 @@ class ExcelService:
         """
         field_data: Dict[int, Dict[str, Any]] = {}
         valid_sheet_found = False
+        saw_valid_item_id = False
+
+        def _row_is_blank(row) -> bool:
+            return not row or all(
+                cell is None or str(cell).strip() == '' for cell in row
+            )
 
         for sheet_name in workbook.sheetnames:
             sheet = workbook[sheet_name]
             try:
                 # Try to detect format by checking first row
                 first_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), None)
-                if not first_row:
+                if not first_row or _row_is_blank(first_row):
                     continue
 
                 # Check if it's old table format (has headers) or new form format
@@ -369,8 +378,11 @@ class ExcelService:
                     start_row = 1
 
                 # Iterate through all rows
-                for row in sheet.iter_rows(min_row=start_row, values_only=True):
-                    if len(row) < 3:
+                for raw_row in sheet.iter_rows(min_row=start_row, values_only=True):
+                    row = tuple(raw_row) if raw_row else ()
+                    while row and row[-1] is None:
+                        row = row[:-1]
+                    if _row_is_blank(row) or len(row) < 4:
                         continue
 
                     # Column A: item_id (hidden)
@@ -380,6 +392,7 @@ class ExcelService:
 
                     try:
                         item_id = int(item_id)
+                        saw_valid_item_id = True
                     except (ValueError, TypeError):
                         # Skip rows without valid item_id
                         continue
@@ -453,7 +466,7 @@ class ExcelService:
         if not valid_sheet_found:
             raise ValueError("The Excel file does not contain a valid data sheet.")
 
-        if not field_data:
+        if not saw_valid_item_id:
             raise ValueError("The Excel file contains no valid data rows with item_id values.")
 
         return field_data
@@ -475,9 +488,7 @@ class ExcelService:
         Returns:
             Dict with success status, count of updates, and any errors
         """
-        from app.services.form_data_service import FormDataService
-        from app.models.forms import FormData
-        from app.models.assignments import PublicSubmission
+        from app import db
         import logging
 
         logger = logging.getLogger(__name__)
@@ -509,7 +520,6 @@ class ExcelService:
                     if not data_entry:
                         # Create new entry
                         data_entry = DataModel(**query_filter)
-                        from app import db
                         db.session.add(data_entry)
 
                     # Handle disaggregation data first (takes precedence)

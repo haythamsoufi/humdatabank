@@ -10,6 +10,7 @@ Part of the /api/v1 blueprint.
 
 from flask import request, current_app
 from flask_login import current_user
+from werkzeug.exceptions import NotFound
 import uuid
 from sqlalchemy import desc
 from app.models.enums import IndicatorSuggestionStatusValue
@@ -327,6 +328,8 @@ def get_indicator_suggestion(suggestion_id):
             'is_new_indicator': suggestion.is_new_indicator
         })
 
+    except NotFound:
+        raise
     except Exception as e:
         current_app.logger.error(f"Error retrieving indicator suggestion {suggestion_id}: {str(e)}")
         return api_error('Failed to retrieve suggestion', 500)
@@ -365,6 +368,8 @@ def update_indicator_suggestion_status(suggestion_id):
             'status_display': suggestion.status_display
         })
 
+    except NotFound:
+        raise
     except Exception as e:
         request_transaction_rollback()
         current_app.logger.error(f"Error updating indicator suggestion status: {str(e)}")

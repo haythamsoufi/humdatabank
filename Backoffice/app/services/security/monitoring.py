@@ -179,7 +179,12 @@ class SecurityMonitor:
             ]
 
             # This is a simplified check - in production, you'd analyze actual request logs
-            user_agent = request.user_agent.string.lower() if request.user_agent else ''
+            user_agent = ''
+            if request.user_agent:
+                if hasattr(request.user_agent, 'string') and request.user_agent.string:
+                    user_agent = request.user_agent.string.lower()
+                else:
+                    user_agent = str(request.user_agent).lower()
 
             for agent in suspicious_agents:
                 if agent in user_agent:

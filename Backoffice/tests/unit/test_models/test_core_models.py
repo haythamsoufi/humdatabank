@@ -561,6 +561,7 @@ class TestCountryModel:
 class TestUserLoginLog:
     def _make_log(self, **kwargs):
         log = UserLoginLog.__new__(UserLoginLog)
+        UserLoginLog._sa_class_manager.setup_instance(log)
         log.event_type = kwargs.get("event_type", "login_success")
         log.browser = kwargs.get("browser", None)
         log.device_type = kwargs.get("device_type", None)

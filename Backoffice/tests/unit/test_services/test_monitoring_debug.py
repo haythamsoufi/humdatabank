@@ -200,7 +200,7 @@ class TestConfigureLogging:
         with (
             patch("os.makedirs"),
             patch("os.path.join", side_effect=lambda *a: "/".join(str(x) for x in a)),
-            patch("logging.handlers.RotatingFileHandler", return_value=mock_handler),
+            patch("app.utils.logging_handlers.create_rotating_file_handler", return_value=mock_handler),
             patch("logging.getLogger", return_value=MagicMock(spec=logging.Logger, handlers=[])),
         ):
             mgr.configure_logging(app)
@@ -240,32 +240,26 @@ class TestConfigureLogging:
         with (
             patch("os.makedirs"),
             patch("os.path.join", side_effect=lambda *a: "/".join(str(x) for x in a)),
-            patch("logging.handlers.RotatingFileHandler", return_value=mock_fh),
+            patch("app.utils.logging_handlers.create_rotating_file_handler", return_value=mock_fh),
             patch("logging.getLogger", return_value=MagicMock(spec=logging.Logger, handlers=[])),
         ):
             mgr.configure_logging(app)
 
-    def test_root_file_handler_exception_logged(self):
-        """If root file handler creation fails, a warning is logged."""
+    def test_file_handler_creation_exception_logged(self):
+        """If application log file handler creation fails, a warning is logged."""
         mgr = _fresh_debug_manager()
         app = _make_mock_app({
             "APPLICATION_LOG_FILE_ENABLED": True,
             "LOG_TO_STDOUT": False,
         })
-        app.application_log_file_path = "/fake/path/application.log"
-
-        call_count = [0]
-
-        def rotating_side_effect(*args, **kwargs):
-            call_count[0] += 1
-            if call_count[0] >= 2:
-                raise OSError("second handler fails")
-            return MagicMock()
 
         with (
             patch("os.makedirs"),
             patch("os.path.join", side_effect=lambda *a: "/".join(str(x) for x in a)),
-            patch("logging.handlers.RotatingFileHandler", side_effect=rotating_side_effect),
+            patch(
+                "app.utils.logging_handlers.create_rotating_file_handler",
+                side_effect=OSError("handler fails"),
+            ),
             patch("logging.getLogger", return_value=MagicMock(spec=logging.Logger, handlers=[])),
         ):
             mgr.configure_logging(app)

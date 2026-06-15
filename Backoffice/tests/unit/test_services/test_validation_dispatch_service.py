@@ -434,6 +434,9 @@ class TestSendDispatch:
             "app.services.validation_dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
             return_value=[],  # no recipients → failed
         ), patch(
+            "app.services.validation_dispatch_service.EntityService.batch_entity_names",
+            return_value={},
+        ), patch(
             "app.services.validation_dispatch_service.utcnow",
             return_value=MagicMock(),
         ):

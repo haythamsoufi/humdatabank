@@ -18,6 +18,10 @@ from app.services.notification.core import (
 )
 from app.models.enums import NotificationType
 from app.utils.datetime_helpers import utcnow
+from app.utils.ws_manager import broadcast_notification, broadcast_unread_count
+from app.services.notification.service import NotificationService
+from app.services.notification.push import PushNotificationService
+from app.services.notification.emails import send_instant_notification_email
 
 DEFAULT_TITLE_KEY = 'notification.admin_message.title'
 DEFAULT_MESSAGE_KEY = 'notification.admin_message.message'
@@ -280,12 +284,6 @@ def process_scheduled_notifications() -> int:
                 notification.sent_at = now
 
                 # Broadcast via WebSocket, push, email (same as immediate notifications)
-                from app.utils.ws_manager import broadcast_notification, broadcast_unread_count
-                from app.services.notification.service import NotificationService
-                from app.services.notification.push import PushNotificationService
-                from app.services.notification.emails import send_instant_notification_email
-                from app.models import User as UserModel
-
                 # Broadcast via WebSocket
                 try:
                     notification_data = {
@@ -312,7 +310,7 @@ def process_scheduled_notifications() -> int:
 
                 # Send push notification
                 try:
-                    user = UserModel.query.get(notification.user_id)
+                    user = User.query.get(notification.user_id)
                     if user:
                         PushNotificationService.send_push_notification(
                             user_id=notification.user_id,
@@ -330,7 +328,7 @@ def process_scheduled_notifications() -> int:
 
                 # Send email if user preferences allow
                 try:
-                    user = UserModel.query.get(notification.user_id)
+                    user = User.query.get(notification.user_id)
                     if user and user.email:
                         send_instant_notification_email(user, notification, override_preferences=False)
                 except Exception as e:

@@ -816,6 +816,8 @@
         // Bulk status form submit
         document.getElementById('bulk-status-form')?.addEventListener('submit', function(e) {
             e.preventDefault();
+            const form = e.currentTarget;
+            if (form && form.dataset.submitting === '1') return;
             const ids = getEntityGridSelectedIds();
             const status = document.getElementById('bulk-status-select')?.value;
             if (ids.length === 0 || !status) {
@@ -824,6 +826,9 @@
                 }
                 return;
             }
+            const submitBtn = form ? form.querySelector('[type="submit"]') : null;
+            if (form) form.dataset.submitting = '1';
+            if (submitBtn) submitBtn.disabled = true;
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
             fetch(cfg.urls.assignmentBulkUpdateStatus, {
                 method: 'POST',
@@ -833,11 +838,15 @@
               .then(function(result) {
                   if (result.ok && result.data.success) { closeModal(bulkStatusModal); window.location.reload(); }
                   else {
+                    if (form) form.dataset.submitting = '0';
+                    if (submitBtn) submitBtn.disabled = false;
                     var m = result.data.error || 'Failed to update status.';
                     if (window.showAlert) window.showAlert(m, 'error');
                   }
               })
               .catch(function() {
+                if (form) form.dataset.submitting = '0';
+                if (submitBtn) submitBtn.disabled = false;
                 if (window.showAlert) window.showAlert('Request failed.', 'error'); else window.__clientWarn && window.__clientWarn('Request failed.');
               });
         });
@@ -855,6 +864,8 @@
         // Bulk due date form submit
         document.getElementById('bulk-duedate-selected-form')?.addEventListener('submit', function(e) {
             e.preventDefault();
+            const form = e.currentTarget;
+            if (form && form.dataset.submitting === '1') return;
             const ids = getEntityGridSelectedIds();
             const dueDate = document.getElementById('bulk-duedate-selected-input')?.value;
             if (ids.length === 0 || !dueDate) {
@@ -863,6 +874,9 @@
                 }
                 return;
             }
+            const submitBtn = form ? form.querySelector('[type="submit"]') : null;
+            if (form) form.dataset.submitting = '1';
+            if (submitBtn) submitBtn.disabled = true;
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
             fetch(cfg.urls.assignmentBulkUpdateDueDate, {
                 method: 'POST',
@@ -872,11 +886,15 @@
               .then(function(result) {
                   if (result.ok && result.data.success) { closeModal(bulkDuedateSelectedModal); window.location.reload(); }
                   else {
+                    if (form) form.dataset.submitting = '0';
+                    if (submitBtn) submitBtn.disabled = false;
                     var m = result.data.error || 'Failed to update due date.';
                     if (window.showAlert) window.showAlert(m, 'error');
                   }
               })
               .catch(function() {
+                if (form) form.dataset.submitting = '0';
+                if (submitBtn) submitBtn.disabled = false;
                 if (window.showAlert) window.showAlert('Request failed.', 'error'); else window.__clientWarn && window.__clientWarn('Request failed.');
               });
         });
@@ -2636,6 +2654,7 @@
                         window.FormSubmitGuard.reset(mainForm);
                     }
                 } catch (_) { /* no-op */ }
+                mainForm.dataset.maSubmitting = '0';
             }
 
             // Use capture phase to ensure we run before any other handlers
@@ -2648,6 +2667,15 @@
                     resetSubmitGuard();
                     return false;
                 }
+
+                // Prevent re-entry while preflight/confirmation dialog is open
+                if (mainForm.dataset.maSubmitting === '1') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    return false;
+                }
+                mainForm.dataset.maSubmitting = '1';
 
                 // We'll submit programmatically after syncing hidden inputs + duplicate preflight.
                 e.preventDefault();

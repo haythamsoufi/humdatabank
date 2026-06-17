@@ -108,22 +108,51 @@ function setupSingleDynamicSection(sectionContainer) {
 
     debugLog('dynamic-indicators', `Setting up dynamic section ${sectionId}`);
 
-    // Set up Add Indicator button
+    // Set up Add Indicator button. Read data-repeat-instance at click time so the handler
+    // works correctly even after repeat-sections.js moves this element into a repeat entry
+    // and adds the attribute post-setup.
     if (addBtn) {
-        addBtn.addEventListener('click', () => handleAddIndicator(sectionContainer, sectionId));
+        addBtn.addEventListener('click', () => {
+            const repeatInstance = sectionContainer.getAttribute('data-repeat-instance')
+                ? parseInt(sectionContainer.getAttribute('data-repeat-instance'), 10)
+                : null;
+            handleAddIndicator(sectionContainer, sectionId, repeatInstance);
+        });
     }
 }
 
-function handleAddIndicator(sectionContainer, sectionId) {
+/**
+ * Initialize the "Add Indicator" button for a per-repeat-entry dynamic interface.
+ * Called by repeat-sections.js after creating a cloned interface for Entry #2+.
+ *
+ * @param {HTMLElement} interfaceContainer - The wrapper element for this per-entry interface
+ * @param {string|number} sectionId - The original section ID
+ * @param {number} repeatInstance - The repeat entry instance number
+ */
+export function setupPerEntryDynamicInterface(interfaceContainer, sectionId, repeatInstance) {
+    const addBtnId = `add-indicator-row-btn-${sectionId}-ri-${repeatInstance}`;
+    // Search within the widget first (it may not be in the live document yet when this is called)
+    const addBtn = interfaceContainer.querySelector(`#${addBtnId}`) || document.getElementById(addBtnId);
+    if (!addBtn) {
+        debugWarn('dynamic-indicators', `Per-entry add button not found: ${addBtnId}`);
+        return;
+    }
+    addBtn.addEventListener('click', () => handleAddIndicator(interfaceContainer, sectionId, repeatInstance));
+    debugLog('dynamic-indicators', `Per-entry dynamic interface ready: section=${sectionId} instance=${repeatInstance}`);
+}
+
+function handleAddIndicator(sectionContainer, sectionId, repeatInstance = null) {
     // Check maximum indicators limit (same logic for all sections)
     const maxIndicators = sectionContainer.getAttribute('data-max-dynamic-indicators');
     if (maxIndicators && exceedsMaximumLimit(sectionContainer, sectionId, maxIndicators)) {
         return; // Exit if limit exceeded
     }
 
-    // Add indicator row
-    const availableIndicators = window.availableIndicatorsData[sectionId] || [];
-    addIndicatorRow(sectionId, availableIndicators);
+    // For per-entry cloned widgets the sectionId might be "416-ri-2"; resolve the
+    // canonical section ID (stored in data-dynamic-section-id or derived by stripping "-ri-N").
+    const canonicalSectionId = sectionContainer.getAttribute('data-dynamic-section-id') || sectionId.replace(/-ri-\d+$/, '');
+    const availableIndicators = window.availableIndicatorsData[canonicalSectionId] || [];
+    addIndicatorRow(canonicalSectionId, availableIndicators, repeatInstance);
 }
 
 function exceedsMaximumLimit(sectionContainer, sectionId, maxIndicators) {
@@ -207,30 +236,45 @@ function setupDynamicIndicatorDeletion() {
                     return;
                 }
 
-                // Saved indicator - use API to delete
+                // Saved indicator - defer deletion to form save (do NOT call the DELETE API now)
                 const displayName = indicatorName || `Indicator ${assignmentId}`;
                 const templates = window.DYNAMIC_INDICATORS_TEMPLATES || {};
                 const confirmMessage = templates.confirmRemove ?
                     templates.confirmRemove.replace('%(name)s', displayName) :
-                    `Are you sure you want to remove the indicator "${displayName}"? This action cannot be undone.`;
+                    `Are you sure you want to remove the indicator "${displayName}"?`;
+
+                const deferDelete = () => {
+                    const indicatorElement = document.querySelector(`[data-assignment-id="${assignmentId}"]`);
+                    const formItemBlock = indicatorElement?.closest('.form-item-block');
+                    const sectionContainer = indicatorElement?.closest('[data-section-type="dynamic_indicators"]');
+
+                    // Track the deletion via a hidden form input processed on save
+                    const form = document.querySelector('form#focalDataEntryForm');
+                    if (form) {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = `delete_dynamic_indicator_${assignmentId}`;
+                        input.value = '1';
+                        form.appendChild(input);
+                    }
+
+                    if (formItemBlock) {
+                        formItemBlock.remove();
+                    } else if (indicatorElement) {
+                        indicatorElement.remove();
+                    }
+
+                    if (sectionContainer) {
+                        refreshSingleSectionButtonState(sectionContainer);
+                    } else {
+                        refreshDynamicIndicatorButtonStates();
+                    }
+                };
+
                 if (window.showDangerConfirmation) {
-                    window.showDangerConfirmation(
-                        confirmMessage,
-                        () => deleteDynamicIndicator(assignmentId, displayName),
-                        null,
-                        'Remove',
-                        'Cancel',
-                        'Remove Indicator?'
-                    );
+                    window.showDangerConfirmation(confirmMessage, deferDelete, null, 'Remove', 'Cancel', 'Remove Indicator?');
                 } else if (window.showConfirmation) {
-                    window.showConfirmation(
-                        confirmMessage,
-                        () => deleteDynamicIndicator(assignmentId, displayName),
-                        null,
-                        'Remove',
-                        'Cancel',
-                        'Remove Indicator?'
-                    );
+                    window.showConfirmation(confirmMessage, deferDelete, null, 'Remove', 'Cancel', 'Remove Indicator?');
                 } else {
                     (window.__clientWarn || console.warn)('Confirmation dialog not available:', confirmMessage);
                 }
@@ -339,10 +383,15 @@ function deleteDynamicIndicator(assignmentId, indicatorName) {
     });
 }
 
-function addIndicatorRow(sectionId, availableIndicators) {
-    const rowsContainer = document.getElementById(`dynamic-indicator-rows-${sectionId}`);
+function addIndicatorRow(sectionId, availableIndicators, repeatInstance = null) {
+    // For per-entry interfaces the rows container has a compound id; fall back to section-level
+    const rowsContainerId = repeatInstance !== null
+        ? `dynamic-indicator-rows-${sectionId}-ri-${repeatInstance}`
+        : `dynamic-indicator-rows-${sectionId}`;
+    const rowsContainer = document.getElementById(rowsContainerId) ||
+                          document.getElementById(`dynamic-indicator-rows-${sectionId}`);
     if (!rowsContainer) {
-        debugError('dynamic-indicators', `Container not found: dynamic-indicator-rows-${sectionId}`);
+        debugError('dynamic-indicators', `Container not found: ${rowsContainerId}`);
         return;
     }
 
@@ -460,7 +509,7 @@ function addIndicatorRow(sectionId, availableIndicators) {
     }
 
     // Set up indicator selection functionality
-    setupIndicatorSelection(rowId, sectionId, indicators, filterData, displayFilters);
+    setupIndicatorSelection(rowId, sectionId, indicators, filterData, displayFilters, repeatInstance);
 
     // Add event listener for remove button
     const removeBtn = document.querySelector(`button[data-row-id="${rowId}"].remove-indicator-row`);
@@ -471,7 +520,7 @@ function addIndicatorRow(sectionId, availableIndicators) {
     }
 }
 
-function setupIndicatorSelection(rowId, sectionId, indicators, filterData, displayFilters) {
+function setupIndicatorSelection(rowId, sectionId, indicators, filterData, displayFilters, repeatInstance = null) {
     debugLog('dynamic-indicators', `Setting up indicator selection for row ${rowId}`);
 
     const searchInput = document.querySelector(`input[data-row-id="${rowId}"]`);
@@ -618,7 +667,7 @@ function setupIndicatorSelection(rowId, sectionId, indicators, filterData, displ
                 const indicatorId = this.getAttribute('data-indicator-id');
                 const indicatorName = this.getAttribute('data-indicator-name');
 
-                if (isIndicatorAlreadyAdded(sectionId, indicatorId)) {
+                if (isIndicatorAlreadyAdded(sectionId, indicatorId, repeatInstance)) {
                     const labels = window.DYNAMIC_INDICATORS_LABELS || {};
                     const message = labels.indicatorAlreadyAdded || 'This indicator is already added to this section.';
                     if (window.showAlert) window.showAlert(message, 'warning');
@@ -637,7 +686,7 @@ function setupIndicatorSelection(rowId, sectionId, indicators, filterData, displ
                 showIndicatorLoadingState(rowId, indicatorName);
 
                 // Add the dynamic indicator without reloading the page
-                addDynamicIndicator(sectionId, indicatorId, rowId);
+                addDynamicIndicator(sectionId, indicatorId, rowId, repeatInstance);
             });
         });
     }
@@ -732,11 +781,15 @@ function removeIndicatorLoadingState(rowId) {
     }
 }
 
-function addDynamicIndicator(sectionId, indicatorId, rowId) {
-    debugLog('dynamic-indicators', `Adding dynamic indicator ${indicatorId} to section ${sectionId}`);
+function addDynamicIndicator(sectionId, indicatorId, rowId, repeatInstance = null) {
+    debugLog('dynamic-indicators', `Adding dynamic indicator ${indicatorId} to section ${sectionId}${repeatInstance !== null ? ` (repeat instance ${repeatInstance})` : ''}`);
 
-    const sectionContainer = document.getElementById(`section-container-${sectionId}`);
-    const aesId = sectionContainer?.getAttribute('data-aes-id');
+    // For per-entry interfaces the section container has a compound id; fall back to section-level
+    const sectionContainer = (repeatInstance !== null
+        ? document.getElementById(`section-container-${sectionId}-ri-${repeatInstance}`)
+        : null) || document.getElementById(`section-container-${sectionId}`);
+    const aesId = sectionContainer?.getAttribute('data-aes-id')
+               || document.querySelector('[data-aes-id]')?.getAttribute('data-aes-id');
 
     if (!aesId) {
         debugError('dynamic-indicators', 'Assignment entity status ID not found');
@@ -834,6 +887,9 @@ function addDynamicIndicator(sectionId, indicatorId, rowId) {
     formData.append('indicator_bank_id', indicatorId);
     formData.append('assignment_entity_status_id', aesId);
     formData.append('temp_assignment_id', tempAssignmentId);
+    if (repeatInstance !== null) {
+        formData.append('repeat_instance_number', repeatInstance);
+    }
 
     // Get CSRF token
     const csrfToken = document.querySelector('input[name="csrf_token"]')?.value ||
@@ -867,7 +923,10 @@ function addDynamicIndicator(sectionId, indicatorId, rowId) {
         removeIndicatorLoadingState(rowId);
 
         try {
-            const interfaceEl = document.getElementById(`dynamic-indicator-interface-${sectionId}`);
+            // For per-entry interfaces use compound id, fall back to section-level id
+            const interfaceEl = (repeatInstance !== null
+                ? document.getElementById(`dynamic-indicator-interface-${sectionId}-ri-${repeatInstance}`)
+                : null) || document.getElementById(`dynamic-indicator-interface-${sectionId}`);
             const insertionPoint = interfaceEl?.parentElement || sectionContainer;
 
             const parser = new DOMParser();
@@ -882,12 +941,16 @@ function addDynamicIndicator(sectionId, indicatorId, rowId) {
                 throw new Error('Insertion point not found');
             }
 
-            // Add hidden input to track pending indicator for form submission
+            // Add hidden input to track pending indicator for form submission.
+            // Per-repeat-instance indicators use a compound key format so the backend
+            // can parse the instance number from the field name.
             const form = document.querySelector('form#focalDataEntryForm');
             if (form) {
                 const pendingInput = document.createElement('input');
                 pendingInput.type = 'hidden';
-                pendingInput.name = `pending_dynamic_indicator_${sectionId}`;
+                pendingInput.name = repeatInstance !== null
+                    ? `pending_dynamic_indicator_${sectionId}_ri_${repeatInstance}`
+                    : `pending_dynamic_indicator_${sectionId}`;
                 pendingInput.value = `${indicatorId}:${tempAssignmentId}`;
                 pendingInput.setAttribute('data-temp-assignment-id', tempAssignmentId);
                 form.appendChild(pendingInput);
@@ -930,11 +993,16 @@ function addDynamicIndicator(sectionId, indicatorId, rowId) {
     });
 }
 
-function isIndicatorAlreadyAdded(sectionId, indicatorId) {
-    const sectionContainer = document.getElementById(`section-container-${sectionId}`);
+function isIndicatorAlreadyAdded(sectionId, indicatorId, repeatInstance = null) {
+    // Check within the appropriate container (per-entry clone or section-level)
+    const containerId = repeatInstance !== null
+        ? `section-container-${sectionId}-ri-${repeatInstance}`
+        : `section-container-${sectionId}`;
+    const container = document.getElementById(containerId) ||
+                      document.getElementById(`section-container-${sectionId}`);
 
-    if (sectionContainer) {
-        const existing = sectionContainer.querySelector(`.propose-changes-btn[data-indicator-id="${indicatorId}"]`);
+    if (container) {
+        const existing = container.querySelector(`.propose-changes-btn[data-indicator-id="${indicatorId}"]`);
         if (existing) {
             return true;
         }
@@ -1215,24 +1283,25 @@ function createInterfaceHTML(sectionId, sectionContainer, maxIndicators, current
         </span>
     ` : '';
 
+    const noteHtml = labels.useButtonToAdd
+        ? `<p class="text-sm text-gray-600 italic mb-3">${escapeHtmlText(labels.useButtonToAdd)}</p>`
+        : '';
+
     return `
         <div class="${spacingClass}" id="dynamic-indicator-interface-${sectionId}" data-aes-id="${escapeHtmlAttr(sectionContainer.getAttribute('data-aes-id'))}">
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex-1">
-                    <p class="text-sm text-gray-600 italic">${escapeHtmlText(labels.useButtonToAdd || 'Use the button to add indicators to this section.')}</p>
-                </div>
-                <div class="flex items-center gap-3">
-                    ${maxIndicatorsText}
-                    <button type="button" id="add-indicator-row-btn-${sectionId}"
-                            class="btn btn-success flex items-center">
-                        <i class="fas fa-plus mr-2"></i>
-                        ${escapeHtmlText(labels.addIndicator || 'Add Indicator')}
-                    </button>
-                </div>
-            </div>
+            ${noteHtml}
 
             <div id="dynamic-indicator-rows-${sectionId}" class="space-y-3">
                 <!-- Dynamic indicator selection rows will be added here -->
+            </div>
+
+            <div class="flex items-center justify-end mt-4">
+                ${maxIndicatorsText}
+                <button type="button" id="add-indicator-row-btn-${sectionId}"
+                        class="btn btn-success flex items-center">
+                    <i class="fas fa-plus mr-2"></i>
+                    ${escapeHtmlText(labels.addIndicator || 'Add Indicator')}
+                </button>
             </div>
         </div>
     `;

@@ -215,6 +215,19 @@ class DebugManager:
         # still surfaced.
         logging.getLogger('app.services.variable_resolution_service').setLevel(logging.INFO)
 
+        # Transaction rollbacks on every 4xx/exception are expected; keep warnings/errors only.
+        for _txn_logger in (
+            'app.utils.transactions',
+            'app.middleware.transaction_middleware',
+        ):
+            logging.getLogger(_txn_logger).setLevel(logging.INFO)
+
+        # Translation services log every string at DEBUG (plus urllib3 HTTP lines).
+        logging.getLogger('app.services.translation.auto_translator').setLevel(logging.INFO)
+        logging.getLogger('app.services.translation.ifrc_service').setLevel(logging.INFO)
+        for _noisy_http in ('urllib3', 'urllib3.connectionpool', 'requests'):
+            logging.getLogger(_noisy_http).setLevel(logging.WARNING)
+
         # OpenAI + httpx log entire request JSON (tools + huge user payloads) at DEBUG,
         # which fills the terminal and log files. Keep them quiet unless explicitly enabled.
         _verbose_openai_http = bool(

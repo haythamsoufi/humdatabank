@@ -12,6 +12,7 @@ import { initCheckboxHandlers, handleYesNoCheckbox } from './modules/checkbox-ha
 import { initDataAvailability } from './modules/data-availability.js';
 import { initDisabilityQuestions } from './modules/disability-questions.js';
 import { initCalculatedLists } from './modules/calculated-lists-runtime.js';
+import { initUniqueSectionOptions } from './modules/unique-section-options.js';
 import { initDisaggregationCalculator } from './modules/disaggregation-calculator.js';
 import { initializeFormValidation } from './modules/form-validation.js';
 import { initPDFExport, initValidationSummaryExport } from './modules/pdf-export.js';
@@ -88,6 +89,7 @@ async function initializeEntryForm() {
         safeInit('initDataAvailability', () => initDataAvailability());
         safeInit('initDisabilityQuestions', () => initDisabilityQuestions());
         safeInit('initCalculatedLists', () => initCalculatedLists());
+        safeInit('initUniqueSectionOptions', () => initUniqueSectionOptions());
         safeInit('initDisaggregationCalculator', () => initDisaggregationCalculator());
         safeInit('initTooltips', () => initTooltips());
 

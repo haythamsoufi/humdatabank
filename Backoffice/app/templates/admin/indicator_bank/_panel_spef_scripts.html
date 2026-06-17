@@ -4,16 +4,55 @@
     if (typeof AgGridHelper === 'undefined') return;
 
     var SPEF_URLS = {
-        newSpef: {{ url_for("system_admin.new_spef_lookup")|tojson|safe }},
-        patchTmpl: {{ url_for('system_admin.api_patch_spef_translations', sid=999001)|tojson|safe }}.replace('999001', '__ID__')
+        newSpef:       {{ url_for("system_admin.new_spef_lookup")|tojson|safe }},
+        patchTmpl:     {{ url_for('system_admin.api_patch_spef_translations', sid=999001)|tojson|safe }}.replace('999001', '__ID__'),
+        autoTranslate: {{ url_for('utilities.api_auto_translate')|tojson|safe }}
     };
     var SPEF_I18N = {
-        edit: {{ _("Edit")|js }},
-        loadError: {{ _("Could not load the form. Try again or refresh the page.")|js }},
-        saveError: {{ _("Request failed. Check your data and try again.")|js }},
-        deleteConfirm: {{ _("Delete this SP/EF code? This cannot be undone.")|js }},
-        loading: {{ _("Loading…")|js }}
+        edit:                {{ _("Edit")|js }},
+        loadError:           {{ _("Could not load the form. Try again or refresh the page.")|js }},
+        saveError:           {{ _("Request failed. Check your data and try again.")|js }},
+        deleteConfirm:       {{ _("Delete this SP/EF code? This cannot be undone.")|js }},
+        loading:             {{ _("Loading…")|js }},
+        enterEnglishFirst:   {{ _("Please enter the English label first.")|tojson|safe }},
+        allFilled:           {{ _("All language fields are already filled.")|tojson|safe }},
+        translating:         {{ _("Translating\u2026")|tojson|safe }},
+        translateFailed:     {{ _("Translation failed.")|tojson|safe }},
+        noTranslations:      {{ _("No translations were received.")|tojson|safe }},
+        networkError:        {{ _("Network error. Please try again.")|tojson|safe }},
+        langsTranslated:     {{ _("language(s) translated.")|tojson|safe }},
+        noRowsNeedTranslation: {{ _("No SP/EF codes need translation")|tojson|safe }},
+        translationCompleted: {{ _("Translation completed!")|tojson|safe }},
+        startingTranslations: {{ _("Starting")|tojson|safe }},
+        translationsEllipsis: {{ _("translations...")|tojson|safe }}
     };
+    var SPEF_LANGS = {{ TRANSLATABLE_LANGUAGES | tojson | safe }};
+
+    function spefLangField(lang) {
+        return lang ? ('name_' + lang) : null;
+    }
+
+    function getSpefRows() {
+        return spefData || [];
+    }
+
+    function patchSpefRowTranslation(id, lang, text) {
+        var field = spefLangField(lang);
+        if (!field) return;
+        for (var i = 0; i < spefData.length; i++) {
+            if (spefData[i].id === id) {
+                spefData[i][field] = text;
+                break;
+            }
+        }
+        var api = window.spefLookupsGridApi;
+        if (!api) return;
+        api.forEachNode(function (node) {
+            if (node.data && node.data.id === id) {
+                node.setDataValue(field, text);
+            }
+        });
+    }
 
     var spefData = [
         {% for s in spef_rows %}
@@ -80,11 +119,28 @@
 
     var modal = document.getElementById('spefLookupModal');
     var modalBody = document.getElementById('spefLookupModalBody');
+    var spefModalCtrl = null;
+
+    if (modal && window.ModalUtils) {
+        spefModalCtrl = window.ModalUtils.makeModal(modal, {
+            closeSelector: '.close-modal, .close-modal-btn',
+            onClose: function () {
+                if (modalBody) modalBody.innerHTML = '';
+            }
+        });
+    }
 
     function openSpefModal(url) {
         if (!modal || !modalBody) return;
+        // Remove result count if it was previously appended to the modal overlay (legacy placement bug).
+        var misplaced = modal.querySelector('.ag-grid-result-count[data-grid-id="spefLookupsGrid"]');
+        if (misplaced) misplaced.remove();
         modalBody.innerHTML = '<p class="text-sm text-gray-500 p-4">' + SPEF_I18N.loading + '</p>';
-        modal.classList.remove('hidden');
+        if (spefModalCtrl && spefModalCtrl.openModal) {
+            spefModalCtrl.openModal();
+        } else {
+            modal.classList.remove('hidden');
+        }
         fetch(url + (url.indexOf('?') >= 0 ? '&' : '?') + 'partial=1', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(function (r) { if (!r.ok) throw new Error('load'); return r.text(); })
             .then(function (html) { modalBody.innerHTML = html; bindSpefForm(); })
@@ -92,13 +148,141 @@
     }
 
     function closeSpefModal() {
+        if (spefModalCtrl && spefModalCtrl.closeModal) {
+            spefModalCtrl.closeModal();
+            return;
+        }
         if (modal) modal.classList.add('hidden');
         if (modalBody) modalBody.innerHTML = '';
+    }
+
+    function spefLangKey(lang) {
+        if (!lang) return '';
+        return String(lang).split('_')[0].split('-')[0].toLowerCase();
+    }
+
+    // section_name API returns { fr: "...", ar: "..." }; form_item uses label_translations.
+    function spefExtractSectionTranslations(data) {
+        if (!data || !data.translations || typeof data.translations !== 'object') return {};
+        var t = data.translations;
+        if (t.label_translations && typeof t.label_translations === 'object') {
+            return t.label_translations;
+        }
+        return t;
+    }
+
+    function spefLookupTranslation(translations, lang) {
+        if (!translations || !lang) return '';
+        var raw = translations[lang];
+        if (raw != null && String(raw).trim()) return String(raw).trim();
+        raw = translations[spefLangKey(lang)];
+        if (raw != null && String(raw).trim()) return String(raw).trim();
+        return '';
+    }
+
+    // Show a coloured status line inside the SPEF translate status element.
+    function showSpefTranslateStatus(el, msg, type) {
+        if (!el) return;
+        el.textContent = msg;
+        el.className = 'spef-translate-status js-spef-translate-status spef-translate-status--' + (type || 'info');
+        el.style.display = 'block';
+    }
+
+    // Wire the "Auto Translate" button inside a SPEF form to the translation API.
+    function bindSpefTranslation(form) {
+        var btn = form && form.querySelector('.js-spef-auto-translate');
+        var statusEl = form && form.querySelector('.js-spef-translate-status');
+        if (!btn) return;
+
+        btn.addEventListener('click', function () {
+            var nameField = form.querySelector('[name="name"]');
+            var englishText = (nameField && nameField.value || '').trim();
+            if (!englishText) {
+                showSpefTranslateStatus(statusEl, SPEF_I18N.enterEnglishFirst, 'error');
+                return;
+            }
+
+            // Collect language codes whose field is currently blank.
+            var langsToTranslate = SPEF_LANGS.filter(function (lang) {
+                if (lang === 'en') return false;
+                var inp = form.querySelector('[name="name_' + lang + '"]');
+                return inp && !(inp.value || '').trim();
+            });
+
+            if (!langsToTranslate.length) {
+                showSpefTranslateStatus(statusEl, SPEF_I18N.allFilled, 'info');
+                return;
+            }
+
+            btn.disabled = true;
+            var icon = btn.querySelector('i');
+            if (icon) icon.className = 'fas fa-spinner fa-spin';
+            showSpefTranslateStatus(statusEl, SPEF_I18N.translating, 'loading');
+
+            var payload = {
+                type: 'section_name',
+                permission_context: 'indicator_bank',
+                permission_code: 'admin.indicator_bank.edit',
+                text: englishText,
+                target_languages: langsToTranslate,
+                translation_service: 'ifrc'
+            };
+            var payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+            var csrfToken = (document.querySelector('meta[name=csrf-token]') || {}).content || '';
+
+            function restoreBtn() {
+                btn.disabled = false;
+                if (icon) icon.className = 'fas fa-magic';
+            }
+
+            fetch(SPEF_URLS.autoTranslate, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ payload: payloadB64 })
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                restoreBtn();
+                if (!data.success) {
+                    showSpefTranslateStatus(statusEl,
+                        SPEF_I18N.translateFailed + (data.message ? ' ' + data.message : ''),
+                        'error');
+                    return;
+                }
+                var labelTrans = spefExtractSectionTranslations(data);
+                var filled = 0;
+                SPEF_LANGS.forEach(function (lang) {
+                    if (lang === 'en') return;
+                    var val = spefLookupTranslation(labelTrans, lang);
+                    if (!val) return;
+                    var inp = form.querySelector('[name="name_' + lang + '"]');
+                    if (inp) {
+                        inp.value = val;
+                        inp.dispatchEvent(new Event('input', { bubbles: true }));
+                        filled++;
+                    }
+                });
+                if (filled > 0) {
+                    showSpefTranslateStatus(statusEl, filled + ' ' + SPEF_I18N.langsTranslated, 'success');
+                } else {
+                    showSpefTranslateStatus(statusEl, SPEF_I18N.noTranslations, 'warning');
+                }
+            })
+            .catch(function () {
+                restoreBtn();
+                showSpefTranslateStatus(statusEl, SPEF_I18N.networkError, 'error');
+            });
+        });
     }
 
     function bindSpefForm() {
         var form = modalBody && modalBody.querySelector('.ml-spef-form');
         if (!form) return;
+        bindSpefTranslation(form);
         var cancel = modalBody.querySelector('.js-ml-spef-cancel');
         if (cancel) cancel.addEventListener('click', closeSpefModal);
         var del = modalBody.querySelector('.js-ml-spef-delete');
@@ -111,6 +295,11 @@
         });
         form.addEventListener('submit', function (e) {
             e.preventDefault();
+            if (form.dataset.submitting === '1') return;
+            form.dataset.submitting = '1';
+            var submitBtn = form.querySelector('[type="submit"]');
+            if (submitBtn) submitBtn.disabled = true;
+
             var fd = new FormData(form);
             fetch(form.action, {
                 method: 'POST',
@@ -126,9 +315,15 @@
                     modalBody.innerHTML = res.j.form_html;
                     bindSpefForm();
                 } else {
+                    form.dataset.submitting = '0';
+                    if (submitBtn) submitBtn.disabled = false;
                     alert(SPEF_I18N.saveError);
                 }
-              }).catch(function () { alert(SPEF_I18N.saveError); });
+              }).catch(function () {
+                form.dataset.submitting = '0';
+                if (submitBtn) submitBtn.disabled = false;
+                alert(SPEF_I18N.saveError);
+              });
         });
     }
 
@@ -150,5 +345,176 @@
         var row = spefData.find(function (d) { return String(d.id) === String(es); });
         if (row && row.edit_url) openSpefModal(row.edit_url);
     }
+
+    window.indicatorBankAutoTranslate = window.indicatorBankAutoTranslate || {};
+    window.indicatorBankAutoTranslate.spef = {
+        getCounts: function (overwriteExisting) {
+            overwriteExisting = !!overwriteExisting;
+            var counts = {};
+            SPEF_LANGS.forEach(function (lang) { counts[lang] = 0; });
+            try {
+                getSpefRows().forEach(function (row) {
+                    if (!row || row.id == null) return;
+                    var base = (row.name || '').trim();
+                    if (!base || base === '-') return;
+                    SPEF_LANGS.forEach(function (lang) {
+                        if (lang === 'en') return;
+                        var f = spefLangField(lang);
+                        var cur = (row[f] || '').trim();
+                        var has = cur && cur !== '-';
+                        if (overwriteExisting) {
+                            counts[lang] += 1;
+                        } else if (!has) {
+                            counts[lang] += 1;
+                        }
+                    });
+                });
+            } catch (err) {
+                console.error('SPEF getCounts', err);
+            }
+            return counts;
+        },
+
+        perform: function (selectedLanguages, selectedService) {
+            var overwriteExisting = typeof jQuery !== 'undefined'
+                && jQuery('#overwrite-existing-translations').is(':checked');
+            var counts = window.getPageSpecificTranslationCounts
+                ? window.getPageSpecificTranslationCounts(overwriteExisting)
+                : {};
+            var languagesNeedingTranslation = overwriteExisting
+                ? selectedLanguages
+                : selectedLanguages.filter(function (lang) { return (counts[lang] || 0) > 0; });
+
+            var jobs = [];
+            getSpefRows().forEach(function (row) {
+                if (!row || row.id == null) return;
+                var base = (row.name || '').trim();
+                if (!base) return;
+                languagesNeedingTranslation.forEach(function (lang) {
+                    if (lang === 'en') return;
+                    var f = spefLangField(lang);
+                    var cur = (row[f] || '').trim();
+                    var has = cur && cur !== '-';
+                    var need = overwriteExisting ? true : !has;
+                    if (need) {
+                        jobs.push({ id: row.id, code: row.code || '', name: base, language: lang });
+                    }
+                });
+            });
+
+            if (!jobs.length) {
+                if (window.autoTranslateModal) {
+                    window.autoTranslateModal.logProgress(SPEF_I18N.noRowsNeedTranslation, 'info');
+                    window.autoTranslateModal.translationState.isRunning = false;
+                    jQuery('#auto-translate-pause-btn, #auto-translate-resume-btn, #auto-translate-stop-btn').addClass('hidden');
+                    jQuery('#auto-translate-close-btn').removeClass('hidden');
+                }
+                return;
+            }
+
+            if (!window.autoTranslateModal) return;
+
+            window.autoTranslateModal.translationState.totalItems = jobs.length;
+            window.autoTranslateModal.updateProgress();
+            window.autoTranslateModal.logProgress(
+                SPEF_I18N.startingTranslations + ' ' + jobs.length + ' ' + SPEF_I18N.translationsEllipsis,
+                'info'
+            );
+
+            function finishSpefBatch() {
+                window.autoTranslateModal.translationState.isRunning = false;
+                window.autoTranslateModal.logProgress(SPEF_I18N.translationCompleted, 'success');
+                jQuery('#auto-translate-pause-btn, #auto-translate-resume-btn, #auto-translate-stop-btn').addClass('hidden');
+                jQuery('#auto-translate-close-btn').removeClass('hidden');
+                if (window.autoTranslateModal.notifyCompletion) {
+                    window.autoTranslateModal.notifyCompletion();
+                }
+            }
+
+            function processSpefJobList(jobs, index, svc) {
+                if (index >= jobs.length || window.autoTranslateModal.translationState.shouldStop) {
+                    finishSpefBatch();
+                    return;
+                }
+                if (window.autoTranslateModal.translationState.isPaused) {
+                    setTimeout(function () { processSpefJobList(jobs, index, svc); }, 500);
+                    return;
+                }
+
+                var job = jobs[index];
+                var pl = {
+                    type: 'section_name',
+                    permission_context: 'indicator_bank',
+                    permission_code: 'admin.indicator_bank.edit',
+                    text: job.name,
+                    target_languages: [job.language],
+                    translation_service: svc || 'ifrc'
+                };
+                var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(pl))));
+                var csrfToken = (typeof jQuery !== 'undefined' && jQuery('meta[name=csrf-token]').attr('content')) || '';
+
+                ((window.getFetch && window.getFetch()) || fetch)(window.autoTranslateModal.config.endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({ payload: b64 })
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    window.autoTranslateModal.translationState.processedItems++;
+                    window.autoTranslateModal.updateProgress();
+                    var labelTrans = spefExtractSectionTranslations(data);
+                    var translated = spefLookupTranslation(labelTrans, job.language);
+                    if (data.success && translated) {
+                        var saveUrl = SPEF_URLS.patchTmpl.replace('__ID__', String(job.id));
+                        var saveBody = {};
+                        saveBody[job.language] = translated;
+                        return ((window.getFetch && window.getFetch()) || fetch)(saveUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': csrfToken
+                            },
+                            body: JSON.stringify({ translations: saveBody })
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (sd) {
+                            if (sd && sd.success !== false) {
+                                window.autoTranslateModal.translationState.successCount++;
+                                patchSpefRowTranslation(job.id, job.language, translated);
+                                window.autoTranslateModal.logProgress(
+                                    '\u2713 ' + (job.code || job.id) + ' \u2192 ' + job.language,
+                                    'success'
+                                );
+                            } else {
+                                window.autoTranslateModal.translationState.errorCount++;
+                            }
+                            window.autoTranslateModal.updateProgress();
+                            setTimeout(function () { processSpefJobList(jobs, index + 1, svc); }, 200);
+                        })
+                        .catch(function () {
+                            window.autoTranslateModal.translationState.errorCount++;
+                            window.autoTranslateModal.updateProgress();
+                            setTimeout(function () { processSpefJobList(jobs, index + 1, svc); }, 200);
+                        });
+                    }
+                    window.autoTranslateModal.translationState.errorCount++;
+                    window.autoTranslateModal.updateProgress();
+                    setTimeout(function () { processSpefJobList(jobs, index + 1, svc); }, 200);
+                })
+                .catch(function () {
+                    window.autoTranslateModal.translationState.processedItems++;
+                    window.autoTranslateModal.translationState.errorCount++;
+                    window.autoTranslateModal.updateProgress();
+                    setTimeout(function () { processSpefJobList(jobs, index + 1, svc); }, 200);
+                });
+            }
+
+            processSpefJobList(jobs, 0, selectedService);
+        }
+    };
 })();
 </script>

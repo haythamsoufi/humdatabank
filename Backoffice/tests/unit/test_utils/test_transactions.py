@@ -20,6 +20,7 @@ from app.utils.transactions import (
     is_view_opted_out,
     is_view_forced,
     is_streaming_response,
+    _should_log_rollback,
 )
 
 
@@ -156,6 +157,40 @@ class TestSafeRollback:
             with patch('app.extensions.db'):
                 safe_rollback(reason='clearing')
             assert g._post_commit_callbacks == []
+
+    def test_4xx_rollback_reason_not_logged(self, app):
+        with app.app_context():
+            with patch('app.extensions.db'), \
+                 patch('app.utils.transactions.logger.debug') as mock_debug:
+                safe_rollback(reason='response_status_401')
+            mock_debug.assert_not_called()
+
+    def test_manual_rollback_reason_is_logged(self, app):
+        with app.app_context():
+            with patch('app.extensions.db'), \
+                 patch('app.utils.transactions.logger.debug') as mock_debug:
+                safe_rollback(reason='manual_request')
+            mock_debug.assert_called_once_with(
+                'db.session.rollback() executed (%s)', 'manual_request'
+            )
+
+
+@pytest.mark.unit
+class TestShouldLogRollback:
+    @pytest.mark.parametrize(
+        'reason,expected',
+        [
+            (None, False),
+            ('response_status_401', False),
+            ('response_status_404', False),
+            ('handle_exception', False),
+            ('teardown_exception', False),
+            ('manual_request', True),
+            ('commit_failed', True),
+        ],
+    )
+    def test_should_log_rollback(self, reason, expected):
+        assert _should_log_rollback(reason) is expected
 
 
 # ---------------------------------------------------------------------------

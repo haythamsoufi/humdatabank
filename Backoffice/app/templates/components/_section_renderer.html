@@ -24,6 +24,7 @@
 {% endmacro %}
 
 {% macro render_section_header(section, is_subsection, parent_section_order='') %}
+{% if not section.hide_section_header %}
 {% set header_tag = 'h4' if is_subsection else 'h3' %}
 {% set header_classes = {
     'main': 'text-xl font-semibold mb-4 pb-4 border-b text-gray-700 flex items-center',
@@ -48,6 +49,7 @@
         {{ section.display_name }}
     {% endif %}
 </{{ header_tag }}>
+{% endif %}
 {% endmacro %}
 
 {% macro render_section_content(section, is_subsection) %}

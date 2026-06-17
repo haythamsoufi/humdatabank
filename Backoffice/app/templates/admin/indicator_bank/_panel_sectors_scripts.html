@@ -691,9 +691,137 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Handle delete form confirmations
-    const deleteForms = document.querySelectorAll('.delete-sector-form, .delete-subsector-form');
-    // Delete forms use global confirm handler (components.js) via data-confirm on form
+    // === Async delete confirmations with indicator-count warning ===
+    (function() {
+        const SECTOR_GET_TPL   = {{ url_for('system_admin.get_sector',   sector_id=0)   |tojson|safe }};
+        const SUBSECTOR_GET_TPL = {{ url_for('system_admin.get_subsector', subsector_id=0)|tojson|safe }};
+
+        function buildGetUrl(tpl, id) { return tpl.replace(/\/0$/, '/' + id); }
+
+        // ── Build modal DOM once ──────────────────────────────────────────
+        const modal = document.createElement('div');
+        modal.id = 'sdm-root';
+        modal.className = 'fixed inset-0 z-[9000] flex items-center justify-center p-4 hidden';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.innerHTML = [
+            '<div class="absolute inset-0 bg-black/50" id="sdm-backdrop"></div>',
+            '<div class="relative bg-white rounded-xl shadow-xl max-w-sm w-full p-6 z-10">',
+            '  <div class="flex items-start gap-4">',
+            '    <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">',
+            '      <i class="fas fa-exclamation-triangle text-red-600"></i>',
+            '    </div>',
+            '    <div class="flex-1 min-w-0">',
+            '      <h3 id="sdm-title" class="text-base font-semibold text-gray-900 mb-1"></h3>',
+            '      <div id="sdm-block-box" class="hidden mt-2 flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-800">',
+            '        <i class="fas fa-ban mt-0.5 flex-shrink-0 text-orange-500"></i>',
+            '        <span id="sdm-block-text"></span>',
+            '      </div>',
+            '      <div id="sdm-warn-box" class="hidden mt-2 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">',
+            '        <i class="fas fa-link mt-0.5 flex-shrink-0 text-amber-500"></i>',
+            '        <span id="sdm-warn-text"></span>',
+            '      </div>',
+            '    </div>',
+            '  </div>',
+            '  <div class="flex justify-end gap-3 mt-5">',
+            '    <button type="button" id="sdm-cancel" class="btn btn-sm btn-secondary">{{ _("Cancel") }}</button>',
+            '    <button type="button" id="sdm-confirm" class="btn btn-sm btn-danger">',
+            '      <i class="fas fa-trash mr-1"></i>{{ _("Delete") }}',
+            '    </button>',
+            '  </div>',
+            '</div>'
+        ].join('');
+        document.body.appendChild(modal);
+
+        let pendingForm = null;
+
+        function openModal()  { modal.classList.remove('hidden'); }
+        function closeModal() { modal.classList.add('hidden'); pendingForm = null; }
+
+        modal.querySelector('#sdm-backdrop').addEventListener('click', closeModal);
+        modal.querySelector('#sdm-cancel').addEventListener('click', closeModal);
+        modal.querySelector('#sdm-confirm').addEventListener('click', function () {
+            if (!pendingForm) return;
+            const f = pendingForm;
+            closeModal();
+            f.submit(); // native submit → full page redirect → flash shown
+        });
+
+        // ── Intercept delete-button clicks ────────────────────────────────
+        async function handleDeleteClick(e, btn) {
+            e.preventDefault();
+            const form = btn.closest('form');
+            if (!form) return;
+
+            const isSector = form.classList.contains('delete-sector-form');
+            const match    = form.action.match(/\/(\d+)$/);
+            if (!match) {
+                // no ID in URL — fall back to native confirm
+                if (confirm(form.dataset.confirm || '{{ _("Are you sure?") }}')) form.submit();
+                return;
+            }
+
+            const id     = parseInt(match[1], 10);
+            const getUrl = buildGetUrl(isSector ? SECTOR_GET_TPL : SUBSECTOR_GET_TPL, id);
+
+            let name = '', indCount = 0, subCount = 0;
+            try {
+                const resp = await fetch(getUrl, { headers: { 'Accept': 'application/json' } });
+                if (resp.ok) {
+                    const d = await resp.json();
+                    name     = d.name      || '';
+                    indCount = d.indicator_count  || 0;
+                    subCount = d.subsector_count  || 0;
+                }
+            } catch (_) {
+                if (confirm(form.dataset.confirm || '{{ _("Are you sure?") }}')) form.submit();
+                return;
+            }
+
+            // ── Populate modal ────────────────────────────────────────────
+            const titleEl    = modal.querySelector('#sdm-title');
+            const blockBox   = modal.querySelector('#sdm-block-box');
+            const blockText  = modal.querySelector('#sdm-block-text');
+            const warnBox    = modal.querySelector('#sdm-warn-box');
+            const warnText   = modal.querySelector('#sdm-warn-text');
+            const confirmBtn = modal.querySelector('#sdm-confirm');
+
+            titleEl.textContent = isSector
+                ? '{{ _("Delete sector") }} \u201c' + name + '\u201d?'
+                : '{{ _("Delete sub-sector") }} \u201c' + name + '\u201d?';
+
+            blockBox.classList.add('hidden');
+            warnBox.classList.add('hidden');
+            confirmBtn.disabled = false;
+            confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+            if (isSector && subCount > 0) {
+                // Hard block — can't delete sector with sub-sectors
+                blockText.textContent = subCount === 1
+                    ? '{{ _("Cannot delete: remove the 1 sub-sector first.") }}'
+                    : '{{ _("Cannot delete: remove the") }} ' + subCount + ' {{ _("sub-sectors first.") }}';
+                blockBox.classList.remove('hidden');
+                confirmBtn.disabled = true;
+                confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else if (indCount > 0) {
+                // Soft warning — indicators will lose their reference
+                const thing = isSector ? '{{ _("sector") }}' : '{{ _("sub-sector") }}';
+                warnText.textContent = indCount === 1
+                    ? '{{ _("1 indicator references this") }} ' + thing + '. {{ _("Its sector reference will be cleared on deletion.") }}'
+                    : indCount + ' {{ _("indicators reference this") }} ' + thing + '. {{ _("Their sector references will be cleared on deletion.") }}';
+                warnBox.classList.remove('hidden');
+            }
+
+            pendingForm = form;
+            openModal();
+        }
+
+        document.querySelectorAll(
+            '.delete-sector-form button[type="submit"], .delete-subsector-form button[type="submit"]'
+        ).forEach(function (btn) {
+            btn.addEventListener('click', function (e) { handleDeleteClick(e, btn); });
+        });
+    })();
 
     // Handle form submissions
     const forms = [
@@ -708,6 +836,17 @@ document.addEventListener('DOMContentLoaded', function() {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
+            if (form.dataset.submitting === '1') return;
+            form.dataset.submitting = '1';
+            const btn = form.querySelector('[type="submit"]');
+            const origHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-spinner fa-spin mr-2';
+                btn.replaceChildren(icon, document.createTextNode(' {{ _("Saving...") }}'));
+            }
+
             try {
                 const formData = new FormData(form);
                 const response = await fetch(form.action, {
@@ -719,7 +858,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 if (response.ok) {
-                    // Reload page to show changes
                     window.location.reload();
                 } else {
                     const data = await response.json();
@@ -730,6 +868,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Error submitting form:', error);
                 if (window.showAlert) window.showAlert('{{ _("Failed to submit form. Please try again.") }}', 'error');
                 else console.error('Failed to submit form');
+            } finally {
+                form.dataset.submitting = '0';
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                }
             }
         });
     });
@@ -882,4 +1026,37 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+</script>
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    function markFailedLogo(img) {
+        var slot = img.closest('.sector-avatar-slot');
+        if (slot) {
+            slot.classList.add('sector-avatar-slot--failed');
+        }
+    }
+
+    function bindSectorLogoFallbacks(root) {
+        (root || document).querySelectorAll('#panel-sectors .js-sector-logo-img').forEach(function(img) {
+            if (img.dataset.logoFallbackBound === '1') {
+                return;
+            }
+            img.dataset.logoFallbackBound = '1';
+            img.addEventListener('error', function() {
+                markFailedLogo(img);
+            });
+            if (img.complete && img.naturalWidth === 0) {
+                markFailedLogo(img);
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            bindSectorLogoFallbacks();
+        });
+    } else {
+        bindSectorLogoFallbacks();
+    }
+})();
 </script>

@@ -1331,50 +1331,9 @@ class AdminNotifications {
             return this.handleEntityCampaignSubmit(e, sendEmail, sendPush, title, message, priority, overridePreferences, category, tags, redirectUrl);
         }
 
-        const userIds = Array.from(this.selectedUsers.keys());
-
-        // Client-side validation for immediate UX feedback
-        // Note: All validation is also done server-side for security
-        if (!sendEmail && !sendPush) {
-            // No JS status: rely on backend flash (user can submit again after fixing)
-            return;
-        }
-
-        if (userIds.length === 0) {
-            return;
-        }
-
-        if (!title) {
-            document.getElementById('admin-notification-title').focus();
-            return;
-        }
-
-        if (!message) {
-            document.getElementById('admin-notification-message').focus();
-            return;
-        }
-
-        if (title.length > 100) {
-            return;
-        }
-
-        if (message.length > 500) {
-            return;
-        }
-
-        // Validate redirect URL only if push notifications are enabled and URL is provided
-        if (sendPush && redirectUrl) {
-            if (redirectUrl.length > 500) {
-                return;
-            }
-
-            if (!redirectUrl.startsWith('/') && !redirectUrl.startsWith('http://') && !redirectUrl.startsWith('https://')) {
-                return;
-            }
-        }
-
-        // Disable submit button
+        // Disable submit button immediately to prevent double-click before validation runs
         const submitButton = document.getElementById('send-admin-notification');
+        if (!submitButton || submitButton.disabled) return;
         const originalNodes = Array.from(submitButton.childNodes).map((n) => n.cloneNode(true));
         const restoreSubmitButton = () => {
             submitButton.replaceChildren(...originalNodes.map((n) => n.cloneNode(true)));
@@ -1388,6 +1347,46 @@ class AdminNotifications {
         }
 
         try {
+            const userIds = Array.from(this.selectedUsers.keys());
+
+            // Client-side validation for immediate UX feedback
+            // Note: All validation is also done server-side for security
+            if (!sendEmail && !sendPush) {
+                return;
+            }
+
+            if (userIds.length === 0) {
+                return;
+            }
+
+            if (!title) {
+                document.getElementById('admin-notification-title').focus();
+                return;
+            }
+
+            if (!message) {
+                document.getElementById('admin-notification-message').focus();
+                return;
+            }
+
+            if (title.length > 100) {
+                return;
+            }
+
+            if (message.length > 500) {
+                return;
+            }
+
+            // Validate redirect URL only if push notifications are enabled and URL is provided
+            if (sendPush && redirectUrl) {
+                if (redirectUrl.length > 500) {
+                    return;
+                }
+
+                if (!redirectUrl.startsWith('/') && !redirectUrl.startsWith('http://') && !redirectUrl.startsWith('https://')) {
+                    return;
+                }
+            }
 
             // Note: Currently only push notifications are supported via API
             // Email notifications are sent automatically when notification is created
@@ -1398,10 +1397,10 @@ class AdminNotifications {
                     title: title,
                     message: message,
                     priority: priority,
-                    redirect_url: sendPush ? (redirectUrl || null) : null,  // Only include redirect_url if push is enabled
-                    override_preferences: overridePreferences,  // Allow admin to override user preferences
-                    send_email: sendEmail,  // Include delivery method flags
-                    send_push: sendPush  // Include delivery method flags
+                    redirect_url: sendPush ? (redirectUrl || null) : null,
+                    override_preferences: overridePreferences,
+                    send_email: sendEmail,
+                    send_push: sendPush
                 })
             });
 

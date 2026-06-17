@@ -21,7 +21,7 @@ avoids table locks. It falls back to a plain (blocking) CREATE INDEX when
 CONCURRENTLY is not available (e.g. inside a transaction on older versions).
 
 Revision ID: migrate_ivfflat_to_hnsw
-Revises: add_ai_document_metadata_enrichment
+Revises: add_ai_doc_meta
 Create Date: 2026-03-05 10:00:00.000000
 """
 from alembic import op

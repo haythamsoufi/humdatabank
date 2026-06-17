@@ -549,6 +549,104 @@ class TestProcessQuestionValue:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# FormDataService emergency operations metadata
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestEmergencyOperationsMetadata:
+    def _make_emergency_question(self):
+        q = MagicMock()
+        q.is_question = True
+        q.lookup_list_id = 'emergency_operations'
+        q.id = 1313
+        return q
+
+    def test_parse_emergency_metadata_from_display_with_code(self, app):
+        from app.services.form_data_service import FormDataService
+
+        with app.app_context():
+            meta = FormDataService._parse_emergency_metadata_from_display(
+                'Afghanistan - Earthquake (MDRAF019)'
+            )
+            assert meta == {'name': 'Afghanistan - Earthquake', 'code': 'MDRAF019'}
+
+    def test_parse_emergency_metadata_from_display_without_code(self, app):
+        from app.services.form_data_service import FormDataService
+
+        with app.app_context():
+            meta = FormDataService._parse_emergency_metadata_from_display('Some Operation')
+            assert meta == {'name': 'Some Operation', 'code': ''}
+
+    def test_get_emergency_metadata_from_request_standard_field(self, app):
+        from app.services.form_data_service import FormDataService
+
+        payload = json.dumps({'name': 'Appeal A', 'code': 'MDRAF001'})
+        with app.test_request_context('/test', method='POST', data={
+            'field_disagg_metadata[1313]': payload,
+        }):
+            meta = FormDataService._get_emergency_metadata_from_request(form_item_id=1313)
+            assert meta == {'name': 'Appeal A', 'code': 'MDRAF001'}
+
+    def test_get_emergency_metadata_from_request_repeat_field(self, app):
+        from app.services.form_data_service import FormDataService
+
+        payload = json.dumps({'name': 'Appeal B', 'code': 'MDRAF002'})
+        with app.test_request_context('/test', method='POST', data={
+            'repeat_390_2_field_0_emergency_metadata': payload,
+        }):
+            meta = FormDataService._get_emergency_metadata_from_request(
+                section_id=390,
+                instance_number=2,
+                field_index=0,
+            )
+            assert meta == {'name': 'Appeal B', 'code': 'MDRAF002'}
+
+    def test_find_field_value_ignores_emergency_metadata(self, app):
+        from app.services.form_data_service import FormDataService
+
+        with app.app_context():
+            field_values = {
+                'field_0_0': '',
+                'field_0_emergency_metadata': '{"name":"[object Object]","code":""}',
+            }
+            value = FormDataService._find_field_value(field_values, 0, ['0'])
+            assert value is None
+
+    def test_apply_emergency_operation_disagg(self, app):
+        from app.models.forms import RepeatGroupData
+        from app.services.form_data_service import FormDataService
+
+        with app.app_context():
+            entry = RepeatGroupData()
+            FormDataService._apply_emergency_operation_disagg(
+                entry,
+                'Afghanistan - Floods (MDRAF015)',
+                {'name': 'Afghanistan - Floods', 'code': 'MDRAF015'},
+            )
+            assert entry.value is None
+            assert entry.disagg_type == 'emergency_operation'
+            assert entry.disagg_data == {'name': 'Afghanistan - Floods', 'code': 'MDRAF015'}
+
+    def test_store_scalar_question_value_applies_emergency_disagg(self, app):
+        from app.models.forms import FormData
+        from app.services.form_data_service import FormDataService
+
+        payload = json.dumps({'name': 'Appeal C', 'code': 'MDRAF003'})
+        with app.test_request_context('/test', method='POST', data={
+            'field_disagg_metadata[1313]': payload,
+        }):
+            question = self._make_emergency_question()
+            entry = FormData()
+            FormDataService._store_scalar_question_value(
+                entry,
+                question,
+                'Appeal C (MDRAF003)',
+            )
+            assert entry.value == 'Appeal C (MDRAF003)'
+            assert entry.disagg_type == 'emergency_operation'
+            assert entry.disagg_data == {'name': 'Appeal C', 'code': 'MDRAF003'}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # FormDataService._add_indirect_reach_to_question
 # ─────────────────────────────────────────────────────────────────────────────
 

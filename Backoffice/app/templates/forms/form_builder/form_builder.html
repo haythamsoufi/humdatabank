@@ -983,7 +983,8 @@
             }
         });
 
-        // Handle delete item and section forms with data deletion confirmation dialog
+        // Handle delete item/section and duplicate forms via event delegation so dynamically
+        // re-rendered forms (after AJAX section reload) are always covered.
         document.addEventListener('DOMContentLoaded', function() {
             function showConfirmModal(message, onConfirm) {
                 if (window.showConfirmation) {
@@ -1009,179 +1010,129 @@
             };
             const deleteDataWarningTemplate = {{ _('This will permanently delete __count__ data entries.') | tojson }};
 
-            function attachDuplicateConfirmation(selector, defaultMessage) {
-                const forms = document.querySelectorAll(selector);
-                forms.forEach(form => {
-                    if (form.dataset.duplicateConfirmBound === 'true') {
-                        return;
-                    }
-                    form.dataset.duplicateConfirmBound = 'true';
+            const deleteSectionSingleNoData = {{ _('This will permanently delete this section and all its contents. Are you sure?') | tojson }};
+            const deleteSectionMultipleNoDataTemplate = {{ _('This will permanently delete 1 section and %(n)s sub-section(s) and all their contents. Are you sure?') | tojson }};
+            const deleteSectionSingleWithDataTemplate = {{ _('This section contains %(count)s saved data entries. Choose an option below.') | tojson }};
+            const deleteSectionMultipleWithDataTemplate = {{ _('This will remove 1 section and %(n)s sub-section(s) and %(count)s saved data entries. Choose an option below.') | tojson }};
 
-                    form.addEventListener('submit', function(e) {
-                        if (form.dataset.duplicateConfirmed === 'true') {
-                            form.dataset.duplicateConfirmed = 'false';
-                            return;
-                        }
+            const deleteLabels = {
+                delete: {{ _("Delete") | tojson }},
+                this: {{ _("This") | tojson }},
+                has: {{ _("has") | tojson }},
+                savedDataEntries: {{ _("saved data entries.") | tojson }},
+                mayHaveAssociatedData: {{ _("may have associated data.") | tojson }},
+                chooseOption: {{ _("Choose an option:") | tojson }},
+                deleteDataAndRemove: {{ _("Delete Data and Remove") | tojson }},
+                permanentlyDelete: {{ _("Permanently delete all associated data entries and remove the") | tojson }},
+                fromTemplate: {{ _("from the template.") | tojson }},
+                keepDataAndRemoveItem: {{ _("Keep Data and Archive Item") | tojson }},
+                keepDataButRemove: {{ _("Keep the data entries but archive the") | tojson }},
+                itemWillBeArchived: {{ _("(The item will be archived and hidden from the template)") | tojson }},
+                sectionWillBeArchived: {{ _("(The section and its items will be archived and hidden from the template)") | tojson }},
+                cancel: {{ _("Cancel") | tojson }},
+                continue: {{ _("Continue") | tojson }}
+            };
 
-                        e.preventDefault();
-                        const message = form.getAttribute('data-confirm-message') || defaultMessage;
-                        const submitForm = () => {
-                            form.dataset.duplicateConfirmed = 'true';
-                            if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
-                                window.FormBuilderAjax.submit(form);
-                            } else if (typeof form.requestSubmit === 'function') {
-                                form.requestSubmit();
-                            } else {
-                                form.submit();
-                            }
-                        };
-
-                        showConfirmModal(message, submitForm);
-                    });
-                });
+            function doSubmit(form) {
+                if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
+                    window.FormBuilderAjax.submit(form);
+                } else if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
             }
 
-            attachDuplicateConfirmation('.duplicate-section-form', duplicateConfirmDefaults.section);
-            attachDuplicateConfirmation('.duplicate-item-form', duplicateConfirmDefaults.item);
+            function setDeleteData(form, value) {
+                const existing = form.querySelector('input[name="delete_data"]');
+                if (existing) {
+                    existing.value = value;
+                } else {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'delete_data';
+                    input.value = value;
+                    form.appendChild(input);
+                }
+            }
 
-            // Handle delete item forms (indicators, questions, document fields, matrix, plugin items)
-            const deleteItemForms = document.querySelectorAll('.delete-item-form');
-            deleteItemForms.forEach(form => {
-                form.addEventListener('submit', function(e) {
+            // Single delegated listener covers all forms, including those re-rendered after AJAX
+            document.addEventListener('submit', function(e) {
+                const form = e.target;
+
+                // --- Duplicate section ---
+                if (form.matches('.duplicate-section-form')) {
+                    if (form.dataset.duplicateConfirmed === 'true') {
+                        form.dataset.duplicateConfirmed = 'false';
+                        return;
+                    }
+                    e.preventDefault();
+                    const message = form.getAttribute('data-confirm-message') || duplicateConfirmDefaults.section;
+                    showConfirmModal(message, function() {
+                        form.dataset.duplicateConfirmed = 'true';
+                        doSubmit(form);
+                    });
+                    return;
+                }
+
+                // --- Duplicate item ---
+                if (form.matches('.duplicate-item-form')) {
+                    if (form.dataset.duplicateConfirmed === 'true') {
+                        form.dataset.duplicateConfirmed = 'false';
+                        return;
+                    }
+                    e.preventDefault();
+                    const message = form.getAttribute('data-confirm-message') || duplicateConfirmDefaults.item;
+                    showConfirmModal(message, function() {
+                        form.dataset.duplicateConfirmed = 'true';
+                        doSubmit(form);
+                    });
+                    return;
+                }
+
+                // --- Delete item ---
+                if (form.matches('.delete-item-form')) {
+                    if (form.dataset.deleteConfirmed === 'true') {
+                        form.dataset.deleteConfirmed = 'false';
+                        return;
+                    }
                     e.preventDefault();
 
                     const dataCount = parseInt(form.getAttribute('data-data-count') || '0');
                     const itemType = form.getAttribute('data-item-type') || 'item';
                     const confirmMessage = form.getAttribute('data-confirm-message') || {{ _('Are you sure?') | tojson }};
 
-                    // If no data, just show a simple confirmation
+                    function proceedDeleteItem(deleteData) {
+                        setDeleteData(form, deleteData);
+                        form.dataset.deleteConfirmed = 'true';
+                        doSubmit(form);
+                    }
+
                     if (dataCount === 0) {
-                        const proceed = () => {
-                            const deleteDataInput = form.querySelector('input[name="delete_data"]');
-                            if (deleteDataInput) {
-                                deleteDataInput.value = 'true';
-                            } else {
-                                const input = document.createElement('input');
-                                input.type = 'hidden';
-                                input.name = 'delete_data';
-                                input.value = 'true';
-                                form.appendChild(input);
-                            }
-                            if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
-                                window.FormBuilderAjax.submit(form);
-                            } else if (typeof form.requestSubmit === 'function') {
-                                form.requestSubmit();
-                            } else {
-                                form.submit();
-                            }
-                        };
-                        showDangerConfirmModal(confirmMessage, proceed);
+                        showDangerConfirmModal(confirmMessage, function() { proceedDeleteItem('true'); });
                         return;
                     }
 
-                    // Show dialog with two options
                     if (window.showDeleteDataConfirmation) {
                         window.showDeleteDataConfirmation(
-                            confirmMessage,
-                            dataCount,
-                            function() {
-                                // User chose to delete data
-                                const deleteDataInput = form.querySelector('input[name="delete_data"]');
-                                if (deleteDataInput) {
-                                    deleteDataInput.value = 'true';
-                                } else {
-                                    const input = document.createElement('input');
-                                    input.type = 'hidden';
-                                    input.name = 'delete_data';
-                                    input.value = 'true';
-                                    form.appendChild(input);
-                                }
-                                if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
-                                    window.FormBuilderAjax.submit(form);
-                                } else if (typeof form.requestSubmit === 'function') {
-                                    form.requestSubmit();
-                                } else {
-                                    form.submit();
-                                }
-                            },
-                            function(action) {
-                                // User chose to keep data but delete the item
-                                if (action === 'delete-item') {
-                                    const deleteDataInput = form.querySelector('input[name="delete_data"]');
-                                    if (deleteDataInput) {
-                                        deleteDataInput.value = 'false-keep-data';
-                                    } else {
-                                        const input = document.createElement('input');
-                                        input.type = 'hidden';
-                                        input.name = 'delete_data';
-                                        input.value = 'false-keep-data';
-                                        form.appendChild(input);
-                                    }
-                                    if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
-                                        window.FormBuilderAjax.submit(form);
-                                    } else if (typeof form.requestSubmit === 'function') {
-                                        form.requestSubmit();
-                                    } else {
-                                        form.submit();
-                                    }
-                                }
-                            },
-                            null,
-                            itemType,
-                            {
-                                delete: {{ _("Delete") | tojson }},
-                                this: {{ _("This") | tojson }},
-                                has: {{ _("has") | tojson }},
-                                savedDataEntries: {{ _("saved data entries.") | tojson }},
-                                mayHaveAssociatedData: {{ _("may have associated data.") | tojson }},
-                                chooseOption: {{ _("Choose an option:") | tojson }},
-                                deleteDataAndRemove: {{ _("Delete Data and Remove") | tojson }},
-                                permanentlyDelete: {{ _("Permanently delete all associated data entries and remove the") | tojson }},
-                                fromTemplate: {{ _("from the template.") | tojson }},
-                                keepDataAndRemoveItem: {{ _("Keep Data and Archive Item") | tojson }},
-                                keepDataButRemove: {{ _("Keep the data entries but archive the") | tojson }},
-                                itemWillBeArchived: {{ _("(The item will be archived and hidden from the template)") | tojson }},
-                                sectionWillBeArchived: {{ _("(The section and its items will be archived and hidden from the template)") | tojson }},
-                                cancel: {{ _("Cancel") | tojson }},
-                                continue: {{ _("Continue") | tojson }}
-                            }
+                            confirmMessage, dataCount,
+                            function() { proceedDeleteItem('true'); },
+                            function(action) { if (action === 'delete-item') proceedDeleteItem('false-keep-data'); },
+                            null, itemType, deleteLabels
                         );
                     } else {
-                        // Fallback to simple confirm if dialog function not available
                         const fallbackMessage = confirmMessage + ' ' + deleteDataWarningTemplate.replace('__count__', dataCount);
-                        const proceed = () => {
-                            const deleteDataInput = form.querySelector('input[name="delete_data"]');
-                            if (deleteDataInput) {
-                                deleteDataInput.value = 'true';
-                            } else {
-                                const input = document.createElement('input');
-                                input.type = 'hidden';
-                                input.name = 'delete_data';
-                                input.value = 'true';
-                                form.appendChild(input);
-                            }
-                            if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
-                                window.FormBuilderAjax.submit(form);
-                            } else if (typeof form.requestSubmit === 'function') {
-                                form.requestSubmit();
-                            } else {
-                                form.submit();
-                            }
-                        };
-                        showDangerConfirmModal(fallbackMessage, proceed);
+                        showDangerConfirmModal(fallbackMessage, function() { proceedDeleteItem('true'); });
                     }
-                });
-            });
+                    return;
+                }
 
-            // Handle delete section forms — single confirmation summarizing section and data counts
-            const deleteSectionSingleNoData = {{ _('This will permanently delete this section and all its contents. Are you sure?') | tojson }};
-            const deleteSectionMultipleNoDataTemplate = {{ _('This will permanently delete 1 section and %(n)s sub-section(s) and all their contents. Are you sure?') | tojson }};
-            const deleteSectionSingleWithDataTemplate = {{ _('This section contains %(count)s saved data entries. Choose an option below.') | tojson }};
-            const deleteSectionMultipleWithDataTemplate = {{ _('This will remove 1 section and %(n)s sub-section(s) and %(count)s saved data entries. Choose an option below.') | tojson }};
-
-            const deleteSectionForms = document.querySelectorAll('.delete-section-form');
-            deleteSectionForms.forEach(form => {
-                form.addEventListener('submit', function(e) {
+                // --- Delete section ---
+                if (form.matches('.delete-section-form')) {
+                    if (form.dataset.deleteConfirmed === 'true') {
+                        form.dataset.deleteConfirmed = 'false';
+                        return;
+                    }
                     e.preventDefault();
 
                     const dataCount = parseInt(form.getAttribute('data-data-count') || '0');
@@ -1189,133 +1140,33 @@
                     const childCount = parseInt(form.getAttribute('data-child-sections-count') || '0');
                     const sectionCount = 1 + childCount;
 
-                    function buildSummaryMessage(noData) {
-                        if (noData) {
-                            return sectionCount === 1
-                                ? deleteSectionSingleNoData
-                                : deleteSectionMultipleNoDataTemplate.replace('%(n)s', childCount);
-                        }
-                        return sectionCount === 1
-                            ? deleteSectionSingleWithDataTemplate.replace('%(count)s', dataCount)
-                            : deleteSectionMultipleWithDataTemplate.replace('%(n)s', childCount).replace('%(count)s', dataCount);
+                    const summaryMessage = (dataCount === 0)
+                        ? (sectionCount === 1 ? deleteSectionSingleNoData : deleteSectionMultipleNoDataTemplate.replace('%(n)s', childCount))
+                        : (sectionCount === 1 ? deleteSectionSingleWithDataTemplate.replace('%(count)s', dataCount) : deleteSectionMultipleWithDataTemplate.replace('%(n)s', childCount).replace('%(count)s', dataCount));
+
+                    function proceedDeleteSection(deleteData) {
+                        setDeleteData(form, deleteData);
+                        form.dataset.deleteConfirmed = 'true';
+                        doSubmit(form);
                     }
 
-                    const summaryMessage = buildSummaryMessage(dataCount === 0);
-
-                    // No saved data: single confirmation with section/data summary
                     if (dataCount === 0) {
-                        const proceed = () => {
-                            const deleteDataInput = form.querySelector('input[name="delete_data"]');
-                            if (deleteDataInput) {
-                                deleteDataInput.value = 'true';
-                            } else {
-                                const input = document.createElement('input');
-                                input.type = 'hidden';
-                                input.name = 'delete_data';
-                                input.value = 'true';
-                                form.appendChild(input);
-                            }
-                            if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
-                                window.FormBuilderAjax.submit(form);
-                            } else if (typeof form.requestSubmit === 'function') {
-                                form.requestSubmit();
-                            } else {
-                                form.submit();
-                            }
-                        };
-                        showDangerConfirmModal(summaryMessage, proceed);
+                        showDangerConfirmModal(summaryMessage, function() { proceedDeleteSection('true'); });
                         return;
                     }
 
-                    // Has saved data: single dialog with section/data summary and delete vs keep-data options
                     if (window.showDeleteDataConfirmation) {
                         window.showDeleteDataConfirmation(
-                            summaryMessage,
-                            dataCount,
-                            function() {
-                                const deleteDataInput = form.querySelector('input[name="delete_data"]');
-                                if (deleteDataInput) {
-                                    deleteDataInput.value = 'true';
-                                } else {
-                                    const input = document.createElement('input');
-                                    input.type = 'hidden';
-                                    input.name = 'delete_data';
-                                    input.value = 'true';
-                                    form.appendChild(input);
-                                }
-                                if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
-                                    window.FormBuilderAjax.submit(form);
-                                } else if (typeof form.requestSubmit === 'function') {
-                                    form.requestSubmit();
-                                } else {
-                                    form.submit();
-                                }
-                            },
-                            function(action) {
-                                if (action === 'delete-item') {
-                                    const deleteDataInput = form.querySelector('input[name="delete_data"]');
-                                    if (deleteDataInput) {
-                                        deleteDataInput.value = 'false-keep-data';
-                                    } else {
-                                        const input = document.createElement('input');
-                                        input.type = 'hidden';
-                                        input.name = 'delete_data';
-                                        input.value = 'false-keep-data';
-                                        form.appendChild(input);
-                                    }
-                                    if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
-                                        window.FormBuilderAjax.submit(form);
-                                    } else if (typeof form.requestSubmit === 'function') {
-                                        form.requestSubmit();
-                                    } else {
-                                        form.submit();
-                                    }
-                                }
-                            },
-                            null,
-                            itemType,
-                            {
-                                delete: {{ _("Delete") | tojson }},
-                                this: {{ _("This") | tojson }},
-                                has: {{ _("has") | tojson }},
-                                savedDataEntries: {{ _("saved data entries.") | tojson }},
-                                mayHaveAssociatedData: {{ _("may have associated data.") | tojson }},
-                                chooseOption: {{ _("Choose an option:") | tojson }},
-                                deleteDataAndRemove: {{ _("Delete Data and Remove") | tojson }},
-                                permanentlyDelete: {{ _("Permanently delete all associated data entries and remove the") | tojson }},
-                                fromTemplate: {{ _("from the template.") | tojson }},
-                                keepDataAndRemoveItem: {{ _("Keep Data and Archive Item") | tojson }},
-                                keepDataButRemove: {{ _("Keep the data entries but archive the") | tojson }},
-                                itemWillBeArchived: {{ _("(The item will be archived and hidden from the template)") | tojson }},
-                                sectionWillBeArchived: {{ _("(The section and its items will be archived and hidden from the template)") | tojson }},
-                                cancel: {{ _("Cancel") | tojson }},
-                                continue: {{ _("Continue") | tojson }}
-                            }
+                            summaryMessage, dataCount,
+                            function() { proceedDeleteSection('true'); },
+                            function(action) { if (action === 'delete-item') proceedDeleteSection('false-keep-data'); },
+                            null, itemType, deleteLabels
                         );
                     } else {
                         const fallbackMessage = summaryMessage + ' ' + deleteDataWarningTemplate.replace('__count__', dataCount);
-                        const proceed = () => {
-                            const deleteDataInput = form.querySelector('input[name="delete_data"]');
-                            if (deleteDataInput) {
-                                deleteDataInput.value = 'true';
-                            } else {
-                                const input = document.createElement('input');
-                                input.type = 'hidden';
-                                input.name = 'delete_data';
-                                input.value = 'true';
-                                form.appendChild(input);
-                            }
-                            if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
-                                window.FormBuilderAjax.submit(form);
-                            } else if (typeof form.requestSubmit === 'function') {
-                                form.requestSubmit();
-                            } else {
-                                form.submit();
-                            }
-                        };
-                        showDangerConfirmModal(fallbackMessage, proceed);
+                        showDangerConfirmModal(fallbackMessage, function() { proceedDeleteSection('true'); });
                     }
-                });
+                }
             });
         });
 
@@ -1366,13 +1217,29 @@
                 const sectionType = e.target.value;
                 const maxEntriesContainer = document.getElementById('repeat-group-config');
                 const maxEntriesInput = document.getElementById('section-max-entries-input');
+                const entryLabelItemSelect = document.getElementById('section-entry-label-item-id');
+                const sectionForm = document.getElementById('section-form');
 
                 if (maxEntriesContainer && maxEntriesInput) {
                     if (sectionType === 'repeat') {
                         maxEntriesContainer.classList.remove('hidden');
+                        let sectionId = null;
+                        if (sectionForm && sectionForm.action) {
+                            const match = sectionForm.action.match(/\/sections\/edit\/(\d+)/);
+                            if (match) sectionId = match[1];
+                        }
+                        if (typeof window.populateRepeatEntryLabelItemSelect === 'function') {
+                            window.populateRepeatEntryLabelItemSelect(
+                                sectionId,
+                                entryLabelItemSelect ? entryLabelItemSelect.value : ''
+                            );
+                        }
                     } else {
                         maxEntriesContainer.classList.add('hidden');
                         maxEntriesInput.value = '';
+                        if (entryLabelItemSelect) {
+                            entryLabelItemSelect.value = '';
+                        }
                     }
                 }
             }

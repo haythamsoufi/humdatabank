@@ -259,7 +259,10 @@ def _create_question_form_item(template, section, form_data, default_order):
         'allow_disability_questions': bool(get_field_value('allow_disability_questions', '')),
         'indirect_reach': bool(get_field_value('indirect_reach', '')),
         'privacy': (get_field_value('privacy', '') or 'ifrc_network'),
-        'allow_over_100': False  # Default to False
+        'allow_over_100': False,  # Default to False
+        'unique_options_in_section': bool(get_field_value('unique_options_in_section', '')),
+        'limit_entries_to_option_count': bool(get_field_value('limit_entries_to_option_count', '')),
+        'use_as_repeat_entry_title': bool(get_field_value('use_as_repeat_entry_title', '')),
     }
 
     # Handle allow_over_100 - check direct field first, then config JSON
@@ -327,6 +330,19 @@ def _create_question_form_item(template, section, form_data, default_order):
             form_item.list_filters_json = json.loads(filters_json_raw) if filters_json_raw else None
         except (json.JSONDecodeError, TypeError):
             form_item.list_filters_json = None
+
+        # Persist plugin-specific config for configurable lists (e.g. Emergency Operations)
+        question_plugin_config_raw = get_field_value('question_plugin_config')
+        if question_plugin_config_raw:
+            try:
+                question_plugin_config = json.loads(question_plugin_config_raw)
+                if not isinstance(form_item.config, dict):
+                    form_item.config = {}
+                form_item.config = {**form_item.config, 'question_plugin_config': question_plugin_config}
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(form_item, 'config')
+            except (json.JSONDecodeError, TypeError):
+                current_app.logger.debug("Invalid question_plugin_config JSON, ignoring")
 
         # Ensure manual options cleared
         form_item.options_json = None

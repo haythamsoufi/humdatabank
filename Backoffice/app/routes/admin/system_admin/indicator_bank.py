@@ -250,10 +250,16 @@ def manage_indicator_bank():
         subsectors_by_sector = defaultdict(list)
         for sub in all_subsectors:
             subsectors_by_sector[sub.sector_id].append(sub)
+        from app.routes.admin.system_admin.indicator_lookups import (
+            batch_sector_indicator_counts,
+            batch_subsector_indicator_counts,
+        )
         template_ctx.update(
             sectors=all_sectors,
             subsectors=all_subsectors,
             subsectors_by_sector=dict(subsectors_by_sector),
+            sector_indicator_counts=batch_sector_indicator_counts([s.id for s in all_sectors]),
+            subsector_indicator_counts=batch_subsector_indicator_counts([s.id for s in all_subsectors]),
         )
 
     if user_has_permission('admin.indicator_bank.edit'):

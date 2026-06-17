@@ -9,6 +9,9 @@
       margin-bottom: 1rem;
     }
     .ml-form-wrap .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       font-size: 1rem;
       font-weight: 600;
       color: #374151;
@@ -16,6 +19,45 @@
       padding-bottom: 0.5rem;
       border-bottom: 2px solid #e5e7eb;
     }
+    .spef-auto-translate-btn {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      font-family: inherit;
+      line-height: 1.4;
+      white-space: nowrap;
+      background: #f5f3ff;
+      color: #4f46e5;
+      border: 1px solid #c4b5fd;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .spef-auto-translate-btn:hover:not(:disabled) {
+      background: #ede9fe;
+      border-color: #a78bfa;
+    }
+    .spef-auto-translate-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .spef-translate-status {
+      display: none;
+      font-size: 0.75rem;
+      margin-top: -0.4rem;
+      margin-bottom: 0.6rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+    }
+    .spef-translate-status--loading { color: #6b7280; background: #f9fafb; }
+    .spef-translate-status--success { color: #15803d; background: #f0fdf4; }
+    .spef-translate-status--error   { color: #dc2626; background: #fef2f2; }
+    .spef-translate-status--warning { color: #d97706; background: #fffbeb; }
+    .spef-translate-status--info    { color: #2563eb; background: #eff6ff; }
     .ml-form-wrap .ml-measurement-meta {
       display: grid;
       width: 100%;
@@ -24,8 +66,37 @@
       gap: 0.75rem 1rem;
       align-items: end;
     }
+    .ml-form-wrap .ml-measurement-meta__code {
+      min-width: 0;
+    }
+    .ml-form-wrap .ml-measurement-meta__order {
+      min-width: 0;
+    }
+    .ml-form-wrap .ml-measurement-meta__active {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 0.5rem;
+      padding-bottom: 0.35rem;
+    }
+    .ml-form-wrap .ml-measurement-meta__hint {
+      grid-column: 1 / -1;
+      margin: 0;
+    }
     @media (max-width: 36rem) {
-      .ml-form-wrap .ml-measurement-meta { grid-template-columns: 1fr; }
+      .ml-form-wrap .ml-measurement-meta {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+      }
+      .ml-form-wrap .ml-measurement-meta__active {
+        padding-bottom: 0;
+      }
+    }
+    .ml-form-wrap .ml-measurement-meta input[type="text"],
+    .ml-form-wrap .ml-measurement-meta input[type="number"] {
+      max-width: 100%;
+      box-sizing: border-box;
+      width: 100%;
     }
   </style>
   {% if is_edit and row and usage_count is defined and usage_count > 0 %}
@@ -40,24 +111,32 @@
       <div class="section-title">{{ _('SP/EF code') }}</div>
       <div class="ml-measurement-meta">
         <div class="ml-measurement-meta__code">
-          <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ form.code.id }}">{{ form.code.label.text }}</label>
+          <label class="block text-sm font-medium text-gray-700 mb-2" for="{{ form.code.id }}">{{ form.code.label.text }}</label>
           {{ form.code(class_='w-full border border-gray-300 rounded px-3 py-2 text-sm', readonly=is_edit and row and usage_count > 0) }}
           {% for e in form.code.errors %}<p class="text-red-600 text-xs mt-1">{{ e }}</p>{% endfor %}
-          <p class="text-xs text-gray-500 mt-1">{{ _('IFRC Strategy 2030 area code (e.g. EF2, SP3).') }}</p>
         </div>
         <div class="ml-measurement-meta__order">
-          <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ form.sort_order.id }}">{{ form.sort_order.label.text }}</label>
+          <label class="block text-sm font-medium text-gray-700 mb-2" for="{{ form.sort_order.id }}">{{ form.sort_order.label.text }}</label>
           {{ form.sort_order(class_='w-full border border-gray-300 rounded px-3 py-2 text-sm') }}
         </div>
         <div class="ml-measurement-meta__active">
-          <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-            {{ form.is_active() }} {{ form.is_active.label.text }}
-          </label>
+          {{ form.is_active() }}
+          <label for="{{ form.is_active.id }}" class="text-sm text-gray-700 m-0">{{ form.is_active.label.text }}</label>
         </div>
+        <p class="ml-measurement-meta__hint text-xs text-gray-500">{{ _('IFRC Strategy 2030 area code (e.g. EF2, SP3).') }}</p>
       </div>
     </div>
     <div class="form-section">
-      <div class="section-title">{{ _('Labels') }}</div>
+      <div class="section-title">
+        <span>{{ _('Labels') }}</span>
+        <button type="button" class="spef-auto-translate-btn js-spef-auto-translate"
+                title="{{ _('Auto-translate the English label to all blank language fields') }}"
+                aria-label="{{ _('Auto Translate') }}">
+          <i class="fas fa-magic" aria-hidden="true"></i>
+          {{ _('Auto Translate') }}
+        </button>
+      </div>
+      <div class="spef-translate-status js-spef-translate-status"></div>
       <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ form.name.id }}">{{ form.name.label.text }}</label>
       {{ form.name(class_='w-full border border-gray-300 rounded px-3 py-2 text-sm mb-3') }}
       {% for e in form.name.errors %}<p class="text-red-600 text-xs mt-1">{{ e }}</p>{% endfor %}

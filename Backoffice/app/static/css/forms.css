@@ -17,8 +17,250 @@ button[disabled] #export-pdf-btn svg { opacity: 0.5; }
 /* Repeat sub-sections use `.space-y-4 pl-6` as their fields container; hide only direct children there too. */
 [data-section-type="repeat"] .space-y-4.pl-6 > .form-item-block { display: none !important; }
 
-/* Show repeat entries */
-.repeat-entry { display: block !important; }
+/* Repeat entry cards — minimal neutral styling */
+.repeat-entry {
+  display: block !important;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #d1d5db;
+  border-radius: 0.375rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 640px) {
+  .repeat-entry {
+    padding: 1rem 1.25rem;
+  }
+}
+
+.repeat-entry__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.875rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+/* Title dropdown in header */
+.repeat-entry__header--title-dropdown {
+  gap: 0.75rem;
+}
+
+/* Title-only entries: the select box is the visual title — skip extra divider below it */
+.repeat-entry__header--title-dropdown-only {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.repeat-entry--title-dropdown-only > .repeat-entry__fields--empty {
+  display: none;
+}
+
+/* First sub-section inside a title-only repeat entry: drop redundant top rule */
+.repeat-entry--title-dropdown-only > [data-section-type]:first-of-type {
+  border-top: none !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+.repeat-entry--title-dropdown-only > [data-section-type]:first-of-type > h4 {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0.75rem;
+}
+
+.repeat-entry__label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Custom field-driven entry names — boxed title */
+.repeat-entry__label--custom {
+  display: inline-block;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #374151;
+  letter-spacing: normal;
+  text-transform: none;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  background-color: #f9fafb;
+}
+
+/* Single-choice dropdown as entry title */
+.repeat-entry__label--title-dropdown {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(100%, 28rem);
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.repeat-entry__title-select-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  width: auto;
+  max-width: min(100%, 28rem);
+  position: relative;
+}
+
+.repeat-entry__title-select {
+  display: inline-block;
+  width: auto;
+  min-width: 14rem;
+  max-width: min(100%, 28rem);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #1e3a8a;
+  letter-spacing: normal;
+  text-transform: none;
+  padding: 0.4375rem 2rem 0.4375rem 0.75rem;
+  border: 1px solid #bfdbfe;
+  border-left: 3px solid #3b82f6;
+  border-radius: 0.375rem;
+  background-color: #eff6ff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%232563eb'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E") no-repeat right 0.625rem center;
+  background-size: 0.875rem;
+  appearance: none;
+  cursor: pointer;
+  box-shadow: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.repeat-entry__title-select:hover {
+  background-color: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.repeat-entry__title-select:focus {
+  outline: none;
+  border-color: #60a5fa;
+  border-left-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.repeat-entry__title-select--loading {
+  color: #64748b;
+  cursor: wait;
+  opacity: 0.92;
+}
+
+.repeat-entry__title-select--loading:hover {
+  background-color: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.repeat-entry__title-select option {
+  color: #374151;
+  background-color: #fff;
+}
+
+.repeat-entry-title-field--hidden {
+  display: none !important;
+}
+
+.calculated-select-stale-indicator {
+  color: #dc2626;
+  font-size: 0.875rem;
+  line-height: 1;
+  flex-shrink: 0;
+  cursor: help;
+}
+
+.calculated-select--stale-saved,
+select.calculated-select--stale-saved {
+  border-color: #fca5a5 !important;
+}
+
+.repeat-entry__title-select.repeat-entry__title-select--stale-saved {
+  border-color: #fca5a5;
+  border-left-color: #dc2626;
+  background-color: #fef2f2;
+}
+
+.repeat-entry-nav-link.is-active {
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.repeat-entry-nav-link.is-active i {
+  color: #2563eb;
+}
+
+.section-container--no-header > [data-collapsible-content] {
+  padding-top: 0;
+}
+
+/* Full-width repeat-section "Add Entry" call-to-action */
+.repeat-add-entry-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  width: 100%;
+  padding: 1rem 1.25rem;
+  border: 2px dotted #86efac;
+  border-radius: 0.5rem;
+  background-color: #f0fdf4;
+  color: #15803d;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  text-align: center;
+}
+
+.repeat-add-entry-btn:hover {
+  background-color: #dcfce7;
+  border-color: #4ade80;
+  color: #166534;
+  box-shadow: 0 1px 3px rgba(22, 163, 74, 0.15);
+}
+
+.repeat-add-entry-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--btn-success-focus);
+}
+
+.repeat-add-entry-btn__main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.repeat-add-entry-btn__main i {
+  font-size: 1.125rem;
+}
+
+.repeat-add-entry-btn__hint {
+  font-size: 0.8125rem;
+  font-style: italic;
+  color: #4b5563;
+  line-height: 1.35;
+}
+
+.repeat-add-entry-btn__limit {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.repeat-add-entry-btn__limit.text-red-600 {
+  color: #dc2626 !important;
+}
 
 .multi-select-dropdown {
   position: fixed;

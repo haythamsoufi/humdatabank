@@ -346,6 +346,9 @@
     function closeModal() { hideModal('embed-modal'); }
 
     function saveEmbed() {
+        var saveBtn = document.getElementById('btn-save-embed');
+        if (saveBtn && saveBtn.disabled) return;
+
         const id = document.getElementById('embed-id').value;
         const payload = {
             title: document.getElementById('embed-title').value.trim(),
@@ -363,6 +366,8 @@
             return;
         }
 
+        if (saveBtn) saveBtn.disabled = true;
+
         const url = id
             ? '/admin/embed-content/' + id
             : '/admin/embed-content/create';
@@ -379,10 +384,12 @@
             if (data.success) {
                 window.location.reload();
             } else {
+                if (saveBtn) saveBtn.disabled = false;
                 alert(data.error || data.message || '{{ _("An error occurred.") }}');
             }
         })
         .catch(function(err) {
+            if (saveBtn) saveBtn.disabled = false;
             console.error(err);
             alert('{{ _("An error occurred.") }}');
         });
@@ -424,6 +431,10 @@
     function closeDeleteModal() { hideModal('delete-modal'); }
 
     function executeDelete() {
+        var confirmBtn = document.getElementById('delete-modal-confirm');
+        if (confirmBtn && confirmBtn.disabled) return;
+        if (confirmBtn) confirmBtn.disabled = true;
+
         const id = document.getElementById('delete-item-id').value;
         fetch('/admin/embed-content/' + id, {
             method: 'DELETE',
@@ -435,10 +446,12 @@
             if (data.success) {
                 window.location.reload();
             } else {
+                if (confirmBtn) confirmBtn.disabled = false;
                 alert(data.error || data.message || '{{ _("An error occurred.") }}');
             }
         })
         .catch(function(err) {
+            if (confirmBtn) confirmBtn.disabled = false;
             console.error(err);
             alert('{{ _("An error occurred.") }}');
         });

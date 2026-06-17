@@ -1,7 +1,7 @@
 """Add use_profile_picture to user
 
 Revision ID: add_use_profile_picture
-Revises: add_profile_picture_url
+Revises: rename_form_item_id
 Create Date: 2025-01-25 12:00:00.000000
 
 """

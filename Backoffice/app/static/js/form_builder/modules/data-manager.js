@@ -198,7 +198,10 @@ export const DataManager = {
 
     // Get section by ID
     getSectionById: function(id) {
-        return this.data.allTemplateSections.find(section => section.id === id);
+        return this.data.allTemplateSections.find(section => {
+            const sectionId = Array.isArray(section) ? section[0] : (section.id ?? section.value);
+            return String(sectionId) === String(id);
+        });
     },
 
     // Get item by ID and type

@@ -1,7 +1,7 @@
 """add pgvector extension and AI embeddings tables
 
 Revision ID: add_pgvector_embeddings
-Revises: add_ai_chat_archiving
+Revises: rename_year_to_period
 Create Date: 2026-01-16 10:00:00.000000
 
 """

@@ -222,6 +222,14 @@ class FormDataService:
                     )
                     field_changes_tracker.extend(dynamic_changes)
 
+                    # Capture/refresh the emergency-operation identity for this dynamic section so
+                    # saved data stays attributable to a specific appeal even if the source API
+                    # later reorders results or filters change (Direction A binding).
+                    try:
+                        cls._persist_emergency_section_binding(section, assignment_entity_status)
+                    except Exception as e:
+                        logger.debug("Emergency section binding skipped for section %s: %s", section.id, e)
+
                 # Process repeat groups for repeat sections
                 if section.section_type == 'repeat':
                     if verbose_section_trace:
@@ -1039,6 +1047,88 @@ class FormDataService:
         return total
 
     @classmethod
+    def _is_emergency_operations_choice(cls, form_item) -> bool:
+        if not form_item or not getattr(form_item, 'is_question', False):
+            return False
+        return str(getattr(form_item, 'lookup_list_id', '') or '') == 'emergency_operations'
+
+    @classmethod
+    def _parse_emergency_metadata_from_display(cls, display_value):
+        import re
+
+        text = str(display_value or '').strip()
+        if not text:
+            return None
+        match = re.match(r'^(.*)\s+\(([^)]+)\)\s*$', text)
+        if match:
+            return {
+                'name': match.group(1).strip(),
+                'code': match.group(2).strip(),
+            }
+        return {'name': text, 'code': ''}
+
+    @classmethod
+    def _get_emergency_metadata_from_request(cls, form_item_id=None, section_id=None, instance_number=None, field_index=None):
+        metadata_raw = None
+        if section_id is not None and instance_number is not None and field_index is not None:
+            metadata_raw = request.form.get(
+                f'repeat_{section_id}_{instance_number}_field_{field_index}_emergency_metadata'
+            )
+        elif form_item_id is not None:
+            metadata_raw = request.form.get(f'field_disagg_metadata[{form_item_id}]')
+
+        if not metadata_raw or not str(metadata_raw).strip():
+            return None
+
+        try:
+            payload = json.loads(metadata_raw)
+        except (json.JSONDecodeError, TypeError):
+            return None
+
+        if not isinstance(payload, dict):
+            return None
+
+        name = str(payload.get('name') or '').strip()
+        code = str(payload.get('code') or '').strip()
+        if not name and not code:
+            return None
+        return {'name': name, 'code': code}
+
+    @classmethod
+    def _apply_emergency_operation_disagg(cls, entry, display_value, metadata=None):
+        """Persist emergency operation name/code alongside the selected display value."""
+        text = str(display_value or '').strip()
+        if not text:
+            return
+
+        meta = metadata or cls._parse_emergency_metadata_from_display(text)
+        if not meta:
+            return
+
+        name = str(meta.get('name') or '').strip()
+        code = str(meta.get('code') or '').strip()
+        if not name and not code:
+            return
+
+        entry.disagg_data = {'name': name, 'code': code}
+        entry.disagg_type = 'emergency_operation'
+
+    @classmethod
+    def _store_scalar_question_value(cls, data_entry, question, processed_value):
+        """Store a scalar question value and any emergency-operation metadata."""
+        if isinstance(processed_value, dict) and 'mode' in processed_value and 'values' in processed_value:
+            data_entry.set_disaggregated_data(processed_value['mode'], processed_value['values'])
+            return
+
+        data_entry.set_simple_value(processed_value)
+        if cls._is_emergency_operations_choice(question) and processed_value:
+            cls._apply_emergency_operation_disagg(
+                data_entry,
+                processed_value,
+                cls._get_emergency_metadata_from_request(form_item_id=question.id),
+            )
+
+    @classmethod
     def _process_question_data(cls, question: FormItem, assignment_entity_status, validation_errors: List) -> List[Dict]:
         """
         Process question data via unified FormItemProcessor to centralize logic.
@@ -1120,10 +1210,7 @@ class FormDataService:
                 data_entry.set_data_availability(data_not_available, not_applicable)
                 # Only set value if we have a value AND no data availability flags
                 if processed_value is not None and not data_not_available and not not_applicable:
-                    if isinstance(processed_value, dict) and 'mode' in processed_value and 'values' in processed_value:
-                        data_entry.set_disaggregated_data(processed_value['mode'], processed_value['values'])
-                    else:
-                        data_entry.set_simple_value(processed_value)
+                    cls._store_scalar_question_value(data_entry, question, processed_value)
 
                 db.session.add(data_entry)
 
@@ -1151,10 +1238,7 @@ class FormDataService:
                 data_entry.set_data_availability(data_not_available, not_applicable)
                 # Only set value if we have a value AND no data availability flags
                 if processed_value is not None and not data_not_available and not not_applicable:
-                    if isinstance(processed_value, dict) and 'mode' in processed_value and 'values' in processed_value:
-                        data_entry.set_disaggregated_data(processed_value['mode'], processed_value['values'])
-                    else:
-                        data_entry.set_simple_value(processed_value)
+                    cls._store_scalar_question_value(data_entry, question, processed_value)
 
                 db.session.add(data_entry)
 
@@ -1690,99 +1774,114 @@ class FormDataService:
 
     @classmethod
     def _create_pending_dynamic_indicators(cls, section, assignment_entity_status, validation_errors: List) -> Dict[str, int]:
-        """Create DB records for pending dynamic indicators and return mapping of temp IDs to real IDs."""
+        """Create DB records for pending dynamic indicators and return mapping of temp IDs to real IDs.
+
+        Handles two key formats emitted by the frontend:
+          - pending_dynamic_indicator_{sectionId}          → section-level (repeat_instance_number=None)
+          - pending_dynamic_indicator_{sectionId}_ri_{N}   → repeat-entry-level (repeat_instance_number=N)
+        """
         temp_to_real_map = {}
 
-        # Find all pending indicators for this section
-        pending_key = f'pending_dynamic_indicator_{section.id}'
-        pending_values = request.form.getlist(pending_key)
+        # Collect all pending indicator keys for this section (section-level and per-repeat-instance)
+        import re as _re
+        section_prefix = f'pending_dynamic_indicator_{section.id}'
+        pending_by_instance: Dict[object, list] = {}  # key = repeat_instance_number (None or int)
 
-        if not pending_values:
+        for form_key in request.form.keys():
+            if form_key == section_prefix:
+                pending_by_instance.setdefault(None, []).extend(request.form.getlist(form_key))
+            elif form_key.startswith(f'{section_prefix}_ri_'):
+                m = _re.fullmatch(rf'pending_dynamic_indicator_{section.id}_ri_(\d+)', form_key)
+                if m:
+                    instance_num = int(m.group(1))
+                    pending_by_instance.setdefault(instance_num, []).extend(request.form.getlist(form_key))
+
+        if not pending_by_instance:
             return temp_to_real_map
 
         is_public = cls._is_public_submission(assignment_entity_status)
-
-        # Get existing assignments to check for duplicates and get max order
-        if is_public:
-            existing_assignments = DynamicIndicatorData.query.filter_by(
-                public_submission_id=assignment_entity_status.id,
-                section_id=section.id
-            ).all()
-        else:
-            existing_assignments = DynamicIndicatorData.query.filter_by(
-                assignment_entity_status_id=assignment_entity_status.id,
-                section_id=section.id
-            ).all()
-
-        existing_indicator_ids = {a.indicator_bank_id for a in existing_assignments}
-        max_order = max((a.order for a in existing_assignments), default=0)
-
-        # Respect max indicator limits if configured
+        from app.models import IndicatorBank
         max_allowed = getattr(section, 'max_dynamic_indicators', None)
         if max_allowed is not None:
             try:
                 max_allowed = int(max_allowed)
-                if len(existing_assignments) >= max_allowed:
-                    validation_errors.append("Maximum indicators reached for this section.")
-                    return temp_to_real_map
             except (TypeError, ValueError):
-                pass
+                max_allowed = None
 
-        # Process each pending indicator
-        for pending_value in pending_values:
-            try:
-                parts = pending_value.split(':')
-                if len(parts) != 2:
-                    continue
-
-                indicator_bank_id = int(parts[0])
-                temp_assignment_id = parts[1]
-
-                # Skip if already exists
-                if indicator_bank_id in existing_indicator_ids:
-                    continue
-
-                # Check max limit
-                if max_allowed is not None and len(existing_assignments) >= max_allowed:
-                    validation_errors.append("Maximum indicators reached for this section.")
-                    break
-
-                # Import IndicatorBank here to avoid circular imports
-                from app.models import IndicatorBank
-                indicator = IndicatorBank.query.get(indicator_bank_id)
-                if not indicator:
-                    continue
-
-                # Create the real assignment
-                max_order += 1
-                dynamic_assignment = DynamicIndicatorData(
+        for repeat_instance_number, pending_values in pending_by_instance.items():
+            # Get existing assignments for this (section, repeat_instance) combination
+            if is_public:
+                existing_assignments = DynamicIndicatorData.query.filter_by(
+                    public_submission_id=assignment_entity_status.id,
                     section_id=section.id,
-                    indicator_bank_id=indicator_bank_id,
-                    custom_label=None,
-                    order=max_order,
-                    added_by_user_id=current_user.id
-                )
+                    repeat_instance_number=repeat_instance_number
+                ).all()
+            else:
+                existing_assignments = DynamicIndicatorData.query.filter_by(
+                    assignment_entity_status_id=assignment_entity_status.id,
+                    section_id=section.id,
+                    repeat_instance_number=repeat_instance_number
+                ).all()
 
-                if is_public:
-                    dynamic_assignment.public_submission_id = assignment_entity_status.id
-                else:
-                    dynamic_assignment.assignment_entity_status_id = assignment_entity_status.id
+            existing_indicator_ids = {a.indicator_bank_id for a in existing_assignments}
+            max_order = max((a.order for a in existing_assignments), default=0)
 
-                db.session.add(dynamic_assignment)
-                db.session.flush()  # Get the real ID
-
-                # Map temp ID to real ID
-                temp_to_real_map[temp_assignment_id] = dynamic_assignment.id
-                existing_indicator_ids.add(indicator_bank_id)
-                existing_assignments.append(dynamic_assignment)
-
-                cls._log_verbose(f"Created pending dynamic indicator: temp_id={temp_assignment_id}, real_id={dynamic_assignment.id}, indicator_id={indicator_bank_id}")
-
-            except (ValueError, TypeError) as e:
-                logger.warning(f"Invalid pending indicator value: {pending_value}, error: {e}")
+            if max_allowed is not None and len(existing_assignments) >= max_allowed:
+                validation_errors.append("Maximum indicators reached for this section.")
                 continue
 
-        # Ensure all created assignments are available for queries
+            for pending_value in pending_values:
+                try:
+                    parts = pending_value.split(':')
+                    if len(parts) != 2:
+                        continue
+
+                    indicator_bank_id = int(parts[0])
+                    temp_assignment_id = parts[1]
+
+                    if indicator_bank_id in existing_indicator_ids:
+                        continue
+
+                    if max_allowed is not None and len(existing_assignments) >= max_allowed:
+                        validation_errors.append("Maximum indicators reached for this section.")
+                        break
+
+                    indicator = IndicatorBank.query.get(indicator_bank_id)
+                    if not indicator:
+                        continue
+
+                    max_order += 1
+                    dynamic_assignment = DynamicIndicatorData(
+                        section_id=section.id,
+                        indicator_bank_id=indicator_bank_id,
+                        custom_label=None,
+                        order=max_order,
+                        added_by_user_id=current_user.id,
+                        repeat_instance_number=repeat_instance_number
+                    )
+
+                    if is_public:
+                        dynamic_assignment.public_submission_id = assignment_entity_status.id
+                    else:
+                        dynamic_assignment.assignment_entity_status_id = assignment_entity_status.id
+
+                    db.session.add(dynamic_assignment)
+                    db.session.flush()
+
+                    temp_to_real_map[temp_assignment_id] = dynamic_assignment.id
+                    existing_indicator_ids.add(indicator_bank_id)
+                    existing_assignments.append(dynamic_assignment)
+
+                    cls._log_verbose(
+                        f"Created pending dynamic indicator: temp_id={temp_assignment_id}, "
+                        f"real_id={dynamic_assignment.id}, indicator_id={indicator_bank_id}, "
+                        f"repeat_instance={repeat_instance_number}"
+                    )
+
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Invalid pending indicator value: {pending_value}, error: {e}")
+                    continue
+
         if temp_to_real_map:
             db.session.flush()
 
@@ -1799,6 +1898,93 @@ class FormDataService:
         request._pending_indicator_id_map = temp_to_real_map
 
     @classmethod
+    def _persist_emergency_section_binding(cls, section, assignment_entity_status) -> None:
+        """Freeze the emergency (appeal-code) identity for an emergency dynamic section.
+
+        Only applies to assignment submissions (not public submissions) and only when the section
+        references an [EOn] slot and has at least one dynamic indicator row. The actual ordering and
+        identity resolution live in app.services.emergency_section_binding.
+        """
+        if cls._is_public_submission(assignment_entity_status):
+            return
+
+        from app.services.emergency_section_binding import slot_for_section, persist_section_binding
+
+        if not slot_for_section(section):
+            return
+
+        # Only bind sections that actually carry dynamic indicators.
+        has_rows = DynamicIndicatorData.query.filter_by(
+            assignment_entity_status_id=assignment_entity_status.id,
+            section_id=section.id,
+        ).first() is not None
+        if not has_rows:
+            return
+
+        user_id = None
+        try:
+            from flask_login import current_user
+            if current_user and getattr(current_user, 'is_authenticated', False):
+                user_id = current_user.id
+        except Exception:
+            user_id = None
+
+        persist_section_binding(section, assignment_entity_status, user_id=user_id)
+
+    @classmethod
+    def _delete_pending_dynamic_indicators(cls, section, assignment_entity_status) -> set:
+        """Delete dynamic indicators marked for removal on form save.
+
+        The frontend writes a hidden input ``delete_dynamic_indicator_{assignmentId}``
+        for each saved indicator the user removes before saving.  We process those here
+        in the same DB transaction as the rest of the form save so that the deletion is
+        atomic and only takes effect when the user actually submits.
+
+        Returns the set of deleted assignment IDs so the caller can skip them when
+        iterating over dynamic assignments.
+        """
+        import re as _re
+        deleted_ids: set = set()
+        is_public = cls._is_public_submission(assignment_entity_status)
+
+        for form_key in request.form.keys():
+            m = _re.fullmatch(r'delete_dynamic_indicator_(\d+)', form_key)
+            if not m:
+                continue
+            assignment_id = int(m.group(1))
+            assignment = DynamicIndicatorData.query.get(assignment_id)
+            if not assignment:
+                continue
+
+            # Ownership check — assignment must belong to this section and submission
+            if assignment.section_id != section.id:
+                logger.warning(
+                    f"Attempted to delete dynamic indicator {assignment_id} "
+                    f"that does not belong to section {section.id} — skipped"
+                )
+                continue
+            if is_public:
+                if assignment.public_submission_id != assignment_entity_status.id:
+                    logger.warning(
+                        f"Attempted to delete dynamic indicator {assignment_id} "
+                        f"belonging to a different public submission — skipped"
+                    )
+                    continue
+            else:
+                if assignment.assignment_entity_status_id != assignment_entity_status.id:
+                    logger.warning(
+                        f"Attempted to delete dynamic indicator {assignment_id} "
+                        f"belonging to a different assignment — skipped"
+                    )
+                    continue
+
+            db.session.delete(assignment)
+            deleted_ids.add(assignment_id)
+            logger.info(f"Deferred-deleted dynamic indicator assignment {assignment_id}")
+
+        return deleted_ids
+
+    @classmethod
     def _process_dynamic_indicators(cls, section, assignment_entity_status, validation_errors: List) -> List[Dict]:
         """Process dynamic indicators using unified FormItemProcessor approach"""
         field_changes = []
@@ -1808,6 +1994,9 @@ class FormDataService:
         dynamic_field_names = [name for name in all_form_fields if 'dynamic' in name]
         cls._log_verbose(f"All form field names: {all_form_fields}")
         cls._log_verbose(f"Dynamic field names: {dynamic_field_names}")
+
+        # Delete indicators the user removed before saving (deferred from the UI delete button)
+        deleted_ids = cls._delete_pending_dynamic_indicators(section, assignment_entity_status)
 
         # Create DB records for pending indicators before processing
         temp_to_real_id_map = cls._create_pending_dynamic_indicators(section, assignment_entity_status, validation_errors)
@@ -1831,6 +2020,8 @@ class FormDataService:
         logger.info(f"Found {len(dynamic_assignments)} dynamic assignments for section {section.id}")
 
         for dynamic_assignment in dynamic_assignments:
+            if dynamic_assignment.id in deleted_ids:
+                continue  # already deleted above — skip value processing
             logger.info(f"Processing dynamic assignment {dynamic_assignment.id}")
 
             # Create a pseudo-form item for the dynamic indicator
@@ -1995,6 +2186,35 @@ class FormDataService:
         """Deprecated: use centralized dynamic indicator builder."""
         return _create_dynamic_indicator_object(dynamic_assignment, section_obj=None)
 
+    @staticmethod
+    def _format_repeat_entry_label_text(raw):
+        if raw is None or raw == '':
+            return None
+        if isinstance(raw, list):
+            text = ', '.join(str(v).strip() for v in raw if v not in (None, ''))
+        else:
+            text = str(raw).strip()
+        if not text:
+            return None
+        return text[:255]
+
+    @classmethod
+    def _compute_repeat_instance_label(cls, section, instance_data, all_fields, instance_number):
+        item_id = section.entry_label_item_id
+        if not item_id:
+            return None
+        for field_index, field in enumerate(all_fields):
+            if getattr(field, 'id', None) != item_id:
+                continue
+            raw = instance_data.get(f'field_{field_index}')
+            if raw in (None, ''):
+                for key, value in instance_data.items():
+                    if key == f'field_{field_index}' or key.startswith(f'field_{field_index}_'):
+                        raw = value
+                        break
+            return cls._format_repeat_entry_label_text(raw)
+        return None
+
     @classmethod
     @performance_monitor("Repeat Groups Processing", quiet=True)
     def _process_repeat_groups(cls, section, assignment_entity_status, validation_errors: List) -> List[Dict]:
@@ -2015,9 +2235,6 @@ class FormDataService:
                     section_id = int(parts[1])
                     instance_number = int(parts[2])
 
-                    if instance_number not in repeat_data:
-                        repeat_data[instance_number] = {}
-
                     if len(parts) >= 5:
                         field_index = int(parts[4])
 
@@ -2026,9 +2243,23 @@ class FormDataService:
 
                         if len(parts) >= 6:
                             input_index = '_'.join(parts[5:])
+                            if input_index == 'emergency_metadata':
+                                # Emergency-metadata hidden inputs are sidebar artifacts appended to
+                                # the <form> element itself (not inside the repeat entry).  They
+                                # survive when the entry is deleted from the DOM.  Skip them here
+                                # and – critically – do NOT register the instance in repeat_data,
+                                # so the orphan-removal step below can correctly delete entries
+                                # that were removed from the UI.
+                                processed_fields.add(field_name)
+                                continue
                             field_key = f'field_{field_index}_{input_index}'
                         else:
                             field_key = f'field_{field_index}'
+
+                        # Register the instance only after we have confirmed this is a real
+                        # data field (not a metadata-only artifact like emergency_metadata).
+                        if instance_number not in repeat_data:
+                            repeat_data[instance_number] = {}
 
                         # Check if this is a multi-choice field
                         base_field = '_'.join(parts[:5])
@@ -2089,6 +2320,10 @@ class FormDataService:
                 else:
                     cls._log_verbose(f"Found existing repeat instance {repeat_instance.id}")
 
+            repeat_instance.instance_label = cls._compute_repeat_instance_label(
+                section, instance_data, all_fields, instance_number
+            )
+
             # Process each field in this instance using comprehensive field processing
             for field_index, field in enumerate(all_fields):
                 cls._log_verbose(f"Checking field {field_index} ({field.label})")
@@ -2116,6 +2351,8 @@ class FormDataService:
                 cls._log_verbose(f"Found matching keys for field {field_index}: {matching_keys}")
                 cls._log_verbose(f"Available keys in instance_data: {list(instance_data.keys())}")
 
+                matching_keys = [key for key in matching_keys if not key.endswith('_emergency_metadata')]
+
                 if matching_keys:
                     # Use comprehensive field processing like the original
                     field_values = {}
@@ -2137,6 +2374,14 @@ class FormDataService:
                     cls._log_verbose(f"Processed value: {processed_value}, has_meaningful_data: {has_meaningful_data}")
 
                     if has_meaningful_data:
+                        emergency_metadata = None
+                        if cls._is_emergency_operations_choice(field):
+                            emergency_metadata = cls._get_emergency_metadata_from_request(
+                                section_id=section.id,
+                                instance_number=instance_number,
+                                field_index=field_index,
+                            )
+
                         # Create or update repeat group data entry
                         existing_entry = RepeatGroupData.query.filter_by(
                             repeat_instance_id=repeat_instance.id,
@@ -2161,7 +2406,14 @@ class FormDataService:
                             change_type = 'updated'
 
                             # Update existing entry
-                            cls._store_repeat_data_entry(existing_entry, processed_value, data_not_available, not_applicable, field)
+                            cls._store_repeat_data_entry(
+                                existing_entry,
+                                processed_value,
+                                data_not_available,
+                                not_applicable,
+                                field,
+                                emergency_metadata=emergency_metadata,
+                            )
                             cls._log_verbose(f"Updated existing repeat data entry for field {field.id}: value={existing_entry.value}, disagg_data={existing_entry.disagg_data}")
                         else:
                             # Create new entry
@@ -2169,7 +2421,14 @@ class FormDataService:
                                 repeat_instance_id=repeat_instance.id,
                                 form_item_id=field.id
                             )
-                            cls._store_repeat_data_entry(new_entry, processed_value, data_not_available, not_applicable, field)
+                            cls._store_repeat_data_entry(
+                                new_entry,
+                                processed_value,
+                                data_not_available,
+                                not_applicable,
+                                field,
+                                emergency_metadata=emergency_metadata,
+                            )
                             db.session.add(new_entry)
                             cls._log_verbose(f"Created new repeat data entry for field {field.id}: value={new_entry.value}, disagg_data={new_entry.disagg_data}")
 
@@ -2201,8 +2460,52 @@ class FormDataService:
                                 'new_not_applicable': not_applicable or False,
                                 'repeat_instance_number': instance_number  # Store separately for potential future use
                             })
+                    else:
+                        existing_entry = RepeatGroupData.query.filter_by(
+                            repeat_instance_id=repeat_instance.id,
+                            form_item_id=field.id
+                        ).first()
+                        if existing_entry:
+                            old_value = existing_entry.get_effective_value()
+                            if existing_entry.disagg_type == 'emergency_operation' and existing_entry.value:
+                                old_value = existing_entry.value
+                            db.session.delete(existing_entry)
+                            base_field_name = get_english_field_name(field)
+                            field_name_with_instance = f"{base_field_name} (Entry {instance_number})"
+                            field_changes.append({
+                                'type': 'removed',
+                                'form_item_id': field.id,
+                                'field_name': field_name_with_instance,
+                                'old_value': old_value,
+                                'new_value': None,
+                                'old_data_not_available': existing_entry.data_not_available or False,
+                                'new_data_not_available': False,
+                                'old_not_applicable': existing_entry.not_applicable or False,
+                                'new_not_applicable': False,
+                                'repeat_instance_number': instance_number,
+                            })
                 else:
                     cls._log_verbose(f"No matching keys found for field {field_index}")
+
+        submitted_instance_numbers = set(repeat_data.keys())
+        if cls._is_public_submission(assignment_entity_status):
+            existing_instances = RepeatGroupInstance.query.filter_by(
+                public_submission_id=assignment_entity_status.id,
+                section_id=section.id,
+            ).all()
+        else:
+            existing_instances = RepeatGroupInstance.query.filter_by(
+                assignment_entity_status_id=assignment_entity_status.id,
+                section_id=section.id,
+            ).all()
+
+        for existing_instance in existing_instances:
+            if existing_instance.instance_number not in submitted_instance_numbers:
+                cls._log_verbose(
+                    f"Removing orphan repeat instance {existing_instance.id} "
+                    f"(instance_number={existing_instance.instance_number})"
+                )
+                db.session.delete(existing_instance)
 
         cls._log_verbose(f"Repeat group processing completed with {len(field_changes)} field changes")
         return field_changes
@@ -2239,7 +2542,8 @@ class FormDataService:
                          and key not in possible_keys
                          and not key.endswith('_data_not_available')
                          and not key.endswith('_not_applicable')
-                         and not key.endswith('_reporting_mode')]
+                         and not key.endswith('_reporting_mode')
+                         and not key.endswith('_emergency_metadata')]
         possible_keys.extend(additional_keys)
 
         for key in possible_keys:
@@ -2417,7 +2721,7 @@ class FormDataService:
         return json.dumps(selected_options) if selected_options else None
 
     @classmethod
-    def _store_repeat_data_entry(cls, entry, processed_value, data_not_available, not_applicable, field=None):
+    def _store_repeat_data_entry(cls, entry, processed_value, data_not_available, not_applicable, field=None, emergency_metadata=None):
         """Store data in a repeat group data entry using appropriate method"""
         # Get field - use provided field or try to load from entry
         if not field:
@@ -2470,6 +2774,12 @@ class FormDataService:
             else:
                 # Simple value
                 entry.set_simple_value(processed_value)
+                if field and cls._is_emergency_operations_choice(field) and processed_value:
+                    cls._apply_emergency_operation_disagg(
+                        entry,
+                        processed_value,
+                        emergency_metadata,
+                    )
                 cls._log_verbose(f"Stored simple value: {processed_value}")
 
         # Set data availability flags for all field types

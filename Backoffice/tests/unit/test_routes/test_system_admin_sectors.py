@@ -266,7 +266,7 @@ class TestDeleteSector:
             mock_sector = MagicMock()
             mock_sector.id = sector.id
             mock_sector.name = sector.name
-            mock_sector.subsectors.first.return_value = None
+            mock_sector.sub_sectors = []
             mock_sector.logo_filename = None
             mock_class.query.get_or_404.return_value = mock_sector
             with patch("app.routes.admin.system_admin.sectors.db") as mock_db:

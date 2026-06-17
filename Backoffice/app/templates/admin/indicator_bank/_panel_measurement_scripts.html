@@ -408,6 +408,11 @@
                     ev.preventDefault();
                     var f = ev.currentTarget;
                     if (!f || f.getAttribute('data-ml-form') !== 'type') return;
+                    if (f.dataset.mlSubmitting === '1') return;
+                    f.dataset.mlSubmitting = '1';
+                    var submitBtn = f.querySelector('[type="submit"]');
+                    if (submitBtn) submitBtn.disabled = true;
+
                     var fd = new FormData(f);
                     ((window.getFetch && window.getFetch()) || fetch)(f.action, {
                         method: 'POST',
@@ -432,6 +437,8 @@
                             } else if (out.body && out.body.form_html) {
                                 mlOpenTypeModalFromHtml(out.body.form_html);
                             } else {
+                                f.dataset.mlSubmitting = '0';
+                                if (submitBtn) submitBtn.disabled = false;
                                 var emsg = (out.body && (out.body.error || out.body.message)) || ML_I18N.saveError;
                                 if (window.__clientWarn) {
                                     window.__clientWarn(String(emsg));
@@ -439,6 +446,8 @@
                             }
                         })
                         .catch(function () {
+                            f.dataset.mlSubmitting = '0';
+                            if (submitBtn) submitBtn.disabled = false;
                             if (window.__clientWarn) {
                                 window.__clientWarn(ML_I18N.saveError);
                             }
@@ -470,6 +479,11 @@
                     ev.preventDefault();
                     var f = ev.currentTarget;
                     if (!f || f.getAttribute('data-ml-form') !== 'unit') return;
+                    if (f.dataset.mlSubmitting === '1') return;
+                    f.dataset.mlSubmitting = '1';
+                    var submitBtn = f.querySelector('[type="submit"]');
+                    if (submitBtn) submitBtn.disabled = true;
+
                     var fd = new FormData(f);
                     ((window.getFetch && window.getFetch()) || fetch)(f.action, {
                         method: 'POST',
@@ -494,6 +508,8 @@
                             } else if (out.body && out.body.form_html) {
                                 mlOpenUnitModalFromHtml(out.body.form_html);
                             } else {
+                                f.dataset.mlSubmitting = '0';
+                                if (submitBtn) submitBtn.disabled = false;
                                 var emsg = (out.body && (out.body.error || out.body.message)) || ML_I18N.saveError;
                                 if (window.__clientWarn) {
                                     window.__clientWarn(String(emsg));
@@ -501,6 +517,8 @@
                             }
                         })
                         .catch(function () {
+                            f.dataset.mlSubmitting = '0';
+                            if (submitBtn) submitBtn.disabled = false;
                             if (window.__clientWarn) {
                                 window.__clientWarn(ML_I18N.saveError);
                             }

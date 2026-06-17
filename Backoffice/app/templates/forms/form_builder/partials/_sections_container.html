@@ -167,6 +167,9 @@
                               data-allowed-sectors="{{ item_s_f.section.allowed_sectors or '' }}"
                               data-add-indicator-note="{{ item_s_f.section.add_indicator_note or '' }}"
                               data-max-entries="{{ item_s_f.section.max_entries or '' }}"
+                              data-entry-label-item-id="{{ item_s_f.section.entry_label_item_id or '' }}"
+                              data-show-entries-in-navigation="{{ 'true' if item_s_f.section.show_entries_in_navigation else 'false' }}"
+                              data-hide-section-header="{{ 'true' if item_s_f.section.hide_section_header else 'false' }}"
                               data-name-translations='{{ (item_s_f.section.name_translations | tojson | e) if item_s_f.section.name_translations else "{}" }}'
                               data-relevance-condition='{{ (item_s_f.section.relevance_condition | tojson | e) if item_s_f.section.relevance_condition else "" }}'>
                         <i class="fas fa-pen w-4 h-4"></i>
@@ -339,6 +342,9 @@
                                           data-allowed-sectors="{{ item_instance.allowed_sectors or '' }}"
                                           data-add-indicator-note="{{ item_instance.add_indicator_note or '' }}"
                                           data-max-entries="{{ item_instance.max_entries or '' }}"
+                                          data-entry-label-item-id="{{ item_instance.entry_label_item_id or '' }}"
+                                          data-show-entries-in-navigation="{{ 'true' if item_instance.show_entries_in_navigation else 'false' }}"
+                                          data-hide-section-header="{{ 'true' if item_instance.hide_section_header else 'false' }}"
                                           data-name-translations='{{ (item_instance.name_translations | tojson | e) if item_instance.name_translations else "{}" }}'
                                           data-relevance-condition='{{ (item_instance.relevance_condition | tojson | e) if item_instance.relevance_condition else "" }}'>
                                     <i class="fas fa-pencil-alt w-3 h-3"></i>

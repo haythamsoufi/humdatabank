@@ -39,6 +39,77 @@ def _b64_decode_field(value):
         return value
 
 
+def _parse_entry_label_item_id(section, raw_value):
+    """Validate and return a repeat-section entry label item id, or None."""
+    if raw_value is None:
+        return None
+    if isinstance(raw_value, str) and not raw_value.strip():
+        return None
+    try:
+        item_id = int(raw_value)
+    except (ValueError, TypeError):
+        return None
+    if item_id <= 0:
+        return None
+    form_item = FormItem.query.filter_by(
+        id=item_id,
+        section_id=section.id,
+        archived=False,
+    ).first()
+    if not form_item or not FormSection.entry_label_item_eligible(form_item):
+        return None
+    return item_id
+
+
+def _apply_repeat_section_config(section, data):
+    """Apply repeat-group settings from section modal form data.
+
+    Always reassigns ``section.config`` to a new dict so that SQLAlchemy
+    detects the change even when no other column is modified.  In-place dict
+    mutations (``self.config['key'] = value``) are invisible to the ORM
+    without ``MutableDict`` tracking or ``flag_modified``.
+    """
+    config = dict(section.config or {})
+
+    max_entries_raw = data.get('max_entries')
+    if max_entries_raw is not None and not isinstance(max_entries_raw, int):
+        try:
+            max_entries_raw = int(max_entries_raw) if str(max_entries_raw).strip() else None
+        except (ValueError, TypeError):
+            max_entries_raw = None
+    if max_entries_raw is not None:
+        config['max_entries'] = max_entries_raw
+    else:
+        config.pop('max_entries', None)
+
+    entry_label_item_id = _parse_entry_label_item_id(section, data.get('entry_label_item_id'))
+    if entry_label_item_id is not None:
+        config['entry_label_item_id'] = entry_label_item_id
+    else:
+        config.pop('entry_label_item_id', None)
+
+    show_entries_in_nav = data.get('show_entries_in_navigation') in ['true', 'on', '1', True, 1]
+    if show_entries_in_nav:
+        config['show_entries_in_navigation'] = True
+    else:
+        config.pop('show_entries_in_navigation', None)
+
+    section.config = config  # full reassignment → SQLAlchemy always tracks this
+
+
+def _apply_section_entry_display_config(section, data):
+    """Apply entry-form display settings from section modal form data."""
+    config = dict(section.config or {})
+
+    hide_header = data.get('hide_section_header') in ['true', 'on', '1', True, 1]
+    if hide_header:
+        config['hide_section_header'] = True
+    else:
+        config.pop('hide_section_header', None)
+
+    section.config = config
+
+
 @bp.route("/templates/<int:template_id>/sections/new", methods=["POST"])
 @permission_required('admin.templates.edit')
 def new_template_section(template_id):
@@ -161,13 +232,12 @@ def new_template_section(template_id):
                 relevance_condition=new_relevance_condition
             )
 
-            # Set max_entries in config for repeat groups
-            if section_type == 'repeat' and max_entries is not None:
-                new_section.set_max_entries(max_entries)
-            elif section_type == 'repeat':
-                # Initialize config as empty dict if not set
-                if new_section.config is None:
-                    new_section.config = {}
+            # Set repeat-group config
+            if section_type == 'repeat':
+                _apply_repeat_section_config(new_section, data)
+            elif new_section.config is None:
+                new_section.config = {}
+            _apply_section_entry_display_config(new_section, data)
 
             # Handle name translations - ISO codes only
             # Read directly from data (not via WTForms form.*.data which uses the "section-" prefix
@@ -311,16 +381,14 @@ def edit_template_section(section_id):
         section.section_type = section_type.lower() if section_type else 'standard'
 
         if section_type.lower() == 'repeat':
-            max_entries = data.get('max_entries', type=int) if hasattr(data, 'get') else data.get('max_entries')
-            if max_entries is not None and not isinstance(max_entries, int):
-                try:
-                    max_entries = int(max_entries)
-                except (ValueError, TypeError):
-                    max_entries = None
-            section.set_max_entries(max_entries)
+            _apply_repeat_section_config(section, data)
         else:
             if section.config:
                 section.config.pop('max_entries', None)
+                section.config.pop('entry_label_item_id', None)
+                section.config.pop('show_entries_in_navigation', None)
+
+        _apply_section_entry_display_config(section, data)
 
         relevance_condition = _b64_decode_field(data.get("relevance_condition"))
         current_app.logger.debug(f"Edit section - form data keys: {list(data.keys())}")
@@ -782,15 +850,9 @@ def configure_repeat_section(section_id):
     current_app.logger.debug(f"Form data: {data}")
 
     try:
-        # Update max_entries in config
-        max_entries = data.get('max_entries')
-        if max_entries and max_entries.strip():
-            try:
-                section.set_max_entries(int(max_entries))
-            except ValueError:
-                section.set_max_entries(None)
-        else:
-            section.set_max_entries(None)
+        # Update repeat-group config
+        _apply_repeat_section_config(section, data)
+        _apply_section_entry_display_config(section, data)
 
         _update_version_timestamp(section.version_id)
         db.session.flush()

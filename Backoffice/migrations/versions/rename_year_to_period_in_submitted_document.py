@@ -1,7 +1,7 @@
 """Rename year column to period in submitted_document table
 
 Revision ID: rename_year_to_period
-Revises: add_performance_indexes
+Revises: remove_legacy_lang_cols
 Create Date: 2025-01-22 12:00:00.000000
 
 This migration renames the 'year' column to 'period' and changes its type

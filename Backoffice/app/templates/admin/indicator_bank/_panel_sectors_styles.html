@@ -6,6 +6,32 @@
             border-radius: 4px;
         }
 
+        .sector-avatar-slot {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .sector-avatar-slot__fallback {
+            display: none;
+        }
+
+        .sector-avatar-slot--failed > .js-sector-logo-img,
+        .sector-avatar-slot--failed > img {
+            display: none;
+        }
+
+        .sector-avatar-slot--failed > .sector-avatar-slot__fallback {
+            display: flex;
+        }
+
+        .sector-avatar-slot--logo.sector-avatar-slot--sm .sector-logo {
+            width: 28px;
+            height: 28px;
+        }
+
         .subsector-logo {
             width: 28px;
             height: 28px;
@@ -169,6 +195,52 @@
             font-weight: 600;
             padding: 0.125rem 0.5rem;
             border-radius: 9999px;
+        }
+
+        /* Indicator count badge — card header */
+        .sector-card-ind-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #6366f1;
+            background: #eef2ff;
+            border: 1px solid #c7d2fe;
+            padding: 0.1rem 0.45rem;
+            border-radius: 9999px;
+            white-space: nowrap;
+        }
+
+        /* Indicator count badge — subsector list item inside card */
+        .subsector-ind-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #6366f1;
+            background: #eef2ff;
+            border: 1px solid #c7d2fe;
+            padding: 0.05rem 0.35rem;
+            border-radius: 9999px;
+            white-space: nowrap;
+            line-height: 1.4;
+        }
+
+        /* Indicator count badge — split list view rows */
+        .split-ind-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #6366f1;
+            background: #eef2ff;
+            border: 1px solid #c7d2fe;
+            padding: 0.1rem 0.45rem;
+            border-radius: 9999px;
+            white-space: nowrap;
         }
 
         .sectors-split-sector-row--active {

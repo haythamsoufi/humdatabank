@@ -158,6 +158,8 @@ def api_add_dynamic_indicator():
         section_id = int(data['section_id'])
         indicator_bank_id = int(data['indicator_bank_id'])
         custom_label = data.get('custom_label', '').strip()
+        repeat_instance_number_raw = data.get('repeat_instance_number')
+        repeat_instance_number = int(repeat_instance_number_raw) if repeat_instance_number_raw is not None else None
 
         # Verify the assignment exists and user has access
         access_result = ensure_aes_access(assignment_entity_status_id)
@@ -173,20 +175,22 @@ def api_add_dynamic_indicator():
         # Verify the indicator exists
         indicator = IndicatorBank.query.get_or_404(indicator_bank_id)
 
-        # Check if this indicator is already assigned to this section
+        # Check if this indicator is already assigned to this section (and repeat instance)
         existing_assignment = DynamicIndicatorData.query.filter_by(
             assignment_entity_status_id=assignment_entity_status.id,
             section_id=section_id,
-            indicator_bank_id=indicator_bank_id
+            indicator_bank_id=indicator_bank_id,
+            repeat_instance_number=repeat_instance_number
         ).first()
 
         if existing_assignment:
             return json_bad_request('This indicator is already assigned to this section')
 
-        # Get the next order number for this section
+        # Get the next order number for this section (and repeat instance)
         max_order = db.session.query(db.func.max(DynamicIndicatorData.order)).filter_by(
             assignment_entity_status_id=assignment_entity_status.id,
-            section_id=section_id
+            section_id=section_id,
+            repeat_instance_number=repeat_instance_number
         ).scalar()
 
         next_order = 1 if max_order is None else max_order + 1
@@ -197,8 +201,9 @@ def api_add_dynamic_indicator():
             section_id=section_id,
             indicator_bank_id=indicator_bank_id,
             custom_label=custom_label if custom_label else None,
-            order=next_order,  # Use the next sequential order number
-            added_by_user_id=current_user.id  # Add the current user ID
+            order=next_order,
+            added_by_user_id=current_user.id,
+            repeat_instance_number=repeat_instance_number
         )
 
         db.session.add(dynamic_assignment)
@@ -240,6 +245,8 @@ def api_render_pending_dynamic_indicator():
         section_id = int(data['section_id'])
         indicator_bank_id = int(data['indicator_bank_id'])
         temp_assignment_id = data['temp_assignment_id']
+        repeat_instance_number_raw = data.get('repeat_instance_number')
+        repeat_instance_number = int(repeat_instance_number_raw) if repeat_instance_number_raw is not None else None
 
         # Verify the assignment exists and user has access
         access_result = ensure_aes_access(assignment_entity_status_id)
@@ -257,11 +264,12 @@ def api_render_pending_dynamic_indicator():
         # Verify the indicator exists
         indicator = IndicatorBank.query.get_or_404(indicator_bank_id)
 
-        # Quick duplicate check (frontend also checks, but verify server-side for security)
+        # Quick duplicate check (scoped to repeat instance when applicable)
         existing_assignment = DynamicIndicatorData.query.filter_by(
             assignment_entity_status_id=assignment_entity_status.id,
             section_id=section_id,
-            indicator_bank_id=indicator_bank_id
+            indicator_bank_id=indicator_bank_id,
+            repeat_instance_number=repeat_instance_number
         ).first()
 
         if existing_assignment:
@@ -270,13 +278,14 @@ def api_render_pending_dynamic_indicator():
         # Create a temporary assignment object (not saved to DB)
         # Use a mock object that mimics DynamicIndicatorData structure
         class TempDynamicAssignment:
-            def __init__(self, temp_id, indicator_bank, section_id, assignment_id):
+            def __init__(self, temp_id, indicator_bank, section_id, assignment_id, repeat_instance_number=None):
                 self.id = temp_id  # Temporary ID
                 self.dynamic_assignment_id = temp_id  # For template compatibility
                 self.indicator_bank_id = indicator_bank.id
                 self.indicator_bank = indicator_bank
                 self.section_id = section_id
                 self.assignment_entity_status_id = assignment_id
+                self.repeat_instance_number = repeat_instance_number
                 self.custom_label = None
                 self.order = 0
                 self.value = None
@@ -284,7 +293,7 @@ def api_render_pending_dynamic_indicator():
                 self.data_not_available = False
                 self.not_applicable = False
 
-        temp_assignment = TempDynamicAssignment(temp_assignment_id, indicator, section_id, assignment_entity_status.id)
+        temp_assignment = TempDynamicAssignment(temp_assignment_id, indicator, section_id, assignment_entity_status.id, repeat_instance_number)
         dynamic_field = _create_dynamic_indicator_object(temp_assignment, section)
 
         # Optimize template structure lookup - prefer section.template (already loaded)

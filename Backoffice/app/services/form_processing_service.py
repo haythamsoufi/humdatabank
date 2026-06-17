@@ -911,12 +911,13 @@ def get_form_items_for_section(section_obj: FormSection, assignment_entity_statu
     return current_section_fields
 
 def _process_dynamic_indicators_for_section(section_obj: FormSection, assignment_entity_status) -> List:
-    """Process dynamic indicators for dynamic sections"""
+    """Process section-level dynamic indicators (repeat_instance_number IS NULL)."""
     dynamic_fields = []
 
-    dynamic_assignments = DynamicIndicatorData.query.filter_by(
-        assignment_entity_status_id=assignment_entity_status.id,
-        section_id=section_obj.id
+    dynamic_assignments = DynamicIndicatorData.query.filter(
+        DynamicIndicatorData.assignment_entity_status_id == assignment_entity_status.id,
+        DynamicIndicatorData.section_id == section_obj.id,
+        DynamicIndicatorData.repeat_instance_number.is_(None)
     ).order_by(DynamicIndicatorData.order).all()
 
     for dynamic_assignment in dynamic_assignments:

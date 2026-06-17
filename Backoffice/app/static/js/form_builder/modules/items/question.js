@@ -43,6 +43,11 @@ export const QuestionItem = {
             if (listSelect) formData.append(`${formPrefix}lookup_list_id`, listSelect.value);
             if (displayColSelect) formData.append(`${formPrefix}list_display_column`, displayColSelect.value);
             if (filtersJsonInput) formData.append(`${formPrefix}list_filters_json`, filtersJsonInput.value || '[]');
+            // Include plugin config for configurable lists (e.g. Emergency Operations)
+            if (window.CalculatedLists && window.CalculatedLists.getPluginConfig) {
+                const cfg = window.CalculatedLists.getPluginConfig();
+                formData.append(`${formPrefix}question_plugin_config`, JSON.stringify(cfg));
+            }
         }
         // Use centralized helper to avoid double-encoding and omit when empty
         appendRuleToFormData(formData, 'relevance_condition', relevanceRuleBuilder);
@@ -89,6 +94,14 @@ export const QuestionItem = {
                 }
                 this.updateIndirectReachVisibility(modalElement);
                 this.updateQuestionLabelRequired(modalElement, e.target.value);
+                if (window.ItemModal && window.ItemModal.ensureUniqueOptionsInSectionField) {
+                    window.ItemModal.currentQuestionType = e.target.value || null;
+                    window.ItemModal.ensureUniqueOptionsInSectionField('question');
+                }
+                if (window.ItemModal && window.ItemModal.ensureUseAsRepeatEntryTitleField) {
+                    window.ItemModal.currentQuestionType = e.target.value || null;
+                    window.ItemModal.ensureUseAsRepeatEntryTitleField('question');
+                }
             }
 
             if (e.target.name === 'options_source') {
@@ -328,6 +341,12 @@ export const QuestionItem = {
                     calculatedListSelect.value = itemData.lookup_list_id;
                     // Directly call handleListSelection to ensure columns are populated
                     if (window.CalculatedLists && window.CalculatedLists.handleListSelection) {
+                        // Pass the existing plugin config so the config UI is fetched
+                        // with the saved values rather than defaults (avoids a second fetch later)
+                        const existingPluginConfig = (itemData.config && itemData.config.question_plugin_config) || null;
+                        if (existingPluginConfig) {
+                            window.CalculatedLists._pendingRestoreConfig = existingPluginConfig;
+                        }
                         window.CalculatedLists.handleListSelection(calculatedListSelect);
                     } else {
                         // Fallback: dispatch change event if handleListSelection is not available
@@ -370,6 +389,10 @@ export const QuestionItem = {
                 const filtersData = itemData.list_filters_json || itemData.filters_json;
                 if (filtersData && window.CalculatedLists && window.CalculatedLists.populateFilters) {
                     window.CalculatedLists.populateFilters(filtersData);
+                }
+                // Clear the pending restore flag (already used by handleListSelection)
+                if (window.CalculatedLists) {
+                    window.CalculatedLists._pendingRestoreConfig = null;
                 }
             }, 300);
         } else {

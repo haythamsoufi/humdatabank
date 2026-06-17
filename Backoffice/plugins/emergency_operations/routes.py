@@ -34,7 +34,7 @@ GO_APPEALS_URL = plugin_config.get_all_config().get('api', {}).get('base_url', "
 
 # Constants
 MAX_LIMIT = 1000
-CACHE_TTL_SECONDS = 60  # 1 minute (reduced for faster updates when config changes)
+CACHE_TTL_SECONDS = 300  # 5 minutes; clear_plugin_cache() is called on config changes
 
 
 def _format_api_error(exc):
@@ -281,20 +281,29 @@ def create_blueprint():
             timeout_sec = cfg.get('api', {}).get('timeout', 10)
             use_file_cache = cfg.get('data_cache', {}).get('use_file_cache', True)
 
-            # Try file cache first (unless live API mode); fall back to live GO API
+            # Try file cache first (unless live API mode); fall back to live GO API.
+            # load_cached() uses a process-level memory cache keyed by file mtime so
+            # repeated requests within a process never re-parse the JSON file.
             store = get_data_store()
-            cached = store.load() if use_file_cache else None
+            fetch_params = {
+                'end_date__gte': end_date_gt,
+                'format': 'json',
+                'limit': limit,
+            }
+            cached = store.load_cached() if use_file_cache else None
             if cached is not None:
                 results = cached.get('results', [])
                 current_app.logger.debug(f"[EmOps List] Serving from file cache ({len(results)} records)")
+                # Stale-while-revalidate: if the scheduled refresh is overdue, kick off a
+                # background refresh so the NEXT request gets fresher data without blocking
+                # this one.
+                schedule = cfg.get('data_cache', {}).get('schedule', 'off')
+                if store.is_refresh_due(schedule, cached.get('fetched_at')):
+                    current_app.logger.info('[EmOps List] Scheduled refresh due — triggering background update')
+                    trigger_background_refresh(GO_APPEALS_URL, fetch_params, timeout=timeout_sec)
             else:
                 current_app.logger.info('[EmOps List] No file cache; fetching live from GO API')
-                params = {
-                    'end_date__gte': end_date_gt,
-                    'format': 'json',
-                    'limit': limit,
-                }
-                r = requests.get(GO_APPEALS_URL, params=params, timeout=timeout_sec)
+                r = requests.get(GO_APPEALS_URL, params=fetch_params, timeout=timeout_sec)
                 current_app.logger.debug(f"[EmOps List] GO status: {r.status_code}")
                 r.raise_for_status()
                 try:
@@ -304,7 +313,7 @@ def create_blueprint():
                     return json_error('Invalid JSON from GO', 502, success=False, error='Invalid JSON from GO')
                 results = data.get('results', [])
                 if use_file_cache:
-                    store.save(results, params)
+                    store.save(results, fetch_params)
             current_app.logger.debug(f"[EmOps List] GO results total: {len(results)}")
 
             if iso:
@@ -398,7 +407,12 @@ def create_blueprint():
                 list_data = filtered_data
                 current_app.logger.debug(f"[EmOps List] After filtering: {len(list_data)} operations remain")
 
-            return json_ok(success=True, count=len(list_data), data=list_data)
+            resp = json_ok(success=True, count=len(list_data), data=list_data)
+            # Allow the browser to cache this response for 5 minutes.  When the
+            # data changes, the admin clears the plugin cache (clear_plugin_cache),
+            # which also invalidates the @cache_plugin_result layer above.
+            resp.headers['Cache-Control'] = 'private, max-age=300'
+            return resp
         except Exception as e:
             current_app.logger.error(f"[EmOps List] error fetching GO data: {e}", exc_info=True)
             return json_error(_format_api_error(e), 502, success=False, error=_format_api_error(e))
@@ -674,7 +688,11 @@ def get_emergency_operations_lookup_list():
 
 def get_emergency_operations_config_ui(config=None):
     """
-    Generate configuration UI HTML for emergency operations in matrix item modal.
+    Generate configuration UI HTML for emergency operations.
+
+    Used by both the matrix item modal and the question list-library config panel.
+    Extra options beyond the matrix use-case (country source, assignment-period timeframe)
+    are always rendered but are hidden/shown client-side via the JS handler.
 
     Args:
         config: Optional existing configuration dictionary
@@ -690,67 +708,145 @@ def get_emergency_operations_config_ui(config=None):
     query_defaults = cfg.get('query_defaults', {})
     default_end_date = query_defaults.get('end_date_gt', '2022-12-31')
 
-    # Default values
-    show_closed_operations = config.get('show_closed_operations', True)
-    operation_types = config.get('operation_types', ['All'])
-    if not isinstance(operation_types, list):
+    def _cfg(emops_key, short_key=None, default=None):
+        """Read a config value accepting both 'emops_key' and 'short_key' forms."""
+        v = config.get(emops_key)
+        if v is None and short_key:
+            v = config.get(short_key)
+        return v if v is not None else default
+
+    def _bool_cfg(emops_key, short_key=None, default=True):
+        """Read a boolean config value; handles True/False, '1', and checkbox arrays ['1']."""
+        v = _cfg(emops_key, short_key, None)
+        if v is None:
+            return default
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, list):
+            return len(v) > 0
+        return str(v).lower() in ('1', 'true', 'yes', 'on')
+
+    def _list_cfg(emops_key, short_key=None, default=None):
+        """Read a list config value; handles both list and scalar forms."""
+        v = _cfg(emops_key, short_key, None)
+        if v is None:
+            return default if default is not None else []
+        if not isinstance(v, list):
+            return [str(v)] if v else (default if default is not None else [])
+        return v
+
+    # Operation type / date defaults — accept both emops_* prefixed and short key forms
+    show_closed_operations = _bool_cfg('emops_show_closed_operations', 'show_closed_operations', True)
+    operation_types = _list_cfg('emops_operation_types', 'operation_types', ['All'])
+    if not operation_types:
         operation_types = ['All']
-    end_date_gt = config.get('end_date_gt', default_end_date)
-    start_date = config.get('start_date', '')
+    end_date_gt = _cfg('emops_end_date_gt', 'end_date_gt', default_end_date)
+    start_date = _cfg('emops_start_date', 'start_date', '')
+
+    # Country source: 'assigned' = use the entity's country (default), 'static' = fixed ISO
+    country_source = _cfg('emops_country_source', default='assigned')
+    static_country_iso = _cfg('emops_static_country_iso', default='')
+
+    # Timeframe mode: 'static' = explicit dates (default), 'assignment_period' = derive from period
+    timeframe_mode = _cfg('emops_timeframe_mode', default='static')
 
     html = """
     <div class="matrix-plugin-config emergency-operations-config mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-        <h5 class="text-sm font-semibold text-gray-700 mb-3">Emergency Operations Configuration</h5>
+        <button type="button"
+                class="emops-config-toggle w-full flex items-center justify-between gap-2 text-left text-sm font-semibold text-gray-700 focus:outline-none"
+                aria-expanded="false" aria-controls="emops-config-body">
+            <span>Emergency Operations Configuration</span>
+            <i class="fas fa-chevron-down emops-config-chevron text-xs text-gray-500 transition-transform duration-200 flex-shrink-0" aria-hidden="true"></i>
+        </button>
+
+        <div id="emops-config-body" class="hidden mt-3">
+
+        <!-- Country -->
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Country</label>
+            <div class="space-y-1">
+                <label class="inline-flex items-center text-sm text-gray-700">
+                    <input type="radio" name="emops_country_source" value="assigned"
+                           class="form-radio h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                           {checked_country_assigned}>
+                    <span class="ml-2">Use the country assigned to this submission <span class="text-xs text-gray-500">(recommended)</span></span>
+                </label>
+                <label class="inline-flex items-center text-sm text-gray-700">
+                    <input type="radio" name="emops_country_source" value="static"
+                           class="form-radio h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                           {checked_country_static}>
+                    <span class="ml-2">Specific country (ISO code)</span>
+                </label>
+            </div>
+            <div id="emops-static-country-wrapper" class="{static_country_hidden}mt-2 ml-6">
+                <input type="text" name="emops_static_country_iso" value="{static_country_iso}"
+                       placeholder="e.g. AFG or AF"
+                       maxlength="3"
+                       class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md px-2 py-1 w-28 uppercase">
+                <p class="text-xs text-gray-500 mt-1">2 or 3-letter ISO country code</p>
+            </div>
+        </div>
+
+        <!-- Timeframe -->
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Timeframe</label>
+            <div class="space-y-1">
+                <label class="inline-flex items-center text-sm text-gray-700">
+                    <input type="radio" name="emops_timeframe_mode" value="static"
+                           class="form-radio h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                           {checked_timeframe_static}>
+                    <span class="ml-2">Static dates</span>
+                </label>
+                <label class="inline-flex items-center text-sm text-gray-700">
+                    <input type="radio" name="emops_timeframe_mode" value="assignment_period"
+                           class="form-radio h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                           {checked_timeframe_period}>
+                    <span class="ml-2">Use assignment period <span class="text-xs text-gray-500">(dates derived from the period when the form is filled)</span></span>
+                </label>
+            </div>
+            <div id="emops-static-dates-wrapper" class="{static_dates_hidden}grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 ml-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Start date</label>
+                    <input type="date" name="emops_start_date" value="{start_date}"
+                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                    <p class="text-xs text-gray-500 mt-1">Operations starting from this date (optional)</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">End date (active after)</label>
+                    <input type="date" name="emops_end_date_gt" value="{end_date_gt}"
+                           class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
+                    <p class="text-xs text-gray-500 mt-1">Operations ending on or after this date (inclusive)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Closed operations + operation types -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Start date</label>
-                <input type="date"
-                       name="emops_start_date"
-                       value="{start_date}"
-                       class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
-                <p class="text-xs text-gray-500 mt-1">Include operations starting from this date (YYYY-MM-DD, optional)</p>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">End date</label>
-                <input type="date"
-                       name="emops_end_date_gt"
-                       value="{end_date_gt}"
-                       class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md">
-                <p class="text-xs text-gray-500 mt-1">Include operations ending on or after this date (YYYY-MM-DD, inclusive)</p>
-            </div>
-            <div>
                 <label class="inline-flex items-center text-sm text-gray-700">
-                    <input type="checkbox"
-                           name="emops_show_closed_operations"
-                           value="1"
+                    <input type="checkbox" name="emops_show_closed_operations" value="1"
                            class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                            {checked_closed}>
                     <span class="ml-2">Show closed operations</span>
                 </label>
             </div>
-            <div class="md:col-span-2">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Operation types to include</label>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Operation types</label>
                 <div class="space-y-2">
                     <label class="inline-flex items-center text-sm text-gray-700">
-                        <input type="checkbox"
-                               name="emops_operation_types"
-                               value="All"
+                        <input type="checkbox" name="emops_operation_types" value="All"
                                class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                {checked_all}>
                         <span class="ml-2">All Types</span>
                     </label>
                     <label class="inline-flex items-center text-sm text-gray-700">
-                        <input type="checkbox"
-                               name="emops_operation_types"
-                               value="Emergency Appeal"
+                        <input type="checkbox" name="emops_operation_types" value="Emergency Appeal"
                                class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                {checked_ea}>
                         <span class="ml-2">Emergency Appeal</span>
                     </label>
                     <label class="inline-flex items-center text-sm text-gray-700">
-                        <input type="checkbox"
-                               name="emops_operation_types"
-                               value="DREF"
+                        <input type="checkbox" name="emops_operation_types" value="DREF"
                                class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                                {checked_dref}>
                         <span class="ml-2">DREF (Disaster Relief Emergency Fund)</span>
@@ -758,16 +854,24 @@ def get_emergency_operations_config_ui(config=None):
                 </div>
             </div>
         </div>
+        </div>
     </div>
     """
 
-    # Replace placeholders
     html = html.replace('{start_date}', start_date)
     html = html.replace('{end_date_gt}', end_date_gt)
+    html = html.replace('{static_country_iso}', static_country_iso)
     html = html.replace('{checked_closed}', 'checked' if show_closed_operations else '')
     html = html.replace('{checked_all}', 'checked' if 'All' in operation_types else '')
     html = html.replace('{checked_ea}', 'checked' if 'Emergency Appeal' in operation_types else '')
     html = html.replace('{checked_dref}', 'checked' if 'DREF' in operation_types else '')
+    html = html.replace('{checked_country_assigned}', 'checked' if country_source == 'assigned' else '')
+    html = html.replace('{checked_country_static}', 'checked' if country_source == 'static' else '')
+    html = html.replace('{checked_timeframe_static}', 'checked' if timeframe_mode == 'static' else '')
+    html = html.replace('{checked_timeframe_period}', 'checked' if timeframe_mode == 'assignment_period' else '')
+    # Show/hide wrapper divs based on persisted state
+    html = html.replace('{static_country_hidden}', '' if country_source == 'static' else 'hidden ')
+    html = html.replace('{static_dates_hidden}', '' if timeframe_mode == 'static' else 'hidden ')
 
     return html
 

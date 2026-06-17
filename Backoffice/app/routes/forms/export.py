@@ -95,23 +95,17 @@ def _export_pdf_impl(aes_id):
                 )
 
         if country:
-            country_iso = (getattr(country, 'iso3', None) or getattr(country, 'iso2', None) or '').strip().upper()
-            if country_iso:
-                try:
-                    from plugins.emergency_operations.routes import get_emergency_operations_data
-                    operations = get_emergency_operations_data(country_iso=country_iso)
-                    for i, key in enumerate(('EO1', 'EO2', 'EO3')):
-                        if i < len(operations):
-                            op = operations[i]
-                            name = (op.get('name') or '').strip()
-                            code = (op.get('code') or '').strip()
-                            resolved_variables[key] = f"{name} ({code})" if code else (name or '')
-                        else:
-                            resolved_variables[key] = ''
-                except Exception as e:
-                    current_app.logger.debug(
-                        f"Could not resolve EO1/EO2/EO3 for PDF export (plugin or API): {e}"
-                    )
+            try:
+                # Binding-aware resolution: keeps EO1/EO2/EO3 in the export aligned with the appeal
+                # codes the data was actually entered against (see emergency_section_binding).
+                from app.services.emergency_section_binding import resolve_eo_variables
+                eo_vars = resolve_eo_variables(assignment_entity_status)
+                for key, value in eo_vars.items():
+                    resolved_variables[key] = value or ''
+            except Exception as e:
+                current_app.logger.debug(
+                    f"Could not resolve EO1/EO2/EO3 for PDF export (plugin or API): {e}"
+                )
 
         translation_key = get_translation_key()
 

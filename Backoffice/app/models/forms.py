@@ -410,6 +410,7 @@ class FormSection(db.Model):
 
     # Relationship to DynamicIndicatorData - ensure cascade delete when section is deleted
     dynamic_indicator_assignments = relationship('DynamicIndicatorData', backref='section', lazy='dynamic', cascade="all, delete-orphan")
+    dynamic_section_contexts = relationship('DynamicSectionContext', backref='section', lazy='dynamic', cascade="all, delete-orphan")
 
     # Section configuration
     section_type = Column(String(50), default='standard', nullable=False)  # Use String for SQLite compatibility
@@ -556,6 +557,81 @@ class FormSection(db.Model):
                 self.config['max_entries'] = None
         else:
             self.config.pop('max_entries', None)
+
+    ENTRY_LABEL_ELIGIBLE_QUESTION_TYPES = frozenset({
+        'text', 'textarea', 'number', 'percentage', 'yesno',
+        'single_choice', 'date', 'datetime',
+    })
+
+    @classmethod
+    def entry_label_item_eligible(cls, form_item):
+        """Return True when a form item can drive repeat entry labels."""
+        if not form_item or getattr(form_item, 'archived', False):
+            return False
+        if not getattr(form_item, 'is_question', False):
+            return False
+        question_type = (getattr(form_item, 'type', None) or '').lower()
+        return question_type in cls.ENTRY_LABEL_ELIGIBLE_QUESTION_TYPES
+
+    @property
+    def entry_label_item_id(self):
+        """Get form item id used to label repeat entries from config."""
+        if self.config and isinstance(self.config, dict):
+            return self.config.get('entry_label_item_id')
+        return None
+
+    def set_entry_label_item_id(self, item_id):
+        """Set form item id used to label repeat entries in config."""
+        if self.config is None:
+            self.config = {}
+        if not isinstance(self.config, dict):
+            self.config = {}
+        if item_id is not None:
+            try:
+                parsed = int(item_id)
+            except (ValueError, TypeError):
+                self.config.pop('entry_label_item_id', None)
+                return
+            if parsed > 0:
+                self.config['entry_label_item_id'] = parsed
+            else:
+                self.config.pop('entry_label_item_id', None)
+        else:
+            self.config.pop('entry_label_item_id', None)
+
+    @property
+    def show_entries_in_navigation(self):
+        """Whether repeat entry instances appear in the entry form side navigation."""
+        if self.config and isinstance(self.config, dict):
+            return bool(self.config.get('show_entries_in_navigation', False))
+        return False
+
+    def set_show_entries_in_navigation(self, enabled):
+        if self.config is None:
+            self.config = {}
+        if not isinstance(self.config, dict):
+            self.config = {}
+        if enabled:
+            self.config['show_entries_in_navigation'] = True
+        else:
+            self.config.pop('show_entries_in_navigation', None)
+
+    @property
+    def hide_section_header(self):
+        """Whether the section title and divider are hidden on the entry form."""
+        if self.config and isinstance(self.config, dict):
+            return bool(self.config.get('hide_section_header', False))
+        return False
+
+    def set_hide_section_header(self, hidden):
+        if self.config is None:
+            self.config = {}
+        if not isinstance(self.config, dict):
+            self.config = {}
+        if hidden:
+            self.config['hide_section_header'] = True
+        else:
+            self.config.pop('hide_section_header', None)
 
     def __repr__(self):
         template_name = self.template.name if self.template else "N/A"
@@ -878,6 +954,10 @@ class DynamicIndicatorData(DataEntryMixin, db.Model):
     section_id = db.Column(db.Integer, db.ForeignKey('form_section.id'), nullable=False)  # The dynamic section
     indicator_bank_id = db.Column(db.Integer, db.ForeignKey('indicator_bank.id'), nullable=False)
 
+    # When this indicator belongs to a specific repeat-group entry, store the instance number.
+    # NULL means the indicator is section-level (no repeat parent).
+    repeat_instance_number = db.Column(db.Integer, nullable=True)
+
     # Assignment metadata
     custom_label = db.Column(db.String(255), nullable=True)
     order = db.Column(db.Float, nullable=False, default=0)
@@ -899,10 +979,11 @@ class DynamicIndicatorData(DataEntryMixin, db.Model):
     added_by_user = db.relationship('User', foreign_keys=[added_by_user_id], backref='added_dynamic_indicators')
     created_by_user = db.relationship('User', foreign_keys=[created_by_user_id])
 
-    # Ensure unique assignment per country/section/indicator combination
+    # Ensure unique assignment per country/section/indicator/repeat-instance combination.
+    # repeat_instance_number=NULL means section-level (enforced by the API).
     __table_args__ = (
-        db.UniqueConstraint('assignment_entity_status_id', 'section_id', 'indicator_bank_id', name='_dynamic_indicator_entity_unique'),
-        db.UniqueConstraint('public_submission_id', 'section_id', 'indicator_bank_id', name='_dynamic_indicator_public_unique'),
+        db.UniqueConstraint('assignment_entity_status_id', 'section_id', 'indicator_bank_id', 'repeat_instance_number', name='_dynamic_indicator_entity_unique'),
+        db.UniqueConstraint('public_submission_id', 'section_id', 'indicator_bank_id', 'repeat_instance_number', name='_dynamic_indicator_public_unique'),
         db.Index('ix_dynamic_indicator_aes', 'assignment_entity_status_id'),
         db.Index('ix_dynamic_indicator_public', 'public_submission_id'),
         db.Index('ix_dynamic_indicator_section', 'section_id'),
@@ -938,6 +1019,58 @@ class DynamicIndicatorData(DataEntryMixin, db.Model):
             _c = _country_for_aes(self.assignment_entity_status)
             country_name = _c.name if _c else None
         return f'<DynamicIndicatorData {self.indicator_bank.name} for {country_name or "N/A"} Value:{display_value}>'
+
+
+class DynamicSectionContext(db.Model):
+    """Binds a dynamic section to a stable external context (e.g. an emergency operation) per assignment.
+
+    Generic, provider-based binding so any list-type plugin can anchor a dynamic section to a stable
+    key instead of a positional slot. For Emergency Operations: provider_id='emergency_operations',
+    context_key=appeal code (e.g. 'MDRBD018'), slot=the EO position (1/2/3) the section references.
+
+    The binding is captured server-side at save time and frozen, so saved dynamic-indicator data stays
+    attributable to the same emergency even when the source API reorders results or filters change.
+    """
+    __tablename__ = 'dynamic_section_context'
+
+    id = db.Column(db.Integer, primary_key=True)
+    # Parent (mirrors DynamicIndicatorData's polymorphic parents)
+    assignment_entity_status_id = db.Column(db.Integer, db.ForeignKey('assignment_entity_status.id'), nullable=True)
+    public_submission_id = db.Column(db.Integer, db.ForeignKey('public_submission.id'), nullable=True)
+    section_id = db.Column(db.Integer, db.ForeignKey('form_section.id'), nullable=False)
+
+    # Generic provider/context identity
+    provider_id = db.Column(db.String(64), nullable=False)  # e.g. 'emergency_operations'
+    slot = db.Column(db.Integer, nullable=True)             # positional slot the section references (EO1/2/3 -> 1/2/3)
+    context_key = db.Column(db.String(128), nullable=False)  # stable external key (appeal code)
+    label_snapshot = db.Column(db.String(512), nullable=True)  # human label captured at bind time
+    status = db.Column(db.String(32), nullable=False, default='active')  # 'active' | 'dropped'
+    filters_hash = db.Column(db.String(64), nullable=True)   # snapshot of the filters used at resolution time
+
+    resolved_at = db.Column(db.DateTime, default=utcnow, nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
+
+    # Relationships
+    assignment_entity_status = db.relationship('AssignmentEntityStatus', foreign_keys=[assignment_entity_status_id])
+    public_submission = db.relationship('PublicSubmission', foreign_keys=[public_submission_id])
+    created_by_user = db.relationship('User', foreign_keys=[created_by_user_id])
+
+    __table_args__ = (
+        db.UniqueConstraint('assignment_entity_status_id', 'section_id', 'provider_id', name='_dynamic_section_context_entity_unique'),
+        db.UniqueConstraint('public_submission_id', 'section_id', 'provider_id', name='_dynamic_section_context_public_unique'),
+        db.Index('ix_dynamic_section_context_aes', 'assignment_entity_status_id'),
+        db.Index('ix_dynamic_section_context_public', 'public_submission_id'),
+        db.Index('ix_dynamic_section_context_section', 'section_id'),
+        db.CheckConstraint(
+            '(assignment_entity_status_id IS NOT NULL) OR (public_submission_id IS NOT NULL)',
+            name='ck_dynamic_section_context_parent',
+        ),
+    )
+
+    def __repr__(self):
+        return f'<DynamicSectionContext section={self.section_id} {self.provider_id}:{self.context_key} slot={self.slot} status={self.status}>'
 
 
 class RepeatGroupInstance(db.Model):

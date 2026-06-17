@@ -976,6 +976,21 @@ export class TemplateVariablesManager {
         }
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
+
+            // Prevent concurrent submissions (rapid double-clicks on the save button)
+            if (form.dataset.varSaving === '1') return;
+            form.dataset.varSaving = '1';
+
+            const _saveBtnEl = modal.querySelector('.variable-form-submit');
+            const _origBtnHtml = _saveBtnEl ? _saveBtnEl.innerHTML : '';
+            if (_saveBtnEl) {
+                _saveBtnEl.disabled = true;
+                const _spinEl = document.createElement('i');
+                _spinEl.className = 'fas fa-spinner fa-spin mr-2';
+                _saveBtnEl.replaceChildren(_spinEl, document.createTextNode(' Saving...'));
+            }
+
+            try {
             const formData = new FormData(form);
             const varName = formData.get('variable_name');
             const variableType = formData.get('variable_type');
@@ -1152,6 +1167,13 @@ export class TemplateVariablesManager {
             closeModal();
             this.renderVariablesList(); // Refresh the table
             this.updateVariablesButton(); // Update button count
+            } finally {
+                form.dataset.varSaving = '0';
+                if (_saveBtnEl) {
+                    _saveBtnEl.disabled = false;
+                    _saveBtnEl.innerHTML = _origBtnHtml;
+                }
+            }
         });
 
         // Cancel button

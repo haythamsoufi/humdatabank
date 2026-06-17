@@ -76,13 +76,28 @@ def _clear_post_commit_callbacks() -> None:
             g._post_commit_callbacks = []
 
 
+def _should_log_rollback(reason: Optional[str]) -> bool:
+    """Skip debug noise for routine request cleanup (4xx responses, duplicate hooks)."""
+    if not reason:
+        return False
+    if reason.startswith("response_status_4"):
+        return False
+    if reason in {"handle_exception", "teardown_exception"}:
+        return False
+    return True
+
+
 def safe_rollback(*, reason: Optional[str] = None) -> None:
     """Rollback the current SQLAlchemy session; never raise."""
     try:
+        from flask import g, has_request_context
         from app.extensions import db
 
         db.session.rollback()
-        if reason:
+        if callable(has_request_context) and has_request_context():
+            with suppress(Exception):
+                g._auto_txn_rolled_back = True
+        if reason and _should_log_rollback(reason):
             logger.debug("db.session.rollback() executed (%s)", reason)
     except Exception as e:
         # If rollback fails the session/connection is likely unhealthy; don't raise here.

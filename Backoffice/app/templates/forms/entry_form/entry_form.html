@@ -487,6 +487,9 @@
                                     {% set section_nav_display_name = section_nav_item._display_name_resolved if hasattr(section_nav_item, '_display_name_resolved') and section_nav_item._display_name_resolved else (section_nav_item.display_name if section_nav_item.display_name else section_nav_item.name) %}
                                     <span class="truncate min-w-0 flex-1">{{ section_nav_display_name }}</span>
                                 </a>
+                                {% if section_nav_item.section_type == 'repeat' and section_nav_item.show_entries_in_navigation %}
+                                    <ul class="repeat-entry-nav-list ml-6 mt-2 space-y-1 border-l-2 border-blue-200 pl-3" data-repeat-section-id="{{ section_nav_item.id }}"></ul>
+                                {% endif %}
                                 {% if section_nav_item.id in sub_sections_by_parent %}
                                     <ul class="ml-6 mt-2 space-y-1 border-l-2 border-gray-200 pl-3">
                                         {% for sub_section_nav in sub_sections_by_parent[section_nav_item.id] %}
@@ -511,6 +514,9 @@
                                     {% set sub_section_nav_display_name = sub_section_nav._display_name_resolved if hasattr(sub_section_nav, '_display_name_resolved') and sub_section_nav._display_name_resolved else (sub_section_nav.display_name if sub_section_nav.display_name else sub_section_nav.name) %}
                                     <span class="truncate text-teal-700 min-w-0 flex-1">{% if template_structure.display_order_visible %}{{ sub_section_nav.display_order }}. {% endif %}{{ sub_section_nav_display_name }}</span>
                                                 </a>
+                                                {% if sub_section_nav.section_type == 'repeat' and sub_section_nav.show_entries_in_navigation %}
+                                                    <ul class="repeat-entry-nav-list ml-4 mt-1 space-y-1 border-l-2 border-blue-200 pl-2" data-repeat-section-id="{{ sub_section_nav.id }}"></ul>
+                                                {% endif %}
                                             </li>
                                         {% endfor %}
                                     </ul>
@@ -720,7 +726,8 @@
                                 {% set page_key_main = section.page_id if section.page_id is not none else 'default' %}
                                 {% set page_number_main = page_display_order_main.get(page_key_main, 1) %}
                                 {% set page_name_main = page_names_main.get(page_key_main, section.page.display_name if section.page and section.page.display_name else (section.page.name if section.page else 'Page ' ~ page_number_main)) %}
-                                <div id="section-container-{{ section.id }}" class="bg-gray-50 p-3 sm:p-6 rounded-lg border border-gray-200 mb-4 sm:mb-6 scroll-mt-20" data-section-type="{{ section.section_type }}" data-page-number="{{ page_number_main }}" data-page-name="{{ page_name_main }}"{% if section.section_type == 'dynamic_indicators' and section.max_dynamic_indicators %} data-max-dynamic-indicators="{{ section.max_dynamic_indicators }}"{% endif %}{% if section.section_type == 'repeat' and section.max_entries %} data-max-entries="{{ section.max_entries }}"{% endif %} data-aes-id="{{ assignment_status.id }}" data-collapsible-id="{{ section.id }}"{% if section.relevance_condition %} data-relevance-condition='{{ section.relevance_condition|tojson }}' data-item-id="{{ section.id }}"{% endif %}>
+                                <div id="section-container-{{ section.id }}" class="bg-gray-50 p-3 sm:p-6 rounded-lg border border-gray-200 mb-4 sm:mb-6 scroll-mt-20{% if section.hide_section_header %} section-container--no-header{% endif %}" data-section-type="{{ section.section_type }}" data-page-number="{{ page_number_main }}" data-page-name="{{ page_name_main }}"{% if section.section_type == 'dynamic_indicators' and section.max_dynamic_indicators %} data-max-dynamic-indicators="{{ section.max_dynamic_indicators }}"{% endif %}{% if section.section_type == 'repeat' and section.max_entries %} data-max-entries="{{ section.max_entries }}"{% endif %}{% if section.section_type == 'repeat' and section.entry_label_item_id %} data-entry-label-item-id="{{ section.entry_label_item_id }}"{% endif %}{% if section.section_type == 'repeat' and section.show_entries_in_navigation %} data-show-entries-in-navigation="true"{% endif %}{% if section.hide_section_header %} data-hide-section-header="true"{% endif %} data-aes-id="{{ assignment_status.id }}" data-collapsible-id="{{ section.id }}"{% if section.relevance_condition %} data-relevance-condition='{{ section.relevance_condition|tojson }}' data-item-id="{{ section.id }}"{% endif %}>
+                                    {% if not section.hide_section_header %}
                                     <h3 class="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 pb-3 sm:pb-4 border-b text-gray-700 flex items-center">
                                          <i class="fas fa-layer-group w-5 h-5 mr-2 text-gray-500"></i>
                                         {% if template_structure.display_order_visible %}<span class="text-xl font-semibold text-gray-700 mr-1">{{ section.display_order }}.</span>{% endif %}
@@ -730,6 +737,7 @@
                                             <i class="fas fa-chevron-up"></i>
                                         </button>
                                     </h3>
+                                    {% endif %}
 
                                     <div id="collapsible-content-{{ section.id }}" data-collapsible-content class="space-y-4 sm:space-y-6"> {# Container for parent section's direct fields AND its sub-sections #}
                                         {# Render direct fields of the parent section #}
@@ -1525,6 +1533,8 @@
                                                         {# --- QUESTION RENDERING (Parent Section) --- #}
                                                         {% elif field.is_question %}
                                                             {% set existing_q_value = existing_data.get('field_value[' ~ field.id ~ ']') %}
+                                                            {% set _unique_opts = field.config.get('unique_options_in_section') if field.config else false %}
+                                                            {% set _limit_entries = field.config.get('limit_entries_to_option_count') if field.config else false %}
                                                             {% set is_prefilled = existing_data.get('field_value[' ~ field.id ~ ']_is_prefilled', false) %}
                                                             {% set is_imputed = existing_data.get('field_value[' ~ field.id ~ ']_is_imputed', false) %}
                                                             {% set is_readonly = existing_data.get('field_value[' ~ field.id ~ ']_is_readonly', false) %}
@@ -1624,12 +1634,18 @@
                                                                     {% set select_classes = select_classes ~ " bg-white" %}
                                                                 {% endif %}
                                                                 <select name="field_value[{{ field.id }}]" id="field-{{ field.id }}"
-                                                                       {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}'{% else %}data-options-source="manual"{% endif %}
+                                                                       data-field-item-id="{{ field.id }}"
+                                                                       {% if _unique_opts %}data-unique-options-in-section="true"{% endif %}
+                                                                       {% if _limit_entries %}data-limit-entries-to-option-count="true"{% endif %}
+                                                                       {% if field.config and field.config.get('use_as_repeat_entry_title') %}data-use-as-repeat-entry-title="true"{% endif %}
+                                                                       {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}' data-plugin-config='{{ ((field.config or {}).get("question_plugin_config") | tojson | e) if field.config else "{}" }}'{% else %}data-options-source="manual"{% endif %}
                                                                        class="{{ select_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}> <option value="">{{ _('Select...') }}</option> {% if not field.lookup_list_id %}{% for option in field.options %} {% set opt_val = option.value if option is mapping else option %} {% set opt_label = option.label if option is mapping else option %} {% if field.display_options and field.display_options[loop.index0] is defined %}{% set display_label = field.display_options[loop.index0] %}{% else %}{% set display_label = opt_label %}{% endif %} <option value="{{ opt_val }}" {% if opt_val == current_q_single %}selected{% endif %}>{{ display_label }}</option> {% endfor %}{% endif %} </select>
                                                             {% elif field.field_type_for_js == 'multiple_choice' %}
                                                                 {% set current_q_multi = existing_q_value if existing_q_value is iterable else [] %}
                                                                 <div class="relative mt-2" id="field-{{ field.id }}"
-                                                                     {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}'{% else %}data-options-source="manual"{% endif %}>
+                                                                     data-field-item-id="{{ field.id }}"
+                                                                     {% if _unique_opts %}data-unique-options-in-section="true"{% endif %}
+                                                                     {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}' data-plugin-config='{{ ((field.config or {}).get("question_plugin_config") | tojson | e) if field.config else "{}" }}'{% else %}data-options-source="manual"{% endif %}>
                                                                     <button type="button"
                                                                             class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-left text-sm focus:outline-none focus:ring-2 focus:ring-green-500 hover:bg-gray-50 multi-select-btn"
                                                                             data-field-id="{{ field.id }}"
@@ -1722,7 +1738,31 @@
                                         {% set section_id = section.id %}
                                         {% include 'forms/entry_form/partials/dynamic_indicators_interface.html' %}
 
-                                        {# No repeat interface here - moved outside #}
+                                        {# Repeat interface for repeat-type sections - rendered BEFORE sub-sections so entries appear first.
+                                           Sub-sections (e.g. dynamic_indicators) then appear below the repeat entries, preventing the
+                                           confusing layout where repeat entries visually appear "inside" a sub-section header. #}
+                                        {% if section.section_type == 'repeat' %}
+                                        <div id="repeat-interface-{{ section.id }}">
+                                            <div id="repeat-entries-{{ section.id }}" class="space-y-4">
+                                                <!-- Repeat entries will be added here -->
+                                            </div>
+
+                                            <div id="add-repeat-entry-container-{{ section.id }}" class="mt-4">
+                                                <button type="button" id="add-repeat-entry-btn-{{ section.id }}"
+                                                        class="repeat-add-entry-btn"
+                                                        data-section-id="{{ section.id }}">
+                                                    <span class="repeat-add-entry-btn__main">
+                                                        <i class="fas fa-plus" aria-hidden="true"></i>
+                                                        <span>{{ _('Add Entry') }}</span>
+                                                    </span>
+                                                    <span class="repeat-add-entry-btn__hint">{{ _('Click to repeat this group of fields multiple times') }}</span>
+                                                    {% if section.max_entries %}
+                                                        <span class="repeat-add-entry-btn__limit" id="repeat-limit-text-{{ section.id }}">{{ _('Max entries: %(max)s', max=section.max_entries) }}</span>
+                                                    {% endif %}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {% endif %}
 
                                         {# Render sub-sections for this main section, INSIDE the parent's content flow #}
                                         {% if section.id in sub_sections_by_parent_form %}
@@ -1731,7 +1771,8 @@
                                                 {% set sub_page_key_main = (sub_section.page_id if sub_section.page_id is not none else page_key_main) %}
                                                 {% set sub_page_number_main = page_display_order_main.get(sub_page_key_main, page_number_main) %}
                                                 {% set sub_page_name_main = page_names_main.get(sub_page_key_main, page_name_main) %}
-                                                <div id="section-container-{{ sub_section.id }}" class="pt-4 sm:pt-6 {% if not loop.first or section.fields_ordered %}border-t border-gray-300 {% endif %}mt-4 sm:mt-6 scroll-mt-20" data-section-type="{{ sub_section.section_type }}" data-page-number="{{ sub_page_number_main }}" data-page-name="{{ sub_page_name_main }}"{% if sub_section.section_type == 'dynamic_indicators' and sub_section.max_dynamic_indicators %} data-max-dynamic-indicators="{{ sub_section.max_dynamic_indicators }}"{% endif %}{% if sub_section.section_type == 'repeat' and sub_section.max_entries %} data-max-entries="{{ sub_section.max_entries }}"{% endif %} data-aes-id="{{ assignment_status.id }}" data-collapsible-id="{{ sub_section.id }}"{% if sub_section.relevance_condition %} data-relevance-condition='{{ sub_section.relevance_condition|tojson }}' data-item-id="{{ sub_section.id }}"{% endif %}>
+                                                <div id="section-container-{{ sub_section.id }}" class="{% if not sub_section.hide_section_header %}{% if not loop.first or section.fields_ordered %}pt-4 sm:pt-6 border-t border-gray-300 {% endif %}mt-4 sm:mt-6{% else %}mt-2 sm:mt-3{% endif %} scroll-mt-20{% if sub_section.hide_section_header %} section-container--no-header{% endif %}" data-section-type="{{ sub_section.section_type }}" data-page-number="{{ sub_page_number_main }}" data-page-name="{{ sub_page_name_main }}"{% if sub_section.section_type == 'dynamic_indicators' and sub_section.max_dynamic_indicators %} data-max-dynamic-indicators="{{ sub_section.max_dynamic_indicators }}"{% endif %}{% if sub_section.section_type == 'repeat' and sub_section.max_entries %} data-max-entries="{{ sub_section.max_entries }}"{% endif %}{% if sub_section.section_type == 'repeat' and sub_section.entry_label_item_id %} data-entry-label-item-id="{{ sub_section.entry_label_item_id }}"{% endif %}{% if sub_section.section_type == 'repeat' and sub_section.show_entries_in_navigation %} data-show-entries-in-navigation="true"{% endif %}{% if sub_section.hide_section_header %} data-hide-section-header="true"{% endif %} data-aes-id="{{ assignment_status.id }}" data-collapsible-id="{{ sub_section.id }}"{% if sub_section.relevance_condition %} data-relevance-condition='{{ sub_section.relevance_condition|tojson }}' data-item-id="{{ sub_section.id }}"{% endif %}>
+                                                    {% if not sub_section.hide_section_header %}
                                                     <h4 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4 pb-3 sm:pb-4 border-b text-gray-700 flex items-center">
                                                         <i class="fas fa-indent w-4 h-4 mr-3 text-gray-500"></i>
                                                         {% if template_structure.display_order_visible %}<span class="text-gray-700 mr-1">{{ sub_section.display_order }}.</span>{% endif %}
@@ -1741,6 +1782,7 @@
                                                             <i class="fas fa-chevron-up"></i>
                                                         </button>
                                                     </h4>
+                                                    {% endif %}
                                                     <div id="collapsible-content-sub-{{ sub_section.id }}" data-collapsible-content class="space-y-3 sm:space-y-4 pl-3 sm:pl-6">
                                                         {% if sub_section.fields_ordered %}
                                                             {% for field in sub_section.fields_ordered %}
@@ -2340,6 +2382,8 @@
                                                                         {# --- QUESTION RENDERING (Sub-Section) --- #}
                                                         {% elif field.is_question %}
                                                                             {% set existing_q_value = existing_data.get('field_value[' ~ field.id ~ ']') %}
+                                                                            {% set _unique_opts = field.config.get('unique_options_in_section') if field.config else false %}
+                                                                            {% set _limit_entries = field.config.get('limit_entries_to_option_count') if field.config else false %}
                                                                             {% set is_readonly = existing_data.get('field_value[' ~ field.id ~ ']_is_readonly', false) %}
                                                                             {% if field.field_type_for_js == 'text' %} <input type="text" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ existing_q_value | default('', true) }}" class="mt-1 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit or is_readonly %}disabled{% endif %} {% if is_readonly %}readonly{% endif %}>
                                                                             {% elif field.field_type_for_js == 'textarea' %} <textarea name="field_value[{{ field.id }}]" id="field-{{ field.id }}" rows="3" class="mt-1 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit or is_readonly %}disabled{% endif %} {% if is_readonly %}readonly{% endif %}>{{ existing_q_value | default('', true) }}</textarea>
@@ -2349,10 +2393,10 @@
                                                                             {% elif field.field_type_for_js|lower == 'yesno' %} {% set current_q_yesno = existing_q_value | lower if existing_q_value is not none else '' %} <div class="flex items-center gap-4"> <div class="flex items-center gap-3"> <label class="inline-flex items-center cursor-pointer"> <input type="checkbox" name="field_value[{{ field.id }}]" value="yes" class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500" {% if current_q_yesno == 'yes' %}checked{% endif %} {% if not can_edit %}disabled{% endif %}> <span class="ml-2 text-sm font-medium text-green-700">Yes</span> </label> <label class="inline-flex items-center cursor-pointer"> <input type="checkbox" name="field_value[{{ field.id }}]" value="no" class="form-checkbox h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500" {% if current_q_yesno == 'no' %}checked{% endif %} {% if not can_edit %}disabled{% endif %}> <span class="ml-2 text-sm font-medium text-red-700">No</span> </label> </div> </div>
                                                                             {% elif field.field_type_for_js == 'date' %} <input type="date" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (existing_q_value|string|lower == 'none') else (existing_q_value | default('', true)) }}" class="mt-1 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}>
                                                                             {% elif field.field_type_for_js == 'datetime' %} <input type="datetime-local" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (existing_q_value|string|lower == 'none') else (existing_q_value | default('', true)) }}" class="mt-1 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}>
-                                                                            {% elif field.field_type_for_js == 'single_choice' %} {% set current_q_single = existing_q_value | default('', true) %} <select name="field_value[{{ field.id }}]" id="field-{{ field.id }}"
-                                                                                   {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}'{% else %}data-options-source="manual"{% endif %}
+                                                                            {% elif field.field_type_for_js == 'single_choice' %} {% set current_q_single = existing_q_value | default('', true) %} <select name="field_value[{{ field.id }}]" id="field-{{ field.id }}" data-field-item-id="{{ field.id }}" {% if _unique_opts %}data-unique-options-in-section="true"{% endif %}{% if _limit_entries %} data-limit-entries-to-option-count="true"{% endif %}{% if field.config and field.config.get('use_as_repeat_entry_title') %} data-use-as-repeat-entry-title="true"{% endif %}
+                                                                                   {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}' data-plugin-config='{{ ((field.config or {}).get("question_plugin_config") | tojson | e) if field.config else "{}" }}'{% else %}data-options-source="manual"{% endif %}
                                                                                    class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" {% if not can_edit %}disabled{% endif %}> <option value="">{{ _('Select...') }}</option> {% if not field.lookup_list_id %}{% for option in field.options %} {% set opt_val = option.value if option is mapping else option %} {% set opt_label = option.label if option is mapping else option %} <option value="{{ opt_val }}" {% if opt_val == current_q_single %}selected{% endif %}>{{ opt_label }}</option> {% endfor %}{% endif %} </select>
-                                                                                                                                                        {% elif field.field_type_for_js == 'multiple_choice' %} {% set current_q_multi = existing_q_value if existing_q_value is iterable else [] %} <div class="mt-2" id="field-{{ field.id }}" {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}'{% else %}data-options-source="manual"{% endif %}> <button type="button"
+                                                                                                                                                        {% elif field.field_type_for_js == 'multiple_choice' %} {% set current_q_multi = existing_q_value if existing_q_value is iterable else [] %} <div class="mt-2" id="field-{{ field.id }}" data-field-item-id="{{ field.id }}" {% if _unique_opts %}data-unique-options-in-section="true"{% endif %} {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}' data-plugin-config='{{ ((field.config or {}).get("question_plugin_config") | tojson | e) if field.config else "{}" }}'{% else %}data-options-source="manual"{% endif %}> <button type="button"
                                                                                    class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-left text-sm focus:outline-none focus:ring-2 focus:ring-green-500 hover:bg-gray-50 multi-select-btn"
                                                                                    data-field-id="{{ field.id }}"
                                                                                    {% if not can_edit %}disabled{% endif %}>
@@ -2466,24 +2510,18 @@
                                                                     </div>
 
                                                                     <div id="add-repeat-entry-container-{{ sub_section.id }}" class="mt-4">
-                                                                        <div class="flex items-center justify-between">
-                                                                            <div class="flex-1">
-                                                                                <p class="text-sm text-gray-600 italic">{{ _('Click "Add Entry" to repeat this group of fields multiple times') }}</p>
-                                                                                {% if sub_section.max_entries %}
-                                                                                    <p class="text-xs text-gray-500 mt-1">
-                                                                                        <span id="repeat-limit-text-{{ sub_section.id }}">{{ _('Max entries: %(max)s', max=sub_section.max_entries) }}</span>
-                                                                                    </p>
-                                                                                {% endif %}
-                                                                            </div>
-                                                                            <div class="flex items-center">
-                                                                                <button type="button" id="add-repeat-entry-btn-{{ sub_section.id }}"
-                                                                                        class="btn btn-success"
-                                                                                        data-section-id="{{ sub_section.id }}">
-                                                                                    <i class="fas fa-plus mr-2"></i>
-                                                                                    {{ _('Add Entry') }}
-                                                                                </button>
-                                                                            </div>
-                                                                        </div>
+                                                                        <button type="button" id="add-repeat-entry-btn-{{ sub_section.id }}"
+                                                                                class="repeat-add-entry-btn"
+                                                                                data-section-id="{{ sub_section.id }}">
+                                                                            <span class="repeat-add-entry-btn__main">
+                                                                                <i class="fas fa-plus" aria-hidden="true"></i>
+                                                                                <span>{{ _('Add Entry') }}</span>
+                                                                            </span>
+                                                                            <span class="repeat-add-entry-btn__hint">{{ _('Click to repeat this group of fields multiple times') }}</span>
+                                                                            {% if sub_section.max_entries %}
+                                                                                <span class="repeat-add-entry-btn__limit" id="repeat-limit-text-{{ sub_section.id }}">{{ _('Max entries: %(max)s', max=sub_section.max_entries) }}</span>
+                                                                            {% endif %}
+                                                                        </button>
                                                                     </div>
                                                                 </div>
                                                                 {% endif %}
@@ -2493,35 +2531,6 @@
                                                 {% endif %} {# End of if section.id in sub_sections_by_parent_form for parent section #}
 
                                                 {# No message shown for sections without items - they may be dynamic sections or sections that will be populated later #}
-
-                                                {% if section.section_type == 'repeat' %}
-                                                <div id="repeat-interface-{{ section.id }}">
-                                                    <div id="repeat-entries-{{ section.id }}" class="space-y-4">
-                                                        <!-- Repeat entries will be added here -->
-                                                    </div>
-
-                                                    <div id="add-repeat-entry-container-{{ section.id }}" class="mt-4">
-                                                        <div class="flex items-center justify-between">
-                                                            <div class="flex-1">
-                                                                <p class="text-sm text-gray-600 italic">{{ _('Click "Add Entry" to repeat this group of fields multiple times') }}</p>
-                                                                {% if section.max_entries %}
-                                                                    <p class="text-xs text-gray-500 mt-1">
-                                                                        <span id="repeat-limit-text-{{ section.id }}">{{ _('Max entries: %(max)s', max=section.max_entries) }}</span>
-                                                                    </p>
-                                                                {% endif %}
-                                                            </div>
-                                                            <div class="flex items-center">
-                                                                <button type="button" id="add-repeat-entry-btn-{{ section.id }}"
-                                                                        class="btn btn-success"
-                                                                        data-section-id="{{ section.id }}">
-                                                                    <i class="fas fa-plus mr-2"></i>
-                                                                    {{ _('Add Entry') }}
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {% endif %}
                                             </div> {# End space-y-6 for parent section #}
                                         </div> {# End section-container-{{ section.id }} for parent section #}
                                     {% endfor %} {# End main_sections_form loop #}
@@ -3187,6 +3196,12 @@
             "assignment_period": {{ (
                 (assignment_status.assigned_form.period_name if assignment_status and assignment_status.assigned_form and assignment_status.assigned_form.period_name else None)
                 or ''
+            ) | tojson }},
+            "country_iso": {{ (
+                assignment_status.country.iso3 if assignment_status and assignment_status.country and assignment_status.country.iso3 else ''
+            ) | tojson }},
+            "country_iso2": {{ (
+                assignment_status.country.iso2 if assignment_status and assignment_status.country and assignment_status.country.iso2 else ''
             ) | tojson }}
         }
         </script>
@@ -3203,6 +3218,7 @@
 
         <script nonce="{{ csp_nonce() }}">
         window.REPEAT_GROUPS_DATA = JSON.parse(document.getElementById('existing-data').textContent).repeat_groups_data || {};
+        window.REPEAT_DYNAMIC_INDICATOR_DATA = JSON.parse(document.getElementById('existing-data').textContent).repeat_dynamic_indicator_data || {};
 
         // Make existing data globally available for relevance condition evaluation
         try {
@@ -3737,6 +3753,10 @@
           'confirmDeleteEntry': _('Are you sure you want to delete this entry?')
         } | tojson }}</script>
 
+        <script type="application/json" id="calculated-list-labels">{{ {
+          'staleSavedValueTooltip': _('Saved value is no longer in the current list. It will still be submitted unless you choose another option.')
+        } | tojson }}</script>
+
         <script type="application/json" id="frontend-config">{{ {
           'baseUrl': get_frontend_url_global(),
           'indicatorBankPath': '/indicator-bank',
@@ -3790,6 +3810,7 @@
           }
           window.PAGINATION_LABELS = loadJson('pagination-labels', window.PAGINATION_LABELS || {});
           window.REPEAT_SECTION_LABELS = loadJson('repeat-section-labels', window.REPEAT_SECTION_LABELS || {});
+          window.CALCULATED_LIST_LABELS = loadJson('calculated-list-labels', window.CALCULATED_LIST_LABELS || {});
           window.FRONTEND_CONFIG = loadJson('frontend-config', window.FRONTEND_CONFIG || {});
           window.DYNAMIC_INDICATORS_LABELS = loadJson('dynamic-indicators-labels', window.DYNAMIC_INDICATORS_LABELS || {});
           window.DYNAMIC_INDICATORS_TEMPLATES = loadJson('dynamic-indicators-templates', window.DYNAMIC_INDICATORS_TEMPLATES || {});
@@ -3880,6 +3901,11 @@
                 if (!form.classList.contains('approve-assignment-form') && !form.classList.contains('reopen-assignment-form')) return;
                 if (form.dataset.confirmed === 'true') { delete form.dataset.confirmed; return; }
                 e.preventDefault();
+
+                var submitBtn = form.querySelector('[type="submit"]');
+                if (submitBtn && submitBtn.disabled) return;
+                if (submitBtn) submitBtn.disabled = true;
+
                 var isApprove = form.classList.contains('approve-assignment-form');
                 var msg = isApprove
                     ? {{ _('Are you sure you want to validate this assignment?')|tojson|safe }}
@@ -3887,7 +3913,14 @@
                 var label = isApprove ? {{ _('Validate')|tojson|safe }} : {{ _('Reopen')|tojson|safe }};
                 var fn = window.showConfirmation || window.showDangerConfirmation;
                 if (fn) {
-                    fn(msg, function() { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, null, label, {{ _('Cancel')|tojson|safe }});
+                    fn(msg,
+                        function() { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); },
+                        function() { if (submitBtn) submitBtn.disabled = false; },
+                        label,
+                        {{ _('Cancel')|tojson|safe }}
+                    );
+                } else {
+                    if (submitBtn) submitBtn.disabled = false;
                 }
             });
         })();

@@ -4,7 +4,8 @@ from flask import render_template, request, flash, redirect, url_for, current_ap
 from flask_login import current_user
 from app import db
 from config import Config
-from app.models import Sector, SubSector
+from sqlalchemy import or_
+from app.models import IndicatorBank, Sector, SubSector
 from app.forms.system import SectorForm, SubSectorForm
 from app.routes.admin.shared import permission_required, rbac_guard_audit_exempt
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
@@ -157,6 +158,13 @@ def get_sector(sector_id):
     """API endpoint to get sector data for editing"""
     sector = Sector.query.get_or_404(sector_id)
 
+    indicator_count = sum(
+        1 for (j,) in db.session.query(IndicatorBank.sector)
+        .filter(IndicatorBank.sector.isnot(None)).all()
+        if j and isinstance(j, dict)
+        and sector_id in (j.get("primary"), j.get("secondary"), j.get("tertiary"))
+    )
+
     return json_ok(
         id=sector.id,
         name=sector.name,
@@ -166,6 +174,8 @@ def get_sector(sector_id):
         logo_filename=sector.logo_filename or '',
         is_active=sector.is_active,
         name_translations=sector.name_translations or {},
+        indicator_count=indicator_count,
+        subsector_count=len(sector.sub_sectors),
     )
 
 @bp.route("/sectors/delete/<int:sector_id>", methods=["POST"])
@@ -174,9 +184,26 @@ def delete_sector(sector_id):
     sector = Sector.query.get_or_404(sector_id)
 
     try:
-        if sector.subsectors.first():
+        if sector.sub_sectors:
             flash(f"Cannot delete sector '{sector.name}' as it has associated sub-sectors.", "danger")
             return redirect(url_for("system_admin.manage_sectors_subsectors"))
+
+        # Clear all indicator references to this sector (primary / secondary / tertiary)
+        affected = IndicatorBank.query.filter(
+            or_(
+                IndicatorBank.sector["primary"].astext == str(sector_id),
+                IndicatorBank.sector["secondary"].astext == str(sector_id),
+                IndicatorBank.sector["tertiary"].astext == str(sector_id),
+            )
+        ).all()
+        for indicator in affected:
+            if indicator.sector and isinstance(indicator.sector, dict):
+                updated = dict(indicator.sector)
+                for level in ("primary", "secondary", "tertiary"):
+                    if updated.get(level) == sector_id:
+                        updated[level] = None
+                indicator.sector = updated
+                flag_modified(indicator, "sector")
 
         if sector.logo_filename:
             _delete_logo_file(get_sector_logo_path(), sector.logo_filename)
@@ -314,6 +341,13 @@ def get_subsector(subsector_id):
     """API endpoint to get subsector data for editing"""
     subsector = SubSector.query.get_or_404(subsector_id)
 
+    indicator_count = sum(
+        1 for (j,) in db.session.query(IndicatorBank.sub_sector)
+        .filter(IndicatorBank.sub_sector.isnot(None)).all()
+        if j and isinstance(j, dict)
+        and subsector_id in (j.get("primary"), j.get("secondary"), j.get("tertiary"))
+    )
+
     return json_ok(
         id=subsector.id,
         name=subsector.name,
@@ -324,6 +358,7 @@ def get_subsector(subsector_id):
         logo_filename=subsector.logo_filename or '',
         is_active=subsector.is_active,
         name_translations=subsector.name_translations or {},
+        indicator_count=indicator_count,
     )
 
 @bp.route("/subsectors/delete/<int:subsector_id>", methods=["POST"])
@@ -332,6 +367,23 @@ def delete_subsector(subsector_id):
     subsector = SubSector.query.get_or_404(subsector_id)
 
     try:
+        # Clear all indicator sub-sector references before deleting
+        affected = IndicatorBank.query.filter(
+            or_(
+                IndicatorBank.sub_sector["primary"].astext == str(subsector_id),
+                IndicatorBank.sub_sector["secondary"].astext == str(subsector_id),
+                IndicatorBank.sub_sector["tertiary"].astext == str(subsector_id),
+            )
+        ).all()
+        for indicator in affected:
+            if indicator.sub_sector and isinstance(indicator.sub_sector, dict):
+                updated = dict(indicator.sub_sector)
+                for level in ("primary", "secondary", "tertiary"):
+                    if updated.get(level) == subsector_id:
+                        updated[level] = None
+                indicator.sub_sector = updated
+                flag_modified(indicator, "sub_sector")
+
         if subsector.logo_filename:
             _delete_logo_file(get_subsector_logo_path(), subsector.logo_filename)
 
@@ -355,8 +407,11 @@ def sector_logo(sector_id):
     sector = Sector.query.get_or_404(sector_id)
     if not sector.logo_filename:
         return ("", 404)
+    rel_path = f"sectors/{sector.logo_filename}"
+    if not storage.exists(storage.SYSTEM, rel_path):
+        return ("", 404)
     return storage.stream_response(
-        storage.SYSTEM, f"sectors/{sector.logo_filename}",
+        storage.SYSTEM, rel_path,
         filename=sector.logo_filename, as_attachment=False,
         mimetype=_safe_logo_mimetype(sector.logo_filename),
     )
@@ -367,8 +422,11 @@ def subsector_logo(subsector_id):
     subsector = SubSector.query.get_or_404(subsector_id)
     if not subsector.logo_filename:
         return ("", 404)
+    rel_path = f"subsectors/{subsector.logo_filename}"
+    if not storage.exists(storage.SYSTEM, rel_path):
+        return ("", 404)
     return storage.stream_response(
-        storage.SYSTEM, f"subsectors/{subsector.logo_filename}",
+        storage.SYSTEM, rel_path,
         filename=subsector.logo_filename, as_attachment=False,
         mimetype=_safe_logo_mimetype(subsector.logo_filename),
     )

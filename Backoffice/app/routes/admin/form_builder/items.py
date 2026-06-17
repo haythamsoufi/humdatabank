@@ -283,6 +283,26 @@ def edit_item(item_id):
     elif submitted_item_type == 'question':
         if 'question_type' in data and data['question_type']:
             form.question_type.data = data['question_type']
+        # For JSON requests request.form is empty, so WTForms falls back to obj (DB) values.
+        # Explicitly sync all question fields used by validators or _update_question_fields.
+        if 'label' in data:
+            form.label.data = data['label'] or ''
+        if 'definition' in data:
+            form.definition.data = data['definition'] or ''
+        if 'unit' in data:
+            form.unit.data = data['unit'] or ''
+        if 'options_source' in data:
+            form.options_source.data = data['options_source'] or 'manual'
+        if 'options_json' in data:
+            form.options_json.data = data['options_json'] or ''
+        if 'options_translations_json' in data:
+            form.options_translations_json.data = data['options_translations_json'] or ''
+        if 'lookup_list_id' in data:
+            form.lookup_list_id.data = data['lookup_list_id'] or ''
+        if 'list_display_column' in data:
+            form.list_display_column.data = data['list_display_column'] or ''
+        if 'list_filters_json' in data:
+            form.list_filters_json.data = data['list_filters_json'] or ''
     elif submitted_item_type == 'matrix':
         if 'label' in data:
             form.label.data = data['label']

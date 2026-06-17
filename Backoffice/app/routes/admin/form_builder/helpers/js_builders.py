@@ -137,6 +137,11 @@ def _build_section_data_for_js(section_obj, all_sections):
         'name': section_obj.name,
         'name_translations': section_obj.name_translations,
         'order': section_obj.order,
+        'section_type': section_obj.section_type,
+        'max_entries': section_obj.max_entries,
+        'entry_label_item_id': section_obj.entry_label_item_id,
+        'show_entries_in_navigation': bool((section_obj.config or {}).get('show_entries_in_navigation', False)),
+        'hide_section_header': bool((section_obj.config or {}).get('hide_section_header', False)),
         'indicators': [],
         'questions': [],
         'document_fields': [],
@@ -466,7 +471,15 @@ def _build_template_data_for_js(template, version_id: int):
         except Exception as e:
             current_app.logger.debug("Legacy subsection order migration exception: %s", e)
 
-    all_template_sections_for_js = [[s.id, s.name] for s in all_sections]
+    all_template_sections_for_js = [
+        {
+            'id': s.id,
+            'name': s.name,
+            'section_type': s.section_type,
+            'parent_section_id': s.parent_section_id,
+        }
+        for s in all_sections
+    ]
 
     # Build indicator bank choices
     all_ib_objects = IndicatorBank.query.order_by(IndicatorBank.name).all()

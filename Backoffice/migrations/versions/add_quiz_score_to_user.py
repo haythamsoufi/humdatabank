@@ -1,7 +1,7 @@
 """Add quiz_score to user
 
 Revision ID: add_quiz_score
-Revises: add_logged_out_at
+Revises: notif_entity_scope
 Create Date: 2025-01-15 12:00:00.000000
 
 """

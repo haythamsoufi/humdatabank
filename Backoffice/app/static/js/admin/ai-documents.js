@@ -1755,6 +1755,8 @@ function initializeUploadForm() {
     uploadForm.addEventListener('submit', async function(e) {
         e.preventDefault();
 
+        if (uploadForm.dataset.uploading === '1') return;
+
         if (!fileInput.files || !fileInput.files.length) {
             if (window.showAlert) {
                 window.showAlert(cfg.t.please_select_a_file_b3d4e2bc, 'warning');
@@ -1770,6 +1772,7 @@ function initializeUploadForm() {
         formData.append('title', document.getElementById('docTitle').value);
         formData.append('is_public', uploadForm.querySelector('[name="is_public"]').checked);
 
+        uploadForm.dataset.uploading = '1';
         uploadBtn.disabled = true;
         uploadProgress.classList.remove('hidden');
         progressBar.style.width = '0%';
@@ -1809,10 +1812,11 @@ function initializeUploadForm() {
                     showProcessingBanner(cfg.t.upload_complete_f79598ab, cfg.t.done_f92965e2, 100);
                 closeUploadModal();
                 reloadDocumentsGrid();
-                setTimeout(function() { hideProcessingBanner(); uploadBtn.disabled = false; }, 2000);
+                setTimeout(function() { hideProcessingBanner(); uploadForm.dataset.uploading = '0'; uploadBtn.disabled = false; }, 2000);
                 } else {
                     uploadStatus.textContent = 'cfg.t.error_3d9f514d ' + ((t && t.error) || result.error || 'Unknown error');
                     hideProcessingBanner();
+                    uploadForm.dataset.uploading = '0';
                     uploadBtn.disabled = false;
                 }
             } else if (result.success) {
@@ -1822,17 +1826,20 @@ function initializeUploadForm() {
                 reloadDocumentsGrid();
                 setTimeout(function() {
                     uploadProgress.classList.add('hidden');
+                    uploadForm.dataset.uploading = '0';
                     uploadBtn.disabled = false;
                 }, 1500);
             } else {
                 progressBar.style.width = '100%';
                 uploadStatus.textContent = 'cfg.t.error_3d9f514d ' + (result.error || 'Unknown error');
+                uploadForm.dataset.uploading = '0';
                 uploadBtn.disabled = false;
             }
         } catch (error) {
             console.error('Upload error:', error);
             uploadProgress.classList.remove('hidden');
             uploadStatus.textContent = 'cfg.t.upload_failed_0e76390e ' + error.message;
+            uploadForm.dataset.uploading = '0';
             uploadBtn.disabled = false;
         }
     });

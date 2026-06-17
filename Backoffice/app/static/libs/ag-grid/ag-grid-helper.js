@@ -1262,6 +1262,22 @@
             const gridPlaceholderId = self.gridDiv && self.gridDiv.getAttribute('data-placeholder-id');
             const placeholderId = configuredPlaceholderId || gridPlaceholderId || 'column-visibility-button-placeholder';
 
+            function isResultCountTitleGroup(el) {
+                if (!el || !el.querySelector) {
+                    return false;
+                }
+                // Tab-local modals (e.g. SP/EF edit) sit beside the grid and contain an h3 title.
+                if (el.getAttribute('role') === 'dialog' || el.classList.contains('modal-backdrop')) {
+                    return false;
+                }
+                try {
+                    if (window.getComputedStyle(el).position === 'fixed') {
+                        return false;
+                    }
+                } catch (e) { /* ignore */ }
+                return !!el.querySelector('h1, h2, h3, h4, [data-ag-grid-title-group]');
+            }
+
             if (placeholderId) {
                 placeholder = document.getElementById(placeholderId);
             }
@@ -1281,11 +1297,19 @@
                 let titleGroup = null;
 
                 if (headerRow && headerRow !== document.body) {
+                    Array.prototype.forEach.call(headerRow.children || [], function(child) {
+                        if (child.getAttribute && child.getAttribute('role') === 'dialog') {
+                            const misplaced = child.querySelector('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]');
+                            if (misplaced) {
+                                misplaced.remove();
+                            }
+                        }
+                    });
                     Array.prototype.some.call(headerRow.children || [], function(child) {
                         if (child === placeholderParent || !child.querySelector) {
                             return false;
                         }
-                        if (child.querySelector('h1, h2, h3, h4, [data-ag-grid-title-group]')) {
+                        if (isResultCountTitleGroup(child)) {
                             titleGroup = child;
                             return true;
                         }
@@ -1305,10 +1329,22 @@
                     return true;
                 }
 
-                // Generic macro-generated grid toolbar: the placeholder itself is the toolbar content.
-                // Avoid rewriting custom right-side action groups that contain buttons next to the placeholder.
+                // Custom toolbar with actions + colvis (e.g. Indicator Bank tab panels).
                 if (placeholderParent.children && placeholderParent.children.length > 1) {
-                    return false;
+                    const existingToolbar = placeholderParent.querySelector('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]');
+                    if (existingToolbar) {
+                        self.resultCountElement = existingToolbar;
+                        return true;
+                    }
+                    countEl.style.marginLeft = '0';
+                    countEl.style.marginRight = 'auto';
+                    placeholderParent.style.display = 'flex';
+                    placeholderParent.style.alignItems = 'center';
+                    placeholderParent.style.flexWrap = 'wrap';
+                    placeholderParent.style.gap = '8px';
+                    placeholderParent.style.width = '100%';
+                    placeholderParent.insertBefore(countEl, placeholderParent.firstChild);
+                    return true;
                 }
 
                 const toolbarRow = placeholderParent;

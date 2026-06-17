@@ -296,6 +296,10 @@ function moveRow(rowId, targetRowId, position) {
 
 // Add row after a specific row
 function addRowAfter(afterRow) {
+    const btn = afterRow ? afterRow.querySelector('.add-row-after-btn') : null;
+    if (btn && btn.disabled) return;
+    if (btn) btn.disabled = true;
+
     // Get the order value of the row we want to insert after
     const afterOrder = parseInt(afterRow.dataset.order || '0');
 
@@ -307,9 +311,11 @@ function addRowAfter(afterRow) {
         if (data && data.success) {
             location.reload();
         } else {
+            if (btn) btn.disabled = false;
             console.error('Failed to add row:', data?.message);
         }
     }).catch(error => {
+        if (btn) btn.disabled = false;
         console.error('Error adding row:', error);
     });
 }
@@ -338,6 +344,10 @@ function deleteRow(rowId) {
 
 // Add the first row to an empty list
 function addFirstRow() {
+    const btn = document.getElementById('add-first-row-btn');
+    if (btn && btn.disabled) return;
+    if (btn) btn.disabled = true;
+
     console.log('Adding first row to list:', lookupListId);
 
     fetchJson(`/admin/api/templates/lists/${lookupListId}/rows`, {
@@ -348,10 +358,12 @@ function addFirstRow() {
         if (data && data.success) {
             location.reload();
         } else {
+            if (btn) btn.disabled = false;
             const msg = data?.message || 'Unknown error';
             if (window.showAlert) window.showAlert('Failed to add first row: ' + msg, 'error');
         }
     }).catch(error => {
+        if (btn) btn.disabled = false;
         console.error('Error adding first row:', error);
         if (window.showAlert) window.showAlert('Error adding first row: ' + (error.message || error), 'error');
     });
@@ -359,6 +371,10 @@ function addFirstRow() {
 
 // Add a row at the end of the list
 function addRowAtEnd() {
+    const btn = document.getElementById('add-row-at-end-btn');
+    if (btn && btn.disabled) return;
+    if (btn) btn.disabled = true;
+
     console.log('Adding row at end of list:', lookupListId);
 
     // Get the highest order number
@@ -381,10 +397,12 @@ function addRowAtEnd() {
         if (data && data.success) {
             location.reload();
         } else {
+            if (btn) btn.disabled = false;
             const msg = data?.message || 'Unknown error';
             if (window.showAlert) window.showAlert('Failed to add row: ' + msg, 'error');
         }
     }).catch(error => {
+        if (btn) btn.disabled = false;
         console.error('Error adding row:', error);
         if (window.showAlert) window.showAlert('Error adding row: ' + (error.message || error), 'error');
     });

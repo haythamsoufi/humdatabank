@@ -236,7 +236,10 @@
                                     <select id="item-calculated-list-select" name="lookup_list_id" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
                                         <option value="">{{ _('Select List...') }}</option>
                                         {% for lst in lookup_lists_for_js %}
-                                            <option value="{{ lst.id }}" data-columns='{{ (lst.columns_config | tojson | e) if lst.columns_config else "{}" }}'>{{ lst.name }}</option>
+                                            <option value="{{ lst.id }}"
+                                                    data-columns='{{ (lst.columns_config | tojson | e) if lst.columns_config else "{}" }}'
+                                                    {% if hasattr(lst, 'has_config_ui') and lst.has_config_ui %}data-has-config-ui="true"{% endif %}
+                                                    {% if hasattr(lst, 'config_js_handler') and lst.config_js_handler %}data-config-js-handler="{{ lst.config_js_handler }}"{% endif %}>{{ lst.name }}</option>
                                         {% endfor %}
                                     </select>
                                     <p class="mt-2 text-xs text-gray-500">{{ _('Filters can be added after selecting a list.') }}</p>
@@ -253,6 +256,9 @@
                             <button type="button" id="item-calculated-list-add-filter-btn" class="text-xs font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center mt-2"><i class="fas fa-filter w-3 h-3 mr-1"></i>{{ _('Add Filter') }}</button>
                             <div id="item-calculated-list-filters-container" class="mt-2 space-y-2"></div>
                             <input type="hidden" name="list_filters_json" id="item-calculated-list-filters-json">
+                            {# Plugin-specific configuration panel (e.g. Emergency Operations) #}
+                            <div id="question-plugin-config-container" class="mt-2"></div>
+                            <input type="hidden" name="question_plugin_config" id="question-plugin-config-json" value="{}">
                         </div>
                     </div>
 
@@ -945,6 +951,32 @@
                                     <input type="checkbox" name="allow_not_applicable" id="item-allow-not-applicable" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
                                     <span class="ml-2">{{ _('Allow "Not applicable" option') }}</span>
                                 </label>
+                            </div>
+
+                            {# Unique options within section (single/multi choice questions only) #}
+                            <div id="unique-options-in-section-row" style="display: none;">
+                                <label class="flex items-center text-gray-700 text-sm">
+                                    <input type="checkbox" name="unique_options_in_section" id="item-unique-options-in-section" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2">{{ _('Each option can only be selected once in this section') }}</span>
+                                </label>
+                            </div>
+
+                            {# Limit repeat entries to option count (single choice in repeat sections with unique options) #}
+                            <div id="limit-entries-to-option-count-row" style="display: none;" class="ml-6">
+                                <label class="flex items-center text-gray-700 text-sm">
+                                    <input type="checkbox" name="limit_entries_to_option_count" id="item-limit-entries-to-option-count" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2">{{ _('Limit repeat section entries to the number of options') }}</span>
+                                </label>
+                                <p class="mt-1 ml-6 text-xs text-gray-500">{{ _('The number of repeat entries cannot exceed the number of available options.') }}</p>
+                            </div>
+
+                            {# Repeat entry title dropdown (single choice in repeat sections) #}
+                            <div id="use-as-repeat-entry-title-row" style="display: none;">
+                                <label class="flex items-center text-gray-700 text-sm">
+                                    <input type="checkbox" name="use_as_repeat_entry_title" id="item-use-as-repeat-entry-title" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2">{{ _('Use as repeat entry title (dropdown in header)') }}</span>
+                                </label>
+                                <p class="mt-1 ml-6 text-xs text-gray-500">{{ _('In repeat sections, shows the dropdown in the entry header instead of as a separate field.') }}</p>
                             </div>
 
                             {# Disability questions (indicators only) #}

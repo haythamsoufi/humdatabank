@@ -3,6 +3,76 @@ import { getFieldValue, getCurrentFieldValue } from './field-management.js';
 
 const MODULE = 'calculated-lists-runtime';
 
+// Deduplication + short-lived cache so concurrent repeat-entry selects that share
+// the same lookup URL make exactly ONE network request instead of N.
+const _pendingFetches = new Map(); // url → Promise<object>  (in-flight)
+const _responseCache  = new Map(); // url → { json, ts }    (completed)
+const CACHE_TTL_MS = 30_000;       // 30 s — covers rapid re-renders / Add Entry clicks
+
+function cachedFetch(urlString) {
+    const cached = _responseCache.get(urlString);
+    if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+        debugLog(MODULE, `📦 Cache hit for ${urlString}`);
+        return Promise.resolve(cached.json);
+    }
+
+    const inFlight = _pendingFetches.get(urlString);
+    if (inFlight) {
+        debugLog(MODULE, `🔗 Sharing in-flight request for ${urlString}`);
+        return inFlight;
+    }
+
+    const fetchFn = (window.getFetch && window.getFetch()) || fetch;
+    const promise = fetchFn(urlString, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        })
+        .then(json => {
+            _responseCache.set(urlString, { json, ts: Date.now() });
+            _pendingFetches.delete(urlString);
+            return json;
+        })
+        .catch(err => {
+            _pendingFetches.delete(urlString);
+            throw err;
+        });
+
+    _pendingFetches.set(urlString, promise);
+    return promise;
+}
+
+/** Resolve ISO code for the assignment's country (used by Emergency Operations list). */
+function resolveAssignedCountryIso() {
+    const ctx = window.metadataContext;
+    if (ctx) {
+        const fromCtx = String(ctx.country_iso || ctx.country_iso2 || '').trim();
+        if (fromCtx) {
+            return fromCtx.toUpperCase();
+        }
+    }
+
+    const countryIsoElement = document.querySelector('[data-country-iso]');
+    if (countryIsoElement && countryIsoElement.dataset.countryIso) {
+        return countryIsoElement.dataset.countryIso.trim().toUpperCase();
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const countryParam = urlParams.get('country') || urlParams.get('iso');
+    if (countryParam) {
+        return countryParam.toUpperCase();
+    }
+
+    if (window.countryInfo) {
+        const fromInfo = window.countryInfo.iso || window.countryInfo.iso3;
+        if (fromInfo) {
+            return String(fromInfo).toUpperCase();
+        }
+    }
+
+    return null;
+}
+
 export function initCalculatedLists() {
     debugLog(MODULE, '🚀 Starting calculated lists initialization...');
     debugLog(MODULE, '🔄 Initializing calculated lists runtime support...');
@@ -20,12 +90,12 @@ export function initCalculatedLists() {
             debugLog(MODULE, 'existingData sample keys:', dataKeys.slice(0, 5));
         }
 
-        if (document.readyState === 'complete' && existingDataReady) {
-            debugLog(MODULE, '✅ Ready to initialize - DOM loaded and existing data available');
-            setTimeout(() => initCalculatedListsCore(), 100);
+        if (document.readyState !== 'loading' && existingDataReady) {
+            debugLog(MODULE, '✅ Ready to initialize - existing data available');
+            initCalculatedListsCore();
         } else {
-            debugLog(MODULE, '⏳ Not ready yet, will retry in 100ms...');
-            setTimeout(checkAndInit, 100);
+            debugLog(MODULE, '⏳ Not ready yet, will retry in 50ms...');
+            setTimeout(checkAndInit, 50);
         }
     };
 
@@ -77,20 +147,14 @@ function initCalculatedListsCore() {
     // Set up a global listener for all form changes to catch missed dependencies
     setupGlobalCalculatedListsListener();
 
-    // IMPORTANT: Delay initial refresh to ensure form data is loaded
-    setTimeout(() => {
-        debugLog(MODULE, '🔄 Performing delayed initial refresh...');
-        selectElements.forEach(sel => {
-            debugLog(MODULE, `Refreshing ${sel.id} after delay`);
-            refreshCalculatedSelect(sel);
-        });
-        multiSelectElements.forEach(div => {
-            debugLog(MODULE, `Refreshing ${div.id} after delay`);
-            refreshCalculatedMultiSelect(div);
-        });
-    }, 500); // Wait 500ms for form data to be loaded
-
     debugLog(MODULE, '✅ Calculated lists initialization complete');
+
+    // Expose refresh helpers globally so repeat-sections.js can trigger option loads
+    // for dynamically cloned calculated-list selects.
+    window.refreshCalculatedSelect = refreshCalculatedSelect;
+    window.refreshCalculatedMultiSelect = refreshCalculatedMultiSelect;
+    window.preserveCalculatedSelectStaleValue = markSelectStaleSavedValue;
+    window.syncEmergencyOperationMetadata = syncEmergencyOperationMetadata;
 }
 
 function setupGlobalCalculatedListsListener() {
@@ -180,6 +244,11 @@ function refreshCalculatedSelect(selectElement) {
     } catch (e) {
         debugError(MODULE, `❌ Failed to parse filters for ${selectElement.id}:`, e);
         return;
+    }
+
+    if (lookupListId === 'emergency_operations') {
+        attachEmergencyMetadataListener(selectElement);
+        attachStaleSavedValueListener(selectElement);
     }
 
     const dependencyIds = filters
@@ -279,6 +348,10 @@ function setupCalculatedSelect(selectElement) {
 
     // Initial population
     debugLog(MODULE, `Performing initial refresh for ${selectElement.id || selectElement.name}`);
+    attachStaleSavedValueListener(selectElement);
+    if (lookupListId === 'emergency_operations') {
+        attachEmergencyMetadataListener(selectElement);
+    }
     refresh();
 }
 
@@ -370,7 +443,213 @@ function setSelectValueRobust(selectElement, value) {
     const inputEvent = new Event('input', { bubbles: true });
     selectElement.dispatchEvent(inputEvent);
 
+    syncEmergencyOperationMetadata(selectElement);
+
     debugLog(MODULE, `🔧 Select value set to: "${selectElement.value}" (events triggered)`);
+}
+
+function resolveCalculatedSelectFieldId(selectElement) {
+    if (selectElement.dataset.fieldItemId) {
+        return selectElement.dataset.fieldItemId;
+    }
+    const id = selectElement.id || '';
+    const standardMatch = id.match(/^field-(\d+)$/);
+    return standardMatch ? standardMatch[1] : null;
+}
+
+function parseEmergencyDisplayValue(value) {
+    const text = String(value || '').trim();
+    if (!text) return null;
+    const match = text.match(/^(.+?)\s+\(([^)]+)\)\s*$/);
+    if (match) {
+        return { name: match[1].trim(), code: match[2].trim() };
+    }
+    return { name: text, code: '' };
+}
+
+function applyEmergencyRowToOption(option, row, displayValue) {
+    if (row?.name) option.dataset.emergencyName = row.name;
+    if (row?.code) option.dataset.emergencyCode = row.code;
+    if (!option.dataset.emergencyName && !option.dataset.emergencyCode && displayValue) {
+        const parsed = parseEmergencyDisplayValue(displayValue);
+        if (parsed) {
+            option.dataset.emergencyName = parsed.name;
+            option.dataset.emergencyCode = parsed.code;
+        }
+    }
+}
+
+function getEmergencyMetadataHiddenInputName(selectElement) {
+    const fieldId = resolveCalculatedSelectFieldId(selectElement);
+    const selectName = selectElement.name || '';
+    if (selectName.startsWith('repeat_')) {
+        return selectName.replace(/_\d+$/, '_emergency_metadata');
+    }
+    return fieldId ? `field_disagg_metadata[${fieldId}]` : null;
+}
+
+function findOrCreateEmergencyMetadataHiddenInput(selectElement) {
+    const name = getEmergencyMetadataHiddenInputName(selectElement);
+    if (!name) return null;
+
+    const form = selectElement.form || selectElement.closest('form');
+    if (!form) return null;
+
+    for (const input of form.querySelectorAll('input[type="hidden"]')) {
+        if (input.name === name) return input;
+    }
+
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = name;
+    hidden.value = '';
+    form.appendChild(hidden);
+    return hidden;
+}
+
+function extractEmergencyMetadataFromOption(option) {
+    if (!option?.value) return null;
+
+    const name = option.dataset.emergencyName?.trim() || '';
+    const code = option.dataset.emergencyCode?.trim() || '';
+    if (name || code) {
+        if (name === '[object Object]') return null;
+        return { name, code };
+    }
+    return parseEmergencyDisplayValue(option.value);
+}
+
+export function syncEmergencyOperationMetadata(selectElement) {
+    if (selectElement.dataset.lookupListId !== 'emergency_operations') return;
+
+    const hidden = findOrCreateEmergencyMetadataHiddenInput(selectElement);
+    if (!hidden) return;
+
+    if (!selectElement.value) {
+        hidden.value = '';
+        return;
+    }
+
+    const option = selectElement.options[selectElement.selectedIndex];
+    const meta = extractEmergencyMetadataFromOption(option);
+    hidden.value = meta ? JSON.stringify(meta) : '';
+}
+
+function attachEmergencyMetadataListener(selectElement) {
+    if (selectElement.dataset.emergencyMetadataListenerAttached === 'true') return;
+    selectElement.dataset.emergencyMetadataListenerAttached = 'true';
+    selectElement.addEventListener('change', () => syncEmergencyOperationMetadata(selectElement));
+}
+
+const STALE_OPTION_SELECTOR = 'option[data-stale-saved-value="true"]';
+const STALE_INDICATOR_CLASS = 'calculated-select-stale-indicator';
+
+function getStaleSavedValueMessage() {
+    const labels = window.CALCULATED_LIST_LABELS || {};
+    return labels.staleSavedValueTooltip
+        || 'Saved value is no longer in the current list. It will still be submitted unless you choose another option.';
+}
+
+function optionValueExists(selectElement, value) {
+    return Array.from(selectElement.options).some((option) => option.value === value);
+}
+
+function appendStaleSavedOption(selectElement, value) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = value;
+    opt.dataset.staleSavedValue = 'true';
+    applyEmergencyRowToOption(opt, null, value);
+    selectElement.appendChild(opt);
+    return opt;
+}
+
+function findStaleSavedIndicator(selectElement) {
+    const titleWrap = selectElement.closest('.repeat-entry__title-select-wrap');
+    if (titleWrap) {
+        return titleWrap.querySelector(`.${STALE_INDICATOR_CLASS}`);
+    }
+    const next = selectElement.nextElementSibling;
+    if (next?.classList?.contains(STALE_INDICATOR_CLASS)) {
+        return next;
+    }
+    return selectElement.parentElement?.querySelector(`.${STALE_INDICATOR_CLASS}`) || null;
+}
+
+function updateStaleSavedValueIndicator(selectElement) {
+    const isStale = selectElement.dataset.staleSavedValue === 'true';
+    let indicator = findStaleSavedIndicator(selectElement);
+
+    if (!isStale) {
+        indicator?.remove();
+        selectElement.classList.remove('calculated-select--stale-saved', 'repeat-entry__title-select--stale-saved');
+        return;
+    }
+
+    if (!indicator) {
+        indicator = document.createElement('span');
+        indicator.className = STALE_INDICATOR_CLASS;
+        indicator.setAttribute('role', 'img');
+        indicator.setAttribute('aria-label', getStaleSavedValueMessage());
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-circle-exclamation';
+        icon.setAttribute('aria-hidden', 'true');
+        indicator.appendChild(icon);
+
+        const titleWrap = selectElement.closest('.repeat-entry__title-select-wrap');
+        if (titleWrap) {
+            titleWrap.appendChild(indicator);
+        } else {
+            selectElement.insertAdjacentElement('afterend', indicator);
+        }
+    }
+
+    indicator.title = getStaleSavedValueMessage();
+    indicator.setAttribute('aria-label', getStaleSavedValueMessage());
+    selectElement.classList.add('calculated-select--stale-saved');
+    if (selectElement.classList.contains('repeat-entry__title-select')) {
+        selectElement.classList.add('repeat-entry__title-select--stale-saved');
+    }
+}
+
+function clearSelectStaleSavedValue(selectElement) {
+    delete selectElement.dataset.staleSavedValue;
+    selectElement.querySelectorAll(STALE_OPTION_SELECTOR).forEach((option) => option.remove());
+    updateStaleSavedValueIndicator(selectElement);
+}
+
+function markSelectStaleSavedValue(selectElement, savedValue) {
+    if (!savedValue) return;
+
+    if (!optionValueExists(selectElement, savedValue)) {
+        appendStaleSavedOption(selectElement, savedValue);
+    }
+
+    selectElement.value = savedValue;
+    selectElement.dataset.staleSavedValue = 'true';
+    updateStaleSavedValueIndicator(selectElement);
+    debugLog(MODULE, `Preserved stale saved value "${savedValue}" with warning indicator`);
+}
+
+function handleCalculatedSelectChange(selectElement) {
+    const selectedOption = selectElement.options[selectElement.selectedIndex];
+    if (!selectedOption || selectedOption.dataset.staleSavedValue === 'true') {
+        if (selectElement.value) {
+            selectElement.dataset.staleSavedValue = 'true';
+            updateStaleSavedValueIndicator(selectElement);
+        }
+        return;
+    }
+
+    clearSelectStaleSavedValue(selectElement);
+}
+
+function attachStaleSavedValueListener(selectElement) {
+    if (selectElement.dataset.staleListenerAttached === 'true') {
+        return;
+    }
+    selectElement.dataset.staleListenerAttached = 'true';
+    selectElement.addEventListener('change', () => handleCalculatedSelectChange(selectElement));
 }
 
 async function refreshSelectOptions(selectElement, lookupListId, displayColumn, filters, dependencyIds) {
@@ -381,7 +660,7 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
     debugLog(MODULE, `Dependencies:`, dependencyIds);
 
     // Debug existing data availability
-    const fieldId = selectElement.id ? selectElement.id.replace('field-', '') : null;
+    const fieldId = resolveCalculatedSelectFieldId(selectElement);
     debugLog(MODULE, `🔍 Debugging existing data for field ${fieldId}:`);
     debugLog(MODULE, `window.existingData available:`, !!window.existingData);
     if (window.existingData && fieldId) {
@@ -411,48 +690,26 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
         url = new URL('/admin/plugins/emergency_operations/api/list-data', window.location.origin);
         debugLog(MODULE, `Emergency Operations URL: ${url.toString()}`);
 
-        // Better country detection - look for country fields more systematically
+        // Read plugin config stored on the element by the template (data-plugin-config)
+        let pluginConfig = {};
+        try {
+            const rawCfg = selectElement.dataset.pluginConfig || selectElement.closest('[data-plugin-config]')?.dataset.pluginConfig || '{}';
+            pluginConfig = JSON.parse(rawCfg);
+        } catch (_) { /* no-op */ }
+
+        // --- Country resolution ---
         let countryIso = null;
 
-        // First, try to find country from data-country-iso attribute (most reliable)
-        const countryIsoElement = document.querySelector('[data-country-iso]');
-        if (countryIsoElement && countryIsoElement.dataset.countryIso) {
-            countryIso = countryIsoElement.dataset.countryIso.trim().toUpperCase();
-            debugLog(MODULE, `Found country ISO from data-country-iso attribute: ${countryIso}`);
-        }
-
-        // If not found in data attribute, try to find country from field values
-        if (!countryIso) {
-            for (const [key, value] of Object.entries(fieldValues)) {
-                if (value && typeof value === 'string') {
-                    const trimmedValue = value.trim().toUpperCase();
-                    // Check if it's a valid ISO code (2 or 3 characters)
-                    if (trimmedValue.length === 2 || trimmedValue.length === 3) {
-                        countryIso = trimmedValue;
-                        debugLog(MODULE, `Found country ISO from field ${key}: ${countryIso}`);
-                        break;
-                    }
-                }
-            }
-        }
-
-        // If not found in field values, try to get from URL or page context
-        if (!countryIso) {
-            // Check if there's a country parameter in the URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const countryParam = urlParams.get('country') || urlParams.get('iso');
-            if (countryParam) {
-                countryIso = countryParam.toUpperCase();
-                debugLog(MODULE, `Found country ISO from URL: ${countryIso}`);
-            }
-
-            // Check if there's country info in the page context
-            if (!countryIso && window.countryInfo) {
-                countryIso = window.countryInfo.iso || window.countryInfo.iso3;
-                if (countryIso) {
-                    countryIso = countryIso.toUpperCase();
-                    debugLog(MODULE, `Found country ISO from page context: ${countryIso}`);
-                }
+        const countrySource = pluginConfig.emops_country_source || 'assigned';
+        if (countrySource === 'static' && pluginConfig.emops_static_country_iso) {
+            // Template designer pinned a specific country
+            countryIso = pluginConfig.emops_static_country_iso.trim().toUpperCase();
+            debugLog(MODULE, `Using static country ISO from plugin config: ${countryIso}`);
+        } else {
+            // Default: use the entity/assignment country from page metadata
+            countryIso = resolveAssignedCountryIso();
+            if (countryIso) {
+                debugLog(MODULE, `Found country ISO from assignment metadata: ${countryIso}`);
             }
         }
 
@@ -462,9 +719,53 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
             debugLog(MODULE, `No country ISO found, will return all operations`);
         }
 
-        // Add filters for emergency operations (operation types, etc.)
-        if (filters && filters.length > 0) {
-            url.searchParams.set('filters', JSON.stringify(filters));
+        // --- Timeframe resolution ---
+        const timeframeMode = pluginConfig.emops_timeframe_mode || 'static';
+
+        if (timeframeMode === 'assignment_period') {
+            // Derive dates from the assignment period (e.g. "Jan-Jun 2026" → year 2026)
+            const periodStr = (window.metadataContext && window.metadataContext.assignment_period) || '';
+            const yearMatch = periodStr.match(/\b(20\d{2})\b/);
+            if (yearMatch) {
+                const year = yearMatch[1];
+                // Include operations that were active at any point during the period year:
+                // end_date_gt = <year>-01-01 means "still active at the start of the period year"
+                url.searchParams.set('end_date__gte', `${year}-01-01`);
+                debugLog(MODULE, `Using assignment period year ${year} for timeframe filter`);
+            } else {
+                debugLog(MODULE, `Could not extract year from period "${periodStr}", no timeframe filter applied`);
+            }
+        } else {
+            // Static dates configured in the form builder
+            if (pluginConfig.emops_end_date_gt) {
+                url.searchParams.set('end_date__gte', pluginConfig.emops_end_date_gt);
+            }
+            // Note: start_date is not supported by the list-data endpoint directly;
+            // it is handled via the filters array below.
+        }
+
+        // Translate operation-type and show-closed plugin config into row filters
+        // (the list-data endpoint already processes a 'filters' JSON array)
+        const extraFilters = [];
+
+        const configTypes = pluginConfig.emops_operation_types;
+        if (configTypes) {
+            const types = Array.isArray(configTypes) ? configTypes : [configTypes];
+            const hasAll = types.includes('All');
+            if (!hasAll && types.length > 0) {
+                extraFilters.push({ field: 'type', op: 'eq', value: types[0] });
+            }
+        }
+
+        const showClosed = pluginConfig.emops_show_closed_operations;
+        if (showClosed === false || showClosed === '0' || showClosed === 0) {
+            extraFilters.push({ field: 'status', op: 'ne', value: 'Closed' });
+        }
+
+        // Merge with any existing row-level filters
+        const allFilters = [...extraFilters, ...(filters || [])];
+        if (allFilters.length > 0) {
+            url.searchParams.set('filters', JSON.stringify(allFilters));
         }
 
     } else if (lookupListId === 'reporting_currency') {
@@ -501,22 +802,10 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
     debugLog(MODULE, `URL params:`, Array.from(url.searchParams.entries()));
 
     try {
-        debugLog(MODULE, `📡 Making API call...`);
+        debugLog(MODULE, `📡 Making API call (or sharing cached/in-flight response)...`);
         debugLog(MODULE, '🌐 Fetching', url.toString());
 
-        const fetchFn = (window.getFetch && window.getFetch()) || fetch;
-        const response = await fetchFn(url.toString(), {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        });
-        debugLog(MODULE, `Response status: ${response.status} ${response.statusText}`);
-
-        if (!response.ok) {
-            debugError(MODULE, `❌ API call failed with status ${response.status}`);
-            debugWarn(MODULE, `Failed to fetch options for list ${lookupListId}: HTTP ${response.status}`);
-            return;
-        }
-
-        const json = await response.json();
+        const json = await cachedFetch(url.toString());
         debugLog(MODULE, `✅ API response received:`, json);
         debugLog(MODULE, '⬇️  API response', json);
 
@@ -538,7 +827,9 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
         // Get existing value using the fieldId we already have
         let existingValue = '';
 
-        if (fieldId && window.existingData) {
+        if (selectElement.dataset.pendingValue) {
+            existingValue = selectElement.dataset.pendingValue;
+        } else if (fieldId && window.existingData) {
             const existingDataKey = `field_value[${fieldId}]`;
             existingValue = window.existingData[existingDataKey] || '';
             debugLog(MODULE, `Existing saved value for field ${fieldId}:`, existingValue);
@@ -562,6 +853,9 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
                 const opt = document.createElement('option');
                 opt.value = val;
                 opt.textContent = val;
+                if (lookupListId === 'emergency_operations') {
+                    applyEmergencyRowToOption(opt, row, val);
+                }
                 selectElement.appendChild(opt);
                 debugLog(MODULE, `Added option ${idx + 1}: "${val}"`);
                 debugLog(MODULE, `   Added option ${idx + 1}:`, val);
@@ -573,9 +867,14 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
         debugLog(MODULE, `✅ Options refreshed. Total ${rows.length} rows, select now has ${selectElement.options.length - 1} options.`);
         debugLog(MODULE, `✅ Options refreshed. Total ${rows.length} rows, select now has ${selectElement.options.length - 1} options.`);
 
-        // Restore previous selection if still valid, otherwise reset
-        if (previousValue && Array.from(selectElement.options).some(o => o.value === previousValue)) {
+        // Restore previous selection if still valid, otherwise preserve stale saved values
+        if (previousValue && optionValueExists(selectElement, previousValue)) {
+            clearSelectStaleSavedValue(selectElement);
             setSelectValueRobust(selectElement, previousValue);
+            delete selectElement.dataset.pendingValue;
+            if (window.revealRepeatEntryTitleSelect) {
+                window.revealRepeatEntryTitleSelect(selectElement);
+            }
             debugLog(MODULE, `Restored previous selection: "${previousValue}"`);
             debugLog(MODULE, `✅ Restored previous selection: "${previousValue}"`);
 
@@ -603,17 +902,35 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
                     debugLog(MODULE, `✅ Value verification successful: "${actualValue}"`);
                 }
             }, 100);
-        } else {
-            selectElement.value = '';
-            debugLog(MODULE, `Reset to empty (previous value "${previousValue}" not available)`);
-            if (previousValue) {
-                debugLog(MODULE, `⚠️ Could not restore previous value "${previousValue}" - not in available options`);
-                debugLog(MODULE, `Available options for comparison:`, Array.from(selectElement.options).map(o => o.value));
+        } else if (previousValue) {
+            markSelectStaleSavedValue(selectElement, previousValue);
+            delete selectElement.dataset.pendingValue;
+            attachStaleSavedValueListener(selectElement);
+            if (window.revealRepeatEntryTitleSelect) {
+                window.revealRepeatEntryTitleSelect(selectElement);
             }
+            debugLog(MODULE, `⚠️ Saved value "${previousValue}" is not in current API options — preserved with warning`);
+        } else {
+            clearSelectStaleSavedValue(selectElement);
+            selectElement.value = '';
+            debugLog(MODULE, 'Reset to empty (no previous value)');
         }
+
+        if (window.applyUniqueSectionOptions) {
+            window.applyUniqueSectionOptions(selectElement.closest('[data-collapsible-id]') || document);
+        }
+
+        if (selectElement.dataset.useAsRepeatEntryTitle === 'true' && window.revealRepeatEntryTitleSelect) {
+            window.revealRepeatEntryTitleSelect(selectElement);
+        }
+
+        syncEmergencyOperationMetadata(selectElement);
     } catch (err) {
         debugError(MODULE, `❌ Exception during API call:`, err);
         debugWarn(MODULE, '❌ Exception while fetching options', err);
+        if (selectElement.dataset.useAsRepeatEntryTitle === 'true' && window.revealRepeatEntryTitleSelect) {
+            window.revealRepeatEntryTitleSelect(selectElement);
+        }
     }
 }
 
@@ -664,22 +981,10 @@ async function refreshMultiSelectOptions(multiSelectDiv, fieldId, lookupListId, 
     debugLog(MODULE, `Final API URL: ${url.toString()}`);
 
     try {
-        debugLog(MODULE, `📡 Making multi-select API call...`);
+        debugLog(MODULE, `📡 Making multi-select API call (or sharing cached/in-flight response)...`);
         debugLog(MODULE, '🌐 Fetching', url.toString());
 
-        const fetchFn = (window.getFetch && window.getFetch()) || fetch;
-        const response = await fetchFn(url.toString(), {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        });
-        debugLog(MODULE, `Response status: ${response.status} ${response.statusText}`);
-
-        if (!response.ok) {
-            debugError(MODULE, `❌ Multi-select API call failed with status ${response.status}`);
-            debugWarn(MODULE, `Failed to fetch options for list ${lookupListId}: HTTP ${response.status}`);
-            return;
-        }
-
-        const json = await response.json();
+        const json = await cachedFetch(url.toString());
         debugLog(MODULE, `✅ Multi-select API response received:`, json);
         debugLog(MODULE, '⬇️  API response', json);
 
@@ -769,6 +1074,10 @@ async function refreshMultiSelectOptions(multiSelectDiv, fieldId, lookupListId, 
 
         debugLog(MODULE, `✅ Multi-select options refreshed. Total ${rows.length} rows, dropdown now has ${dropdown.children.length} options.`);
         debugLog(MODULE, `✅ Multi-select options refreshed. Total ${rows.length} rows, dropdown now has ${dropdown.children.length} options.`);
+
+        if (window.applyUniqueSectionOptions) {
+            window.applyUniqueSectionOptions(multiSelectDiv.closest('[data-collapsible-id]') || document);
+        }
     } catch (err) {
         debugError(MODULE, `❌ Exception during multi-select API call:`, err);
         debugWarn(MODULE, '❌ Exception while fetching multi-select options', err);

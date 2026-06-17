@@ -101,6 +101,132 @@ export const CalculatedLists = {
 
         // Clear existing filters when list changes
         this.clearAllFilters();
+
+        // Load plugin config UI if the selected list supports it
+        this._loadPluginConfigUI(selectedOption, null);
+    },
+
+    // --- Plugin config UI (e.g. Emergency Operations) ---
+
+    /**
+     * Fetch and inject the plugin config UI for the selected list option.
+     * @param {HTMLOptionElement|null} selectedOption - The chosen <option> element
+     * @param {Object|null} existingConfig - Previously saved plugin config (for edit mode)
+     */
+    _loadPluginConfigUI: function(selectedOption, existingConfig) {
+        const container = Utils.getElementById('question-plugin-config-container');
+        const hiddenInput = Utils.getElementById('question-plugin-config-json');
+        if (!container) return;
+
+        // If populateForm placed a pending restore config (edit mode), use it instead of
+        // the null passed by handleListSelection so we fetch the UI with saved values
+        // and avoid a redundant second request.
+        const configToLoad = existingConfig
+            || (this._pendingRestoreConfig ? this._pendingRestoreConfig : null);
+        // Consume it (restorePluginConfig skipped when _pendingRestoreConfig is already used here)
+        this._pendingRestoreConfig = null;
+
+        // Version counter: each call increments it so a stale fetch response is ignored.
+        if (!this._configUIVersion) this._configUIVersion = 0;
+        const version = ++this._configUIVersion;
+
+        // Clear previous config UI and reset hidden input
+        container.replaceChildren();
+        if (hiddenInput) hiddenInput.value = '{}';
+
+        if (!selectedOption || !selectedOption.dataset.hasConfigUi) return;
+
+        const listId = selectedOption.value;
+        const configParam = configToLoad ? encodeURIComponent(JSON.stringify(configToLoad)) : '%7B%7D';
+        const url = `/api/forms/lookup-lists/${listId}/config-ui?config=${configParam}`;
+        console.debug('[PluginConfig] fetching config UI, restoring config ->', configToLoad);
+
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+                // Discard if a newer call has already started
+                if (this._configUIVersion !== version) return;
+                if (!data.success || !data.html) return;
+                container.innerHTML = data.html;
+
+                // Immediately sync the hidden input with whatever the server rendered
+                // (covers edit-mode restore where the user saves without changing anything)
+                this._serializePluginConfig(container);
+
+                // Wire up the JS handler exported by the plugin
+                const jsHandler = selectedOption.dataset.configJsHandler;
+                if (!jsHandler) return;
+
+                const updateCallback = () => this._serializePluginConfig(container);
+
+                const doSetup = (fn) => fn(container, updateCallback);
+
+                if (window[jsHandler]) {
+                    doSetup(window[jsHandler]);
+                } else {
+                    // Dynamic import for the EO plugin (same path matrix.js uses)
+                    import('/plugins/static/emergency_operations/js/matrix_config_handler.js')
+                        .then(mod => {
+                            if (mod[jsHandler]) doSetup(mod[jsHandler]);
+                        })
+                        .catch(err => console.warn('Failed to load plugin config JS handler:', err));
+                }
+            })
+            .catch(err => console.warn('Failed to fetch plugin config UI:', err));
+    },
+
+    /**
+     * Read all named inputs from the config container and write the result to the
+     * hidden #question-plugin-config-json input.
+     */
+    _serializePluginConfig: function(container) {
+        const hiddenInput = Utils.getElementById('question-plugin-config-json');
+        if (!hiddenInput || !container) return;
+
+        const config = {};
+        const inputs = container.querySelectorAll('input, select, textarea');
+
+        // Group checkboxes with the same name as arrays
+        const checkboxGroups = {};
+        inputs.forEach(input => {
+            const name = input.name;
+            if (!name) return;
+            if (input.type === 'checkbox') {
+                if (!checkboxGroups[name]) checkboxGroups[name] = [];
+                if (input.checked) checkboxGroups[name].push(input.value);
+            } else if (input.type === 'radio') {
+                if (input.checked) config[name] = input.value;
+            } else {
+                config[name] = input.value;
+            }
+        });
+
+        Object.assign(config, checkboxGroups);
+        hiddenInput.value = JSON.stringify(config);
+        console.debug('[PluginConfig] serialized ->', hiddenInput.value);
+    },
+
+    /**
+     * Get the current plugin config as a plain object (parsed from hidden input).
+     */
+    getPluginConfig: function() {
+        const hiddenInput = Utils.getElementById('question-plugin-config-json');
+        if (!hiddenInput || !hiddenInput.value) return {};
+        try { return JSON.parse(hiddenInput.value); } catch (_) { return {}; }
+    },
+
+    /**
+     * Restore the config UI for a list that was previously configured (edit mode).
+     * Should be called after the list select value is set.
+     * @param {Object} config - The saved plugin config object
+     */
+    restorePluginConfig: function(config) {
+        const listSelect = Utils.getElementById('item-calculated-list-select');
+        if (!listSelect) return;
+        const selectedOption = listSelect.selectedOptions && listSelect.selectedOptions[0];
+        if (selectedOption) {
+            this._loadPluginConfigUI(selectedOption, config);
+        }
     },
 
     // Add a new filter for calculated lists

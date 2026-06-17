@@ -174,6 +174,11 @@ def stream_response(
     safe_rel = _normalize_rel(rel_path)
     effective_mime = mimetype or _guess_mimetype(filename)
 
+    if not exists(category, safe_rel):
+        from werkzeug.exceptions import NotFound
+
+        raise NotFound()
+
     if _provider() == "azure_blob":
         name = _blob_name(category, safe_rel)
         container = _get_container_client()

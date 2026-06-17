@@ -755,6 +755,29 @@ class TestFormSection:
             section.set_max_entries(None)
             assert "max_entries" not in section.config
 
+    def test_entry_label_item_id_from_config(self, db_session, app):
+        with app.app_context():
+            template = create_test_template(db_session)
+            section = create_test_section(db_session, template)
+            section.config = {"entry_label_item_id": 42}
+            assert section.entry_label_item_id == 42
+
+    def test_set_entry_label_item_id(self, db_session, app):
+        with app.app_context():
+            template = create_test_template(db_session)
+            section = create_test_section(db_session, template)
+            section.config = {}
+            section.set_entry_label_item_id(12)
+            assert section.config["entry_label_item_id"] == 12
+
+    def test_set_entry_label_item_id_none_removes_key(self, db_session, app):
+        with app.app_context():
+            template = create_test_template(db_session)
+            section = create_test_section(db_session, template)
+            section.config = {"entry_label_item_id": 12}
+            section.set_entry_label_item_id(None)
+            assert "entry_label_item_id" not in section.config
+
     def test_set_max_entries_invalid_value(self, db_session, app):
         with app.app_context():
             template = create_test_template(db_session)
@@ -778,6 +801,23 @@ class TestFormSection:
             section.config = "invalid"
             section.set_max_entries(5)
             assert section.config["max_entries"] == 5
+
+    def test_hide_section_header_from_config(self, db_session, app):
+        with app.app_context():
+            template = create_test_template(db_session)
+            section = create_test_section(db_session, template)
+            section.config = {"hide_section_header": True}
+            assert section.hide_section_header is True
+
+    def test_set_hide_section_header(self, db_session, app):
+        with app.app_context():
+            template = create_test_template(db_session)
+            section = create_test_section(db_session, template)
+            section.config = {}
+            section.set_hide_section_header(True)
+            assert section.config["hide_section_header"] is True
+            section.set_hide_section_header(False)
+            assert "hide_section_header" not in section.config
 
     def test_repr(self, db_session, app):
         with app.app_context():

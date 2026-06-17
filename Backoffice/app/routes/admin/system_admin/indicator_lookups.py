@@ -105,6 +105,46 @@ def batch_unit_usage_counts(ids: list[int]) -> dict[int, int]:
     return counts
 
 
+def batch_sector_indicator_counts(ids: list[int]) -> dict[int, int]:
+    """Count IndicatorBank rows referencing each sector ID across primary/secondary/tertiary."""
+    if not ids:
+        return {}
+    id_set = set(ids)
+    counts: dict[int, int] = {i: 0 for i in ids}
+    for (sector_json,) in (
+        db.session.query(IndicatorBank.sector)
+        .filter(IndicatorBank.sector.isnot(None))
+        .all()
+    ):
+        if not sector_json or not isinstance(sector_json, dict):
+            continue
+        for level in ("primary", "secondary", "tertiary"):
+            sid = sector_json.get(level)
+            if sid in id_set:
+                counts[sid] = counts.get(sid, 0) + 1
+    return counts
+
+
+def batch_subsector_indicator_counts(ids: list[int]) -> dict[int, int]:
+    """Count IndicatorBank rows referencing each sub-sector ID across primary/secondary/tertiary."""
+    if not ids:
+        return {}
+    id_set = set(ids)
+    counts: dict[int, int] = {i: 0 for i in ids}
+    for (sub_sector_json,) in (
+        db.session.query(IndicatorBank.sub_sector)
+        .filter(IndicatorBank.sub_sector.isnot(None))
+        .all()
+    ):
+        if not sub_sector_json or not isinstance(sub_sector_json, dict):
+            continue
+        for level in ("primary", "secondary", "tertiary"):
+            ssid = sub_sector_json.get(level)
+            if ssid in id_set:
+                counts[ssid] = counts.get(ssid, 0) + 1
+    return counts
+
+
 def _wants_json_post() -> bool:
     return request.method == "POST" and is_json_request()
 

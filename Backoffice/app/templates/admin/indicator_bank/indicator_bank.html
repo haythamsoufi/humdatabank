@@ -909,12 +909,7 @@
                 return parts.join(' / ');
             },
             valueFormatter: function(params) {
-                // Return string value for valueFormatter
-                const parts = [];
-                if (params.data && params.data.sector_primary) parts.push(params.data.sector_primary);
-                if (params.data && params.data.sector_secondary) parts.push(params.data.sector_secondary);
-                if (params.data && params.data.sector_tertiary) parts.push(params.data.sector_tertiary);
-                return parts.length > 0 ? parts.join(' / ') : '';
+                return params.value || '';
             },
             cellRenderer: function(params) {
                 const parts = [];
@@ -948,12 +943,7 @@
                 return parts.join(' / ');
             },
             valueFormatter: function(params) {
-                // Return string value for valueFormatter
-                const parts = [];
-                if (params.data && params.data.subsector_primary) parts.push(params.data.subsector_primary);
-                if (params.data && params.data.subsector_secondary) parts.push(params.data.subsector_secondary);
-                if (params.data && params.data.subsector_tertiary) parts.push(params.data.subsector_tertiary);
-                return parts.length > 0 ? parts.join(' / ') : '';
+                return params.value || '';
             },
             cellRenderer: function(params) {
                 const parts = [];
@@ -1271,8 +1261,6 @@
             });
         });
 
-
-
         if (indicatorsToTranslate.length === 0) {
             window.autoTranslateModal.logProgress({{ _("No indicators found that need translation")|js }}, 'info');
             window.autoTranslateModal.translationState.isRunning = false;
@@ -1316,7 +1304,7 @@
         }
 
         const indicator = indicators[index];
-                const service = selectedService || 'ifrc';
+        const service = selectedService || 'ifrc';
 
         // Call the translation API
         const translationPayload = {
@@ -1328,7 +1316,6 @@
             target_languages: [indicator.language],
             translation_service: service
         };
-
 
         // Encode payload to avoid WAF false positives on indicator text/definitions.
         // Backend (api_auto_translate) already supports { payload: b64 }.
@@ -1382,7 +1369,7 @@
                 // Check if we have any translations to save
                 if (!hasTranslations) {
                     window.autoTranslateModal.translationState.errorCount++;
-                    window.autoTranslateModal.logProgress(`No translations received for indicator ${indicator.id}`, 'error');
+                    window.autoTranslateModal.logProgress({{ _('No translations received for indicator')|tojson|safe }} + ' ' + indicator.id, 'error');
                     window.autoTranslateModal.updateProgress();
                     setTimeout(() => processNextIndicator(indicators, index + 1, selectedLanguages, selectedService), 100);
                     return;
@@ -1868,8 +1855,6 @@
                 form.style.display = 'none';
 
                 // Add CSRF token
-                const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-
                 const csrfInput = document.createElement('input');
                 csrfInput.type = 'hidden';
                 csrfInput.name = 'csrf_token';
@@ -1960,8 +1945,8 @@
                 function _row(label, data) {
                     if (!data || (data.to_create === 0 && data.to_update === 0)) return '';
                     const parts = [];
-                    if (data.to_create > 0) parts.push('<span class="text-green-700 font-medium">' + data.to_create + ' new</span>');
-                    if (data.to_update > 0) parts.push('<span class="text-yellow-700 font-medium">' + data.to_update + ' update</span>');
+                    if (data.to_create > 0) parts.push('<span class="text-green-700 font-medium">' + data.to_create + ' ' + {{ _('new')|tojson|safe }} + '</span>');
+                    if (data.to_update > 0) parts.push('<span class="text-yellow-700 font-medium">' + data.to_update + ' ' + {{ _('update')|tojson|safe }} + '</span>');
                     return '<tr><td class="py-1.5 pr-4 font-medium text-gray-700 whitespace-nowrap">' + escapeHtml(label) + '</td>' +
                            '<td class="py-1.5 text-sm">' + parts.join('<span class="text-gray-400 mx-1">/</span>') + '</td></tr>';
                 }
@@ -2170,13 +2155,8 @@
                 });
             }
 
-            // Initialize actions dropdown - try immediately and also after a short delay
+            // Initialize actions dropdown (elements are server-rendered, always present)
             initializeActionsDropdown();
-
-            // Also try after a short delay in case elements are rendered dynamically
-            setTimeout(function() {
-                initializeActionsDropdown();
-            }, 100);
 
             // Confirm before deleting indicators (POST form)
             $(document).on('submit', '.delete-indicator-form', function(e) {
@@ -2186,6 +2166,9 @@
                     return true;
                 }
                 e.preventDefault();
+                const submitBtn = $form[0] ? $form[0].querySelector('[type="submit"]') : null;
+                if (submitBtn && submitBtn.disabled) return false;
+                if (submitBtn) submitBtn.disabled = true;
                 showModal({
                     title: {{ _('Delete')|tojson|safe }},
                     message: String(msg || ''),
@@ -2195,6 +2178,9 @@
                     onConfirm: function() {
                         $form.data('confirmed', true);
                         $form.trigger('submit');
+                    },
+                    onCancel: function() {
+                        if (submitBtn) submitBtn.disabled = false;
                     }
                 });
                 return false;
@@ -2267,18 +2253,6 @@
             if (tabId === 'spef' && window.spefLookupsGridApi) resizeGridApi(window.spefLookupsGridApi);
         }
 
-        function bindAutoTranslateForTab(tabId) {
-            var registry = window.indicatorBankAutoTranslate || {};
-            var entry = registry[tabId];
-            if (!entry && (tabId === 'types' || tabId === 'units')) {
-                entry = registry.measurement;
-            }
-            if (!entry) entry = registry.indicators;
-            if (!entry) return;
-            window.getPageSpecificTranslationCounts = entry.getCounts;
-            window.performPageSpecificTranslation = entry.perform;
-        }
-
         function mainTabPanel(tabId) {
             if (!tabId) return null;
             var el = document.getElementById('panel-' + tabId);
@@ -2322,7 +2296,6 @@
             }
             lazyInitGridsForTab(tabId);
             resizeGridsForTab(tabId);
-            bindAutoTranslateForTab(tabId);
             document.dispatchEvent(new CustomEvent('indicator-bank-tab-activated', { detail: { tab: tabId } }));
         }
 
@@ -2342,5 +2315,235 @@
         activateMainTab(initial);
     })();
     </script>
+
+    {# ── "Auto Translate All" — multi-section coordinator ─────────────────────
+       Extends the auto-translate modal with a "Sections to translate" selector
+       (all checked by default) and runs all selected sections sequentially.
+    #}
+    {% if can_edit_indicators %}
+    <script nonce="{{ csp_nonce() }}">
+    (function () {
+        'use strict';
+
+        // All sections that register an auto-translate handler on this page.
+        var IB_SECTIONS = [
+            { id: 'indicators',  label: {{ _('Indicators')|tojson|safe }} },
+            {% if can_manage_org %}
+            { id: 'sectors',     label: {{ _('Sectors & Subsectors')|tojson|safe }} },
+            {% endif %}
+            { id: 'measurement', label: {{ _('Types & Units')|tojson|safe }} },
+            { id: 'spef',       label: {{ _('SPs & EFs')|tojson|safe }} }
+        ];
+        var IB_LANGS = {{ TRANSLATABLE_LANGUAGES | tojson | safe }};
+
+        var _selectorInjected = false;
+        var _sectionListenersBound = false;
+
+        // Inject a "Sections to translate" card as the first card in the modal stack.
+        function injectSectionSelector() {
+            if (_selectorInjected) return;
+            var stack = document.querySelector('#confirmation-section .autotrans-stack');
+            if (!stack) return;
+            _selectorInjected = true;
+
+            var checkboxes = IB_SECTIONS.map(function (s) {
+                return '<label style="display:flex;align-items:center;gap:8px;padding:8px;'
+                    + 'background:#fff;border-radius:6px;border:1px solid #e5e7eb;cursor:pointer;">'
+                    + '<input type="checkbox" class="ib-section-checkbox" value="' + s.id + '" '
+                    + 'style="border-radius:4px;border-color:#d1d5db;accent-color:#4f46e5;" checked>'
+                    + '<span style="font-size:0.875rem;font-weight:500;color:#374151;">' + s.label + '</span>'
+                    + '</label>';
+            }).join('');
+
+            var card = document.createElement('div');
+            card.id = 'ib-section-selector-card';
+            card.className = 'autotrans-card bg-gray-50 rounded-lg';
+            card.innerHTML =
+                '<div class="autotrans-card-head flex items-center">'
+                + '<i class="fas fa-layer-group text-indigo-600 flex-shrink-0" aria-hidden="true"></i>'
+                + '<span class="font-medium">' + {{ _('Sections to translate')|tojson|safe }} + '</span>'
+                + '<div class="ml-auto" style="display:flex;gap:8px;">'
+                + '<button type="button" id="ib-section-select-all"'
+                + ' class="text-xs font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline">'
+                + {{ _('All')|tojson|safe }} + '</button>'
+                + '<button type="button" id="ib-section-deselect-all"'
+                + ' class="text-xs font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:underline">'
+                + {{ _('None')|tojson|safe }} + '</button>'
+                + '</div>'
+                + '</div>'
+                + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">'
+                + checkboxes
+                + '</div>';
+
+            stack.insertBefore(card, stack.firstChild);
+
+            if (!_sectionListenersBound) {
+                _sectionListenersBound = true;
+                card.addEventListener('change', function (e) {
+                    if (e.target && e.target.classList.contains('ib-section-checkbox')) {
+                        refreshIndicatorBankLanguageCounts();
+                    }
+                });
+                document.getElementById('ib-section-select-all').addEventListener('click', function () {
+                    card.querySelectorAll('.ib-section-checkbox').forEach(function (cb) { cb.checked = true; });
+                    refreshIndicatorBankLanguageCounts();
+                });
+                document.getElementById('ib-section-deselect-all').addEventListener('click', function () {
+                    card.querySelectorAll('.ib-section-checkbox').forEach(function (cb) { cb.checked = false; });
+                    refreshIndicatorBankLanguageCounts();
+                });
+            }
+        }
+
+        // Checked section IDs only. Before the selector exists, assume all sections.
+        function getSelectedSectionIds() {
+            var card = document.getElementById('ib-section-selector-card');
+            if (!card) {
+                return IB_SECTIONS.map(function (s) { return s.id; });
+            }
+            var result = [];
+            card.querySelectorAll('.ib-section-checkbox:checked').forEach(function (cb) {
+                result.push(cb.value);
+            });
+            return result;
+        }
+
+        // Aggregate translation counts from selected sections only (one shared context).
+        function combinedGetCounts(overwriteExisting) {
+            var registry = window.indicatorBankAutoTranslate || {};
+            var totals = {};
+            IB_LANGS.forEach(function (lang) { totals[lang] = 0; });
+            getSelectedSectionIds().forEach(function (id) {
+                var entry = registry[id];
+                if (!entry) return;
+                try {
+                    var c = entry.getCounts(overwriteExisting);
+                    Object.keys(c).forEach(function (lang) {
+                        if (!Object.prototype.hasOwnProperty.call(totals, lang)) {
+                            totals[lang] = 0;
+                        }
+                        totals[lang] += (parseInt(c[lang], 10) || 0);
+                    });
+                } catch (e) {
+                    console.error('IB translate-all: getCounts error for section', id, e);
+                }
+            });
+            return totals;
+        }
+
+        function refreshIndicatorBankLanguageCounts() {
+            if (typeof window.getPageSpecificTranslationCounts !== 'function') return;
+            if (!window.autoTranslateModal || typeof window.autoTranslateModal.updateLanguageCounts !== 'function') {
+                return;
+            }
+            var overwriteExisting = typeof jQuery !== 'undefined'
+                && jQuery('#overwrite-existing-translations').is(':checked');
+            var counts = window.getPageSpecificTranslationCounts(overwriteExisting);
+            window.autoTranslateModal.updateLanguageCounts(counts);
+        }
+
+        // Run each selected section sequentially, chaining via notifyCompletion.
+        function combinedPerform(selectedLanguages, selectedService) {
+            var registry = window.indicatorBankAutoTranslate || {};
+            var sectionsToRun = getSelectedSectionIds()
+                .map(function (id) {
+                    var meta = null;
+                    IB_SECTIONS.forEach(function (s) { if (s.id === id) meta = s; });
+                    return { id: id, label: (meta && meta.label) || id, entry: registry[id] };
+                })
+                .filter(function (s) { return !!s.entry; });
+
+            var am = window.autoTranslateModal;
+
+            if (!sectionsToRun.length) {
+                if (am) {
+                    am.logProgress({{ _('No sections selected for translation.')|tojson|safe }}, 'info');
+                    am.translationState.isRunning = false;
+                }
+                jQuery('#auto-translate-pause-btn, #auto-translate-resume-btn, #auto-translate-stop-btn').addClass('hidden');
+                jQuery('#auto-translate-close-btn').removeClass('hidden');
+                return;
+            }
+
+            var sectionIndex = 0;
+            var multiSection = sectionsToRun.length > 1;
+
+            function runNextSection() {
+                am = window.autoTranslateModal;
+                if (!am) return;
+
+                var stopped = am.translationState.shouldStop;
+                var allDone  = sectionIndex >= sectionsToRun.length;
+
+                if (stopped || allDone) {
+                    am.translationState.isRunning = false;
+                    if (allDone && !stopped && multiSection) {
+                        am.logProgress({{ _('All sections completed.')|tojson|safe }}, 'success');
+                    }
+                    jQuery('#auto-translate-pause-btn, #auto-translate-resume-btn, #auto-translate-stop-btn').addClass('hidden');
+                    jQuery('#auto-translate-close-btn').removeClass('hidden');
+                    if (typeof am.notifyCompletion === 'function') am.notifyCompletion();
+                    return;
+                }
+
+                var sec = sectionsToRun[sectionIndex];
+                sectionIndex++;
+
+                if (multiSection) {
+                    am.logProgress('\u2500\u2500 ' + sec.label + ' \u2500\u2500', 'info');
+                }
+
+                // Intercept window.autoTranslateModal.notifyCompletion to chain the next section.
+                // Each section's internal processNext… reads this at call time, so patching it
+                // here is the canonical way to hook into the completion lifecycle.
+                var origNotify = am.notifyCompletion;
+                am.notifyCompletion = function () {
+                    am = window.autoTranslateModal;
+                    if (am) am.notifyCompletion = origNotify;
+
+                    var moreSections = sectionIndex < sectionsToRun.length;
+                    var wasStopped   = am && am.translationState.shouldStop;
+
+                    if (!moreSections || wasStopped) {
+                        // Last section done (or user stopped) — hand off to final completion.
+                        runNextSection();
+                        return;
+                    }
+
+                    // More sections remain — re-arm the progress UI and continue after a brief pause.
+                    if (am) am.translationState.isRunning = true;
+                    jQuery('#auto-translate-close-btn').addClass('hidden');
+                    jQuery('#auto-translate-stop-btn, #auto-translate-pause-btn').removeClass('hidden');
+                    jQuery('#auto-translate-resume-btn').addClass('hidden');
+                    setTimeout(runNextSection, 350);
+                };
+
+                sec.entry.perform(selectedLanguages, selectedService);
+            }
+
+            runNextSection();
+        }
+
+        function bindCombinedHandlers() {
+            window.getPageSpecificTranslationCounts = combinedGetCounts;
+            window.performPageSpecificTranslation   = combinedPerform;
+        }
+
+        // Always use combined handlers on this page (sections + languages share one context).
+        bindCombinedHandlers();
+
+        // Use capture phase so this fires before auto-translate.js opens the modal:
+        // inject the section selector and refresh counts for the current selection.
+        var btn = document.getElementById('auto-translate-all-btn');
+        if (btn) {
+            btn.addEventListener('click', function () {
+                injectSectionSelector();
+                bindCombinedHandlers();
+                refreshIndicatorBankLanguageCounts();
+            }, true);
+        }
+    })();
+    </script>
+    {% endif %}
 
 {% endblock %}

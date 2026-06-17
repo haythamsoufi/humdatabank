@@ -12,10 +12,12 @@
  */
 
 import { debugLog, debugWarn, debugError } from './debug.js';
+import { initRepeatEntryNavigation, syncRepeatEntryNavigation, syncAllRepeatEntryNavigation } from './repeat-entry-nav.js';
 import { updateFieldVisibility } from './field-management.js';
 import { applyLayoutToContainer } from './layout.js';
 import { setupNumberInputFormatting } from './formatting.js';
 import { reinitializeDisaggregationCalculator } from './disaggregation-calculator.js';
+import { setupPerEntryDynamicInterface } from './dynamic-indicators.js';
 
 /**
  * Parse a field value that might contain data availability flags in various formats
@@ -56,9 +58,331 @@ function parseFieldDataWithAvailability(fieldData) {
     return { value: fieldValue, dataNotAvailable, notApplicable };
 }
 
+function getRepeatEntryLabelItemId(sectionId) {
+    const sectionContainer = document.getElementById(`section-container-${sectionId}`);
+    if (!sectionContainer) return null;
+    const raw = sectionContainer.getAttribute('data-entry-label-item-id');
+    if (!raw) return null;
+    const parsed = parseInt(raw, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+}
+
+function getDefaultRepeatEntryLabel(instanceNumber) {
+    const entryWord = window.REPEAT_SECTION_LABELS?.entry || 'Entry';
+    return `${entryWord} #${instanceNumber}`;
+}
+
+function getFieldDisplayValueForRepeatLabel(repeatEntry, itemId) {
+    const fieldBlock = repeatEntry.querySelector(`[data-item-id="${itemId}"]`);
+    if (!fieldBlock) return '';
+
+    const select = fieldBlock.querySelector('select');
+    if (select && select.value) {
+        const selectedOption = select.options[select.selectedIndex];
+        return (selectedOption ? selectedOption.text : select.value).trim();
+    }
+
+    const checkedRadio = fieldBlock.querySelector('input[type="radio"]:checked');
+    if (checkedRadio) {
+        const radioLabel = fieldBlock.querySelector(`label[for="${checkedRadio.id}"]`);
+        if (radioLabel) return radioLabel.textContent.trim();
+        return String(checkedRadio.value || '').trim();
+    }
+
+    const yesCheckbox = fieldBlock.querySelector('input[type="checkbox"][value="yes"]');
+    const noCheckbox = fieldBlock.querySelector('input[type="checkbox"][value="no"]');
+    if (yesCheckbox && noCheckbox) {
+        if (yesCheckbox.checked) return yesCheckbox.getAttribute('data-label-yes') || 'Yes';
+        if (noCheckbox.checked) return noCheckbox.getAttribute('data-label-no') || 'No';
+        return '';
+    }
+
+    const valueInput = fieldBlock.querySelector(
+        'input[type="text"], input[type="number"], input[type="date"], input[type="datetime-local"], textarea'
+    );
+    if (valueInput && valueInput.value) {
+        return valueInput.value.trim();
+    }
+
+    return '';
+}
+
+function formatRepeatEntryLabel(sectionId, instanceNumber, repeatEntry) {
+    const labelItemId = getRepeatEntryLabelItemId(sectionId);
+    if (labelItemId) {
+        const value = getFieldDisplayValueForRepeatLabel(repeatEntry, labelItemId);
+        if (value) return value;
+    }
+    return getDefaultRepeatEntryLabel(instanceNumber);
+}
+
+function updateRepeatEntryLabel(repeatEntry, sectionId, instanceNumber, savedLabel = '') {
+    const labelEl = repeatEntry.querySelector('.repeat-entry__label');
+    if (!labelEl) return;
+
+    // Title-dropdown mode: the select itself is the label — do not overwrite with text
+    if (repeatEntry.querySelector('select[data-use-as-repeat-entry-title="true"]')) {
+        return;
+    }
+
+    const defaultLabel = getDefaultRepeatEntryLabel(instanceNumber);
+    const dynamicLabel = formatRepeatEntryLabel(sectionId, instanceNumber, repeatEntry);
+
+    let displayLabel = dynamicLabel;
+    if (dynamicLabel === defaultLabel && savedLabel) {
+        displayLabel = String(savedLabel).trim();
+    }
+
+    const isCustom = displayLabel !== defaultLabel;
+    labelEl.textContent = displayLabel;
+    labelEl.classList.toggle('repeat-entry__label--custom', isCustom);
+    const sectionMatch = repeatEntry.id?.match(/^repeat-entry-(\d+)-\d+$/);
+    if (sectionMatch) {
+        syncRepeatEntryNavigation(sectionMatch[1]);
+    }
+}
+
+function bindRepeatEntryLabelListeners(repeatEntry, sectionId, instanceNumber) {
+    const labelItemId = getRepeatEntryLabelItemId(sectionId);
+    const titleSelect = repeatEntry.querySelector('select[data-use-as-repeat-entry-title="true"]');
+    if (titleSelect) {
+        titleSelect.addEventListener('change', () => syncRepeatEntryNavigation(sectionId));
+        return;
+    }
+    if (!labelItemId) return;
+
+    const fieldBlock = repeatEntry.querySelector(`[data-item-id="${labelItemId}"]`);
+    if (!fieldBlock) return;
+
+    const handler = () => updateRepeatEntryLabel(repeatEntry, sectionId, instanceNumber);
+    fieldBlock.querySelectorAll('input, select, textarea').forEach((el) => {
+        el.addEventListener('change', handler);
+        el.addEventListener('input', handler);
+    });
+}
+
+/**
+ * Move a single-choice field configured as repeat entry title into the entry header
+ * and hide the original field block in the entry body.
+ */
+function getRepeatInstanceFieldValue(sectionId, instanceNumber, fieldId) {
+    const groups = window.REPEAT_GROUPS_DATA || {};
+    const sectionData = groups[String(sectionId)] ?? groups[sectionId];
+    if (!sectionData) return null;
+    const instance = sectionData[instanceNumber] ?? sectionData[String(instanceNumber)];
+    if (!instance) return null;
+    const fieldData = instance.data || instance;
+    const raw = fieldData[String(fieldId)] ?? fieldData[fieldId];
+    if (raw == null) return null;
+    if (typeof raw === 'object' && raw !== null && 'value' in raw) return raw.value;
+    return raw;
+}
+
+function purgeRepeatInstanceData(sectionId, instanceNumber) {
+    const groups = window.REPEAT_GROUPS_DATA;
+    if (!groups) return;
+    const sectionData = groups[String(sectionId)] ?? groups[sectionId];
+    if (!sectionData) return;
+    delete sectionData[instanceNumber];
+    delete sectionData[String(instanceNumber)];
+}
+
+function setRepeatEntryTitleLoading(repeatEntry, loading) {
+    const wrap = repeatEntry?.querySelector('.repeat-entry__title-select-wrap');
+    const select = wrap?.querySelector('select.repeat-entry__title-select');
+    if (!select) return;
+
+    select.classList.toggle('repeat-entry__title-select--loading', loading);
+
+    if (loading) {
+        if (!select.dataset.loadingWasDisabled) {
+            select.dataset.loadingWasDisabled = select.disabled ? 'true' : 'false';
+        }
+        select.disabled = true;
+    } else {
+        select.disabled = select.dataset.loadingWasDisabled === 'true';
+        delete select.dataset.loadingWasDisabled;
+    }
+
+    const placeholder = select.querySelector('option[value=""]');
+    if (loading) {
+        if (placeholder) {
+            if (!select.dataset.loadingPlaceholderOriginal) {
+                select.dataset.loadingPlaceholderOriginal = placeholder.textContent;
+            }
+            placeholder.textContent = window.REPEAT_SECTION_LABELS?.loading || 'Loading...';
+        }
+        select.setAttribute('aria-busy', 'true');
+    } else {
+        if (placeholder && select.dataset.loadingPlaceholderOriginal) {
+            placeholder.textContent = select.dataset.loadingPlaceholderOriginal;
+            delete select.dataset.loadingPlaceholderOriginal;
+        }
+        select.removeAttribute('aria-busy');
+    }
+}
+
+function revealRepeatEntryTitleSelect(select) {
+    if (!select || select.dataset.useAsRepeatEntryTitle !== 'true') return;
+    const repeatEntry = select.closest('.repeat-entry');
+    if (!repeatEntry) return;
+
+    setRepeatEntryTitleLoading(repeatEntry, false);
+    repeatEntry.classList.remove('repeat-entry--hydrating');
+
+    const match = repeatEntry.id?.match(/^repeat-entry-(\d+)-\d+$/);
+    if (match) {
+        syncRepeatEntryNavigation(match[1]);
+    }
+}
+
+function restoreTitleSelectToFieldBlock(repeatEntry) {
+    const titleSelect = repeatEntry.querySelector('select[data-use-as-repeat-entry-title="true"]');
+    if (!titleSelect) return;
+
+    const fieldBlock = repeatEntry.querySelector(
+        `.form-item-block[data-item-id="${titleSelect.dataset.fieldItemId}"]`
+    );
+    if (!fieldBlock || fieldBlock.contains(titleSelect)) return;
+
+    fieldBlock.appendChild(titleSelect);
+    titleSelect.classList.remove('repeat-entry__title-select');
+}
+
+function finalizeRepeatEntryDeletion(sectionId, instanceNumber) {
+    // Emergency-metadata hidden inputs are appended directly to the <form> element (not
+    // inside the repeat entry element), so they survive repeatEntry.remove().  Remove them
+    // explicitly here so they don't fool the server into thinking the deleted entry was
+    // still submitted, which would prevent the backend's orphan-removal from deleting it.
+    const form = document.querySelector('form');
+    if (form) {
+        const prefix = `repeat_${sectionId}_${instanceNumber}_field_`;
+        form.querySelectorAll('input[type="hidden"]').forEach(hidden => {
+            if (hidden.name.startsWith(prefix) && hidden.name.endsWith('_emergency_metadata')) {
+                hidden.remove();
+            }
+        });
+    }
+
+    purgeRepeatInstanceData(sectionId, instanceNumber);
+    updateRepeatLimitText(sectionId);
+    syncRepeatEntryNavigation(sectionId);
+
+    const sectionEl = document.getElementById(`section-container-${sectionId}`);
+    if (sectionEl && window.applyUniqueSectionOptions) {
+        window.applyUniqueSectionOptions(sectionEl);
+    }
+}
+
+function setupRepeatEntryTitleDropdown(repeatEntry, sectionId, instanceNumber) {
+    const titleSelect = repeatEntry.querySelector('select[data-use-as-repeat-entry-title="true"]');
+    if (!titleSelect) return;
+
+    const fieldBlock = titleSelect.closest('.form-item-block[data-item-id]');
+    const labelEl = repeatEntry.querySelector('.repeat-entry__label');
+    if (!labelEl) return;
+
+    if (fieldBlock) {
+        fieldBlock.classList.add('repeat-entry-title-field--hidden');
+        fieldBlock.setAttribute('data-repeat-entry-title-field', 'true');
+    }
+
+    let titleWrap = labelEl.querySelector('.repeat-entry__title-select-wrap');
+    if (!titleWrap) {
+        titleWrap = document.createElement('div');
+        titleWrap.className = 'repeat-entry__title-select-wrap';
+        labelEl.replaceChildren(titleWrap);
+        labelEl.classList.add('repeat-entry__label--title-dropdown');
+        labelEl.classList.remove('repeat-entry__label--custom');
+    }
+
+    titleSelect.classList.add('repeat-entry__title-select');
+    titleSelect.classList.remove('mt-1', 'block', 'w-full', 'shadow-sm', 'py-2', 'px-3', 'border', 'border-gray-300', 'rounded-md', 'sm:text-sm', 'bg-white', 'bg-yellow-100', 'border-yellow-300', 'bg-blue-50', 'border-blue-300');
+    if (titleSelect.parentElement !== titleWrap) {
+        titleWrap.appendChild(titleSelect);
+    }
+
+    refreshRepeatEntryTitleDropdownLayout(repeatEntry);
+
+    const fieldItemId = titleSelect.dataset.fieldItemId;
+    const savedValue = getRepeatInstanceFieldValue(sectionId, instanceNumber, fieldItemId);
+    const pendingValue = titleSelect.dataset.pendingValue;
+    const awaitingSavedValue = (!!pendingValue || !!savedValue) && !titleSelect.value;
+
+    if (awaitingSavedValue) {
+        repeatEntry.classList.add('repeat-entry--hydrating');
+        setRepeatEntryTitleLoading(repeatEntry, true);
+        if (titleSelect.dataset.optionsSource === 'calculated') {
+            if (savedValue && !pendingValue) {
+                titleSelect.dataset.pendingValue = savedValue;
+            }
+            if (window.refreshCalculatedSelect) {
+                window.refreshCalculatedSelect(titleSelect);
+            }
+        }
+    } else if (!titleSelect.value) {
+        // New empty entry — show entry number as placeholder
+        const placeholder = titleSelect.querySelector('option[value=""]');
+        if (placeholder && (!placeholder.textContent.trim() || placeholder.textContent.trim() === 'Select...')) {
+            placeholder.textContent = getDefaultRepeatEntryLabel(instanceNumber);
+        }
+        setRepeatEntryTitleLoading(repeatEntry, false);
+        repeatEntry.classList.remove('repeat-entry--hydrating');
+        if (titleSelect.dataset.optionsSource === 'calculated' && window.refreshCalculatedSelect) {
+            window.refreshCalculatedSelect(titleSelect);
+        }
+    } else {
+        setRepeatEntryTitleLoading(repeatEntry, false);
+        repeatEntry.classList.remove('repeat-entry--hydrating');
+    }
+}
+
+/**
+ * Adjust repeat-entry layout when a title dropdown is used:
+ * - constrain header width
+ * - remove redundant dividers when the body has no visible fields
+ */
+function refreshRepeatEntryTitleDropdownLayout(repeatEntry) {
+    const titleSelect = repeatEntry.querySelector('select[data-use-as-repeat-entry-title="true"]');
+    const header = repeatEntry.querySelector('.repeat-entry__header');
+    const fieldsContainer = repeatEntry.querySelector(':scope > .space-y-4');
+
+    const visibleFieldBlocks = fieldsContainer
+        ? Array.from(fieldsContainer.querySelectorAll('.form-item-block'))
+            .filter(block => !block.classList.contains('repeat-entry-title-field--hidden'))
+        : [];
+
+    const hasTitleDropdown = !!titleSelect;
+    const titleOnly = hasTitleDropdown && visibleFieldBlocks.length === 0;
+
+    repeatEntry.classList.toggle('repeat-entry--title-dropdown', hasTitleDropdown);
+    repeatEntry.classList.toggle('repeat-entry--title-dropdown-only', titleOnly);
+    if (header) {
+        header.classList.toggle('repeat-entry__header--title-dropdown', hasTitleDropdown);
+        header.classList.toggle('repeat-entry__header--title-dropdown-only', titleOnly);
+    }
+    if (fieldsContainer) {
+        fieldsContainer.classList.toggle('repeat-entry__fields--empty', titleOnly);
+    }
+}
+
+function setupAllRepeatEntryTitleDropdowns(scope) {
+    const root = scope || document;
+    root.querySelectorAll('.repeat-entry').forEach((repeatEntry) => {
+        const sectionId = repeatEntry.id.match(/^repeat-entry-(\d+)-\d+$/)?.[1];
+        const instanceNumber = parseInt(repeatEntry.getAttribute('data-repeat-instance') || '1', 10);
+        if (sectionId) {
+            setupRepeatEntryTitleDropdown(repeatEntry, sectionId, instanceNumber);
+        }
+    });
+}
+
 export function initRepeatSections() {
     setupRepeatSections();
     loadExistingRepeatData();
+    setupAllRepeatEntryTitleDropdowns();
+    initRepeatEntryNavigation();
+    window.revealRepeatEntryTitleSelect = revealRepeatEntryTitleSelect;
 }
 
 function setupRepeatSections() {
@@ -184,42 +508,74 @@ function createInitialRepeatEntries() {
 }
 
 /**
+ * Return the effective max entries imposed by single-choice questions that have
+ * `data-limit-entries-to-option-count="true"`.  Counts the total number of
+ * non-empty options in the first occurrence of each such field (the full option
+ * list is the same across all entries; disabled/hidden options count toward the
+ * total because they represent slots that are already taken).
+ *
+ * Returns null when no such questions exist in this section.
+ *
+ * @param {string} sectionId
+ * @returns {number|null}
+ */
+function getOptionCountLimit(sectionId) {
+    const repeatContainer = document.getElementById(`repeat-entries-${sectionId}`);
+    if (!repeatContainer) return null;
+
+    let min = null;
+    const seenFieldIds = new Set();
+
+    repeatContainer.querySelectorAll('select[data-limit-entries-to-option-count="true"]').forEach(sel => {
+        const fieldId = sel.getAttribute('data-field-item-id');
+        // Only count each distinct field once (same field appears in every entry)
+        if (fieldId && seenFieldIds.has(fieldId)) return;
+        if (fieldId) seenFieldIds.add(fieldId);
+
+        const count = Array.from(sel.options).filter(opt => opt.value !== '').length;
+        if (count > 0) {
+            min = min === null ? count : Math.min(min, count);
+        }
+    });
+
+    return min;
+}
+
+/**
  * Update the max entries limit text display
  * @param {string} sectionId - The section ID
  */
 function updateRepeatLimitText(sectionId) {
     const limitTextElement = document.getElementById(`repeat-limit-text-${sectionId}`);
-    if (!limitTextElement) {
-        return; // No limit text element found
-    }
+    if (!limitTextElement) return;
 
     const sectionContainer = document.getElementById(`section-container-${sectionId}`);
-    if (!sectionContainer) {
-        return;
-    }
-
-    const maxEntries = sectionContainer.getAttribute('data-max-entries');
-    if (!maxEntries) {
-        return; // No max entries limit set
-    }
-
-    const maxEntriesNum = parseInt(maxEntries, 10);
-    if (isNaN(maxEntriesNum)) {
-        return;
-    }
+    if (!sectionContainer) return;
 
     const repeatContainer = document.getElementById(`repeat-entries-${sectionId}`);
-    if (!repeatContainer) {
-        return;
+    if (!repeatContainer) return;
+
+    // Determine effective max: minimum of the hard section max and the option-count limit
+    let effectiveMax = null;
+    const maxEntriesAttr = sectionContainer.getAttribute('data-max-entries');
+    if (maxEntriesAttr) {
+        const n = parseInt(maxEntriesAttr, 10);
+        if (!isNaN(n)) effectiveMax = n;
     }
+    const optMax = getOptionCountLimit(sectionId);
+    if (optMax !== null) {
+        effectiveMax = effectiveMax !== null ? Math.min(effectiveMax, optMax) : optMax;
+    }
+
+    if (effectiveMax === null) return; // No limit to display
 
     const currentEntries = repeatContainer.querySelectorAll('.repeat-entry').length;
 
     // Update text to show current/max format
-    limitTextElement.textContent = `Max entries: ${currentEntries}/${maxEntriesNum}`;
+    limitTextElement.textContent = `Max entries: ${currentEntries}/${effectiveMax}`;
 
     // Add visual indicator if limit is reached
-    if (currentEntries >= maxEntriesNum) {
+    if (currentEntries >= effectiveMax) {
         limitTextElement.classList.add('text-red-600', 'font-semibold');
         limitTextElement.classList.remove('text-gray-500');
     } else {
@@ -231,31 +587,154 @@ function updateRepeatLimitText(sectionId) {
 function addRepeatEntry(sectionId) {
     debugLog('repeat-sections', `Adding repeat entry for section ${sectionId}`);
 
-    // Check max entries limit
+    const repeatContainer = document.getElementById(`repeat-entries-${sectionId}`);
+    const currentEntries = repeatContainer ? repeatContainer.querySelectorAll('.repeat-entry').length : 0;
+
+    // Check hard max-entries limit from section config
     const sectionContainer = document.getElementById(`section-container-${sectionId}`);
     if (sectionContainer) {
         const maxEntries = sectionContainer.getAttribute('data-max-entries');
         if (maxEntries) {
             const maxEntriesNum = parseInt(maxEntries, 10);
-            if (!isNaN(maxEntriesNum)) {
-                const repeatContainer = document.getElementById(`repeat-entries-${sectionId}`);
-                if (repeatContainer) {
-                    const currentEntries = repeatContainer.querySelectorAll('.repeat-entry').length;
-                    if (currentEntries >= maxEntriesNum) {
-                        debugWarn('repeat-sections', `Cannot add more entries: reached maximum of ${maxEntriesNum}`);
-                        const msg = `Maximum number of entries (${maxEntriesNum}) has been reached for this repeat group.`;
-                        if (window.showAlert) window.showAlert(msg, 'warning');
-                        else (window.__clientWarn || console.warn)(msg);
-                        return;
-                    }
-                }
+            if (!isNaN(maxEntriesNum) && currentEntries >= maxEntriesNum) {
+                debugWarn('repeat-sections', `Cannot add more entries: reached maximum of ${maxEntriesNum}`);
+                const msg = `Maximum number of entries (${maxEntriesNum}) has been reached for this repeat group.`;
+                if (window.showAlert) window.showAlert(msg, 'warning');
+                else (window.__clientWarn || console.warn)(msg);
+                return;
             }
         }
+    }
+
+    // Check option-count limit: single-choice questions with limit_entries_to_option_count
+    const optMax = getOptionCountLimit(sectionId);
+    if (optMax !== null && currentEntries >= optMax) {
+        debugWarn('repeat-sections', `Cannot add more entries: all ${optMax} options are already allocated.`);
+        const msg = `All available options are already in use. The number of entries cannot exceed ${optMax} (the number of options in this section).`;
+        if (window.showAlert) window.showAlert(msg, 'warning');
+        else (window.__clientWarn || console.warn)(msg);
+        return;
     }
 
     createRepeatEntry(sectionId, false); // false = not initial entry
     updateRepeatLimitText(sectionId); // Update limit display after adding
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dynamic-indicator sub-section helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Return all [data-section-type="dynamic_indicators"] containers that are
+ * DIRECT children of the given repeat-section container (not nested deeper).
+ */
+function findDynamicIndicatorSubSections(sectionContainer) {
+    const candidates = Array.from(
+        sectionContainer.querySelectorAll('[data-section-type="dynamic_indicators"]')
+    );
+    return candidates.filter(el => {
+        let parent = el.parentElement;
+        while (parent && parent !== sectionContainer) {
+            if (parent.hasAttribute('data-section-type')) return false; // nested deeper
+            parent = parent.parentElement;
+        }
+        return true;
+    });
+}
+
+/**
+ * Build a lightweight per-entry dynamic-indicator widget for repeat Entry #N.
+ * This mirrors the structure expected by dynamic-indicators.js (compound IDs).
+ */
+function createPerEntryDynamicWidget(sectionId, instanceNumber, aesId, sectionLabel = '') {
+    const wrapper = document.createElement('div');
+    wrapper.id = `section-container-${sectionId}-ri-${instanceNumber}`;
+    wrapper.setAttribute('data-section-type', 'dynamic_indicators');
+    wrapper.setAttribute('data-dynamic-section-id', sectionId);
+    wrapper.setAttribute('data-repeat-instance', instanceNumber);
+    wrapper.className = 'pt-4 sm:pt-6 border-t border-gray-300 mt-4 sm:mt-6 scroll-mt-20';
+
+    // Section title heading (mirrors the server-rendered <h4> for the original sub-section)
+    if (sectionLabel) {
+        const heading = document.createElement('h4');
+        heading.className = 'text-base sm:text-lg font-semibold mb-3 sm:mb-4 pb-3 sm:pb-4 border-b text-gray-700 flex items-center';
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-indent w-4 h-4 mr-3 text-gray-500';
+        const label = document.createElement('span');
+        label.className = 'text-gray-600 font-medium';
+        label.textContent = sectionLabel;
+        heading.appendChild(icon);
+        heading.appendChild(label);
+        wrapper.appendChild(heading);
+    }
+
+    // Content container — mirrors the collapsible-content-sub-N div from the server-rendered
+    // Entry #1 (which has space-y-3 sm:space-y-4 pl-3 sm:pl-6). injectExistingRepeatIndicators
+    // uses ifaceEl.parentNode.insertBefore(), so placing iface inside this container ensures
+    // injected indicators land here and inherit its space-y-3 spacing.
+    const contentContainer = document.createElement('div');
+    contentContainer.className = 'space-y-3 sm:space-y-4 pl-3 sm:pl-6';
+
+    // Interface container
+    const iface = document.createElement('div');
+    iface.id = `dynamic-indicator-interface-${sectionId}-ri-${instanceNumber}`;
+    iface.setAttribute('data-aes-id', aesId || '');
+    iface.className = 'mt-2';
+
+    const rows = document.createElement('div');
+    rows.id = `dynamic-indicator-rows-${sectionId}-ri-${instanceNumber}`;
+    rows.className = 'space-y-3';
+    iface.appendChild(rows);
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'flex items-center justify-end mt-4';
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.id = `add-indicator-row-btn-${sectionId}-ri-${instanceNumber}`;
+    addBtn.className = 'btn btn-success';
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-plus mr-2';
+    addBtn.appendChild(icon);
+    addBtn.appendChild(document.createTextNode(
+        (window.DYNAMIC_INDICATORS_LABELS || {}).addIndicator || 'Add Indicator'
+    ));
+    btnRow.appendChild(addBtn);
+    iface.appendChild(btnRow);
+
+    contentContainer.appendChild(iface);
+    wrapper.appendChild(contentContainer);
+    return wrapper;
+}
+
+/**
+ * Inject pre-rendered HTML for indicators that were previously saved for a
+ * specific (sectionId, instanceNumber) combination.
+ */
+function injectExistingRepeatIndicators(containerEl, sectionId, instanceNumber) {
+    const allData = window.REPEAT_DYNAMIC_INDICATOR_DATA || {};
+    const sectionData = allData[sectionId] || allData[String(sectionId)] || {};
+    const items = sectionData[instanceNumber] || sectionData[String(instanceNumber)] || [];
+    if (!items.length) return;
+
+    // Insert items before the interface element (the Add-Indicator button row)
+    const ifaceEl = containerEl.querySelector('[id^="dynamic-indicator-interface-"]');
+    items.forEach(item => {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(item.html.trim(), 'text/html');
+        const el = doc.body.firstElementChild;
+        if (!el) return;
+        if (ifaceEl) {
+            // insertBefore requires a direct-child reference; ifaceEl may be nested
+            // inside a collapsible wrapper, so use its own parentNode
+            ifaceEl.parentNode.insertBefore(el, ifaceEl);
+        } else {
+            containerEl.appendChild(el);
+        }
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function createRepeatEntry(sectionId, isInitialEntry = false) {
     // Get the section container
@@ -279,8 +758,21 @@ function createRepeatEntry(sectionId, isInitialEntry = false) {
     // Find fields to use
     let fieldsToUse;
     if (isInitialEntry) {
-        // Initial entry: move original fields
-        fieldsToUse = Array.from(sectionContainer.querySelectorAll('.form-item-block:not([data-repeat-instance]):not(.layout-ignore .form-item-block):not(.layout-ignore)'));
+        // Initial entry: move original fields that belong directly to this section.
+        // Exclude .form-item-block elements that are inside nested sub-section containers
+        // (e.g. dynamic_indicators sub-sections), since those must stay in their own
+        // section container and should not be treated as repeat entry fields.
+        const allFormItemBlocks = Array.from(sectionContainer.querySelectorAll('.form-item-block:not([data-repeat-instance]):not(.layout-ignore .form-item-block):not(.layout-ignore)'));
+        fieldsToUse = allFormItemBlocks.filter(field => {
+            let parent = field.parentElement;
+            while (parent && parent !== sectionContainer) {
+                if (parent.hasAttribute('data-section-type')) {
+                    return false; // inside a nested sub-section — exclude
+                }
+                parent = parent.parentElement;
+            }
+            return true;
+        });
         debugLog('repeat-sections', `Initial entry: Moving ${fieldsToUse.length} original fields to Entry #1`);
     } else {
         // Subsequent entries: clone from Entry #1
@@ -289,7 +781,19 @@ function createRepeatEntry(sectionId, isInitialEntry = false) {
             debugError('repeat-sections', `Entry #1 not found for cloning`);
             return;
         }
-        fieldsToUse = Array.from(firstEntry.querySelectorAll('.form-item-block'));
+        // Title-dropdown selects live in the header; restore to field blocks before cloning
+        restoreTitleSelectToFieldBlock(firstEntry);
+        // Apply the same sub-section exclusion as the initial-entry path: skip any
+        // .form-item-block that lives inside a nested [data-section-type] element
+        // (e.g. a dynamic_indicators sub-section that has its own cloning logic).
+        fieldsToUse = Array.from(firstEntry.querySelectorAll('.form-item-block')).filter(field => {
+            let parent = field.parentElement;
+            while (parent && parent !== firstEntry) {
+                if (parent.hasAttribute('data-section-type')) return false;
+                parent = parent.parentElement;
+            }
+            return true;
+        });
         debugLog('repeat-sections', `Adding entry: Cloning ${fieldsToUse.length} fields from Entry #1`);
     }
 
@@ -300,26 +804,23 @@ function createRepeatEntry(sectionId, isInitialEntry = false) {
 
     // Create new repeat entry container
     const repeatEntry = document.createElement('div');
-        repeatEntry.className = 'repeat-entry border-2 border-green-200 rounded-lg p-3 sm:p-4 bg-green-50 mb-4';
+    repeatEntry.classList.add('repeat-entry', 'scroll-mt-20');
     repeatEntry.id = `repeat-entry-${sectionId}-${instanceNumber}`;
     repeatEntry.setAttribute('data-repeat-instance', instanceNumber);
 
     // Add header with entry number and delete button
     const header = document.createElement('div');
-    header.className = 'flex items-center justify-between mb-4 pb-2 border-b border-green-300';
+    header.className = 'repeat-entry__header';
 
     const entryLabel = document.createElement('h5');
-    entryLabel.className = 'font-semibold text-green-800 flex items-center';
-    const icon = document.createElement('i');
-    icon.className = 'fas fa-copy w-4 h-4 mr-2';
-    entryLabel.appendChild(icon);
+    entryLabel.className = 'repeat-entry__label';
     entryLabel.appendChild(document.createTextNode(`${window.REPEAT_SECTION_LABELS?.entry || 'Entry'} #${instanceNumber}`));
 
     const deleteButton = document.createElement('button');
     deleteButton.type = 'button';
-    deleteButton.className = 'btn btn-danger btn-icon';
+    deleteButton.className = 'w-5 h-5 flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors repeat-entry-delete-btn';
     const deleteIcon = document.createElement('i');
-    deleteIcon.className = 'fas fa-trash w-4 h-4';
+    deleteIcon.className = 'fas fa-trash';
     deleteButton.appendChild(deleteIcon);
     deleteButton.title = window.REPEAT_SECTION_LABELS?.deleteThisEntry || 'Delete this entry';
     deleteButton.addEventListener('click', function() {
@@ -330,7 +831,7 @@ function createRepeatEntry(sectionId, isInitialEntry = false) {
                 () => {
                     repeatEntry.remove();
                     debugLog('repeat-sections', `Deleted repeat entry #${instanceNumber} for section ${sectionId}`);
-                    updateRepeatLimitText(sectionId); // Update limit display after removing
+                    finalizeRepeatEntryDeletion(sectionId, instanceNumber);
                 },
                 null,
                 'Delete',
@@ -343,7 +844,7 @@ function createRepeatEntry(sectionId, isInitialEntry = false) {
                 () => {
                     repeatEntry.remove();
                     debugLog('repeat-sections', `Deleted repeat entry #${instanceNumber} for section ${sectionId}`);
-                    updateRepeatLimitText(sectionId); // Update limit display after removing
+                    finalizeRepeatEntryDeletion(sectionId, instanceNumber);
                 },
                 null,
                 'Delete',
@@ -392,6 +893,47 @@ function createRepeatEntry(sectionId, isInitialEntry = false) {
     });
 
     repeatEntry.appendChild(fieldsContainer);
+
+    // ── Dynamic-indicator sub-sections ──────────────────────────────────────
+    // When the repeat section contains a dynamic_indicators sub-section, each
+    // repeat entry needs its own indicator pool.
+    if (isInitialEntry) {
+        // Move the original sub-section containers INTO Entry #1 and tag them.
+        const dynSubSections = findDynamicIndicatorSubSections(sectionContainer);
+        dynSubSections.forEach(subSection => {
+            subSection.setAttribute('data-repeat-instance', '1');
+            repeatEntry.appendChild(subSection);
+            // Inject any existing DB indicators for instance 1
+            const subSectionId = subSection.id.replace('section-container-', '');
+            injectExistingRepeatIndicators(subSection, subSectionId, 1);
+        });
+    } else {
+        // For Entry #2+ find the originating sub-sections via Entry #1 as a reference.
+        const entry1 = repeatContainer.querySelector('.repeat-entry[data-repeat-instance="1"]');
+        if (entry1) {
+            const dynSubSections1 = Array.from(
+                entry1.querySelectorAll('[data-section-type="dynamic_indicators"]')
+            );
+            dynSubSections1.forEach(refSection => {
+                const subSectionId = refSection.getAttribute('data-dynamic-section-id')
+                    || refSection.id.replace('section-container-', '').replace(/-ri-\d+$/, '');
+                const aesId = refSection.querySelector('[data-aes-id]')?.getAttribute('data-aes-id')
+                    || refSection.getAttribute('data-aes-id')
+                    || document.querySelector('[data-aes-id]')?.getAttribute('data-aes-id')
+                    || '';
+                // Grab the section label from Entry #1's heading to replicate the title
+                const sectionLabel = refSection.querySelector('h4 span.font-medium')?.textContent?.trim() || '';
+                const widget = createPerEntryDynamicWidget(subSectionId, instanceNumber, aesId, sectionLabel);
+                repeatEntry.appendChild(widget);
+                // Inject existing DB indicators for this instance
+                injectExistingRepeatIndicators(widget, subSectionId, instanceNumber);
+                // Wire up the "Add Indicator" button
+                setupPerEntryDynamicInterface(widget, subSectionId, instanceNumber);
+            });
+        }
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     repeatContainer.appendChild(repeatEntry);
 
     // Apply layout to the newly created repeat entry
@@ -405,11 +947,31 @@ function createRepeatEntry(sectionId, isInitialEntry = false) {
     // Reinitialize all form features for the repeat entry
     reinitializeFormFeatures(repeatEntry);
 
+    setupRepeatEntryTitleDropdown(repeatEntry, sectionId, instanceNumber);
+    if (!isInitialEntry) {
+        const entryOne = repeatContainer.querySelector('.repeat-entry[data-repeat-instance="1"]');
+        if (entryOne) {
+            setupRepeatEntryTitleDropdown(entryOne, sectionId, 1);
+        }
+    }
+    updateRepeatEntryLabel(repeatEntry, sectionId, instanceNumber);
+    bindRepeatEntryLabelListeners(repeatEntry, sectionId, instanceNumber);
+
+    if (window.applyUniqueSectionOptions) {
+        const sectionEl = repeatEntry.closest('[id^="section-container-"]')
+            || repeatEntry.closest('[data-collapsible-id]');
+        if (sectionEl) {
+            window.applyUniqueSectionOptions(sectionEl);
+        }
+    }
+
     if (isInitialEntry) {
         debugLog('repeat-sections', `✅ Created initial Entry #${instanceNumber} for section ${sectionId}`);
     } else {
         debugLog('repeat-sections', `✅ Added repeat entry #${instanceNumber} for section ${sectionId}`);
     }
+
+    syncRepeatEntryNavigation(sectionId);
 }
 
 function updateRepeatFieldAttributes(fieldElement, sectionId, instanceNumber, fieldIndex, originalField) {
@@ -787,6 +1349,7 @@ function clearFieldValues(fieldElement) {
             case 'select-one':
             case 'select-multiple':
                 input.selectedIndex = 0; // Reset to first option (usually empty/default)
+                delete input.dataset.pendingValue; // Clear any data-pending-value cloned from the source entry
                 debugLog('repeat-sections', `📋 Reset select ${input.name} to first option`);
                 break;
             default:
@@ -986,16 +1549,20 @@ function loadExistingRepeatData() {
                                 }
                             } else if (input.type === 'select-one') {
                                 input.selectedIndex = 0;
+                                delete input.dataset.pendingValue; // Clear any data-pending-value cloned from the source entry
                             } else {
                                 input.value = '';
                             }
                         });
                     });
                 }
+                updateRepeatEntryLabel(currentEntry, sectionId, instanceNumber, instanceData.label || '');
+                bindRepeatEntryLabelListeners(currentEntry, sectionId, instanceNumber);
                 return;
             }
 
             debugLog('repeat-sections', `📋 Loading ${Object.keys(fieldData).length} field values into repeat entry`);
+            setupRepeatEntryTitleDropdown(currentEntry, sectionId, instanceNumber);
             Object.entries(fieldData).forEach(([fieldId, fieldData]) => {
                 // Parse field data using unified utility function
                 const { value: fieldValue, dataNotAvailable, notApplicable } = parseFieldDataWithAvailability(fieldData);
@@ -1040,17 +1607,71 @@ function loadExistingRepeatData() {
                     }
                 });
             }
+
+            setupRepeatEntryTitleDropdown(currentEntry, sectionId, instanceNumber);
+            updateRepeatEntryLabel(currentEntry, sectionId, instanceNumber, instanceData.label || '');
+            bindRepeatEntryLabelListeners(currentEntry, sectionId, instanceNumber);
         });
 
         // Update limit text display after loading existing data
         updateRepeatLimitText(sectionId);
+
+        // Reveal any entries that had no saved title value (shouldn't stay hidden)
+        repeatContainer.querySelectorAll('.repeat-entry--hydrating').forEach(entry => {
+            const titleSelect = entry.querySelector('select[data-use-as-repeat-entry-title="true"]');
+            if (!titleSelect?.dataset.pendingValue) {
+                revealRepeatEntryTitleSelect(titleSelect);
+            }
+        });
+
+        syncRepeatEntryNavigation(sectionId);
     });
+}
+
+/**
+ * Convert emergency-operation {name, code} metadata or corrupted saved values into a select display string.
+ */
+function coerceEmergencyOperationDisplayValue(value) {
+    if (value == null) return value;
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed === '[object Object]' || trimmed.includes('"name":"[object Object]"')) {
+            return '';
+        }
+        if (trimmed.startsWith('{') && trimmed.includes('"name"')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (parsed && typeof parsed === 'object' && !parsed.mode) {
+                    return coerceEmergencyOperationDisplayValue(parsed);
+                }
+            } catch (_) {
+                // keep original string
+            }
+        }
+        return value;
+    }
+    if (typeof value !== 'object') return value;
+    if (value.mode && value.values) return value;
+    if (value.data_not_available !== undefined || value.not_applicable !== undefined) {
+        return coerceEmergencyOperationDisplayValue(value.value);
+    }
+    if ('name' in value || 'code' in value) {
+        const name = String(value.name ?? '').trim();
+        const code = String(value.code ?? '').trim();
+        if (name === '[object Object]') return '';
+        if (!name && !code) return '';
+        return code ? `${name} (${code})` : name;
+    }
+    return value;
 }
 
 /**
  * Set select value with fallback to text matching if value doesn't match
  */
 function setSelectValueWithFallback(select, valueToSet) {
+    if (valueToSet && typeof valueToSet === 'object') {
+        valueToSet = coerceEmergencyOperationDisplayValue(valueToSet);
+    }
     if (!valueToSet) {
         select.value = '';
         return;
@@ -1077,16 +1698,48 @@ function setSelectValueWithFallback(select, valueToSet) {
         if (foundOption) {
             select.value = foundOption.value;
             debugLog('repeat-sections', `✅ Found matching option by text, set value to: ${foundOption.value}`);
+        } else if (select.dataset.optionsSource === 'calculated' && window.preserveCalculatedSelectStaleValue) {
+            window.preserveCalculatedSelectStaleValue(select, valueToSet);
+            debugLog('repeat-sections', `✅ Preserved stale calculated-list value "${valueToSet}"`);
         } else {
             debugLog('repeat-sections', `❌ Could not find option matching "${valueToSet}"`);
             debugLog('repeat-sections', `📋 Available options (first 10):`,
                 options.slice(0, 10).map(opt => `"${opt.value}" (text: "${opt.textContent.trim()}")`).join(', '));
-            // Reset to original value if we couldn't find a match
             select.value = originalValue;
         }
     } else {
         debugLog('repeat-sections', `✅ Set select value: ${valueToSet} in ${select.name}`);
     }
+
+    if (select.dataset.useAsRepeatEntryTitle === 'true' && select.value) {
+        revealRepeatEntryTitleSelect(select);
+    }
+}
+
+/**
+ * Find inputs for a repeat field, including title-dropdown selects moved to the entry header.
+ */
+function findRepeatFieldInputs(repeatEntry, fieldEl, fieldId) {
+    const inputs = Array.from(fieldEl.querySelectorAll('input, select, textarea'));
+    const titleSelect = repeatEntry.querySelector(
+        `select[data-use-as-repeat-entry-title="true"][data-field-item-id="${fieldId}"]`
+    );
+    if (titleSelect && !inputs.includes(titleSelect)) {
+        return [titleSelect, ...inputs];
+    }
+    return inputs;
+}
+
+function findRepeatFieldSelects(repeatEntry, fieldEl, fieldId, sectionId, repeatNumber) {
+    const inField = Array.from(
+        fieldEl.querySelectorAll(`select[name*="repeat_${sectionId}_${repeatNumber}"]`)
+    );
+    if (inField.length > 0) return inField;
+
+    const titleSelect = repeatEntry.querySelector(
+        `select[data-use-as-repeat-entry-title="true"][data-field-item-id="${fieldId}"]`
+    );
+    return titleSelect ? [titleSelect] : [];
 }
 
 function loadFieldValue(repeatEntry, fieldId, fieldValue, sectionId, instanceNumber, dataNotAvailable = false, notApplicable = false) {
@@ -1120,24 +1773,27 @@ function loadFieldValue(repeatEntry, fieldId, fieldValue, sectionId, instanceNum
             // Unified format with embedded data availability flags
             valueToSet = parsedData.value;
             debugLog('repeat-sections', `🔧 Object format detected - extracted value: ${valueToSet}`);
-        } else {
-            // Check if this might be matrix data (rowId_column keys)
-            const hasColumnKeys = Object.keys(parsedData).some(key =>
-                (typeof key === 'string') &&
-                !key.startsWith('_') &&
-                (key.includes('_Column ') || key.includes('Column') || key.includes('_'))
-            );
-
-            if (hasColumnKeys) {
-                // This is likely matrix data - keep as object to handle specially
-                debugLog('repeat-sections', `🔷 Detected potential matrix data with column keys`);
-                valueToSet = fieldValue; // Keep as object for matrix handling
             } else {
-                // Other object data - treat as simple value
-                valueToSet = fieldValue;
-                debugLog('repeat-sections', `📋 Object without mode/values or data availability flags, using as simple value`);
+                // Check if this might be matrix data (rowId_column keys)
+                const hasColumnKeys = Object.keys(parsedData).some(key =>
+                    (typeof key === 'string') &&
+                    !key.startsWith('_') &&
+                    (key.includes('_Column ') || key.includes('Column') || key.includes('_'))
+                );
+
+                if (hasColumnKeys) {
+                    // This is likely matrix data - keep as object to handle specially
+                    debugLog('repeat-sections', `🔷 Detected potential matrix data with column keys`);
+                    valueToSet = fieldValue; // Keep as object for matrix handling
+                } else if ('name' in parsedData || 'code' in parsedData) {
+                    valueToSet = coerceEmergencyOperationDisplayValue(parsedData);
+                    debugLog('repeat-sections', `📋 Emergency operation metadata converted to display value: ${valueToSet}`);
+                } else {
+                    // Other object data - treat as simple value
+                    valueToSet = fieldValue;
+                    debugLog('repeat-sections', `📋 Object without mode/values or data availability flags, using as simple value`);
+                }
             }
-        }
     } else if (typeof fieldValue === 'string' && fieldValue.startsWith('{')) {
         // Field value is a JSON string that needs parsing
         try {
@@ -1156,7 +1812,7 @@ function loadFieldValue(repeatEntry, fieldId, fieldValue, sectionId, instanceNum
                 debugLog('repeat-sections', `🔧 Unified format detected - extracted value: ${valueToSet}`);
             } else {
                 // Other JSON data - use as simple value
-                valueToSet = fieldValue;
+                valueToSet = coerceEmergencyOperationDisplayValue(parsedData);
                 debugLog('repeat-sections', `📋 JSON data without mode/values or data availability flags, using as simple value: ${valueToSet}`);
             }
         } catch (e) {
@@ -1166,15 +1822,16 @@ function loadFieldValue(repeatEntry, fieldId, fieldValue, sectionId, instanceNum
     } else {
         // Simple value
         debugLog('repeat-sections', `📄 Simple value (not JSON): ${fieldValue}`);
+        valueToSet = coerceEmergencyOperationDisplayValue(fieldValue);
 
         // For checkboxes, handle yes/no values
-        if (fieldValue === 'yes' || fieldValue === 'no') {
+        if (valueToSet === 'yes' || valueToSet === 'no') {
             debugLog('repeat-sections', `☑️ Detected checkbox value: ${fieldValue}`);
         }
     }
 
-    // Find all inputs in this field
-    const inputs = field.querySelectorAll('input, select, textarea');
+    // Find all inputs in this field (including title-dropdown selects in the header)
+    const inputs = findRepeatFieldInputs(repeatEntry, field, fieldId);
     debugLog('repeat-sections', `🔍 Found ${inputs.length} inputs in field ${fieldId}`);
 
     // Detect the actual repeat entry number from input names (it might differ from instanceNumber)
@@ -1349,7 +2006,7 @@ function loadFieldValue(repeatEntry, fieldId, fieldValue, sectionId, instanceNum
 
         } else {
             // Check if this is a select field (single choice)
-            const selectInputs = field.querySelectorAll(`select[name*="repeat_${sectionId}_${actualRepeatNumber}"]`);
+            const selectInputs = findRepeatFieldSelects(repeatEntry, field, fieldId, sectionId, actualRepeatNumber);
             if (selectInputs.length > 0) {
                 debugLog('repeat-sections', `📋 Found ${selectInputs.length} select inputs for single choice field`);
                 selectInputs.forEach(select => {
@@ -1364,35 +2021,44 @@ function loadFieldValue(repeatEntry, fieldId, fieldValue, sectionId, instanceNum
                         select.dataset.pendingValue = valueToSet;
 
                         // If options are already loaded, try to set the value now
-                        if (select.options.length > 1) { // More than just the placeholder
+                        if (select.options.length > 1) {
                             setSelectValueWithFallback(select, valueToSet);
                             delete select.dataset.pendingValue;
                         } else {
+                            if (select.dataset.useAsRepeatEntryTitle === 'true') {
+                                repeatEntry.classList.add('repeat-entry--hydrating');
+                                setRepeatEntryTitleLoading(repeatEntry, true);
+                            }
+
                             // Options not loaded yet - try to trigger refresh if available
                             if (window.refreshCalculatedSelect && typeof window.refreshCalculatedSelect === 'function') {
                                 debugLog('repeat-sections', `🔄 Triggering calculated list refresh for ${select.id || select.name}`);
                                 window.refreshCalculatedSelect(select);
                             }
 
-                            // Poll for options to be loaded (with timeout)
-                            let attempts = 0;
-                            const maxAttempts = 20; // 2 seconds total (20 * 100ms)
-                            const checkInterval = setInterval(() => {
-                                attempts++;
+                            // Use MutationObserver to detect when options are injected (event-driven,
+                            // avoids the fixed-timeout race when multiple selects load concurrently).
+                            let safetyTimer;
+                            const observer = new MutationObserver(() => {
                                 if (select.options.length > 1) {
-                                    // Options are now loaded
-                                    clearInterval(checkInterval);
+                                    observer.disconnect();
+                                    clearTimeout(safetyTimer);
                                     setSelectValueWithFallback(select, valueToSet);
                                     delete select.dataset.pendingValue;
-                                    debugLog('repeat-sections', `✅ Options loaded after ${attempts} attempts, value set`);
-                                } else if (attempts >= maxAttempts) {
-                                    // Timeout - try to set anyway (might work if options are there but not detected)
-                                    clearInterval(checkInterval);
-                                    setSelectValueWithFallback(select, valueToSet);
-                                    delete select.dataset.pendingValue;
-                                    debugLog('repeat-sections', `⚠️ Timeout waiting for options, attempted to set value anyway`);
+                                    revealRepeatEntryTitleSelect(select);
+                                    debugLog('repeat-sections', `✅ Options loaded (MutationObserver), value set`);
                                 }
-                            }, 100);
+                            });
+                            observer.observe(select, { childList: true });
+
+                            // Safety fallback: if options never arrive within 10 s, give up gracefully
+                            safetyTimer = setTimeout(() => {
+                                observer.disconnect();
+                                setSelectValueWithFallback(select, valueToSet);
+                                delete select.dataset.pendingValue;
+                                revealRepeatEntryTitleSelect(select);
+                                debugLog('repeat-sections', `⚠️ Safety timeout (10 s) waiting for options, attempted to set value anyway`);
+                            }, 10000);
                         }
                     } else {
                         // Regular select - set value directly

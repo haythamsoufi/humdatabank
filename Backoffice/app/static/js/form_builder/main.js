@@ -643,16 +643,32 @@ function initializeSectionManagement() {
         sectionForm.addEventListener('submit', async function(e) {
             e.preventDefault();
 
+            // Prevent concurrent submissions: discard any click that arrives while a save is in-flight.
+            if (sectionForm.dataset.submitting === '1') return;
+            sectionForm.dataset.submitting = '1';
+
             const submitButton = this.querySelector('button[type="submit"]');
+            const originalBtnHtml = submitButton ? submitButton.innerHTML : '';
+            const originalBtnClass = submitButton ? submitButton.className : '';
+
             if (submitButton) {
                 submitButton.disabled = true;
                 submitButton.replaceChildren();
                 {
                     const icon = document.createElement('i');
                     icon.className = 'fas fa-spinner fa-spin mr-2';
-                    submitButton.append(icon, document.createTextNode('Processing...'));
+                    submitButton.append(icon, document.createTextNode('Saving...'));
                 }
             }
+
+            const resetButton = () => {
+                sectionForm.dataset.submitting = '0';
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalBtnHtml;
+                    submitButton.className = originalBtnClass;
+                }
+            };
 
             try {
                 const payload = window.formDataToJson ? window.formDataToJson(sectionForm) : null;
@@ -693,10 +709,7 @@ function initializeSectionManagement() {
                 window.location.reload();
             } catch (err) {
                 console.error('Section save failed:', err);
-                if (submitButton) {
-                    submitButton.disabled = false;
-                    submitButton.textContent = 'Save';
-                }
+                resetButton();
             }
         });
     }
@@ -730,6 +743,9 @@ function initializeSectionManagement() {
                 const maxDynamicIndicators = dataset.maxDynamicIndicators;
                 const addIndicatorNote = dataset.addIndicatorNote;
                 const maxEntries = dataset.maxEntries;
+                const entryLabelItemId = dataset.entryLabelItemId;
+                const showEntriesInNavigation = dataset.showEntriesInNavigation === 'true';
+                const hideSectionHeader = dataset.hideSectionHeader === 'true';
                 const nameTranslations = dataset.nameTranslations;
                 const relevanceCondition = dataset.relevanceCondition;
 
@@ -744,6 +760,9 @@ function initializeSectionManagement() {
                     max_dynamic_indicators: maxDynamicIndicators,
                     add_indicator_note: addIndicatorNote,
                     max_entries: maxEntries,
+                    entry_label_item_id: entryLabelItemId,
+                    show_entries_in_navigation: showEntriesInNavigation,
+                    hide_section_header: hideSectionHeader,
                     name_translations: nameTranslations,
                     relevance_condition: relevanceCondition
                 });
@@ -1385,6 +1404,60 @@ function showAddDocumentFieldModal(sectionId, sectionName) {
     }
 }
 
+const ENTRY_LABEL_ELIGIBLE_TYPES = new Set([
+    'text', 'textarea', 'number', 'percentage', 'yesno',
+    'single_choice', 'date', 'datetime',
+]);
+
+function populateRepeatEntryLabelItemSelect(sectionId, selectedItemId) {
+    const select = document.getElementById('section-entry-label-item-id');
+    if (!select) return;
+
+    const defaultLabel = select.querySelector('option[value=""]')?.textContent
+        || 'Entry number (Entry #1, Entry #2, …)';
+    select.replaceChildren();
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = '';
+    defaultOpt.textContent = defaultLabel;
+    select.appendChild(defaultOpt);
+
+    if (!sectionId) {
+        select.value = '';
+        return;
+    }
+
+    const sectionsDataEl = document.getElementById('sections-with-items-data');
+    if (!sectionsDataEl) return;
+
+    let sectionsData = [];
+    try {
+        sectionsData = JSON.parse(sectionsDataEl.textContent);
+    } catch (_e) {
+        return;
+    }
+
+    const section = sectionsData.find((s) => String(s.id) === String(sectionId));
+    if (!section) return;
+
+    (section.form_items || [])
+        .filter((item) => !item.archived
+            && item.item_type === 'question'
+            && ENTRY_LABEL_ELIGIBLE_TYPES.has((item.type || '').toLowerCase()))
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .forEach((item) => {
+            const opt = document.createElement('option');
+            opt.value = String(item.item_id);
+            opt.textContent = item.label || `Item ${item.item_id}`;
+            select.appendChild(opt);
+        });
+
+    if (selectedItemId) {
+        select.value = String(selectedItemId);
+    }
+}
+
+window.populateRepeatEntryLabelItemSelect = populateRepeatEntryLabelItemSelect;
+
 function showSectionModal(mode, sectionData = null) {
     const modal = Utils.getElementById('section-modal');
     const form = Utils.getElementById('section-form');
@@ -1581,11 +1654,21 @@ function showSectionModal(mode, sectionData = null) {
         // Hide max_entries field for new sections
         const maxEntriesContainer = Utils.getElementById('repeat-group-config');
         const maxEntriesInput = Utils.getElementById('section-max-entries-input');
+        const entryLabelItemSelect = document.getElementById('section-entry-label-item-id');
         if (maxEntriesContainer) {
             Utils.hideElement(maxEntriesContainer);
         }
         if (maxEntriesInput) {
             maxEntriesInput.value = '';
+        }
+        populateRepeatEntryLabelItemSelect(null, null);
+        const showEntriesNavCheckbox = document.getElementById('section-show-entries-in-nav');
+        if (showEntriesNavCheckbox) {
+            showEntriesNavCheckbox.checked = false;
+        }
+        const hideSectionHeaderCheckbox = document.getElementById('section-hide-header');
+        if (hideSectionHeaderCheckbox) {
+            hideSectionHeaderCheckbox.checked = false;
         }
 
         // Clear relevance condition
@@ -1667,16 +1750,33 @@ function showSectionModal(mode, sectionData = null) {
         if (maxEntriesContainer && maxEntriesInput) {
             if (radioValue === 'repeat') {
                 Utils.showElement(maxEntriesContainer);
-                // Populate max_entries if editing
                 if (sectionData.max_entries) {
                     maxEntriesInput.value = sectionData.max_entries;
                 } else {
                     maxEntriesInput.value = '';
                 }
+                populateRepeatEntryLabelItemSelect(
+                    sectionData.id,
+                    sectionData.entry_label_item_id || ''
+                );
+                const showEntriesNavCheckbox = document.getElementById('section-show-entries-in-nav');
+                if (showEntriesNavCheckbox) {
+                    showEntriesNavCheckbox.checked = !!sectionData.show_entries_in_navigation;
+                }
             } else {
                 Utils.hideElement(maxEntriesContainer);
                 maxEntriesInput.value = '';
+                populateRepeatEntryLabelItemSelect(null, null);
+                const showEntriesNavCheckbox = document.getElementById('section-show-entries-in-nav');
+                if (showEntriesNavCheckbox) {
+                    showEntriesNavCheckbox.checked = false;
+                }
             }
+        }
+
+        const hideSectionHeaderCheckbox = document.getElementById('section-hide-header');
+        if (hideSectionHeaderCheckbox) {
+            hideSectionHeaderCheckbox.checked = !!sectionData.hide_section_header;
         }
 
         // Handle relevance condition for section skip logic

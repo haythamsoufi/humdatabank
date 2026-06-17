@@ -1,7 +1,7 @@
 """Add source_url to ai_documents for URL-only reference documents
 
 Revision ID: add_source_url_ai_docs
-Revises: add_country_to_ai_documents
+Revises: add_part_of_to_national_societies
 Create Date: 2026-01-29
 
 When set, the document is reference-only (no local file); download/hyperlinks use this URL.

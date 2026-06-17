@@ -73,6 +73,7 @@ def init_transaction_middleware(app):
         # Defaults
         g._auto_txn_managed = False
         g._auto_txn_streaming = False
+        g._auto_txn_rolled_back = False
 
         if current_app.config.get("TESTING"):
             g._post_commit_callbacks = []
@@ -111,16 +112,6 @@ def init_transaction_middleware(app):
             if force_rollback:
                 safe_rollback(reason="manual_request")
             elif status_code >= 400:
-                try:
-                    logger.debug(
-                        "Transaction rollback: %s %s → %d [endpoint=%s]",
-                        request.method,
-                        request.path,
-                        status_code,
-                        request.endpoint or "unknown",
-                    )
-                except Exception:
-                    pass
                 safe_rollback(reason=f"response_status_{status_code}")
             else:
                 db.session.commit()
@@ -144,7 +135,7 @@ def init_transaction_middleware(app):
             return
 
         # On any exception, rollback to clear failed/dirty state (even for opt-out endpoints).
-        if exception is not None:
+        if exception is not None and not getattr(g, "_auto_txn_rolled_back", False):
             safe_rollback(reason="teardown_exception")
 
         # Always remove; safe_remove is idempotent

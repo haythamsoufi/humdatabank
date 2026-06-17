@@ -11,46 +11,51 @@
     var escapeHtml = AgGridRenderers.escapeHtml;
     var escapeHtmlAttr = AgGridRenderers.escapeHtmlAttr;
 
+    var BADGE_BASE = 'px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full';
+    var BADGE_STYLE = 'style="white-space:nowrap;max-width:100%;"';
+
     var securityEventRenderers = {
         severityBadge: function (params) {
             var severity = (params.value || '').toLowerCase();
             var severityText = severity.charAt(0).toUpperCase() + severity.slice(1);
-            var classes = 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full ';
-            if (severity === 'critical') { classes += 'bg-red-100 text-red-800'; }
-            else if (severity === 'high') { classes += 'bg-yellow-100 text-yellow-800'; }
-            else if (severity === 'medium') { classes += 'bg-blue-100 text-blue-800'; }
-            else if (severity === 'low') { classes += 'bg-green-100 text-green-800'; }
-            else { classes += 'bg-gray-100 text-gray-800'; }
-            return '<span class="' + classes + '">' + escapeHtml(severityText) + '</span>';
+            var colorClass;
+            if (severity === 'critical') { colorClass = 'bg-red-100 text-red-800'; }
+            else if (severity === 'high') { colorClass = 'bg-yellow-100 text-yellow-800'; }
+            else if (severity === 'medium') { colorClass = 'bg-blue-100 text-blue-800'; }
+            else if (severity === 'low') { colorClass = 'bg-green-100 text-green-800'; }
+            else { colorClass = 'bg-gray-100 text-gray-800'; }
+            return '<span class="' + BADGE_BASE + ' ' + colorClass + '" ' + BADGE_STYLE + '>' + escapeHtml(severityText) + '</span>';
         },
 
         eventTypeBadge: function (params) {
             var eventType = (params.value || '').toLowerCase();
             var eventTypeText = eventType.replace(/_/g, ' ').replace(/\b\w/g, function (l) { return l.toUpperCase(); });
-            var classes = 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full ';
-            if (eventType === 'suspicious_login') { classes += 'bg-yellow-100 text-yellow-800'; }
-            else if (eventType === 'brute_force') { classes += 'bg-red-100 text-red-800'; }
-            else if (eventType === 'unusual_access') { classes += 'bg-blue-100 text-blue-800'; }
-            else if (eventType === 'data_breach') { classes += 'bg-pink-100 text-pink-800'; }
-            else if (eventType === 'privilege_escalation') { classes += 'bg-purple-100 text-purple-800'; }
-            else { classes += 'bg-gray-100 text-gray-800'; }
-            return '<span class="' + classes + '">' + escapeHtml(eventTypeText) + '</span>';
+            var colorClass;
+            if (eventType === 'suspicious_login') { colorClass = 'bg-yellow-100 text-yellow-800'; }
+            else if (eventType === 'brute_force') { colorClass = 'bg-red-100 text-red-800'; }
+            else if (eventType === 'unusual_access') { colorClass = 'bg-blue-100 text-blue-800'; }
+            else if (eventType === 'data_breach') { colorClass = 'bg-pink-100 text-pink-800'; }
+            else if (eventType === 'privilege_escalation') { colorClass = 'bg-purple-100 text-purple-800'; }
+            else { colorClass = 'bg-gray-100 text-gray-800'; }
+            return '<span class="' + BADGE_BASE + ' ' + colorClass + '" ' + BADGE_STYLE + '>' + escapeHtml(eventTypeText) + '</span>';
         },
 
         statusBadge: function (params) {
             var data = params.data;
             if (!data) return '';
             if (data.is_resolved) {
-                var html = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i> Resolved</span>';
+                var html = '<div style="overflow:hidden;width:100%;">';
+                html += '<span class="' + BADGE_BASE + ' bg-green-100 text-green-800" ' + BADGE_STYLE + '><i class="fas fa-check-circle mr-1"></i> Resolved</span>';
                 if (data.resolved_by_name || data.resolved_by_email) {
-                    html += '<div class="text-xs text-gray-500 mt-1">by ' + escapeHtml(data.resolved_by_name || data.resolved_by_email) + '</div>';
+                    html += '<div class="text-xs text-gray-500 mt-1" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">by ' + escapeHtml(data.resolved_by_name || data.resolved_by_email) + '</div>';
                 }
                 if (data.resolved_at) {
                     html += '<div class="text-xs text-gray-500">' + escapeHtml(data.resolved_at) + '</div>';
                 }
+                html += '</div>';
                 return html;
             }
-            return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800"><i class="fas fa-hourglass-half mr-1"></i> Pending</span>';
+            return '<span class="' + BADGE_BASE + ' bg-yellow-100 text-yellow-800" ' + BADGE_STYLE + '><i class="fas fa-hourglass-half mr-1"></i> Pending</span>';
         },
 
         descriptionCell: function (params) {
@@ -164,8 +169,9 @@
         {
             field: 'timestamp',
             headerName: cfg.t.timestamp_a3d5de3e,
-            width: 180,
-            cellRenderer: AgGridRenderers.dateTime,
+            width: 170,
+            minWidth: 160,
+            cellRenderer: AgGridRenderers.dateTimeDual,
             filter: 'agDateColumnFilter',
             sortable: true,
             lockVisible: true
@@ -173,7 +179,8 @@
         {
             field: 'event_type',
             headerName: cfg.t.event_type_8a29d87b,
-            width: 180,
+            width: 190,
+            minWidth: 160,
             cellRenderer: securityEventRenderers.eventTypeBadge,
             filter: 'customSetFilter',
             sortable: true
@@ -181,7 +188,8 @@
         {
             field: 'severity',
             headerName: cfg.t.severity_5a1caa0f,
-            width: 120,
+            width: 110,
+            minWidth: 100,
             cellRenderer: securityEventRenderers.severityBadge,
             filter: 'customSetFilter',
             sortable: true,
@@ -193,7 +201,8 @@
         {
             field: 'description',
             headerName: cfg.t.description_b5a7adde,
-            flex: 1, minWidth: 200,
+            flex: 1,
+            minWidth: 220,
             cellRenderer: securityEventRenderers.descriptionCell,
             filter: 'agTextColumnFilter',
             sortable: true,
@@ -202,19 +211,23 @@
         {
             field: 'ip_address',
             headerName: cfg.t.ip_address_5b8c99da,
-            width: 150,
+            width: 170,
+            minWidth: 150,
+            hide: true,
             filter: 'agTextColumnFilter',
             sortable: true,
             cellRenderer: function (params) {
-                if (params.value) return '<div class="text-sm text-gray-900 font-mono">' + escapeHtml(params.value) + '</div>';
+                if (params.value) return '<div class="text-sm text-gray-900 font-mono" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(params.value) + '</div>';
                 return '<span class="text-sm text-gray-500">N/A</span>';
             }
         },
         {
             field: 'user_email',
             headerName: cfg.t.user_8f9bfe9d,
-            width: 200,
+            width: 190,
+            minWidth: 160,
             cellRenderer: securityEventRenderers.userCell,
+            cellStyle: { overflow: 'hidden' },
             filter: 'agTextColumnFilter',
             sortable: true,
             valueGetter: function (params) {
@@ -224,15 +237,18 @@
         {
             field: 'is_resolved',
             headerName: cfg.t.status_ec53a8c4,
-            width: 150,
+            width: 160,
+            minWidth: 140,
             cellRenderer: securityEventRenderers.statusBadge,
+            cellStyle: { overflow: 'hidden' },
             filter: 'customSetFilter',
             sortable: true
         },
         {
             field: 'actions',
             headerName: cfg.t.actions_9f36b7c9,
-            width: 150,
+            width: 140,
+            minWidth: 120,
             cellRenderer: securityEventRenderers.actionsCell,
             sortable: false,
             filter: false,
@@ -255,7 +271,7 @@
     } else {
         var gridHelper = new AgGridHelper({
             containerId: 'securityEventsGrid',
-            templateId: cfg.templateId || 'security-events-analytics',
+            templateId: (cfg.templateId || 'security-events-analytics') + '-v2',
             columnDefs: columnDefs,
             rowData: eventsData,
             columnVisibilityOptions: {
@@ -264,11 +280,13 @@
                 enableExport: true,
                 enableReset: true
             },
-            gridOptions: {
+            options: {
                 pagination: true,
                 paginationPageSize: 25,
                 paginationPageSizeSelector: [10, 25, 50, 100],
-                rowHeight: 60,
+                rowHeight: 80,
+                sizeColumnsToFitOnInit: false,
+                sizeColumnsToFitOnColumnChange: false,
                 processCellForClipboard: function (params) {
                     if (!params || !params.column || !params.node || !params.node.data) {
                         return params && params.value != null ? params.value : '';

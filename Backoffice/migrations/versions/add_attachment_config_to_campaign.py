@@ -1,7 +1,7 @@
 """Add attachment_config to notification_campaign
 
 Revision ID: add_attachment_config
-Revises: add_entity_based_campaigns
+Revises: add_expiry_af
 Create Date: 2025-02-03
 
 Adds attachment_config JSON field for entity-based campaigns:

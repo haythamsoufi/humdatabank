@@ -24,6 +24,15 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+# ── Process-level memory cache ─────────────────────────────────────────────────
+# Avoids re-reading and re-parsing the JSON file on every Flask-cache miss.
+# Keyed by file mtime so it invalidates automatically whenever a background
+# refresh writes a new file (via os.replace the mtime always changes).
+
+_mem_data: Optional[Dict[str, Any]] = None
+_mem_mtime: float = -1.0
+_mem_lock = threading.Lock()
+
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 CACHE_FILENAME = 'appeals_cache.json'
@@ -102,6 +111,29 @@ class EmergencyOperationsDataStore:
         except Exception as e:
             logger.warning(f'[EmOps DataStore] Failed to load cache file: {e}')
             return None
+
+    def load_cached(self) -> Optional[Dict[str, Any]]:
+        """Like load() but served from the module-level memory cache when the
+        file has not changed, avoiding repeated disk IO and JSON parsing."""
+        global _mem_data, _mem_mtime
+        try:
+            mtime = self.cache_file.stat().st_mtime if self.cache_file.exists() else None
+        except OSError:
+            return None
+
+        if mtime is None:
+            return None
+
+        with _mem_lock:
+            if _mem_data is not None and _mem_mtime == mtime:
+                return _mem_data
+
+        data = self.load()
+        if data is not None:
+            with _mem_lock:
+                _mem_data = data
+                _mem_mtime = mtime
+        return data
 
     def save(self, results: List[Dict], query_params: Dict) -> bool:
         """Write results to disk atomically (write-then-rename)."""

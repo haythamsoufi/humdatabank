@@ -24,7 +24,7 @@ from app.models import (
 from app.models.enums import EntityType
 from app.services.entity_service import EntityService
 from app.services.form_data_service import FormDataService
-from app.services.form_processing_service import get_form_items_for_section, slugify_age_group
+from app.services.form_processing_service import get_form_items_for_section, slugify_age_group, _create_dynamic_indicator_object
 from app.services.monitoring.debug import debug_manager, performance_monitor
 from app.services.notification.core import (
     log_entity_activity,
@@ -235,6 +235,27 @@ def handle_assignment_form(aes_id):
             except Exception as e:
                 current_app.logger.warning(f"Variable resolution failed: {e}", exc_info=True)
                 resolved_variables = {}
+
+            # Resolve Emergency Operations label variables (EO1/EO2/EO3) server-side, anchored to a
+            # stable appeal code per assignment (see emergency_section_binding). This keeps section
+            # names stable across API reordering/filter changes; the client replacement remains a
+            # fallback for any [EOn] left untouched (e.g. when no value could be resolved).
+            try:
+                has_eo_placeholder = any(
+                    '[EO' in (getattr(s, 'display_name', '') or '') or '[EO' in (getattr(s, 'name', '') or '')
+                    for s in all_sections
+                )
+                if has_eo_placeholder:
+                    from app.services.emergency_section_binding import resolve_eo_variables
+                    eo_vars = resolve_eo_variables(assignment_entity_status)
+                    if not isinstance(resolved_variables, dict):
+                        resolved_variables = {}
+                    for key, value in eo_vars.items():
+                        # Only override with a non-empty resolved value; leave [EOn] for the client otherwise.
+                        if value:
+                            resolved_variables[key] = value
+            except Exception as e:
+                current_app.logger.debug(f"Emergency Operations EO variable resolution skipped: {e}")
 
             _match_by_bank_cache = {}
             placeholder_pattern = re.compile(r'\[(\w+)\]')
@@ -555,16 +576,15 @@ def handle_assignment_form(aes_id):
             else:
                 continue
 
-            if repeat_data_entry.disagg_data:
-                actual_value = repeat_data_entry.disagg_data
-                data_not_available = repeat_data_entry.data_not_available
-                not_applicable = repeat_data_entry.not_applicable
-                display_value = actual_value
+            data_not_available = repeat_data_entry.data_not_available
+            not_applicable = repeat_data_entry.not_applicable
+            # Emergency-operation metadata lives in disagg_data; the select value is in value.
+            if repeat_data_entry.disagg_type == 'emergency_operation':
+                display_value = repeat_data_entry.value
+            elif repeat_data_entry.disagg_data:
+                display_value = repeat_data_entry.disagg_data
             else:
-                actual_value = repeat_data_entry.value
-                data_not_available = repeat_data_entry.data_not_available
-                not_applicable = repeat_data_entry.not_applicable
-                display_value = actual_value
+                display_value = repeat_data_entry.value
 
             field_data = {
                 'value': display_value,
@@ -611,6 +631,59 @@ def handle_assignment_form(aes_id):
                     }
 
     existing_data_processed['repeat_groups_data'] = repeat_groups_data
+
+    # Build per-repeat-instance dynamic indicator HTML map so the frontend can populate existing
+    # indicators into each repeat entry when the form loads.
+    # Structure: { section_id: { instance_number: [ { assignment_id, html } ] } }
+    repeat_dynamic_indicator_data: dict = {}
+    per_instance_assignments = DynamicIndicatorData.query.filter(
+        DynamicIndicatorData.assignment_entity_status_id == assignment_entity_status.id,
+        DynamicIndicatorData.repeat_instance_number.isnot(None)
+    ).order_by(DynamicIndicatorData.section_id, DynamicIndicatorData.repeat_instance_number, DynamicIndicatorData.order).all()
+
+    if per_instance_assignments:
+        # Pre-load sections needed for rendering
+        _section_cache: dict = {}
+        for _did in per_instance_assignments:
+            _sid = _did.section_id
+            if _sid not in _section_cache:
+                _section_cache[_sid] = FormSection.query.get(_sid)
+
+        for _did in per_instance_assignments:
+            _sec = _section_cache.get(_did.section_id)
+            if _sec is None:
+                continue
+            _field = _create_dynamic_indicator_object(_did, _sec)
+            _template_structure = getattr(_sec, 'template', None)
+            if not _template_structure and assignment_entity_status:
+                _template_structure = getattr(getattr(assignment_entity_status, 'assigned_form', None), 'template', None)
+            if not _template_structure:
+                _template_structure = type('TemplateStructure', (), {'display_order_visible': True})()
+            _html = render_template(
+                'forms/entry_form/partials/dynamic_indicator_item.html',
+                field=_field,
+                section=_sec,
+                existing_data=existing_data_processed,
+                template_structure=_template_structure,
+                config=Config,
+                can_edit=can_edit,
+                translation_key=get_translation_key(),
+                get_localized_indicator_definition=get_localized_indicator_definition,
+                get_localized_indicator_type=get_localized_indicator_type,
+                get_localized_indicator_unit=get_localized_indicator_unit,
+                isinstance=isinstance,
+                json=json,
+                hasattr=hasattr,
+                slugify_age_group=slugify_age_group,
+            )
+            sid_key = _did.section_id
+            inst_key = _did.repeat_instance_number
+            repeat_dynamic_indicator_data.setdefault(sid_key, {}).setdefault(inst_key, []).append({
+                'assignment_id': _did.id,
+                'html': _html,
+            })
+
+    existing_data_processed['repeat_dynamic_indicator_data'] = repeat_dynamic_indicator_data
 
     submitted_docs = (
         SubmittedDocument.query.filter_by(assignment_entity_status_id=assignment_entity_status.id)

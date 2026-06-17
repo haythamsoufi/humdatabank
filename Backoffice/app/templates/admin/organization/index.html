@@ -1155,8 +1155,12 @@ try {
                     return;
                 }
 
+                const submitBtn = document.getElementById('submit-add-category-btn');
+                if (submitBtn && submitBtn.disabled) return;
+                if (submitBtn) submitBtn.disabled = true;
+
                 // Add the category
-                addCategory(categoryName);
+                addCategory(categoryName, submitBtn);
 
                 // Close modal
                 closeModal();
@@ -1165,7 +1169,7 @@ try {
     }
 
     // Add a new category
-    function addCategory(categoryName) {
+    function addCategory(categoryName, submitBtn) {
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
         fetch("{{ url_for('organization.api_add_part_of_program') }}", {
@@ -1182,6 +1186,7 @@ try {
         })
         .then(response => response.json())
         .then(data => {
+            if (submitBtn) submitBtn.disabled = false;
             if (data.success) {
                 availableCategories = data.categories || data.programs;
                 rebuildGridColumns();
@@ -1191,6 +1196,7 @@ try {
             }
         })
         .catch(error => {
+            if (submitBtn) submitBtn.disabled = false;
             console.error('Error adding category:', error);
             var m = {{ _('Error adding category') | tojson }};
             if (window.showAlert) window.showAlert(m, 'error');

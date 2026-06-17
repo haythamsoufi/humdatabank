@@ -6,7 +6,7 @@
             <i id="section-modal-icon" class="fas w-6 h-6 mr-2"></i>
             <span id="section-modal-text">Section</span>
         </h3>
-        <form id="section-form" method="POST" action="">
+        <form id="section-form" method="POST" action="" data-fb-no-ajax="1">
             {{ section_form.hidden_tag() }} {# For CSRF from section_form #}
             <input type="hidden" name="version_id" value="{{ active_version_id }}">
             <div class="mb-4">
@@ -91,12 +91,39 @@
                     </div>
 
                     {# Repeat Group Configuration - Shown only when repeat type is selected #}
-                    <div id="repeat-group-config" class="mb-4 hidden">
-                        <label for="section-max-entries-input" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Max Number of Entries') }}</label>
-                        <input type="number" name="max_entries" id="section-max-entries-input"
-                               class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                               min="1" placeholder="{{ _('No limit') }}" aria-label="{{ _('Max Number of Entries') }}">
-                        <p class="mt-1 text-xs text-gray-500">{{ _('Maximum number of repeat entries that can be added. Leave empty for no limit.') }}</p>
+                    <div id="repeat-group-config" class="mb-4 hidden space-y-4">
+                        <div>
+                            <label for="section-max-entries-input" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Max Number of Entries') }}</label>
+                            <input type="number" name="max_entries" id="section-max-entries-input"
+                                   class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                                   min="1" placeholder="{{ _('No limit') }}" aria-label="{{ _('Max Number of Entries') }}">
+                            <p class="mt-1 text-xs text-gray-500">{{ _('Maximum number of repeat entries that can be added. Leave empty for no limit.') }}</p>
+                        </div>
+                        <div>
+                            <label for="section-entry-label-item-id" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Entry Label Field') }}</label>
+                            <select name="entry_label_item_id" id="section-entry-label-item-id"
+                                    class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                                    aria-label="{{ _('Entry Label Field') }}">
+                                <option value="">{{ _('Entry number (Entry #1, Entry #2, …)') }}</option>
+                            </select>
+                            <p class="mt-1 text-xs text-gray-500">{{ _('Optional. Use the value of a text or single-choice item in this section as each entry label instead of "Entry #1". Add items to the section first, then edit the section to select one.') }}</p>
+                        </div>
+                        <div>
+                            <label class="flex items-center text-gray-700 text-sm">
+                                <input type="checkbox" name="show_entries_in_navigation" id="section-show-entries-in-nav" value="true" class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500">
+                                <span class="ml-2">{{ _('Show entries in form navigation') }}</span>
+                            </label>
+                            <p class="mt-1 ml-6 text-xs text-gray-500">{{ _('Lists each repeat entry under this section in the side navigation panel on the entry form.') }}</p>
+                        </div>
+                    </div>
+
+                    {# Entry form display options (all section types) #}
+                    <div class="mb-4">
+                        <label class="flex items-center text-gray-700 text-sm">
+                            <input type="checkbox" name="hide_section_header" id="section-hide-header" value="true" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            <span class="ml-2">{{ _('Hide section header on entry form') }}</span>
+                        </label>
+                        <p class="mt-1 ml-6 text-xs text-gray-500">{{ _('Hides the section title and horizontal divider when the form is filled in. The section name still appears in the side navigation.') }}</p>
                     </div>
 
                     {# Rules Section - Below Section Type Selection #}

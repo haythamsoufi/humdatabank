@@ -1500,12 +1500,17 @@ document.addEventListener('DOMContentLoaded', function() {
             if (form.dataset.confirmed === 'true') { delete form.dataset.confirmed; return; }
             event.preventDefault();
             resetSubmitGuardState(form);
+            const _dsrBtn = form.querySelector('[type="submit"]');
+            if (_dsrBtn && _dsrBtn.disabled) return;
+            if (_dsrBtn) _dsrBtn.disabled = true;
             const msg = getSecureConfirmMessage('deleteSelfReport', 'Are you sure you want to delete this self-report?');
+            const _dsrRestore = () => { if (_dsrBtn) _dsrBtn.disabled = false; };
             if (window.showDangerConfirmation) {
-                window.showDangerConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, null, 'Delete', 'Cancel', 'Confirm Delete');
+                window.showDangerConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, _dsrRestore, 'Delete', 'Cancel', 'Confirm Delete');
             } else if (window.showConfirmation) {
-                window.showConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, null, 'Delete', 'Cancel', 'Confirm Delete');
+                window.showConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, _dsrRestore, 'Delete', 'Cancel', 'Confirm Delete');
             } else {
+                _dsrRestore();
                 console.warn('Confirmation dialog not available:', msg);
                 return false;
             }
@@ -1516,10 +1521,15 @@ document.addEventListener('DOMContentLoaded', function() {
             if (form.dataset.confirmed === 'true') { delete form.dataset.confirmed; return; }
             event.preventDefault();
             resetSubmitGuardState(form);
+            const _aaBtn = form.querySelector('[type="submit"]');
+            if (_aaBtn && _aaBtn.disabled) return;
+            if (_aaBtn) _aaBtn.disabled = true;
             const msg = getSecureConfirmMessage('approveAssignment', 'Are you sure you want to approve this assignment?');
+            const _aaRestore = () => { if (_aaBtn) _aaBtn.disabled = false; };
             if (window.showConfirmation) {
-                window.showConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, null, 'Approve', 'Cancel', 'Approve Assignment?');
+                window.showConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, _aaRestore, 'Approve', 'Cancel', 'Approve Assignment?');
             } else {
+                _aaRestore();
                 console.warn('Confirmation dialog not available:', msg);
                 return false;
             }
@@ -1530,10 +1540,15 @@ document.addEventListener('DOMContentLoaded', function() {
             if (form.dataset.confirmed === 'true') { delete form.dataset.confirmed; return; }
             event.preventDefault();
             resetSubmitGuardState(form);
+            const _raBtn = form.querySelector('[type="submit"]');
+            if (_raBtn && _raBtn.disabled) return;
+            if (_raBtn) _raBtn.disabled = true;
             const msg = getSecureConfirmMessage('reopenAssignment', 'Are you sure you want to reopen this assignment?');
+            const _raRestore = () => { if (_raBtn) _raBtn.disabled = false; };
             if (window.showConfirmation) {
-                window.showConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, null, 'Reopen', 'Cancel', 'Reopen Assignment?');
+                window.showConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, _raRestore, 'Reopen', 'Cancel', 'Reopen Assignment?');
             } else {
+                _raRestore();
                 console.warn('Confirmation dialog not available:', msg);
                 return false;
             }

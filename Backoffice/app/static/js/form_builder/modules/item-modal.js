@@ -343,6 +343,10 @@ export const ItemModal = {
             // Update currentSectionId
             this.currentSectionId = e.target.value;
 
+            if (this.ensureUseAsRepeatEntryTitleField) {
+                this.ensureUseAsRepeatEntryTitleField(this.currentItemType || 'question');
+            }
+
             // Recalculate default order for the new section (only in add mode)
             if (this.currentMode === 'add' && e.target.value) {
                 this.setDefaultOrderValue(e.target.value);
@@ -469,6 +473,16 @@ export const ItemModal = {
         try {
             if (this.currentItemType === 'matrix') {
                 this.updateMatrixConfig();
+            }
+        } catch (_e) {}
+
+        // Question (calculated-list): ensure plugin config hidden input is in sync
+        try {
+            if (this.currentItemType === 'question' && window.CalculatedLists && window.CalculatedLists._serializePluginConfig) {
+                const configContainer = document.getElementById('question-plugin-config-container');
+                if (configContainer && configContainer.children.length > 0) {
+                    window.CalculatedLists._serializePluginConfig(configContainer);
+                }
             }
         } catch (_e) {}
 
@@ -775,6 +789,15 @@ export const ItemModal = {
         if (itemType === 'question') {
             const questionTypeSelect = this.modalElement.querySelector('#item-question-type-select');
             const questionTypeInput = this.modalElement.querySelector('#item-question-type-input');
+            // Re-apply the question type value: populateTypeDropdown (called inside toggleFieldsVisibility)
+            // uses replaceChildren() which resets the select's value back to '' after we set it above.
+            if (questionTypeSelect && optionalQuestionType) {
+                const opt = questionTypeSelect.querySelector(`option[value="${optionalQuestionType}"]`);
+                if (opt) {
+                    questionTypeSelect.value = optionalQuestionType;
+                    if (questionTypeInput) questionTypeInput.value = optionalQuestionType;
+                }
+            }
             if (questionTypeSelect && questionTypeInput) questionTypeInput.value = questionTypeSelect.value || '';
             if (questionTypeSelect && optionalQuestionType) {
                 questionTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
@@ -787,6 +810,12 @@ export const ItemModal = {
 
         // Ensure Allow Over 100% checkbox for percentage items
         this.ensureAllowOver100Field(itemType);
+
+        // Unique-options-in-section checkbox for choice questions
+        this.ensureUniqueOptionsInSectionField(itemType);
+
+        // Repeat entry title dropdown for single choice questions
+        this.ensureUseAsRepeatEntryTitleField(itemType);
 
         // Update submit button
         this.updateSubmitButton(itemType);
@@ -999,6 +1028,143 @@ export const ItemModal = {
 
         // Append to properties content
         propertiesContent.appendChild(container);
+    },
+
+    isChoiceQuestionType: function(questionType) {
+        return ['single_choice', 'multiple_choice'].includes(questionType || '');
+    },
+
+    getActiveSectionId: function() {
+        if (!this.modalElement) return this.currentSectionId || null;
+        const sectionSelect = this.modalElement.querySelector('#item-section-select');
+        const hiddenSectionId = this.modalElement.querySelector('#item-modal-section-id');
+        return (sectionSelect && sectionSelect.value)
+            || (hiddenSectionId && hiddenSectionId.value)
+            || this.currentSectionId
+            || null;
+    },
+
+    isRepeatSection: function(sectionId) {
+        if (!sectionId) return false;
+
+        const sections = (DataManager && typeof DataManager.getData === 'function')
+            ? (DataManager.getData('allTemplateSections') || [])
+            : [];
+
+        const section = sections.find(s => {
+            const id = Array.isArray(s) ? s[0] : (s.id ?? s.value);
+            return String(id) === String(sectionId);
+        });
+
+        if (section && !Array.isArray(section)) {
+            const st = String(section.section_type || '').toLowerCase();
+            if (st === 'repeat') return true;
+        }
+
+        // DOM fallback (form builder section cards)
+        const editBtn = document.querySelector(`.edit-section-btn[data-section-id="${sectionId}"]`);
+        if (editBtn) {
+            const domType = String(editBtn.getAttribute('data-section-type') || '').toLowerCase();
+            if (domType === 'repeat') return true;
+        }
+
+        return false;
+    },
+
+    ensureUniqueOptionsInSectionField: function(itemType) {
+        if (!this.modalElement) return;
+        const row = this.modalElement.querySelector('#unique-options-in-section-row');
+        const checkbox = this.modalElement.querySelector('#item-unique-options-in-section');
+        if (!row || !checkbox) return;
+
+        let questionType = '';
+        if (itemType === 'question') {
+            const questionTypeSelect = this.modalElement.querySelector('#item-question-type-select');
+            questionType = (questionTypeSelect && questionTypeSelect.value) || this.currentQuestionType || '';
+        }
+
+        const show = itemType === 'question' && this.isChoiceQuestionType(questionType);
+        row.style.display = show ? '' : 'none';
+        if (!show) {
+            checkbox.checked = false;
+            checkbox.disabled = true;
+        } else {
+            checkbox.disabled = false;
+            if (this._pendingUniqueOptionsInSection !== undefined) {
+                checkbox.checked = !!this._pendingUniqueOptionsInSection;
+                this._pendingUniqueOptionsInSection = undefined;
+            }
+        }
+
+        // Wire up change listener once so toggling unique_options re-evaluates the sub-option
+        if (!checkbox._limitEntriesChangeListenerAdded) {
+            checkbox.addEventListener('change', () => {
+                this.ensureLimitEntriesToOptionCountField('question');
+            });
+            checkbox._limitEntriesChangeListenerAdded = true;
+        }
+
+        this.ensureLimitEntriesToOptionCountField(itemType);
+    },
+
+    ensureLimitEntriesToOptionCountField: function(itemType) {
+        if (!this.modalElement) return;
+        const row = this.modalElement.querySelector('#limit-entries-to-option-count-row');
+        const checkbox = this.modalElement.querySelector('#item-limit-entries-to-option-count');
+        const uniqueCheckbox = this.modalElement.querySelector('#item-unique-options-in-section');
+        if (!row || !checkbox || !uniqueCheckbox) return;
+
+        let questionType = '';
+        if (itemType === 'question') {
+            const questionTypeSelect = this.modalElement.querySelector('#item-question-type-select');
+            questionType = (questionTypeSelect && questionTypeSelect.value) || this.currentQuestionType || '';
+        }
+
+        // Show only for single_choice in a repeat section when unique_options_in_section is enabled
+        const show = itemType === 'question'
+            && questionType === 'single_choice'
+            && this.isRepeatSection(this.getActiveSectionId())
+            && uniqueCheckbox.checked;
+
+        row.style.display = show ? '' : 'none';
+        if (!show) {
+            checkbox.checked = false;
+            checkbox.disabled = true;
+        } else {
+            checkbox.disabled = false;
+            if (this._pendingLimitEntriesToOptionCount !== undefined) {
+                checkbox.checked = !!this._pendingLimitEntriesToOptionCount;
+                this._pendingLimitEntriesToOptionCount = undefined;
+            }
+        }
+    },
+
+    ensureUseAsRepeatEntryTitleField: function(itemType) {
+        if (!this.modalElement) return;
+        const row = this.modalElement.querySelector('#use-as-repeat-entry-title-row');
+        const checkbox = this.modalElement.querySelector('#item-use-as-repeat-entry-title');
+        if (!row || !checkbox) return;
+
+        let questionType = '';
+        if (itemType === 'question') {
+            const questionTypeSelect = this.modalElement.querySelector('#item-question-type-select');
+            questionType = (questionTypeSelect && questionTypeSelect.value) || this.currentQuestionType || '';
+        }
+
+        const show = itemType === 'question'
+            && questionType === 'single_choice'
+            && this.isRepeatSection(this.getActiveSectionId());
+        row.style.display = show ? '' : 'none';
+        if (!show) {
+            checkbox.checked = false;
+            checkbox.disabled = true;
+        } else {
+            checkbox.disabled = false;
+            if (this._pendingUseAsRepeatEntryTitle !== undefined) {
+                checkbox.checked = !!this._pendingUseAsRepeatEntryTitle;
+                this._pendingUseAsRepeatEntryTitle = undefined;
+            }
+        }
     },
 
     // Check if the current item is a percentage type
@@ -2557,7 +2723,10 @@ export const ItemModal = {
         // Ensure checkbox exists after question type is populated (so isPercentageItem can check the question type)
         (window.__clientLog || console.debug)('[ItemModal:AllowOver100] populateQuestionForm: calling ensureAllowOver100Field after populating question');
         this.ensureAllowOver100Field('question');
+        this.ensureUniqueOptionsInSectionField('question');
+        this.ensureUseAsRepeatEntryTitleField('question');
         this.populateCommonFields(itemData);
+        this.ensureUseAsRepeatEntryTitleField('question');
         const translationsInput = this.modalElement.querySelector('#item-modal-shared-label-translations');
         if (translationsInput && itemData.label_translations) {
             translationsInput.value = JSON.stringify(itemData.label_translations);
@@ -2821,6 +2990,45 @@ export const ItemModal = {
         if (notApplicableCheckbox) {
             const val2 = itemData.allow_not_applicable;
             notApplicableCheckbox.checked = val2 === true || val2 === 'true' || val2 === 1 || val2 === '1';
+        }
+
+        const uniqueOptionsCheckbox = this.modalElement.querySelector('#item-unique-options-in-section');
+        if (uniqueOptionsCheckbox) {
+            let uniqueVal = false;
+            if (itemData && itemData.config && itemData.config.unique_options_in_section !== undefined) {
+                uniqueVal = itemData.config.unique_options_in_section === true
+                    || itemData.config.unique_options_in_section === 'true'
+                    || itemData.config.unique_options_in_section === 1
+                    || itemData.config.unique_options_in_section === '1';
+            }
+            this._pendingUniqueOptionsInSection = uniqueVal;
+            uniqueOptionsCheckbox.checked = uniqueVal;
+        }
+
+        const repeatTitleCheckbox = this.modalElement.querySelector('#item-use-as-repeat-entry-title');
+        if (repeatTitleCheckbox) {
+            let repeatTitleVal = false;
+            if (itemData && itemData.config && itemData.config.use_as_repeat_entry_title !== undefined) {
+                repeatTitleVal = itemData.config.use_as_repeat_entry_title === true
+                    || itemData.config.use_as_repeat_entry_title === 'true'
+                    || itemData.config.use_as_repeat_entry_title === 1
+                    || itemData.config.use_as_repeat_entry_title === '1';
+            }
+            this._pendingUseAsRepeatEntryTitle = repeatTitleVal;
+            repeatTitleCheckbox.checked = repeatTitleVal;
+        }
+
+        const limitEntriesCheckbox = this.modalElement.querySelector('#item-limit-entries-to-option-count');
+        if (limitEntriesCheckbox) {
+            let limitVal = false;
+            if (itemData && itemData.config && itemData.config.limit_entries_to_option_count !== undefined) {
+                limitVal = itemData.config.limit_entries_to_option_count === true
+                    || itemData.config.limit_entries_to_option_count === 'true'
+                    || itemData.config.limit_entries_to_option_count === 1
+                    || itemData.config.limit_entries_to_option_count === '1';
+            }
+            this._pendingLimitEntriesToOptionCount = limitVal;
+            limitEntriesCheckbox.checked = limitVal;
         }
 
         if (disabilityQuestionsCheckbox) {

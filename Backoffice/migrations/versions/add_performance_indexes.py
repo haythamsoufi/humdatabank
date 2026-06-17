@@ -1,7 +1,7 @@
 """Add performance indexes for query optimization
 
 Revision ID: add_performance_indexes
-Revises: add_quiz_score_to_user
+Revises: add_can_explore_data
 Create Date: 2024-01-01 12:00:00.000000
 
 """

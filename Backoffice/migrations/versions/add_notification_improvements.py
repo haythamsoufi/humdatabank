@@ -1,7 +1,7 @@
 """Add notification system improvements
 
 Revision ID: add_notification_improvements
-Revises: add_logged_out_at_to_user_devices
+Revises: add_notif_created_at_idx
 Create Date: 2025-01-XX XX:XX:XX.XXXXXX
 
 This migration adds:

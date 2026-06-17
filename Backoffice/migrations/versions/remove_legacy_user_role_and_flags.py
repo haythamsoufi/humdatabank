@@ -1,7 +1,7 @@
 """Remove legacy User.role and can_manage_* flags (RBAC-only)
 
 Revision ID: remove_legacy_user_role_and_flags
-Revises: remove_template_type
+Revises: expand_alembic_version_num
 Create Date: 2026-01-18
 """
 

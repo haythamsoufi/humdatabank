@@ -237,6 +237,23 @@ def _update_question_fields(question, form, request_form):
         except (json.JSONDecodeError, TypeError):
             question.list_filters_json = None
 
+        # Persist plugin-specific config for configurable lists (e.g. Emergency Operations)
+        question_plugin_config_raw = _fp('question_plugin_config')
+        if question_plugin_config_raw:
+            try:
+                question_plugin_config = json.loads(question_plugin_config_raw)
+                if not isinstance(question.config, dict):
+                    question.config = {}
+                question.config = {**question.config, 'question_plugin_config': question_plugin_config}
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(question, 'config')
+                current_app.logger.debug(
+                    "Saved question_plugin_config for item %s: %s",
+                    getattr(question, 'id', '?'), question_plugin_config
+                )
+            except (json.JSONDecodeError, TypeError) as e:
+                current_app.logger.debug("Invalid question_plugin_config JSON, ignoring: %s", e)
+
         # Ensure manual options are cleared when using calculated lists
         question.options_json = None
     else:
@@ -536,6 +553,42 @@ def _update_item_config(form_item, form, request_form):
         except (json.JSONDecodeError, TypeError):
             allow_over_100 = False
     form_item.config['allow_over_100'] = bool(allow_over_100)
+
+    # Unique option selection within a section (single/multi choice questions)
+    unique_options_in_section = False
+    if 'unique_options_in_section' in request_form:
+        unique_options_in_section = request_form.get('unique_options_in_section') in ['true', 'on', '1']
+    elif request_form.get('config'):
+        try:
+            config_json = json.loads(request_form.get('config'))
+            unique_options_in_section = bool(config_json.get('unique_options_in_section', False))
+        except (json.JSONDecodeError, TypeError):
+            unique_options_in_section = False
+    form_item.config['unique_options_in_section'] = unique_options_in_section
+
+    # Repeat entry title dropdown (single choice in repeat sections)
+    use_as_repeat_entry_title = False
+    if 'use_as_repeat_entry_title' in request_form:
+        use_as_repeat_entry_title = request_form.get('use_as_repeat_entry_title') in ['true', 'on', '1']
+    elif request_form.get('config'):
+        try:
+            config_json = json.loads(request_form.get('config'))
+            use_as_repeat_entry_title = bool(config_json.get('use_as_repeat_entry_title', False))
+        except (json.JSONDecodeError, TypeError):
+            use_as_repeat_entry_title = False
+    form_item.config['use_as_repeat_entry_title'] = use_as_repeat_entry_title
+
+    # Limit repeat entries to option count (single choice in repeat sections with unique options)
+    limit_entries_to_option_count = False
+    if 'limit_entries_to_option_count' in request_form:
+        limit_entries_to_option_count = request_form.get('limit_entries_to_option_count') in ['true', 'on', '1']
+    elif request_form.get('config'):
+        try:
+            config_json = json.loads(request_form.get('config'))
+            limit_entries_to_option_count = bool(config_json.get('limit_entries_to_option_count', False))
+        except (json.JSONDecodeError, TypeError):
+            limit_entries_to_option_count = False
+    form_item.config['limit_entries_to_option_count'] = limit_entries_to_option_count
 
     # Privacy (dropdown, defaults to organization network / internal visibility)
     try:

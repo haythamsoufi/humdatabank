@@ -91,6 +91,16 @@ class TestRefreshCsrfTokenGet:
         resp = client.get("/admin/api/refresh-csrf-token")
         assert resp.status_code in (302, 401)
 
+    def test_redirects_unauthenticated_xhr_request(self, client, db_session):
+        resp = client.get(
+            "/admin/api/refresh-csrf-token",
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        assert resp.status_code == 401
+        data = _json(resp)
+        assert data.get("success") is False
+        assert "error" in data
+
     def test_exception_returns_500(self, logged_in_client, db_session):
         with patch(
             "app.routes.admin.utilities.csrf.csrf.generate_csrf",

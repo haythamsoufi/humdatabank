@@ -289,22 +289,26 @@
                         data-subsection-order="{{ item_instance.order }}"
                         {% if is_subsection_archived %}data-archived="true"{% endif %}>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 w-1/16 subsection-header-banner-cell">
-                            <div class="flex items-center">
-                                <button type="button" class="subsection-toggle fb-icon-btn fb-icon-btn--primary flex-shrink-0 mr-2" aria-expanded="true" title="{{ _('Collapse subsection') }}">
-                                    <i class="fas fa-chevron-down w-3 h-3 transition-transform duration-200"></i>
+                            <div class="fb-table-order-cell">
+                                <button type="button" class="subsection-toggle fb-icon-btn fb-icon-btn--neutral flex-shrink-0" aria-expanded="true" title="{{ _('Collapse subsection') }}">
+                                    <i class="fas fa-chevron-down w-4 h-4 transition-transform duration-200"></i>
                                 </button>
-                                <i class="fas fa-indent w-4 h-4 mr-2 text-teal-600"></i>
-                                <span class="font-semibold text-teal-700">{{ item_instance.display_order.split('.')[-1] }}</span>
+                                <span class="fb-table-order-number">{{ item_instance.display_order.split('.')[-1] }}</span>
                             </div>
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/2">
-                            {% if is_subsection_archived %}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-400 text-white mr-2">
-                                    <i class="fas fa-archive w-3 h-3 mr-1"></i>
-                                    {{ _('Archived') }}
+                            <div class="fb-table-label-cell">
+                                <i class="fas fa-indent w-4 h-4 flex-shrink-0 text-teal-600" aria-hidden="true"></i>
+                                <span class="fb-table-label-cell__text">
+                                    {% if is_subsection_archived %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-400 text-white mr-2">
+                                            <i class="fas fa-archive w-3 h-3 mr-1"></i>
+                                            {{ _('Archived') }}
+                                        </span>
+                                    {% endif %}
+                                    <span class="font-semibold text-teal-700 {{ 'text-gray-500' if is_subsection_archived else '' }}">{{ item_instance.name }}</span>
                                 </span>
-                            {% endif %}
-                            <span class="font-semibold text-teal-700 {{ 'text-gray-500' if is_subsection_archived else '' }}">{{ item_instance.name }}</span>
+                            </div>
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/4">
                             {# Show relevance conditions if present #}
@@ -403,13 +407,10 @@
                     {% set is_archived = item_instance.archived if hasattr(item_instance, 'archived') and item_instance.archived else False %}
                     <tr class="{{ 'bg-gray-50' if is_sub_item or is_subsection_item else '' }} {{ 'opacity-60 bg-gray-100' if is_archived else '' }} archived-item-row {% if is_subsection_item %}subsection-content-row{% endif %}" data-item-id="{{ item_instance.id }}" {% if is_archived %}data-archived="true"{% endif %}{% if is_subsection_item %} data-parent-subsection-id="{{ item_data.parent_subsection_id }}"{% endif %}>
                             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 w-1/16">
-                                {% if is_sub_item %}
-                                    <span class="ml-6">&#8627; {{ item_instance.display_order }}</span>
-                                {% elif is_subsection_item %}
-                                    <span class="ml-6">&#8627; {{ item_instance.display_order }}</span>
-                                {% else %}
-                                    {{ item_instance.display_order }}
-                                {% endif %}
+                                <div class="fb-table-order-cell{% if is_sub_item or is_subsection_item %} fb-table-order-cell--nested{% endif %}">
+                                    <span class="fb-table-order-toggle-placeholder" aria-hidden="true"></span>
+                                    <span class="fb-table-order-number">{% if is_sub_item or is_subsection_item %}&#8627; {% endif %}{{ item_instance.display_order }}</span>
+                                </div>
                             </td>
                             {% set _display_item_id = item_instance.id %}
                             <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/2" title="{{ _('Item ID') }}: {{ _display_item_id }}">
@@ -420,11 +421,10 @@
                                 'matrix': 'fas fa-table text-orange-600',
                                 'plugin': 'fas fa-puzzle-piece text-teal-600'
                             }.get(item_type, 'fas fa-circle text-gray-400') %}
-                            {% if is_sub_item or is_subsection_item %}
-                                    <span class="ml-6 flex items-center gap-2"><i class="{{ _item_type_icon }} w-4 h-4 flex-shrink-0" aria-hidden="true"></i><span class="text-gray-600">{{ item_label_content(item_type, item_instance) }}</span></span>
-                                {% else %}
-                                    <span class="flex items-center gap-2"><i class="{{ _item_type_icon }} w-4 h-4 flex-shrink-0" aria-hidden="true"></i><span class="font-medium {{ 'text-gray-500' if is_archived else '' }}">{{ item_label_content(item_type, item_instance) }}</span></span>
-                                {% endif %}
+                                <div class="fb-table-label-cell{% if is_sub_item or is_subsection_item %} fb-table-label-cell--nested{% endif %}">
+                                    <i class="{{ _item_type_icon }} w-4 h-4 flex-shrink-0" aria-hidden="true"></i>
+                                    <span class="fb-table-label-cell__text {% if is_sub_item or is_subsection_item %}text-gray-600{% else %}font-medium {{ 'text-gray-500' if is_archived else '' }}{% endif %}">{{ item_label_content(item_type, item_instance) }}</span>
+                                </div>
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/4">
                                 {% if is_archived %}

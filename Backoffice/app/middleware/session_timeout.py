@@ -4,9 +4,10 @@ Session Timeout Middleware
 Handles session timeout checking and user logout for inactive sessions.
 """
 
-from flask import session, redirect, url_for
+from flask import session, redirect, url_for, request
 from flask_login import logout_user, current_user
-from app.utils.request_utils import is_static_asset_request
+from app.utils.request_utils import is_static_asset_request, is_json_request
+from app.utils.api_responses import json_auth_required
 from app.utils.redirect_utils import get_current_relative_url
 from datetime import datetime, timezone
 from config import Config
@@ -16,6 +17,13 @@ from app.services.user_analytics_service import (
     is_session_blacklisted,
 )
 from contextlib import suppress
+
+
+def _session_auth_failure_response():
+    """Return JSON 401 for AJAX/API requests; HTML redirect for normal navigation."""
+    if is_json_request():
+        return json_auth_required('Your session has expired. Please log in again.')
+    return redirect(url_for('auth.login', next=get_current_relative_url()))
 
 
 def check_session_timeout():
@@ -37,8 +45,6 @@ def handle_session_timeout():
     Middleware function to check and handle session timeouts.
     Should be called in before_request hook.
     """
-    from flask import request
-
     # Static assets: avoid DB via Flask-Login user load on every CSS/JS request
     if is_static_asset_request(request):
         return None
@@ -61,7 +67,7 @@ def handle_session_timeout():
         logout_user()
         session.clear()
         remove_session_from_blacklist(_sid)
-        return redirect(url_for('auth.login', next=get_current_relative_url()))
+        return _session_auth_failure_response()
 
     # Check session timeout using the centralized function
     if check_session_timeout():
@@ -74,8 +80,7 @@ def handle_session_timeout():
         remove_session_from_blacklist(_sid)
         # Fully clear the session to prevent stale session_id from re-triggering
         session.clear()
-        # Redirect to login page, preserving intended page for after re-login
-        return redirect(url_for('auth.login', next=get_current_relative_url()))
+        return _session_auth_failure_response()
 
     return None
 

@@ -142,8 +142,30 @@
         }
     ];
 
+    function pinInactiveAssignmentsToBottom(nodes) {
+        if (!nodes || !nodes.length) return;
+        var active = [];
+        var inactive = [];
+        for (var i = 0; i < nodes.length; i++) {
+            var node = nodes[i];
+            if (node.data && node.data.is_active === false) {
+                inactive.push(node);
+            } else {
+                active.push(node);
+            }
+        }
+        nodes.length = 0;
+        Array.prototype.push.apply(nodes, active);
+        Array.prototype.push.apply(nodes, inactive);
+    }
+
     function initializeGrid() {
         var result = AgGridHelper.create('assignmentsGrid', 'assignments', columnDefs, assignmentsData, {
+            gridOptions: {
+                postSortRows: function (params) {
+                    pinInactiveAssignmentsToBottom(params.nodes);
+                }
+            },
             onReady: function (api, helper) {
                 AgGridHelper.pinActionsColumn(api, null, helper && helper.columnVisibilityManager);
                 var urlParams = new URLSearchParams(window.location.search);

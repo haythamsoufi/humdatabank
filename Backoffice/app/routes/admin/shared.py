@@ -90,13 +90,19 @@ def _auto_login_system_manager_if_debug():
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        is_json_request = _is_json_request()
+
         if not current_app.config.get('DEBUG_SKIP_LOGIN'):
             if not current_user.is_authenticated:
+                if is_json_request:
+                    return json_auth_required()
                 flash("Access denied. Please log in.", "warning")
                 return redirect(url_for("auth.login", next=get_current_relative_url()))
             # RBAC-only: allow into /admin only if the user is a system manager,
             # or has at least one admin permission (routes still gate specifics).
             if not AuthorizationService.is_admin(current_user):
+                if is_json_request:
+                    return json_forbidden('Admin privileges required.')
                 flash("Access denied. Admin privileges required.", "warning")
                 return redirect(url_for("main.dashboard"))
         else:  # pragma: no cover -- DEBUG_SKIP_LOGIN

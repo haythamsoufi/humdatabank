@@ -163,12 +163,32 @@ class TestHandleSessionTimeout:
                  patch("app.middleware.session_timeout.logout_user") as mock_logout, \
                  patch("app.middleware.session_timeout.remove_session_from_blacklist") as mock_remove, \
                  patch("app.middleware.session_timeout.session",
-                       {"session_id": "blacklisted-sid"}):
+                       {"session_id": "blacklisted-sid"}), \
+                 patch("app.middleware.session_timeout.is_json_request", return_value=False):
                 result = handle_session_timeout()
                 mock_logout.assert_called_once()
                 mock_remove.assert_called_once_with("blacklisted-sid")
                 assert result is not None  # redirect
                 assert result.status_code == 302
+
+    def test_blacklisted_session_json_returns_401(self, app):
+        with app.test_request_context(
+            "/admin/api/refresh-csrf-token",
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        ):
+            with patch("app.middleware.session_timeout.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.session_timeout.is_session_blacklisted",
+                       return_value=True), \
+                 patch("app.middleware.session_timeout.logout_user") as mock_logout, \
+                 patch("app.middleware.session_timeout.remove_session_from_blacklist") as mock_remove, \
+                 patch("app.middleware.session_timeout.session",
+                       {"session_id": "blacklisted-sid"}), \
+                 patch("app.middleware.session_timeout.is_json_request", return_value=True):
+                result = handle_session_timeout()
+                mock_logout.assert_called_once()
+                assert result is not None
+                assert result.status_code == 401
 
     def test_timed_out_session_redirects_to_login(self, app):
         with app.test_request_context("/dashboard"):
@@ -182,13 +202,37 @@ class TestHandleSessionTimeout:
                  patch("app.middleware.session_timeout.logout_user") as mock_logout, \
                  patch("app.middleware.session_timeout.remove_session_from_blacklist") as mock_remove, \
                  patch("app.middleware.session_timeout.session",
-                       {"session_id": "expired-sid"}):
+                       {"session_id": "expired-sid"}), \
+                 patch("app.middleware.session_timeout.is_json_request", return_value=False):
                 result = handle_session_timeout()
                 mock_end.assert_called_once_with("expired-sid", "timeout")
                 mock_logout.assert_called_once()
                 mock_remove.assert_called_once_with("expired-sid")
                 assert result is not None
                 assert result.status_code == 302
+
+    def test_timed_out_session_json_returns_401(self, app):
+        with app.test_request_context(
+            "/admin/api/refresh-csrf-token",
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        ):
+            with patch("app.middleware.session_timeout.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.session_timeout.is_session_blacklisted",
+                       return_value=False), \
+                 patch("app.middleware.session_timeout.check_session_timeout",
+                       return_value=True), \
+                 patch("app.middleware.session_timeout.end_user_session") as mock_end, \
+                 patch("app.middleware.session_timeout.logout_user") as mock_logout, \
+                 patch("app.middleware.session_timeout.remove_session_from_blacklist") as mock_remove, \
+                 patch("app.middleware.session_timeout.session",
+                       {"session_id": "expired-sid"}), \
+                 patch("app.middleware.session_timeout.is_json_request", return_value=True):
+                result = handle_session_timeout()
+                mock_end.assert_called_once_with("expired-sid", "timeout")
+                mock_logout.assert_called_once()
+                assert result is not None
+                assert result.status_code == 401
 
     def test_active_session_returns_none(self, app):
         with app.test_request_context("/dashboard"):

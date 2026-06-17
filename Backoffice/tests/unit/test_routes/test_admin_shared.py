@@ -31,11 +31,31 @@ class TestAdminRequired:
                  patch("app.routes.admin.shared.redirect", side_effect=lambda loc, **kw: ("redirect", loc)) as mock_redirect, \
                  patch("app.routes.admin.shared.url_for", return_value="/login"), \
                  patch("app.routes.admin.shared.get_current_relative_url", return_value="/admin/"), \
-                 patch("app.routes.admin.shared.flash"):
+                 patch("app.routes.admin.shared.flash"), \
+                 patch("app.routes.admin.shared._is_json_request", return_value=False):
                 mock_user.is_authenticated = False
                 app.config["DEBUG_SKIP_LOGIN"] = False
                 result = dummy_view()
         assert result == ("redirect", "/login")
+
+    def test_unauthenticated_json_returns_401(self, app, db_session):
+        from app.routes.admin.shared import admin_required
+
+        @admin_required
+        def dummy_view():
+            return _mock_view()
+
+        with app.test_request_context(
+            "/admin/api/refresh-csrf-token",
+            method="GET",
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        ):
+            with patch("app.routes.admin.shared.current_user") as mock_user, \
+                 patch("app.routes.admin.shared._is_json_request", return_value=True):
+                mock_user.is_authenticated = False
+                app.config["DEBUG_SKIP_LOGIN"] = False
+                resp = dummy_view()
+        assert resp.status_code == 401
 
     def test_non_admin_user_redirects_to_dashboard(self, app, db_session):
         from app.routes.admin.shared import admin_required
@@ -49,11 +69,32 @@ class TestAdminRequired:
                  patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=False), \
                  patch("app.routes.admin.shared.redirect", side_effect=lambda loc, **kw: ("redirect", loc)), \
                  patch("app.routes.admin.shared.url_for", return_value="/dashboard"), \
-                 patch("app.routes.admin.shared.flash"):
+                 patch("app.routes.admin.shared.flash"), \
+                 patch("app.routes.admin.shared._is_json_request", return_value=False):
                 mock_user.is_authenticated = True
                 app.config["DEBUG_SKIP_LOGIN"] = False
                 result = dummy_view()
         assert "redirect" in result
+
+    def test_non_admin_user_json_returns_403(self, app, db_session):
+        from app.routes.admin.shared import admin_required
+
+        @admin_required
+        def dummy_view():
+            return _mock_view()
+
+        with app.test_request_context(
+            "/admin/api/refresh-csrf-token",
+            method="GET",
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        ):
+            with patch("app.routes.admin.shared.current_user") as mock_user, \
+                 patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=False), \
+                 patch("app.routes.admin.shared._is_json_request", return_value=True):
+                mock_user.is_authenticated = True
+                app.config["DEBUG_SKIP_LOGIN"] = False
+                resp = dummy_view()
+        assert resp.status_code == 403
 
     def test_admin_user_proceeds(self, app, db_session):
         from app.routes.admin.shared import admin_required

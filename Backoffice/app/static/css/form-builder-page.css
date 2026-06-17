@@ -146,3 +146,37 @@
     color: var(--btn-warning-hover);
     background-color: rgba(234, 88, 12, 0.1);
 }
+
+/* -------------------------------------------------------------------------- */
+/* Items table: shared order / label layout for items and subsection headers  */
+/* -------------------------------------------------------------------------- */
+#form-builder-ui .fb-table-order-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+#form-builder-ui .fb-table-order-toggle-placeholder {
+    display: inline-flex;
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+}
+#form-builder-ui .fb-table-order-number {
+    font-variant-numeric: tabular-nums;
+}
+#form-builder-ui .fb-table-label-cell {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+#form-builder-ui .fb-table-label-cell__text {
+    min-width: 0;
+}
+#form-builder-ui .fb-table-order-cell--nested,
+#form-builder-ui .fb-table-label-cell--nested {
+    padding-left: 1.5rem;
+}
+#form-builder-ui tr.subsection-header-row .fb-table-order-number {
+    font-weight: 600;
+    color: #0f766e;
+}

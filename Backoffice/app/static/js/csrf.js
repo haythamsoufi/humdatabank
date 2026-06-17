@@ -8,44 +8,90 @@ function getCSRFToken() {
     return metaTag.getAttribute('content');
 }
 
+function shouldUseAdminCsrfRefresh() {
+    return window.location.pathname.startsWith('/admin');
+}
+
+let csrfRefreshTimerId = null;
+let csrfSessionExpired = false;
+
+function handleCsrfSessionExpired() {
+    if (csrfSessionExpired) return;
+    csrfSessionExpired = true;
+    if (csrfRefreshTimerId !== null) {
+        clearInterval(csrfRefreshTimerId);
+        csrfRefreshTimerId = null;
+    }
+}
+
+function applyCsrfToken(token) {
+    if (!token) return null;
+
+    const metaTag = document.querySelector('meta[name="csrf-token"]');
+    if (metaTag) {
+        metaTag.setAttribute('content', token);
+    }
+
+    document.querySelectorAll('input[name="csrf_token"]').forEach(input => {
+        input.value = token;
+    });
+
+    if (window.rawCsrfTokenValue !== undefined) {
+        window.rawCsrfTokenValue = token;
+    }
+
+    return token;
+}
+
+async function refreshCSRFTokenViaAdminApi() {
+    const response = await fetch('/admin/api/refresh-csrf-token', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin',
+        cache: 'no-cache'
+    });
+
+    if (response.status === 401 || response.status === 403) {
+        handleCsrfSessionExpired();
+        return null;
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!response.ok || !contentType.includes('application/json')) {
+        if (response.redirected || contentType.includes('text/html')) {
+            handleCsrfSessionExpired();
+            return null;
+        }
+        throw new Error('Admin CSRF refresh returned non-JSON response');
+    }
+
+    const data = await response.json();
+    if (data.csrf_token) {
+        return applyCsrfToken(data.csrf_token);
+    }
+
+    throw new Error('Failed to refresh CSRF token');
+}
+
 // Function to refresh CSRF token
 async function refreshCSRFToken() {
+    if (csrfSessionExpired) return null;
+
     try {
-        const response = await fetch('/admin/api/refresh-csrf-token', {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            credentials: 'same-origin', // Ensure session cookies are sent
-            cache: 'no-cache' // Always get fresh token
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            if (data.csrf_token) {
-                // Update meta tag
-                const metaTag = document.querySelector('meta[name="csrf-token"]');
-                if (metaTag) {
-                    metaTag.setAttribute('content', data.csrf_token);
-                }
-
-                // Update all hidden CSRF inputs in forms
-                document.querySelectorAll('input[name="csrf_token"]').forEach(input => {
-                    input.value = data.csrf_token;
-                });
-
-                // Update any JavaScript variables that hold the CSRF token
-                if (window.rawCsrfTokenValue !== undefined) {
-                    window.rawCsrfTokenValue = data.csrf_token;
-                }
-
-                return data.csrf_token;
-            }
+        if (shouldUseAdminCsrfRefresh()) {
+            return await refreshCSRFTokenViaAdminApi();
         }
-        throw new Error('Failed to refresh CSRF token');
+        if (typeof refreshCsrfFromCurrentPage === 'function') {
+            return await refreshCsrfFromCurrentPage();
+        }
+        return null;
     } catch (error) {
-        console.error('Error refreshing CSRF token:', error);
+        if (!csrfSessionExpired) {
+            console.warn('Error refreshing CSRF token:', error);
+        }
         return null;
     }
 }
@@ -66,13 +112,9 @@ async function refreshCsrfFromCurrentPage() {
         if (!response.ok) return null;
         const html = await response.text();
         const doc = new DOMParser().parseFromString(html, 'text/html');
-        const newToken = doc.querySelector('input[name="csrf_token"]')?.value;
-        if (!newToken) return null;
-        const metaTag = document.querySelector('meta[name="csrf-token"]');
-        if (metaTag) metaTag.setAttribute('content', newToken);
-        document.querySelectorAll('input[name="csrf_token"]').forEach(input => { input.value = newToken; });
-        if (window.rawCsrfTokenValue !== undefined) window.rawCsrfTokenValue = newToken;
-        return newToken;
+        const newToken = doc.querySelector('input[name="csrf_token"]')?.value
+            || doc.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        return applyCsrfToken(newToken);
     } catch (error) {
         console.warn('Failed to refresh CSRF token from page:', error);
         return null;
@@ -104,8 +146,9 @@ document.addEventListener('DOMContentLoaded', function() {
         originalSend.apply(this, arguments);
     };
 
-    // Periodically refresh CSRF token (every 45 minutes)
-    setInterval(refreshCSRFToken, 45 * 60 * 1000);
+    // Periodically refresh CSRF token (every 45 minutes).
+    // Admin pages use /admin/api/refresh-csrf-token; other pages re-fetch the current page.
+    csrfRefreshTimerId = setInterval(refreshCSRFToken, 45 * 60 * 1000);
 });
 
 // Enhanced fetch wrapper that handles CSRF token expiration

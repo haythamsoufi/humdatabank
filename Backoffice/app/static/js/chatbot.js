@@ -1121,6 +1121,7 @@ class HumDatabankChatbot {
         const canInit = this.elements.widget && (this.elements.fab || this._isImmersive());
         if (canInit) {
             this._initFloatingDrag();
+            this._initFabDrag();
             this.setupEventListeners();
             this.loadConversationHistory();
             this.loadExpandedState();
@@ -1649,6 +1650,257 @@ class HumDatabankChatbot {
                 }
             } catch (_) {}
         };
+    }
+
+    _initFabDrag() {
+        const fab = this.elements && this.elements.fab;
+        if (!fab || this._isImmersive()) return;
+
+        // Init logs always print (no flag needed — they fire once at page load).
+        // Interaction logs are gated so they don't spam during normal use.
+        const ilog = (...a) => console.log('[FAB drag]', ...a);
+        const dlog = (...a) => window.CHATBOT_DEBUG && console.log('[FAB drag]', ...a);
+
+        const STORAGE_KEY    = 'chatbot_fab_pos';
+        const DRAG_THRESHOLD = 5;   // px movement before drag mode activates
+        const EDGE_MARGIN    = 16;  // px gap between FAB and screen edge when snapped
+        const VIEWPORT_PAD   = 8;   // min clearance from viewport edges during free drag
+        const NAV_BAR_HEIGHT = 64;  // approx top-nav height (h-14 = 56 px + 8 px buffer)
+        const FAB_SIZE       = 56;  // matches --chat-fab-size CSS variable
+
+        let isDragging  = false;
+        let hasDragged  = false;
+        let startX = 0, startY = 0;
+        let baseLeft = 0, baseTop = 0;
+        let currentDx = 0, currentDy = 0;
+        // BoundingRect captured on pointerdown — applied to DOM only if drag threshold is exceeded.
+        let pendingRect = null;
+
+        const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+        // Safe clamp that returns lo when any value is non-finite (catches NaN / Infinity).
+        const safeClamp = (v, lo, hi) => {
+            if (!isFinite(v)) return lo;
+            if (!isFinite(hi) || hi < lo) return lo;
+            return clamp(v, lo, hi);
+        };
+
+        // Apply left/top anchoring. Called only once the drag threshold is exceeded — never on a plain click.
+        const initBasePos = () => {
+            if (fab.classList.contains('fab-dragged')) {
+                baseLeft = parseFloat(fab.style.left)  || 0;
+                baseTop  = parseFloat(fab.style.top)   || 0;
+                dlog('initBasePos (already dragged): left=%d top=%d', baseLeft, baseTop);
+            } else if (pendingRect) {
+                baseLeft = pendingRect.left;
+                baseTop  = pendingRect.top;
+                fab.style.bottom = '';
+                fab.style.right  = '';
+                fab.style.left   = baseLeft + 'px';
+                fab.style.top    = baseTop  + 'px';
+                fab.classList.add('fab-dragged');
+                dlog('initBasePos (first drag): left=%d top=%d', baseLeft, baseTop);
+            }
+            pendingRect = null;
+        };
+
+        const setTranslate = (dx, dy) => {
+            fab.style.transform = `translate(${dx}px,${dy}px) scale(1.1)`;
+        };
+
+        const clearTranslate = () => {
+            fab.style.transform = '';
+        };
+
+        // Snap finished position to nearest vertical edge with a spring animation.
+        const snapToEdge = (rawLeft, rawTop) => {
+            const mid         = (window.innerWidth - FAB_SIZE) / 2;
+            const minTop      = NAV_BAR_HEIGHT + VIEWPORT_PAD;
+            const snappedLeft = rawLeft <= mid
+                ? EDGE_MARGIN
+                : window.innerWidth - FAB_SIZE - EDGE_MARGIN;
+            const snappedTop  = clamp(rawTop, minTop, window.innerHeight - FAB_SIZE - VIEWPORT_PAD);
+
+            dlog('snapToEdge: rawLeft=%d → snappedLeft=%d top=%d', rawLeft, snappedLeft, snappedTop);
+
+            fab.classList.add('fab-snapping');
+            fab.style.left = snappedLeft + 'px';
+            fab.style.top  = snappedTop  + 'px';
+            baseLeft = snappedLeft;
+            baseTop  = snappedTop;
+
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ left: snappedLeft, top: snappedTop, v: 2 }));
+            } catch (_) {}
+
+            fab.addEventListener('transitionend', () => {
+                fab.classList.remove('fab-snapping');
+            }, { once: true });
+        };
+
+        // ── Pointer Events ──────────────────────────────────────────────────────
+        fab.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+            // Snapshot current rect — applied to DOM only if drag threshold is exceeded.
+            // We must NOT call e.preventDefault() here: that would swallow the subsequent
+            // click event and prevent toggleChat() from firing on a plain tap/click.
+            // Scroll-prevention on touch is handled by `touch-action: none` in CSS.
+            pendingRect = fab.getBoundingClientRect();
+            isDragging  = true;
+            hasDragged  = false;
+            currentDx   = 0;
+            currentDy   = 0;
+            startX      = e.clientX;
+            startY      = e.clientY;
+            fab.setPointerCapture(e.pointerId);
+            fab.classList.remove('fab-snapping');
+            dlog('pointerdown at (%d,%d) fab rect=(%d,%d)', e.clientX, e.clientY, pendingRect.left, pendingRect.top);
+        });
+
+        fab.addEventListener('pointermove', (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            if (!hasDragged && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+
+            if (!hasDragged) {
+                hasDragged = true;
+                initBasePos();  // Switch to left/top anchoring now that we know it's a drag
+                fab.classList.add('fab-dragging');
+                dlog('drag started: base=(%d,%d)', baseLeft, baseTop);
+            }
+
+            const minTop = NAV_BAR_HEIGHT + VIEWPORT_PAD;
+            // Clamp so the FAB never leaves the viewport during drag.
+            currentDx = clamp(baseLeft + dx, VIEWPORT_PAD, window.innerWidth  - FAB_SIZE - VIEWPORT_PAD) - baseLeft;
+            currentDy = clamp(baseTop  + dy, minTop,        window.innerHeight - FAB_SIZE - VIEWPORT_PAD) - baseTop;
+            setTranslate(currentDx, currentDy);
+        });
+
+        const endDrag = (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            pendingRect = null;
+            dlog('endDrag: hasDragged=%s event=%s', hasDragged, e.type);
+
+            if (hasDragged) {
+                const minTop    = NAV_BAR_HEIGHT + VIEWPORT_PAD;
+                const finalLeft = clamp(baseLeft + currentDx, VIEWPORT_PAD, window.innerWidth  - FAB_SIZE - VIEWPORT_PAD);
+                const finalTop  = clamp(baseTop  + currentDy, minTop,        window.innerHeight - FAB_SIZE - VIEWPORT_PAD);
+                dlog('drag end: final=(%d,%d)', finalLeft, finalTop);
+
+                clearTranslate();
+                fab.style.left = finalLeft + 'px';
+                fab.style.top  = finalTop  + 'px';
+                baseLeft = finalLeft;
+                baseTop  = finalTop;
+
+                fab.classList.remove('fab-dragging');
+                snapToEdge(finalLeft, finalTop);
+
+                // Suppress the next click so the chat widget does not open after a drag.
+                fab.addEventListener('click', (ce) => {
+                    dlog('click suppressed after drag');
+                    ce.stopImmediatePropagation();
+                }, { once: true, capture: true });
+            } else {
+                // Plain click — no DOM changes, let the existing click handler fire normally.
+                dlog('plain click (no drag) — letting click event through');
+                clearTranslate();
+                fab.classList.remove('fab-dragging');
+            }
+        };
+
+        fab.addEventListener('pointerup',     endDrag);
+        fab.addEventListener('pointercancel', endDrag);
+
+        // ── Restore & resize ────────────────────────────────────────────────────
+        this._restoreFabPos = () => {
+            try {
+                const raw   = localStorage.getItem(STORAGE_KEY);
+                const saved = raw ? JSON.parse(raw) : null;
+
+                // Validate: must have finite numeric left/top.
+                // Note: typeof NaN === 'number', so isFinite() is required.
+                const valid = saved
+                    && typeof saved.left === 'number' && isFinite(saved.left)
+                    && typeof saved.top  === 'number' && isFinite(saved.top);
+
+                if (!valid) {
+                    if (raw) {
+                        ilog('clearing invalid/stale saved position:', raw);
+                        localStorage.removeItem(STORAGE_KEY);
+                    }
+                    return;
+                }
+
+                // Re-derive the correct edge position for the current viewport.
+                // saved.left tells us which EDGE the FAB was on (left vs right).
+                // We recalculate the exact pixel offset fresh so the FAB is always
+                // on a proper edge even if the viewport has changed since the save.
+                const minTop      = NAV_BAR_HEIGHT + VIEWPORT_PAD;
+                const mid         = (window.innerWidth - FAB_SIZE) / 2;
+                const isRightEdge = saved.left >= mid;
+                const cl = isRightEdge
+                    ? window.innerWidth - FAB_SIZE - EDGE_MARGIN
+                    : EDGE_MARGIN;
+                const ct = safeClamp(saved.top, minTop, window.innerHeight - FAB_SIZE - VIEWPORT_PAD);
+
+                ilog('restoring FAB — edge=%s stored=(left=%d,top=%d) placing=(left=%d,top=%d)',
+                    isRightEdge ? 'right' : 'left', saved.left, saved.top, cl, ct);
+
+                fab.style.bottom = '';
+                fab.style.right  = '';
+                fab.style.left   = cl + 'px';
+                fab.style.top    = ct + 'px';
+                fab.classList.add('fab-dragged');
+                baseLeft = cl;
+                baseTop  = ct;
+            } catch (err) {
+                ilog('error restoring FAB position, clearing storage:', err);
+                try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+            }
+        };
+
+        // Re-snap to the correct edge whenever the viewport resizes.
+        window.addEventListener('resize', () => {
+            if (!fab.classList.contains('fab-dragged') || isDragging) return;
+            const minTop = NAV_BAR_HEIGHT + VIEWPORT_PAD;
+            const cl = safeClamp(baseLeft, VIEWPORT_PAD, window.innerWidth  - FAB_SIZE - VIEWPORT_PAD);
+            const ct = safeClamp(baseTop,  minTop,        window.innerHeight - FAB_SIZE - VIEWPORT_PAD);
+            snapToEdge(cl, ct);
+        });
+
+        // Restore saved position immediately on initialisation.
+        this._restoreFabPos();
+        ilog('_initFabDrag complete — fab-dragged=%s left=%s top=%s',
+            fab.classList.contains('fab-dragged'), fab.style.left || 'css-default', fab.style.top || 'css-default');
+
+        // Post-render diagnostic: runs after the first paint so computed styles reflect reality.
+        requestAnimationFrame(() => {
+            try {
+                const cs   = window.getComputedStyle(fab);
+                const rect = fab.getBoundingClientRect();
+                ilog('POST-PAINT — opacity=%s visibility=%s display=%s zIndex=%s',
+                    cs.opacity, cs.visibility, cs.display, cs.zIndex);
+                ilog('POST-PAINT — computed left=%s top=%s transform=%s',
+                    cs.left, cs.top, cs.transform);
+                ilog('POST-PAINT — bounding rect left=%d top=%d w=%d h=%d',
+                    Math.round(rect.left), Math.round(rect.top), Math.round(rect.width), Math.round(rect.height));
+                ilog('POST-PAINT — classList: %s', Array.from(fab.classList).join(' '));
+                if (rect.width > 0 && rect.height > 0) {
+                    const cx  = rect.left + rect.width  / 2;
+                    const cy  = rect.top  + rect.height / 2;
+                    const hit = document.elementFromPoint(cx, cy);
+                    ilog('POST-PAINT — element at FAB center (%d,%d): <%s id="%s">',
+                        Math.round(cx), Math.round(cy),
+                        hit ? hit.tagName.toLowerCase() : 'none',
+                        hit ? (hit.id || hit.className || '?') : '');
+                }
+            } catch (_) {}
+        });
     }
 
     toggleChat(forceOpen) {

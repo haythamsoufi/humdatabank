@@ -8,13 +8,17 @@
         <i class="fas fa-chevron-left" aria-hidden="true"></i>
     </button>
     <div class="year-picker-input-wrap">
-        <i class="fas fa-calendar-alt year-picker-icon" aria-hidden="true"></i>
-        <input type="number"
+        <button type="button" class="year-picker-calendar-toggle" data-year-picker-calendar
+                aria-label="{{ _('Open year calendar') }}" aria-haspopup="listbox" aria-expanded="false">
+            <i class="fas fa-calendar-alt" aria-hidden="true"></i>
+        </button>
+        <input type="text"
                id="{{ input_id }}"
                class="year-picker-input"
-               min="{{ min }}"
-               max="{{ max }}"
+               maxlength="4"
                inputmode="numeric"
+               pattern="[0-9]{4}"
+               autocomplete="off"
                data-year-min="{{ min }}"
                data-year-max="{{ max }}"
                aria-label="{{ label or _('Year') }}">

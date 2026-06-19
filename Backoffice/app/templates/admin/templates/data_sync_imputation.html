@@ -206,6 +206,16 @@
     'attributes': {'id': 'data-sync-open-btn', 'title': _('Sync data from external API')}
 }) %}
 {% endif %}
+{% if template.id in [22, 23, 24, 25] %}
+{% set __ = header_actions.items.append({
+    'type': 'link',
+    'text': _('UPR Excel Sync'),
+    'icon': 'fas fa-file-excel',
+    'url': url_for('upr_excel_import.wizard'),
+    'classes': 'professional-action-btn professional-action-btn-green',
+    'attributes': {'title': _('Import from UPR Master Excel workbook')}
+}) %}
+{% endif %}
 {% call page_header(
     title=_('Data Sync & Imputation'),
     icon='fas fa-sync-alt',
@@ -651,7 +661,7 @@ document.addEventListener('DOMContentLoaded', function() {
         templateSelector.addEventListener('change', function() {
             const templateId = this.value;
             if (!templateId || !urlTemplate) return;
-            window.location.href = urlTemplate.replace('/0', '/' + encodeURIComponent(templateId));
+            window.location.href = urlTemplate.replace(/\/0$/, '/' + encodeURIComponent(templateId));
         });
     }
 
@@ -761,7 +771,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Handle save all button
-    saveAllBtn.addEventListener('click', function() {
+    if (saveAllBtn) saveAllBtn.addEventListener('click', function() {
         if (pendingChanges.size === 0) return;
 
         // Disable button during save
@@ -822,14 +832,16 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function updateSaveAllButton() {
+        if (!saveAllBtn) return;
+        const svgCheck = '<svg class="h-4 w-4 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
         if (pendingChanges.size > 0) {
             saveAllBtn.disabled = false;
             saveAllBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            saveAllBtn.textContent = `Save All Changes (${pendingChanges.size})`;
+            saveAllBtn.innerHTML = svgCheck + `Save All Changes (${pendingChanges.size})`;
         } else {
             saveAllBtn.disabled = true;
             saveAllBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            saveAllBtn.textContent = 'Save All Changes';
+            saveAllBtn.innerHTML = svgCheck + 'Save All Changes';
         }
     }
 
@@ -857,6 +869,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let currentPreviewData = [];
     let allPreviewData = []; // Store unfiltered data
+    let currentLoadMode = 'data'; // 'data' | 'imputation' — tracks which action last loaded the grid
 
     // Helper function to format numbers with thousands separators
     function formatNumber(value) {
@@ -1065,6 +1078,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function loadPreviewData(year) {
+        currentLoadMode = 'data';
         showPreviewLoading('Loading preview data...', 'Initializing...');
         loadPreviewDataChunked(year, 0, []);
     }
@@ -1121,6 +1135,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function previewImputation(year, sourcePeriod) {
+        currentLoadMode = 'imputation';
         showPreviewLoading('Calculating imputation...', 'Initializing calculations...');
         window.__clientLog && window.__clientLog('Starting imputation preview for year:', year);
         previewImputationChunked(year, 0, [], sourcePeriod);
@@ -1271,8 +1286,7 @@ document.addEventListener('DOMContentLoaded', function() {
     previewCountryFilter.addEventListener('change', function() {
         const year = previewYearInput.value;
         if (year && allPreviewData.length > 0) {
-            const currentAction = previewLoadingText.textContent.includes('Calculating') ? 'imputation' : 'data';
-            if (currentAction === 'imputation') {
+            if (currentLoadMode === 'imputation') {
                 previewImputation(year, previewSourcePeriodSelect.value || null);
             } else {
                 loadPreviewData(year);
@@ -1283,8 +1297,7 @@ document.addEventListener('DOMContentLoaded', function() {
     previewItemFilter.addEventListener('change', function() {
         const year = previewYearInput.value;
         if (year && allPreviewData.length > 0) {
-            const currentAction = previewLoadingText.textContent.includes('Calculating') ? 'imputation' : 'data';
-            if (currentAction === 'imputation') {
+            if (currentLoadMode === 'imputation') {
                 previewImputation(year, previewSourcePeriodSelect.value || null);
             } else {
                 loadPreviewData(year);
@@ -1295,8 +1308,7 @@ document.addEventListener('DOMContentLoaded', function() {
     previewTypeFilter.addEventListener('change', function() {
         const year = previewYearInput.value;
         if (year && allPreviewData.length > 0) {
-            const currentAction = previewLoadingText.textContent.includes('Calculating') ? 'imputation' : 'data';
-            if (currentAction === 'imputation') {
+            if (currentLoadMode === 'imputation') {
                 previewImputation(year, previewSourcePeriodSelect.value || null);
             } else {
                 loadPreviewData(year);
@@ -1366,38 +1378,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 100);
         }
 
-        // Old table rendering code removed - using AG Grid now
-        /*
-        data.forEach(row => {
-            const tr = document.createElement('tr');
-            tr.className = 'hover:bg-gray-50';
-
-            tr.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${row.country}</td>
-                <td class="px-6 py-4 text-sm text-gray-900">
-                    <div class="font-medium">${row.item_label}</div>
-                    ${row.item_unit ? `<div class="text-xs text-gray-500">${row.item_unit}</div>` : ''}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${row.current_value !== null ? formatNumber(row.current_value) : '<span class="text-gray-400 italic">No data</span>'}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${row.imputed_value !== null ?
-                        `<span class="text-blue-600 font-medium">${formatNumber(row.imputed_value)}</span>` :
-                        '<span class="text-gray-400 italic">-</span>'
-                    }
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    ${row.method || '-'}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    ${row.source_periods ? row.source_periods.join(', ') : '-'}
-                </td>
-            `;
-
-        });
-        */
-
         previewTableContainer.classList.remove('hidden');
 
         // Re-enable preview actions
@@ -1413,6 +1393,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Preview grid initialization is handled in the extra_js block
 
+    {% if has_data_sync %}
     // Data Sync modal
     const dataSyncOpenBtn = document.getElementById('data-sync-open-btn');
     const dataSyncModal = document.getElementById('data-sync-modal');
@@ -1739,6 +1720,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            if (dataSyncUIMode === 'running') {
+                e.preventDefault();
+                e.stopPropagation();
+            } else if (!dataSyncModal.classList.contains('hidden')) {
+                closeDataSyncModal();
+            }
+        }
+    });
+
     if (dataSyncRunBtn) {
         dataSyncRunBtn.addEventListener('click', function() {
             const params = collectDataSyncParams();
@@ -1808,6 +1800,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+    {% endif %}
 
     // Close dropdowns when clicking outside
     document.addEventListener('click', function() {

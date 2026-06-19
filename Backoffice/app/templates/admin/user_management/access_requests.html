@@ -165,6 +165,7 @@
             maxWidth: 300,
             filter: 'agTextColumnFilter',
             sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'overflow-wrap': 'break-word', 'line-height': '1.4', 'overflow': 'hidden', 'max-width': '100%' },
             cellRenderer: function(params) {
                 return AgGridRenderers.userHoverCell(params, {
                     idField: 'user_id',
@@ -274,6 +275,7 @@
             maxWidth: 300,
             filter: 'agTextColumnFilter',
             sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'overflow-wrap': 'break-word', 'line-height': '1.4', 'overflow': 'hidden', 'max-width': '100%' },
             cellRenderer: function(params) {
                 return AgGridRenderers.userHoverCell(params, {
                     idField: 'user_id',

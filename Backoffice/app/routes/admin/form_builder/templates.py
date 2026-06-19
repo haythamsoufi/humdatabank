@@ -1798,11 +1798,12 @@ def manage_template_variables(template_id):
     # Get version_id from query parameter (for both GET and POST)
     version_id = request.args.get('version_id', type=int)
     if not version_id and request.method == 'POST':
-        # Try to get from JSON body
+        # Try to get from JSON body (unwraps WAF { payload: b64 } envelope when present)
         with suppress(Exception):
-            json_data = get_json_safe()
-            if json_data and 'version_id' in json_data:
-                version_id = json_data.get('version_id', type=int)
+            post_data = get_request_data()
+            vid = post_data.get('version_id')
+            if vid is not None:
+                version_id = int(vid)
 
     # Determine which version to use
     version = None
@@ -1824,27 +1825,26 @@ def manage_template_variables(template_id):
     elif request.method == 'POST':
         # Save variables
         try:
-            # Get JSON data - handle both Content-Type: application/json and form data
-            variables_data = None
-            if is_json_request():
-                variables_data = get_json_safe()
-            else:
-                # Try to parse from form data
+            # get_request_data() handles JSON bodies and unwraps WAF { payload: b64 } envelopes
+            data = get_request_data()
+            variables_dict = data.get('variables')
+
+            if variables_dict is None:
+                # Legacy form-encoded POST: variables as a JSON string field
                 variables_str = request.form.get('variables')
                 if variables_str:
                     try:
-                        variables_data = json.loads(variables_str)
+                        parsed = json.loads(variables_str)
+                        if isinstance(parsed, dict) and 'variables' in parsed:
+                            variables_dict = parsed['variables']
+                        elif isinstance(parsed, dict):
+                            variables_dict = parsed
                     except json.JSONDecodeError:
                         return json_bad_request('Invalid JSON in variables field.')
 
-            if not variables_data:
+            if variables_dict is None:
                 return json_bad_request('No data provided. Expected JSON with "variables" key.')
 
-            if 'variables' not in variables_data:
-                return json_bad_request('Invalid data format. Expected "variables" key.')
-
-            # Validate variables structure
-            variables_dict = variables_data['variables']
             if not isinstance(variables_dict, dict):
                 return json_bad_request('Variables must be a dictionary/object.')
 

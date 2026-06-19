@@ -2154,34 +2154,27 @@ class MatrixHandler {
             headerCell.classList.add('matrix-manual-row-header');
         }
 
-        // Create a wrapper div for the row label and button to ensure proper layout
-        const labelWrapper = document.createElement('div');
-        labelWrapper.style.display = 'flex';
-        labelWrapper.style.alignItems = 'center';
-        labelWrapper.style.flexWrap = 'wrap';
-        labelWrapper.style.gap = '4px';
-
         const labelSpan = document.createElement('span');
         labelSpan.textContent = rowLabel;
         labelSpan.style.wordWrap = 'break-word';
         labelSpan.style.overflowWrap = 'break-word';
-        labelWrapper.appendChild(labelSpan);
 
         // Only add remove button for manually added rows (not auto-loaded)
         if (!isAutoLoaded) {
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'remove-matrix-row-btn ml-2 text-red-600 hover:text-red-800 text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex-shrink-0';
+            btn.className = 'remove-matrix-row-btn ml-1 text-red-600 hover:text-red-800 text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200';
             btn.title = 'Remove row';
 
             const icon = document.createElement('i');
             icon.className = 'fas fa-times w-3 h-3';
             btn.appendChild(icon);
 
-            labelWrapper.appendChild(btn);
+            // Inline with label text so the X sits on the last wrapped line, not a new row
+            labelSpan.appendChild(btn);
         }
 
-        headerCell.appendChild(labelWrapper);
+        headerCell.appendChild(labelSpan);
         row.appendChild(headerCell);
 
         // Create data cells

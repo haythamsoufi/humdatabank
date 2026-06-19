@@ -628,6 +628,12 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
     max-width: 100% !important;
     box-sizing: border-box !important;
 }
+.matrix-container table td[role="rowheader"] .remove-matrix-row-btn {
+    display: inline-block !important;
+    vertical-align: middle !important;
+    max-width: none !important;
+    flex-shrink: 0 !important;
+}
 .disaggregation-inputs { overflow-x: auto; -webkit-overflow-scrolling: touch; min-height: 0; transition: none; padding-bottom: 8px; }
 .disaggregation-inputs table td:not(:first-child) { width: auto; min-width: 72px; }
 

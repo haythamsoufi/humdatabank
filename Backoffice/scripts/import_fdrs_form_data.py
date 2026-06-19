@@ -2218,6 +2218,208 @@ def row_to_payload(row: Dict[str, str]) -> Tuple[Optional[int], Optional[int], O
     return assignment_entity_status_id, public_submission_id, form_item_id, payload
 
 
+def upsert_form_data_rows(
+    rows: List[Dict[str, str]],
+    *,
+    dry_run: bool = False,
+    batch_size: int = 1000,
+    valid_form_item_ids: Optional[set] = None,
+    progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+    progress_start_pct: float = 20.0,
+    progress_end_pct: float = 100.0,
+    stats: Optional[Dict[str, int]] = None,
+) -> Dict[str, int]:
+    """Upsert ready-to-import rows into form_data (shared by FDRS and UPR Excel pipelines)."""
+    from app.extensions import db
+    from app.models.forms import FormData
+    from sqlalchemy import tuple_
+
+    from app.models.assignments import AssignmentEntityStatus
+
+    if stats is None:
+        stats = {"loaded": 0, "skipped": 0, "inserted": 0, "updated": 0, "errors": 0}
+    stats["loaded"] = len(rows)
+
+    def _check_cancel() -> None:
+        if cancel_check and cancel_check():
+            try:
+                db.session.rollback()
+            except Exception as e:
+                logger.debug("rollback on cancel failed: %s", e)
+            raise FdrsSyncCancelled()
+
+    valid_aes_ids = set(aid for (aid,) in db.session.query(AssignmentEntityStatus.id).all())
+    total_rows = len(rows)
+    span = max(progress_end_pct - progress_start_pct, 0.0)
+
+    if progress_cb:
+        progress_cb({
+            "stage": "upsert",
+            "message": "Starting upsert...",
+            "current": 0,
+            "total": total_rows,
+            "percent": progress_start_pct,
+            "stats": dict(stats),
+        })
+
+    def _maybe_report(i: int, row: Dict[str, Any]) -> None:
+        if not progress_cb:
+            return
+        _check_cancel()
+        if not (i == 1 or i % 50 == 0 or i == total_rows):
+            return
+        pct = progress_start_pct + (span * (i / total_rows)) if total_rows else progress_end_pct
+        kpi = (row.get("_debug_kpi_code") or "").strip()
+        iso3 = (row.get("_debug_iso3") or "").strip()
+        yr = (row.get("_debug_year") or "").strip()
+        details = " ".join(b for b in (iso3, yr, kpi) if b).strip()
+        msg = f"Processing {i}/{total_rows} ({pct:.1f}%)" + (f" - {details}" if details else "")
+        progress_cb({
+            "stage": "upsert",
+            "message": msg,
+            "current": i,
+            "total": total_rows,
+            "percent": pct,
+            "stats": dict(stats),
+        })
+
+    prefetch_size = max(2000, int(batch_size or 1000))
+
+    for batch_start in range(0, total_rows, prefetch_size):
+        _check_cancel()
+        batch = rows[batch_start: batch_start + prefetch_size]
+
+        # Parse every row once upfront; reuse results in both the prefetch and
+        # the main loop to avoid calling row_to_payload twice per row.
+        parsed_batch = []
+        aes_pairs_set = set()
+        pub_pairs_set = set()
+        for r in batch:
+            try:
+                p = row_to_payload(r)
+            except Exception as e:
+                logger.debug("row_to_payload failed: %s", e)
+                p = (None, None, None, {})
+            parsed_batch.append(p)
+            aes_id, pub_id, item_id, _ = p
+            if not item_id:
+                continue
+            if aes_id:
+                aes_pairs_set.add((int(aes_id), int(item_id)))
+            elif pub_id:
+                pub_pairs_set.add((int(pub_id), int(item_id)))
+
+        existing_by_aes: Dict[Tuple[int, int], FormData] = {}
+        existing_by_pub: Dict[Tuple[int, int], FormData] = {}
+        if aes_pairs_set:
+            q = FormData.query.filter(
+                tuple_(FormData.assignment_entity_status_id, FormData.form_item_id).in_(list(aes_pairs_set))
+            )
+            for fd in q.all():
+                key = (int(fd.assignment_entity_status_id), int(fd.form_item_id))
+                existing_by_aes.setdefault(key, fd)
+        if pub_pairs_set:
+            q = FormData.query.filter(
+                tuple_(FormData.public_submission_id, FormData.form_item_id).in_(list(pub_pairs_set))
+            )
+            for fd in q.all():
+                key = (int(fd.public_submission_id), int(fd.form_item_id))
+                existing_by_pub.setdefault(key, fd)
+
+        for j_rel, (row, (assignment_entity_status_id, public_submission_id, form_item_id, payload)) in enumerate(
+            zip(batch, parsed_batch)
+        ):
+            j = batch_start + j_rel + 1
+            if not form_item_id or (not assignment_entity_status_id and not public_submission_id):
+                stats["skipped"] += 1
+                _maybe_report(j, row)
+                continue
+            if valid_form_item_ids is not None and form_item_id not in valid_form_item_ids:
+                stats["skipped"] += 1
+                _maybe_report(j, row)
+                continue
+            if assignment_entity_status_id and assignment_entity_status_id not in valid_aes_ids:
+                stats["skipped"] += 1
+                _maybe_report(j, row)
+                continue
+
+            if assignment_entity_status_id:
+                existing = existing_by_aes.get((int(assignment_entity_status_id), int(form_item_id)))
+            else:
+                existing = existing_by_pub.get((int(public_submission_id), int(form_item_id)))
+
+            if dry_run:
+                if existing:
+                    stats["updated"] += 1
+                else:
+                    stats["inserted"] += 1
+                _maybe_report(j, row)
+                continue
+
+            try:
+                disagg_for_db = _disagg_data_for_db(payload["disagg_data"])
+                if disagg_for_db is None:
+                    disagg_for_db = db.null()
+                prefilled_for_db = FormData._coerce_scalar_text_value(payload["prefilled_value"])
+                imputed_for_db = FormData._coerce_scalar_text_value(payload["imputed_value"])
+                disagg_type = payload.get("disagg_type")
+                if not disagg_type:
+                    if isinstance(payload.get("disagg_data"), dict) and payload["disagg_data"].get("mode"):
+                        disagg_type = "standard_disagg"
+                    elif payload.get("value") not in (None, ""):
+                        disagg_type = "simple"
+                    elif isinstance(payload.get("disagg_data"), dict) and payload["disagg_data"]:
+                        disagg_type = "matrix"
+                if existing:
+                    existing.value = payload["value"]
+                    existing._sync_numeric_value_from_string()
+                    existing.disagg_data = disagg_for_db
+                    existing.disagg_type = disagg_type
+                    existing.data_not_available = payload["data_not_available"]
+                    existing.not_applicable = payload["not_applicable"]
+                    existing.prefilled_value = prefilled_for_db
+                    FormData.sync_imputed_numeric_value(existing, imputed_for_db)
+                    if payload["submitted_at"] is not None:
+                        existing.submitted_at = payload["submitted_at"]
+                    db.session.add(existing)
+                    stats["updated"] += 1
+                else:
+                    entry = FormData(
+                        assignment_entity_status_id=assignment_entity_status_id,
+                        public_submission_id=public_submission_id,
+                        form_item_id=form_item_id,
+                        value=payload["value"],
+                        disagg_data=disagg_for_db,
+                        disagg_type=disagg_type,
+                        data_not_available=payload["data_not_available"],
+                        not_applicable=payload["not_applicable"],
+                        prefilled_value=prefilled_for_db,
+                        submitted_at=payload["submitted_at"],
+                    )
+                    entry._sync_numeric_value_from_string()
+                    FormData.sync_imputed_numeric_value(entry, imputed_for_db)
+                    db.session.add(entry)
+                    stats["inserted"] += 1
+                    if assignment_entity_status_id:
+                        existing_by_aes[(int(assignment_entity_status_id), int(form_item_id))] = entry
+                    else:
+                        existing_by_pub[(int(public_submission_id), int(form_item_id))] = entry
+            except Exception as e:
+                stats["errors"] += 1
+                if j < 5 or stats["errors"] <= 3:
+                    logger.error("Row %d error: %s", j, e)
+
+            if batch_size and ((stats["inserted"] + stats["updated"]) % batch_size == 0) and (stats["inserted"] + stats["updated"]) > 0:
+                db.session.commit()
+            _maybe_report(j, row)
+
+    if not dry_run and (stats["inserted"] + stats["updated"]) > 0:
+        db.session.commit()
+
+    return stats
+
+
 def run_import(
     input_path: Optional[str] = None,
     fdrs_api_url: Optional[str] = None,
@@ -2559,185 +2761,23 @@ def run_import(
             _progress(stage="complete", message="Preview exported.", current=len(rows), total=len(rows), percent=100.0, extra={"stats": dict(stats)})
             return stats
 
-        # Optional: restrict to form items of this template
         valid_form_item_ids = None
         if template_id is not None:
             valid_form_item_ids = set(
                 fid for (fid,) in db.session.query(FormItem.id).filter(FormItem.template_id == template_id).all()
             )
-        valid_aes_ids = set(
-            aid for (aid,) in db.session.query(AssignmentEntityStatus.id).all()
+
+        stats = upsert_form_data_rows(
+            rows,
+            dry_run=dry_run,
+            batch_size=batch_size,
+            valid_form_item_ids=valid_form_item_ids,
+            progress_cb=_emit_progress if progress_cb else None,
+            cancel_check=cancel_check,
+            progress_start_pct=20.0,
+            progress_end_pct=100.0,
+            stats=stats,
         )
-
-        # NOTE: Upsert performance
-        # The naive approach (querying FormData per row) is extremely slow for large imports.
-        # We batch-prefetch existing FormData rows for the next N input rows, then do in-memory matching.
-        from sqlalchemy import tuple_
-
-        total_rows = len(rows)
-        _progress(stage="upsert", message="Starting upsert...", current=0, total=total_rows, percent=20.0, extra={"stats": dict(stats)})
-
-        def _maybe_report(i: int, row: Dict[str, Any]) -> None:
-            if not progress_cb and not cancel_check:
-                return
-            _check_cancel()
-            if not progress_cb:
-                return
-            if not (i == 1 or i % 50 == 0 or i == total_rows):
-                return
-            pct = 20.0 + (80.0 * (i / total_rows)) if total_rows else 100.0
-            kpi = (row.get("_debug_kpi_code") or "").strip()
-            iso3 = (row.get("_debug_iso3") or "").strip()
-            yr = (row.get("_debug_year") or "").strip()
-            details = " ".join(b for b in (iso3, yr, kpi) if b).strip()
-            msg = f"Processing {i}/{total_rows} ({pct:.1f}%)" + (f" - {details}" if details else "")
-            _progress(
-                stage="upsert",
-                message=msg,
-                current=i,
-                total=total_rows,
-                percent=pct,
-                extra={"stats": dict(stats)},
-            )
-
-        # Batch size for prefetching existing records (not the DB commit batch size).
-        prefetch_size = max(2000, int(batch_size or 1000))
-
-        for batch_start in range(0, total_rows, prefetch_size):
-            _check_cancel()
-            batch = rows[batch_start: batch_start + prefetch_size]
-
-            # Prefetch existing records for this batch
-            aes_pairs_set = set()
-            pub_pairs_set = set()
-            for r in batch:
-                try:
-                    aes_id, pub_id, item_id, _ = row_to_payload(r)
-                except Exception as e:
-                    logger.debug("row_to_payload failed: %s", e)
-                    continue
-                if not item_id:
-                    continue
-                if aes_id:
-                    aes_pairs_set.add((int(aes_id), int(item_id)))
-                elif pub_id:
-                    pub_pairs_set.add((int(pub_id), int(item_id)))
-
-            existing_by_aes: Dict[Tuple[int, int], FormData] = {}
-            existing_by_pub: Dict[Tuple[int, int], FormData] = {}
-            if aes_pairs_set:
-                q = (
-                    FormData.query.filter(
-                        tuple_(FormData.assignment_entity_status_id, FormData.form_item_id).in_(list(aes_pairs_set))
-                    )
-                )
-                for fd in q.all():
-                    key = (int(fd.assignment_entity_status_id), int(fd.form_item_id))
-                    # If duplicates exist, keep the first one we see (shouldn't happen ideally).
-                    existing_by_aes.setdefault(key, fd)
-            if pub_pairs_set:
-                q = (
-                    FormData.query.filter(
-                        tuple_(FormData.public_submission_id, FormData.form_item_id).in_(list(pub_pairs_set))
-                    )
-                )
-                for fd in q.all():
-                    key = (int(fd.public_submission_id), int(fd.form_item_id))
-                    existing_by_pub.setdefault(key, fd)
-
-            for j, row in enumerate(batch, start=batch_start + 1):
-                assignment_entity_status_id, public_submission_id, form_item_id, payload = row_to_payload(row)
-                if not form_item_id or (not assignment_entity_status_id and not public_submission_id):
-                    stats["skipped"] += 1
-                    _maybe_report(j, row)
-                    continue
-                if valid_form_item_ids is not None and form_item_id not in valid_form_item_ids:
-                    stats["skipped"] += 1
-                    _maybe_report(j, row)
-                    continue
-                if assignment_entity_status_id and assignment_entity_status_id not in valid_aes_ids:
-                    stats["skipped"] += 1
-                    _maybe_report(j, row)
-                    continue
-
-                if assignment_entity_status_id:
-                    existing = existing_by_aes.get((int(assignment_entity_status_id), int(form_item_id)))
-                else:
-                    existing = existing_by_pub.get((int(public_submission_id), int(form_item_id)))
-
-                if dry_run:
-                    if existing:
-                        stats["updated"] += 1
-                    else:
-                        stats["inserted"] += 1
-                    _maybe_report(j, row)
-                    continue
-
-                try:
-                    # IMPORTANT (PostgreSQL JSON/JSONB): Python None may serialize to JSON literal `null`.
-                    # Use db.null() to store a real SQL NULL when there's no disaggregation payload.
-                    disagg_for_db = _disagg_data_for_db(payload["disagg_data"])
-                    if disagg_for_db is None:
-                        disagg_for_db = db.null()
-                    prefilled_for_db = FormData._coerce_scalar_text_value(payload["prefilled_value"])
-                    imputed_for_db = FormData._coerce_scalar_text_value(payload["imputed_value"])
-                    disagg_type = payload.get("disagg_type")
-                    if not disagg_type:
-                        if isinstance(payload.get("disagg_data"), dict) and payload["disagg_data"].get("mode"):
-                            disagg_type = "standard_disagg"
-                        elif payload.get("value") not in (None, ""):
-                            disagg_type = "simple"
-                        elif isinstance(payload.get("disagg_data"), dict) and payload["disagg_data"]:
-                            disagg_type = "matrix"
-                    if existing:
-                        existing.value = payload["value"]
-                        existing._sync_numeric_value_from_string()
-                        existing.disagg_data = disagg_for_db
-                        existing.disagg_type = disagg_type
-                        existing.data_not_available = payload["data_not_available"]
-                        existing.not_applicable = payload["not_applicable"]
-                        existing.prefilled_value = prefilled_for_db
-                        FormData.sync_imputed_numeric_value(existing, imputed_for_db)
-                        if payload["submitted_at"] is not None:
-                            existing.submitted_at = payload["submitted_at"]
-                        db.session.add(existing)
-                        stats["updated"] += 1
-                    else:
-                        entry = FormData(
-                            assignment_entity_status_id=assignment_entity_status_id,
-                            public_submission_id=public_submission_id,
-                            form_item_id=form_item_id,
-                            value=payload["value"],
-                            disagg_data=disagg_for_db,
-                            disagg_type=disagg_type,
-                            data_not_available=payload["data_not_available"],
-                            not_applicable=payload["not_applicable"],
-                            prefilled_value=prefilled_for_db,
-                            submitted_at=payload["submitted_at"],
-                        )
-                        entry._sync_numeric_value_from_string()
-                        FormData.sync_imputed_numeric_value(
-                            entry,
-                            imputed_for_db,
-                        )
-                        db.session.add(entry)
-                        stats["inserted"] += 1
-                        # So same (aes, item) later in this batch updates this instead of inserting again
-                        if assignment_entity_status_id:
-                            existing_by_aes[(int(assignment_entity_status_id), int(form_item_id))] = entry
-                        else:
-                            existing_by_pub[(int(public_submission_id), int(form_item_id))] = entry
-                except Exception as e:
-                    stats["errors"] += 1
-                    if j < 5 or stats["errors"] <= 3:
-                        logger.error("Row %d error: %s", j, e)
-
-                if batch_size and ((stats["inserted"] + stats["updated"]) % batch_size == 0) and (stats["inserted"] + stats["updated"]) > 0:
-                    db.session.commit()
-                _maybe_report(j, row)
-
-        if not dry_run and (stats["inserted"] + stats["updated"]) > 0:
-            db.session.commit()
 
         if fdrs_from_data_api and sync_documents:
             _check_cancel()
@@ -2804,7 +2844,7 @@ def run_import(
                 stats["assignment_status_errors"] = stats.get("assignment_status_errors", 0) + 1
                 logger.error("FDRS assignment status sync failed: %s", e, exc_info=True)
 
-        _progress(stage="complete", message="Sync completed.", current=total_rows, total=total_rows, percent=100.0, extra={"stats": dict(stats)})
+        _progress(stage="complete", message="Sync completed.", current=len(rows), total=len(rows), percent=100.0, extra={"stats": dict(stats)})
     return stats
 
 

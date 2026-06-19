@@ -153,7 +153,10 @@
                 <p class="text-gray-600 text-sm">{{ _('View your current entity access and request additional country access.') }}</p>
             </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {# Non-org users are limited to a single country. #}
+            {% set non_org_at_limit = (not can_request_multiple_countries) and (entity_access_list|length > 0) %}
+
+                <div class="grid grid-cols-1 {% if not non_org_at_limit %}lg:grid-cols-2{% endif %} gap-6">
                     <div>
                         <h3 class="text-base font-semibold text-gray-800 mb-3">Current Access</h3>
                         {% if entity_access_list %}
@@ -173,6 +176,21 @@
                         {% endif %}
                     </div>
 
+                    {% if non_org_at_limit %}
+                    {# Non-org user already has their one allowed country — no further requests. #}
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3 self-start">
+                        <i class="fas fa-info-circle text-blue-500 mt-0.5 flex-shrink-0"></i>
+                        <p class="text-sm text-blue-800">
+                            You already have access to manage
+                            {% if entity_access_list|length == 1 %}
+                                <strong>{{ entity_access_list[0].entity_name }}</strong>'s
+                            {% else %}
+                                your assigned
+                            {% endif %}
+                            data. If anything looks wrong or you need changes, please reach out to an administrator.
+                        </p>
+                    </div>
+                    {% else %}
                     <div>
                         <h3 class="text-base font-semibold text-gray-800 mb-3">Request Country Access</h3>
                         <form method="POST" action="{{ url_for('main.request_country_access') }}">
@@ -215,6 +233,7 @@
                             </button>
                         </form>
                     </div>
+                    {% endif %}
                 </div>
 
                 <div class="mt-8">

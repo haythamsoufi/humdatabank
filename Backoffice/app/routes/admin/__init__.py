@@ -30,6 +30,7 @@ from app.routes.admin.analytics import bp as analytics_bp
 from app.routes.admin.analytics_api import bp as analytics_api_bp
 from app.routes.admin.utilities import bp as utilities_bp
 from app.routes.admin.data_sync_imputation import bp as data_sync_imputation_bp
+from app.routes.admin.upr_excel_import import bp as upr_excel_import_bp
 from app.routes.admin.settings import bp as settings_bp
 from app.routes.admin.organization import bp as organization_bp
 from app.routes.admin.monitoring import bp as monitoring_bp
@@ -78,6 +79,7 @@ def register_admin_blueprints(app):
     app.register_blueprint(utilities_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(data_sync_imputation_bp)
+    app.register_blueprint(upr_excel_import_bp)
     app.register_blueprint(organization_bp)
     app.register_blueprint(monitoring_bp)
     app.register_blueprint(data_exploration_bp)

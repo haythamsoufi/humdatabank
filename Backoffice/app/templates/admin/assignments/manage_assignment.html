@@ -150,22 +150,24 @@
         </div>
 
         {# Row 2: Data Owner + dates (new assignment shows due/expiry inline; edit shows them in their own section below) #}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mt-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start mt-4">
             {# Data Owner #}
             {% if form.data_owner_id is defined %}
-            <div>
-                <label for="{{ form.data_owner_id.id }}" class="block text-gray-700 text-sm font-semibold mb-2">
+            <div class="flex flex-col">
+                <label for="{{ form.data_owner_id.id }}" class="block text-gray-700 text-sm font-semibold mb-2 min-h-[2.75rem]">
                     {{ form.data_owner_id.label.text }}
                     <span class="ml-1 text-gray-400" title="{{ _('The person accountable for data quality in this collection cycle. Defaults to the template owner.') }}">
                         <i class="fas fa-info-circle text-xs"></i>
                     </span>
                 </label>
                 {{ form.data_owner_id(id="data_owner_id_select", class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
-                {% if assignment and assignment.data_owner_user %}
-                    <p class="mt-1 text-xs text-green-600"><i class="fas fa-user-check mr-1"></i>{{ assignment.data_owner_user.name }}</p>
-                {% elif assignment and not assignment.data_owner_user %}
-                    <p class="mt-1 text-xs text-amber-600"><i class="fas fa-exclamation-triangle mr-1"></i>{{ _('No data owner set — governance gap.') }}</p>
-                {% endif %}
+                <div class="mt-1 min-h-[2.5rem]">
+                    {% if assignment and assignment.data_owner_user %}
+                        <p class="text-xs text-green-600"><i class="fas fa-user-check mr-1"></i>{{ assignment.data_owner_user.name }}</p>
+                    {% elif assignment and not assignment.data_owner_user %}
+                        <p class="text-xs text-amber-600"><i class="fas fa-exclamation-triangle mr-1"></i>{{ _('No data owner set — governance gap.') }}</p>
+                    {% endif %}
+                </div>
                 {% for error in form.data_owner_id.errors %}
                     <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
                 {% endfor %}
@@ -173,17 +175,22 @@
             {% endif %}
 
             {% if not assignment %}
-            <div>
-                {{ form.due_date.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+            <div class="flex flex-col">
+                <label for="{{ form.due_date.id }}" class="block text-gray-700 text-sm font-semibold mb-2 min-h-[2.75rem]">{{ _('Due Date') }}</label>
                 {{ form.due_date(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
+                <div class="mt-1 min-h-[2.5rem]">
+                    <p class="text-xs text-gray-500">{{ _('Applies to all selected countries.') }}</p>
+                </div>
                 {% for error in form.due_date.errors %}
                     <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
                 {% endfor %}
             </div>
-            <div>
-                {{ form.expiry_date.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
+            <div class="flex flex-col">
+                <label for="{{ form.expiry_date.id }}" class="block text-gray-700 text-sm font-semibold mb-2 min-h-[2.75rem]">{{ _('Expiry Date') }}</label>
                 {{ form.expiry_date(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
-                <p class="mt-1 text-xs text-gray-500">{{ _('After this date the assignment will be treated as Closed. Leave empty for no automatic closure.') }}</p>
+                <div class="mt-1 min-h-[2.5rem]">
+                    <p class="text-xs text-gray-500">{{ _('After this date the assignment will be treated as Closed. Leave empty for no automatic closure.') }}</p>
+                </div>
                 {% for error in form.expiry_date.errors %}
                     <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
                 {% endfor %}

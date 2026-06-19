@@ -213,9 +213,18 @@ export class TemplateVariablesManager {
         const td4 = document.createElement('td');
         td4.className = 'px-4 py-3 whitespace-nowrap';
         {
+            const PERIOD_LABELS = {
+                '__current__':  'Same as current period',
+                '__previous__': 'Previous period',
+                '__latest__':   'Latest available period',
+            };
+            const rawPeriod = varConfig.source_assignment_period || null;
+            const periodDisplay = variableType === 'metadata'
+                ? 'N/A'
+                : (PERIOD_LABELS[rawPeriod] || rawPeriod || 'N/A');
             const div = document.createElement('div');
             div.className = 'text-sm text-gray-900';
-            div.textContent = String(variableType === 'metadata' ? 'N/A' : (varConfig.source_assignment_period || 'N/A'));
+            div.textContent = String(periodDisplay);
             td4.appendChild(div);
         }
 
@@ -363,9 +372,22 @@ export class TemplateVariablesManager {
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Source Assignment Period *</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    Source Assignment Period *
+                                    <span class="custom-info-tooltip cursor-help w-5 h-5 inline-flex items-center justify-center ml-1">
+                                        <i class="fas fa-info-circle text-gray-400"></i>
+                                        <span class="tooltip-text">Choose a dynamic option that is resolved at form-fill time, or pick a specific fixed period from the source template's existing assignments.</span>
+                                    </span>
+                                </label>
                                 <select name="source_assignment_period" class="w-full px-3 py-2 border border-gray-300 rounded-md" id="source-assignment-select">
                                     <option value="">Select assignment period...</option>
+                                    <optgroup label="Dynamic — resolved at form-fill time">
+                                        <option value="__current__" ${existingVar?.source_assignment_period === '__current__' ? 'selected' : ''}>Same period as current assignment</option>
+                                        <option value="__previous__" ${existingVar?.source_assignment_period === '__previous__' ? 'selected' : ''}>Previous period (one before current)</option>
+                                        <option value="__latest__" ${existingVar?.source_assignment_period === '__latest__' ? 'selected' : ''}>Latest available period</option>
+                                    </optgroup>
+                                    <optgroup label="Specific period" id="specific-periods-group">
+                                    </optgroup>
                                 </select>
                             </div>
                         </div>
@@ -675,6 +697,11 @@ export class TemplateVariablesManager {
             updateVariableTypeUI();
             updateLookupTypeUI();
             updateSourceItemMappingUi();
+            // If editing an existing variable, fire the template-change event to pre-populate
+            // the "Specific period" optgroup and the form-item list.
+            if (existingVar?.source_template_id) {
+                sourceTemplateSelect.dispatchEvent(new Event('change'));
+            }
             if (typeof updateMatrixColumnValidation === 'function') {
                 updateMatrixColumnValidation();
             }
@@ -686,13 +713,10 @@ export class TemplateVariablesManager {
         // Update assignments when template changes
         sourceTemplateSelect.addEventListener('change', async () => {
             const templateId = sourceTemplateSelect.value;
-            sourceAssignmentSelect.replaceChildren();
-            {
-                const opt = document.createElement('option');
-                opt.value = '';
-                opt.textContent = 'Select assignment period...';
-                sourceAssignmentSelect.appendChild(opt);
-            }
+            // Only clear the specific-period optgroup; dynamic sentinel options remain intact
+            const specificPeriodsGroup = sourceAssignmentSelect.querySelector('#specific-periods-group');
+            if (specificPeriodsGroup) specificPeriodsGroup.replaceChildren();
+
             sourceFormItemSelect.replaceChildren();
             {
                 const opt = document.createElement('option');
@@ -709,7 +733,11 @@ export class TemplateVariablesManager {
                     if (existingVar?.source_assignment_period === assignment.period_name) {
                         option.selected = true;
                     }
-                    sourceAssignmentSelect.appendChild(option);
+                    if (specificPeriodsGroup) {
+                        specificPeriodsGroup.appendChild(option);
+                    } else {
+                        sourceAssignmentSelect.appendChild(option);
+                    }
                 });
             }
 
@@ -1215,6 +1243,7 @@ export class TemplateVariablesManager {
             const data = fetchFn
                 ? await fetchFn(`/admin/templates/${this.templateId}/variables?version_id=${this.versionId}`, {
                     method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ payload: _varPayloadB64 })
                 })
                 : await (async () => {

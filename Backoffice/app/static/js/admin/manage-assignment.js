@@ -1690,6 +1690,8 @@
                 updateEntityGlobalSelectAll();
             }
 
+            // Sync hidden country inputs so the main form reflects the updated checkbox state
+            syncCountriesToMainForm();
         }
 
         // Handle category filter change in Manage Existing Entities: filter grid by Part of selection
@@ -1795,8 +1797,8 @@
             updateEntityRegionSelectAll(region);
         });
 
-        // Sync country selections to main form for new assignments
-        if (!cfg.assignmentId) {
+        // Sync country selections to main form.
+        // Safe to call at any time: no-op when the container is absent (e.g. edit pages).
         function syncCountriesToMainForm() {
             const container = document.getElementById('country-selections-container');
             if (!container) return;
@@ -1815,6 +1817,8 @@
             });
         }
 
+        // Register change-event listeners and run initial sync only for new assignments
+        if (!cfg.assignmentId) {
         // Sync on checkbox change
         entityCountryCheckboxes.forEach(countryCheckbox => {
             countryCheckbox.addEventListener('change', syncCountriesToMainForm);
@@ -2800,6 +2804,10 @@
                 const confirmCancel = cfg.t.cancel;
 
                 function doSubmit() {
+                    // Re-sync country checkboxes → hidden inputs right before submission
+                    // (guards against the category-filter path that sets .checked without
+                    // firing a change event, and any other programmatic checkbox changes)
+                    syncCountriesToMainForm();
                     HTMLFormElement.prototype.submit.call(mainForm);
                 }
                 if (window.showConfirmation) {

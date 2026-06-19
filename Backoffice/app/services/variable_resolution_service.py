@@ -64,6 +64,71 @@ class VariableResolutionService:
     # Reserved matrix_column_name value: when set, variable reads the row total (sum of all columns) for each row.
     MATRIX_COLUMN_ROW_TOTAL = '_row_total'
 
+    # Sentinel values for source_assignment_period that are resolved dynamically at form-fill time.
+    _PERIOD_SENTINEL_CURRENT  = '__current__'
+    _PERIOD_SENTINEL_PREVIOUS = '__previous__'
+    _PERIOD_SENTINEL_LATEST   = '__latest__'
+
+    @classmethod
+    def _resolve_effective_period(
+        cls,
+        source_assignment_period: Optional[str],
+        source_template_id: Optional[int],
+        assignment_entity_status: Optional['AssignmentEntityStatus'],
+    ) -> Optional[str]:
+        """
+        Expand a dynamic period sentinel to an actual ``period_name`` string.
+
+        Sentinel values:
+          ``__current__``  – same period as the current assignment being filled.
+          ``__previous__`` – the period immediately before the current one among
+                             the source template's assignments (lexicographic order
+                             matching how assignments are ordered across the system).
+          ``__latest__``   – the most-recent period for the source template,
+                             regardless of the current form's period.
+
+        Plain (non-sentinel) strings are returned unchanged.
+        Returns *None* when the period cannot be resolved (e.g. no previous period exists).
+        """
+        if not source_assignment_period:
+            return None
+
+        if source_assignment_period == cls._PERIOD_SENTINEL_CURRENT:
+            af = getattr(assignment_entity_status, 'assigned_form', None) if assignment_entity_status else None
+            return af.period_name if af else None
+
+        if source_assignment_period == cls._PERIOD_SENTINEL_LATEST:
+            latest = AssignedForm.query.filter_by(
+                template_id=source_template_id
+            ).order_by(AssignedForm.period_name.desc()).first()
+            return latest.period_name if latest else None
+
+        if source_assignment_period == cls._PERIOD_SENTINEL_PREVIOUS:
+            current_af = getattr(assignment_entity_status, 'assigned_form', None) if assignment_entity_status else None
+            if not current_af:
+                return None
+            current_period = current_af.period_name
+            all_periods = [
+                a.period_name for a in AssignedForm.query.filter_by(
+                    template_id=source_template_id
+                ).order_by(AssignedForm.period_name.desc()).all()
+            ]
+            if not all_periods:
+                return None
+            try:
+                idx = all_periods.index(current_period)
+                # Descending list: the "previous" period is one index higher
+                return all_periods[idx + 1] if idx + 1 < len(all_periods) else None
+            except ValueError:
+                # Current period not among source template's assignments.
+                # Fall back to the most-recent period that is lexicographically before
+                # the current one (handles cross-template period mismatches gracefully).
+                before_current = [p for p in all_periods if p < current_period]
+                return before_current[0] if before_current else None
+
+        # Plain string — return as-is.
+        return source_assignment_period
+
     @classmethod
     def _effective_matrix_cell_value(cls, cell_value: Any) -> Any:
         """
@@ -259,6 +324,13 @@ class VariableResolutionService:
             if not source_template_id or not source_assignment_period:
                 return None
 
+            # Expand any dynamic period sentinel
+            effective_period = cls._resolve_effective_period(
+                source_assignment_period, source_template_id, assignment_entity_status
+            )
+            if not effective_period:
+                return None
+
             indicator_bank_id = getattr(current_form_item, 'indicator_bank_id', None)
             if not indicator_bank_id:
                 return None
@@ -301,6 +373,8 @@ class VariableResolutionService:
 
             cfg = dict(variable_config)
             cfg['source_form_item_id'] = int(source_form_item_id)
+            # Store the already-resolved period so _resolve_single_variable skips re-expanding
+            cfg['source_assignment_period'] = effective_period
             # Ensure a normal lookup path (entities_containing is matrix-only and does not apply here)
             if cfg.get('entity_scope') == 'entities_containing':
                 cfg['entity_scope'] = 'same'
@@ -371,19 +445,26 @@ class VariableResolutionService:
             if not all([source_template_id, source_assignment_period, source_form_item_id]):
                 continue
 
-            cache_key = (source_template_id, source_assignment_period, source_form_item_id, entity_scope)
+            # Expand sentinel to actual period name so batch cache keys are consistent
+            effective_period = cls._resolve_effective_period(
+                source_assignment_period, source_template_id, assignment_entity_status
+            )
+            if not effective_period:
+                continue
+
+            cache_key = (source_template_id, effective_period, source_form_item_id, entity_scope)
             if cache_key not in variable_groups:
                 variable_groups[cache_key] = []
             variable_groups[cache_key].append((variable_name, variable_config))
 
         # Pre-fetch FormData for each variable group
-        for (source_template_id, source_assignment_period, source_form_item_id, entity_scope), var_list in variable_groups.items():
-            # Find the source assignment (cache this lookup)
-            assigned_form_key = (source_template_id, source_assignment_period)
+        for (source_template_id, effective_period, source_form_item_id, entity_scope), var_list in variable_groups.items():
+            # Find the source assignment (cache this lookup, keyed by resolved period)
+            assigned_form_key = (source_template_id, effective_period)
             if assigned_form_key not in assigned_form_cache:
                 source_assigned_form = AssignedForm.query.filter_by(
                     template_id=source_template_id,
-                    period_name=source_assignment_period
+                    period_name=effective_period
                 ).first()
                 assigned_form_cache[assigned_form_key] = source_assigned_form
             else:
@@ -519,20 +600,27 @@ class VariableResolutionService:
         if not all([source_template_id, source_assignment_period, source_form_item_id]):
             return None
 
+        # Expand any dynamic period sentinel (__current__, __previous__, __latest__)
+        effective_period = cls._resolve_effective_period(
+            source_assignment_period, source_template_id, assignment_entity_status
+        )
+        if not effective_period:
+            return None
+
         # Check cache for assigned form and entity statuses first (from batch resolution)
         assigned_form_cache = variable_config.get('_assigned_form_cache') or {}
         entity_statuses_cache = variable_config.get('_entity_statuses_cache') or {}
         entity_statuses = None
 
-        # Try to get assigned form from cache
-        assigned_form_key = (source_template_id, source_assignment_period)
+        # Try to get assigned form from cache (keyed by resolved period)
+        assigned_form_key = (source_template_id, effective_period)
         source_assigned_form = assigned_form_cache.get(assigned_form_key)
 
         # If not in cache, query (shouldn't happen in batch mode, but fallback for safety)
         if not source_assigned_form:
             source_assigned_form = AssignedForm.query.filter_by(
                 template_id=source_template_id,
-                period_name=source_assignment_period
+                period_name=effective_period
             ).first()
 
         if not source_assigned_form:
@@ -770,10 +858,22 @@ class VariableResolutionService:
             logger.warning(f"_resolve_single_variable: Incomplete variable config: {variable_config}")
             return None
 
+        # Expand any dynamic period sentinel (__current__, __previous__, __latest__)
+        effective_period = cls._resolve_effective_period(
+            source_assignment_period, source_template_id, assignment_entity_status
+        )
+        if not effective_period:
+            logger.debug(
+                "_resolve_single_variable: period sentinel '%s' could not be resolved "
+                "(no matching assignment for template %s)",
+                source_assignment_period, source_template_id
+            )
+            return None
+
         # Find the source assignment
         source_assigned_form = AssignedForm.query.filter_by(
             template_id=source_template_id,
-            period_name=source_assignment_period
+            period_name=effective_period
         ).first()
 
         if not source_assigned_form:

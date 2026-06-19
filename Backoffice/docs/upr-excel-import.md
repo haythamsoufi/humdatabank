@@ -270,10 +270,9 @@ Accessible from the "UPR Excel Sync" button in the Data Sync & Imputation header
 
 | Step | Panel | What happens |
 |------|-------|-------------|
-| 1 Upload | `panel-1` | Stores file to `instance/upr_import_uploads/`; saves path in Flask session |
-| 2 Review | `panel-2` | Calls `/analyze` → reads sheet, returns row counts, rounds, sections, countries. Shows spinner while loading; result cached so navigating back doesn't re-read. |
-| 3 Configure | `panel-3` | Template checkboxes, round filter (blank = all P*), batch size, dry-run toggle. Auto-calls `/preview` on arrival → shows transformed row count, countries, and deduplicated warnings in a scrollable panel. |
-| 4 Import | `panel-4` | Async background job via `/run`; polls `/status/<job_id>` every second; shows progress bar. |
+| 1 Upload | `panel-1` | Drag/drop or click to select file. The dropzone validates the file type/size client-side, then POSTs to `/upload` (server-side MIME + extension check), then immediately POSTs to `/analyze` (reads the "UPR Data" sheet). The workbook summary (rows, countries, rounds, sections) appears in the dropzone status panel on success, or an error message on failure. The **Next** button is only enabled after analyze succeeds. |
+| 2 Configure | `panel-2` | Template checkboxes, round filter (blank = all P*), batch size, dry-run toggle. Auto-calls `/preview` on arrival → shows transformed row count, countries, and deduplicated warnings in a scrollable panel. |
+| 3 Import | `panel-3` | Async background job via `/run`; polls `/status/<job_id>` every second; shows progress bar. |
 
 ### Warning display
 Warnings are deduplicated server-side by `summarize_warnings()`:
@@ -333,7 +332,7 @@ Debug-only fields (`_debug_iso3`, `_debug_year`, `_debug_kpi_code`) are stripped
 - [x] Template 22: Staff matrix (auto-created if missing) → item 1367
 - [x] Dry-run mode (no DB writes, optional preview Excel output)
 - [x] Async background job with progress polling
-- [x] 4-step UI wizard with spinners, loading states, disabled nav during async ops
+- [x] 3-step UI wizard: Upload+Analyze inline (step 1), Configure (step 2), Import (step 3)
 - [x] Warning deduplication with repeat counts
 - [x] Shared `upsert_form_data_rows` with FDRS importer
 

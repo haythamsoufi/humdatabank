@@ -761,7 +761,10 @@ def dashboard():
                 admin_role_user_ids = set(
                     uid for (uid,) in db.session.query(RbacUserRole.user_id)
                     .join(RbacRole, RbacUserRole.role_id == RbacRole.id)
-                    .filter(RbacRole.code.in_(["system_manager", "admin_core"]))
+                    .filter(or_(
+                        RbacRole.code == "system_manager",
+                        RbacRole.code.like("admin_%")
+                    ))
                     .all()
                 )
                 ns_focal_points = [fp for fp in all_focal_points_for_country if not is_org_email(fp.email)]

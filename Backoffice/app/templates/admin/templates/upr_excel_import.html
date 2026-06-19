@@ -7,19 +7,16 @@
 {% block head %}
 {{ super() }}
 <style nonce="{{ csp_nonce() }}">
-.wizard-step.active { color: #2563eb; border-color: #2563eb; }
+.wizard-step.active  { color: #2563eb; border-color: #2563eb; }
 .wizard-step.completed { color: #059669; border-color: #059669; }
 .wizard-step-connector { height: 2px; flex: 1; background: #d1d5db; }
 .wizard-step-connector.completed { background: #059669; }
-.wizard-step-connector.active { background: #2563eb; }
+.wizard-step-connector.active   { background: #2563eb; }
 @keyframes upr-wizard-spin { to { transform: rotate(360deg); } }
 .upr-wizard-spinner {
-  width: 2rem;
-  height: 2rem;
-  border: 4px solid #e5e7eb;
-  border-top-color: #2563eb;
-  border-radius: 50%;
-  animation: upr-wizard-spin 1s linear infinite;
+  width: 2rem; height: 2rem;
+  border: 4px solid #e5e7eb; border-top-color: #2563eb;
+  border-radius: 50%; animation: upr-wizard-spin 1s linear infinite;
 }
 </style>
 {% endblock %}
@@ -36,35 +33,39 @@
 
 <div class="max-w-5xl mx-auto pb-10">
   <p class="text-sm text-gray-600 mb-6">
-    {{ _('Import data from UPR Master.xlsx (sheet “UPR Data”) into planning templates. Currently supports Unified Country Plan (24) and PNS staff on template 22. Reporting templates will be added later.') }}
+    {{ _('Import data from UPR Master.xlsx (sheet "UPR Data") into planning templates. Currently supports Unified Country Plan (24) and PNS staff on template 22. Reporting templates will be added later.') }}
   </p>
 
+  {# ── 3-step progress bar ── #}
+  {% set step_labels = [_('Upload'), _('Configure'), _('Import')] %}
   <div class="flex items-center mb-8 gap-2" id="wizard-steps">
-    {% for label in [_('Upload'), _('Review'), _('Configure'), _('Import')] %}
-    <div class="wizard-step flex items-center justify-center w-8 h-8 rounded-full border-2 text-sm font-medium {% if loop.first %}active{% else %}text-gray-400 border-gray-300{% endif %}" data-step="{{ loop.index }}">{{ loop.index }}</div>
+    {% for label in step_labels %}
+    <div class="wizard-step flex items-center justify-center w-8 h-8 rounded-full border-2 text-sm font-medium
+                {% if loop.first %}active{% else %}text-gray-400 border-gray-300{% endif %}"
+         data-step="{{ loop.index }}" title="{{ label }}">{{ loop.index }}</div>
     {% if not loop.last %}<div class="wizard-step-connector"></div>{% endif %}
     {% endfor %}
   </div>
 
   <div class="bg-white shadow border border-gray-200 rounded-lg p-6">
+
+    {# ── Panel 1: Upload + inline Analyze ── #}
     <div class="wizard-panel" id="panel-1">
       <h3 class="text-lg font-medium text-gray-900 mb-2">{{ _('Upload UPR Master file') }}</h3>
-      <p class="text-sm text-gray-600 mb-4">{{ _('Select the Excel workbook containing the “UPR Data” sheet.') }}</p>
-      {{ excel_import_dropzone('upr-excel-dropzone', 'upr_excel_file', accept='.xlsx,.xls', title=_('Drop UPR Master.xlsx here or click to browse')) }}
-      <p id="upload-status" class="mt-3 text-sm text-gray-500 hidden"></p>
+      <p class="text-sm text-gray-600 mb-4">
+        {{ _('Select the Excel workbook containing the "UPR Data" sheet. The file is validated and analyzed automatically after upload — the workbook summary must appear before you can proceed.') }}
+      </p>
+      {{ excel_import_dropzone(
+          'upr-excel-dropzone',
+          input_id='upr_excel_file',
+          input_name='upr_excel_file',
+          accept='.xlsx,.xls',
+          title=_('Drop UPR Master.xlsx here or click to browse')
+      ) }}
     </div>
 
+    {# ── Panel 2: Configure ── #}
     <div class="wizard-panel hidden" id="panel-2">
-      <h3 class="text-lg font-medium text-gray-900 mb-4">{{ _('Workbook summary') }}</h3>
-      <div id="analyze-loading" class="hidden text-center py-10" role="status" aria-live="polite">
-        <div class="upr-wizard-spinner mx-auto mb-4" aria-hidden="true"></div>
-        <p id="analyze-loading-text" class="text-sm text-gray-700 font-medium">{{ _('Analyzing workbook…') }}</p>
-        <p class="text-xs text-gray-500 mt-2">{{ _('Reading the UPR Data sheet — large files may take a minute.') }}</p>
-      </div>
-      <div id="analyze-summary" class="text-sm text-gray-700 space-y-2 hidden"></div>
-    </div>
-
-    <div class="wizard-panel hidden" id="panel-3">
       <h3 class="text-lg font-medium text-gray-900 mb-4">{{ _('Import settings') }}</h3>
       <div class="space-y-4">
         <div>
@@ -77,7 +78,9 @@
           {% endfor %}
         </div>
         <div>
-          <label for="upr-rounds" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Planning rounds (comma-separated, empty = all P*)') }}</label>
+          <label for="upr-rounds" class="block text-sm font-medium text-gray-700 mb-1">
+            {{ _('Planning rounds (comma-separated, empty = all P*)') }}
+          </label>
           <input type="text" id="upr-rounds" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="P25,P26">
         </div>
         <div>
@@ -93,7 +96,8 @@
           <span>{{ _('Create staff matrix on template 22 if missing') }}</span>
         </label>
       </div>
-      <div id="preview-loading" class="hidden text-center py-8 mt-4 border-t border-gray-200 pt-4" role="status" aria-live="polite">
+      <div id="preview-loading" class="hidden text-center py-8 mt-4 border-t border-gray-200 pt-4"
+           role="status" aria-live="polite">
         <div class="upr-wizard-spinner mx-auto mb-4" aria-hidden="true"></div>
         <p class="text-sm text-gray-700 font-medium">{{ _('Building import preview…') }}</p>
         <p class="text-xs text-gray-500 mt-2">{{ _('Transforming rows and matching assignments.') }}</p>
@@ -101,10 +105,14 @@
       <div id="preview-summary" class="mt-4 hidden text-sm text-gray-700 border-t border-gray-200 pt-4"></div>
     </div>
 
-    <div class="wizard-panel hidden" id="panel-4">
+    {# ── Panel 3: Import progress ── #}
+    <div class="wizard-panel hidden" id="panel-3">
       <h3 class="text-lg font-medium text-gray-900 mb-4">{{ _('Import progress') }}</h3>
       <div id="import-progress" class="hidden mb-4">
-        <p class="text-sm text-gray-700 mb-2"><span class="font-medium">{{ _('Status') }}:</span> <span id="import-stage">-</span></p>
+        <p class="text-sm text-gray-700 mb-2">
+          <span class="font-medium">{{ _('Status') }}:</span>
+          <span id="import-stage">-</span>
+        </p>
         <div class="w-full bg-gray-200 rounded-full h-2">
           <div id="import-progress-bar" class="bg-purple-600 h-2 rounded-full transition-all" style="width:0%"></div>
         </div>
@@ -113,11 +121,26 @@
       <div id="import-result" class="text-sm"></div>
     </div>
 
+    {# ── Navigation ── #}
     <div class="mt-6 pt-4 border-t border-gray-200 flex justify-between">
-      <button type="button" id="wizard-back" class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hidden">{{ _('Back') }}</button>
+      <button type="button" id="wizard-back"
+              class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hidden">
+        {{ _('Back') }}
+      </button>
       <div class="ml-auto flex gap-2">
         <button type="button" id="wizard-next" class="btn btn-primary" disabled>{{ _('Next') }}</button>
         <button type="button" id="wizard-run" class="btn btn-purple hidden">{{ _('Run import') }}</button>
+        {# shown when the import job reaches a terminal state (completed / failed) #}
+        <div id="wizard-done-actions" class="hidden flex gap-2">
+          <a href="{{ url_for('admin.admin_dashboard') }}"
+             class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+            <i class="fas fa-home mr-2" aria-hidden="true"></i>{{ _('Admin Dashboard') }}
+          </a>
+          <button type="button" id="wizard-restart"
+                  class="btn btn-primary">
+            <i class="fas fa-redo mr-2" aria-hidden="true"></i>{{ _('New import') }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -126,153 +149,112 @@
 
 {% block extra_js %}
 <script nonce="{{ csp_nonce() }}">
-document.addEventListener('DOMContentLoaded', function() {
-  const csrfToken = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-  const uploadUrl = '{{ url_for("upr_excel_import.upload") }}';
-  const analyzeUrl = '{{ url_for("upr_excel_import.analyze") }}';
-  const previewUrl = '{{ url_for("upr_excel_import.preview") }}';
-  const runUrl = '{{ url_for("upr_excel_import.run_import") }}';
-  const statusUrlTemplate = '{{ url_for("upr_excel_import.job_status", job_id="__JOB__") }}';
+document.addEventListener('DOMContentLoaded', function () {
+  var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+  var uploadUrl  = {{ url_for('upr_excel_import.upload') | tojson }};
+  var analyzeUrl = {{ url_for('upr_excel_import.analyze') | tojson }};
+  var previewUrl = {{ url_for('upr_excel_import.preview') | tojson }};
+  var runUrl     = {{ url_for('upr_excel_import.run_import') | tojson }};
+  var statusUrlTpl = {{ url_for('upr_excel_import.job_status', job_id='__JOB__') | tojson }};
 
-  let step = 1;
-  let uploaded = false;
-  let analyzeLoaded = false;
-  let analyzeLoading = false;
-  let previewLoading = false;
-  let activeJobId = null;
-  let pollTimer = null;
+  var step          = 1;
+  var analyzeLoaded = false;
+  var analyzeData   = null;
+  var previewLoading = false;
+  var activeJobId   = null;
+  var pollTimer     = null;
 
-  const panels = document.querySelectorAll('.wizard-panel');
-  const stepEls = document.querySelectorAll('#wizard-steps .wizard-step');
-  const connectors = document.querySelectorAll('#wizard-steps .wizard-step-connector');
-  const btnBack = document.getElementById('wizard-back');
-  const btnNext = document.getElementById('wizard-next');
-  const btnRun = document.getElementById('wizard-run');
-  const uploadStatus = document.getElementById('upload-status');
-  const analyzeLoadingEl = document.getElementById('analyze-loading');
-  const analyzeSummaryEl = document.getElementById('analyze-summary');
-  const previewLoadingEl = document.getElementById('preview-loading');
-  const previewSummaryEl = document.getElementById('preview-summary');
+  var panels    = document.querySelectorAll('.wizard-panel');
+  var stepEls   = document.querySelectorAll('#wizard-steps .wizard-step');
+  var connectors = document.querySelectorAll('#wizard-steps .wizard-step-connector');
+  var btnBack   = document.getElementById('wizard-back');
+  var btnNext   = document.getElementById('wizard-next');
+  var btnRun    = document.getElementById('wizard-run');
+  var doneActions = document.getElementById('wizard-done-actions');
+  var btnRestart  = document.getElementById('wizard-restart');
+  var previewLoadingEl = document.getElementById('preview-loading');
+  var previewSummaryEl = document.getElementById('preview-summary');
 
-  function updateNavButtons() {
-    const stepBusy = (step === 2 && analyzeLoading) || (step === 3 && previewLoading);
-    btnBack.disabled = stepBusy;
-    if (step === 1) {
-      btnNext.disabled = !uploaded;
-    } else if (step === 2) {
-      btnNext.disabled = analyzeLoading || !analyzeLoaded;
-    } else if (step === 3) {
-      btnNext.disabled = true;
-    } else {
-      btnNext.disabled = false;
-    }
-  }
+  // ── Helpers ──────────────────────────────────────────────────────────────
 
-  function showStep(n) {
-    step = n;
-    panels.forEach(function(p, i) { p.classList.toggle('hidden', i + 1 !== n); });
-    stepEls.forEach(function(el, i) {
-      el.classList.remove('active', 'completed', 'text-gray-400', 'border-gray-300');
-      if (i + 1 < n) el.classList.add('completed');
-      else if (i + 1 === n) el.classList.add('active');
-      else el.classList.add('text-gray-400', 'border-gray-300');
-    });
-    connectors.forEach(function(c, i) {
-      c.classList.remove('completed', 'active');
-      if (i + 1 < n) c.classList.add('completed');
-      else if (i + 1 === n) c.classList.add('active');
-    });
-    btnBack.classList.toggle('hidden', n <= 1);
-    btnNext.classList.toggle('hidden', n >= 4);
-    btnRun.classList.toggle('hidden', n !== 3);
-    if (n === 2 && uploaded) loadAnalyze();
-    if (n === 3) loadPreview();
-    updateNavButtons();
+  function escapeHtml(text) {
+    return String(text || '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   function postJSON(url, body) {
     return fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken || '' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
       body: JSON.stringify(body || {})
-    }).then(function(r) { return r.json(); });
+    }).then(function (r) { return r.json(); });
   }
 
   function selectedTemplateIds() {
-    return Array.from(document.querySelectorAll('.template-checkbox:checked')).map(function(el) { return parseInt(el.value, 10); });
+    return Array.from(document.querySelectorAll('.template-checkbox:checked'))
+      .map(function (el) { return parseInt(el.value, 10); });
   }
 
   function selectedRounds() {
-    const raw = (document.getElementById('upr-rounds').value || '').trim();
+    var raw = (document.getElementById('upr-rounds').value || '').trim();
     if (!raw) return [];
-    return raw.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+    return raw.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
   }
 
-  function renderAnalyzeSummary(data) {
-    analyzeSummaryEl.innerHTML = [
-      '<p><strong>{{ _("Rows") }}:</strong> ' + data.total_rows + '</p>',
-      '<p><strong>{{ _("Planning rounds") }}:</strong> ' + (data.planning_rounds || []).join(', ') + '</p>',
-      '<p><strong>{{ _("Sections") }}:</strong> ' + (data.sections || []).join(', ') + '</p>',
-      '<p><strong>{{ _("Countries") }}:</strong> ' + data.countries + '</p>'
-    ].join('');
+  // ── Navigation ───────────────────────────────────────────────────────────
+
+  function updateNavButtons() {
+    var busy = step === 2 && previewLoading;
+    btnBack.disabled  = busy;
+    // btnNext is only rendered on step 1; keep its disabled state consistent
+    btnNext.disabled  = !analyzeLoaded;
   }
 
-  function loadAnalyze() {
-    if (analyzeLoading) return;
-    if (analyzeLoaded) {
-      analyzeLoadingEl.classList.add('hidden');
-      analyzeSummaryEl.classList.remove('hidden');
-      updateNavButtons();
-      return;
-    }
-    analyzeLoading = true;
-    analyzeLoadingEl.classList.remove('hidden');
-    analyzeSummaryEl.classList.add('hidden');
-    analyzeSummaryEl.innerHTML = '';
-    updateNavButtons();
-
-    postJSON(analyzeUrl, {}).then(function(data) {
-      if (!data.success) {
-        analyzeSummaryEl.innerHTML = '<p class="text-red-600">' + (data.message || '{{ _("Analysis failed") }}') + '</p>';
-        analyzeSummaryEl.classList.remove('hidden');
-        return;
-      }
-      renderAnalyzeSummary(data);
-      analyzeSummaryEl.classList.remove('hidden');
-      analyzeLoaded = true;
-    }).catch(function(err) {
-      analyzeSummaryEl.innerHTML = '<p class="text-red-600">' + (err.message || '{{ _("Analysis failed") }}') + '</p>';
-      analyzeSummaryEl.classList.remove('hidden');
-    }).finally(function() {
-      analyzeLoading = false;
-      analyzeLoadingEl.classList.add('hidden');
-      updateNavButtons();
+  function showStep(n) {
+    step = n;
+    panels.forEach(function (p, i) { p.classList.toggle('hidden', i + 1 !== n); });
+    stepEls.forEach(function (el, i) {
+      el.classList.remove('active', 'completed', 'text-gray-400', 'border-gray-300');
+      if      (i + 1 < n)  el.classList.add('completed');
+      else if (i + 1 === n) el.classList.add('active');
+      else                  el.classList.add('text-gray-400', 'border-gray-300');
     });
+    connectors.forEach(function (c, i) {
+      c.classList.remove('completed', 'active');
+      if      (i + 1 < n)  c.classList.add('completed');
+      else if (i + 1 === n) c.classList.add('active');
+    });
+    // Back: visible only on configure step (step 2)
+    btnBack.classList.toggle('hidden', n !== 2);
+    // Next: visible only on upload step (step 1)
+    btnNext.classList.toggle('hidden', n !== 1);
+    // Run: visible only on configure step (step 2)
+    btnRun.classList.toggle('hidden', n !== 2);
+    // Done actions: hidden whenever we change step (shown by pollStatus on terminal state)
+    doneActions.classList.add('hidden');
+    if (n === 2) loadPreview();
+    updateNavButtons();
   }
 
-  function escapeHtml(text) {
-    return String(text)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
+  btnNext.addEventListener('click', function () { if (step === 1 && analyzeLoaded) showStep(2); });
+  btnBack.addEventListener('click', function () { if (step > 1) showStep(step - 1); });
+
+  // ── Configure preview ────────────────────────────────────────────────────
 
   function renderPreviewSummary(data) {
-    let html = '<p><strong>{{ _("Transformed form_data rows") }}:</strong> ' + data.transformed_rows + '</p>';
-    html += '<p><strong>{{ _("Countries with data") }}:</strong> ' + data.countries + '</p>';
+    var html = '<p><strong>{{ _("Transformed form_data rows") }}:</strong> ' + data.transformed_rows + '</p>'
+             + '<p><strong>{{ _("Countries with data") }}:</strong> ' + data.countries + '</p>';
     if (data.warning_count) {
-      let warningLabel = String(data.warning_count);
+      var warnLabel = String(data.warning_count);
       if (data.warning_unique_count && data.warning_unique_count !== data.warning_count) {
-        warningLabel += ' (' + data.warning_unique_count + ' {{ _("unique") }})';
+        warnLabel += ' (' + data.warning_unique_count + ' {{ _("unique") }})';
       }
-      html += '<p class="text-amber-700"><strong>{{ _("Warnings") }}:</strong> ' + warningLabel + '</p>';
-      html += '<div class="max-h-72 overflow-y-auto mt-2 border border-amber-200 rounded-md bg-amber-50 p-3">';
-      html += '<ul class="list-disc ml-5 space-y-1 text-amber-900 text-sm">';
-      html += (data.warnings || []).map(function(w) {
-        return '<li>' + escapeHtml(w) + '</li>';
-      }).join('');
-      html += '</ul></div>';
+      html += '<p class="text-amber-700"><strong>{{ _("Warnings") }}:</strong> ' + warnLabel + '</p>'
+            + '<div class="max-h-72 overflow-y-auto mt-2 border border-amber-200 rounded-md bg-amber-50 p-3">'
+            + '<ul class="list-disc ml-5 space-y-1 text-amber-900 text-sm">'
+            + (data.warnings || []).map(function (w) { return '<li>' + escapeHtml(w) + '</li>'; }).join('')
+            + '</ul></div>';
     }
     return html;
   }
@@ -286,68 +268,42 @@ document.addEventListener('DOMContentLoaded', function() {
     btnRun.disabled = true;
     updateNavButtons();
 
-    postJSON(previewUrl, { template_ids: selectedTemplateIds(), rounds: selectedRounds() }).then(function(data) {
-      previewSummaryEl.classList.remove('hidden');
-      if (!data.success) {
-        previewSummaryEl.innerHTML = '<p class="text-red-600">' + (data.message || '{{ _("Preview failed") }}') + '</p>';
-        return;
-      }
-      previewSummaryEl.innerHTML = renderPreviewSummary(data);
-    }).catch(function(err) {
-      previewSummaryEl.classList.remove('hidden');
-      previewSummaryEl.innerHTML = '<p class="text-red-600">' + (err.message || '{{ _("Preview failed") }}') + '</p>';
-    }).finally(function() {
-      previewLoading = false;
-      previewLoadingEl.classList.add('hidden');
-      btnRun.disabled = false;
-      updateNavButtons();
-    });
+    postJSON(previewUrl, { template_ids: selectedTemplateIds(), rounds: selectedRounds() })
+      .then(function (data) {
+        previewSummaryEl.classList.remove('hidden');
+        previewSummaryEl.innerHTML = data.success
+          ? renderPreviewSummary(data)
+          : '<p class="text-red-600">' + escapeHtml(data.message || '{{ _("Preview failed") }}') + '</p>';
+      })
+      .catch(function (err) {
+        previewSummaryEl.classList.remove('hidden');
+        previewSummaryEl.innerHTML = '<p class="text-red-600">' + escapeHtml(err.message || '{{ _("Preview failed") }}') + '</p>';
+      })
+      .finally(function () {
+        previewLoading = false;
+        previewLoadingEl.classList.add('hidden');
+        btnRun.disabled = false;
+        updateNavButtons();
+      });
   }
 
-  const fileInput = document.getElementById('upr_excel_file');
-  if (fileInput) {
-    fileInput.addEventListener('change', function() {
-      const file = fileInput.files[0];
-      if (!file) return;
-      const fd = new FormData();
-      fd.append('file', file);
-      uploadStatus.classList.remove('hidden');
-      uploadStatus.innerHTML = '<i class="fas fa-spinner fa-spin mr-1" aria-hidden="true"></i> {{ _("Uploading…") }}';
-      btnNext.disabled = true;
-      fetch(uploadUrl, { method: 'POST', headers: { 'X-CSRFToken': csrfToken || '' }, body: fd })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (!data.success) throw new Error(data.message || '{{ _("Upload failed") }}');
-          uploaded = true;
-          analyzeLoaded = false;
-          uploadStatus.textContent = '{{ _("Uploaded") }}: ' + file.name;
-          updateNavButtons();
-        })
-        .catch(function(err) {
-          uploaded = false;
-          analyzeLoaded = false;
-          uploadStatus.textContent = err.message || '{{ _("Upload failed") }}';
-          updateNavButtons();
-        });
-    });
-  }
+  // ── Import job polling ───────────────────────────────────────────────────
 
-  btnNext.addEventListener('click', function() { if (step < 4) showStep(step + 1); });
-  btnBack.addEventListener('click', function() { if (step > 1) showStep(step - 1); });
-
-  btnRun.addEventListener('click', function() {
-    showStep(4);
+  btnRun.addEventListener('click', function () {
+    showStep(3);
     document.getElementById('import-progress').classList.remove('hidden');
     postJSON(runUrl, {
-      template_ids: selectedTemplateIds(),
-      rounds: selectedRounds(),
-      dry_run: document.getElementById('upr-dry-run').checked,
-      batch_size: parseInt(document.getElementById('upr-batch-size').value, 10) || 1000,
-      ensure_staff_matrix: document.getElementById('upr-ensure-staff-matrix').checked,
-      async: true
-    }).then(function(data) {
+      template_ids:         selectedTemplateIds(),
+      rounds:               selectedRounds(),
+      dry_run:              document.getElementById('upr-dry-run').checked,
+      batch_size:           parseInt(document.getElementById('upr-batch-size').value, 10) || 1000,
+      ensure_staff_matrix:  document.getElementById('upr-ensure-staff-matrix').checked,
+      async:                true
+    }).then(function (data) {
       if (!data.success || !data.job_id) {
-        document.getElementById('import-result').innerHTML = '<p class="text-red-700">' + (data.message || data.error || 'Import failed') + '</p>';
+        document.getElementById('import-result').innerHTML =
+          '<p class="text-red-700">' + escapeHtml(data.message || data.error || 'Import failed') + '</p>';
+        doneActions.classList.remove('hidden');
         return;
       }
       activeJobId = data.job_id;
@@ -355,31 +311,195 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
+  if (btnRestart) {
+    btnRestart.addEventListener('click', function () { window.location.reload(); });
+  }
+
   function pollStatus() {
     if (!activeJobId) return;
-    fetch(statusUrlTemplate.replace('__JOB__', encodeURIComponent(activeJobId)))
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        const job = data.job || {};
-        document.getElementById('import-stage').textContent = job.message || job.stage || '-';
-        document.getElementById('import-progress-bar').style.width = (job.percent || 0) + '%';
-        document.getElementById('import-progress-text').textContent = Math.round(job.percent || 0) + '%';
+    fetch(statusUrlTpl.replace('__JOB__', encodeURIComponent(activeJobId)))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var job  = data.job || {};
+        var pct  = job.percent || 0;
+        document.getElementById('import-stage').textContent        = job.message || job.stage || '-';
+        document.getElementById('import-progress-bar').style.width = pct + '%';
+        document.getElementById('import-progress-text').textContent = Math.round(pct) + '%';
+
         if (job.status === 'completed') {
-          const stats = job.stats || {};
-          let msg = 'Loaded: ' + (stats.loaded || 0) + ', Inserted: ' + (stats.inserted || 0) + ', Updated: ' + (stats.updated || 0) + ', Skipped: ' + (stats.skipped || 0) + ', Errors: ' + (stats.errors || 0);
+          var stats = job.stats || {};
+          var msg = 'Loaded: ' + (stats.loaded  || 0)
+                  + ', Inserted: '  + (stats.inserted || 0)
+                  + ', Updated: '   + (stats.updated  || 0)
+                  + ', Skipped: '   + (stats.skipped  || 0)
+                  + ', Errors: '    + (stats.errors   || 0);
           if (job.download_ready && job.download_url) {
-            msg += ' <a class="text-purple-700 underline" href="' + job.download_url + '">Download preview Excel</a>';
+            msg += ' <a class="text-purple-700 underline" href="'
+                 + escapeHtml(job.download_url) + '">{{ _("Download preview Excel") }}</a>';
           }
           document.getElementById('import-result').innerHTML = '<p class="text-green-700">' + msg + '</p>';
+          doneActions.classList.remove('hidden');
           return;
         }
         if (job.status === 'failed') {
-          document.getElementById('import-result').innerHTML = '<p class="text-red-700">' + (job.error || 'Failed') + '</p>';
+          document.getElementById('import-result').innerHTML =
+            '<p class="text-red-700">' + escapeHtml(job.error || 'Failed') + '</p>';
+          doneActions.classList.remove('hidden');
           return;
         }
         pollTimer = setTimeout(pollStatus, 1000);
       });
   }
+
+  // ── Dropzone: upload + analyze pipeline ─────────────────────────────────
+  //
+  // We use initExcelImportDropzone with a custom onFileSelected callback.
+  // After client-side file-type & size checks pass the hook:
+  //   1. POSTs the file to /upload (server-side MIME + extension check)
+  //   2. On success, POSTs to /analyze (reads the "UPR Data" sheet)
+  //   3. Calls renderValidationStatus({ valid, preview }) — which drives the
+  //      dropzone status panel AND enables/disables btnNext (passed as submitBtn).
+  //
+  // The custom buildValidPreviewHtml renders the workbook summary (rows / countries
+  // / rounds / sections) in place of the generic template-import summary.
+
+  var DZ = 'excel-io-dropzone'; // CSS class prefix from excel-import-dropzone.js
+
+  function buildUprWorkbookPreviewHtml(preview) {
+    var lines = [];
+    var parts = [];
+    if (preview.total_rows != null) parts.push(escapeHtml(String(preview.total_rows)) + ' {{ _("rows") }}');
+    if (preview.countries   != null) parts.push(escapeHtml(String(preview.countries)) + ' {{ _("countries") }}');
+    if (parts.length) lines.push('<p class="' + DZ + '__preview-line">' + parts.join(' &middot; ') + '</p>');
+    if (preview.planning_rounds && preview.planning_rounds.length) {
+      lines.push(
+        '<p class="' + DZ + '__preview-line">'
+        + '<span class="' + DZ + '__preview-meta-label">{{ _("Rounds") }}: </span>'
+        + '<span class="' + DZ + '__preview-meta-value">' + escapeHtml(preview.planning_rounds.join(', ')) + '</span>'
+        + '</p>'
+      );
+    }
+    if (preview.sections && preview.sections.length) {
+      lines.push(
+        '<p class="' + DZ + '__preview-line">'
+        + '<span class="' + DZ + '__preview-meta-label">{{ _("Sections") }}: </span>'
+        + '<span class="' + DZ + '__preview-meta-value">' + escapeHtml(preview.sections.join(', ')) + '</span>'
+        + '</p>'
+      );
+    }
+    return '<div class="' + DZ + '__preview">'
+         + '<p class="' + DZ + '__preview-line ' + DZ + '__preview-line--success">'
+         + '<i class="fas fa-check-circle" aria-hidden="true"></i>'
+         + '<span>{{ _("Valid UPR workbook") }}</span></p>'
+         + lines.join('')
+         + '</div>';
+  }
+
+  import({{ static_url('js/components/excel-import-dropzone.js') | tojson }})
+    .then(function (mod) {
+      mod.initExcelImportDropzone('#upr-excel-dropzone', {
+        requireValidation:     true,
+        submitBtn:             btnNext,      // managed by renderValidationStatus
+        csrfToken:             csrfToken,
+        maxSizeBytes:          80 * 1024 * 1024,
+        buildValidPreviewHtml: buildUprWorkbookPreviewHtml,
+        invalidFileTypeLabel:  '{{ _("Please upload a valid Excel file (.xlsx or .xls)") }}',
+        maxSizeLabel:          '{{ _("File is too large (max 80 MB)") }}',
+        validationFailedLabel: '{{ _("Validation failed. Please choose a different file.") }}',
+        networkErrorLabel:     '{{ _("Could not reach the server. Please try again.") }}',
+
+        onReset: function () {
+          analyzeLoaded = false;
+          analyzeData   = null;
+          updateNavButtons();
+        },
+
+        onFileSelected: function (file, ctx) {
+          var renderValidationStatus = ctx.renderValidationStatus;
+          var dropzone               = ctx.dropzone;
+          var statusEl               = dropzone.querySelector('.' + DZ + '__status');
+
+          analyzeLoaded = false;
+          analyzeData   = null;
+          updateNavButtons();
+
+          function setPending(msg) {
+            if (!statusEl) return;
+            statusEl.className = DZ + '__status ' + DZ + '__status--pending';
+            statusEl.innerHTML =
+              '<div class="' + DZ + '__preview">'
+              + '<p class="' + DZ + '__preview-line ' + DZ + '__preview-line--pending">'
+              + '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i>'
+              + '<span>' + escapeHtml(msg) + '</span>'
+              + '</p></div>';
+          }
+
+          // Step A: upload
+          setPending('{{ _("Uploading…") }}');
+          var fd = new FormData();
+          fd.append('file', file);
+
+          fetch(uploadUrl, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (uploadData) {
+              if (!uploadData.success) {
+                renderValidationStatus({
+                  valid: false,
+                  message: uploadData.message || '{{ _("Upload failed") }}'
+                });
+                return;
+              }
+
+              // Step B: analyze
+              setPending('{{ _("Analyzing workbook\u2026") }}');
+              return postJSON(analyzeUrl, {}).then(function (aData) {
+                if (!aData.success) {
+                  renderValidationStatus({
+                    valid: false,
+                    message: aData.message || '{{ _("Analysis failed. Check that the file contains the UPR Data sheet.") }}'
+                  });
+                  return;
+                }
+                analyzeLoaded = true;
+                analyzeData   = aData;
+                renderValidationStatus({ valid: true, preview: aData });
+              });
+            })
+            .catch(function (err) {
+              renderValidationStatus({
+                valid: false,
+                message: err.message || '{{ _("Upload failed") }}'
+              });
+            });
+        }
+      });
+    })
+    .catch(function (err) {
+      // If the module fails to load, fall back to plain upload so the wizard
+      // is not completely broken.
+      console.error('Failed to load excel-import-dropzone module:', err);
+      var fileInput = document.getElementById('upr_excel_file');
+      if (fileInput) {
+        fileInput.addEventListener('change', function () {
+          var file = fileInput.files[0];
+          if (!file) return;
+          var fd = new FormData();
+          fd.append('file', file);
+          btnNext.disabled = true;
+          fetch(uploadUrl, { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (!d.success) return;
+              return postJSON(analyzeUrl, {}).then(function (a) {
+                if (!a.success) return;
+                analyzeLoaded = true;
+                analyzeData   = a;
+                updateNavButtons();
+              });
+            });
+        });
+      }
+    });
 
   showStep(1);
 });

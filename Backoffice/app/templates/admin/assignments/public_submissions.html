@@ -2,6 +2,7 @@
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 {% from "macros/empty_state.html" import empty_state %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label, status_label_for_active, status_label_for_public_submission %}
 {% block title %}{{ _('Public Submissions') }}{% endblock %}
 
 {% block head %}
@@ -49,15 +50,9 @@
                     {% set approved_count = submissions|selectattr('status.value', 'equalto', 'approved')|list|length %}
                     {% set rejected_count = submissions|selectattr('status.value', 'equalto', 'rejected')|list|length %}
                     <div class="flex space-x-2 mt-1 justify-end">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
-                            {{ pending_count }} {{ _('Pending') }}
-                        </span>
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            {{ approved_count }} {{ _('Approved') }}
-                        </span>
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                            {{ rejected_count }} {{ _('Rejected') }}
-                        </span>
+                        {{ status_label(pending_count ~ ' ' ~ _('Pending'), 'pending') }}
+                        {{ status_label(approved_count ~ ' ' ~ _('Approved'), 'success') }}
+                        {{ status_label(rejected_count ~ ' ' ~ _('Rejected'), 'danger') }}
                     </div>
                 </div>
             </div>
@@ -74,13 +69,9 @@
                     <div>
                         <p class="text-sm font-medium text-gray-700">{{ _('Status') }}:</p>
                         {% if assignment.is_public_active %}
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                {{ _('Active') }}
-                            </span>
+                            {{ status_label_for_active(true) }}
                         {% else %}
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                {{ _('Inactive') }}
-                            </span>
+                            {{ status_label_for_active(false) }}
                         {% endif %}
                     </div>
                 </div>
@@ -110,15 +101,9 @@
                 {% set approved_count = submissions|selectattr('status.value', 'equalto', 'approved')|list|length %}
                 {% set rejected_count = submissions|selectattr('status.value', 'equalto', 'rejected')|list|length %}
                 <div class="flex space-x-2 mt-1">
-                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
-                        {{ pending_count }} {{ _('Pending') }}
-                    </span>
-                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                        {{ approved_count }} {{ _('Approved') }}
-                    </span>
-                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                        {{ rejected_count }} {{ _('Rejected') }}
-                    </span>
+                    {{ status_label(pending_count ~ ' ' ~ _('Pending'), 'pending') }}
+                    {{ status_label(approved_count ~ ' ' ~ _('Approved'), 'success') }}
+                    {{ status_label(rejected_count ~ ' ' ~ _('Rejected'), 'danger') }}
                 </div>
             </div>
         </div>

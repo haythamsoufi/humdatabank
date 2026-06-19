@@ -96,7 +96,7 @@ def run_import():
     rounds = data.get("rounds") or []
     dry_run = bool(data.get("dry_run", False))
     batch_size = int(data.get("batch_size") or 1000)
-    ensure_staff_matrix = bool(data.get("ensure_staff_matrix", True))
+    ensure_staff_matrix = bool(data.get("ensure_staff_matrix", True))  # kept for backward compat
     async_mode = bool(data.get("async", True))
 
     if batch_size < 100:

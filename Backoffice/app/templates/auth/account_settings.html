@@ -1,6 +1,7 @@
 {% extends "core/layout.html" %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 {% from "components/_form_helpers.html" import render_field %}
+{% from "components/_status_label.html" import status_label, status_label_for_access_request, status_label_for_active %}
 
 {% from "components/_page_header.html" import page_header %}
 {% block head %}
@@ -247,24 +248,7 @@
                                 <span class="text-sm font-medium text-gray-900">
                                     {{ request.country.name if request.country else ('Unknown Country (ID: ' ~ request.country_id ~ ')') }}
                                 </span>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                                    {% if request.status == 'pending' %}bg-yellow-100 text-yellow-800
-                                    {% elif is_revoked %}bg-orange-100 text-orange-800
-                                    {% elif request.status == 'approved' %}bg-green-100 text-green-800
-                                    {% elif request.status == 'rejected' %}bg-red-100 text-red-800
-                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                    {% if request.status == 'pending' %}
-                                        Pending
-                                    {% elif is_revoked %}
-                                        Revoked
-                                    {% elif request.status == 'approved' %}
-                                        Approved
-                                    {% elif request.status == 'rejected' %}
-                                        Rejected
-                                    {% else %}
-                                        {{ request.status|title }}
-                                    {% endif %}
-                                </span>
+                                {{ status_label_for_access_request(request.status, is_revoked) }}
                             </div>
                             {% if request.request_message %}
                             <p class="text-xs text-gray-600 mt-2"><span class="font-medium">Your note:</span> {{ request.request_message }}</p>
@@ -399,18 +383,12 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 {% if device.logged_out_at %}
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                        <i class="fas fa-sign-out-alt mr-1"></i>
-                                        Logged Out
-                                    </span>
+                                    {{ status_label(_('Logged Out'), 'danger') }}
                                     <div class="text-xs text-gray-500 mt-1 device-logged-out-date" data-datetime="{{ device.logged_out_at|datetime_iso }}">
                                         {{ device.logged_out_at.strftime('%Y-%m-%d %H:%M') if device.logged_out_at else '' }}
                                     </div>
                                 {% else %}
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        <i class="fas fa-check-circle mr-1"></i>
-                                        Active
-                                    </span>
+                                    {{ status_label_for_active(true) }}
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -460,6 +438,7 @@
 {% from "components/datetime_utils_js.html" import datetime_utils_js %}
 {{ datetime_utils_js() }}
 
+<script src="{{ static_url('js/components/status-labels.js') }}"></script>
 <script src="{{ static_url('libs/profile-initials.js') }}"></script>
 <script src="{{ static_url('js/account-notification-preferences.js') }}"></script>
 <script nonce="{{ csp_nonce() }}">
@@ -929,10 +908,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         };
 
                         statusCell.innerHTML = `
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                <i class="fas fa-sign-out-alt mr-1"></i>
-                                Logged Out
-                            </span>
+                            ${(window.StatusLabels && StatusLabels.render('Logged Out', 'danger')) || '<span class="status-label status-label--danger">Logged Out</span>'}
                             <div class="text-xs text-gray-500 mt-1">${escHtml(formattedDate)}</div>
                         `;
                     }

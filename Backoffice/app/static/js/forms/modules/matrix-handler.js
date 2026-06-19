@@ -12,6 +12,8 @@ function _mhFetch(url, opts = {}) {
 
 // Locale-aware integer formatter for totals
 const __matrixIntegerFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+// Locale-aware formatter for variable/tooltip display (preserves decimals)
+const __matrixNumberFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 20 });
 function __formatInteger(value) {
     try {
         const num = Number(value || 0);
@@ -19,6 +21,20 @@ function __formatInteger(value) {
         return __matrixIntegerFormatter.format(Math.round(num));
     } catch (e) {
         return String(Math.round(Number(value || 0)) || 0);
+    }
+}
+function __formatNumberForDisplay(value) {
+    if (value == null || value === '') return null;
+    const raw = (typeof window.__numericUnformat === 'function')
+        ? window.__numericUnformat(String(value))
+        : String(value).trim().replace(/,/g, '');
+    if (raw === '') return null;
+    const num = Number(raw);
+    if (!isFinite(num)) return String(value);
+    try {
+        return __matrixNumberFormatter.format(num);
+    } catch (e) {
+        return String(value);
     }
 }
 
@@ -2471,7 +2487,9 @@ class MatrixHandler {
                 hasSavedValue = true;
 
                 if (typeof savedValue === 'object' && savedValue.original !== undefined) {
-                    savedDisplayValue = savedValue.modified || savedValue.original;
+                    // Use != null so that "" (PNS deliberately cleared) and 0 show as-is,
+                    // only falling back to original when modified is absent (null/undefined).
+                    savedDisplayValue = savedValue.modified != null ? savedValue.modified : savedValue.original;
                     savedOriginalValue = savedValue.original;
                     savedIsModified = savedValue.isModified || false;
                 } else {
@@ -2657,7 +2675,7 @@ class MatrixHandler {
 
                     // Handle new structure with original/modified tracking
                     if (typeof savedValue === 'object' && savedValue.original !== undefined) {
-                        savedDisplayValue = savedValue.modified || savedValue.original;
+                        savedDisplayValue = savedValue.modified != null ? savedValue.modified : savedValue.original;
                         savedOriginalValue = savedValue.original;
                         savedIsModified = savedValue.isModified || false;
                     } else {
@@ -3262,7 +3280,7 @@ class MatrixHandler {
                     white-space: nowrap;
                     z-index: 10000;
                     opacity: 0;
-                    pointer-events: auto;
+                    pointer-events: none;
                     transition: opacity 0.2s;
                     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
                 `;
@@ -3279,7 +3297,10 @@ class MatrixHandler {
                 });
                 tipEl.addEventListener('mouseleave', () => {
                     const t = document.getElementById(existingTooltipId);
-                    if (t) t.style.opacity = '0';
+                    if (t) {
+                        t.style.opacity = '0';
+                        t.style.pointerEvents = 'none';
+                    }
                 });
             };
             if (!tooltip) {
@@ -3303,10 +3324,6 @@ class MatrixHandler {
                 }
                 const currentOriginalValue = cell._variableOriginalValue !== undefined ? cell._variableOriginalValue : originalValue;
 
-                // Update content - show original value or "empty" if it was empty
-                const originalDisplay = (currentOriginalValue !== null && currentOriginalValue !== undefined && currentOriginalValue !== '')
-                    ? this.escapeHtml(currentOriginalValue)
-                    : '(empty)';
                 if (tooltip) {
                     tooltip.replaceChildren();
                     const title = document.createElement('div');
@@ -3316,11 +3333,9 @@ class MatrixHandler {
 
                     const originalRow = document.createElement('div');
                     originalRow.appendChild(document.createTextNode('Original: '));
-                    // `originalDisplay` already escaped HTML; append as text to avoid parsing.
-                    // We can safely display the underlying value by using the raw value instead.
                     const originalText =
                         (currentOriginalValue !== null && currentOriginalValue !== undefined && currentOriginalValue !== '')
-                            ? String(currentOriginalValue)
+                            ? (__formatNumberForDisplay(currentOriginalValue) ?? String(currentOriginalValue))
                             : '(empty)';
                     originalRow.appendChild(document.createTextNode(originalText));
 
@@ -3424,6 +3439,7 @@ class MatrixHandler {
                 if (tooltip) {
                     updateTooltip(); // Calculate position and update content
                     tooltip.style.opacity = '1';
+                    tooltip.style.pointerEvents = 'auto';
                 }
             };
             const mouseMoveHandler = () => {
@@ -3445,7 +3461,10 @@ class MatrixHandler {
                 cell._variableTooltipHideTimeout = setTimeout(() => {
                     cell._variableTooltipHideTimeout = null;
                     const currentTooltip = document.getElementById(existingTooltipId);
-                    if (currentTooltip) currentTooltip.style.opacity = '0';
+                    if (currentTooltip) {
+                        currentTooltip.style.opacity = '0';
+                        currentTooltip.style.pointerEvents = 'none';
+                    }
                 }, 150);
             };
 
@@ -3593,7 +3612,7 @@ class MatrixHandler {
                 if (isVariable) {
                     if (typeof value === 'object' && value.original !== undefined) {
                         // New structure with modification tracking
-                        displayValue = value.modified || value.original;
+                        displayValue = value.modified != null ? value.modified : value.original;
                         originalValue = value.original;
                         isModified = value.isModified || false;
                         updatedMatrix.data[cellKey] = value; // Keep full structure
@@ -3705,7 +3724,7 @@ class MatrixHandler {
                 if (isVariable) {
                     if (typeof value === 'object' && value.original !== undefined) {
                         // New structure with modification tracking
-                        displayValue = value.modified || value.original;
+                        displayValue = value.modified != null ? value.modified : value.original;
                         originalValue = value.original;
                         isModified = value.isModified || false;
                     } else {

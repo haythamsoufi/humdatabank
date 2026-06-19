@@ -139,11 +139,9 @@ Built once per import run by `build_import_context()`. Caches all DB lookups so 
 
 ### 6.2 Funding → Templates 24 and 22
 
-The `Source` column determines routing.
+The `Country Value` and `PNS Value` columns are processed independently — a single Excel row can contribute to both templates.
 
-#### `Source = Country Data` (or untagged) — → Template 24
-
-Value column: **`Country Value`** (fallback to `ValueNum` for older exports).
+#### Country Value → Template 24
 
 | Entity | Target item | Row key |
 |--------|-------------|---------|
@@ -153,19 +151,39 @@ Value column: **`Country Value`** (fallback to `ValueNum` for older exports).
 
 Year offset is computed from `Year - period`. Offsets outside 0–2 are skipped.
 
-#### `Source = PNS Data` — → Template 22
+> **Period-lookup pitfall:** The year offset lookup uses `_year_offset(period, year_val)` where `period` is the **dynamic** assignment period derived from the round code (e.g. `"2026"` for P26). Hard-coding the period as a static value (e.g. `"2025"`) causes all funding rows to be silently skipped (offset out of 0–2 range or None). Always derive `period` from `round_to_period(rnd)`.
 
-Value column: **`PNS Value`**. Only year-offset **0** (current year) is imported (template 22 has a single funding matrix).
+#### PNS Value → Template 22 (structured cell format)
+
+Only year-offset **0** (current year) is imported. Rows with EITHER a non-zero `Country Value` or a non-zero `PNS Value` contribute to the T22 matrix.
 
 Routing chain:
-
 ```
-NS column (e.g. "Danish Red Cross")
-  → NationalSociety.country_id → Country.iso3 = "DNK"
-    → template 22 AES for (period, "DNK")
+NS column (e.g. "Netherlands Red Cross")
+  → NationalSociety.country_id → Country.iso3 = "NLD"
+    → template 22 AES for (period, "NLD")
       → item 1303 (Funding Requirements, row_mode=list_library, lookup=country_map)
-        → cell key = {host Country.id}_{SP1–EFs}  (e.g. "1_SP1" for Afghanistan)
+        → cell key = {host Country.id}_{SP1–EFs}  (e.g. "184_SP2" for Uganda)
 ```
+
+Each cell is a **structured dict**, not a plain number:
+
+```json
+{
+  "184_SP2": { "original": 616508, "modified": 439311, "isModified": true  },
+  "184_SP1": { "original": 200000, "modified": "",     "isModified": true  },
+  "184_EFs": { "original": 0,      "modified": 696998, "isModified": true  },
+  "106_EFs": { "original": 328758, "modified": 670961, "isModified": false }
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `original` | `Country Value` — what the host country's T24 template reports this PNS contributed |
+| `modified` | `PNS Value` — what the PNS itself reported; `""` if not reported for this area |
+| `isModified` | `true` only when the PNS has reported AND the PNS value **differs** from the country value. `false` if they match, or if the PNS didn't report for this country at all |
+
+`isModified` is computed **per cell**: `pns_reported_for_country AND (pns_value ≠ country_value)` (both treated as 0 when blank).
 
 > **Important:** Template 22 AES keys are the **PNS's home country ISO3**, not the host country ISO3. `assignment_by_template[22]` is kept separate from `assignment_by_template[24]` to prevent collisions when the same ISO3 exists in both.
 
@@ -257,7 +275,7 @@ Unknown `Comments_*` slugs are title-cased automatically.
 | 960 Emergency Appeals | `{name} ({code})` | `Total People to be reached` | `Afghanistan - Earthquake (MDRAF019)_Total People to be reached` |
 | 967/968/974 HNS+IFRC funding | Entity name string | SP/EFs | `HNS_SP1`, `IFRC Secretariat_EFs` |
 | 970/973/975 PNS funding tpl24 | `NationalSociety.id` | SP/EFs | `140_SP3` |
-| 1303 PNS funding tpl22 | `Country.id` (host country) | SP/EFs | `1_SP1` |
+| 1303 PNS funding tpl22 | `Country.id` (host country) | SP/EFs | `184_SP2` — value is `{"original":616508,"modified":439311,"isModified":true}` |
 | 1367 Staff | `NationalSociety.id` | column name | `49_intl_delegates_hns` |
 | 956 Comments | — | — | plain text scalar |
 
@@ -324,12 +342,12 @@ Debug-only fields (`_debug_iso3`, `_debug_year`, `_debug_kpi_code`) are stripped
 - [x] ISO3 → `Country.id` index (for `country_map` matrix row keys)
 - [x] Template 24: NS Data scalars
 - [x] Template 24: Funding — HNS/IFRC and Country-reported PNS → `Country Value` → items 967/968/974/970/973/975
-- [x] Template 22: Funding — PNS self-reported → `PNS Value` → item 1303, year-0 only
+- [x] Template 22: Funding — PNS self-reported → `PNS Value` + country reference `Country Value` → item 1303 as `{original, modified, isModified}` structured cells, year-0 only
 - [x] Template 24: Reach — SP1–SP5 → item 954 (Longer-term programmes)
 - [x] Template 24: Reach — EA1–EA3 → item 960 (Emergency Appeals) via EA Code + GO API fallback
 - [x] Template 24: Support — bilateral tick marks → item 955
 - [x] Template 24: Comments — human-readable labels, `Value` column, single-newline join → item 956
-- [x] Template 22: Staff matrix (auto-created if missing) → item 1367
+- [x] Template 22: Staff matrix → item 1367
 - [x] Dry-run mode (no DB writes, optional preview Excel output)
 - [x] Async background job with progress polling
 - [x] 3-step UI wizard: Upload+Analyze inline (step 1), Configure (step 2), Import (step 3)
@@ -344,12 +362,11 @@ Debug-only fields (`_debug_iso3`, `_debug_year`, `_debug_kpi_code`) are stripped
 |---|------|-------|
 | 1 | **Template 22 Staff section AES routing** | Currently uses host ISO3 — must use NS home country (same pattern as PNS Funding). Will silently produce 0 rows until fixed + 2026 tpl22 assignments exist. |
 | 2 | **Template 22 Staff matrix row key** | Should be host-country NS id (HNS being supported), not the contributing PNS id. Needs clarification of intended matrix structure. |
-| 3 | **Template 22 2026 assignments** | Must be created for each PNS country before P26 PNS Funding or Staff data can be imported. |
-| 4 | **Reporting templates (25 + 1 other)** | Not implemented. Require new entries in `UPR_TEMPLATE_PROFILES` and handler blocks in `transform_to_import_rows`. |
-| 5 | **NS name fuzzy matching** | Current match is exact case-insensitive. Names that differ by punctuation, accents, or abbreviation (e.g. "The Netherlands Red Cross" vs "Netherlands Red Cross") will warn and be skipped. Consider normalised or phonetic fallback. |
-| 6 | **Multi-year PNS Funding in template 22** | Currently only year-offset 0 (current year) is imported. If template 22 is extended with year+1/year+2 funding matrices, the offset restriction should be lifted. |
-| 7 | **File locking** | UPR Master.xlsx is locked when open in Excel. Users must copy the file first or close Excel. |
-| 8 | **Unit tests** | No automated tests for the transform logic. Key test cases: AFG P26 dry run vs DB, NS name resolution, EA Code vs slot fallback. |
+| 3 | **Reporting templates (25 + 1 other)** | Not implemented. Require new entries in `UPR_TEMPLATE_PROFILES` and handler blocks in `transform_to_import_rows`. |
+| 4 | **NS name fuzzy matching** | Current match is exact case-insensitive. Names that differ by punctuation, accents, or abbreviation (e.g. "The Netherlands Red Cross" vs "Netherlands Red Cross") will warn and be skipped. Consider normalised or phonetic fallback. |
+| 5 | **Multi-year PNS Funding in template 22** | Currently only year-offset 0 (current year) is imported. If template 22 is extended with year+1/year+2 funding matrices, the offset restriction should be lifted. |
+| 6 | **File locking** | UPR Master.xlsx is locked when open in Excel. Users must copy the file first or close Excel. |
+| 7 | **Unit tests** | No automated tests for the transform logic. Key test cases: AFG P26 dry run vs DB, NS name resolution, EA Code vs slot fallback. |
 
 ---
 

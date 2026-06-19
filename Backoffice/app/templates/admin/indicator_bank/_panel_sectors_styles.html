@@ -14,7 +14,8 @@
             flex-shrink: 0;
         }
 
-        .sector-avatar-slot__fallback {
+        /* Child combinator beats .sector-card-icon / .sector-avatar-icon { display: flex } on the fallback node */
+        .sector-avatar-slot > .sector-avatar-slot__fallback {
             display: none;
         }
 

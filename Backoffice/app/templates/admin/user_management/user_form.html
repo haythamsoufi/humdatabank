@@ -6,6 +6,7 @@
 {% block content %}
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes, admin_underline_subtab_btn_classes %}
+{% from "components/_status_label.html" import status_label, status_label_for_active %}
 {% set azure_sso_enabled = azure_sso_enabled | default(false) %}
 
 {# Permission gates for deactivate / delete actions (only meaningful when editing) #}
@@ -1116,18 +1117,12 @@ window.userFormConfig = {
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     {% if device.logged_out_at %}
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                            <i class="fas fa-sign-out-alt mr-1"></i>
-                                            Logged Out
-                                        </span>
+                                        {{ status_label(_('Logged Out'), 'danger') }}
                                         <div class="text-xs text-gray-500 mt-1 device-logged-out-date" data-datetime="{{ device.logged_out_at|datetime_iso }}">
                                             {{ device.logged_out_at.strftime('%Y-%m-%d %H:%M') if device.logged_out_at else '' }}
                                         </div>
                                     {% else %}
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            <i class="fas fa-check-circle mr-1"></i>
-                                            Active
-                                        </span>
+                                        {{ status_label_for_active(true) }}
                                     {% endif %}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">

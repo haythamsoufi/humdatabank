@@ -1,5 +1,6 @@
 {# Versions Management Modal - uses shared modal_shell for consistent structure #}
 {% from "macros/modal_shell.html" import modal_shell %}
+{% from "components/_status_label.html" import status_label_for_generic_status %}
 {% set versions_title = '<i class="fas fa-code-branch w-6 h-6 mr-2 text-blue-600"></i> ' ~ _('Template Versions') %}
 {% call modal_shell('versions-modal', versions_title, aria_label=_('Template Versions'), max_width='max-w-4xl', title_safe=true) %}
 {# Versions Table #}
@@ -60,13 +61,7 @@
                             </div>
                         </td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                {% if v.status|lower == 'published' %}bg-green-100 text-green-800
-                                {% elif v.status|lower == 'draft' %}bg-yellow-100 text-yellow-800
-                                {% else %}bg-gray-100 text-gray-800
-                                {% endif %}">
-                                {{ v.status|title }}
-                            </span>
+                            {{ status_label_for_generic_status(v.status) }}
                         </td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
                             {% set dt = v.updated_at if v.updated_at else v.created_at %}

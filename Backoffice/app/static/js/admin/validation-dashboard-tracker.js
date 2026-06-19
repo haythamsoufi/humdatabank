@@ -73,17 +73,11 @@
     }
 
     function statusBadge(status, label) {
-        var map = {
-            approved: 'bg-green-100 text-green-800',
-            submitted: 'bg-blue-100 text-blue-800',
-            sent_for_review: 'bg-purple-100 text-purple-800',
-            requires_revision: 'bg-orange-100 text-orange-800',
-            in_progress: 'bg-amber-100 text-amber-800',
-            pending: 'bg-gray-100 text-gray-700',
-        };
         var text = label || statusLabel(status);
-        return '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium ' +
-            (map[status] || 'bg-gray-100 text-gray-800') + '">' + esc(text) + '</span>';
+        if (window.StatusLabels) {
+            return window.StatusLabels.renderAssignmentStatus(status, text);
+        }
+        return '<span class="status-label status-label--neutral">' + esc(text) + '</span>';
     }
 
     function sectionStatusLabel(fillStatus) {

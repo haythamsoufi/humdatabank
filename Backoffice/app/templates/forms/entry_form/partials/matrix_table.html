@@ -1,3 +1,4 @@
+{% from "components/_status_label.html" import status_label_for_data_flag %}
 {# Matrix Table Template #}
 {# This template renders a matrix table for form fields #}
 
@@ -41,11 +42,11 @@
 
     {% if matrix_is_prefilled %}
         <div class="flex items-center justify-end mb-2">
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800" title="{{ _('This matrix is prefilled') }}">{{ _('Prefilled') }}</span>
+            <span title="{{ _('This matrix is prefilled') }}">{{ status_label_for_data_flag('prefilled') }}</span>
         </div>
     {% elif matrix_is_imputed %}
         <div class="flex items-center justify-end mb-2">
-            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800" title="{{ _('This matrix is imputed') }}">{{ _('Imputed') }}</span>
+            <span title="{{ _('This matrix is imputed') }}">{{ status_label_for_data_flag('imputed') }}</span>
         </div>
     {% endif %}
 

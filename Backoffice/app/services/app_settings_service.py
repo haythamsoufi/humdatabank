@@ -625,8 +625,8 @@ def user_has_ai_beta_access(user) -> bool:
 
     Access rules:
     - Beta OFF (toggle disabled): all authenticated users have access — no restriction applied.
-    - Beta ON (toggle enabled): only system managers and users explicitly added to the
-      allow-list can access AI. Admins must be added to the list to gain access.
+    - Beta ON (toggle enabled): only users explicitly added to the allow-list can access AI
+      (including system managers and admins).
     - Unauthenticated users: never have access regardless of toggle state.
     """
     if not user or not getattr(user, "is_authenticated", False):
@@ -635,15 +635,6 @@ def user_has_ai_beta_access(user) -> bool:
     # When beta mode is OFF, access is unrestricted — everyone can use AI.
     if not is_ai_beta_restricted():
         return True
-
-    # Beta mode is ON: only system managers and explicitly allowed users have access.
-    try:
-        from app.services.authorization_service import AuthorizationService
-
-        if AuthorizationService.is_system_manager(user):
-            return True
-    except Exception as e:
-        logger.debug("user_has_ai_beta_access system-manager check failed: %s", e)
 
     try:
         uid = int(getattr(user, "id", 0) or 0)
@@ -655,27 +646,15 @@ def user_has_ai_beta_access(user) -> bool:
 
 
 def user_is_explicit_beta_tester(user) -> bool:
-    """Return True for users who are explicitly in the AI beta allow-list.
+    """Return True for users explicitly in the AI beta allow-list when beta mode is ON.
 
-    System managers always have access but are NOT considered beta testers for
-    UI-display purposes (they don't need the badge). Everyone else — including
-    admins — must be in the allow-list when beta mode is ON to see the badge.
+    Used for UI badges (e.g. chatbot Beta pill). Same allow-list as ``user_has_ai_beta_access``.
     """
     if not user or not getattr(user, "is_authenticated", False):
         return False
 
-    # Badge is only shown when beta mode is active.
     if not is_ai_beta_restricted():
         return False
-
-    # System managers bypass the list and don't need the badge.
-    try:
-        from app.services.authorization_service import AuthorizationService
-
-        if AuthorizationService.is_system_manager(user):
-            return False
-    except Exception:
-        pass
 
     try:
         uid = int(getattr(user, "id", 0) or 0)

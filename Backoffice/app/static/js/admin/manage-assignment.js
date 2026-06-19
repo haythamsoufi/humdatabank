@@ -346,36 +346,23 @@
                 .replace(/\b\w/g, function(chr) { return chr.toUpperCase(); });
         }
 
-        function getStatusBadgeClasses(status) {
-            const statusLower = (status || '').toLowerCase().replace(/_/g, ' ');
-            let bgClass = 'bg-gray-100';
-            let textClass = 'text-gray-800';
-            if (statusLower === 'completed' || statusLower === 'submitted' || statusLower === 'approved') {
-                bgClass = 'bg-green-100';
-                textClass = 'text-green-800';
-            } else if (statusLower === 'sent for review') {
-                bgClass = 'bg-purple-100';
-                textClass = 'text-purple-800';
-            } else if (statusLower === 'requires revision') {
-                bgClass = 'bg-orange-100';
-                textClass = 'text-orange-800';
-            } else if (statusLower === 'in progress') {
-                bgClass = 'bg-yellow-100';
-                textClass = 'text-yellow-800';
-            } else if (statusLower === 'pending') {
-                bgClass = 'bg-blue-100';
-                textClass = 'text-blue-800';
+        function getStatusVariant(status) {
+            const key = String(status || '').toLowerCase().replace(/\s+/g, '_');
+            if (window.StatusLabels) {
+                return window.StatusLabels.assignmentStatusVariant(key) !== 'neutral'
+                    ? window.StatusLabels.assignmentStatusVariant(key)
+                    : window.StatusLabels.genericStatusVariant(key);
             }
-            return { bgClass: bgClass, textClass: textClass };
+            return 'neutral';
         }
 
         function applyStatusChip(chipBtn, status) {
             if (!chipBtn) return;
-            const classes = getStatusBadgeClasses(status);
+            const variant = getStatusVariant(status);
             chipBtn.classList.remove('entity-status-chip--loading');
             chipBtn.removeAttribute('aria-busy');
-            chipBtn.className = 'entity-status-chip inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold leading-5 border-0 ' +
-                classes.bgClass + ' ' + classes.textClass;
+            chipBtn.className = 'entity-status-chip status-label status-label--' + variant +
+                ' inline-flex items-center gap-1 border-0';
             chipBtn.dataset.status = status || '';
             chipBtn.setAttribute('aria-label', 'Change status: ' + getStatusDisplayLabel(status));
             chipBtn.setAttribute('aria-haspopup', 'listbox');
@@ -393,14 +380,14 @@
         function setStatusChipLoading(chipBtn) {
             if (!chipBtn) return;
             const status = chipBtn.dataset.status || '';
-            const classes = getStatusBadgeClasses(status);
+            const variant = getStatusVariant(status);
             chipBtn.disabled = true;
             chipBtn.classList.add('entity-status-chip--loading');
             chipBtn.setAttribute('aria-busy', 'true');
             chipBtn.setAttribute('aria-label', 'Saving status');
             chipBtn.removeAttribute('aria-haspopup');
-            chipBtn.className = 'entity-status-chip inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold leading-5 border-0 ' +
-                classes.bgClass + ' ' + classes.textClass;
+            chipBtn.className = 'entity-status-chip status-label status-label--' + variant +
+                ' inline-flex items-center justify-center gap-1 border-0';
             while (chipBtn.firstChild) chipBtn.removeChild(chipBtn.firstChild);
             const spinner = document.createElement('i');
             spinner.className = 'fas fa-spinner fa-spin entity-status-chip-spinner';
@@ -409,10 +396,9 @@
         }
 
         function buildStatusMenuPill(statusValue, labelText) {
-            const classes = getStatusBadgeClasses(statusValue);
+            const variant = getStatusVariant(statusValue);
             const pill = document.createElement('span');
-            pill.className = 'entity-status-menu-pill inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ' +
-                classes.bgClass + ' ' + classes.textClass;
+            pill.className = 'entity-status-menu-pill status-label status-label--' + variant;
             pill.textContent = labelText;
             return pill;
         }
@@ -598,9 +584,13 @@
         // Helper function to render public reporting badge
         function renderPublicBadge(isAvailable) {
             if (isAvailable) {
-                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i>Available</span>';
+                return window.StatusLabels
+                    ? window.StatusLabels.render('Available', 'success')
+                    : '<span class="status-label status-label--success">Available</span>';
             } else {
-                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800"><i class="fas fa-times-circle mr-1"></i>Not Available</span>';
+                return window.StatusLabels
+                    ? window.StatusLabels.render('Not Available', 'neutral')
+                    : '<span class="status-label status-label--neutral">Not Available</span>';
             }
         }
 

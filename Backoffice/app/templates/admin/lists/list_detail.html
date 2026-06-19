@@ -2,6 +2,7 @@
 {% from "macros/modal_shell.html" import modal_shell %}
 
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label %}
 {% block content %}
 <style nonce="{{ csp_style_nonce() }}">
     .drag-handle {
@@ -73,7 +74,7 @@
             <div class="flex items-center justify-between">
                 <h2 class="text-lg font-medium text-gray-900">List Data
                     {% if lookup_list.is_system_list %}
-                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-800">System List (Read-Only)</span>
+                    {{ status_label(_('System List (Read-Only)'), 'neutral', 'ml-2') }}
                     {% endif %}
                 </h2>
                 {% if lookup_list.columns_config and rows and not lookup_list.is_system_list %}

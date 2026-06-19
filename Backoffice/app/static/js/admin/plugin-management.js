@@ -226,8 +226,12 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     ${plugin.is_active ?
-                        `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><i class=\"fas fa-check-circle text-sm mr-1 align-middle leading-none\"></i>${i18n.status_active}</span>` :
-                        `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"><i class=\"fas fa-pause-circle text-sm mr-1 align-middle leading-none\"></i>${i18n.status_inactive}</span>`
+                        (window.StatusLabels
+                            ? window.StatusLabels.render(i18n.status_active, 'success')
+                            : `<span class="status-label status-label--success">${escapeHtml(i18n.status_active)}</span>`) :
+                        (window.StatusLabels
+                            ? window.StatusLabels.render(i18n.status_inactive, 'neutral')
+                            : `<span class="status-label status-label--neutral">${escapeHtml(i18n.status_inactive)}</span>`)
                     }
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

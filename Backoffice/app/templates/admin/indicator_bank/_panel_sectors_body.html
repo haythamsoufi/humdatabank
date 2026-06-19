@@ -1,4 +1,5 @@
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+{% from "components/_status_label.html" import status_label %}
 
 {% macro normalize_fa_icon(icon_class) -%}
 {%- set ic = (icon_class or '')|trim -%}
@@ -134,7 +135,7 @@
                             <div class="min-w-0">
                                 <h3 class="font-semibold text-gray-900 leading-tight">{{ sector_name }}</h3>
                                 {% if not sector.is_active %}
-                                    <span class="inline-block mt-1 text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{{ _('Inactive') }}</span>
+                                    {{ status_label(_('Inactive'), 'neutral', 'inline-block mt-1') }}
                                 {% endif %}
                             </div>
                         </div>
@@ -180,7 +181,7 @@
                                         <span class="min-w-0 flex items-center gap-1.5 flex-wrap">
                                             <span class="block truncate">{{ get_localized_subsector_name(subsector) }}</span>
                                             {% if not subsector.is_active %}
-                                                <span class="text-xs text-gray-400">{{ _('Inactive') }}</span>
+                                                {{ status_label(_('Inactive'), 'neutral') }}
                                             {% endif %}
                                             {% if _ss_ind %}
                                                 <span class="subsector-ind-count flex-shrink-0"
@@ -257,9 +258,7 @@
                         <h3 class="text-sm font-semibold text-gray-800">
                             <i class="fas fa-layer-group text-purple-600 mr-1.5"></i>{{ _('Sectors') }}
                         </h3>
-                        <span class="text-xs font-medium text-purple-800 bg-purple-100 px-2 py-0.5 rounded-full">
-                            {{ sectors|length }}
-                        </span>
+                        {{ status_label(sectors|length, 'info') }}
                     </header>
                     <ul class="divide-y divide-gray-100 max-h-[min(70vh,640px)] overflow-y-auto" id="sectors-split-sector-list">
                         {% for sector in sectors %}
@@ -311,9 +310,8 @@
                         <h3 class="text-sm font-semibold text-gray-800">
                             <i class="fas fa-sitemap text-indigo-600 mr-1.5"></i>{{ _('Sub-sectors') }}
                         </h3>
-                        <span class="text-xs font-medium text-indigo-800 bg-indigo-100 px-2 py-0.5 rounded-full"
-                              id="sectors-split-subsector-count">
-                            {{ subsectors|length }}
+                        <span id="sectors-split-subsector-count">
+                            {{ status_label(subsectors|length, 'info') }}
                         </span>
                     </header>
                     {% if subsectors %}

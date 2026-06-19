@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label, status_label_for_generic_status %}
 
 {% block title %}{{ _('AI Review Queue') }}{% endblock %}
 
@@ -71,8 +72,13 @@
             <td class="px-4 py-3">
                 {% if trace and trace.grounding_score is not none %}
                 {% set pct = (trace.grounding_score * 100)|int %}
-                {% set color = 'text-green-700 bg-green-50' if pct >= 75 else ('text-yellow-700 bg-yellow-50' if pct >= 45 else 'text-red-700 bg-red-50') %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold {{ color }}">{{ pct }}%</span>
+                {% if pct >= 75 %}
+                    {{ status_label(pct ~ '%', 'success') }}
+                {% elif pct >= 45 %}
+                    {{ status_label(pct ~ '%', 'warning') }}
+                {% else %}
+                    {{ status_label(pct ~ '%', 'danger') }}
+                {% endif %}
                 {% else %}
                 <span class="text-xs text-gray-400">—</span>
                 {% endif %}
@@ -87,10 +93,7 @@
                 {% endif %}
             </td>
             <td class="px-4 py-3">
-                {% set status_colors = {'pending': 'bg-yellow-50 text-yellow-800', 'in_review': 'bg-blue-50 text-blue-800', 'completed': 'bg-green-50 text-green-800', 'dismissed': 'bg-gray-100 text-gray-600'} %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ status_colors.get(review.status, 'bg-gray-100 text-gray-700') }}">
-                    {{ review.status|replace('_', ' ')|title }}
-                </span>
+                {{ status_label_for_generic_status(review.status) }}
             </td>
             <td class="px-4 py-3">
                 {% if review.verdict %}

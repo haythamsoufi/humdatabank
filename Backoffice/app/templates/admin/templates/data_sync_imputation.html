@@ -2,6 +2,7 @@
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+{% from "components/_status_label.html" import status_label %}
 
 {% block head %}
     {{ super() }}
@@ -551,9 +552,7 @@
                     </svg>
                     <h3 class="text-sm font-semibold text-gray-800">{{ section_data.section.name }}</h3>
                   </div>
-                  <span class="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {{ section_data.section_items|length }} item{{ 's' if section_data.section_items|length != 1 else '' }}
-                  </span>
+                  {{ status_label(section_data.section_items|length ~ ' item' ~ ('s' if section_data.section_items|length != 1 else ''), 'info', 'ml-3') }}
                 </div>
               </td>
             </tr>

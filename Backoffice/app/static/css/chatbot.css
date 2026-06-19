@@ -3,45 +3,65 @@
 /* Design tokens for consistent sizing */
 :root {
     --chat-fab-size: 56px;
+    --chat-fab-height: 48px;
+    --chat-fab-radius: 100px;
     /* Horizontal inset from viewport edge (also used by entry_form inline for hover menu `right`) */
     --chat-fab-offset: 1.5rem;
     /* Bottom inset for fixed FABs — matches responsive.css #mobileMenuFAB on phones */
     --chat-fab-bottom-inset: calc(1.5rem + env(safe-area-inset-bottom, 0px));
     --chat-fab-tooltip-gap: 16px;
-    --fab-hover-duration: 0.28s;
+    --fab-hover-duration: 0.2s;
     --fab-hover-stagger: 55ms;
-    --fab-hover-ease: cubic-bezier(0.34, 1.25, 0.64, 1);
+    --fab-hover-ease: cubic-bezier(0.4, 0, 0.2, 1);
     --chat-message-max-width: 85%;
     --chat-input-max-height: 200px;
     --chat-input-min-height: 44px;
 }
 
-/* AI Chatbot FAB – circular, branded, friendly */
+/* AI Chatbot FAB – dark pill with robot icon */
 #aiChatbotFAB {
     position: fixed;
     bottom: var(--chat-fab-bottom-inset);
     right: calc(var(--chat-fab-offset) + env(safe-area-inset-right, 0px));
-    width: var(--chat-fab-size);
-    height: var(--chat-fab-size);
-    padding: 0;
+    height: var(--chat-fab-height);
+    width: auto;
+    padding: 0 18px 0 8px;
     margin: 0;
     box-sizing: border-box;
-    background: linear-gradient(145deg, #c53030 0%, #9b2424 100%);
-    color: #ffffff;
-    border: none;
-    border-radius: 50%;
-    box-shadow: 0 4px 14px rgba(197, 48, 48, 0.35), 0 2px 6px rgba(0, 0, 0, 0.1);
+    background: #0c0c0e;
+    color: #f1f5f9;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: var(--chat-fab-radius);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.12) inset,
+        0 1px 3px rgba(0, 0, 0, 0.45),
+        0 6px 18px rgba(0, 0, 0, 0.32),
+        0 18px 40px rgba(0, 0, 0, 0.18);
     z-index: 1060;
-    cursor: grab;
+    cursor: pointer;
     touch-action: none;
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease, background 0.2s ease;
+    transition:
+        transform var(--fab-hover-duration) var(--fab-hover-ease),
+        box-shadow var(--fab-hover-duration) var(--fab-hover-ease),
+        background var(--fab-hover-duration) ease,
+        border-color var(--fab-hover-duration) ease;
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-size: 1.35rem;
-    transform-origin: center;
-    overflow: hidden;
+    gap: 10px;
+    white-space: nowrap;
     user-select: none;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+}
+
+#aiChatbotFAB::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(175deg, rgba(255, 255, 255, 0.09) 0%, transparent 45%);
+    pointer-events: none;
+    z-index: 0;
 }
 
 /* Dragged state: anchored by left/top instead of bottom/right */
@@ -50,25 +70,62 @@
     right:  auto !important;
 }
 
-/* Snap-to-edge spring transition */
+/* Snap-to-edge transition */
 #aiChatbotFAB.fab-snapping {
     transition:
-        left     0.42s cubic-bezier(0.34, 1.56, 0.64, 1),
-        top      0.42s cubic-bezier(0.34, 1.56, 0.64, 1),
-        transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-        box-shadow 0.25s ease !important;
+        left     0.32s cubic-bezier(0.4, 0, 0.2, 1),
+        top      0.32s cubic-bezier(0.4, 0, 0.2, 1),
+        transform var(--fab-hover-duration) var(--fab-hover-ease),
+        box-shadow var(--fab-hover-duration) ease !important;
 }
 
-/* Active drag: instant transform, lifted shadow, grabbing cursor */
+/* Active drag: no transitions so position tracks the cursor instantly */
 #aiChatbotFAB.fab-dragging {
     cursor: grabbing !important;
-    transition: box-shadow 0.1s ease, background 0.1s ease !important;
-    box-shadow: 0 12px 32px rgba(197, 48, 48, 0.45), 0 6px 16px rgba(0, 0, 0, 0.18) !important;
-    will-change: transform;
+    transition: none !important;
+    box-shadow:
+        0 2px 6px rgba(0, 0, 0, 0.55),
+        0 14px 36px rgba(0, 0, 0, 0.38),
+        0 0 40px rgba(185, 28, 28, 0.18) !important;
+    border-color: rgba(220, 38, 38, 0.28) !important;
+    will-change: left, top;
+}
+
+#aiChatbotFAB .fab-icon-slot {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, rgba(239, 68, 68, 0.28) 0%, rgba(127, 29, 29, 0.42) 100%);
+    border: 1px solid rgba(248, 113, 113, 0.32);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.14),
+        0 0 14px rgba(239, 68, 68, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    transition:
+        background var(--fab-hover-duration) ease,
+        border-color var(--fab-hover-duration) ease,
+        box-shadow var(--fab-hover-duration) ease,
+        transform var(--fab-hover-duration) var(--fab-hover-ease);
+}
+
+#aiChatbotFAB .fab-icon-slot::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.16), transparent 55%);
+    pointer-events: none;
 }
 
 #aiChatbotFAB .robot-face {
     position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -77,34 +134,80 @@
 }
 
 #aiChatbotFAB .robot-icon {
+    font-size: 0.95rem;
+    color: #fecaca;
     transition: all 0.3s ease;
     transform-origin: center;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
 }
 
-/* Ensure Font Awesome robot icon has correct font-weight in FAB */
 #aiChatbotFAB .robot-icon.fas.fa-robot,
 #aiChatbotFAB i.fas.fa-robot {
     font-weight: 900 !important;
     font-family: "Font Awesome 6 Free" !important;
 }
 
+#aiChatbotFAB .fab-label {
+    position: relative;
+    z-index: 1;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.012em;
+    color: rgba(241, 245, 249, 0.78);
+    transition: color var(--fab-hover-duration) ease;
+}
+
+@keyframes fabSlotPulse {
+    0%, 100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 14px rgba(239, 68, 68, 0.18); }
+    60%       { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 22px rgba(239, 68, 68, 0.32); }
+}
+#aiChatbotFAB:not(.fab-dragging):not(.chat-open) .fab-icon-slot {
+    animation: fabSlotPulse 3.8s ease-out 3s infinite;
+}
+
 #aiChatbotFAB:hover:not(.fab-dragging) {
-    transform: scale(1.08) translateY(-2px);
-    box-shadow: 0 8px 24px rgba(197, 48, 48, 0.4), 0 4px 12px rgba(0, 0, 0, 0.12);
-    background: linear-gradient(145deg, #dc2626 0%, #b91c1c 100%);
-    cursor: grab;
+    transform: translateY(-2px);
+    background: #131316;
+    border-color: rgba(220, 38, 38, 0.3);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.12) inset,
+        0 2px 6px rgba(0, 0, 0, 0.5),
+        0 12px 28px rgba(0, 0, 0, 0.38),
+        0 24px 50px rgba(0, 0, 0, 0.2),
+        0 0 32px rgba(185, 28, 28, 0.16);
+}
+
+#aiChatbotFAB:hover:not(.fab-dragging) .fab-icon-slot {
+    background: linear-gradient(145deg, rgba(239, 68, 68, 0.38) 0%, rgba(153, 27, 27, 0.52) 100%);
+    border-color: rgba(252, 165, 165, 0.45);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.18),
+        0 0 18px rgba(239, 68, 68, 0.35);
+    animation: none;
+    transform: scale(1.06);
+}
+
+#aiChatbotFAB:hover:not(.fab-dragging) .robot-icon {
+    color: #ffffff;
+    transform: scale(1.1);
+}
+
+#aiChatbotFAB:hover:not(.fab-dragging) .fab-label {
+    color: #f1f5f9;
 }
 
 #aiChatbotFAB:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.8), 0 4px 14px rgba(197, 48, 48, 0.35);
+    box-shadow:
+        0 0 0 2px #0c0c0e,
+        0 0 0 4px rgba(220, 38, 38, 0.55),
+        0 6px 18px rgba(0, 0, 0, 0.3);
 }
 
 #aiChatbotFAB.chat-open {
     opacity: 0;
     visibility: hidden;
-    transform: scale(0.8) translateY(-2px);
+    transform: translateY(6px) scale(0.94);
     pointer-events: none;
 }
 
@@ -176,24 +279,30 @@
 }
 
 @keyframes fabBounce {
-    0% { transform: scale(1) rotate(0deg); }
-    25% { transform: scale(0.9) rotate(-5deg); }
-    50% { transform: scale(1.1) rotate(5deg); }
-    75% { transform: scale(0.95) rotate(-2deg); }
-    100% { transform: scale(1) rotate(0deg); }
+    0%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-3px); }
+    70% { transform: translateY(-1px); }
 }
 
-/* Mood states – subtle (red-tinted to match FAB) */
+/* Mood states */
 #aiChatbotFAB.robot-excited {
-    box-shadow: 0 6px 20px rgba(197, 48, 48, 0.4), 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow:
+        0 2px 6px rgba(0, 0, 0, 0.5),
+        0 10px 24px rgba(0, 0, 0, 0.34),
+        0 0 28px rgba(185, 28, 28, 0.18);
 }
 
 #aiChatbotFAB.robot-tired {
-    box-shadow: 0 2px 10px rgba(197, 48, 48, 0.2), 0 1px 4px rgba(0, 0, 0, 0.08);
+    opacity: 0.88;
+    box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.4),
+        0 4px 10px rgba(0, 0, 0, 0.22);
 }
 
 #aiChatbotFAB.robot-thinking {
-    box-shadow: 0 4px 14px rgba(197, 48, 48, 0.35), 0 2px 6px rgba(0, 0, 0, 0.1);
+    box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.45),
+        0 6px 18px rgba(0, 0, 0, 0.32);
 }
 
 /* AI Chat Widget – always maximized (no minimize/expand) */

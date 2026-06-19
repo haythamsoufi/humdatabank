@@ -1,6 +1,7 @@
 {% extends "core/layout.html" %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label, status_label_for_active, status_label_for_generic_status %}
 
 {% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
 {% set can_manage_api = current_is_system_manager or has_permission('admin.api.manage') %}
@@ -131,21 +132,13 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         {% if key.is_revoked %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                <i class="fas fa-ban mr-1"></i>{{ _('Revoked') }}
-                            </span>
+                            {{ status_label(_('Revoked'), 'danger') }}
                         {% elif key.expires_at and key.expires_at <= now %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                <i class="fas fa-clock mr-1"></i>{{ _('Expired') }}
-                            </span>
+                            {{ status_label(_('Expired'), 'warning') }}
                         {% elif key.is_active %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                <i class="fas fa-check-circle mr-1"></i>{{ _('Active') }}
-                            </span>
+                            {{ status_label_for_active(true) }}
                         {% else %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                <i class="fas fa-pause-circle mr-1"></i>{{ _('Inactive') }}
-                            </span>
+                            {{ status_label_for_active(false) }}
                         {% endif %}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

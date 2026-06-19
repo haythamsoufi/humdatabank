@@ -2,6 +2,7 @@
 {% extends "core/layout.html" %}
 {% from "components/_profile_icon.html" import profile_icon %}
 {% from "components/_assignment_status_pipeline.html" import assignment_status_pipeline_badge %}
+{% from "components/_status_label.html" import status_label, status_label_for_access_request, status_label_for_public_submission, status_label_for_change_type %}
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {% block content %}
@@ -143,8 +144,8 @@
             display: none;
             z-index: 200;
         }
-        .assignment-status-pipeline-container:hover .assignment-status-pipeline-tooltip,
-        .assignment-status-pipeline-container:focus-within .assignment-status-pipeline-tooltip {
+        .assignment-status-pipeline-container:hover > .assignment-status-pipeline-tooltip,
+        .assignment-status-pipeline-trigger:focus-visible ~ .assignment-status-pipeline-tooltip {
             display: block;
         }
         #current-assignments-section .grid {
@@ -577,17 +578,7 @@
                 {{ _('Assignments for') }}
                 {% if selected_entity_type and selected_entity_type != 'country' %}
                     {# Show entity with hierarchy #}
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-blue-100 text-blue-800 mr-1">
-                        <i class="fas
-                            {% if selected_entity_type == 'ns_branch' %}fa-sitemap
-                            {% elif selected_entity_type == 'ns_subbranch' %}fa-code-branch
-                            {% elif selected_entity_type == 'ns_localunit' %}fa-map-marker-alt
-                            {% elif selected_entity_type == 'division' %}fa-building
-                            {% elif selected_entity_type == 'department' %}fa-briefcase
-                            {% else %}fa-folder
-                            {% endif %} mr-1"></i>
-                        {{ selected_entity_display_name|default('', true) }}
-                    </span>
+                    {{ status_label(selected_entity_display_name|default('', true), 'info', 'mr-1') }}
                 {% elif selected_country %}
                     {{ get_localized_national_society_name(selected_country) }}
                 {% endif %}
@@ -684,7 +675,7 @@
                                                 </svg>
                                                 {{ _('Due Date') }}: <span class="font-medium">{{ item.date_info|format_date_localized('medium') }}</span>
                                                 {% if is_overdue %}
-                                                    <span class="ml-1 px-2 py-0.5 text-xs font-semibold text-red-800 bg-red-200 rounded-full">{{ _('Overdue') }}</span>
+                                                    {{ status_label(_('Overdue'), 'danger', 'ml-1') }}
                                                 {% endif %}
                                             </p>
                                         {% endif %}
@@ -738,7 +729,7 @@
                                 <div class="absolute bottom-2 flex items-center space-x-2 {% if current_lang == 'ar' %}left-2{% else %}right-2{% endif %}">
                                     {# "Self-Reported" label #}
                                     {% if item.type == 'assigned' and item.item_object.assigned_form.period_name == 'Self-Reported' %}
-                                        <div class="text-xs text-green-600 font-medium bg-green-50 px-2 py-0.5 rounded-full self-reported-label">{{ _('Self-Reported') }}</div>
+                                        {{ status_label(_('Self-Reported'), 'success') }}
                                     {% endif %}
 
                                     {# Last modified user profile icon #}
@@ -903,12 +894,7 @@
                                                                 {% for submission in item.public_submissions %}
                                                                     <a href="{{ url_for('forms.view_public_submission', submission_id=submission.id) }}" class="flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900" role="menuitem">
                                                                         <span>{{ submission.submitted_at|format_datetime_localized('short', 'short') }}</span>
-                                                                        <span class="px-2 py-1 text-xs font-medium rounded-full
-                                                                            {% if submission.status.value == 'approved' %}bg-green-100 text-green-800
-                                                                            {% elif submission.status.value == 'rejected' %}bg-red-100 text-red-800
-                                                                            {% else %}bg-yellow-100 text-yellow-800{% endif %}">
-                                                                            {{ _(submission.status.value) }}
-                                                                        </span>
+                                                                        {{ status_label_for_public_submission(submission.status) }}
                                                                     </a>
                                                                 {% endfor %}
                                                             </div>
@@ -1074,9 +1060,6 @@
                                             {{ _('Status Updated') }}
                                         </th>
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            {{ _('Attribution') }}
-                                        </th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             {{ _('Actions') }}
                                         </th>
                                     </tr>
@@ -1136,9 +1119,7 @@
                                                         item.item_object
                                                     ) }}
                                                 {% else %}
-                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                        {{ localize_status(item.status) }}
-                                                    </span>
+                                                    {{ status_label(localize_status(item.status), 'neutral') }}
                                                 {% endif %}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -1146,18 +1127,6 @@
                                                     {{ item.status_timestamp|format_datetime_localized('short', 'short') }}
                                                 {% else %}
                                                     {{ _('N/A') }}
-                                                {% endif %}
-                                            </td>
-                                            <td class="px-6 py-4 text-sm text-gray-600">
-                                                {% if item.status == 'approved' and item.approved_by_user is defined and item.approved_by_user %}
-                                                    <div class="font-medium text-gray-700">{{ _('by') }}: {{ item.approved_by_user.name or _('Unknown') }}</div>
-                                                    {% if item.submitted_by_user is defined and item.submitted_by_user %}
-                                                        <div class="text-xs text-gray-500">{{ _('Submitted by') }}: {{ item.submitted_by_user.name or _('Unknown') }}</div>
-                                                    {% endif %}
-                                                {% elif item.submitted_by_user is defined and item.submitted_by_user %}
-                                                    <div class="font-medium text-gray-700">{{ _('by') }}: {{ item.submitted_by_user.name or _('Unknown') }}</div>
-                                                {% else %}
-                                                    <span class="text-gray-400">—</span>
                                                 {% endif %}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -1557,10 +1526,7 @@
                                         {# Change-type badge based on summary params (no context_data) #}
                                         {# Top-right badge: show count only when multiple #}
                                         {% if sk == 'activity.form_data_updated.multiple' and sp.get('count') %}
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                <i class="fas fa-list mr-1"></i>
-                                                {{ sp.get('count') }}
-                                            </span>
+                                            {{ status_label(sp.get('count'), 'neutral') }}
                                         {% endif %}
                                     </div>
 
@@ -1571,13 +1537,9 @@
                                             {% for change in activity.context_data.field_changes[:3] %}
                                                 <div class="flex items-start p-2 bg-gray-50 rounded-md">
                                                     {% if change.type == 'added' %}
-                                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 mr-3 flex-shrink-0">
-                                                            <i class="fas fa-plus text-xs mr-1"></i> {{ _('Added') }}
-                                                        </span>
+                                                        <span class="mr-3 flex-shrink-0">{{ status_label_for_change_type('added') }}</span>
                                                     {% elif change.type == 'updated' %}
-                                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 mr-3 flex-shrink-0">
-                                                            <i class="fas fa-pen text-xs mr-1"></i> {{ _('Updated') }}
-                                                        </span>
+                                                        <span class="mr-3 flex-shrink-0">{{ status_label(_('Updated'), 'info') }}</span>
                                                     {% endif %}
                                                     <div class="flex-1 min-w-0">
                                                         <p class="text-xs font-medium text-gray-900 mb-1">{{ change.field_name }}</p>
@@ -1622,13 +1584,9 @@
                                                     {% for change in activity.context_data.field_changes[3:] %}
                                                         <div class="flex items-start p-2 bg-gray-50 rounded-md">
                                                             {% if change.type == 'added' %}
-                                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 mr-3 flex-shrink-0">
-                                                                    <i class="fas fa-plus text-xs mr-1"></i> {{ _('Added') }}
-                                                                </span>
+                                                                <span class="mr-3 flex-shrink-0">{{ status_label_for_change_type('added') }}</span>
                                                             {% elif change.type == 'updated' %}
-                                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 mr-3 flex-shrink-0">
-                                                                    <i class="fas fa-pen text-xs mr-1"></i> {{ _('Updated') }}
-                                                                </span>
+                                                                <span class="mr-3 flex-shrink-0">{{ status_label(_('Updated'), 'info') }}</span>
                                                             {% endif %}
                                                             <div class="flex-1 min-w-0">
                                                                 <p class="text-xs font-medium text-gray-900 mb-1">{{ localized_field_name(change.form_item_id, change.field_name) }}</p>
@@ -1655,12 +1613,14 @@
                                     {% else %}
                                         <p class="text-sm text-gray-700">
                                             {% if sk == 'activity.form_data_updated.single' %}
-                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium mr-2 align-middle
-                                                    {% if ct == 'added' %} bg-green-100 text-green-800
-                                                    {% elif ct == 'removed' %} bg-red-100 text-red-800
-                                                    {% else %} bg-blue-100 text-blue-800{% endif %}">
-                                                    <i class="{% if ct == 'added' %}fas fa-plus{% elif ct == 'removed' %}fas fa-minus{% else %}fas fa-pen{% endif %} mr-1"></i>
-                                                    {% if ct == 'added' %}{{ _('Added') }}{% elif ct == 'removed' %}{{ _('Removed') }}{% else %}{{ _('Updated') }}{% endif %}
+                                                <span class="mr-2 align-middle">
+                                                    {% if ct == 'added' %}
+                                                        {{ status_label_for_change_type('added') }}
+                                                    {% elif ct == 'removed' %}
+                                                        {{ status_label_for_change_type('removed') }}
+                                                    {% else %}
+                                                        {{ status_label(_('Updated'), 'info') }}
+                                                    {% endif %}
                                                 </span>
                                             {% endif %}
                                             {% if sk == 'activity.form_data_updated.single' %}
@@ -1700,11 +1660,14 @@
                                                 {% for ch in sp.get('changes') %}
                                                     {% set ict = (ch.get('change_type') or 'updated')|lower %}
                                                     <div class="flex items-start text-xs">
-                                                        <span class="inline-flex items-center px-1 py-0.5 rounded font-medium mr-2
-                                                            {% if ict == 'added' %} bg-green-100 text-green-800
-                                                            {% elif ict == 'removed' %} bg-red-100 text-red-800
-                                                            {% else %} bg-blue-100 text-blue-800{% endif %}">
-                                                            {% if ict == 'added' %}{{ _('Added') }}{% elif ict == 'removed' %}{{ _('Removed') }}{% else %}{{ _('Updated') }}{% endif %}
+                                                        <span class="mr-2">
+                                                            {% if ict == 'added' %}
+                                                                {{ status_label_for_change_type('added') }}
+                                                            {% elif ict == 'removed' %}
+                                                                {{ status_label_for_change_type('removed') }}
+                                                            {% else %}
+                                                                {{ status_label(_('Updated'), 'info') }}
+                                                            {% endif %}
                                                         </span>
                                                         <span class="text-gray-800">
                                                             {% set ch_field_id = ch.get('field_id') %}
@@ -1946,7 +1909,7 @@
                              {% if request.status == 'approved' %}
                                  {% set is_revoked = request._access_revoked|default(False) %}
                              {% endif %}
-                             <div class="border border-gray-200 rounded-lg p-4 {% if request.status == 'pending' %}bg-yellow-50 border-yellow-300{% elif is_revoked %}bg-orange-50 border-orange-300{% elif request.status == 'approved' %}bg-green-50 border-green-300{% elif request.status == 'rejected' %}bg-red-50 border-red-300{% else %}bg-gray-50{% endif %}">
+                             <div class="border border-gray-200 rounded-lg p-4 bg-white">
                                  <div class="flex-1">
                                      {# First line: Country name on left, status and date on right #}
                                      <div class="flex items-center justify-between flex-wrap gap-3 mb-2">
@@ -1958,24 +1921,7 @@
                                              {% endif %}
                                          </h4>
                                          <div class="flex items-center gap-3 flex-wrap">
-                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                                 {% if request.status == 'pending' %}bg-yellow-100 text-yellow-800
-                                                 {% elif is_revoked %}bg-orange-100 text-orange-800
-                                                 {% elif request.status == 'approved' %}bg-green-100 text-green-800
-                                                 {% elif request.status == 'rejected' %}bg-red-100 text-red-800
-                                                 {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                                 {% if request.status == 'pending' %}
-                                                     <i class="fas fa-clock mr-1"></i>{{ _('Pending') }}
-                                                 {% elif is_revoked %}
-                                                     <i class="fas fa-ban mr-1"></i>{{ _('Access Revoked') }}
-                                                 {% elif request.status == 'approved' %}
-                                                     <i class="fas fa-check-circle mr-1"></i>{{ _('Approved') }}
-                                                 {% elif request.status == 'rejected' %}
-                                                     <i class="fas fa-times-circle mr-1"></i>{{ _('Rejected') }}
-                                                 {% else %}
-                                                     {{ request.status|title }}
-                                                 {% endif %}
-                                             </span>
+                                             {{ status_label_for_access_request(request.status, is_revoked) }}
                                              <span class="text-xs text-gray-500">
                                                  <i class="far fa-calendar mr-1"></i>
                                                  {{ request.created_at|datetime_local('datetime') }}
@@ -2133,7 +2079,7 @@
                              {% if request.status == 'approved' %}
                                  {% set is_revoked = request._access_revoked|default(False) %}
                              {% endif %}
-                            <div class="border border-gray-200 rounded-lg p-3 {% if request.status == 'pending' %}bg-yellow-50 border-yellow-300{% elif is_revoked %}bg-orange-50 border-orange-300{% elif request.status == 'approved' %}bg-green-50 border-green-300{% elif request.status == 'rejected' %}bg-red-50 border-red-300{% else %}bg-gray-50{% endif %}">
+                            <div class="border border-gray-200 rounded-lg p-3 bg-white">
                                 <div class="flex items-center justify-between">
                                     <span class="text-sm font-medium text-gray-900">
                                         {% if request.country %}
@@ -2142,24 +2088,7 @@
                                             {{ _('Unknown Country') }} (ID: {{ request.country_id }})
                                         {% endif %}
                                     </span>
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                                        {% if request.status == 'pending' %}bg-yellow-100 text-yellow-800
-                                        {% elif is_revoked %}bg-orange-100 text-orange-800
-                                        {% elif request.status == 'approved' %}bg-green-100 text-green-800
-                                        {% elif request.status == 'rejected' %}bg-red-100 text-red-800
-                                        {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                        {% if request.status == 'pending' %}
-                                            <i class="fas fa-clock mr-1"></i>{{ _('Pending') }}
-                                        {% elif is_revoked %}
-                                            <i class="fas fa-ban mr-1"></i>{{ _('Revoked') }}
-                                        {% elif request.status == 'approved' %}
-                                            <i class="fas fa-check-circle mr-1"></i>{{ _('Approved') }}
-                                        {% elif request.status == 'rejected' %}
-                                            <i class="fas fa-times-circle mr-1"></i>{{ _('Rejected') }}
-                                        {% else %}
-                                            {{ request.status|title }}
-                                        {% endif %}
-                                    </span>
+                                    {{ status_label_for_access_request(request.status, is_revoked) }}
                                 </div>
                             </div>
                         {% endfor %}

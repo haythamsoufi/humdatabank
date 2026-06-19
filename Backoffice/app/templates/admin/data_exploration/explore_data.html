@@ -626,6 +626,7 @@
     <!-- AG Grid JS -->
     {% from "components/ag_grid_includes.html" import ag_grid_js %}
     {{ ag_grid_js() }}
+    <script src="{{ static_url('js/components/status-labels.js') }}"></script>
     <!-- Disaggregation Analysis (pure processing + ApexCharts rendering) -->
     <script src="{{ static_url('js/data-exploration-analysis-core.js') }}"></script>
     <script src="{{ static_url('js/data-exploration-disaggregation-apex.js') }}"></script>
@@ -1445,19 +1446,21 @@
             (suggestedDisaggData !== null && suggestedDisaggData !== undefined)
         );
 
-        let badgeClass = 'bg-gray-100 text-gray-800';
+        function aiVerdictBadgeVariant(verdict, status) {
+            if (status === 'failed') return 'danger';
+            if (verdict === 'good') return 'success';
+            if (verdict === 'discrepancy') return 'warning';
+            return 'neutral';
+        }
+
         let badgeText = aiVerdictLabel(verdict, status);
         if (status === 'failed') {
-            badgeClass = 'bg-red-100 text-red-800';
             badgeText = aiVerdictLabel('uncertain', 'failed');
         } else if (verdict === 'good') {
-            badgeClass = 'bg-green-100 text-green-800';
             badgeText = aiVerdictLabel('good', status);
         } else if (verdict === 'discrepancy') {
-            badgeClass = 'bg-orange-100 text-orange-800';
             badgeText = aiVerdictLabel('discrepancy', status);
         } else if (verdict === 'uncertain') {
-            badgeClass = 'bg-gray-100 text-gray-800';
             badgeText = aiVerdictLabel('uncertain', status);
         }
 
@@ -1492,9 +1495,7 @@
 
         return `
             <div class="w-full">
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${badgeClass}">
-                    ${escapeHtml(String(badgeText))}${escapeHtml(confText)}
-                </span>
+                ${StatusLabels.render(String(badgeText) + confText, aiVerdictBadgeVariant(verdict, status))}
                 ${opinionSummary ? `<div class="text-xs text-gray-700 mt-1">${escapeHtml(opinionSummary)}</div>` : ''}
                 ${hasExpandable ? `
                     <details class="mt-1 text-xs">
@@ -1749,8 +1750,7 @@
             sortable: true,
             cellRenderer: function(params) {
                 const type = params.value || '';
-                const bgClass = type === 'assigned' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800';
-                return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${bgClass}">${escapeHtml(type)}</span>`;
+                return StatusLabels.render(escapeHtml(type), type === 'assigned' ? 'info' : 'success');
             }
         },
         {
@@ -2831,15 +2831,8 @@
 
     // Render compliance status badge
     function renderComplianceBadge(isCompliant) {
-        const badgeClass = isCompliant ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
         const badgeText = isCompliant ? '{{ _("Compliant") }}' : '{{ _("Non-Compliant") }}';
-        const badgeIcon = isCompliant ? '<i class="fas fa-check mr-1"></i>' : '<i class="fas fa-times mr-1"></i>';
-
-        return `
-            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${badgeClass}">
-                ${badgeIcon}${badgeText}
-            </span>
-        `;
+        return StatusLabels.render(badgeText, isCompliant ? 'success' : 'danger');
     }
 
     function renderCompliancePendingValidationNotice(notice) {

@@ -102,25 +102,27 @@
         feedbackEl.classList.remove('hidden');
     }
 
-    function badge(text, cls) {
-        return '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium ' + cls + '">' + esc(text) + '</span>';
+    function badge(text, variant) {
+        if (window.StatusLabels) {
+            return window.StatusLabels.render(text, variant || 'neutral');
+        }
+        return '<span class="status-label status-label--' + (variant || 'neutral') + '">' + esc(text) + '</span>';
     }
 
     function severityRenderer(params) {
-        var map = { error: 'bg-red-100 text-red-800', warning: 'bg-amber-100 text-amber-800', info: 'bg-blue-100 text-blue-800' };
         var sev = params.value || '';
-        return badge(sev, map[sev] || 'bg-gray-100 text-gray-800');
+        var variant = sev === 'error' ? 'danger' : (sev === 'warning' ? 'warning' : (sev === 'info' ? 'info' : 'neutral'));
+        return badge(sev, variant);
     }
 
     function statusRenderer(params) {
-        var map = {
-            open: 'bg-orange-100 text-orange-800',
-            answered: 'bg-green-100 text-green-800',
-            waived: 'bg-gray-100 text-gray-700',
-            resolved: 'bg-slate-100 text-slate-700',
-        };
         var st = params.value || '';
-        return badge(st, map[st] || 'bg-gray-100 text-gray-800');
+        var variant = 'neutral';
+        if (st === 'open') variant = 'warning';
+        else if (st === 'answered') variant = 'success';
+        else if (st === 'waived') variant = 'neutral';
+        else if (st === 'resolved') variant = 'success';
+        return badge(st, variant);
     }
 
     function createMultilineTextRenderer(fieldName) {

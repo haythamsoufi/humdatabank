@@ -621,12 +621,24 @@ class TestUserHasAiBetaAccess:
             user.is_authenticated = True
             assert svc.user_has_ai_beta_access(user) is True
 
-    def test_restricted_system_manager_has_access(self, app, db_session):
+    def test_restricted_system_manager_not_in_list_no_access(self, app, db_session):
         with app.app_context():
             _clear_settings(db_session, app)
             svc.set_ai_beta_access_settings(enabled=True, allowed_user_ids=[])
             user = MagicMock()
             user.is_authenticated = True
+            user.id = 1
+            with patch("app.services.authorization_service.AuthorizationService") as mock_auth:
+                mock_auth.is_system_manager.return_value = True
+                assert svc.user_has_ai_beta_access(user) is False
+
+    def test_restricted_system_manager_in_list_has_access(self, app, db_session):
+        with app.app_context():
+            _clear_settings(db_session, app)
+            svc.set_ai_beta_access_settings(enabled=True, allowed_user_ids=[1])
+            user = MagicMock()
+            user.is_authenticated = True
+            user.id = 1
             with patch("app.services.authorization_service.AuthorizationService") as mock_auth:
                 mock_auth.is_system_manager.return_value = True
                 assert svc.user_has_ai_beta_access(user) is True
@@ -638,9 +650,7 @@ class TestUserHasAiBetaAccess:
             user = MagicMock()
             user.is_authenticated = True
             user.id = 42
-            with patch("app.services.authorization_service.AuthorizationService") as mock_auth:
-                mock_auth.is_system_manager.return_value = False
-                assert svc.user_has_ai_beta_access(user) is True
+            assert svc.user_has_ai_beta_access(user) is True
 
     def test_restricted_non_allowed_user_no_access(self, app, db_session):
         with app.app_context():
@@ -649,21 +659,16 @@ class TestUserHasAiBetaAccess:
             user = MagicMock()
             user.is_authenticated = True
             user.id = 99
-            with patch("app.services.authorization_service.AuthorizationService") as mock_auth:
-                mock_auth.is_system_manager.return_value = False
-                assert svc.user_has_ai_beta_access(user) is False
+            assert svc.user_has_ai_beta_access(user) is False
 
-    def test_restricted_auth_service_exception(self, app, db_session):
+    def test_restricted_allowed_user_with_invalid_auth_check(self, app, db_session):
         with app.app_context():
             _clear_settings(db_session, app)
             svc.set_ai_beta_access_settings(enabled=True, allowed_user_ids=[5])
             user = MagicMock()
             user.is_authenticated = True
             user.id = 5
-            with patch("app.services.authorization_service.AuthorizationService") as mock_auth:
-                mock_auth.is_system_manager.side_effect = Exception("boom")
-                result = svc.user_has_ai_beta_access(user)
-            assert result is True  # in allowed list
+            assert svc.user_has_ai_beta_access(user) is True
 
     def test_invalid_user_id_returns_false(self, app, db_session):
         with app.app_context():
@@ -672,9 +677,7 @@ class TestUserHasAiBetaAccess:
             user = MagicMock()
             user.is_authenticated = True
             user.id = "not-an-int"
-            with patch("app.services.authorization_service.AuthorizationService") as mock_auth:
-                mock_auth.is_system_manager.return_value = False
-                assert svc.user_has_ai_beta_access(user) is False
+            assert svc.user_has_ai_beta_access(user) is False
 
 
 # ---------------------------------------------------------------------------
@@ -700,15 +703,23 @@ class TestUserIsExplicitBetaTester:
             user.is_authenticated = True
             assert svc.user_is_explicit_beta_tester(user) is False
 
-    def test_system_manager_not_beta_tester(self, app, db_session):
+    def test_system_manager_not_in_list_not_beta_tester(self, app, db_session):
         with app.app_context():
             _clear_settings(db_session, app)
             svc.set_ai_beta_access_settings(enabled=True, allowed_user_ids=[])
             user = MagicMock()
             user.is_authenticated = True
-            with patch("app.services.authorization_service.AuthorizationService") as mock_auth:
-                mock_auth.is_system_manager.return_value = True
-                assert svc.user_is_explicit_beta_tester(user) is False
+            user.id = 1
+            assert svc.user_is_explicit_beta_tester(user) is False
+
+    def test_system_manager_in_list_is_beta_tester(self, app, db_session):
+        with app.app_context():
+            _clear_settings(db_session, app)
+            svc.set_ai_beta_access_settings(enabled=True, allowed_user_ids=[1])
+            user = MagicMock()
+            user.is_authenticated = True
+            user.id = 1
+            assert svc.user_is_explicit_beta_tester(user) is True
 
     def test_explicit_tester(self, app, db_session):
         with app.app_context():
@@ -717,9 +728,7 @@ class TestUserIsExplicitBetaTester:
             user = MagicMock()
             user.is_authenticated = True
             user.id = 77
-            with patch("app.services.authorization_service.AuthorizationService") as mock_auth:
-                mock_auth.is_system_manager.return_value = False
-                assert svc.user_is_explicit_beta_tester(user) is True
+            assert svc.user_is_explicit_beta_tester(user) is True
 
     def test_not_in_list(self, app, db_session):
         with app.app_context():
@@ -728,21 +737,16 @@ class TestUserIsExplicitBetaTester:
             user = MagicMock()
             user.is_authenticated = True
             user.id = 88
-            with patch("app.services.authorization_service.AuthorizationService") as mock_auth:
-                mock_auth.is_system_manager.return_value = False
-                assert svc.user_is_explicit_beta_tester(user) is False
+            assert svc.user_is_explicit_beta_tester(user) is False
 
-    def test_auth_service_exception_ignored(self, app, db_session):
+    def test_allowed_user_is_beta_tester(self, app, db_session):
         with app.app_context():
             _clear_settings(db_session, app)
             svc.set_ai_beta_access_settings(enabled=True, allowed_user_ids=[55])
             user = MagicMock()
             user.is_authenticated = True
             user.id = 55
-            with patch("app.services.authorization_service.AuthorizationService") as mock_auth:
-                mock_auth.is_system_manager.side_effect = Exception("boom")
-                result = svc.user_is_explicit_beta_tester(user)
-            assert result is True
+            assert svc.user_is_explicit_beta_tester(user) is True
 
     def test_invalid_user_id_returns_false(self, app, db_session):
         with app.app_context():
@@ -751,9 +755,7 @@ class TestUserIsExplicitBetaTester:
             user = MagicMock()
             user.is_authenticated = True
             user.id = "invalid"
-            with patch("app.services.authorization_service.AuthorizationService") as mock_auth:
-                mock_auth.is_system_manager.return_value = False
-                assert svc.user_is_explicit_beta_tester(user) is False
+            assert svc.user_is_explicit_beta_tester(user) is False
 
 
 # ---------------------------------------------------------------------------

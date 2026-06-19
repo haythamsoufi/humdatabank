@@ -1,4 +1,5 @@
 {% from "macros/empty_state.html" import empty_state %}
+{% from "components/_status_label.html" import status_label, status_label_for_active %}
 {# user_analytics_embedded: True when loaded via fetch into user form (default). False for /admin/analytics/user/<id> full page. #}
 {% set user_analytics_embedded = (user_analytics_embedded is not defined) or user_analytics_embedded %}
 {# Use <a href="#"> not <button> when embedded: HTML is inserted via SafeDom.sanitizeHtml() which strips buttons. #}
@@ -179,13 +180,9 @@
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap">
                                 {% if session.is_active %}
-                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                    <i class="fas fa-circle mr-1"></i> {{ _('Active') }}
-                                </span>
+                                {{ status_label_for_active(true) }}
                                 {% else %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                                    {{ _('Ended') }}
-                                </span>
+                                {{ status_label(_('Ended'), 'neutral') }}
                                 {% endif %}
                             </td>
                         </tr>
@@ -226,17 +223,11 @@
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap">
                                 {% if login.event_type == 'login_success' %}
-                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                    <i class="fas fa-check-circle mr-1"></i> {{ _('Login') }}
-                                </span>
+                                {{ status_label(_('Login'), 'success') }}
                                 {% elif login.event_type == 'logout' %}
-                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                    <i class="fas fa-door-open mr-1"></i> {{ _('Logout') }}
-                                </span>
+                                {{ status_label(_('Logout'), 'info') }}
                                 {% elif login.event_type == 'login_failed' %}
-                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                    <i class="fas fa-times-circle mr-1"></i> {{ _('Failed login') }}
-                                </span>
+                                {{ status_label(_('Failed login'), 'danger') }}
                                 {% endif %}
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap">
@@ -257,15 +248,13 @@
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap">
                                 {% if login.is_suspicious %}
-                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                    <i class="fas fa-exclamation-triangle mr-1"></i> {{ _('Suspicious') }}
-                                </span>
+                                {{ status_label(_('Suspicious'), 'warning') }}
                                 {% elif login.is_successful %}
-                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">{{ _('Success') }}</span>
+                                {{ status_label(_('Success'), 'success') }}
                                 {% elif login.is_logout %}
-                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">{{ _('Completed') }}</span>
+                                {{ status_label(_('Completed'), 'info') }}
                                 {% else %}
-                                <span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">{{ _('Failed') }}</span>
+                                {{ status_label(_('Failed'), 'danger') }}
                                 {% endif %}
                             </td>
                         </tr>

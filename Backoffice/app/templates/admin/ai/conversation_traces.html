@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label, status_label_for_generic_status %}
 
 {% block title %}{{ _('Conversation traces') }}: {{ conversation_id[:20] }}…{% endblock %}
 
@@ -104,13 +105,7 @@
                     <div>
                         <dt class="text-sm text-gray-500">{{ _('Status') }}</dt>
                         <dd class="mt-1">
-                            {% if trace.status == 'completed' %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i> {{ trace.status }}</span>
-                            {% elif trace.status == 'error' %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"><i class="fas fa-times-circle mr-1"></i> {{ trace.status }}</span>
-                            {% else %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ trace.status }}</span>
-                            {% endif %}
+                            {{ status_label_for_generic_status(trace.status) }}
                         </dd>
                     </div>
                     <div>
@@ -138,7 +133,7 @@
                 <h4 class="text-sm font-semibold text-gray-600 mt-6 mb-2">{{ _('Tools Used') }}</h4>
                 <div class="flex flex-wrap gap-1">
                     {% for tool in trace.tools_used %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700 font-mono">{{ tool }}</span>
+                    {{ status_label(tool, 'info', 'font-mono') }}
                     {% endfor %}
                 </div>
                 {% endif %}
@@ -169,7 +164,7 @@
                 {% for step in trace.steps %}
                 <div class="step-card trace-step-content {% if step.action == 'finish' %}step-finish{% else %}step-action{% endif %} pl-6 py-3 bg-gray-50 rounded-r-lg">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">{{ _('Step') }} {{ step.step or loop.index }}</span>
+                        {{ status_label(_('Step') ~ ' ' ~ (step.step or loop.index), 'info') }}
                         {% if step.timestamp %}<span class="text-xs text-gray-400">{{ step.timestamp }}</span>{% endif %}
                     </div>
                     {% if step.thought %}
@@ -234,9 +229,9 @@
                             <td class="px-4 py-3"><code class="text-sm font-mono text-purple-700">{{ usage.tool_name }}</code></td>
                             <td class="px-4 py-3">
                                 {% if usage.success %}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 text-green-700"><i class="fas fa-check mr-1"></i> {{ _('Success') }}</span>
+                                {{ status_label(_('Success'), 'success') }}
                                 {% else %}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-red-100 text-red-700" title="{{ usage.error_message or '' }}"><i class="fas fa-times mr-1"></i> {{ _('Failed') }}</span>
+                                {{ status_label(_('Failed'), 'danger') }}
                                 {% endif %}
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-500">{% if usage.execution_time_ms %}{{ usage.execution_time_ms }}ms{% else %}-{% endif %}</td>

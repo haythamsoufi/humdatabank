@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
+{% from "components/_status_label.html" import status_label_for_active %}
 
 {% block title %}{{ 'Edit Assignment' if assignment else 'Create New Assignment' }}{% endblock %}
 
@@ -265,13 +266,9 @@
                     {% if assignment.has_public_url() %}
                         <div class="flex items-center gap-2 mb-2 flex-wrap">
                             {% if assignment.is_public_active %}
-                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                    <i class="fas fa-check-circle mr-1"></i>{{ _('Active') }}
-                                </span>
+                                {{ status_label_for_active(true) }}
                             {% else %}
-                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                    <i class="fas fa-times-circle mr-1"></i>{{ _('Inactive') }}
-                                </span>
+                                {{ status_label_for_active(false) }}
                             {% endif %}
                             <button type="button" id="copy-public-url-btn"
                                     class="btn btn-primary btn-sm"

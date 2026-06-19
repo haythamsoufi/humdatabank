@@ -46,25 +46,6 @@
             text-align: center;
         }
 
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .status-active {
-            background-color: #d1fae5;
-            color: #065f46;
-        }
-
-        .status-inactive {
-            background-color: #fee2e2;
-            color: #991b1b;
-        }
-
         .search-container {
             margin-bottom: 20px;
         }
@@ -795,11 +776,11 @@
             sortable: true,
             cellRenderer: function(params) {
                 const isActive = params.value;
-                if (isActive) {
-                    return '<span class="status-badge status-active"><i class="fas fa-check-circle mr-1"></i>Active</span>';
-                } else {
-                    return '<span class="status-badge status-inactive"><i class="fas fa-times-circle mr-1"></i>Inactive</span>';
+                if (window.StatusLabels) {
+                    return window.StatusLabels.renderActive(isActive, 'Active', 'Inactive');
                 }
+                return '<span class="status-label status-label--' + (isActive ? 'success' : 'neutral') + '">' +
+                    (isActive ? 'Active' : 'Inactive') + '</span>';
             },
             cellStyle: { 'text-align': 'center' }
         },

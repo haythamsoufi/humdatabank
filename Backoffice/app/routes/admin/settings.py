@@ -1178,7 +1178,7 @@ def manage_settings():
                     current_app.logger.debug("set_ai_settings failed: %s", e)
                     ai_ok = False
 
-            # AI beta access gate (selected users + admins/system managers)
+            # AI beta access gate (explicit allow-list only when enabled)
             ai_beta_ok = True
             try:
                 beta_enabled = data.get("ai_beta_enabled") == "1"

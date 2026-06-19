@@ -91,10 +91,6 @@
           <input type="checkbox" id="upr-dry-run" class="h-4 w-4">
           <span>{{ _('Dry run (preview counts + Excel, no DB write)') }}</span>
         </label>
-        <label class="flex items-center gap-2 text-sm text-gray-800">
-          <input type="checkbox" id="upr-ensure-staff-matrix" class="h-4 w-4" checked>
-          <span>{{ _('Create staff matrix on template 22 if missing') }}</span>
-        </label>
       </div>
       <div id="preview-loading" class="hidden text-center py-8 mt-4 border-t border-gray-200 pt-4"
            role="status" aria-live="polite">
@@ -297,7 +293,6 @@ document.addEventListener('DOMContentLoaded', function () {
       rounds:               selectedRounds(),
       dry_run:              document.getElementById('upr-dry-run').checked,
       batch_size:           parseInt(document.getElementById('upr-batch-size').value, 10) || 1000,
-      ensure_staff_matrix:  document.getElementById('upr-ensure-staff-matrix').checked,
       async:                true
     }).then(function (data) {
       if (!data.success || !data.job_id) {

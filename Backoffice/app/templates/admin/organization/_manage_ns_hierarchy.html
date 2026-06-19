@@ -147,6 +147,7 @@
     .status-badge[data-status="inactive"] { background-color: #fef2f2 !important; color: #991b1b !important; }
 </style>
 
+<script src="{{ static_url('js/components/status-labels.js') }}"></script>
 <script nonce="{{ csp_nonce() }}">
     // AG Grid helpers for NS hierarchy tables
     let branchesGridHelper = null;
@@ -197,7 +198,7 @@
             sortable: true,
             cellRenderer: function(params) {
                 if (!params.value) return '<span class="text-gray-400 text-xs">-</span>';
-                return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' + params.value + '</span>';
+                return StatusLabels.render(String(params.value), 'neutral');
             }
         },
         {
@@ -242,9 +243,7 @@
             sortable: true,
             cellRenderer: function(params) {
                 const isActive = params.value;
-                const bgClass = isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-                const text = isActive ? '{{ _("Active") }}' : '{{ _("Inactive") }}';
-                return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' + bgClass + '">' + text + '</span>';
+                return StatusLabels.renderActive(isActive, '{{ _("Active") }}', '{{ _("Inactive") }}');
             },
             cellStyle: { 'text-align': 'center' }
         },
@@ -270,7 +269,7 @@
             sortable: true,
             cellRenderer: function(params) {
                 const order = params.value || 0;
-                return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' + order + '</span>';
+                return StatusLabels.render(String(order), 'neutral');
             },
             cellStyle: { 'text-align': 'center' }
         },
@@ -341,7 +340,7 @@
             sortable: true,
             cellRenderer: function(params) {
                 if (!params.value) return '<span class="text-gray-400 text-xs">-</span>';
-                return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' + params.value + '</span>';
+                return StatusLabels.render(String(params.value), 'neutral');
             }
         },
         {
@@ -398,9 +397,7 @@
             sortable: true,
             cellRenderer: function(params) {
                 const isActive = params.value;
-                const bgClass = isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-                const text = isActive ? '{{ _("Active") }}' : '{{ _("Inactive") }}';
-                return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' + bgClass + '">' + text + '</span>';
+                return StatusLabels.renderActive(isActive, '{{ _("Active") }}', '{{ _("Inactive") }}');
             },
             cellStyle: { 'text-align': 'center' }
         },
@@ -426,7 +423,7 @@
             sortable: true,
             cellRenderer: function(params) {
                 const order = params.value || 0;
-                return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' + order + '</span>';
+                return StatusLabels.render(String(order), 'neutral');
             },
             cellStyle: { 'text-align': 'center' }
         },
@@ -499,7 +496,7 @@
             sortable: true,
             cellRenderer: function(params) {
                 if (!params.value) return '<span class="text-gray-400 text-xs">-</span>';
-                return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' + params.value + '</span>';
+                return StatusLabels.render(String(params.value), 'neutral');
             }
         },
         {
@@ -568,9 +565,7 @@
             sortable: true,
             cellRenderer: function(params) {
                 const isActive = params.value;
-                const bgClass = isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-                const text = isActive ? '{{ _("Active") }}' : '{{ _("Inactive") }}';
-                return '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ' + bgClass + '">' + text + '</span>';
+                return StatusLabels.renderActive(isActive, '{{ _("Active") }}', '{{ _("Inactive") }}');
             },
             cellStyle: { 'text-align': 'center' }
         },
@@ -596,7 +591,7 @@
             sortable: true,
             cellRenderer: function(params) {
                 const order = params.value || 0;
-                return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' + order + '</span>';
+                return StatusLabels.render(String(order), 'neutral');
             },
             cellStyle: { 'text-align': 'center' }
         },

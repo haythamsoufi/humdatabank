@@ -90,7 +90,7 @@ class UprExcelImportService:
         try:
             _, rows = load_upr_data_sheet(path)
             round_set = {r.strip().upper() for r in (rounds or []) if r and str(r).strip()} or None
-            ctx = build_import_context(template_ids, ensure_staff_matrix=False)
+            ctx = build_import_context(template_ids)
             import_rows = transform_to_import_rows(rows, ctx, template_ids=template_ids, rounds=round_set)
             by_item: Dict[str, int] = {}
             by_iso3: Dict[str, int] = {}
@@ -122,7 +122,7 @@ class UprExcelImportService:
         rounds: Optional[List[str]] = None,
         dry_run: bool = False,
         batch_size: int = 1000,
-        ensure_staff_matrix: bool = True,
+        ensure_staff_matrix: bool = True,  # kept for API backward compat, no longer used
         progress_cb=None,
         cancel_check=None,
     ) -> Dict[str, Any]:
@@ -148,7 +148,7 @@ class UprExcelImportService:
             preview_excel_path=preview_path,
             progress_cb=progress_cb,
             cancel_check=cancel_check,
-            ensure_staff_matrix=ensure_staff_matrix,
+            ensure_staff_matrix=ensure_staff_matrix,  # backward compat, ignored
         )
         stats["success"] = stats.get("errors", 0) == 0
         if preview_path:

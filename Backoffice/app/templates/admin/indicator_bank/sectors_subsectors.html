@@ -2,6 +2,7 @@
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label %}
 {% block head %}
     {{ super() }}
     <style nonce="{{ csp_style_nonce() }}">
@@ -147,9 +148,7 @@
                     <i class="fas fa-layer-group text-purple-600 mr-2"></i>{{ _('Sectors') }}
                 </h2>
                 <div class="flex items-center">
-                    <span class="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-sm font-medium">
-                        {{ sectors|length }} {{ _('sector') if sectors|length == 1 else _('sectors') }}
-                    </span>
+                    {{ status_label(sectors|length ~ ' ' ~ (_('sector') if sectors|length == 1 else _('sectors')), 'info') }}
                     <button class="new-sector-btn add-button purple" title="{{ _('Add New Sector') }}">
                         <i class="fas fa-plus"></i>
                     </button>
@@ -216,9 +215,7 @@
                     <i class="fas fa-sitemap text-indigo-600 mr-2"></i>{{ _('Sub-Sectors') }}
                 </h2>
                 <div class="flex items-center">
-                    <span class="bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full text-sm font-medium">
-                        {{ subsectors|length }} {{ _('sub-sector') if subsectors|length == 1 else _('sub-sectors') }}
-                    </span>
+                    {{ status_label(subsectors|length ~ ' ' ~ (_('sub-sector') if subsectors|length == 1 else _('sub-sectors')), 'info') }}
                     <button class="new-subsector-btn add-button indigo" title="{{ _('Add New Sub-Sector') }}">
                         <i class="fas fa-plus"></i>
                     </button>

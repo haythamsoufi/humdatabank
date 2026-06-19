@@ -1,6 +1,7 @@
 {# Renders one full trace card. Used by trace_detail (once) and conversation_traces (per trace). #}
 {# Required: trace, user, tool_usages, id_prefix (e.g. "trace" or "trace-123-") #}
 {# Optional: quality_debug (default none), final_answer_mode: "render" = script+div for JS, "plain" = raw text only #}
+{% from "components/_status_label.html" import status_label, status_label_for_generic_status %}
 {% set _quality_debug = quality_debug if quality_debug is defined else none %}
 {% set _final_answer_mode = final_answer_mode if final_answer_mode is defined else 'render' %}
 
@@ -93,13 +94,7 @@
             <div>
                 <dt class="text-sm text-gray-500">{{ _('Status') }}</dt>
                 <dd class="mt-1">
-                    {% if trace.status == 'completed' %}
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i> {{ (trace.status or '')|replace('_', ' ')|title }}</span>
-                    {% elif trace.status == 'error' %}
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"><i class="fas fa-times-circle mr-1"></i> {{ (trace.status or '')|replace('_', ' ')|title }}</span>
-                    {% else %}
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ (trace.status or '')|replace('_', ' ')|title }}</span>
-                    {% endif %}
+                    {{ status_label_for_generic_status(trace.status) }}
                 </dd>
             </div>
             <div>
@@ -183,20 +178,22 @@
                 <dt class="text-sm text-gray-500">{{ _('Grounding / Confidence') }}</dt>
                 <dd class="mt-1">
                     {% if trace.grounding_score is not none %}
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                        {% if trace.grounding_score >= 0.75 %}bg-green-100 text-green-800
-                        {% elif trace.grounding_score >= 0.45 %}bg-yellow-100 text-yellow-800
-                        {% else %}bg-red-100 text-red-800{% endif %}">
-                        {{ "%.2f"|format(trace.grounding_score) }}
-                    </span>
+                    {% if trace.grounding_score >= 0.75 %}
+                        {{ status_label("%.2f"|format(trace.grounding_score), 'success') }}
+                    {% elif trace.grounding_score >= 0.45 %}
+                        {{ status_label("%.2f"|format(trace.grounding_score), 'warning') }}
+                    {% else %}
+                        {{ status_label("%.2f"|format(trace.grounding_score), 'danger') }}
+                    {% endif %}
                     {% endif %}
                     {% if trace.confidence_level %}
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                        {% if trace.confidence_level == 'high' %}bg-green-100 text-green-800
-                        {% elif trace.confidence_level == 'medium' %}bg-yellow-100 text-yellow-800
-                        {% else %}bg-red-100 text-red-800{% endif %} ml-1">
-                        {{ trace.confidence_level }}
-                    </span>
+                    {% if trace.confidence_level == 'high' %}
+                        {{ status_label(trace.confidence_level|title, 'success', 'ml-1') }}
+                    {% elif trace.confidence_level == 'medium' %}
+                        {{ status_label(trace.confidence_level|title, 'warning', 'ml-1') }}
+                    {% else %}
+                        {{ status_label(trace.confidence_level|title, 'danger', 'ml-1') }}
+                    {% endif %}
                     {% endif %}
                 </dd>
             </div>
@@ -206,29 +203,31 @@
                 <dt class="text-sm text-gray-500">
                     <i class="fas fa-gavel mr-1 text-indigo-400"></i>{{ _('LLM Quality Judge') }}
                     {% if trace.llm_needs_review %}
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 ml-1">
-                        <i class="fas fa-flag mr-0.5"></i>{{ _('Review') }}
-                    </span>
+                    {{ status_label(_('Review'), 'warning', 'ml-1') }}
                     {% endif %}
                 </dt>
                 <dd class="mt-1">
                     {% if trace.llm_quality_score is not none %}
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                        {% if trace.llm_quality_score >= 0.7 %}bg-green-100 text-green-800
-                        {% elif trace.llm_quality_score >= 0.5 %}bg-yellow-100 text-yellow-800
-                        {% else %}bg-red-100 text-red-800{% endif %}">
-                        {{ "%.0f"|format(trace.llm_quality_score * 100) }}%
-                    </span>
+                    {% if trace.llm_quality_score >= 0.7 %}
+                        {{ status_label("%.0f"|format(trace.llm_quality_score * 100) ~ '%', 'success') }}
+                    {% elif trace.llm_quality_score >= 0.5 %}
+                        {{ status_label("%.0f"|format(trace.llm_quality_score * 100) ~ '%', 'warning') }}
+                    {% else %}
+                        {{ status_label("%.0f"|format(trace.llm_quality_score * 100) ~ '%', 'danger') }}
+                    {% endif %}
                     {% endif %}
                     {% if trace.llm_quality_verdict %}
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ml-1
-                        {% if trace.llm_quality_verdict == 'excellent' %}bg-green-100 text-green-800
-                        {% elif trace.llm_quality_verdict == 'good' %}bg-blue-100 text-blue-800
-                        {% elif trace.llm_quality_verdict == 'acceptable' %}bg-yellow-100 text-yellow-800
-                        {% elif trace.llm_quality_verdict == 'poor' %}bg-orange-100 text-orange-800
-                        {% else %}bg-red-100 text-red-800{% endif %}">
-                        {{ (trace.llm_quality_verdict or '')|replace('_', ' ')|title }}
-                    </span>
+                    {% if trace.llm_quality_verdict == 'excellent' %}
+                        {{ status_label(trace.llm_quality_verdict|replace('_', ' ')|title, 'success', 'ml-1') }}
+                    {% elif trace.llm_quality_verdict == 'good' %}
+                        {{ status_label(trace.llm_quality_verdict|replace('_', ' ')|title, 'info', 'ml-1') }}
+                    {% elif trace.llm_quality_verdict == 'acceptable' %}
+                        {{ status_label(trace.llm_quality_verdict|replace('_', ' ')|title, 'warning', 'ml-1') }}
+                    {% elif trace.llm_quality_verdict == 'poor' %}
+                        {{ status_label(trace.llm_quality_verdict|replace('_', ' ')|title, 'warning', 'ml-1') }}
+                    {% else %}
+                        {{ status_label(trace.llm_quality_verdict|replace('_', ' ')|title, 'danger', 'ml-1') }}
+                    {% endif %}
                     {% endif %}
                     {% if trace.llm_quality_reasoning %}
                     <p class="text-xs text-gray-600 mt-2 leading-relaxed">{{ trace.llm_quality_reasoning }}</p>
@@ -265,7 +264,7 @@
         <h4 class="text-sm font-semibold text-gray-600 mt-6 mb-2">{{ _('Tools Used') }}</h4>
         <div class="flex flex-wrap gap-1">
             {% for tool in trace.tools_used %}
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700 font-mono">{{ tool }}</span>
+            {{ status_label(tool, 'info', 'font-mono') }}
             {% endfor %}
         </div>
         {% endif %}
@@ -358,7 +357,7 @@
         {% for step in trace.steps %}
         <div class="step-card trace-step-content {% if step.action == 'finish' %}step-finish{% else %}step-action{% endif %} pl-6 py-3 bg-gray-50 rounded-r-lg">
             <div class="flex items-center justify-between mb-2">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">{{ _('Step') }} {{ step.step or loop.index }}</span>
+                {{ status_label(_('Step') ~ ' ' ~ (step.step or loop.index), 'info') }}
                 {% if step.timestamp %}<span class="text-xs text-gray-400">{{ step.timestamp }}</span>{% endif %}
             </div>
             {% if step.thought %}
@@ -418,9 +417,9 @@
                     <td class="px-4 py-3"><code class="text-sm font-mono text-purple-700">{{ usage.tool_name }}</code></td>
                     <td class="px-4 py-3">
                         {% if usage.success %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 text-green-700"><i class="fas fa-check mr-1"></i> {{ _('Success') }}</span>
+                        {{ status_label(_('Success'), 'success') }}
                         {% else %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-red-100 text-red-700" title="{{ usage.error_message or '' }}"><i class="fas fa-times mr-1"></i> {{ _('Failed') }}</span>
+                        {{ status_label(_('Failed'), 'danger') }}
                         {% endif %}
                     </td>
                     <td class="px-4 py-3 text-sm text-gray-500">{% if usage.execution_time_ms %}{{ usage.execution_time_ms }}ms{% else %}-{% endif %}</td>

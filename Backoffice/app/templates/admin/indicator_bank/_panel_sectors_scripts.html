@@ -399,7 +399,11 @@ document.addEventListener('DOMContentLoaded', function() {
         var activeSectorId = null;
 
         function updateCount(visible) {
-            if (countEl) countEl.textContent = String(visible);
+            if (countEl) {
+                countEl.innerHTML = (window.StatusLabels && StatusLabels.render)
+                    ? StatusLabels.render(String(visible), 'info')
+                    : String(visible);
+            }
         }
 
         function applyFilter(sectorId) {

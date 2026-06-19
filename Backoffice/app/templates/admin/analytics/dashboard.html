@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label %}
 {% block title %}{{ _('User Analytics Dashboard') }}{% endblock %}
 
 {% block head %}
@@ -118,9 +119,7 @@
             <h5 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
                 <i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>
                 {{ _('High Priority Security Events') }}
-                <span class="ml-2 px-2 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded-full">
-                    {{ _('Requires Attention') }}
-                </span>
+                <span class="ml-2">{{ status_label(_('Requires Attention'), 'danger') }}</span>
             </h5>
             <div class="space-y-3">
                 {% for event in security_summary.high_priority_events %}
@@ -130,11 +129,11 @@
                     <div class="flex-grow">
                         <div class="flex items-center gap-2 mb-1">
                             <strong class="font-semibold text-gray-800">{{ event.type|title }}</strong>
-                            <span class="px-2 py-0.5 rounded-full text-xs font-semibold
-                                         {% if event.severity == 'critical' %}bg-red-100 text-red-800
-                                         {% else %}bg-yellow-100 text-yellow-800{% endif %}">
-                                {{ event.severity|upper }}
-                            </span>
+                            {% if event.severity == 'critical' %}
+                                {{ status_label(event.severity|upper, 'danger') }}
+                            {% else %}
+                                {{ status_label(event.severity|upper, 'warning') }}
+                            {% endif %}
                         </div>
                         <p class="text-sm text-gray-600 mb-1">{{ event.description }}</p>
                         <small class="text-xs text-gray-500">{{ event.timestamp|datetime_local('datetime') }}</small>
@@ -241,15 +240,17 @@
                             </td>
                             <td class="px-4 py-3">
                                 {% set lvl = user_access_level(user) %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                                {% if lvl in ['admin', 'system_manager'] %}bg-red-100 text-red-800
-                                {% elif lvl == 'focal_point' %}bg-blue-100 text-blue-800
-                                {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                    {% if lvl == 'system_manager' %}{{ _('System Manager') }}
-                                    {% elif lvl == 'admin' %}{{ _('Admin') }}
-                                    {% elif lvl == 'focal_point' %}{{ _('Focal Point') }}
-                                    {% else %}{{ _('User') }}{% endif %}
-                                </span>
+                                {% if lvl in ['admin', 'system_manager'] %}
+                                    {% if lvl == 'system_manager' %}
+                                        {{ status_label(_('System Manager'), 'danger') }}
+                                    {% else %}
+                                        {{ status_label(_('Admin'), 'danger') }}
+                                    {% endif %}
+                                {% elif lvl == 'focal_point' %}
+                                    {{ status_label(_('Focal Point'), 'info') }}
+                                {% else %}
+                                    {{ status_label(_('User'), 'neutral') }}
+                                {% endif %}
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-500">{{ user.activity_count }}</td>
                             <td class="px-4 py-3 text-sm font-medium">
@@ -384,13 +385,15 @@
                         <td class="px-4 py-3 text-sm text-gray-500">{{ event.timestamp|datetime_local('datetimeShort') }}</td>
                         <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ event.event_type|replace('_', ' ')|title }}</td>
                         <td class="px-4 py-3">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                            {% if event.severity == 'critical' %}bg-red-100 text-red-800
-                            {% elif event.severity == 'high' %}bg-yellow-100 text-yellow-800
-                            {% elif event.severity == 'medium' %}bg-blue-100 text-blue-800
-                            {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                {{ event.severity|upper }}
-                            </span>
+                            {% if event.severity == 'critical' %}
+                                {{ status_label(event.severity|upper, 'danger') }}
+                            {% elif event.severity == 'high' %}
+                                {{ status_label(event.severity|upper, 'warning') }}
+                            {% elif event.severity == 'medium' %}
+                                {{ status_label(event.severity|upper, 'info') }}
+                            {% else %}
+                                {{ status_label(event.severity|upper, 'neutral') }}
+                            {% endif %}
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-500 max-w-xs">
                             <div class="truncate" title="{{ event.description }}">
@@ -399,9 +402,9 @@
                         </td>
                         <td class="px-4 py-3">
                             {% if event.is_resolved %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Resolved</span>
+                                {{ status_label(_('Resolved'), 'success') }}
                             {% else %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Open</span>
+                                {{ status_label(_('Open'), 'danger') }}
                             {% endif %}
                         </td>
                     </tr>

@@ -442,9 +442,12 @@
     <!-- AI Chatbot -->
     {% if current_user.is_authenticated and CHATBOT_ENABLED and current_user.chatbot_enabled and (not CHATBOT_ORG_ONLY or is_organization_email(current_user.email)) and user_has_ai_beta_access(current_user) %}
     <button id="aiChatbotFAB" aria-label="{{ _('Open %(assistant)s', assistant=CHATBOT_NAME) if CHATBOT_NAME else _('Open AI Assistant') }}">
-        <div class="robot-face">
-            <i class="fas fa-robot robot-icon"></i>
-        </div>
+        <span class="fab-icon-slot">
+            <div class="robot-face">
+                <i class="fas fa-robot robot-icon"></i>
+            </div>
+        </span>
+        <span class="fab-label">{{ CHATBOT_NAME or _('AI Assistant') }}</span>
     </button>
     <div id="aiChatWidget" role="dialog" aria-modal="true" aria-labelledby="chatTitle" data-immersive-url="{{ url_for('main.chat_immersive') }}">
         <aside class="chat-floating-sidebar" id="chatFloatingSidebar" aria-label="{{ _('Conversations') }}">
@@ -541,6 +544,7 @@
     <script src="{{ static_url('js/lib/platform-error-reporter.js') }}"></script>
     <script src="{{ static_url('js/lib/api-fetch.js') }}"></script>
     <script src="{{ static_url('js/lib/auto-translate-service.js') }}"></script>
+    <script src="{{ static_url('js/components/status-labels.js') }}"></script>
     <script src="{{ static_url('js/components.js') }}"></script>
     <script src="{{ static_url('js/components/country-region-select.js') }}"></script>
     <script src="{{ static_url('js/components/thumbnail-upload.js') }}"></script>

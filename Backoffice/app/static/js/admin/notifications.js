@@ -1206,12 +1206,12 @@ class AdminNotifications {
                             </div>
                             <div class="ml-4 text-right">
                                 ${hasDevices
-                                    ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        <i class="fas fa-check-circle mr-1"></i>${deviceCount} device${deviceCount !== 1 ? 's' : ''}
-                                       </span>`
-                                    : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                        <i class="fas fa-exclamation-circle mr-1"></i>No devices
-                                       </span>`
+                                    ? (window.StatusLabels
+                                        ? window.StatusLabels.render(`${deviceCount} device${deviceCount !== 1 ? 's' : ''}`, 'success')
+                                        : `<span class="status-label status-label--success">${deviceCount} device${deviceCount !== 1 ? 's' : ''}</span>`)
+                                    : (window.StatusLabels
+                                        ? window.StatusLabels.render('No devices', 'warning')
+                                        : '<span class="status-label status-label--warning">No devices</span>')
                                 }
                             </div>
                         </div>

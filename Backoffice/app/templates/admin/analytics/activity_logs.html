@@ -5,6 +5,7 @@
 {% from "components/pagination.html" import render_pagination %}
 
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label %}
 {% block title %}{{ _('Activity Logs') }} - {{ _('Admin Panel') }}{% endblock %}
 
 {% block head %}
@@ -111,29 +112,17 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 {% if log.activity_type == 'page_view' %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                    <i class="fas fa-eye mr-1"></i> Page View
-                                </span>
+                                {{ status_label(_('Page View'), 'info') }}
                                 {% elif log.activity_type == 'form_submit' %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                    <i class="fas fa-paper-plane mr-1"></i> Form Submit
-                                </span>
+                                {{ status_label(_('Form Submit'), 'success') }}
                                 {% elif log.activity_type == 'file_upload' %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
-                                    <i class="fas fa-upload mr-1"></i> File Upload
-                                </span>
+                                {{ status_label(_('File Upload'), 'info') }}
                                 {% elif log.activity_type == 'data_export' %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
-                                    <i class="fas fa-download mr-1"></i> Data Export
-                                </span>
+                                {{ status_label(_('Data Export'), 'warning') }}
                                 {% elif log.activity_type == 'admin_action' %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                    <i class="fas fa-shield-alt mr-1"></i> Admin Action
-                                </span>
+                                {{ status_label(_('Admin Action'), 'danger') }}
                                 {% else %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                                    <i class="fas fa-cog mr-1"></i> {{ log.activity_type|title }}
-                                </span>
+                                {{ status_label(log.activity_type|title, 'neutral') }}
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4">
@@ -161,21 +150,13 @@
                             <td class="px-6 py-4 whitespace-nowrap">
                                 {% if log.response_status_code %}
                                     {% if log.response_status_code < 300 %}
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                        {{ log.response_status_code }}
-                                    </span>
+                                    {{ status_label(log.response_status_code, 'success') }}
                                     {% elif log.response_status_code < 400 %}
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                        {{ log.response_status_code }}
-                                    </span>
+                                    {{ status_label(log.response_status_code, 'info') }}
                                     {% elif log.response_status_code < 500 %}
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                        {{ log.response_status_code }}
-                                    </span>
+                                    {{ status_label(log.response_status_code, 'warning') }}
                                     {% else %}
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                        {{ log.response_status_code }}
-                                    </span>
+                                    {{ status_label(log.response_status_code, 'danger') }}
                                     {% endif %}
                                     {% if log.response_time_ms %}
                                     <div class="text-xs text-gray-500 mt-1">{{ log.response_time_ms }}ms</div>

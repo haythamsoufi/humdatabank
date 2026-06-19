@@ -214,6 +214,7 @@ Entity answers are stored in three data tables, all keyed by either `assignment_
 |-------|---------|
 | `form_data` | Standard form item answers (indicators, questions, matrix, plugins) |
 | `dynamic_indicator_data` | Focal-point-selected indicators in dynamic sections |
+| `dynamic_section_context` | Binds a dynamic section to a stable external context per submission (e.g. emergency appeal **code** for `[EO1]`/`[EO2]`/`[EO3]` sections); see [Emergency section binding](../Backoffice/plugins/emergency_operations/DYNAMIC_SECTION_BINDING.md) |
 | `repeat_group_instance` + `repeat_group_data` | Repeat section row registry and per-row field answers |
 
 **Dual-nullable-FK parent pattern (F10):** `form_data`, `dynamic_indicator_data`, and `repeat_group_instance` each have both parent FK columns nullable at the column level, with a PostgreSQL `CHECK` constraint enforcing that **at least one** is set. This is the canonical extension point if a third submission context is ever added (add another nullable FK + widen the check constraint). Do not introduce a different parent-link pattern for new submission types.

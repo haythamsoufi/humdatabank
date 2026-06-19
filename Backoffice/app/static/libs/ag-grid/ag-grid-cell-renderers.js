@@ -65,6 +65,13 @@
         return escapeHtml(value);
     }
 
+    function renderStatusLabel(text, variant) {
+        if (window.StatusLabels) {
+            return window.StatusLabels.render(text, variant || 'neutral');
+        }
+        return '<span class="status-label status-label--' + (variant || 'neutral') + '">' + escapeHtml(text) + '</span>';
+    }
+
     /**
      * Common Cell Renderers
      */
@@ -77,13 +84,7 @@
             var isActive = params.value;
             var activeText = getTranslation('active', 'Active');
             var inactiveText = getTranslation('inactive', 'Inactive');
-
-            if (isActive) {
-                return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800">' +
-                    activeText + '</span>';
-            }
-            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-200 text-gray-700">' +
-                inactiveText + '</span>';
+            return renderStatusLabel(isActive ? activeText : inactiveText, isActive ? 'success' : 'neutral');
         },
 
         /**
@@ -99,14 +100,11 @@
 
             switch(status) {
                 case 'approved':
-                    return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">' +
-                        '<i class="fas fa-check-circle mr-1"></i>' + approvedText + '</span>';
+                    return renderStatusLabel(approvedText, 'success');
                 case 'rejected':
-                    return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">' +
-                        '<i class="fas fa-times-circle mr-1"></i>' + rejectedText + '</span>';
+                    return renderStatusLabel(rejectedText, 'danger');
                 default:
-                    return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">' +
-                        '<i class="fas fa-clock mr-1"></i>' + (pendingReviewText || pendingText) + '</span>';
+                    return renderStatusLabel(pendingReviewText || pendingText, 'pending');
             }
         },
 
@@ -119,13 +117,7 @@
             var deployedText = getTranslation('deployed', 'Deployed');
             var draftText = getTranslation('draft', 'Draft');
             var displayText = params.value || (isDeployed ? deployedText : draftText);
-
-            if (isDeployed) {
-                return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">' +
-                    '<i class="fas fa-check-circle mr-1"></i>' + displayText + '</span>';
-            }
-            return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' +
-                '<i class="fas fa-clock mr-1"></i>' + displayText + '</span>';
+            return renderStatusLabel(displayText, isDeployed ? 'success' : 'neutral');
         },
 
         /**
@@ -206,13 +198,7 @@
         privacyBadge: function(params) {
             var publicText = getTranslation('public', 'Public');
             var privateText = getTranslation('private', 'Private');
-
-            if (params.value) {
-                return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">' +
-                    '<i class="fas fa-globe mr-1"></i>' + publicText + '</span>';
-            }
-            return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' +
-                '<i class="fas fa-lock mr-1"></i>' + privateText + '</span>';
+            return renderStatusLabel(params.value ? publicText : privateText, params.value ? 'success' : 'neutral');
         },
 
         /**
@@ -222,15 +208,10 @@
         archivedStatus: function(params) {
             var archivedText = getTranslation('archived', 'Archived');
             var activeText = getTranslation('active', 'Active');
-
-            if (params.value) {
-                return '<span class="indicator-state-badge inline-flex items-center gap-x-2 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 shadow-sm">' +
-                    '<span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-amber-700 ring-1 ring-amber-200"><i class="fas fa-archive" style="font-size: 10px;"></i></span>' +
-                    '<span>' + archivedText + '</span></span>';
-            }
-            return '<span class="indicator-state-badge inline-flex items-center gap-x-2 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 shadow-sm">' +
-                '<span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200"><i class="fas fa-check" style="font-size: 10px;"></i></span>' +
-                '<span>' + activeText + '</span></span>';
+            return renderStatusLabel(
+                params.value ? archivedText : activeText,
+                params.value ? 'warning' : 'success'
+            );
         },
 
         /** Filter labels for archived column (matches archivedStatus display). */
@@ -260,15 +241,10 @@
         emergencyBadge: function(params) {
             var emergencyText = getTranslation('emergency', 'Emergency');
             var notEmergencyText = getTranslation('not_emergency', 'Not emergency');
-
-            if (params.value) {
-                return '<span class="indicator-state-badge inline-flex items-center gap-x-2 rounded-full border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-800 shadow-sm">' +
-                    '<span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-rose-700 ring-1 ring-rose-200"><i class="fas fa-bolt" style="font-size: 10px;"></i></span>' +
-                    '<span>' + emergencyText + '</span></span>';
-            }
-            return '<span class="indicator-state-badge inline-flex items-center gap-x-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-sm">' +
-                '<span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-slate-500 ring-1 ring-slate-200"><i class="fas fa-minus" style="font-size: 10px;"></i></span>' +
-                '<span>' + notEmergencyText + '</span></span>';
+            return renderStatusLabel(
+                params.value ? emergencyText : notEmergencyText,
+                params.value ? 'danger' : 'neutral'
+            );
         },
 
         /**

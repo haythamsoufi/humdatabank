@@ -2,6 +2,7 @@
 {% from "macros/modal_shell.html" import modal_shell %}
 
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label %}
 {% block content %}
 <div class="container mx-auto px-4 py-6">
 
@@ -53,7 +54,7 @@
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-medium text-gray-900">
                             <a href="{{ sl.url }}" class="hover:text-blue-600">{{ sl.name }}</a>
-                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-800">System</span>
+                            {{ status_label(_('System'), 'neutral', 'ml-2') }}
                         </div>
                     </td>
                     <td class="px-6 py-4">

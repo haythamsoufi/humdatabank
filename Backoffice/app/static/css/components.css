@@ -667,3 +667,114 @@ a.close-modal:not(.btn) {
         min-width: 100vw;
     }
 }
+
+/* ==========================================================================
+   STATUS LABELS — inset field (readonly form-value look)
+   Soft corners, recessed surface, semantic tint — not a badge chip.
+   Usage: {{ status_label(_('Approved'), 'success') }}
+   ========================================================================== */
+.status-label {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1875rem 0.5625rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: #374151;
+    background: #f9fafb;
+    border: 1px solid #d1d5db;
+    border-radius: 9999px;
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.status-label--neutral {
+    color: #475569;
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.status-label--success {
+    color: #166534;
+    background: #f0fdf4;
+    border-color: #86efac;
+}
+
+.status-label--danger {
+    color: #991b1b;
+    background: #fef2f2;
+    border-color: #fca5a5;
+}
+
+.status-label--warning {
+    color: #9a3412;
+    background: #fff7ed;
+    border-color: #fdba74;
+}
+
+.status-label--review {
+    color: #6b21a8;
+    background: #faf5ff;
+    border-color: #d8b4fe;
+}
+
+.status-label--active {
+    color: #115e59;
+    background: #f0fdfa;
+    border-color: #5eead4;
+}
+
+.status-label--pending {
+    color: #854d0e;
+    background: #fffbeb;
+    border-color: #fcd34d;
+}
+
+.status-label--info {
+    color: #1e40af;
+    background: #eff6ff;
+    border-color: #93c5fd;
+}
+
+/* Interactive status chips (e.g. entity management grid) reuse .status-label styling */
+button.entity-status-chip.status-label,
+.entity-status-chip.status-label {
+    cursor: pointer;
+    font-family: inherit;
+    gap: 0.25rem;
+}
+
+.entity-status-chip.status-label:disabled {
+    cursor: wait;
+    opacity: 0.85;
+}
+
+.entity-status-chip-caret {
+    font-size: 0.65rem;
+    line-height: 1;
+    opacity: 0.65;
+}
+
+.entity-status-chip-spinner {
+    font-size: 0.75rem;
+    line-height: 1;
+}
+
+/* Preserve pill rounding inside sharp-ui dashboards */
+.sharp-ui .status-label {
+    border-radius: 9999px !important;
+}
+
+/* Assignment status workflow pipeline (hover/focus on status badge) */
+.assignment-status-pipeline-tooltip {
+    display: none;
+    min-width: 20rem;
+    max-width: min(34rem, calc(100vw - 1.5rem));
+    z-index: 200;
+}
+
+.assignment-status-pipeline-container:hover > .assignment-status-pipeline-tooltip,
+.assignment-status-pipeline-trigger:focus-visible ~ .assignment-status-pipeline-tooltip {
+    display: block;
+}

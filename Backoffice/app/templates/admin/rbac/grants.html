@@ -1,6 +1,7 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
 {% from "macros/empty_state.html" import empty_state %}
+{% from "components/_status_label.html" import status_label %}
 
 {% block title %}{{ _('Access Rules') }}{% endblock %}
 
@@ -85,13 +86,9 @@
                         <td class="px-4 py-3 text-sm text-center">
                             {% set effect = (grant.effect or 'allow') %}
                             {% if effect == 'deny' %}
-                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-                                    {{ _('deny') }}
-                                </span>
+                                {{ status_label(_('deny'), 'danger') }}
                             {% else %}
-                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                                    {{ _('allow') }}
-                                </span>
+                                {{ status_label(_('allow'), 'success') }}
                             {% endif %}
                         </td>
                         <td class="px-4 py-3 text-xs text-gray-700">

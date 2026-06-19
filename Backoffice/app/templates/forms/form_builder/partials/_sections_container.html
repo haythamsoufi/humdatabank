@@ -1,4 +1,5 @@
 {# Existing Sections and their Items (Indicators, Document Fields, or Questions) #}
+{% from "components/_status_label.html" import status_label %}
 <div id="sections-container" class="space-y-6">
     {# Group sections hierarchically - only show main sections, sub-sections will be nested #}
     {% set main_sections = [] %}
@@ -111,27 +112,15 @@
                         <h3 class="text-lg font-semibold text-gray-800 {{ 'text-gray-500' if is_section_archived else '' }}">{{ item_s_f.section.name }}</h3>
                     </div>
                     {% if is_section_archived %}
-                        <span class="ml-3 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-400 text-white">
-                            <i class="fas fa-archive w-3 h-3 mr-1"></i>
-                            {{ _('Archived') }}
-                        </span>
+                        <span class="ml-3">{{ status_label(_('Archived'), 'neutral') }}</span>
                     {% endif %}
                     {# NEW: Section Type Badge #}
                     {% if item_s_f.section.section_type_enum.value == 'Dynamic Indicators' %}
-                        <span class="ml-3 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                            <i class="fas fa-magic w-3 h-3 mr-1"></i>
-                            {{ _('Dynamic Indicators') }}
-                        </span>
+                        <span class="ml-3">{{ status_label(_('Dynamic Indicators'), 'info') }}</span>
                     {% elif item_s_f.section.section_type_enum.value == 'Repeat' %}
-                        <span class="ml-3 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <i class="fas fa-plus-circle w-3 h-3 mr-1"></i>
-                            {{ _('Repeat Group') }}
-                        </span>
+                        <span class="ml-3">{{ status_label(_('Repeat Group'), 'success') }}</span>
                     {% else %}
-                        <span class="ml-3 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            <i class="fas fa-list w-3 h-3 mr-1"></i>
-                            {{ _('Standard') }}
-                        </span>
+                        <span class="ml-3">{{ status_label(_('Standard'), 'neutral') }}</span>
                     {% endif %}
                 </div>
                 <div class="space-x-2 flex items-center">
@@ -301,10 +290,7 @@
                                 <i class="fas fa-indent w-4 h-4 flex-shrink-0 text-teal-600" aria-hidden="true"></i>
                                 <span class="fb-table-label-cell__text">
                                     {% if is_subsection_archived %}
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-400 text-white mr-2">
-                                            <i class="fas fa-archive w-3 h-3 mr-1"></i>
-                                            {{ _('Archived') }}
-                                        </span>
+                                        <span class="mr-2">{{ status_label(_('Archived'), 'neutral') }}</span>
                                     {% endif %}
                                     <span class="font-semibold text-teal-700 {{ 'text-gray-500' if is_subsection_archived else '' }}">{{ item_instance.name }}</span>
                                 </span>
@@ -429,10 +415,7 @@
                             <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/4">
                                 {% if is_archived %}
                                     <p class="mb-1">
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-400 text-white">
-                                            <i class="fas fa-archive w-3 h-3 mr-1"></i>
-                                            {{ _('Archived') }}
-                                        </span>
+                                        <span>{{ status_label(_('Archived'), 'neutral') }}</span>
                                     </p>
                                 {% endif %}
                                 {% if item_type == 'indicator' %}
@@ -441,10 +424,7 @@
                                     {% set _import_issues = _cfg.get('_import_issues', []) if _cfg else [] %}
                                     {% if not item_instance.indicator_bank_id %}
                                         <p class="mb-2">
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-                                                <i class="fas fa-exclamation-triangle w-3 h-3 mr-1"></i>
-                                                {{ _('Issue: Missing/invalid indicator reference') }}
-                                            </span>
+                                            {{ status_label(_('Issue: Missing/invalid indicator reference'), 'danger') }}
                                         </p>
                                         {% if _import_issues and _import_issues is iterable %}
                                             {# Show first issue message if present #}

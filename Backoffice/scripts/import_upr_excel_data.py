@@ -76,7 +76,6 @@ STAFF_INDICATOR_COLUMNS: Dict[str, str] = {
 }
 
 STAFF_MATRIX_LABEL = "PNS staff contributions"
-STAFF_MATRIX_CONFIG_KEY = "upr_staff_matrix"
 
 FUNDING_MATRIX_BY_YEAR_OFFSET = {
     0: {"hns_ifrc": 967, "pns": 970},
@@ -90,10 +89,6 @@ ITEM_BILATERAL_SUPPORT = 955
 ITEM_COMMENTS = 956
 ITEM_FUNDING_REQUIREMENTS_T22 = 1303  # Template 22 – Funding Requirements (rows=country_map)
 EMERGENCY_APPEALS_COLUMN = "Total People to be reached"
-
-# Funding Source column values
-FUNDING_SOURCE_COUNTRY = "Country Data"
-FUNDING_SOURCE_PNS = "PNS Data"
 
 # Excel Comments_* indicator codes → labels shown in the form textarea.
 COMMENT_INDICATOR_LABELS: Dict[str, str] = {
@@ -121,7 +116,7 @@ class UprImportContext:
     assignment_by_template: Dict[int, Dict[Tuple[str, str], int]] = field(default_factory=dict)
     items_by_bank_id: Dict[int, Dict[int, int]] = field(default_factory=dict)  # template_id -> bank_id -> item_id
     item_ids_by_label: Dict[int, Dict[str, int]] = field(default_factory=dict)
-    staff_matrix_item_id: Optional[int] = None
+    staff_matrix_item_id: int = 1367  # Template 22 – PNS staff contributions matrix (fixed)
     ns_name_to_id: Dict[str, int] = field(default_factory=dict)
     # NS name (lower) → home country ISO3 (for PNS funding → template 22 lookup)
     ns_home_country_iso3: Dict[str, str] = field(default_factory=dict)
@@ -519,92 +514,7 @@ def _load_items_by_label(template_ids: List[int]) -> Dict[int, Dict[str, int]]:
     return out
 
 
-def ensure_staff_matrix_item(template_id: int = 22) -> int:
-    """Create the PNS staff matrix on template 22 when missing."""
-    from app.extensions import db
-    from sqlalchemy import func
-    from app.models.form_items import FormItem
-    from app.models.forms import FormSection, FormTemplate, FormTemplateVersion
-
-    template = FormTemplate.query.get(template_id)
-    if not template or not template.published_version_id:
-        raise ValueError(f"Template {template_id} has no published version")
-
-    version_id = int(template.published_version_id)
-    # Single pass: check for existing staff matrix or an unlabelled item to tag.
-    label_match = None
-    for item in FormItem.query.filter_by(template_id=template_id, archived=False).all():
-        cfg = item.config or {}
-        if cfg.get(STAFF_MATRIX_CONFIG_KEY):
-            return int(item.id)
-        if label_match is None and (item.label or "").strip().lower() == STAFF_MATRIX_LABEL.lower():
-            label_match = item
-
-    if label_match is not None:
-        cfg = dict(label_match.config or {})
-        cfg[STAFF_MATRIX_CONFIG_KEY] = True
-        label_match.config = cfg
-        db.session.add(label_match)
-        db.session.commit()
-        return int(label_match.id)
-
-    section = (
-        FormSection.query.filter_by(template_id=template_id, version_id=version_id, archived=False)
-        .order_by(FormSection.order.desc())
-        .first()
-    )
-    if not section:
-        raise ValueError(f"Template {template_id} has no sections")
-
-    columns = []
-    for indicator_label, col_name in STAFF_INDICATOR_COLUMNS.items():
-        columns.append({"name": col_name, "type": "number", "name_translations": {"en": indicator_label}})
-
-    matrix_config = {
-        "type": "matrix",
-        "row_mode": "list_library",
-        "lookup_list_id": "national_society",
-        "list_display_column": "name",
-        "rows": [],
-        "columns": columns,
-        "show_row_totals": False,
-        "show_column_totals": False,
-    }
-    max_order = (
-        db.session.query(func.max(FormItem.order))
-        .filter_by(section_id=section.id)
-        .scalar()
-    ) or 0
-
-    item = FormItem(
-        item_type="matrix",
-        section_id=section.id,
-        template_id=template_id,
-        version_id=version_id,
-        label=STAFF_MATRIX_LABEL,
-        order=float(max_order) + 1,
-        lookup_list_id="national_society",
-        list_display_column="name",
-        config={
-            "is_required": False,
-            "layout_column_width": 12,
-            "layout_break_after": False,
-            "matrix_config": matrix_config,
-            STAFF_MATRIX_CONFIG_KEY: True,
-            "allowed_disaggregation_options": ["total"],
-            "allow_data_not_available": False,
-            "allow_not_applicable": False,
-            "indirect_reach": False,
-            "privacy": "ifrc_network",
-        },
-    )
-    db.session.add(item)
-    db.session.commit()
-    logger.info("Created staff matrix item id=%s on template %s", item.id, template_id)
-    return int(item.id)
-
-
-def build_import_context(template_ids: List[int], *, ensure_staff_matrix: bool = True) -> UprImportContext:
+def build_import_context(template_ids: List[int]) -> UprImportContext:
     ids = [int(t) for t in template_ids]
     ctx = UprImportContext(template_ids=ids)
     ctx.assignment_by_template = _load_assignment_map(ids)
@@ -616,8 +526,6 @@ def build_import_context(template_ids: List[int], *, ensure_staff_matrix: bool =
     ctx.ns_home_country_iso3, ctx.country_id_by_iso3 = _build_ns_home_country_index()
     if 24 in ids:
         ctx.emergency_matrix_plugin_config = _load_emergency_matrix_plugin_config(24)
-    if 22 in ids and ensure_staff_matrix:
-        ctx.staff_matrix_item_id = ensure_staff_matrix_item(22)
     return ctx
 
 
@@ -702,7 +610,7 @@ def _scalar_row(
 def _year_offset(base_period: str, year_val: Any) -> Optional[int]:
     try:
         base = int(str(base_period).strip())
-        year = int(str(year_val).strip())
+        year = int(float(str(year_val).strip()))  # float-safe: handles "2026.0" from Excel
     except (ValueError, TypeError):
         return None
     offset = year - base
@@ -756,6 +664,12 @@ def transform_to_import_rows(
     matrix_cells: Dict[Tuple[int, int], Dict[str, Any]] = defaultdict(dict)
     comment_parts: Dict[int, List[str]] = defaultdict(list)
     import_rows: List[Dict[str, str]] = []
+
+    # T22 PNS funding staging — collected across all rows then converted to matrix cells.
+    # Keyed by (pns_aes_id, host_country_id, area) → (country_val, pns_val).
+    # Separate from matrix_cells so we can compute isModified per (aes, country) after all rows.
+    pns_t22_staging: Dict[Tuple[int, int, str], Tuple[Optional[float], Optional[float]]] = {}
+    pns_t22_has_pns: Set[Tuple[int, int]] = set()  # (pns_aes_id, host_country_id) with any pns_val
 
     for row in filtered:
         iso3 = str(row.get("ISO3") or "").strip().upper()
@@ -836,7 +750,6 @@ def transform_to_import_rows(
             if offset is None:
                 continue
 
-            source = str(row.get("Source") or "").strip()
             ent_upper = entity.upper()
 
             # ── HNS / IFRC Secretariat → always country-reported → template 24 ──
@@ -844,7 +757,7 @@ def transform_to_import_rows(
                 country_val = parse_value_num(row.get("Country Value"))
                 if country_val is None:
                     country_val = value_num  # older export fallback
-                if country_val is None:
+                if not country_val:
                     continue
                 aes_id = ctx.assignment_by_template.get(24, {}).get((period, iso3))
                 if not aes_id:
@@ -856,52 +769,51 @@ def transform_to_import_rows(
                 matrix_cells[(aes_id, item_map["hns_ifrc"])][f"{row_key}_{area}"] = country_val
                 continue
 
-            # ── PNS entity ──
+            # ── PNS entity — Country Value and PNS Value are independent ──
+            # A single row can carry both; process each column to its target template.
             if ent_upper != "PNS":
                 continue
 
-            if source == FUNDING_SOURCE_PNS and 22 in tids:
-                # PNS self-reported → goes into the PNS's own template 22 assignment.
-                # Only import current year (offset 0); template 22 has a single funding matrix.
-                if offset != 0:
-                    continue
-                pns_val = parse_value_num(row.get("PNS Value"))
-                if pns_val is None:
-                    continue
-                # NS name → PNS home country ISO3 → template 22 AES
+            country_val = parse_value_num(row.get("Country Value"))
+            pns_val = parse_value_num(row.get("PNS Value"))
+
+            # Country Value → template 24 (always, any source that has it)
+            if country_val and 24 in tids:
+                t24_aes = ctx.assignment_by_template.get(24, {}).get((period, iso3))
+                item_map = FUNDING_MATRIX_BY_YEAR_OFFSET.get(offset)
+                if t24_aes and item_map:
+                    ns_id = _resolve_ns_row_id(ctx, ns_name)
+                    if ns_id is not None:
+                        matrix_cells[(t24_aes, item_map["pns"])][f"{ns_id}_{area}"] = country_val
+
+            # T22: stage Country Value + PNS Value together; build {original, modified, isModified}
+            # cells after the row loop (isModified flag is per host-country, not per cell).
+            if 22 in tids and offset == 0 and (country_val or pns_val):
                 pns_iso3 = ctx.ns_home_country_iso3.get(ns_name.lower())
                 if not pns_iso3:
-                    ctx.warnings.append(f"Cannot resolve home country for NS: {ns_name!r}")
-                    continue
-                aes_id = ctx.assignment_by_template.get(22, {}).get((period, pns_iso3))
-                if not aes_id:
-                    ctx.warnings.append(f"No template 22 assignment for {pns_iso3} {period} (NS: {ns_name!r})")
-                    continue
-                # Row key = host country's Country.id (country_map list_library uses Country.id)
-                host_country_id = ctx.country_id_by_iso3.get(iso3)
-                if not host_country_id:
-                    ctx.warnings.append(f"Cannot resolve Country.id for ISO3: {iso3!r}")
-                    continue
-                matrix_cells[(aes_id, ITEM_FUNDING_REQUIREMENTS_T22)][f"{host_country_id}_{area}"] = pns_val
-            else:
-                # Country Data (or untagged) PNS row → template 24
-                if 24 not in tids:
-                    continue
-                country_val = parse_value_num(row.get("Country Value"))
-                if country_val is None:
-                    country_val = value_num  # older export fallback
-                if country_val is None:
-                    continue
-                aes_id = ctx.assignment_by_template.get(24, {}).get((period, iso3))
-                if not aes_id:
-                    continue
-                item_map = FUNDING_MATRIX_BY_YEAR_OFFSET.get(offset)
-                if not item_map:
-                    continue
-                ns_id = _resolve_ns_row_id(ctx, ns_name)
-                if ns_id is None:
-                    continue
-                matrix_cells[(aes_id, item_map["pns"])][f"{ns_id}_{area}"] = country_val
+                    if pns_val:
+                        ctx.warnings.append(f"Cannot resolve home country for NS: {ns_name!r}")
+                else:
+                    pns_aes = ctx.assignment_by_template.get(22, {}).get((period, pns_iso3))
+                    if not pns_aes:
+                        if pns_val:
+                            ctx.warnings.append(
+                                f"No template 22 assignment for {pns_iso3} {period} (NS: {ns_name!r})"
+                            )
+                    else:
+                        host_cid = ctx.country_id_by_iso3.get(iso3)
+                        if not host_cid:
+                            if pns_val:
+                                ctx.warnings.append(f"Cannot resolve Country.id for ISO3: {iso3!r}")
+                        else:
+                            key = (pns_aes, host_cid, area)
+                            prev_cv, prev_pv = pns_t22_staging.get(key, (None, None))
+                            pns_t22_staging[key] = (
+                                country_val if country_val is not None else prev_cv,
+                                pns_val if pns_val is not None else prev_pv,
+                            )
+                            if pns_val:
+                                pns_t22_has_pns.add((pns_aes, host_cid))
             continue
 
         # --- Template 24: Reach ---
@@ -911,7 +823,7 @@ def transform_to_import_rows(
             if not area or area in AGGREGATE_AREA:
                 continue
             aes_id = _resolve_aes(ctx, period, iso3)
-            if not aes_id or value_num is None:
+            if not aes_id or not value_num:
                 continue
             if area.startswith("EA") and area != "EAs":
                 cell_key = _resolve_emergency_row_key(
@@ -941,11 +853,26 @@ def transform_to_import_rows(
                 continue
             aes_id = _resolve_aes(ctx, period, iso3)
             ns_id = _resolve_ns_row_id(ctx, ns_name)
-            staff_item = ctx.staff_matrix_item_id
-            if not aes_id or ns_id is None or not staff_item or value_num is None:
+            if not aes_id or ns_id is None or not value_num:
                 continue
             cell_key = f"{ns_id}_{col_name}"
-            matrix_cells[(aes_id, staff_item)][cell_key] = value_num
+            matrix_cells[(aes_id, ctx.staff_matrix_item_id)][cell_key] = value_num
+
+    # Convert T22 PNS funding staging into structured matrix cells.
+    # Each cell stores {original (country value), modified (PNS value), isModified}.
+    # isModified is per-cell: True only when the PNS's value differs from the country's value.
+    # If the PNS kept the same value, it is not considered modified.
+    # If the PNS didn't report for this host country at all, isModified is always False.
+    for (pns_aes, host_cid, area), (cv, pv) in pns_t22_staging.items():
+        pns_reported = (pns_aes, host_cid) in pns_t22_has_pns
+        orig_num = cv or 0
+        mod_num = pv or 0  # treat None as 0 for comparison
+        is_modified = pns_reported and (mod_num != orig_num)
+        matrix_cells[(pns_aes, ITEM_FUNDING_REQUIREMENTS_T22)][f"{host_cid}_{area}"] = {
+            "original": orig_num,
+            "modified": pv if pv is not None else "",
+            "isModified": is_modified,
+        }
 
     # Build reverse map: aes_id → (iso3, period) covering ALL templates, not just template 24.
     aes_meta: Dict[int, Tuple[str, str]] = {}
@@ -996,7 +923,7 @@ def run_upr_import(
     preview_excel_path: Optional[str] = None,
     progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
-    ensure_staff_matrix: bool = True,
+    ensure_staff_matrix: bool = True,  # kept for API backward compat, no longer used
 ) -> Dict[str, Any]:
     """Load UPR Excel, transform, and upsert into form_data."""
     from app.extensions import db
@@ -1031,7 +958,7 @@ def run_upr_import(
     with _ctx:
         _progress("read", "Reading UPR Data sheet...", 5.0)
         _, rows = load_upr_data_sheet(input_path)
-        ctx = build_import_context(tids, ensure_staff_matrix=ensure_staff_matrix)
+        ctx = build_import_context(tids)
 
         _progress("transform", "Mapping Excel rows to form items...", 15.0)
         import_rows = transform_to_import_rows(rows, ctx, template_ids=tids, rounds=round_set)

@@ -191,6 +191,7 @@
 {% block extra_js %}
 {% from "components/ag_grid_includes.html" import ag_grid_js %}
 {{ ag_grid_js() }}
+<script src="{{ static_url('js/components/status-labels.js') }}"></script>
 <script nonce="{{ csp_nonce() }}">
 (function() {
     'use strict';
@@ -366,13 +367,7 @@
                 const s = params.value;
                 if (!s) return '';
                 const label = statusLabel(s);
-                let cls = 'bg-gray-100 text-gray-800';
-                let icon = 'fa-circle';
-                if (s === 'completed') { cls = 'bg-green-100 text-green-800'; icon = 'fa-check-circle'; }
-                else if (s === 'error') { cls = 'bg-red-100 text-red-800'; icon = 'fa-times-circle'; }
-                else if (s === 'cost_limit_exceeded') { cls = 'bg-yellow-100 text-yellow-800'; icon = 'fa-exclamation-triangle'; }
-                else if (s === 'max_iterations_exceeded') { cls = 'bg-orange-100 text-orange-800'; icon = 'fa-redo'; }
-                return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' + cls + '"><i class="fas ' + icon + ' mr-1"></i> ' + (label.replace(/</g, '&lt;').replace(/>/g, '&gt;')) + '</span>';
+                return StatusLabels.renderGenericStatus(s, label);
             },
             cellStyle: { 'white-space': 'nowrap' }
         },
@@ -410,18 +405,7 @@
                 var score = params.data && params.data.llm_quality_score;
                 var needsReview = params.data && params.data.llm_needs_review;
                 if ((!verdict || verdict === '') && score == null) return '<span class="text-gray-400">—</span>';
-                var cls = 'bg-gray-100 text-gray-800';
-                if (verdict === 'excellent') cls = 'bg-green-100 text-green-800';
-                else if (verdict === 'good') cls = 'bg-blue-100 text-blue-800';
-                else if (verdict === 'acceptable') cls = 'bg-yellow-100 text-yellow-800';
-                else if (verdict === 'poor') cls = 'bg-orange-100 text-orange-800';
-                else if (verdict === 'incorrect') cls = 'bg-red-100 text-red-800';
-                var html = '';
-                if (score != null) {
-                    const percent = Math.max(0, Math.min(100, Number(score) * 100));
-                    html += '<span class="text-xs font-mono mr-1">' + percent.toFixed(0) + '%</span>';
-                }
-                if (verdict) html += '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ' + cls + '">' + escapeHtml(toTitleCaseLabel(verdict)) + '</span>';
+                if (verdict) html += StatusLabels.renderGenericStatus(verdict, toTitleCaseLabel(verdict));
                 if (needsReview) html += ' <i class="fas fa-flag text-amber-500 ml-1" title="{{ _("Flagged for review") }}"></i>';
                 return '<div class="flex items-center gap-1">' + html + '</div>';
             }

@@ -4,6 +4,8 @@
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 {% from "components/_floating_progress_banner.html" import floating_progress_banner %}
 {% from "components/_form_helpers.html" import format_number_value %}
+{% from "components/_assignment_status_pipeline.html" import assignment_status_pipeline_badge %}
+{% from "components/_status_label.html" import status_label, status_label_for_data_flag %}
 {% block title %}{{ get_localized_template_name(template_structure) if template_structure and get_localized_template_name else (template_structure.name if template_structure else '') }}{% endblock %}
 
 {% block head %}
@@ -126,23 +128,14 @@
                                 {{ assignment_status.assigned_form.period_name }} -
                                 {% if assignment_status.entity_type and assignment_status.entity_type != 'country' %}
                                     {# Show entity hierarchy for non-country entities #}
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-100 text-blue-800 mr-2">
-                                        <i class="fas
-                                            {% if assignment_status.entity_type == 'ns_branch' %}fa-sitemap
-                                            {% elif assignment_status.entity_type == 'ns_subbranch' %}fa-code-branch
-                                            {% elif assignment_status.entity_type == 'ns_localunit' %}fa-map-marker-alt
-                                            {% elif assignment_status.entity_type == 'division' %}fa-building
-                                            {% elif assignment_status.entity_type == 'department' %}fa-briefcase
-                                            {% else %}fa-folder
-                                            {% endif %} mr-1"></i>
-                                        {% if assignment_status.entity_type == 'ns_branch' %}NS Branch
-                                        {% elif assignment_status.entity_type == 'ns_subbranch' %}NS Sub-branch
-                                        {% elif assignment_status.entity_type == 'ns_localunit' %}NS Local Unit
-                                        {% elif assignment_status.entity_type == 'division' %}Division
-                                        {% elif assignment_status.entity_type == 'department' %}Department
-                                        {% else %}{{ assignment_status.entity_type }}
-                                        {% endif %}
-                                    </span>
+                                    <span class="mr-2">{{ status_label(
+                                        ('NS Branch' if assignment_status.entity_type == 'ns_branch' else
+                                         'NS Sub-branch' if assignment_status.entity_type == 'ns_subbranch' else
+                                         'NS Local Unit' if assignment_status.entity_type == 'ns_localunit' else
+                                         'Division' if assignment_status.entity_type == 'division' else
+                                         'Department' if assignment_status.entity_type == 'department' else
+                                         assignment_status.entity_type),
+                                        'info') }}</span>
                                     <span class="font-medium">{{ assignment_status.entity.name if assignment_status.entity else 'Entity' }}</span>
                                     {% if assignment_status.country %}
                                         <span class="text-gray-500 text-xs">
@@ -159,22 +152,7 @@
                                 <span class="mx-2">•</span>
                                 <span class="font-medium">{{ _('Status:') }}</span>
                                 {% set aes_status = assignment_status.status.value if assignment_status.status is not none and assignment_status.status.value is defined else assignment_status.status %}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                    {% if aes_status in ['Completed', 'submitted', 'approved'] %}
-                                        bg-green-100 text-green-800
-                                    {% elif aes_status == 'sent_for_review' %}
-                                        bg-purple-100 text-purple-800
-                                    {% elif aes_status == 'requires_revision' %}
-                                        bg-orange-100 text-orange-800
-                                    {% elif aes_status == 'in_progress' %}
-                                        bg-yellow-100 text-yellow-800
-                                    {% elif aes_status in ['Not Started', 'pending'] %}
-                                        bg-gray-100 text-gray-800
-                                    {% else %}
-                                        bg-gray-100 text-gray-800
-                                    {% endif %}">
-                                    {{ localize_status(assignment_status.status) }}
-                                </span>
+                                {{ assignment_status_pipeline_badge(assignment_status.status, assignment_status.is_closed|default(false), translation_key if translation_key is defined else 'en', assignment_status.entity_status if assignment_status.entity_status is defined else none) }}
                                 {% if completion_rate is defined %}
                                 {# Completion tiers match dashboard.html / MobileApp AssignmentCard._getCompletionColor #}
                                 {% set cr = completion_rate|default(0)|float %}
@@ -808,9 +786,9 @@
                                                                     {% endif %}
                                                                     {% if field.is_required_for_js %}<span class="text-red-500">*</span>{% endif %}
                                                                     {% if plugin_is_prefilled %}
-                                                                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">{{ _('Prefilled') }}</span>
+                                                                        <span class="ml-2">{{ status_label_for_data_flag('prefilled') }}</span>
                                                                     {% elif plugin_is_imputed %}
-                                                                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{{ _('Imputed') }}</span>
+                                                                        <span class="ml-2">{{ status_label_for_data_flag('imputed') }}</span>
                                                                     {% endif %}
                                                                 </label>
                                                             </div>
@@ -1827,9 +1805,9 @@
                                                                                     {% endif %}
                                                                                     {% if field.is_required_for_js %}<span class="text-red-500">*</span>{% endif %}
                                                                                     {% if plugin_is_prefilled %}
-                                                                                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">{{ _('Prefilled') }}</span>
+                                                                                        <span class="ml-2">{{ status_label_for_data_flag('prefilled') }}</span>
                                                                                     {% elif plugin_is_imputed %}
-                                                                                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{{ _('Imputed') }}</span>
+                                                                                        <span class="ml-2">{{ status_label_for_data_flag('imputed') }}</span>
                                                                                     {% endif %}
                                                                                 </label>
                                                                             </div>

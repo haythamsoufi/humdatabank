@@ -361,11 +361,11 @@
             sortable: true,
             cellRenderer: function(params) {
                 const isActive = params.value;
-                if (isActive) {
-                    return '<span class="status-badge status-active"><i class="fas fa-check-circle mr-1"></i>Active</span>';
-                } else {
-                    return '<span class="status-badge status-inactive"><i class="fas fa-times-circle mr-1"></i>Inactive</span>';
+                if (window.StatusLabels) {
+                    return window.StatusLabels.renderActive(isActive, 'Active', 'Inactive');
                 }
+                return '<span class="status-label status-label--' + (isActive ? 'success' : 'neutral') + '">' +
+                    (isActive ? 'Active' : 'Inactive') + '</span>';
             },
             cellStyle: { 'text-align': 'center' }
         },

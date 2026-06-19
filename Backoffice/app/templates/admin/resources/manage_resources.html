@@ -3,6 +3,7 @@
 {% from "components/pagination.html" import render_pagination %}
 
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label %}
 {% block title %}Manage Resources{% endblock %}
 
 {% block extra_js %}
@@ -81,10 +82,7 @@
                 <tr>
                     <td class="px-6 py-4 text-sm text-gray-900 align-top">{{ resource.default_title }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 align-top">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                            {% if resource.resource_type == 'publication' %}bg-blue-100 text-blue-800{% else %}bg-green-100 text-green-800{% endif %}">
-                            {{ resource.resource_type.title() }}
-                        </span>
+                        {{ status_label(resource.resource_type.title(), 'info' if resource.resource_type == 'publication' else 'success') }}
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-700 align-top">
                         {% if resource.resource_subcategory %}
@@ -100,9 +98,7 @@
                         {% if available_languages %}
                             <div class="flex flex-wrap gap-1">
                                 {% for lang in available_languages %}
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                                        {{ lang.upper() }}
-                                    </span>
+                                    {{ status_label(lang.upper(), 'neutral') }}
                                 {% endfor %}
                             </div>
                         {% else %}

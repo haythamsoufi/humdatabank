@@ -1,0 +1,37 @@
+---
+description: Playwright browser testing conventions - always hard refresh after code changes
+alwaysApply: true
+---
+
+# Playwright Browser Testing
+
+After making code changes to static files (JS, CSS, HTML templates), always perform a **hard refresh** before testing in the browser via Playwright MCP.
+
+## Hard Refresh
+
+After navigating to the page, force-reload to bypass the browser cache:
+
+```js
+// Hard refresh via keyboard shortcut
+await page.keyboard.down('Control');
+await page.keyboard.press('F5');
+await page.keyboard.up('Control');
+
+// Or via evaluate (most reliable)
+await page.evaluate(() => location.reload(true));
+
+// Or navigate with cache bypass
+await page.goto(url, { waitUntil: 'networkidle' });
+await page.evaluate(() => location.reload(true));
+```
+
+Or using the MCP `browser_evaluate` tool:
+```json
+{ "function": "() => { location.reload(true); return 'hard refreshing'; }" }
+```
+
+Then wait for the page to be ready before interacting.
+
+## Why
+
+The browser caches JS/CSS files. Without a hard refresh, Playwright will test against the **old cached version** of modified files, giving misleading results.

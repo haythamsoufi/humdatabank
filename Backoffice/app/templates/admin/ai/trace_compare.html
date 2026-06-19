@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label %}
 
 {% block title %}{{ _('Compare Traces') }}{% endblock %}
 
@@ -81,7 +82,7 @@
     <!-- Left column -->
     <div class="space-y-4">
         <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{{ _('Left') }}</span>
+            {{ status_label(_('Left'), 'info') }}
             {{ _('Trace') }} #{{ left.id }}
             <a href="{{ url_for('ai_management.trace_detail', trace_id=left.id) }}"
                class="text-xs text-blue-600 hover:underline"><i class="fas fa-external-link-alt"></i></a>
@@ -105,7 +106,7 @@
             {% if left.tools_used %}
             <div class="flex flex-wrap gap-1.5">
                 {% for tool in left.tools_used %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">{{ tool }}</span>
+                {{ status_label(tool, 'neutral') }}
                 {% endfor %}
             </div>
             {% else %}
@@ -117,7 +118,7 @@
     <!-- Right column -->
     <div class="space-y-4">
         <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">{{ _('Right') }}</span>
+            {{ status_label(_('Right'), 'review') }}
             {{ _('Trace') }} #{{ right.id }}
             <a href="{{ url_for('ai_management.trace_detail', trace_id=right.id) }}"
                class="text-xs text-blue-600 hover:underline"><i class="fas fa-external-link-alt"></i></a>
@@ -141,7 +142,7 @@
             {% if right.tools_used %}
             <div class="flex flex-wrap gap-1.5">
                 {% for tool in right.tools_used %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">{{ tool }}</span>
+                {{ status_label(tool, 'neutral') }}
                 {% endfor %}
             </div>
             {% else %}

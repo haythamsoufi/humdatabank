@@ -59,12 +59,8 @@
         #indicatorBankGrid.ag-theme-alpine .sector-items div:last-child {
             margin-bottom: 0;
         }
-        #indicatorBankGrid.ag-theme-alpine .indicator-state-badge {
-            font-weight: 600 !important;
-            letter-spacing: 0.01em;
-        }
 
-        /* Archived indicators: highlight full row (matches Status badge yellow) */
+        /* Archived indicators: highlight full row */
         #indicatorBankGrid.ag-theme-alpine .ag-row.indicator-archived-row .ag-cell {
             background-color: #fef9c3 !important;
         }
@@ -232,17 +228,6 @@
         }
 
         /* Column visibility toolbar: ag-column-visibility-manager.css */
-        /* Additional template-specific overrides can be added here if needed */
-
-        /* Shared status badge colours (used by both common-words and sectors panels) */
-        .status-active {
-            background-color: #d1fae5;
-            color: #065f46;
-        }
-        .status-inactive {
-            background-color: #fee2e2;
-            color: #991b1b;
-        }
 
         /* Shared modal scroll container (common-words & sectors modals) */
         .modal-content {
@@ -1996,8 +1981,8 @@
                     html += '<div class="space-y-1 max-h-40 overflow-y-auto border border-gray-100 rounded p-2 bg-gray-50">';
                     sample.forEach(function(item) {
                         const badge = item.action === 'create'
-                            ? '<span class="inline-block text-xs bg-green-100 text-green-800 rounded px-1.5 py-0.5 mr-1">NEW</span>'
-                            : '<span class="inline-block text-xs bg-yellow-100 text-yellow-800 rounded px-1.5 py-0.5 mr-1">UPDATE</span>';
+                            ? StatusLabels.render('NEW', 'success')
+                            : StatusLabels.render('UPDATE', 'warning');
                         html += '<div class="text-xs text-gray-700 flex items-start gap-1">' + badge +
                                 '<span class="truncate">' + escapeHtml(item.name) + '</span></div>';
                     });

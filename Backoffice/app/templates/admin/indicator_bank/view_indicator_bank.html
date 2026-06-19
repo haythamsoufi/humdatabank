@@ -1,6 +1,7 @@
 {% extends "core/layout.html" %}
 
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label, status_label_for_change_type %}
 {% block content %}
 <div class="container mx-auto px-4 py-6">
 
@@ -36,19 +37,13 @@
             {# Status Badges #}
             <div class="flex gap-4 mb-6">
                 {% if indicator.archived %}
-                    <span class="status-badge status-archived">
-                        <i class="fas fa-archive mr-1"></i>Archived
-                    </span>
+                    {{ status_label(_('Archived'), 'warning') }}
                 {% else %}
-                    <span class="status-badge status-active">
-                        <i class="fas fa-check-circle mr-1"></i>Active
-                    </span>
+                    {{ status_label(_('Active'), 'success') }}
                 {% endif %}
 
                 {% if indicator.emergency %}
-                    <span class="status-badge status-emergency">
-                        <i class="fas fa-exclamation-triangle mr-1"></i>Emergency
-                    </span>
+                    {{ status_label(_('Emergency'), 'danger') }}
                 {% endif %}
             </div>
 
@@ -64,9 +59,7 @@
                         <div>
                             <dt class="text-sm font-medium text-gray-500">Type</dt>
                             <dd class="mt-1 text-sm text-gray-900">
-                                <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
-                                    {{ indicator.type }}
-                                </span>
+                                {{ status_label(indicator.type, 'neutral') }}
                             </dd>
                         </div>
                         <div>
@@ -275,11 +268,11 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm">
                                     {% if history.change_type == 'create' %}
-                                        <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Created</span>
+                                        {{ status_label(_('Created'), 'success') }}
                                     {% elif history.change_type == 'update' %}
-                                        <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Updated</span>
+                                        {{ status_label(_('Updated'), 'info') }}
                                     {% elif history.change_type == 'delete' %}
-                                        <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Deleted</span>
+                                        {{ status_label(_('Deleted'), 'danger') }}
                                     {% endif %}
                                 </td>
                                 <td class="px-6 py-4 text-sm text-gray-900">

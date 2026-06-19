@@ -1025,14 +1025,15 @@ function renderDataQualityPanel(data) {
     }
 
     if (validationSlot) {
-        validationSlot.innerHTML = val.asked
-            ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                (val.answered || 0) >= val.asked ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
-            }">
-                <i class="fas fa-clipboard-check" aria-hidden="true"></i>
-                ${val.answered || 0}/${val.asked} ${getSecureConfirmMessage('validationAnswered', 'validation questions answered')}
-            </span>`
-            : '';
+        if (val.asked) {
+            const allAnswered = (val.answered || 0) >= val.asked;
+            const validationLabel = `${val.answered || 0}/${val.asked} ${getSecureConfirmMessage('validationAnswered', 'validation questions answered')}`;
+            validationSlot.innerHTML = window.StatusLabels
+                ? window.StatusLabels.render(validationLabel, allAnswered ? 'success' : 'pending')
+                : `<span class="status-label status-label--${allAnswered ? 'success' : 'pending'}">${validationLabel}</span>`;
+        } else {
+            validationSlot.innerHTML = '';
+        }
     }
 
     const warningsHtml = (data.warnings || []).length

@@ -2,6 +2,7 @@
 {% from "components/pagination.html" import render_pagination %}
 
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label %}
 {% block title %}Indicator Suggestions - Admin{% endblock %}
 
 {% block content %}
@@ -100,13 +101,15 @@
                             <div class="text-sm text-ifrc-gray-500">{{ suggestion.submitter_email }}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                {% if suggestion.suggestion_type == 'new_indicator' %}bg-blue-100 text-blue-800
-                                {% elif suggestion.suggestion_type == 'correction' %}bg-yellow-100 text-yellow-800
-                                {% elif suggestion.suggestion_type == 'improvement' %}bg-green-100 text-green-800
-                                {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                {{ suggestion.suggestion_type_display }}
-                            </span>
+                            {% if suggestion.suggestion_type == 'new_indicator' %}
+                                {{ status_label(suggestion.suggestion_type_display, 'info') }}
+                            {% elif suggestion.suggestion_type == 'correction' %}
+                                {{ status_label(suggestion.suggestion_type_display, 'pending') }}
+                            {% elif suggestion.suggestion_type == 'improvement' %}
+                                {{ status_label(suggestion.suggestion_type_display, 'success') }}
+                            {% else %}
+                                {{ status_label(suggestion.suggestion_type_display, 'neutral') }}
+                            {% endif %}
                         </td>
                         <td class="px-6 py-4">
                             <div class="text-sm font-medium text-ifrc-gray-900">{{ suggestion.indicator_name }}</div>
@@ -117,14 +120,17 @@
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                {% if suggestion.status == 'pending' %}bg-yellow-100 text-yellow-800
-                                {% elif suggestion.status == 'reviewed' %}bg-blue-100 text-blue-800
-                                {% elif suggestion.status == 'approved' %}bg-green-100 text-green-800
-                                {% elif suggestion.status == 'rejected' %}bg-red-100 text-red-800
-                                {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                {{ suggestion.status_display }}
-                            </span>
+                            {% if suggestion.status == 'pending' %}
+                                {{ status_label(suggestion.status_display, 'pending') }}
+                            {% elif suggestion.status == 'reviewed' %}
+                                {{ status_label(suggestion.status_display, 'review') }}
+                            {% elif suggestion.status == 'approved' %}
+                                {{ status_label(suggestion.status_display, 'success') }}
+                            {% elif suggestion.status == 'rejected' %}
+                                {{ status_label(suggestion.status_display, 'danger') }}
+                            {% else %}
+                                {{ status_label(suggestion.status_display, 'neutral') }}
+                            {% endif %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <a href="{{ url_for('utilities.view_indicator_suggestion', suggestion_id=suggestion.id) }}"

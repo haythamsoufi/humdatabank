@@ -1648,13 +1648,12 @@
                             const now = new Date();
                             const formattedDate = DateTimeUtils.format(now, 'datetime');
 
-                            statusCell.innerHTML = `
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                    <i class="fas fa-sign-out-alt mr-1"></i>
-                                    Logged Out
-                                </span>
-                                <div class="text-xs text-gray-500 mt-1">${formattedDate}</div>
-                            `;
+                            statusCell.innerHTML = (
+                                (window.StatusLabels
+                                    ? window.StatusLabels.render('Logged Out', 'danger')
+                                    : '<span class="status-label status-label--danger">Logged Out</span>') +
+                                `<div class="text-xs text-gray-500 mt-1">${formattedDate}</div>`
+                            );
                         }
 
                         // Update actions cell - remove kickout button, keep remove button

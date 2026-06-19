@@ -1,5 +1,6 @@
 {# Reusable Form Item Renderer #}
 {# This macro provides consistent rendering for all form items across sections, subsections, and repeat entries #}
+{% from "components/_status_label.html" import status_label %}
 
 {% macro render_form_item(field, section_display_order='', is_sub_item=false, is_dynamic_indicator=false, container_context='main') %}
 {% set unified_item_id = field.id %}
@@ -146,7 +147,7 @@
             {% endif %}
             {% if field.is_required %}<span class="text-red-500">*</span>{% endif %}
             {% if is_dynamic_indicator %}
-                <span class="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">{{ _('Dynamic') }}</span>
+                <span class="ml-2">{{ status_label(_('Dynamic'), 'success') }}</span>
             {% endif %}
         </label>
 

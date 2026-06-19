@@ -1,32 +1,21 @@
 {# Assignment workflow pipeline tooltip (hover on status badge). #}
+{% from "components/_status_label.html" import status_label, assignment_status_variant, assignment_status_key %}
 {% macro assignment_status_pipeline_badge(status, is_closed=false, lang='en', assignment_entity_status=none) %}
-    {% set raw_status = status.value if status is not none and status.value is defined else status %}
-    {% set status_key = raw_status|string|lower|replace(' ', '_') %}
+    {% set status_key %}{{ assignment_status_key(status) }}{% endset %}
+    {% set status_key = status_key|trim %}
     {% set steps = assignment_status_workflow_steps(assignment_entity_status) %}
     {% set cur_idx = steps.index(status_key) if status_key in steps else -1 %}
+    {% set status_variant %}{{ assignment_status_variant(status) }}{% endset %}
+    {% set status_variant = status_variant|trim %}
+    {% set status_text = localize_status(status) ~ (' - ' ~ _('Closed') if is_closed else '') %}
 
-    <span class="assignment-status-pipeline-container relative inline-flex align-middle shrink-0">
-        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-help
-            {% if status_key in ['submitted', 'approved'] %}
-                bg-green-100 text-green-800
-            {% elif status_key == 'requires_revision' %}
-                bg-orange-100 text-orange-800
-            {% elif status_key == 'sent_for_review' %}
-                bg-purple-100 text-purple-800
-            {% elif status_key == 'in_progress' %}
-                bg-yellow-100 text-yellow-800
-            {% else %}
-                bg-gray-100 text-gray-800
-            {% endif %}"
-              tabindex="0"
-              aria-label="{{ _('Status') }}: {{ localize_status(status) }}">
-            {% if is_closed %}
-                {{ localize_status(status) }} - {{ _('Closed') }}
-            {% else %}
-                {{ localize_status(status) }}
-            {% endif %}
+    <span class="assignment-status-pipeline-container relative inline-block align-middle shrink-0">
+        <span tabindex="0"
+              class="assignment-status-pipeline-trigger cursor-help"
+              aria-label="{{ _('Status') }}: {{ status_text }}">
+            {{ status_label(status_text, status_variant) }}
         </span>
-        <span class="assignment-status-pipeline-tooltip absolute top-full mt-1 px-3 py-2.5 bg-white text-gray-800 text-xs rounded-lg border border-gray-200 shadow-lg {% if lang == 'ar' %}right-0{% else %}left-0{% endif %}"
+        <span class="assignment-status-pipeline-tooltip hidden absolute top-full mt-1 px-3 py-2.5 bg-white text-gray-800 text-xs rounded-lg border border-gray-200 shadow-lg {% if lang == 'ar' %}right-0{% else %}left-0{% endif %}"
               role="tooltip">
             <span class="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">{{ _('Workflow progress') }}</span>
             <span class="assignment-status-pipeline flex items-start w-full" role="list" aria-label="{{ _('Assignment status workflow') }}">

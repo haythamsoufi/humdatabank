@@ -97,8 +97,11 @@
         return found;
     }
 
-    function badge(text, cls) {
-        return '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium ' + cls + '">' + esc(text) + '</span>';
+    function badge(text, variant) {
+        if (window.StatusLabels) {
+            return window.StatusLabels.render(text, variant || 'neutral');
+        }
+        return '<span class="status-label status-label--' + (variant || 'neutral') + '">' + esc(text) + '</span>';
     }
 
     function automaticCheckLabel(row) {
@@ -145,16 +148,14 @@
         var d = params.data || {};
         var status = d.question_status;
         if (status) {
-            var map = {
-                open: 'bg-orange-100 text-orange-800',
-                answered: 'bg-green-100 text-green-800',
-                waived: 'bg-gray-100 text-gray-700',
-                resolved: 'bg-slate-100 text-slate-700',
-            };
-            return badge(questionStatusLabel(status), map[status] || 'bg-gray-100 text-gray-800');
+            var variant = 'neutral';
+            if (status === 'open') variant = 'warning';
+            else if (status === 'answered') variant = 'success';
+            else if (status === 'resolved') variant = 'success';
+            return badge(questionStatusLabel(status), variant);
         }
         if (d.flagged) {
-            return badge(t.notGenerated || 'Not generated', 'bg-gray-100 text-gray-600');
+            return badge(t.notGenerated || 'Not generated', 'neutral');
         }
         return '';
     }
@@ -163,7 +164,7 @@
         var d = params.data || {};
         if (d.sent_at) return esc(formatIsoDate(d.sent_at));
         if (d.question_id && d.question_status === 'open') {
-            return badge(t.notSent || 'Not sent', 'bg-amber-50 text-amber-800');
+            return badge(t.notSent || 'Not sent', 'pending');
         }
         return '';
     }
@@ -273,7 +274,7 @@
                 valueGetter: function (p) { return automaticCheckLabel(p.data); },
                 cellRenderer: function (p) {
                     if (p.data && p.data.flagged) {
-                        return badge(automaticCheckLabel(p.data), 'bg-red-100 text-red-800');
+                        return badge(automaticCheckLabel(p.data), 'danger');
                     }
                     return '';
                 },
@@ -285,8 +286,9 @@
                 minWidth: 100,
                 filter: 'customSetFilter',
                 cellRenderer: function (p) {
-                    var map = { error: 'bg-red-100 text-red-800', warning: 'bg-amber-100 text-amber-800', info: 'bg-blue-100 text-blue-800' };
-                    return p.value ? badge(p.value, map[p.value] || 'bg-gray-100 text-gray-800') : '';
+                    if (!p.value) return '';
+                    var variant = p.value === 'error' ? 'danger' : (p.value === 'warning' ? 'warning' : (p.value === 'info' ? 'info' : 'neutral'));
+                    return badge(p.value, variant);
                 },
             },
             {

@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label %}
 
 {% block title %}{{ _('Roles') }}{% endblock %}
 
@@ -75,14 +76,10 @@
                                 {{ role.description or '-' }}
                             </td>
                             <td class="px-4 py-3 text-sm text-center">
-                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
-                                    {{ role_user_counts.get(role.id, 0) }}
-                                </span>
+                                {{ status_label(role_user_counts.get(role.id, 0), 'info') }}
                             </td>
                             <td class="px-4 py-3 text-sm text-center">
-                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
-                                    {{ role_perm_counts.get(role.id, 0) }}
-                                </span>
+                                {{ status_label(role_perm_counts.get(role.id, 0), 'neutral') }}
                             </td>
                             {% if current_is_system_manager %}
                                 <td class="px-4 py-3 text-sm">

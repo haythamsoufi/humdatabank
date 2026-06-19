@@ -28,33 +28,26 @@ function getFileIcon(fileType) {
 
 // Helper function to get status badge HTML
 function getStatusBadge(status, error) {
-    const statusMap = {
-        'completed': {
-            class: 'bg-green-100 text-green-800',
-            icon: 'fa-check-circle',
-            text: cfg.t.completed_07ca5050
-        },
-        'pending': {
-            class: 'bg-yellow-100 text-yellow-800',
-            icon: 'fa-clock',
-            text: cfg.t.pending_2d13df6f
-        },
-        'processing': {
-            class: 'bg-blue-100 text-blue-800',
-            icon: 'fa-spinner fa-spin',
-            text: cfg.t.processing_643562a9
-        },
-        'failed': {
-            class: 'bg-red-100 text-red-800',
-            icon: 'fa-times-circle',
-            text: cfg.t.failed_d7c8c85b
-        }
+    const variantMap = {
+        completed: 'success',
+        pending: 'pending',
+        processing: 'active',
+        failed: 'danger',
     };
-
-    const statusInfo = statusMap[status] || statusMap['failed'];
+    const textMap = {
+        completed: cfg.t.completed_07ca5050,
+        pending: cfg.t.pending_2d13df6f,
+        processing: cfg.t.processing_643562a9,
+        failed: cfg.t.failed_d7c8c85b,
+    };
+    const key = status || 'failed';
+    const variant = variantMap[key] || 'danger';
+    const text = textMap[key] || textMap.failed;
     const titleAttr = error ? ' title="' + escapeAttr(error) + '"' : '';
-    return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' + statusInfo.class + '"' + titleAttr + '>' +
-           '<i class="fas ' + statusInfo.icon + ' mr-1"></i> ' + statusInfo.text + '</span>';
+    if (window.StatusLabels) {
+        return window.StatusLabels.render(text, variant).replace('<span ', '<span' + titleAttr + ' ');
+    }
+    return '<span class="status-label status-label--' + variant + '"' + titleAttr + '>' + text + '</span>';
 }
 
 // Document category taxonomy (must match ai_metadata_extractor.DOCUMENT_CATEGORIES / CATEGORY_LABELS)
@@ -1072,11 +1065,10 @@ const columnDefs = [
             const docId = data && data.id;
             const label = isPublic ? cfg.t.public_3d067bed : cfg.t.not_public_20257be8;
             const titleAttr = isPublic ? cfg.t.click_to_make_not_public_1466b6c5 : cfg.t.click_to_make_public_f00ad0b7;
-            const btnClass = isPublic
-                ? 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 cursor-pointer border border-transparent hover:border-green-300 transition-colors'
-                : 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 cursor-pointer border border-transparent hover:border-gray-300 transition-colors';
+            const btnClass = 'status-label status-label--' + (isPublic ? 'success' : 'neutral') +
+                ' cursor-pointer hover:opacity-90 transition-opacity border-0';
             return '<button type="button" class="' + btnClass + '" data-ai-doc-action="toggle-public" data-doc-id="' + (docId || '') + '" data-is-public="' + (isPublic ? 'true' : 'false') + '" title="' + escapeAttr(titleAttr) + '">' +
-                   (isPublic ? '<i class="fas fa-globe mr-1"></i>' : '<i class="fas fa-lock mr-1"></i>') + label + '</button>';
+                   label + '</button>';
         },
         valueGetter: function(params) {
             const v = params.data && params.data.is_public;

@@ -1,6 +1,7 @@
 {% extends "core/layout.html" %}
 
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label, status_label_for_active %}
 {% block title %}{{ _('User Analytics') }} - {{ user.name or user.email }} - {{ _('Admin Panel') }}{% endblock %}
 
 {% block content %}
@@ -47,24 +48,15 @@
                     <dt class="text-sm font-medium text-gray-500">{{ _('Role') }}</dt>
                     <dd class="mt-1">
                         {% set lvl = user_access_level(user) %}
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                        {% if lvl in ['admin', 'system_manager'] %}bg-purple-100 text-purple-800
-                        {% elif lvl == 'focal_point' %}bg-blue-100 text-blue-800
-                        {% else %}bg-gray-100 text-gray-800{% endif %}">
-                            {% if lvl == 'system_manager' %}{{ _('System Manager') }}
-                            {% elif lvl == 'admin' %}{{ _('Admin') }}
-                            {% elif lvl == 'focal_point' %}{{ _('Focal Point') }}
-                            {% else %}{{ _('User') }}{% endif %}
-                        </span>
+                        {% set role_label = _('System Manager') if lvl == 'system_manager' else _('Admin') if lvl == 'admin' else _('Focal Point') if lvl == 'focal_point' else _('User') %}
+                        {% set role_variant = 'review' if lvl in ['admin', 'system_manager'] else ('info' if lvl == 'focal_point' else 'neutral') %}
+                        {{ status_label(role_label, role_variant) }}
                     </dd>
                 </div>
                 <div>
                     <dt class="text-sm font-medium text-gray-500">{{ _('Status') }}</dt>
                     <dd class="mt-1">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                        {% if user.is_active %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
-                            {% if user.is_active %}{{ _('Active') }}{% else %}{{ _('Inactive') }}{% endif %}
-                        </span>
+                        {{ status_label_for_active(user.is_active) }}
                     </dd>
                 </div>
             </div>

@@ -11,33 +11,34 @@
     var escapeHtml = AgGridRenderers.escapeHtml;
     var escapeHtmlAttr = AgGridRenderers.escapeHtmlAttr;
 
-    var BADGE_BASE = 'px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full';
-    var BADGE_STYLE = 'style="white-space:nowrap;max-width:100%;"';
+    function severityVariant(severity) {
+        if (severity === 'critical') return 'danger';
+        if (severity === 'high') return 'warning';
+        if (severity === 'medium') return 'info';
+        if (severity === 'low') return 'success';
+        return 'neutral';
+    }
+
+    function eventTypeVariant(eventType) {
+        if (eventType === 'suspicious_login') return 'warning';
+        if (eventType === 'brute_force') return 'danger';
+        if (eventType === 'unusual_access') return 'info';
+        if (eventType === 'data_breach') return 'danger';
+        if (eventType === 'privilege_escalation') return 'review';
+        return 'neutral';
+    }
 
     var securityEventRenderers = {
         severityBadge: function (params) {
             var severity = (params.value || '').toLowerCase();
             var severityText = severity.charAt(0).toUpperCase() + severity.slice(1);
-            var colorClass;
-            if (severity === 'critical') { colorClass = 'bg-red-100 text-red-800'; }
-            else if (severity === 'high') { colorClass = 'bg-yellow-100 text-yellow-800'; }
-            else if (severity === 'medium') { colorClass = 'bg-blue-100 text-blue-800'; }
-            else if (severity === 'low') { colorClass = 'bg-green-100 text-green-800'; }
-            else { colorClass = 'bg-gray-100 text-gray-800'; }
-            return '<span class="' + BADGE_BASE + ' ' + colorClass + '" ' + BADGE_STYLE + '>' + escapeHtml(severityText) + '</span>';
+            return StatusLabels.render(severityText, severityVariant(severity), 'whitespace-nowrap max-w-full');
         },
 
         eventTypeBadge: function (params) {
             var eventType = (params.value || '').toLowerCase();
             var eventTypeText = eventType.replace(/_/g, ' ').replace(/\b\w/g, function (l) { return l.toUpperCase(); });
-            var colorClass;
-            if (eventType === 'suspicious_login') { colorClass = 'bg-yellow-100 text-yellow-800'; }
-            else if (eventType === 'brute_force') { colorClass = 'bg-red-100 text-red-800'; }
-            else if (eventType === 'unusual_access') { colorClass = 'bg-blue-100 text-blue-800'; }
-            else if (eventType === 'data_breach') { colorClass = 'bg-pink-100 text-pink-800'; }
-            else if (eventType === 'privilege_escalation') { colorClass = 'bg-purple-100 text-purple-800'; }
-            else { colorClass = 'bg-gray-100 text-gray-800'; }
-            return '<span class="' + BADGE_BASE + ' ' + colorClass + '" ' + BADGE_STYLE + '>' + escapeHtml(eventTypeText) + '</span>';
+            return StatusLabels.render(eventTypeText, eventTypeVariant(eventType), 'whitespace-nowrap max-w-full');
         },
 
         statusBadge: function (params) {
@@ -45,7 +46,7 @@
             if (!data) return '';
             if (data.is_resolved) {
                 var html = '<div style="overflow:hidden;width:100%;">';
-                html += '<span class="' + BADGE_BASE + ' bg-green-100 text-green-800" ' + BADGE_STYLE + '><i class="fas fa-check-circle mr-1"></i> Resolved</span>';
+                html += StatusLabels.render('Resolved', 'success', 'whitespace-nowrap max-w-full');
                 if (data.resolved_by_name || data.resolved_by_email) {
                     html += '<div class="text-xs text-gray-500 mt-1" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">by ' + escapeHtml(data.resolved_by_name || data.resolved_by_email) + '</div>';
                 }
@@ -55,7 +56,7 @@
                 html += '</div>';
                 return html;
             }
-            return '<span class="' + BADGE_BASE + ' bg-yellow-100 text-yellow-800" ' + BADGE_STYLE + '><i class="fas fa-hourglass-half mr-1"></i> Pending</span>';
+            return StatusLabels.render('Pending', 'pending', 'whitespace-nowrap max-w-full');
         },
 
         descriptionCell: function (params) {

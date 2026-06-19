@@ -1,6 +1,7 @@
 {% extends "core/layout.html" %}
 
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label %}
 {% block title %}View Suggestion - Admin{% endblock %}
 
 {% block content %}
@@ -31,21 +32,26 @@
                 <div class="flex justify-between items-start mb-4">
                     <h2 class="text-xl font-semibold text-ifrc-navy">Suggestion Information</h2>
                     <div class="flex gap-2">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                            {% if suggestion.suggestion_type == 'new_indicator' %}bg-blue-100 text-blue-800
-                            {% elif suggestion.suggestion_type == 'correction' %}bg-yellow-100 text-yellow-800
-                            {% elif suggestion.suggestion_type == 'improvement' %}bg-green-100 text-green-800
-                            {% else %}bg-gray-100 text-gray-800{% endif %}">
-                            {{ suggestion.suggestion_type_display }}
-                        </span>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                            {% if suggestion.status == 'pending' %}bg-yellow-100 text-yellow-800
-                            {% elif suggestion.status == 'reviewed' %}bg-blue-100 text-blue-800
-                            {% elif suggestion.status == 'approved' %}bg-green-100 text-green-800
-                            {% elif suggestion.status == 'rejected' %}bg-red-100 text-red-800
-                            {% else %}bg-gray-100 text-gray-800{% endif %}">
-                            {{ suggestion.status_display }}
-                        </span>
+                        {% if suggestion.suggestion_type == 'new_indicator' %}
+                            {{ status_label(suggestion.suggestion_type_display, 'info') }}
+                        {% elif suggestion.suggestion_type == 'correction' %}
+                            {{ status_label(suggestion.suggestion_type_display, 'pending') }}
+                        {% elif suggestion.suggestion_type == 'improvement' %}
+                            {{ status_label(suggestion.suggestion_type_display, 'success') }}
+                        {% else %}
+                            {{ status_label(suggestion.suggestion_type_display, 'neutral') }}
+                        {% endif %}
+                        {% if suggestion.status == 'pending' %}
+                            {{ status_label(suggestion.status_display, 'pending') }}
+                        {% elif suggestion.status == 'reviewed' %}
+                            {{ status_label(suggestion.status_display, 'review') }}
+                        {% elif suggestion.status == 'approved' %}
+                            {{ status_label(suggestion.status_display, 'success') }}
+                        {% elif suggestion.status == 'rejected' %}
+                            {{ status_label(suggestion.status_display, 'danger') }}
+                        {% else %}
+                            {{ status_label(suggestion.status_display, 'neutral') }}
+                        {% endif %}
                     </div>
                 </div>
 

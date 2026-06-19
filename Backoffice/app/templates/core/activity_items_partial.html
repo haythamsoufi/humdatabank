@@ -1,4 +1,5 @@
 {% from "components/_profile_icon.html" import profile_icon %}
+{% from "components/_status_label.html" import status_label, status_label_for_change_type %}
 {% for activity in recent_activities %}
     {% set sk = activity.summary_key %}
     {% set sp = activity.summary_params if activity.summary_params else {} %}
@@ -71,21 +72,20 @@
             {# Change-type badge based on summary params (no context_data) #}
             {# Top-right badge: show count only when multiple #}
             {% if sk == 'activity.form_data_updated.multiple' and sp.get('count') %}
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                    <i class="fas fa-list mr-1"></i>
-                    {{ sp.get('count') }}
-                </span>
+                {{ status_label(sp.get('count'), 'neutral') }}
             {% endif %}
         </div>
 
         <p class="text-sm text-gray-700">
             {% if sk == 'activity.form_data_updated.single' %}
-                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium mr-2 align-middle
-                    {% if ct == 'added' %} bg-green-100 text-green-800
-                    {% elif ct == 'removed' %} bg-red-100 text-red-800
-                    {% else %} bg-blue-100 text-blue-800{% endif %}">
-                    <i class="{% if ct == 'added' %}fas fa-plus{% elif ct == 'removed' %}fas fa-minus{% else %}fas fa-pen{% endif %} mr-1"></i>
-                    {% if ct == 'added' %}{{ _('Added') }}{% elif ct == 'removed' %}{{ _('Removed') }}{% else %}{{ _('Updated') }}{% endif %}
+                <span class="mr-2 align-middle">
+                    {% if ct == 'added' %}
+                        {{ status_label_for_change_type('added') }}
+                    {% elif ct == 'removed' %}
+                        {{ status_label_for_change_type('removed') }}
+                    {% else %}
+                        {{ status_label(_('Updated'), 'info') }}
+                    {% endif %}
                 </span>
             {% endif %}
             {% if sk == 'activity.form_data_updated.single' %}
@@ -124,11 +124,14 @@
                 {% for ch in sp.get('changes') %}
                     {% set ict = (ch.get('change_type') or 'updated')|lower %}
                     <div class="flex items-start text-xs">
-                        <span class="inline-flex items-center px-1 py-0.5 rounded font-medium mr-2
-                            {% if ict == 'added' %} bg-green-100 text-green-800
-                            {% elif ict == 'removed' %} bg-red-100 text-red-800
-                            {% else %} bg-blue-100 text-blue-800{% endif %}">
-                            {% if ict == 'added' %}{{ _('Added') }}{% elif ict == 'removed' %}{{ _('Removed') }}{% else %}{{ _('Updated') }}{% endif %}
+                        <span class="mr-2">
+                            {% if ict == 'added' %}
+                                {{ status_label_for_change_type('added') }}
+                            {% elif ict == 'removed' %}
+                                {{ status_label_for_change_type('removed') }}
+                            {% else %}
+                                {{ status_label(_('Updated'), 'info') }}
+                            {% endif %}
                         </span>
                         <span class="text-gray-800">
                             {% set ch_field_id = ch.get('field_id') %}

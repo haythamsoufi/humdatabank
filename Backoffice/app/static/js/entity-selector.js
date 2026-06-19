@@ -584,17 +584,13 @@ class EntitySelector {
     }
 
     createStatusBadge(status) {
-        const statusColors = {
-            'pending': 'bg-yellow-100 text-yellow-800',
-            'in_progress': 'bg-blue-100 text-blue-800',
-            'submitted': 'bg-green-100 text-green-800',
-            'approved': 'bg-green-100 text-green-800',
-            'rejected': 'bg-red-100 text-red-800'
-        };
-        const colorClass = statusColors[status] || 'bg-gray-100 text-gray-800';
+        const label = String(status || '').replace(/_/g, ' ');
         const span = document.createElement('span');
-        span.className = `px-2 py-1 text-xs font-semibold rounded-full ${colorClass}`;
-        span.textContent = String(status || '');
+        const variant = window.StatusLabels
+            ? window.StatusLabels.genericStatusVariant(status)
+            : 'neutral';
+        span.className = 'status-label status-label--' + variant;
+        span.textContent = label;
         return span;
     }
 

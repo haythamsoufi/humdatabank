@@ -5,6 +5,7 @@
 {% from "components/pagination.html" import render_pagination %}
 
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_status_label.html" import status_label, status_label_for_active %}
 {% block title %}{{ _('Admin Actions') }} - {{ _('Admin Panel') }}{% endblock %}
 
 {% block head %}
@@ -119,9 +120,7 @@
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                    {{ action.action_type.replace('_', ' ')|title }}
-                                </span>
+                                {{ status_label(action.action_type.replace('_', ' ')|title, 'info') }}
                             </td>
                             <td class="px-6 py-4 max-w-sm"> {# Added max-w-sm for description column #}
                                 <div class="text-sm text-gray-900 truncate" title="{{action.description}}">{{ action.description }}</div>
@@ -135,13 +134,15 @@
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                                {% if action.risk_level == 'high' %}bg-red-100 text-red-800
-                                {% elif action.risk_level == 'medium' %}bg-yellow-100 text-yellow-800
-                                {% elif action.risk_level == 'low' %}bg-green-100 text-green-800
-                                {% else %}bg-gray-100 text-gray-800 {% endif %}">
-                                    {{ action.risk_level|title }}
-                                </span>
+                                {% if action.risk_level == 'high' %}
+                                    {{ status_label(action.risk_level|title, 'danger') }}
+                                {% elif action.risk_level == 'medium' %}
+                                    {{ status_label(action.risk_level|title, 'warning') }}
+                                {% elif action.risk_level == 'low' %}
+                                    {{ status_label(action.risk_level|title, 'success') }}
+                                {% else %}
+                                    {{ status_label(action.risk_level|title, 'neutral') }}
+                                {% endif %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 {% if action.ip_address %}
@@ -152,13 +153,9 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 {% if action.requires_review %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
-                                     <i class="fas fa-exclamation-circle mr-1"></i> Needs Review
-                                </span>
+                                {{ status_label(_('Needs Review'), 'warning') }}
                                 {% else %}
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                     <i class="fas fa-check-circle mr-1"></i> Normal
-                                </span>
+                                {{ status_label(_('Normal'), 'success') }}
                                 {% endif %}
                             </td>
                         </tr>

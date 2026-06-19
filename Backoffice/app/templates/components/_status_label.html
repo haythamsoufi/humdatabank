@@ -1,0 +1,129 @@
+{# Centralized status labels — styles in app/static/css/components.css (.status-label) #}
+{# JS equivalent: StatusLabels.render() in app/static/js/components/status-labels.js #}
+
+{% macro status_label(text, variant='neutral', extra_class='') %}
+<span class="status-label status-label--{{ variant }}{% if extra_class %} {{ extra_class }}{% endif %}">{{ text }}</span>
+{% endmacro %}
+
+{% macro assignment_status_key(status) -%}
+    {%- set raw = status.value if status is not none and status.value is defined else status -%}
+    {{- raw|string|lower|replace(' ', '_') -}}
+{%- endmacro %}
+
+{% macro assignment_status_variant(status) -%}
+    {%- set raw = status.value if status is not none and status.value is defined else status -%}
+    {%- set key = raw|string|lower|replace(' ', '_') -%}
+    {%- if key in ['submitted', 'approved'] -%}success
+    {%- elif key == 'requires_revision' -%}warning
+    {%- elif key == 'sent_for_review' -%}review
+    {%- elif key == 'in_progress' -%}active
+    {%- else -%}neutral
+    {%- endif -%}
+{%- endmacro %}
+
+{% macro status_label_for_assignment(status, is_closed=false, extra_class='') %}
+    {% set variant %}{{ assignment_status_variant(status) }}{% endset %}
+    {% set text = localize_status(status) ~ (' - ' ~ _('Closed') if is_closed else '') %}
+    {{ status_label(text, variant|trim, extra_class) }}
+{% endmacro %}
+
+{% macro status_label_for_access_request(status, is_revoked=false, extra_class='') %}
+    {% if status == 'pending' %}
+        {{ status_label(_('Pending'), 'pending', extra_class) }}
+    {% elif is_revoked %}
+        {{ status_label(_('Access Revoked'), 'warning', extra_class) }}
+    {% elif status == 'approved' %}
+        {{ status_label(_('Approved'), 'success', extra_class) }}
+    {% elif status == 'rejected' %}
+        {{ status_label(_('Rejected'), 'danger', extra_class) }}
+    {% else %}
+        {{ status_label(status|title, 'neutral', extra_class) }}
+    {% endif %}
+{% endmacro %}
+
+{% macro status_label_for_public_submission(status, extra_class='') %}
+    {% set val = status.value if status is not none and status.value is defined else status %}
+    {% if val == 'approved' %}
+        {{ status_label(_(val), 'success', extra_class) }}
+    {% elif val == 'rejected' %}
+        {{ status_label(_(val), 'danger', extra_class) }}
+    {% else %}
+        {{ status_label(_(val|string), 'pending', extra_class) }}
+    {% endif %}
+{% endmacro %}
+
+{% macro status_label_for_change_type(change_type, extra_class='') %}
+    {% set ct = change_type|string|lower %}
+    {% if ct == 'added' %}
+        {{ status_label(_('Added'), 'success', extra_class) }}
+    {% elif ct == 'removed' %}
+        {{ status_label(_('Removed'), 'danger', extra_class) }}
+    {% elif ct == 'modified' %}
+        {{ status_label(_('Modified'), 'warning', extra_class) }}
+    {% else %}
+        {{ status_label(change_type|title, 'neutral', extra_class) }}
+    {% endif %}
+{% endmacro %}
+
+{% macro status_label_for_active(is_active, active_text=none, inactive_text=none, extra_class='') %}
+    {% set active_text = active_text or _('Active') %}
+    {% set inactive_text = inactive_text or _('Inactive') %}
+    {% if is_active %}
+        {{ status_label(active_text, 'success', extra_class) }}
+    {% else %}
+        {{ status_label(inactive_text, 'neutral', extra_class) }}
+    {% endif %}
+{% endmacro %}
+
+{% macro status_label_for_yes_no(value, yes_text=none, no_text=none, extra_class='') %}
+    {% set yes_text = yes_text or _('Yes') %}
+    {% set no_text = no_text or _('No') %}
+    {% if value %}
+        {{ status_label(yes_text, 'success', extra_class) }}
+    {% else %}
+        {{ status_label(no_text, 'danger', extra_class) }}
+    {% endif %}
+{% endmacro %}
+
+{% macro status_label_for_data_flag(flag, extra_class='') %}
+    {# Prefilled / imputed field markers on entry forms #}
+    {% if flag == 'prefilled' %}
+        {{ status_label(_('Prefilled'), 'pending', extra_class) }}
+    {% elif flag == 'imputed' %}
+        {{ status_label(_('Imputed'), 'info', extra_class) }}
+    {% endif %}
+{% endmacro %}
+
+{% macro status_label_for_suggestion_type(suggestion_type, extra_class='') %}
+    {% set t = suggestion_type|string|lower %}
+    {% if t == 'new' %}
+        {{ status_label(_('New'), 'info', extra_class) }}
+    {% elif t == 'correction' %}
+        {{ status_label(_('Correction'), 'pending', extra_class) }}
+    {% elif t == 'improvement' %}
+        {{ status_label(_('Improvement'), 'success', extra_class) }}
+    {% else %}
+        {{ status_label(suggestion_type|title, 'neutral', extra_class) }}
+    {% endif %}
+{% endmacro %}
+
+{% macro status_label_for_generic_status(status, extra_class='') %}
+    {# Maps common string statuses (pending, approved, rejected, etc.) #}
+    {% set s = status.value if status is not none and status.value is defined else status %}
+    {% set key = s|string|lower|replace(' ', '_') %}
+    {% if key in ['approved', 'active', 'enabled', 'success', 'completed', 'submitted', 'sent', 'deployed', 'published', 'available'] %}
+        {{ status_label(s|string|title if s is string else localize_status(s), 'success', extra_class) }}
+    {% elif key in ['rejected', 'failed', 'error', 'revoked', 'disabled', 'inactive', 'unavailable', 'deleted'] %}
+        {{ status_label(s|string|title if s is string else localize_status(s), 'danger', extra_class) }}
+    {% elif key in ['pending', 'waiting', 'draft', 'in_review'] %}
+        {{ status_label(s|string|title if s is string else localize_status(s), 'pending', extra_class) }}
+    {% elif key in ['requires_revision', 'warning', 'caution'] %}
+        {{ status_label(s|string|title if s is string else localize_status(s), 'warning', extra_class) }}
+    {% elif key in ['sent_for_review', 'review'] %}
+        {{ status_label(s|string|title if s is string else localize_status(s), 'review', extra_class) }}
+    {% elif key in ['in_progress', 'processing', 'running'] %}
+        {{ status_label(s|string|title if s is string else localize_status(s), 'active', extra_class) }}
+    {% else %}
+        {{ status_label(s|string|title if s is string else localize_status(s), 'neutral', extra_class) }}
+    {% endif %}
+{% endmacro %}

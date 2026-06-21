@@ -77,6 +77,8 @@
         {
             "id": {{ assignment.id }},
             "period_name": {{ (assignment.period_name or '')|tojson }},
+            "custom_name": {{ (assignment.custom_name or '')|tojson }},
+            "display_name": {{ assignment.display_name|tojson }},
             "template_name": {{ (assignment.template.name if assignment.template else _('Template Missing'))|tojson }},
             "data_owner_user_id": {{ (assignment.data_owner_user.id if assignment.data_owner_user else None)|tojson }},
             "data_owner_name": {{ (assignment.data_owner_user.name if assignment.data_owner_user else '')|tojson }},
@@ -111,6 +113,7 @@
     window.assignmentsConfig = window.assignmentsConfig || {};
     window.assignmentsConfig.t = {
         period_59cc1782: {{ _('Period')|tojson }},
+        name_d4a1c2b3: {{ _('Name')|tojson }},
         template_fe21f1e3: {{ _('Template')|tojson }},
         data_owner_eba18e59: {{ _('Data Owner')|tojson }},
         due_date_4e61d8e3: {{ _('Due Date')|tojson }},

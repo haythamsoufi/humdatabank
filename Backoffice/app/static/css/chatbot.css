@@ -98,29 +98,20 @@
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: linear-gradient(145deg, rgba(239, 68, 68, 0.28) 0%, rgba(127, 29, 29, 0.42) 100%);
-    border: 1px solid rgba(248, 113, 113, 0.32);
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.14),
-        0 0 14px rgba(239, 68, 68, 0.18);
+    background: transparent;
+    border: 1.5px solid rgba(255, 255, 255, 0.42);
+    box-shadow: none;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
     transition:
-        background var(--fab-hover-duration) ease,
         border-color var(--fab-hover-duration) ease,
-        box-shadow var(--fab-hover-duration) ease,
         transform var(--fab-hover-duration) var(--fab-hover-ease);
 }
 
 #aiChatbotFAB .fab-icon-slot::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.16), transparent 55%);
-    pointer-events: none;
+    content: none;
 }
 
 #aiChatbotFAB .robot-face {
@@ -135,10 +126,9 @@
 
 #aiChatbotFAB .robot-icon {
     font-size: 0.95rem;
-    color: #fecaca;
+    color: rgba(255, 255, 255, 0.88);
     transition: all 0.3s ease;
     transform-origin: center;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
 }
 
 #aiChatbotFAB .robot-icon.fas.fa-robot,
@@ -158,8 +148,8 @@
 }
 
 @keyframes fabSlotPulse {
-    0%, 100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 14px rgba(239, 68, 68, 0.18); }
-    60%       { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 22px rgba(239, 68, 68, 0.32); }
+    0%, 100% { border-color: rgba(255, 255, 255, 0.38); }
+    60%       { border-color: rgba(255, 255, 255, 0.62); }
 }
 #aiChatbotFAB:not(.fab-dragging):not(.chat-open) .fab-icon-slot {
     animation: fabSlotPulse 3.8s ease-out 3s infinite;
@@ -178,11 +168,9 @@
 }
 
 #aiChatbotFAB:hover:not(.fab-dragging) .fab-icon-slot {
-    background: linear-gradient(145deg, rgba(239, 68, 68, 0.38) 0%, rgba(153, 27, 27, 0.52) 100%);
-    border-color: rgba(252, 165, 165, 0.45);
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.18),
-        0 0 18px rgba(239, 68, 68, 0.35);
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.78);
+    box-shadow: none;
     animation: none;
     transform: scale(1.06);
 }
@@ -190,6 +178,7 @@
 #aiChatbotFAB:hover:not(.fab-dragging) .robot-icon {
     color: #ffffff;
     transform: scale(1.1);
+    animation: none;
 }
 
 #aiChatbotFAB:hover:not(.fab-dragging) .fab-label {

@@ -1046,6 +1046,30 @@ class TestAssignmentStatusWorkflowSteps:
             assert "in_progress" not in steps or "requires_revision" in steps
 
 
+class TestAssignmentStatusStepDescription:
+    def test_pending_description(self, app):
+        from app.routes.main.helpers import assignment_status_step_description
+        with app.app_context():
+            result = assignment_status_step_description("pending")
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_unknown_status_returns_empty(self, app):
+        from app.routes.main.helpers import assignment_status_step_description
+        with app.app_context():
+            result = assignment_status_step_description("unknown_status")
+        assert result == ""
+
+    def test_enum_status(self, app):
+        from app.routes.main.helpers import assignment_status_step_description
+        with app.app_context():
+            mock_status = MagicMock()
+            mock_status.value = "submitted"
+            result = assignment_status_step_description(mock_status)
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+
 # ---------------------------------------------------------------------------
 # render_activity_summary (Jinja global)
 # ---------------------------------------------------------------------------

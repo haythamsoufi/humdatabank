@@ -14,22 +14,35 @@
 
     var columnDefs = [
         {
-            field: 'period_name',
-            headerName: cfg.t.period_59cc1782,
-            width: 200, minWidth: 150, maxWidth: 300,
+            field: 'display_name',
+            headerName: cfg.t.name_d4a1c2b3,
+            width: 260, minWidth: 180, maxWidth: 400,
             filter: 'agTextColumnFilter', sortable: true,
             cellRenderer: function (params) {
-                var name = params.value || '';
-                var escapedName = name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                var displayName = params.value || '';
+                var escapedName = displayName.replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 var editUrl = params.data.edit_url || '';
                 var isActive = params.data.is_active !== false;
+                var hasCustomName = !!(params.data.custom_name);
+                var periodName = (params.data.period_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+                var innerHtml = escapedName;
+                if (hasCustomName && periodName) {
+                    innerHtml += ' <span class="ml-1 text-gray-400 text-xs font-normal">(' + periodName + ')</span>';
+                }
+
                 var nameHtml = editUrl
-                    ? '<a href="' + editUrl + '" class="text-blue-600 hover:text-blue-800 hover:underline font-medium">' + escapedName + '</a>'
-                    : escapedName;
+                    ? '<a href="' + editUrl + '" class="text-blue-600 hover:text-blue-800 hover:underline font-medium">' + innerHtml + '</a>'
+                    : innerHtml;
+
                 if (!isActive) {
+                    var inactiveInner = escapedName;
+                    if (hasCustomName && periodName) {
+                        inactiveInner += ' <span class="ml-1 text-gray-400 text-xs font-normal">(' + periodName + ')</span>';
+                    }
                     return '<span class="text-gray-500">' + (editUrl
-                        ? '<a href="' + editUrl + '" class="text-gray-500 hover:text-gray-700 hover:underline">' + escapedName + '</a>'
-                        : escapedName) + '</span> <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-600">' + cfg.t.inactive_6d6fe6a0 + '</span>';
+                        ? '<a href="' + editUrl + '" class="text-gray-500 hover:text-gray-700 hover:underline">' + inactiveInner + '</a>'
+                        : inactiveInner) + '</span> <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-600">' + cfg.t.inactive_6d6fe6a0 + '</span>';
                 }
                 return nameHtml;
             }

@@ -1130,6 +1130,43 @@ def assignment_status_workflow_steps(assignment_entity_status=None):
 
 
 @bp.app_template_global()
+def assignment_status_step_description(status):
+    """Jinja helper: short explanation of each assignment workflow step for the pipeline tooltip."""
+    if not status:
+        return ''
+
+    if hasattr(status, 'value'):
+        status = status.value
+
+    status_lower = str(status).strip().casefold().replace(' ', '_')
+
+    description_map = {
+        'pending': _(
+            'The assignment is available but data entry has not started yet.'
+        ),
+        'in_progress': _(
+            'Data entry is underway. You can save drafts and continue completing the form.'
+        ),
+        'requires_revision': _(
+            'Changes were requested. Update the form and submit again when ready.'
+        ),
+        'sent_for_review': _(
+            'The form was sent for delegation review before final submission.'
+        ),
+        'submitted': _(
+            'The form was submitted and is awaiting validation by an administrator.'
+        ),
+        'approved': _(
+            'The submission was validated and approved. Data entry is complete.'
+        ),
+        'rejected': _('This submission was rejected.'),
+        'closed': _('This assignment is closed and no further changes are expected.'),
+    }
+
+    return description_map.get(status_lower, '')
+
+
+@bp.app_template_global()
 def localize_status(status):
     """Jinja helper to localize assignment status strings."""
     if not status:

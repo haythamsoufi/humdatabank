@@ -1393,6 +1393,8 @@ def extract_update_translations():
     'admin.translations.manage',
     'admin.organization.manage',
     'admin.settings.manage',
+    'admin.assignments.create',
+    'admin.assignments.edit',
 )
 def api_auto_translate():
     """API endpoint for automatic translation"""
@@ -1452,6 +1454,8 @@ def api_auto_translate():
             'settings': {'admin.settings.manage'},
             # Organization management editor (edit_entity helper page)
             'organization': {'admin.organization.manage'},
+            # Assignment management (custom name translations)
+            'assignments': {'admin.assignments.create', 'admin.assignments.edit'},
         }
 
         # Backwards compatibility: if caller didn't pass context, infer safe defaults.
@@ -1471,6 +1475,7 @@ def api_auto_translate():
                 'translations': 'admin.translations.manage',
                 'settings': 'admin.settings.manage',
                 'organization': 'admin.organization.manage',
+                'assignments': 'admin.assignments.edit',
             }
             permission_code = default_permission_by_context.get(permission_context, '')
 
@@ -1826,6 +1831,8 @@ def api_auto_translate():
     'admin.translations.manage',
     'admin.organization.manage',
     'admin.settings.manage',
+    'admin.assignments.create',
+    'admin.assignments.edit',
 )
 def api_auto_translate_summary():
     """Log a single activity record summarising a bulk auto-translate run.

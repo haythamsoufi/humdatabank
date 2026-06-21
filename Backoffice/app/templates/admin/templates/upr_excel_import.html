@@ -33,7 +33,7 @@
 
 <div class="max-w-5xl mx-auto pb-10">
   <p class="text-sm text-gray-600 mb-6">
-    {{ _('Import data from UPR Master.xlsx (sheet "UPR Data") into planning templates. Currently supports Unified Country Plan (24) and PNS staff on template 22. Reporting templates will be added later.') }}
+    {{ _('Import data from UPR Master.xlsx (sheet "UPR Data") into planning and reporting templates. Planning rounds (P*): templates 24 and 22. Annual Reports (AR*): templates 25 and 23. Mid-Year Reviews (MYR*): template 25.') }}
   </p>
 
   {# ── 3-step progress bar ── #}
@@ -79,9 +79,9 @@
         </div>
         <div>
           <label for="upr-rounds" class="block text-sm font-medium text-gray-700 mb-1">
-            {{ _('Planning rounds (comma-separated, empty = all P*)') }}
+            {{ _('Rounds (comma-separated, e.g. P26, AR25, MYR26 — empty = all rounds matching selected templates)') }}
           </label>
-          <input type="text" id="upr-rounds" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="P25,P26">
+          <input type="text" id="upr-rounds" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="P26, AR25, MYR26">
         </div>
         <div>
           <label for="upr-batch-size" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Batch size') }}</label>
@@ -366,14 +366,22 @@ document.addEventListener('DOMContentLoaded', function () {
     if (preview.total_rows != null) parts.push(escapeHtml(String(preview.total_rows)) + ' {{ _("rows") }}');
     if (preview.countries   != null) parts.push(escapeHtml(String(preview.countries)) + ' {{ _("countries") }}');
     if (parts.length) lines.push('<p class="' + DZ + '__preview-line">' + parts.join(' &middot; ') + '</p>');
-    if (preview.planning_rounds && preview.planning_rounds.length) {
-      lines.push(
-        '<p class="' + DZ + '__preview-line">'
-        + '<span class="' + DZ + '__preview-meta-label">{{ _("Rounds") }}: </span>'
-        + '<span class="' + DZ + '__preview-meta-value">' + escapeHtml(preview.planning_rounds.join(', ')) + '</span>'
-        + '</p>'
-      );
-    }
+    var roundGroups = [
+      { label: '{{ _("Planning") }}', key: 'planning_rounds' },
+      { label: '{{ _("AR") }}',       key: 'ar_rounds' },
+      { label: '{{ _("MYR") }}',      key: 'myr_rounds' }
+    ];
+    roundGroups.forEach(function (g) {
+      var rr = preview[g.key];
+      if (rr && rr.length) {
+        lines.push(
+          '<p class="' + DZ + '__preview-line">'
+          + '<span class="' + DZ + '__preview-meta-label">' + escapeHtml(g.label) + ' {{ _("rounds") }}: </span>'
+          + '<span class="' + DZ + '__preview-meta-value">' + escapeHtml(rr.join(', ')) + '</span>'
+          + '</p>'
+        );
+      }
+    });
     if (preview.sections && preview.sections.length) {
       lines.push(
         '<p class="' + DZ + '__preview-line">'

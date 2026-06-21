@@ -278,6 +278,10 @@ if (typeof MutationObserver !== 'undefined') {
 window.__numericUnformat = unformat;
 window.__numericFormatInPlace = function formatInPlaceForInput(input) {
     if (!input || typeof input.value === 'undefined') return;
+    // On mobile (coarse pointer) inputs stay as type="number". Assigning a comma-formatted string
+    // (e.g. "475,000") to a type="number" input makes the browser reject and clear it — blank cells.
+    // Skip formatting entirely on coarse devices; the raw numeric value is already correct.
+    if (IS_COARSE) return;
     try { formatInPlace(input); } catch (_) {}
 };
 window.__setupNumericFormatting = setupNumericFormatting;

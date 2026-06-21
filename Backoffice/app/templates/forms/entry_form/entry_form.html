@@ -2570,23 +2570,25 @@
             <div id="chatbot-ai-hover-menu"
                  class="fixed z-[1059] flex flex-col items-end gap-3"
                  style="bottom: calc(var(--chat-fab-bottom-inset, 1.5rem) + 72px); right: calc(var(--chat-fab-offset, 1.5rem) + env(safe-area-inset-right, 0px));">
-                <div class="chatbot-ai-hover-row flex items-center gap-3">
-                    <span class="chatbot-ai-tooltip">{{ _('Validation Summary') }}</span>
+                <div class="chatbot-ai-hover-row">
                     <button type="button" id="fab-validation-summary-btn"
-                            class="rounded-full bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white flex items-center justify-center shadow-lg transition-all duration-150 hover:scale-105"
-                            aria-label="{{ _('Validation Summary') }}"
-                            style="width: var(--chat-fab-size, 56px); height: var(--chat-fab-size, 56px); border: none; box-shadow: 0 4px 14px rgba(124,58,237,0.4), 0 2px 6px rgba(0,0,0,0.15);">
-                        <i class="fas fa-clipboard-check text-xl"></i>
+                            class="fab-hover-pill"
+                            aria-label="{{ _('Validation Summary') }}">
+                        <span class="fab-hover-pill-icon">
+                            <i class="fas fa-clipboard-check"></i>
+                        </span>
+                        <span class="fab-hover-pill-label">{{ _('Validation Summary') }}</span>
                     </button>
                 </div>
                 {% if tmpl and tmpl.enable_ai_validation and user_has_ai_beta_access(current_user) %}
-                <div class="chatbot-ai-hover-row flex items-center gap-3">
-                    <span class="chatbot-ai-tooltip">{{ _('Run AI validation') }}</span>
+                <div class="chatbot-ai-hover-row">
                     <button type="button" id="fab-run-ai-opinions-btn"
-                            class="rounded-full bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white flex items-center justify-center shadow-lg transition-all duration-150 hover:scale-105"
-                            aria-label="{{ _('Run AI validation') }}"
-                            style="width: var(--chat-fab-size, 56px); height: var(--chat-fab-size, 56px); border: none; box-shadow: 0 4px 14px rgba(124,58,237,0.4), 0 2px 6px rgba(0,0,0,0.15);">
-                        <i class="fas fa-robot text-xl"></i>
+                            class="fab-hover-pill"
+                            aria-label="{{ _('Run AI validation') }}">
+                        <span class="fab-hover-pill-icon">
+                            <i class="fas fa-robot"></i>
+                        </span>
+                        <span class="fab-hover-pill-label">{{ _('Run AI validation') }}</span>
                     </button>
                 </div>
                 {% endif %}

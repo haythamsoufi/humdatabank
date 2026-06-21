@@ -1,6 +1,7 @@
 {% extends "core/layout.html" %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 {% from "components/_status_label.html" import status_label_for_active %}
+{% from "macros/translation_modal.html" import translation_modal %}
 
 {% block title %}{{ 'Edit Assignment' if assignment else 'Create New Assignment' }}{% endblock %}
 
@@ -150,8 +151,60 @@
             {% endfor %}
         </div>
 
-        {# Row 2: Data Owner + dates (new assignment shows due/expiry inline; edit shows them in their own section below) #}
+        {# Row 2: Custom Name + Data Owner + dates (new assignment shows due/expiry inline; edit shows them in their own section below) #}
+        {% set existing_trans = (assignment.custom_name_translations or {}) if assignment else {} %}
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start mt-4">
+            {# Custom Name — optional override for the display name shown to users #}
+            <div class="flex flex-col">
+                <div class="flex items-center gap-2 flex-wrap mb-2 min-h-[2.75rem]">
+                    <label for="{{ form.custom_name.id }}" class="text-gray-700 text-sm font-semibold">
+                        {{ _('Custom Name') }}
+                        <span class="ml-1 font-normal text-gray-400 text-xs">({{ _('optional') }})</span>
+                    </label>
+                    {% if TRANSLATABLE_LANGUAGES %}
+                    <button type="button"
+                            id="custom-name-translations-btn"
+                            class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0"
+                            title="{{ _('Add translations') }}"
+                            aria-label="{{ _('Add translations') }}">
+                        <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                    </button>
+                    {% endif %}
+                </div>
+                {{ form.custom_name(
+                    class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md",
+                    placeholder=_('e.g. Annual Country Survey 2025 — leave blank to use "Template – Period"')
+                ) }}
+                {% if TRANSLATABLE_LANGUAGES %}
+                {% for code in TRANSLATABLE_LANGUAGES %}
+                <input type="hidden"
+                       name="custom_name_{{ code }}"
+                       id="custom_name_{{ code }}"
+                       value="{{ existing_trans.get(code, '') }}">
+                {% endfor %}
+                <input type="hidden"
+                       id="custom-name-translations"
+                       value="{{ existing_trans|tojson|e }}"
+                       data-existing-translations="{{ existing_trans|tojson|e }}">
+                {% endif %}
+                <div class="mt-1 min-h-[2.5rem]">
+                    {% if assignment and assignment.custom_name %}
+                        <p class="text-xs text-blue-600">
+                            <i class="fas fa-tag mr-1"></i>{{ _('Current name:') }} <span class="font-medium">{{ assignment.custom_name }}</span>
+                        </p>
+                    {% elif assignment %}
+                        <p class="text-xs text-gray-500">
+                            {{ _('Default:') }} <span class="font-medium">{{ assignment.display_name }}</span>
+                        </p>
+                    {% else %}
+                        <p class="text-xs text-gray-500">{{ _('Leave blank to use "Template – Period" everywhere.') }}</p>
+                    {% endif %}
+                </div>
+                {% for error in form.custom_name.errors %}
+                    <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                {% endfor %}
+            </div>
+
             {# Data Owner #}
             {% if form.data_owner_id is defined %}
             <div class="flex flex-col">
@@ -186,7 +239,12 @@
                     <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
                 {% endfor %}
             </div>
-            <div class="flex flex-col">
+            {% endif %}
+        </div>
+
+        {% if not assignment %}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start mt-4">
+            <div class="flex flex-col md:col-span-1">
                 <label for="{{ form.expiry_date.id }}" class="block text-gray-700 text-sm font-semibold mb-2 min-h-[2.75rem]">{{ _('Expiry Date') }}</label>
                 {{ form.expiry_date(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
                 <div class="mt-1 min-h-[2.5rem]">
@@ -196,8 +254,8 @@
                     <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
                 {% endfor %}
             </div>
-            {% endif %}
         </div>
+        {% endif %}
 
         {# Hidden fields for country selections (for new assignments) - populated from Entity Assignments tab #}
         {% if not assignment %}
@@ -701,6 +759,20 @@
 
 {# Modal for editing AssignmentEntityStatus - only for existing assignments #}
 {% from "macros/modal_shell.html" import modal_shell %}
+
+{% if TRANSLATABLE_LANGUAGES %}
+{{ translation_modal(
+    modal_id='custom-name-translations-modal',
+    modal_title=_('Custom Name Translations'),
+    description=_('Add translations for this assignment name in different languages. English is entered in the Custom Name field above.'),
+    context='assignment_custom_name',
+    show_auto_translate=true,
+    css_prefix='custom-name',
+    auto_translate_permission_context='assignments',
+    auto_translate_permission_code='admin.assignments.edit'
+) }}
+{% endif %}
+
 {% if assignment %}
 {% call modal_shell('edit-status-modal', 'Edit Status for <span id="edit-status-modal-entity-name" class="font-bold ml-1">Entity</span>', aria_label=_('Edit Status'), max_width='max-w-md', title_safe=true) %}
         <form id="edit-status-actual-form" method="POST" action="">
@@ -783,6 +855,56 @@
 {{ ag_grid_js() }}
 <!-- Include utils for flash messages -->
 <script src="{{ static_url('js/form_builder/modules/utils.js') }}"></script>
+{% if TRANSLATABLE_LANGUAGES %}
+<script type="application/json" id="translation-data">
+{
+    "supportedLanguages": {{ SUPPORTED_LANGUAGES|tojson }},
+    "languageDisplayNames": {{ (LANGUAGE_DISPLAY_NAMES or {})|tojson }}
+}
+</script>
+<script type="module" nonce="{{ csp_nonce() }}">
+    import { TranslationModal } from '{{ static_url('js/components/translation-modal.js') }}';
+    import '{{ static_url('js/components/translation-utils.js') }}';
+
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!document.getElementById('custom-name-translations-modal')) return;
+
+        TranslationModal.attach({
+            openButtonId: 'custom-name-translations-btn',
+            modalId: 'custom-name-translations-modal',
+            cssPrefix: 'custom-name',
+            hiddenInputSelector: '#custom-name-translations',
+            resolveEnglishText: function () {
+                const input = document.getElementById('{{ form.custom_name.id }}');
+                return input ? input.value : '';
+            },
+            onSaveHiddenFields: function (collected) {
+                const hiddenJson = document.getElementById('custom-name-translations');
+                if (hiddenJson) hiddenJson.value = JSON.stringify(collected || {});
+                Object.keys(collected || {}).forEach(function (code) {
+                    const field = document.getElementById('custom_name_' + code);
+                    if (field) field.value = collected[code] || '';
+                });
+                const btn = document.getElementById('custom-name-translations-btn');
+                if (btn) {
+                    const originalNodes = Array.from(btn.childNodes).map(function (n) { return n.cloneNode(true); });
+                    btn.replaceChildren();
+                    const icon = document.createElement('i');
+                    icon.className = 'fas fa-check w-4 h-4';
+                    icon.setAttribute('aria-hidden', 'true');
+                    btn.appendChild(icon);
+                    btn.classList.add('text-green-600');
+                    setTimeout(function () {
+                        btn.replaceChildren(...originalNodes.map(function (n) { return n.cloneNode(true); }));
+                        btn.classList.remove('text-green-600');
+                    }, 2000);
+                }
+            },
+            autoTranslateType: 'template_name'
+        });
+    });
+</script>
+{% endif %}
 <script type="application/json" id="entity-management-data">[
 {% for aes in assignment_entities %}
 {% set aes_display_name = assignment_entity_display.get(aes.id, '') if assignment_entity_display is defined else EntityService.get_entity_name(aes.entity_type, aes.entity_id, include_hierarchy=True) %}

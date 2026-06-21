@@ -139,15 +139,6 @@
         [data-dashboard-card-actions]:not([data-actions-layout-ready]) .dashboard-card-actions-bar {
             visibility: hidden;
         }
-        /* Status workflow pipeline tooltip */
-        .assignment-status-pipeline-tooltip {
-            display: none;
-            z-index: 200;
-        }
-        .assignment-status-pipeline-container:hover > .assignment-status-pipeline-tooltip,
-        .assignment-status-pipeline-trigger:focus-visible ~ .assignment-status-pipeline-tooltip {
-            display: block;
-        }
         #current-assignments-section .grid {
             overflow: visible;
         }
@@ -624,9 +615,13 @@
                                         {# Wrap the title in an anchor tag to make it clickable #}
                                         {% if item.type == 'assigned' %}
                                             <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=item.item_object.id) }}" class="hover:underline text-black-700"> {# Added styling for link appearance #}
-                                                {{ get_localized_template_name(item.item_object.assigned_form.template) if item.item_object.assigned_form.template else _('Template Missing') }}
-                                                {% if item.item_object.assigned_form.period_name != 'Self-Reported' %}
-                                                    - {{ item.item_object.assigned_form.period_name }}
+                                                {% if item.item_object.assigned_form.custom_name %}
+                                                    {{ item.item_object.assigned_form.display_name }}
+                                                {% else %}
+                                                    {{ get_localized_template_name(item.item_object.assigned_form.template) if item.item_object.assigned_form.template else _('Template Missing') }}
+                                                    {% if item.item_object.assigned_form.period_name != 'Self-Reported' %}
+                                                        - {{ item.item_object.assigned_form.period_name }}
+                                                    {% endif %}
                                                 {% endif %}
                                             </a>
                                         {% else %} {# item.type == 'public' #}
@@ -1092,7 +1087,11 @@
                                                         <div class="text-sm font-medium text-gray-900">
                                                             {% if item.type == 'assigned' %}
                                                                 <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=item.item_object.id) }}" class="hover:underline text-black-700">
-                                                                    {{ get_localized_template_name(item.item_object.assigned_form.template) if item.item_object.assigned_form.template else _('Template Missing') }}
+                                                                    {% if item.item_object.assigned_form.custom_name %}
+                                                                        {{ item.item_object.assigned_form.display_name }}
+                                                                    {% else %}
+                                                                        {{ get_localized_template_name(item.item_object.assigned_form.template) if item.item_object.assigned_form.template else _('Template Missing') }}
+                                                                    {% endif %}
                                                                 </a>
                                                             {% else %}
                                                                 <a href="{{ item.view_data_link }}" class="hover:underline text-black-700">

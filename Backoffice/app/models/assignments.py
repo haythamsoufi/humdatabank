@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
-from sqlalchemy import Column, Integer, ForeignKey, String, DateTime, Date, Boolean, Enum, and_, or_
+from sqlalchemy import Column, Integer, ForeignKey, String, DateTime, Date, Boolean, Enum, JSON, and_, or_
 from sqlalchemy.orm import relationship, backref, foreign
 from sqlalchemy import and_
 from ..extensions import db
@@ -58,6 +58,13 @@ class AssignedForm(db.Model):
     # When true, non-org focal points must use sent_for_review before upstream submit
     requires_delegation_review = Column(Boolean, default=False, nullable=False)
 
+    # Optional override for the assignment's display name.
+    # When None the UI falls back to "<template name> – <period>".
+    custom_name = Column(String(200), nullable=True)
+    # Per-language translations for custom_name, keyed by ISO code {"ar": "...", "fr": "..."}.
+    # English is always stored in custom_name; this dict holds non-English variants.
+    custom_name_translations = Column(JSON, nullable=True)
+
     # Data ownership governance
     data_owner_id = Column(Integer, ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
 
@@ -93,6 +100,7 @@ class AssignedForm(db.Model):
         db.Index('ix_assigned_form_data_owner', 'data_owner_id'),
         db.Index('ix_assigned_form_activated_by', 'activated_by_user_id'),
         db.Index('ix_assigned_form_deactivated_by', 'deactivated_by_user_id'),
+        db.Index('ix_assigned_form_custom_name', 'custom_name'),
     )
 
     @property
@@ -219,6 +227,47 @@ class AssignedForm(db.Model):
     def is_entry_allowed(self) -> bool:
         """Whether logged-in users may open the assignment form (deactivate blocks; close does not)."""
         return self.is_active
+
+    def get_custom_name_translation(self, lang: str) -> str:
+        """Return the translation for *lang*, falling back to English custom_name."""
+        if self.custom_name_translations and isinstance(self.custom_name_translations, dict):
+            val = self.custom_name_translations.get(lang)
+            if val and str(val).strip():
+                return str(val).strip()
+        return self.custom_name or ''
+
+    def set_custom_name_translation(self, lang: str, text: str) -> None:
+        """Set (or clear) the translation for *lang*.  Replaces the whole dict so SQLAlchemy
+        detects the mutation without needing flag_modified."""
+        current = dict(self.custom_name_translations) if isinstance(self.custom_name_translations, dict) else {}
+        text = (text or '').strip()
+        if text:
+            current[lang] = text
+        else:
+            current.pop(lang, None)
+        self.custom_name_translations = current or None
+
+    @property
+    def display_name(self) -> str:
+        """Human-readable name, locale-aware when inside a request context.
+
+        Resolution order:
+          1. custom_name_translations[current_locale]  (if set and non-English)
+          2. custom_name                               (English / fallback)
+          3. "<template> – <period>"                  (default)
+        """
+        if self.custom_name:
+            from contextlib import suppress
+            with suppress(Exception):
+                from app.utils.form_localization import get_translation_key
+                lang = get_translation_key()
+                if lang and lang != 'en' and self.custom_name_translations:
+                    val = self.custom_name_translations.get(lang)
+                    if val and str(val).strip():
+                        return str(val).strip()
+            return self.custom_name
+        template_name = self.template.name if self.template else 'Template Missing'
+        return f"{template_name} \u2013 {self.period_name}" if self.period_name else template_name
 
     @property
     def is_public_submission_allowed(self) -> bool:

@@ -256,8 +256,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPage = 1;
     let currentSearch = '';
     let currentLogSource = 'all';
-    let currentLogLevels = ['error', 'warning', 'info', 'verbose']; // Default: all selected
+    let currentLogLevel = 'all'; // matches #log-level select values: all | error | warning | info | verbose
     let currentPerPage = 100;
+    let searchDebounceTimer = null;
 
     function loadLogs() {
         const container = document.getElementById('logs-container');
@@ -267,13 +268,9 @@ document.addEventListener('DOMContentLoaded', function() {
             page: currentPage,
             per_page: currentPerPage,
             search: currentSearch,
-            log_source: currentLogSource
+            log_source: currentLogSource,
+            log_level: currentLogLevel
         });
-
-        // Add log levels as comma-separated values
-        if (currentLogLevels.length > 0) {
-            params.append('log_level', currentLogLevels.join(','));
-        }
 
         fetch(`{{ url_for('monitoring.get_monitoring_logs') }}?${params}`, {
             headers: {
@@ -381,7 +378,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('log-search')?.addEventListener('input', (e) => {
         currentSearch = e.target.value;
         currentPage = 1;
-        loadLogs();
+        // Debounce: wait 400 ms after user stops typing before firing request
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(loadLogs, 400);
     });
 
     document.getElementById('log-source')?.addEventListener('change', (e) => {
@@ -390,16 +389,10 @@ document.addEventListener('DOMContentLoaded', function() {
         loadLogs();
     });
 
-    // Handle log level checkboxes
-    function updateLogLevels() {
-        const checkboxes = document.querySelectorAll('.log-level-checkbox:checked');
-        currentLogLevels = Array.from(checkboxes).map(cb => cb.value);
+    document.getElementById('log-level')?.addEventListener('change', (e) => {
+        currentLogLevel = e.target.value;
         currentPage = 1;
         loadLogs();
-    }
-
-    document.querySelectorAll('.log-level-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', updateLogLevels);
     });
 
     document.getElementById('log-per-page')?.addEventListener('change', (e) => {
@@ -417,24 +410,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('next-page')?.addEventListener('click', () => {
         currentPage++;
-        loadLogs();
-    });
-
-    function updatePeakFilterIndicator() {
-        const indicator = document.getElementById('peak-filter-active');
-        if (showPeaksOnly) {
-            indicator.classList.remove('hidden');
-        } else {
-            indicator.classList.add('hidden');
-        }
-    }
-
-    document.getElementById('clear-peak-filter')?.addEventListener('click', () => {
-        showPeaksOnly = false;
-        currentFilter = 'all';
-        document.getElementById('log-filter').value = 'all';
-        currentPage = 1;
-        updatePeakFilterIndicator();
         loadLogs();
     });
 

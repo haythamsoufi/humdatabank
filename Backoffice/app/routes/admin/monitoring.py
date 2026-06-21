@@ -367,22 +367,24 @@ def get_monitoring_logs():
 @bp.route("/monitoring/logs/download", methods=["GET"])
 @admin_permission_required('admin.analytics.view')
 def download_monitoring_logs():
-    """Download monitoring logs (combined memory + system logs)."""
+    """Download monitoring logs (combined memory + system + application logs)."""
     try:
         memory_log_path = memory_monitor.get_log_file_path()
         system_log_path = system_monitor.get_log_file_path()
+        application_log_path = getattr(current_app, 'application_log_file_path', None)
 
         memory_exists = memory_log_path and os.path.exists(memory_log_path)
         system_exists = system_log_path and os.path.exists(system_log_path)
+        application_exists = application_log_path and os.path.exists(application_log_path)
 
-        if not memory_exists and not system_exists:
+        if not memory_exists and not system_exists and not application_exists:
             abort(404, description="No monitoring log files found")
 
         # Create combined log content
         combined_log = io.StringIO()
 
         combined_log.write("=" * 80 + "\n")
-        combined_log.write("MONITORING LOGS - Combined Memory and System Logs\n")
+        combined_log.write("MONITORING LOGS - Combined Memory, System, and Application Logs\n")
         combined_log.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         combined_log.write("=" * 80 + "\n\n")
 
@@ -390,7 +392,7 @@ def download_monitoring_logs():
             combined_log.write("=" * 80 + "\n")
             combined_log.write("MEMORY LOGS\n")
             combined_log.write("=" * 80 + "\n")
-            with open(memory_log_path, 'r', encoding='utf-8') as f:
+            with open(memory_log_path, 'r', encoding='utf-8', errors='ignore') as f:
                 combined_log.write(f.read())
             combined_log.write("\n\n")
 
@@ -398,7 +400,15 @@ def download_monitoring_logs():
             combined_log.write("=" * 80 + "\n")
             combined_log.write("SYSTEM LOGS\n")
             combined_log.write("=" * 80 + "\n")
-            with open(system_log_path, 'r', encoding='utf-8') as f:
+            with open(system_log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                combined_log.write(f.read())
+            combined_log.write("\n\n")
+
+        if application_exists:
+            combined_log.write("=" * 80 + "\n")
+            combined_log.write("APPLICATION LOGS\n")
+            combined_log.write("=" * 80 + "\n")
+            with open(application_log_path, 'r', encoding='utf-8', errors='ignore') as f:
                 combined_log.write(f.read())
             combined_log.write("\n")
 

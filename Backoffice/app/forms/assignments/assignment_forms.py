@@ -26,6 +26,7 @@ class AssignedFormForm(BaseForm):
         validators=[Optional()]  # Avoids 'required' on individual checkboxes
     )
     period_name = StringField("Reporting Period Name", validators=[DataRequired()])
+    custom_name = StringField("Custom Name (optional)", validators=[Optional()])
     due_date = DateField("Due Date (for all selected countries)", format='%Y-%m-%d', validators=[Optional()])
     expiry_date = DateField("Expiry Date (assignment will be treated as Closed after this date)", format='%Y-%m-%d', validators=[Optional()])
 

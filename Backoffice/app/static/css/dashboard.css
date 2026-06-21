@@ -170,7 +170,7 @@
 }
 
 .past-assignments-table-wrap:has(.assignment-status-pipeline-container:hover),
-.past-assignments-table-wrap:has(.assignment-status-pipeline-trigger:focus-visible) {
+.past-assignments-table-wrap:has(.assignment-status-pipeline-container:focus-within) {
     overflow: visible;
 }
 
@@ -179,119 +179,9 @@
 }
 
 #approved-assignments-list tr:has(.assignment-status-pipeline-container:hover),
-#approved-assignments-list tr:has(.assignment-status-pipeline-trigger:focus-visible) {
+#approved-assignments-list tr:has(.assignment-status-pipeline-container:focus-within) {
     position: relative;
     z-index: 10;
-}
-
-/* Assignment status workflow pipeline (hover on status badge) */
-.assignment-status-pipeline-tooltip {
-    display: none;
-    min-width: 20rem;
-    max-width: min(34rem, calc(100vw - 1.5rem));
-    z-index: 200;
-}
-
-.assignment-status-pipeline-container:hover > .assignment-status-pipeline-tooltip,
-.assignment-status-pipeline-trigger:focus-visible ~ .assignment-status-pipeline-tooltip {
-    display: block;
-}
-
-.assignment-status-pipeline {
-    display: flex;
-    align-items: flex-start;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-.assignment-status-pipeline-marker {
-    position: relative;
-}
-
-.assignment-status-pipeline-dot {
-    background-color: #d1d5db;
-}
-
-.assignment-status-pipeline-check {
-    display: none;
-}
-
-.assignment-status-pipeline-connector {
-    flex: 1 1 0%;
-    min-width: 0.5rem;
-    height: 2px;
-    margin-top: 7px;
-    border: none;
-    border-radius: 9999px;
-    background: #e5e7eb;
-}
-
-.assignment-status-pipeline-label {
-    color: #9ca3af;
-}
-
-/* Pending is a start point, not a completed milestone — show a neutral ring when passed */
-.assignment-status-pipeline-step.is-passed .assignment-status-pipeline-check {
-    display: none;
-}
-
-.assignment-status-pipeline-step.is-passed .assignment-status-pipeline-dot {
-    display: block;
-    background-color: #ffffff;
-    border: 2px solid #9ca3af;
-    width: 0.5rem;
-    height: 0.5rem;
-}
-
-.assignment-status-pipeline-step.is-passed .assignment-status-pipeline-label {
-    color: #6b7280;
-}
-
-.assignment-status-pipeline-step.is-complete .assignment-status-pipeline-dot {
-    display: none;
-}
-
-.assignment-status-pipeline-step.is-complete .assignment-status-pipeline-check {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1rem;
-    height: 1rem;
-    border-radius: 9999px;
-    background-color: #22c55e;
-    color: #ffffff;
-    font-size: 0.5rem;
-    line-height: 1;
-}
-
-.assignment-status-pipeline-connector.is-filled {
-    background: #86efac;
-}
-
-.assignment-status-pipeline-step.is-complete .assignment-status-pipeline-label {
-    color: #15803d;
-}
-
-.assignment-status-pipeline-step.is-current .assignment-status-pipeline-marker {
-    width: 0.75rem;
-    height: 0.75rem;
-}
-
-.assignment-status-pipeline-step.is-current .assignment-status-pipeline-dot {
-    background-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
-    width: 0.625rem;
-    height: 0.625rem;
-}
-
-.assignment-status-pipeline-step.is-current .assignment-status-pipeline-label {
-    color: #1d4ed8;
-    font-weight: 700;
-}
-
-.assignment-status-pipeline-step.is-upcoming .assignment-status-pipeline-dot {
-    background-color: #e5e7eb;
 }
 
 /* Contributor avatar stack (used on dashboard cards) */

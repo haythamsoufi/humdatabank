@@ -75,6 +75,7 @@ def _delete_assignment_entity_status_with_children(aes):
 class EditAssignmentDetailsForm(FlaskForm):
     template_id = SelectField("Form Template", coerce=int, validators=[DataRequired()])
     period_name = StringField("Period Name", validators=[DataRequired()])
+    custom_name = StringField("Custom Name (optional)", validators=[Optional()])
     due_date = DateField("Due Date", validators=[Optional()])
     expiry_date = DateField("Expiry Date (assignment will be treated as Closed after this date)", format='%Y-%m-%d', validators=[Optional()])
     data_owner_id = SelectField(
@@ -137,6 +138,8 @@ def manage_assignments():
             assignments_data.append({
                 'id': assignment.id,
                 'period_name': assignment.period_name or 'Unnamed Assignment',
+                'custom_name': assignment.custom_name or None,
+                'display_name': assignment.display_name,
                 'template_name': template_name,
                 'template_id': assignment.template_id if assignment.template else None,
                 'has_public_url': assignment.has_public_url() if hasattr(assignment, 'has_public_url') else False,
@@ -278,9 +281,20 @@ def new_assignment():
                 )
                 return redirect(url_for("assignment_management.new_assignment"))
 
+            custom_name_value = (form.custom_name.data or '').strip() or None
+            # Collect per-language translations for custom_name
+            _trans_langs = current_app.config.get('TRANSLATABLE_LANGUAGES', []) or []
+            custom_name_trans = {}
+            for _lang in _trans_langs:
+                _val = (request.form.get(f'custom_name_{_lang}') or '').strip()
+                if _val:
+                    custom_name_trans[_lang] = _val
+
             new_assignment = AssignedForm(
                 template_id=form.template_id.data,
                 period_name=period_name,
+                custom_name=custom_name_value,
+                custom_name_translations=custom_name_trans or None,
                 expiry_date=form.expiry_date.data if form.expiry_date.data else None,
                 data_owner_id=form.data_owner_id.data or None,
                 requires_delegation_review=bool(form.requires_delegation_review.data),
@@ -468,6 +482,15 @@ def edit_assignment(assignment_id):
         try:
             assignment.template_id = form.template_id.data
             assignment.period_name = form.period_name.data
+            assignment.custom_name = (form.custom_name.data or '').strip() or None
+            # Persist per-language translations for custom_name
+            _trans_langs = current_app.config.get('TRANSLATABLE_LANGUAGES', []) or []
+            _new_trans = {}
+            for _lang in _trans_langs:
+                _val = (request.form.get(f'custom_name_{_lang}') or '').strip()
+                if _val:
+                    _new_trans[_lang] = _val
+            assignment.custom_name_translations = _new_trans or None
             assignment.expiry_date = form.expiry_date.data if form.expiry_date.data else None
             assignment.data_owner_id = form.data_owner_id.data or None
             assignment.requires_delegation_review = bool(form.requires_delegation_review.data)

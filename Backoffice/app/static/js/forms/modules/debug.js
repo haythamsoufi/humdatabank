@@ -2,26 +2,26 @@
 const DEBUG_CONFIG = {
     global: true,  // Master switch for all debugging
     modules: {
-        'forms-loader': true,
+        'forms-loader': false,
         'data-availability': false,
         'conditions': false,
-        'field-management': true,
-        'dynamic-indicators': true,
+        'field-management': false,
+        'dynamic-indicators': false,
         'layout': false,
         'multi-select': false,
-        'repeat-sections': true,
+        'repeat-sections': false,
         'form-optimization': false,
         'form-events': false,
         'ajax-save': false,
         'form_validation': false,
         'pdf-export': false,
         'excel-export': false,
-        'calculated-lists-runtime': false,
+        'calculated-lists-runtime': true,
         'disaggregation-calculator': false,
         'matrix-handler': false,
         'numeric-formatting': false,
-        'plugin-field-loader': false,
-        'plugins': false,
+        'plugin-field-loader': true,
+        'plugins': true,
         'pagination': false,  // Pagination module debugging
         'section-nav-scroll': false,  // Section nav scroll (non-paginated) debugging
         'chatbot': false,  // AI Chatbot debugging

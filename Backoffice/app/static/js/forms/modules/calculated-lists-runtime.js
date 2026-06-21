@@ -3,6 +3,25 @@ import { getFieldValue, getCurrentFieldValue } from './field-management.js';
 
 const MODULE = 'calculated-lists-runtime';
 
+/** Always-on EmOps type-filter tracing (filter DevTools console by "[EmOpsFilter]"). */
+function traceEmOpsFilter(fieldId, step, detail) {
+    const id = fieldId != null && fieldId !== '' ? String(fieldId) : '?';
+    if (detail !== undefined) {
+        console.log(`[EmOpsFilter] field=${id} | ${step}`, detail);
+    } else {
+        console.log(`[EmOpsFilter] field=${id} | ${step}`);
+    }
+}
+
+function summarizeEmOpsTypes(rows) {
+    const counts = {};
+    (rows || []).forEach((row) => {
+        const t = row && row.type != null ? String(row.type) : '(missing type)';
+        counts[t] = (counts[t] || 0) + 1;
+    });
+    return counts;
+}
+
 // Deduplication + short-lived cache so concurrent repeat-entry selects that share
 // the same lookup URL make exactly ONE network request instead of N.
 const _pendingFetches = new Map(); // url → Promise<object>  (in-flight)
@@ -690,12 +709,33 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
         url = new URL('/admin/plugins/emergency_operations/api/list-data', window.location.origin);
         debugLog(MODULE, `Emergency Operations URL: ${url.toString()}`);
 
+        const fieldIdForTrace = resolveCalculatedSelectFieldId(selectElement);
+        traceEmOpsFilter(fieldIdForTrace, 'refresh start', {
+            selectId: selectElement.id || null,
+            displayColumn,
+            listFilters: filters,
+        });
+
         // Read plugin config stored on the element by the template (data-plugin-config)
         let pluginConfig = {};
+        const rawCfgSelf = selectElement.dataset.pluginConfig;
+        const rawCfgClosest = selectElement.closest('[data-plugin-config]')?.dataset.pluginConfig;
+        const rawCfg = rawCfgSelf || rawCfgClosest || '{}';
+        traceEmOpsFilter(fieldIdForTrace, 'data-plugin-config source', {
+            fromSelect: Boolean(rawCfgSelf),
+            fromAncestor: Boolean(!rawCfgSelf && rawCfgClosest),
+            rawLength: rawCfg.length,
+            rawPreview: rawCfg.length > 200 ? `${rawCfg.slice(0, 200)}…` : rawCfg,
+        });
         try {
-            const rawCfg = selectElement.dataset.pluginConfig || selectElement.closest('[data-plugin-config]')?.dataset.pluginConfig || '{}';
             pluginConfig = JSON.parse(rawCfg);
-        } catch (_) { /* no-op */ }
+        } catch (parseErr) {
+            traceEmOpsFilter(fieldIdForTrace, 'data-plugin-config parse FAILED', {
+                error: parseErr && parseErr.message ? parseErr.message : String(parseErr),
+                rawCfg,
+            });
+        }
+        traceEmOpsFilter(fieldIdForTrace, 'parsed question_plugin_config', pluginConfig);
 
         // --- Country resolution ---
         let countryIso = null;
@@ -735,8 +775,18 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
                 // Include operations that were active at any point during the period year:
                 // end_date_gt = <year>-01-01 means "still active at the start of the period year"
                 queryPayload.end_date__gte = `${year}-01-01`;
+                traceEmOpsFilter(fieldIdForTrace, 'timeframe: assignment_period', {
+                    periodStr,
+                    effectiveEndDateGte: queryPayload.end_date__gte,
+                    note: 'Overrides emops_end_date_gt from form builder config',
+                    staticConfigEndDate: pluginConfig.emops_end_date_gt || null,
+                });
                 debugLog(MODULE, `Using assignment period year ${year} for timeframe filter`);
             } else {
+                traceEmOpsFilter(fieldIdForTrace, 'timeframe: assignment_period (no year parsed)', {
+                    periodStr,
+                    metadataContext: window.metadataContext || null,
+                });
                 debugLog(MODULE, `Could not extract year from period "${periodStr}", no timeframe filter applied`);
             }
         } else {
@@ -744,6 +794,9 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
             if (pluginConfig.emops_end_date_gt) {
                 queryPayload.end_date__gte = pluginConfig.emops_end_date_gt;
             }
+            traceEmOpsFilter(fieldIdForTrace, 'timeframe: static', {
+                effectiveEndDateGte: queryPayload.end_date__gte || null,
+            });
             // Note: start_date is not supported by the list-data endpoint directly;
             // it is handled via the filters array below.
         }
@@ -753,29 +806,70 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
         const extraFilters = [];
 
         const configTypes = pluginConfig.emops_operation_types;
+        traceEmOpsFilter(fieldIdForTrace, 'emops_operation_types raw', {
+            value: configTypes,
+            typeof: typeof configTypes,
+            isArray: Array.isArray(configTypes),
+        });
         if (configTypes) {
             const types = Array.isArray(configTypes) ? configTypes : [configTypes];
             const hasAll = types.includes('All');
             if (!hasAll && types.length > 0) {
                 extraFilters.push({ field: 'type', op: 'eq', value: types[0] });
+                traceEmOpsFilter(fieldIdForTrace, 'type filter applied', {
+                    filter: extraFilters[extraFilters.length - 1],
+                    note: types.length > 1
+                        ? `Only first of ${types.length} selected types is used (eq filter)`
+                        : 'Single type selected',
+                });
+            } else {
+                traceEmOpsFilter(fieldIdForTrace, 'type filter SKIPPED', {
+                    reason: hasAll ? 'includes All' : 'empty types array',
+                    types,
+                });
             }
+        } else {
+            traceEmOpsFilter(fieldIdForTrace, 'type filter SKIPPED', {
+                reason: 'emops_operation_types missing or falsy in plugin config',
+            });
         }
 
         const showClosed = pluginConfig.emops_show_closed_operations;
+        traceEmOpsFilter(fieldIdForTrace, 'emops_show_closed_operations', {
+            value: showClosed,
+            typeof: typeof showClosed,
+            isArray: Array.isArray(showClosed),
+        });
         if (showClosed === false || showClosed === '0' || showClosed === 0) {
             extraFilters.push({ field: 'status', op: 'ne', value: 'Closed' });
+            traceEmOpsFilter(fieldIdForTrace, 'status filter applied (hide closed)', extraFilters[extraFilters.length - 1]);
+        } else {
+            traceEmOpsFilter(fieldIdForTrace, 'status filter SKIPPED (showing closed ops)', { showClosed });
         }
 
         // Merge with any existing row-level filters
         const allFilters = [...extraFilters, ...(filters || [])];
+        traceEmOpsFilter(fieldIdForTrace, 'merged filters', {
+            extraFilters,
+            listFilters: filters,
+            allFilters,
+        });
         if (allFilters.length > 0) {
             queryPayload.filters = allFilters;
         }
+
+        traceEmOpsFilter(fieldIdForTrace, 'query payload (pre-b64)', queryPayload);
 
         if (Object.keys(queryPayload).length > 0) {
             const queryB64 = btoa(unescape(encodeURIComponent(JSON.stringify(queryPayload))));
             url.searchParams.set('query_b64', queryB64);
         }
+
+        traceEmOpsFilter(fieldIdForTrace, 'request URL', {
+            iso: url.searchParams.get('iso'),
+            hasQueryB64: url.searchParams.has('query_b64'),
+            url: url.toString(),
+        });
 
     } else if (lookupListId === 'reporting_currency') {
         // Core system list: Reporting Currency
@@ -828,6 +922,43 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
         let rows = [];
         if (lookupListId === 'emergency_operations') {
             rows = json.data || [];
+            const typeCounts = summarizeEmOpsTypes(rows);
+            traceEmOpsFilter(fieldId, 'API response rows', {
+                count: rows.length,
+                typeCounts,
+                sample: rows.slice(0, 5).map((r) => ({
+                    name: r.name,
+                    code: r.code,
+                    type: r.type,
+                    status: r.status,
+                    end_date: r.end_date,
+                })),
+            });
+            const expectedTypeFilter = (() => {
+                try {
+                    const raw = selectElement.dataset.pluginConfig
+                        || selectElement.closest('[data-plugin-config]')?.dataset.pluginConfig
+                        || '{}';
+                    const cfg = JSON.parse(raw);
+                    const types = cfg.emops_operation_types;
+                    const arr = Array.isArray(types) ? types : (types ? [types] : []);
+                    if (arr.length && !arr.includes('All')) return arr[0];
+                } catch (_) { /* no-op */ }
+                return null;
+            })();
+            if (expectedTypeFilter) {
+                const unexpected = rows.filter((r) => String(r.type || '') !== String(expectedTypeFilter));
+                if (unexpected.length > 0) {
+                    traceEmOpsFilter(fieldId, 'UNEXPECTED types in response (filter may not be applied server-side)', {
+                        expectedType: expectedTypeFilter,
+                        unexpectedCount: unexpected.length,
+                        unexpectedTypes: summarizeEmOpsTypes(unexpected),
+                        examples: unexpected.slice(0, 3).map((r) => ({ name: r.name, type: r.type, status: r.status })),
+                    });
+                } else {
+                    traceEmOpsFilter(fieldId, 'all rows match expected type filter', { expectedType: expectedTypeFilter });
+                }
+            }
         } else {
             rows = json.rows || [];
         }

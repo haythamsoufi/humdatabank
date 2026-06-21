@@ -362,9 +362,24 @@ def create_blueprint():
                     store.save(results, fetch_params)
             current_app.logger.debug(f"[EmOps List] GO results total: {len(results)}")
 
-            if iso:
-                results = _filter_by_country_iso(results, iso)
-                current_app.logger.debug(f"[EmOps List] Filtered by iso={iso}: {len(results)} results")
+            # Apply country + date filters on raw GO rows (required when serving from file
+            # cache — cache is stored with admin default dates, not per-request query_b64).
+            start_date_gte = _emops_query_arg('start_date__gte', default=None)
+            before_filter_count = len(results)
+            results = _apply_filters(
+                results,
+                iso=iso,
+                end_date_gt=end_date_gt,
+                start_date_gte=start_date_gte,
+            )
+            current_app.logger.info(
+                "[EmOps List] After country/date filters (iso=%s end_date__gte=%s start_date__gte=%s): %s → %s results",
+                iso or '(all)',
+                end_date_gt,
+                start_date_gte,
+                before_filter_count,
+                len(results),
+            )
 
             # Transform data for form builder list format
             list_data = []
@@ -395,6 +410,7 @@ def create_blueprint():
                     'type': item.get('atype_display', 'Unknown Type'),
                     'status': item.get('status_display', 'Unknown Status'),
                     'country': country_str,
+                    'end_date': str(item.get('end_date') or '')[:10] or None,
                     'requested_amount': item.get('amount_requested', 0),
                     'funded_amount': item.get('amount_funded', 0)
                 })
@@ -402,6 +418,11 @@ def create_blueprint():
             # Apply filters if any
             if filters:
                 current_app.logger.debug(f"[EmOps List] Applying {len(filters)} filters to {len(list_data)} operations")
+                current_app.logger.info(
+                    "[EmOps List] Filter payload: %s | types before filter: %s",
+                    filters,
+                    sorted({op.get('type', '?') for op in list_data}),
+                )
                 filtered_data = []
 
                 for operation in list_data:
@@ -452,6 +473,16 @@ def create_blueprint():
 
                 list_data = filtered_data
                 current_app.logger.debug(f"[EmOps List] After filtering: {len(list_data)} operations remain")
+                current_app.logger.info(
+                    "[EmOps List] Types after filter: %s",
+                    sorted({op.get('type', '?') for op in list_data}),
+                )
+            else:
+                current_app.logger.info(
+                    "[EmOps List] No row filters applied — returning all %s types: %s",
+                    len(list_data),
+                    sorted({op.get('type', '?') for op in list_data}),
+                )
 
             resp = json_ok(success=True, count=len(list_data), data=list_data)
             # Allow the browser to cache this response for 5 minutes.  When the

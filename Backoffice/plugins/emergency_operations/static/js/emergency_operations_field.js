@@ -226,7 +226,7 @@ export class EmergencyOperationsField {
       debugPluginLog(this.pluginName, 'end_date_gt from config (inclusive >=):', this.config.end_date_gt);
     }
     if (Object.keys(queryPayload).length > 0) {
-      params.set('query_b64', btoa(unescape(encodeURIComponent(JSON.stringify(queryPayload))));
+      params.set('query_b64', btoa(unescape(encodeURIComponent(JSON.stringify(queryPayload)))));
     }
 
     const cacheKey = this._cacheKeyForParams(params);

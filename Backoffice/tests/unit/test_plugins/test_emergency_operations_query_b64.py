@@ -35,3 +35,15 @@ def test_plain_query_params_still_work(app, emops_helpers):
     with app.test_request_context(f"/?end_date__gte=2023-12-31&filters={filters_json}"):
         assert emops_query_arg("end_date__gte") == "2023-12-31"
         assert emops_filters_from_request() == [{"field": "type", "op": "eq", "value": "DREF"}]
+
+
+def test_apply_filters_end_date_gte_excludes_earlier_end_dates():
+    from plugins.emergency_operations.routes import _apply_filters
+
+    results = [
+        {"code": "OLD", "end_date": "2025-06-01", "atype_display": "Emergency Appeal"},
+        {"code": "NEW", "end_date": "2026-06-01", "atype_display": "Emergency Appeal"},
+        {"code": "OPEN", "atype_display": "Emergency Appeal"},
+    ]
+    filtered = _apply_filters(results, end_date_gt="2026-01-01")
+    assert {r["code"] for r in filtered} == {"NEW", "OPEN"}

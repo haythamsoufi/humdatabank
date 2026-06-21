@@ -1,5 +1,6 @@
 from flask import Blueprint, request, current_app, render_template
 from flask_login import login_required
+import base64
 import requests
 import logging
 import json
@@ -57,6 +58,53 @@ def _format_api_error(exc):
     if isinstance(exc, req.exceptions.ConnectionError):
         return 'Could not connect to the API. Check the URL and network.'
     return str(exc) if exc else 'Unknown API error'
+
+
+def _decode_query_b64_params():
+    """Decode optional query_b64 GET param (WAF-safe wrapper for dates/filters JSON)."""
+    query_b64 = request.args.get('query_b64')
+    if not query_b64:
+        return {}
+    try:
+        padded = query_b64 + '=' * (-len(query_b64) % 4)
+        decoded = base64.b64decode(padded.encode('ascii')).decode('utf-8')
+        if not decoded:
+            return {}
+        parsed = json.loads(decoded)
+        return parsed if isinstance(parsed, dict) else {}
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        return {}
+
+
+def _emops_query_arg(name, default=None, aliases=None):
+    """Read EmOps GET param from plain query string, else from query_b64."""
+    keys = aliases or [name]
+    for key in keys:
+        val = request.args.get(key)
+        if val is not None and str(val).strip() != '':
+            return val
+    b64_params = _decode_query_b64_params()
+    for key in keys:
+        val = b64_params.get(key)
+        if val is not None and str(val).strip() != '':
+            return val
+    return default
+
+
+def _emops_filters_from_request():
+    """Parse EmOps row filters from filters query param or query_b64."""
+    filters_json = request.args.get('filters')
+    if filters_json:
+        try:
+            parsed = json.loads(filters_json)
+            return parsed if isinstance(parsed, list) else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    b64_filters = _decode_query_b64_params().get('filters')
+    if isinstance(b64_filters, list):
+        return b64_filters
+    return []
 
 
 def _filter_by_country_iso(results, iso):
@@ -256,25 +304,23 @@ def create_blueprint():
         query_defaults = cfg.get('query_defaults', {})
         limit_default = str(query_defaults.get('limit', 1000))
         end_date_default = query_defaults.get('end_date_gt', '2022-12-31')
-        limit_str = request.args.get('limit', default=limit_default)
+        limit_str = _emops_query_arg('limit', default=limit_default)
         # Accept both end_date__gt and end_date__gte for backward compatibility, but use gte for inclusive filtering
-        end_date_gt = request.args.get('end_date__gte') or request.args.get('end_date__gt', default=end_date_default)
+        end_date_gt = _emops_query_arg(
+            'end_date__gte',
+            default=end_date_default,
+            aliases=['end_date__gte', 'end_date__gt'],
+        )
 
         # Validate query parameters
         limit, end_date_gt = _validate_query_params(limit_str, end_date_gt, MAX_LIMIT)
         if limit is None:
             return json_bad_request('Invalid query parameters', success=False, error='Invalid query parameters')
 
-        # Parse filters from request
-        filters = []
-        filters_json = request.args.get('filters')
-        if filters_json:
-            try:
-                filters = json.loads(filters_json)
-                current_app.logger.debug(f"[EmOps List] Parsed filters: {filters}")
-            except (json.JSONDecodeError, TypeError) as e:
-                current_app.logger.warning(f"[EmOps List] Failed to parse filters: {e}")
-                filters = []
+        # Parse filters from request (plain filters param or WAF-safe query_b64)
+        filters = _emops_filters_from_request()
+        if filters:
+            current_app.logger.debug(f"[EmOps List] Parsed filters: {filters}")
 
         try:
             current_app.logger.debug(f"[EmOps List] Incoming /api/list-data iso={iso} end_date__gte={end_date_gt} limit={limit}")
@@ -455,9 +501,13 @@ def create_blueprint():
         query_defaults = cfg.get('query_defaults', {})
         limit_default = str(query_defaults.get('limit', 1000))
         end_date_default = query_defaults.get('end_date_gt', '2022-12-31')
-        limit_str = request.args.get('limit', default=limit_default)
-        end_date_gt = request.args.get('end_date__gte') or request.args.get('end_date__gt', default=end_date_default)
-        start_date_gte = request.args.get('start_date__gte', default=None)
+        limit_str = _emops_query_arg('limit', default=limit_default)
+        end_date_gt = _emops_query_arg(
+            'end_date__gte',
+            default=end_date_default,
+            aliases=['end_date__gte', 'end_date__gt'],
+        )
+        start_date_gte = _emops_query_arg('start_date__gte', default=None)
 
         limit, end_date_gt = _validate_query_params(limit_str, end_date_gt, MAX_LIMIT)
         if limit is None:

@@ -137,8 +137,9 @@ export const CalculatedLists = {
         if (!selectedOption || !selectedOption.dataset.hasConfigUi) return;
 
         const listId = selectedOption.value;
-        const configParam = configToLoad ? encodeURIComponent(JSON.stringify(configToLoad)) : '%7B%7D';
-        const url = `/api/forms/lookup-lists/${listId}/config-ui?config=${configParam}`;
+        // WAF: pass config as base64 so JSON values (dates, appeal names, etc.) don't trigger CRS rules.
+        const configB64 = btoa(unescape(encodeURIComponent(JSON.stringify(configToLoad || {}))));
+        const url = `/api/forms/lookup-lists/${listId}/config-ui?config_b64=${encodeURIComponent(configB64)}`;
         console.debug('[PluginConfig] fetching config UI, restoring config ->', configToLoad);
 
         fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })

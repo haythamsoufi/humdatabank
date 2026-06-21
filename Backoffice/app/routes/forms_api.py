@@ -31,6 +31,7 @@ from app.utils.form_localization import (
 from sqlalchemy import or_, inspect
 from sqlalchemy.orm import joinedload
 from datetime import datetime
+import base64
 import re
 import json
 from app.services.presence_store import get_active_presence, record_presence
@@ -454,6 +455,24 @@ def api_toggle_repeat_instance_hide(instance_id):
         return handle_json_view_exception(e, 'Database error', status_code=500)
 
 
+def _parse_lookup_list_config_from_request():
+    """Parse plugin lookup-list config from query args (WAF-safe config_b64 preferred)."""
+    config_b64 = request.args.get('config_b64')
+    if config_b64:
+        try:
+            padded = config_b64 + '=' * (-len(config_b64) % 4)
+            decoded = base64.b64decode(padded.encode('ascii')).decode('utf-8')
+            return json.loads(decoded) if decoded else {}
+        except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+            return {}
+
+    existing_config_json = request.args.get('config', '{}')
+    try:
+        return json.loads(existing_config_json) if existing_config_json else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
 @bp.route('/lookup-lists/<list_id>/config-ui', methods=['GET'])
 @login_required
 def get_lookup_list_config_ui(list_id):
@@ -481,12 +500,7 @@ def get_lookup_list_config_ui(list_id):
                 # Check if plugin provides a config UI handler
                 config_ui_handler = lookup_list_data.get('get_config_ui_handler')
                 if config_ui_handler and callable(config_ui_handler):
-                    # Get existing config from query parameter if provided
-                    existing_config_json = request.args.get('config', '{}')
-                    try:
-                        existing_config = json.loads(existing_config_json) if existing_config_json else {}
-                    except (json.JSONDecodeError, TypeError):
-                        existing_config = {}
+                    existing_config = _parse_lookup_list_config_from_request()
 
                     # Call the plugin's config UI handler
                     try:

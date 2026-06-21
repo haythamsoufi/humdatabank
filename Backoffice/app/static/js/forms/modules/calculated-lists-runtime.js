@@ -719,6 +719,10 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
             debugLog(MODULE, `No country ISO found, will return all operations`);
         }
 
+        // WAF: pack dates and filter JSON in query_b64 so values like dates and "Emergency Appeal"
+        // don't trigger OWASP CRS rules in the URL query string.
+        const queryPayload = {};
+
         // --- Timeframe resolution ---
         const timeframeMode = pluginConfig.emops_timeframe_mode || 'static';
 
@@ -730,7 +734,7 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
                 const year = yearMatch[1];
                 // Include operations that were active at any point during the period year:
                 // end_date_gt = <year>-01-01 means "still active at the start of the period year"
-                url.searchParams.set('end_date__gte', `${year}-01-01`);
+                queryPayload.end_date__gte = `${year}-01-01`;
                 debugLog(MODULE, `Using assignment period year ${year} for timeframe filter`);
             } else {
                 debugLog(MODULE, `Could not extract year from period "${periodStr}", no timeframe filter applied`);
@@ -738,7 +742,7 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
         } else {
             // Static dates configured in the form builder
             if (pluginConfig.emops_end_date_gt) {
-                url.searchParams.set('end_date__gte', pluginConfig.emops_end_date_gt);
+                queryPayload.end_date__gte = pluginConfig.emops_end_date_gt;
             }
             // Note: start_date is not supported by the list-data endpoint directly;
             // it is handled via the filters array below.
@@ -765,7 +769,12 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
         // Merge with any existing row-level filters
         const allFilters = [...extraFilters, ...(filters || [])];
         if (allFilters.length > 0) {
-            url.searchParams.set('filters', JSON.stringify(allFilters));
+            queryPayload.filters = allFilters;
+        }
+
+        if (Object.keys(queryPayload).length > 0) {
+            const queryB64 = btoa(unescape(encodeURIComponent(JSON.stringify(queryPayload))));
+            url.searchParams.set('query_b64', queryB64);
         }
 
     } else if (lookupListId === 'reporting_currency') {

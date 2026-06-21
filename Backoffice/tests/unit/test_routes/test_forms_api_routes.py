@@ -684,6 +684,32 @@ class TestGetLookupListConfigUi:
         data = resp.get_json()
         assert "<div>Config UI</div>" in data.get("html", "")
 
+    def test_handler_with_config_b64_param(self, app, admin_user, db_session, client):
+        client = _make_logged_in_client(client, admin_user.id)
+        import base64
+        import json
+
+        received_config = {}
+
+        def config_handler(config=None):
+            received_config.update(config or {})
+            return "<div>OK</div>"
+
+        mock_fi = MagicMock()
+        mock_fi.get_plugin_lookup_lists.return_value = [
+            {"id": "my-list", "get_config_ui_handler": config_handler}
+        ]
+
+        config_payload = {"emops_end_date_gt": "2023-12-31", "emops_operation_types": ["Emergency Appeal"]}
+        config_b64 = base64.b64encode(json.dumps(config_payload).encode("utf-8")).decode("ascii")
+
+        with patch("app.routes.forms_api.current_app") as mock_capp:
+            mock_capp.form_integration = mock_fi
+            mock_capp.logger = MagicMock()
+            resp = client.get(f"/api/forms/lookup-lists/my-list/config-ui?config_b64={config_b64}")
+        assert resp.status_code == 200
+        assert received_config == config_payload
+
     def test_handler_with_invalid_config_json_uses_empty_dict(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)
 

@@ -1041,7 +1041,8 @@ export const MatrixItem = {
 
                 // Fetch config UI from API
                 const fetchFn = (window.getApiFetch && window.getApiFetch()) || ((url, opts) => ((window.getFetch && window.getFetch()) || fetch)(url, opts).then(r => r.ok ? r.json() : Promise.reject((window.httpErrorSync && window.httpErrorSync(r)) || new Error(`HTTP ${r.status}`))));
-                const data = await fetchFn(`/api/forms/lookup-lists/${encodeURIComponent(listId)}/config-ui?config=${encodeURIComponent(JSON.stringify(existingConfig))}`).catch(() => null);
+                const configB64 = btoa(unescape(encodeURIComponent(JSON.stringify(existingConfig))));
+                const data = await fetchFn(`/api/forms/lookup-lists/${encodeURIComponent(listId)}/config-ui?config_b64=${encodeURIComponent(configB64)}`).catch(() => null);
 
                 if (data && data.success && data.html) {
                     this.setSanitizedHtml(configContainer, data.html);

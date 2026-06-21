@@ -69,8 +69,16 @@ export class EmergencyOperationsField {
 
   _cacheKeyForParams(params) {
     const iso = String(this.countryIso || '').toUpperCase();
-    const start = params.get('start_date__gte') || '';
-    const end = params.get('end_date__gte') || params.get('end_date__gt') || '';
+    let start = params.get('start_date__gte') || String(this.config?.start_date || '');
+    let end = params.get('end_date__gte') || params.get('end_date__gt') || String(this.config?.end_date_gt || '');
+    const queryB64 = params.get('query_b64');
+    if (queryB64) {
+      try {
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(queryB64))));
+        start = start || decoded.start_date__gte || '';
+        end = end || decoded.end_date__gte || decoded.end_date__gt || '';
+      } catch (_) { /* no-op */ }
+    }
     const raw = JSON.stringify({ v: 1, iso, start, end });
     return `emops_ops_v1_${this._hashString(raw)}`;
   }
@@ -207,14 +215,18 @@ export class EmergencyOperationsField {
     const params = new URLSearchParams();
     if (this.countryIso) params.set('iso', String(this.countryIso).toUpperCase());
 
-    // Add date range parameters from config (inclusive filtering: >=)
+    // WAF: pack date filters in query_b64 so date patterns don't trigger OWASP CRS rules.
+    const queryPayload = {};
     if (this.config?.start_date) {
-      params.set('start_date__gte', this.config.start_date);
+      queryPayload.start_date__gte = this.config.start_date;
       debugPluginLog(this.pluginName, 'start_date from config (inclusive >=):', this.config.start_date);
     }
     if (this.config?.end_date_gt) {
-      params.set('end_date__gte', this.config.end_date_gt);  // Use gte for inclusive filtering (>=)
+      queryPayload.end_date__gte = this.config.end_date_gt;
       debugPluginLog(this.pluginName, 'end_date_gt from config (inclusive >=):', this.config.end_date_gt);
+    }
+    if (Object.keys(queryPayload).length > 0) {
+      params.set('query_b64', btoa(unescape(encodeURIComponent(JSON.stringify(queryPayload))));
     }
 
     const cacheKey = this._cacheKeyForParams(params);

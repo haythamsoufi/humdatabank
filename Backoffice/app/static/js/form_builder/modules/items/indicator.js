@@ -3,6 +3,14 @@
 import { DataManager } from '../data-manager.js';
 import { SelectHelper } from './shared.js';
 
+const selectOptionByValue = (selectEl, value) => {
+    if (!selectEl || value === null || value === undefined) return false;
+    const match = Array.from(selectEl.options || []).find((opt) => String(opt.value) === String(value));
+    if (!match) return false;
+    selectEl.value = match.value;
+    return true;
+};
+
 export const IndicatorItem = {
     setup(modalElement) {
         this.populateDropdowns(modalElement);
@@ -452,16 +460,10 @@ export const IndicatorItem = {
             const finalTypeSelect = typeSelect || document.getElementById('item-indicator-type-select');
             const finalUnitSelect = unitSelect || document.getElementById('item-indicator-unit-select');
             if (finalTypeSelect && indicator.type) {
-                const typeOption = finalTypeSelect.querySelector(`option[value="${indicator.type}"]`);
-                if (typeOption) {
-                    finalTypeSelect.value = indicator.type;
-                }
+                selectOptionByValue(finalTypeSelect, indicator.type);
             }
             if (finalUnitSelect && indicator.unit) {
-                const unitOption = finalUnitSelect.querySelector(`option[value="${indicator.unit}"]`);
-                if (unitOption) {
-                    finalUnitSelect.value = indicator.unit;
-                }
+                selectOptionByValue(finalUnitSelect, indicator.unit);
             }
             this.updateBankOptions(modalElement);
         } finally {
@@ -484,7 +486,7 @@ export const IndicatorItem = {
             const ageGroupsInput = modalElement.querySelector('#add_item_modal_indicator_age_groups_input');
             const defaultValueInput = modalElement.querySelector('#item-indicator-default-value') || document.getElementById('item-indicator-default-value');
             if (bankSelect && itemData.indicator_bank_id) {
-                let existingOption = bankSelect.querySelector(`option[value="${itemData.indicator_bank_id}"]`);
+                let existingOption = Array.from(bankSelect.options || []).find((opt) => String(opt.value) === String(itemData.indicator_bank_id));
                 if (!existingOption) {
                     const indicatorObj = DataManager.getIndicatorById(parseInt(itemData.indicator_bank_id)) || {};
                     existingOption = document.createElement('option');

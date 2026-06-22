@@ -90,6 +90,7 @@ export const MatrixItem = {
         container.appendChild(fragment);
     },
     setup(modalElement) {
+        this.resetState(modalElement);
         this.setupRowModeListeners(modalElement);
         this.initializeDefault(modalElement);
         this.setupEventListeners(modalElement);
@@ -97,6 +98,7 @@ export const MatrixItem = {
         this.setupListLibrary(modalElement);
         this.showVariableOptionsForAllColumns(modalElement);
         this.setupDragAndDrop(modalElement);
+        this.updateConfig(modalElement);
     },
 
     teardown(modalElement) {
@@ -115,6 +117,78 @@ export const MatrixItem = {
         }
         const container = Utils.getElementById('matrix-columns-container');
         if (container) container._dndInitialized = false;
+    },
+
+    resetState(modalElement) {
+        if (!modalElement) return;
+        this._listConfigVersion = (this._listConfigVersion || 0) + 1;
+
+        const rowsContainer = modalElement.querySelector('#matrix-rows-container');
+        const columnsContainer = modalElement.querySelector('#matrix-columns-container');
+        const manualSection = modalElement.querySelector('#matrix-manual-rows-section');
+        const listLibrarySection = modalElement.querySelector('#matrix-list-library-section');
+        const manualModeRadio = modalElement.querySelector('input[name="matrix_row_mode"][value="manual"]');
+        const listSelect = modalElement.querySelector('#matrix-list-select');
+        const displayColumnWrapper = modalElement.querySelector('#matrix-display-column-wrapper');
+        const displayColumnSelect = modalElement.querySelector('#matrix-list-display-column');
+        const groupByWrapper = modalElement.querySelector('#matrix-group-by-wrapper');
+        const groupBySelect = modalElement.querySelector('#matrix-group-by-column');
+        const groupControlsWrapper = modalElement.querySelector('#matrix-group-controls-wrapper');
+        const filtersContainer = modalElement.querySelector('#matrix-list-filters-container');
+        const filtersInput = modalElement.querySelector('#matrix-list-filters-json');
+        const pluginConfigContainer = modalElement.querySelector('#matrix-plugin-config-container');
+        const searchPlaceholderInput = modalElement.querySelector('#matrix-search-placeholder');
+        const searchPlaceholderTranslationsInput = modalElement.querySelector('#matrix-search-placeholder-translations');
+        const rowTotalsCheckbox = modalElement.querySelector('#matrix-show-row-totals');
+        const columnTotalsCheckbox = modalElement.querySelector('#matrix-show-column-totals');
+        const autoLoadCheckbox = modalElement.querySelector('#matrix-auto-load-entities');
+        const highlightManualRowsCheckbox = modalElement.querySelector('#matrix-highlight-manual-rows');
+        const legendTextInput = modalElement.querySelector('#matrix-legend-text');
+        const legendTextTranslationsInput = modalElement.querySelector('#matrix-legend-text-translations');
+        const legendHideInput = modalElement.querySelector('#matrix-legend-hide');
+
+        if (rowsContainer) rowsContainer.replaceChildren();
+        if (columnsContainer) columnsContainer.replaceChildren();
+        if (manualModeRadio) manualModeRadio.checked = true;
+        if (manualSection) Utils.showElement(manualSection);
+        if (listLibrarySection) Utils.hideElement(listLibrarySection);
+        if (listSelect) listSelect.value = '';
+        if (displayColumnWrapper) Utils.hideElement(displayColumnWrapper);
+        if (displayColumnSelect) {
+            displayColumnSelect.replaceChildren();
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Select Column...';
+            displayColumnSelect.appendChild(placeholder);
+        }
+        if (groupByWrapper) Utils.hideElement(groupByWrapper);
+        if (groupBySelect) {
+            groupBySelect.replaceChildren();
+            const noGroup = document.createElement('option');
+            noGroup.value = '';
+            noGroup.textContent = 'No grouping';
+            groupBySelect.appendChild(noGroup);
+        }
+        if (groupControlsWrapper) groupControlsWrapper.classList.add('hidden');
+        if (filtersContainer) filtersContainer.replaceChildren();
+        if (filtersInput) filtersInput.value = '[]';
+        if (pluginConfigContainer) {
+            pluginConfigContainer.replaceChildren();
+            pluginConfigContainer.style.display = 'none';
+        }
+        if (searchPlaceholderInput) searchPlaceholderInput.value = 'Search and select a row to add...';
+        if (searchPlaceholderTranslationsInput) searchPlaceholderTranslationsInput.value = '{}';
+        if (rowTotalsCheckbox) rowTotalsCheckbox.checked = true;
+        if (columnTotalsCheckbox) columnTotalsCheckbox.checked = true;
+        if (autoLoadCheckbox) autoLoadCheckbox.checked = false;
+        if (highlightManualRowsCheckbox) highlightManualRowsCheckbox.checked = false;
+        if (legendTextInput) {
+            legendTextInput.value = 'Manually added row';
+            legendTextInput.disabled = false;
+            legendTextInput.classList.remove('bg-gray-100', 'cursor-not-allowed');
+        }
+        if (legendTextTranslationsInput) legendTextTranslationsInput.value = '{}';
+        if (legendHideInput) legendHideInput.value = 'false';
     },
 
     initializeDefault(modalElement) {
@@ -717,29 +791,47 @@ export const MatrixItem = {
         const legendHideInput = Utils.getElementById('matrix-legend-hide');
 
         if (rowTotalsCheckbox) {
-            rowTotalsCheckbox.addEventListener('change', () => this.updateConfig(modalElement));
+            if (!rowTotalsCheckbox._matrixConfigListenerAdded) {
+                rowTotalsCheckbox.addEventListener('change', () => this.updateConfig(modalElement));
+                rowTotalsCheckbox._matrixConfigListenerAdded = true;
+            }
         }
         if (columnTotalsCheckbox) {
-            columnTotalsCheckbox.addEventListener('change', () => this.updateConfig(modalElement));
+            if (!columnTotalsCheckbox._matrixConfigListenerAdded) {
+                columnTotalsCheckbox.addEventListener('change', () => this.updateConfig(modalElement));
+                columnTotalsCheckbox._matrixConfigListenerAdded = true;
+            }
         }
         if (autoLoadCheckbox) {
-            autoLoadCheckbox.addEventListener('change', () => this.updateConfig(modalElement));
+            if (!autoLoadCheckbox._matrixConfigListenerAdded) {
+                autoLoadCheckbox.addEventListener('change', () => this.updateConfig(modalElement));
+                autoLoadCheckbox._matrixConfigListenerAdded = true;
+            }
         }
         if (highlightManualRowsCheckbox) {
-            highlightManualRowsCheckbox.addEventListener('change', () => {
-                // Show/hide legend text input based on checkbox state
-                this.updateLegendTextVisibility(modalElement);
-                this.updateConfig(modalElement);
-            });
+            if (!highlightManualRowsCheckbox._matrixHighlightListenerAdded) {
+                highlightManualRowsCheckbox.addEventListener('change', () => {
+                    // Show/hide legend text input based on checkbox state
+                    this.updateLegendTextVisibility(modalElement);
+                    this.updateConfig(modalElement);
+                });
+                highlightManualRowsCheckbox._matrixHighlightListenerAdded = true;
+            }
         }
         if (legendTextInput) {
-            legendTextInput.addEventListener('input', () => this.updateConfig(modalElement));
-            legendTextInput.addEventListener('change', () => this.updateConfig(modalElement));
+            if (!legendTextInput._matrixLegendListenerAdded) {
+                legendTextInput.addEventListener('input', () => this.updateConfig(modalElement));
+                legendTextInput.addEventListener('change', () => this.updateConfig(modalElement));
+                legendTextInput._matrixLegendListenerAdded = true;
+            }
         }
         if (legendHideBtn) {
-            legendHideBtn.addEventListener('click', () => {
-                this.toggleLegendHide(modalElement);
-            });
+            if (!legendHideBtn._matrixLegendHideListenerAdded) {
+                legendHideBtn.addEventListener('click', () => {
+                    this.toggleLegendHide(modalElement);
+                });
+                legendHideBtn._matrixLegendHideListenerAdded = true;
+            }
         }
 
         // Check if any column is a variable and show/hide auto-load checkbox
@@ -909,7 +1001,10 @@ export const MatrixItem = {
             this.updateConfig(modalElement);
         };
         rowModeRadios.forEach(radio => {
-            radio.addEventListener('change', updateRowModeVisibility);
+            if (!radio._matrixRowModeListenerAdded) {
+                radio.addEventListener('change', updateRowModeVisibility);
+                radio._matrixRowModeListenerAdded = true;
+            }
         });
         updateRowModeVisibility();
     },
@@ -922,33 +1017,52 @@ export const MatrixItem = {
         const groupTableEnabled = modalElement.querySelector('#matrix-group-table-enabled');
         const addFilterBtn = modalElement.querySelector('#matrix-list-add-filter-btn');
         if (listSelect && displayColumnSelect) {
-            listSelect.addEventListener('change', (e) => {
-                this.handleListSelection(modalElement, e.target.value);
-            });
+            if (!listSelect._matrixListSelectionListenerAdded) {
+                listSelect.addEventListener('change', (e) => {
+                    this.handleListSelection(modalElement, e.target.value);
+                });
+                listSelect._matrixListSelectionListenerAdded = true;
+            }
         }
         if (displayColumnSelect) {
-            displayColumnSelect.addEventListener('change', () => this.updateConfig(modalElement));
+            if (!displayColumnSelect._matrixConfigListenerAdded) {
+                displayColumnSelect.addEventListener('change', () => this.updateConfig(modalElement));
+                displayColumnSelect._matrixConfigListenerAdded = true;
+            }
         }
         if (groupBySelect) {
-            groupBySelect.addEventListener('change', () => {
-                this.updateGroupingControlsVisibility(modalElement);
-                this.updateConfig(modalElement);
-            });
+            if (!groupBySelect._matrixGroupingListenerAdded) {
+                groupBySelect.addEventListener('change', () => {
+                    this.updateGroupingControlsVisibility(modalElement);
+                    this.updateConfig(modalElement);
+                });
+                groupBySelect._matrixGroupingListenerAdded = true;
+            }
         }
         if (groupDropdownEnabled) {
-            groupDropdownEnabled.addEventListener('change', () => this.updateConfig(modalElement));
+            if (!groupDropdownEnabled._matrixConfigListenerAdded) {
+                groupDropdownEnabled.addEventListener('change', () => this.updateConfig(modalElement));
+                groupDropdownEnabled._matrixConfigListenerAdded = true;
+            }
         }
         if (groupTableEnabled) {
-            groupTableEnabled.addEventListener('change', () => this.updateConfig(modalElement));
+            if (!groupTableEnabled._matrixConfigListenerAdded) {
+                groupTableEnabled.addEventListener('change', () => this.updateConfig(modalElement));
+                groupTableEnabled._matrixConfigListenerAdded = true;
+            }
         }
         if (addFilterBtn) {
-            addFilterBtn.addEventListener('click', () => {
-                this.addListFilter(modalElement);
-            });
+            if (!addFilterBtn._matrixAddFilterListenerAdded) {
+                addFilterBtn.addEventListener('click', () => {
+                    this.addListFilter(modalElement);
+                });
+                addFilterBtn._matrixAddFilterListenerAdded = true;
+            }
         }
     },
 
     async handleListSelection(modalElement, listId) {
+        const version = this._listConfigVersion = (this._listConfigVersion || 0) + 1;
         const displayColumnWrapper = modalElement.querySelector('#matrix-display-column-wrapper');
         const displayColumnSelect = modalElement.querySelector('#matrix-list-display-column');
         const configContainer = modalElement.querySelector('#matrix-plugin-config-container');
@@ -1043,6 +1157,10 @@ export const MatrixItem = {
                 const fetchFn = (window.getApiFetch && window.getApiFetch()) || ((url, opts) => ((window.getFetch && window.getFetch()) || fetch)(url, opts).then(r => r.ok ? r.json() : Promise.reject((window.httpErrorSync && window.httpErrorSync(r)) || new Error(`HTTP ${r.status}`))));
                 const configB64 = btoa(unescape(encodeURIComponent(JSON.stringify(existingConfig))));
                 const data = await fetchFn(`/api/forms/lookup-lists/${encodeURIComponent(listId)}/config-ui?config_b64=${encodeURIComponent(configB64)}`).catch(() => null);
+                const currentListSelect = modalElement.querySelector('#matrix-list-select');
+                if (this._listConfigVersion !== version || !currentListSelect || String(currentListSelect.value) !== String(listId)) {
+                    return;
+                }
 
                 if (data && data.success && data.html) {
                     this.setSanitizedHtml(configContainer, data.html);
@@ -1427,7 +1545,9 @@ export const MatrixItem = {
             config.rows = [];
         }
         configInput.value = JSON.stringify(config);
-        console.log('Updated matrix config:', config);
+        if (window.formBuilderDebug && window.formBuilderDebug.isEnabled && window.formBuilderDebug.isEnabled('matrix')) {
+            window.formBuilderDebug.log('matrix', 'Updated matrix config:', config);
+        }
     },
 
     populateForm(modalElement, itemData) {

@@ -22,8 +22,7 @@ window.DynamicSections = DynamicSections;
 
 // Initialize everything when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    // Enabled in code (no URL flags / console steps needed)
-    initFormBuilderDebug({ global: true });
+    initFormBuilderDebug();
 
     // Initialize modules
     CsrfHandler.init();
@@ -117,7 +116,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 try { if (defTr && defTr.value) dt = JSON.parse(defTr.value); } catch(_) {}
                 const lbl = document.getElementById('item-indicator-label')?.value || '';
                 const def = document.getElementById('item-indicator-definition')?.value || '';
-                try { console.log('[IndicatorTranslate] onModalOpen', { englishLabel: lbl, englishDefinition: def, existingLabelTranslations: lt, existingDefinitionTranslations: dt }); } catch (_) {}
+                try {
+                    if (window.formBuilderDebug && window.formBuilderDebug.isEnabled && window.formBuilderDebug.isEnabled('translation')) {
+                        window.formBuilderDebug.log('translation', '[IndicatorTranslate] onModalOpen', {
+                            englishLabel: lbl,
+                            englishDefinition: def,
+                            existingLabelTranslations: lt,
+                            existingDefinitionTranslations: dt
+                        });
+                    }
+                } catch (_) {}
                 if (window.TranslationModalUtils) {
                     window.TranslationModalUtils.populateFields('translation', lt, '', 'labels');
                     window.TranslationModalUtils.populateFields('translation', dt, '', 'definitions');

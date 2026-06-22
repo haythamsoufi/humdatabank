@@ -6,10 +6,10 @@
  */
 
 const DEBUG_CONFIG = {
-  global: true, // Master switch for all form builder debugging
+  global: false, // Master switch for all form builder debugging
   modules: {
     // Loader/resource timing
-    'form-builder-loader': true,
+    'form-builder-loader': false,
 
     // Common areas (default off; enable as needed)
     'csrf-handler': false,
@@ -19,6 +19,8 @@ const DEBUG_CONFIG = {
     'conditions': false,
     'dynamic-sections': false,
     'form-submit-ui': false,
+    'matrix': false,
+    'plugin-item': false,
     'translation': false,
     'ui': false
   },
@@ -192,8 +194,7 @@ export function logResourceTimingTable() {
       // eslint-disable-next-line no-console
       console.groupEnd();
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.debug('[form-builder-loader] failed to read resource timing', e);
+      debugWarn('form-builder-loader', 'failed to read resource timing', e);
     }
   }, 0);
 }

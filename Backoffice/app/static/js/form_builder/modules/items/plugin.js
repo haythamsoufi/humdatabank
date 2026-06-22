@@ -2,6 +2,19 @@
 
 const truthyStrings = new Set(['true', '1', 'yes', 'on']);
 const falsyStrings = new Set(['false', '0', 'no', 'off', '']);
+const browserConsole = window.console;
+const pluginDebug = (...args) => {
+    if (window.formBuilderDebug && window.formBuilderDebug.isEnabled && window.formBuilderDebug.isEnabled('plugin-item')) {
+        window.formBuilderDebug.log('plugin-item', ...args);
+    }
+};
+const console = new Proxy(browserConsole, {
+    get(target, prop) {
+        if (prop === 'log') return pluginDebug;
+        const value = target[prop];
+        return typeof value === 'function' ? value.bind(target) : value;
+    }
+});
 
 const isTruthyConfigValue = (value) => {
     if (typeof value === 'boolean') return value;
@@ -91,6 +104,7 @@ export const PluginItem = {
     },
 
     setup(modalElement, itemType, pendingPluginData) {
+        const setupVersion = this._setupVersion = (this._setupVersion || 0) + 1;
         console.log('[PluginItem] setup called', {
             itemType,
             hasPendingData: !!pendingPluginData,
@@ -101,6 +115,7 @@ export const PluginItem = {
         this.pendingPluginData = pendingPluginData || null;
         this.loadBaseTemplate(modalElement)
             .then(() => {
+                if (setupVersion !== this._setupVersion) return;
                 console.log('[PluginItem] setup: Base template loaded');
                 const customFieldTypesData = document.getElementById('custom-field-types-data');
                 if (!customFieldTypesData) {
@@ -138,7 +153,7 @@ export const PluginItem = {
                     console.log('[PluginItem] setup: No pending plugin data, using defaults');
                 }
 
-                this.loadConfiguration(modalElement, fieldType, existingConfig);
+                this.loadConfiguration(modalElement, fieldType, existingConfig, setupVersion);
                 this.setupEventListeners(modalElement, fieldType);
             })
             .catch((err) => {
@@ -148,10 +163,20 @@ export const PluginItem = {
 
     teardown(modalElement) {
         if (!modalElement) return;
+        this._setupVersion = (this._setupVersion || 0) + 1;
         if (modalElement._pluginChangeHandler) {
             document.removeEventListener('change', modalElement._pluginChangeHandler);
             modalElement._pluginChangeHandler = null;
         }
+        this.cleanupPropertyClones(modalElement);
+    },
+
+    cleanupPropertyClones(modalElement) {
+        if (!modalElement) return;
+        const propertiesSection = modalElement.querySelector('.mb-3.border-t.border-gray-200.pt-4');
+        const propertiesContent = propertiesSection ? propertiesSection.querySelector('.grid.grid-cols-2.gap-6.items-center') : null;
+        if (!propertiesContent) return;
+        propertiesContent.querySelectorAll('.plugin-option-to-properties.plugin-cloned').forEach(el => el.remove());
     },
 
     loadBaseTemplate(modalElement) {
@@ -227,7 +252,7 @@ export const PluginItem = {
         });
     },
 
-    loadConfiguration(modalElement, fieldType, existingConfig = null) {
+    loadConfiguration(modalElement, fieldType, existingConfig = null, setupVersion = this._setupVersion) {
         console.log('[PluginItem] loadConfiguration called', {
             fieldType: fieldType?.type_id || fieldType,
             hasExistingConfig: !!existingConfig,
@@ -283,6 +308,7 @@ export const PluginItem = {
                     htmlLength: data.html?.length || 0,
                     error: data.error || 'none'
                 });
+                if (setupVersion !== this._setupVersion) return;
 
                 if (!data.success) {
                     console.error('[PluginItem] loadConfiguration: API returned error', data.error);
@@ -351,8 +377,10 @@ export const PluginItem = {
                 // The function itself uses requestAnimationFrame for additional safety
                 // Populate config fields AFTER integration so cloned fields in Properties are also populated
                 setTimeout(() => {
+                    if (setupVersion !== this._setupVersion) return;
                     console.log('[PluginItem] loadConfiguration: setTimeout callback executing');
-                    this.integrateOptionsIntoProperties(modalElement, fieldType).then(() => {
+                    this.integrateOptionsIntoProperties(modalElement, fieldType, setupVersion).then(() => {
+                        if (setupVersion !== this._setupVersion) return;
                         console.log('[PluginItem] loadConfiguration: Integration promise resolved');
                         // Populate config fields after integration completes
                         if (existingConfig) {
@@ -634,7 +662,7 @@ export const PluginItem = {
         }
     },
 
-    integrateOptionsIntoProperties(modalElement, fieldType) {
+    integrateOptionsIntoProperties(modalElement, fieldType, setupVersion = this._setupVersion) {
         console.log('[PluginItem] integrateOptionsIntoProperties called', {
             fieldType: fieldType?.type_id || fieldType,
             modalElement: modalElement ? 'found' : 'missing',
@@ -644,13 +672,21 @@ export const PluginItem = {
         // Use requestAnimationFrame to ensure DOM is fully updated after setSanitizedHtml
         return new Promise((resolve) => {
             requestAnimationFrame(() => {
+                if (setupVersion !== this._setupVersion) {
+                    resolve();
+                    return;
+                }
                 console.log('[PluginItem] requestAnimationFrame callback executing');
-                this._doIntegrateOptionsIntoProperties(modalElement, fieldType, 0, resolve);
+                this._doIntegrateOptionsIntoProperties(modalElement, fieldType, 0, resolve, setupVersion);
             });
         });
     },
 
-    _doIntegrateOptionsIntoProperties(modalElement, fieldType, retryCount = 0, resolve = null) {
+    _doIntegrateOptionsIntoProperties(modalElement, fieldType, retryCount = 0, resolve = null, setupVersion = this._setupVersion) {
+        if (setupVersion !== this._setupVersion) {
+            if (resolve) resolve();
+            return;
+        }
         const maxRetries = 3;
         const debugPrefix = `[PluginItem] [Retry ${retryCount}/${maxRetries}]`;
 
@@ -668,7 +704,7 @@ export const PluginItem = {
             });
             if (retryCount < maxRetries) {
                 console.log(`${debugPrefix} Retrying in 50ms...`);
-                setTimeout(() => this._doIntegrateOptionsIntoProperties(modalElement, fieldType, retryCount + 1, resolve), 50);
+                setTimeout(() => this._doIntegrateOptionsIntoProperties(modalElement, fieldType, retryCount + 1, resolve, setupVersion), 50);
             } else {
                 console.error('[PluginItem] Properties section not found after max retries');
                 if (resolve) resolve();
@@ -685,7 +721,7 @@ export const PluginItem = {
             });
             if (retryCount < maxRetries) {
                 console.log(`${debugPrefix} Retrying in 50ms...`);
-                setTimeout(() => this._doIntegrateOptionsIntoProperties(modalElement, fieldType, retryCount + 1, resolve), 50);
+                setTimeout(() => this._doIntegrateOptionsIntoProperties(modalElement, fieldType, retryCount + 1, resolve, setupVersion), 50);
             } else {
                 console.error('[PluginItem] Plugin configuration container not found after max retries');
                 if (resolve) resolve();
@@ -721,7 +757,7 @@ export const PluginItem = {
             });
             if (retryCount < maxRetries) {
                 console.log(`${debugPrefix} Retrying in 50ms...`);
-                setTimeout(() => this._doIntegrateOptionsIntoProperties(modalElement, fieldType, retryCount + 1, resolve), 50);
+                setTimeout(() => this._doIntegrateOptionsIntoProperties(modalElement, fieldType, retryCount + 1, resolve, setupVersion), 50);
             } else {
                 console.error('[PluginItem] Properties content grid not found after max retries');
                 if (resolve) resolve();

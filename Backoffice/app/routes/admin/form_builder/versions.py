@@ -320,7 +320,19 @@ def create_draft_version(template_id):
             updated_at=now,
             name=source_version.name,
             name_translations=source_version.name_translations.copy() if source_version.name_translations else None,
-            description_translations=source_version.description_translations.copy() if source_version.description_translations else None
+            description_translations=source_version.description_translations.copy() if source_version.description_translations else None,
+            description=source_version.description,
+            add_to_self_report=source_version.add_to_self_report,
+            display_order_visible=source_version.display_order_visible,
+            is_paginated=source_version.is_paginated,
+            enable_export_pdf=source_version.enable_export_pdf,
+            enable_export_excel=source_version.enable_export_excel,
+            enable_import_excel=source_version.enable_import_excel,
+            enable_ai_validation=source_version.enable_ai_validation,
+            enable_data_quality=source_version.enable_data_quality,
+            data_quality_methodology=source_version.data_quality_methodology,
+            validation_rule_pack=source_version.validation_rule_pack,
+            variables=source_version.variables.copy() if source_version.variables else None,
         )
         db.session.add(draft)
         db.session.flush()

@@ -235,7 +235,16 @@
                 {% endif %}
             </div>
         </div>
-        <div class="ml-4 flex-shrink-0">
+        <div class="ml-4 flex-shrink-0 flex items-center gap-2">
+            {% if selected_version_status == 'archived' %}
+            <form method="POST" action="{{ url_for('form_builder.deploy_template_version', template_id=template.id) }}" class="inline-block deploy-version-form-banner-archived">
+                <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
+                <input type="hidden" name="version_id" value="{{ active_version_id }}">
+                <button type="button" id="deploy-version-from-archived-banner" class="btn btn-success btn-sm inline-flex items-center">
+                    <i class="fas fa-rocket w-4 h-4 mr-2"></i>{{ _('Deploy This Version') }}
+                </button>
+            </form>
+            {% endif %}
             <button type="button" id="open-versions-from-banner" class="btn btn-secondary">
                 <i class="fas fa-code-branch w-4 h-4 mr-2"></i>{{ _('Open Versions') }}
             </button>
@@ -243,6 +252,38 @@
     </div>
     <script nonce="{{ csp_nonce() }}">
     document.addEventListener('DOMContentLoaded', function () {
+        const deployArchivedBtn = document.getElementById('deploy-version-from-archived-banner');
+        if (deployArchivedBtn) {
+            deployArchivedBtn.addEventListener('click', function () {
+                const form = this.closest('form');
+                if (!form) return;
+                const message = {{ _("Deploy this archived version? This will publish it as the live version.") | tojson }};
+                const doSubmit = () => {
+                    form.dataset.confirmed = 'true';
+                    if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
+                        window.FormBuilderAjax.submit(form);
+                    } else if (typeof form.requestSubmit === 'function') {
+                        form.requestSubmit();
+                    } else {
+                        form.submit();
+                    }
+                };
+                if (window.showConfirmation) {
+                    window.showConfirmation(
+                        message,
+                        () => { doSubmit(); },
+                        null,
+                        {{ _('Deploy') | tojson }},
+                        {{ _('Cancel') | tojson }},
+                        {{ _('Deploy Archived Version?') | tojson }}
+                    );
+                } else {
+                    doSubmit();
+                }
+            });
+            deployArchivedBtn.dataset.fbWired = '1';
+        }
+
         const openBtn = document.getElementById('open-versions-from-banner');
         if (openBtn) {
             openBtn.addEventListener('click', function () {
@@ -258,7 +299,7 @@
         // Published versions now allow editing with a warning notice
         {% if selected_version_status == 'archived' %}
         try {
-            const whitelistIds = new Set(['versions-modal-btn', 'open-versions-from-banner']);
+            const whitelistIds = new Set(['versions-modal-btn', 'open-versions-from-banner', 'deploy-version-from-archived-banner']);
             const whitelistText = [{{ _('Preview') | tojson }}, {{ _('Open Versions') | tojson }}, {{ _('Audit Trail') | tojson }}];
             const keywords = [{{ _('Add') | tojson }}, {{ _('Edit') | tojson }}, {{ _('New') | tojson }}, {{ _('Duplicate') | tojson }}, {{ _('Clone') | tojson }}, {{ _('Create') | tojson }}, {{ _('Remove') | tojson }}, {{ _('Delete') | tojson }}];
             const iconClasses = ['fa-plus', 'fa-plus-circle', 'fa-pencil', 'fa-pen', 'fa-trash', 'fa-times', 'fa-clone', 'fa-copy', 'fa-minus'];

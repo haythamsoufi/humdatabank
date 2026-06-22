@@ -73,6 +73,54 @@ export const QuestionItem = {
         }
     },
 
+    resetOptionsState(modalElement) {
+        if (!modalElement) return;
+
+        const questionFields = modalElement.querySelector('#item-question-fields');
+        const optionsSourceContainer = modalElement.querySelector('#options-source-container');
+        const manualContainer = modalElement.querySelector('#item-question-options-container');
+        const listContainer = modalElement.querySelector('#item-question-calculated-list-container');
+        const displayColumnWrapper = modalElement.querySelector('#item-calculated-display-column-wrapper');
+
+        const placeAfter = (node, anchor) => {
+            if (!node || !anchor || !anchor.parentNode) return;
+            if (node.parentNode !== anchor.parentNode || anchor.nextSibling !== node) {
+                anchor.parentNode.insertBefore(node, anchor.nextSibling);
+            }
+        };
+
+        if (questionFields && optionsSourceContainer) {
+            if (!questionFields.contains(optionsSourceContainer)) {
+                questionFields.appendChild(optionsSourceContainer);
+            }
+            if (manualContainer) placeAfter(manualContainer, optionsSourceContainer);
+            if (listContainer) placeAfter(listContainer, manualContainer || optionsSourceContainer);
+        }
+
+        if (optionsSourceContainer) {
+            optionsSourceContainer.classList.add('hidden');
+            optionsSourceContainer.style.display = '';
+        }
+        if (manualContainer) Utils.hideElement(manualContainer);
+        if (listContainer) Utils.hideElement(listContainer);
+        if (displayColumnWrapper) Utils.hideElement(displayColumnWrapper);
+
+        modalElement.querySelectorAll('input[name="options_source"]').forEach((radio) => {
+            radio.checked = radio.value === 'manual';
+        });
+
+        if (window.CalculatedLists && typeof window.CalculatedLists.reset === 'function') {
+            window.CalculatedLists.reset();
+        }
+
+        try {
+            if (window.ItemModal && typeof window.ItemModal.syncRightPanel === 'function') {
+                window.ItemModal.modalElement = window.ItemModal.modalElement || modalElement;
+                window.ItemModal.syncRightPanel();
+            }
+        } catch (_e) {}
+    },
+
     populateTypeDropdown(modalElement) {
         const typeSelect = modalElement.querySelector('#item-question-type-select');
         if (!typeSelect) return;
@@ -115,12 +163,6 @@ export const QuestionItem = {
                 } else {
                     Utils.hideElement(manualContainer);
                     Utils.showElement(listContainer);
-                }
-            }
-
-            if (id === 'item-calculated-list-select') {
-                if (window.CalculatedLists && window.CalculatedLists.handleListSelection) {
-                    window.CalculatedLists.handleListSelection(e.target);
                 }
             }
         };

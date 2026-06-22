@@ -39,7 +39,7 @@
                                 <a href="{{ url_for('forms.preview_template', template_id=template.id) }}?version_id={{ v.id }}" target="_blank" class="inline-flex items-center text-gray-600 hover:text-gray-800 p-0 ml-1" title="{{ _('Preview') }}" aria-label="{{ _('Preview version') }}">
                                     <i class="fas fa-eye w-4 h-4"></i>
                                 </a>
-                                {% if not is_published and is_active %}
+                                {% if not is_published %}
                                 <form method="POST" action="{{ url_for('form_builder.deploy_template_version', template_id=template.id) }}" class="inline-flex items-center deploy-version-form-{{ v.id }}">
                                     <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
                                     <input type="hidden" name="version_id" value="{{ v.id }}">

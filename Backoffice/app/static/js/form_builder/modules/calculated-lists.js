@@ -4,6 +4,12 @@
 import { DataManager } from './data-manager.js';
 
 export const CalculatedLists = {
+    _debug: function(...args) {
+        if (window.formBuilderDebug && window.formBuilderDebug.isEnabled && window.formBuilderDebug.isEnabled('calculated-lists')) {
+            window.formBuilderDebug.log('calculated-lists', ...args);
+        }
+    },
+
     _setSelectPlaceholder(selectEl, placeholderText) {
         if (!selectEl) return;
         selectEl.replaceChildren();
@@ -13,6 +19,45 @@ export const CalculatedLists = {
         selectEl.appendChild(opt);
     },
 
+    _setSanitizedHtml(container, html) {
+        if (!container) return;
+        container.replaceChildren();
+        if (typeof html !== 'string' || !html.trim()) return;
+
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const root = doc.body;
+        if (!root) return;
+
+        root.querySelectorAll('script, iframe, object, embed, style, meta, link, base, form').forEach((el) => el.remove());
+        root.querySelectorAll('*').forEach((el) => {
+            [...el.attributes].forEach((attr) => {
+                const name = String(attr.name || '').toLowerCase();
+                const value = String(attr.value || '').trim().toLowerCase().replace(/[\s\x00-\x1f]/g, '');
+
+                if (name.startsWith('on')) {
+                    el.removeAttribute(attr.name);
+                    return;
+                }
+
+                if (name === 'href' || name === 'src' || name === 'xlink:href' || name === 'formaction') {
+                    if (
+                        value.startsWith('javascript:') ||
+                        value.startsWith('data:') ||
+                        value.startsWith('vbscript:') ||
+                        value.startsWith('file:') ||
+                        value.startsWith('about:')
+                    ) {
+                        el.removeAttribute(attr.name);
+                    }
+                }
+            });
+        });
+
+        const fragment = document.createDocumentFragment();
+        while (root.firstChild) fragment.appendChild(root.firstChild);
+        container.appendChild(fragment);
+    },
+
     // Initialize calculated lists functionality
     init: function() {
         this.setupEventListeners();
@@ -20,14 +65,17 @@ export const CalculatedLists = {
 
     // Setup event listeners for calculated lists
     setupEventListeners: function() {
-        document.addEventListener('change', (e) => {
-            const id = e.target.id;
+        if (!this._documentChangeHandler) {
+            this._documentChangeHandler = (e) => {
+                const id = e.target.id;
 
-            // Handle calculated list selection to populate display column
-            if (id === 'item-calculated-list-select') {
-                this.handleListSelection(e.target);
-            }
-        });
+                // Handle calculated list selection to populate display column
+                if (id === 'item-calculated-list-select') {
+                    this.handleListSelection(e.target);
+                }
+            };
+            document.addEventListener('change', this._documentChangeHandler);
+        }
 
         // Add filter button for calculated lists
         const addFilterBtn = Utils.getElementById('item-calculated-list-add-filter-btn');
@@ -55,7 +103,7 @@ export const CalculatedLists = {
                 const columns = JSON.parse(selectedOption.dataset.columns);
                 let firstValue = null;
 
-                columns.forEach((column, index) => {
+                columns.forEach((column) => {
                     // Skip name_translations field
                     if (column.name === 'name_translations') {
                         return;
@@ -82,7 +130,7 @@ export const CalculatedLists = {
                     option.textContent = displayText;
                     colSelect.appendChild(option);
 
-                    if (index === 0) firstValue = column.name;
+                    if (!firstValue) firstValue = column.name;
                 });
 
                 // Auto-select first column by default
@@ -139,8 +187,8 @@ export const CalculatedLists = {
         const listId = selectedOption.value;
         // WAF: pass config as base64 so JSON values (dates, appeal names, etc.) don't trigger CRS rules.
         const configB64 = btoa(unescape(encodeURIComponent(JSON.stringify(configToLoad || {}))));
-        const url = `/api/forms/lookup-lists/${listId}/config-ui?config_b64=${encodeURIComponent(configB64)}`;
-        console.debug('[PluginConfig] fetching config UI, restoring config ->', configToLoad);
+        const url = `/api/forms/lookup-lists/${encodeURIComponent(listId)}/config-ui?config_b64=${encodeURIComponent(configB64)}`;
+        this._debug('[PluginConfig] fetching config UI, restoring config ->', configToLoad);
 
         fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(r => r.json())
@@ -148,7 +196,7 @@ export const CalculatedLists = {
                 // Discard if a newer call has already started
                 if (this._configUIVersion !== version) return;
                 if (!data.success || !data.html) return;
-                container.innerHTML = data.html;
+                this._setSanitizedHtml(container, data.html);
 
                 // Immediately sync the hidden input with whatever the server rendered
                 // (covers edit-mode restore where the user saves without changing anything)
@@ -204,7 +252,7 @@ export const CalculatedLists = {
 
         Object.assign(config, checkboxGroups);
         hiddenInput.value = JSON.stringify(config);
-        console.debug('[PluginConfig] serialized ->', hiddenInput.value);
+        this._debug('[PluginConfig] serialized ->', hiddenInput.value);
     },
 
     /**
@@ -391,7 +439,7 @@ export const CalculatedLists = {
         const valueInput = filterDiv.querySelector('.filter-value-input');
 
         const handler = () => {
-            console.log('Filter changed, updating JSON...'); // Add debugging
+            this._debug('Filter changed, updating JSON...');
             this.updateFiltersJson();
         };
 
@@ -443,14 +491,14 @@ export const CalculatedLists = {
         const jsonInput = Utils.getElementById('item-calculated-list-filters-json');
 
         if (!container || !jsonInput) {
-            console.log('DEBUG: Container or JSON input not found');
+            this._debug('Container or JSON input not found');
             return;
         }
 
         const filters = [];
         const filterItems = container.querySelectorAll('.filter-item');
 
-        console.log('DEBUG: Processing', filterItems.length, 'filter items');
+        this._debug('Processing', filterItems.length, 'filter items');
 
         filterItems.forEach((item, index) => {
             const field = item.querySelector('.filter-field-select').value;
@@ -458,7 +506,7 @@ export const CalculatedLists = {
             const valueSelect = item.querySelector('.filter-value-select').value;
             const valueInput = item.querySelector('.filter-value-input').value;
 
-            console.log(`DEBUG: Filter ${index}:`, {
+            this._debug(`Filter ${index}:`, {
                 field,
                 operator,
                 valueSelect,
@@ -473,9 +521,9 @@ export const CalculatedLists = {
                 // Custom value selected - use text input value
                 if (valueInput.trim()) {
                     filterObj.value = valueInput.trim();
-                    console.log(`DEBUG: Filter ${index} using custom value:`, filterObj.value);
+                    this._debug(`Filter ${index} using custom value:`, filterObj.value);
                 } else {
-                    console.log(`DEBUG: Filter ${index} has empty custom value, skipping`);
+                    this._debug(`Filter ${index} has empty custom value, skipping`);
                     return; // Skip this filter if no value provided
                 }
             } else {
@@ -487,15 +535,15 @@ export const CalculatedLists = {
                     const match = fieldId.match(/^(question_|indicator_|document_field_)(\d+)$/);
                     if (match) {
                         fieldId = parseInt(match[2], 10);
-                        console.log(`DEBUG: Extracted numeric ID from ${valueSelect.trim()}: ${fieldId}`);
+                        this._debug(`Extracted numeric ID from ${valueSelect.trim()}:`, fieldId);
                     } else {
-                        console.log(`DEBUG: Using field ID as-is: ${fieldId}`);
+                        this._debug('Using field ID as-is:', fieldId);
                     }
 
                     filterObj.value_field_id = fieldId;
-                    console.log(`DEBUG: Filter ${index} using field reference:`, filterObj.value_field_id);
+                    this._debug(`Filter ${index} using field reference:`, filterObj.value_field_id);
                 } else {
-                    console.log(`DEBUG: Filter ${index} has empty field ID, skipping`);
+                    this._debug(`Filter ${index} has empty field ID, skipping`);
                     return; // Skip this filter if no field ID provided
                 }
             }
@@ -503,41 +551,41 @@ export const CalculatedLists = {
             // Only push if we have field, operator, and either custom value or field reference
             if (field && operator && (filterObj.value !== undefined || filterObj.value_field_id !== undefined)) {
                 filters.push(filterObj);
-                console.log(`DEBUG: Added filter ${index}:`, filterObj);
+                this._debug(`Added filter ${index}:`, filterObj);
             } else {
-                console.log(`DEBUG: Skipping incomplete filter ${index}:`, { field, operator, filterObj });
+                this._debug(`Skipping incomplete filter ${index}:`, { field, operator, filterObj });
             }
         });
 
         jsonInput.value = JSON.stringify(filters);
-        console.log('Updated calculated list filters:', filters);
-        console.log('JSON input value set to:', jsonInput.value);
+        this._debug('Updated calculated list filters:', filters);
+        this._debug('JSON input value set to:', jsonInput.value);
     },
 
     // Populate calculated list filters from existing data
     populateFilters: function(filtersJson) {
-        console.log('DEBUG: populateFilters called with:', filtersJson);
+        this._debug('populateFilters called with:', filtersJson);
 
         if (!filtersJson) {
-            console.log('DEBUG: No filters JSON provided');
+            this._debug('No filters JSON provided');
             return;
         }
 
         let filters;
         try {
             filters = typeof filtersJson === 'string' ? JSON.parse(filtersJson) : filtersJson;
-            console.log('DEBUG: Parsed filters:', filters);
+            this._debug('Parsed filters:', filters);
         } catch (err) {
             console.error('Failed to parse filters JSON:', err);
             return;
         }
 
         if (!Array.isArray(filters)) {
-            console.log('DEBUG: Filters is not an array:', typeof filters);
+            this._debug('Filters is not an array:', typeof filters);
             return;
         }
 
-        console.log('DEBUG: About to populate', filters.length, 'filters');
+        this._debug('About to populate', filters.length, 'filters');
 
         // Clear existing filters first
         this.clearAllFilters();
@@ -547,7 +595,7 @@ export const CalculatedLists = {
 
         // Add each filter
         filters.forEach((filter, index) => {
-            console.log(`DEBUG: Processing filter ${index}:`, filter);
+            this._debug(`Processing filter ${index}:`, filter);
 
             // Create filter element directly instead of calling addFilter()
             const container = Utils.getElementById('item-calculated-list-filters-container');
@@ -567,7 +615,7 @@ export const CalculatedLists = {
             // Handle custom value vs field reference
             if ('value_field_id' in filter && filter.value_field_id !== null && filter.value_field_id !== undefined) {
                 // Field reference - find the corresponding prefixed option in dropdown
-                console.log('Setting field reference:', filter.value_field_id);
+                this._debug('Setting field reference:', filter.value_field_id);
 
                 // Convert numeric ID back to prefixed format for dropdown selection
                 let dropdownValue = '';
@@ -579,7 +627,7 @@ export const CalculatedLists = {
                             const match = option.value.match(/^(question_|indicator_|document_field_)(\d+)$/);
                             if (match && parseInt(match[2], 10) === filter.value_field_id) {
                                 dropdownValue = option.value;
-                                console.log(`DEBUG: Found matching dropdown option: ${dropdownValue} for field ID: ${filter.value_field_id}`);
+                                this._debug(`Found matching dropdown option: ${dropdownValue} for field ID:`, filter.value_field_id);
                                 break;
                             }
                         }
@@ -593,7 +641,7 @@ export const CalculatedLists = {
                 }
             } else if ('value' in filter && filter.value) {
                 // Custom value - select "Custom value" option and show/populate text input
-                console.log('Setting custom value:', filter.value);
+                this._debug('Setting custom value:', filter.value);
                 if (valueSelect) valueSelect.value = '';
                 if (valueInput) {
                     valueInput.style.display = 'block';
@@ -601,7 +649,7 @@ export const CalculatedLists = {
                 }
             } else {
                 // Default to custom value if neither is properly set
-                console.log('Defaulting to custom value mode for filter:', filter);
+                this._debug('Defaulting to custom value mode for filter:', filter);
                 if (valueSelect) valueSelect.value = '';
                 if (valueInput) {
                     valueInput.style.display = 'block';
@@ -613,7 +661,7 @@ export const CalculatedLists = {
             this.attachFilterEvents(filterDiv);
         });
 
-        console.log('DEBUG: Finished populating filters, calling updateFiltersJson');
+        this._debug('Finished populating filters, calling updateFiltersJson');
         this.updateFiltersJson();
     },
 
@@ -689,13 +737,23 @@ export const CalculatedLists = {
 
     // Reset to default state
     reset: function() {
+        this._pendingRestoreConfig = null;
+        this._configUIVersion = (this._configUIVersion || 0) + 1;
         this.clearAllFilters();
 
+        const listSelect = Utils.getElementById('item-calculated-list-select');
         const colWrapper = Utils.getElementById('item-calculated-display-column-wrapper');
         const colSelect = Utils.getElementById('item-calculated-list-display-column');
+        const filtersJsonInput = Utils.getElementById('item-calculated-list-filters-json');
+        const pluginConfigContainer = Utils.getElementById('question-plugin-config-container');
+        const pluginConfigInput = Utils.getElementById('question-plugin-config-json');
 
+        if (listSelect) listSelect.value = '';
         if (colWrapper) Utils.hideElement(colWrapper);
         if (colSelect) this._setSelectPlaceholder(colSelect, 'Select Column...');
+        if (filtersJsonInput) filtersJsonInput.value = '[]';
+        if (pluginConfigContainer) pluginConfigContainer.replaceChildren();
+        if (pluginConfigInput) pluginConfigInput.value = '{}';
     }
 };
 

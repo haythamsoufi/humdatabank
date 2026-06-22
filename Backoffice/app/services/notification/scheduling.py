@@ -245,14 +245,44 @@ def process_scheduled_notifications() -> int:
     Returns:
         Number of notifications processed
     """
+    from sqlalchemy import text
+    from app.utils.constants import DEFAULT_SCHEDULED_NOTIFICATIONS_LOCK_ID
+
+    lock_conn = None
+    lock_acquired = False
+    lock_id = None
     try:
         now = utcnow()
+
+        # PostgreSQL advisory lock: prevents two concurrent invocations (e.g. during a
+        # worker restart race) from double-sending the same scheduled notification.
+        # The scheduler's file-based worker election already prevents most overlap, but
+        # this acts as a second layer of defence.
+        dialect = db.engine.dialect.name
+        if dialect == "postgresql":
+            lock_id = int(current_app.config.get(
+                'SCHEDULED_NOTIFICATIONS_LOCK_ID', DEFAULT_SCHEDULED_NOTIFICATIONS_LOCK_ID
+            ))
+            lock_conn = db.engine.connect()
+            lock_acquired = bool(
+                lock_conn.execute(
+                    text("SELECT pg_try_advisory_lock(:lock_id)"),
+                    {"lock_id": lock_id},
+                ).scalar()
+            )
+            if not lock_acquired:
+                current_app.logger.debug(
+                    "Skipping scheduled notification processing — another run is in progress"
+                )
+                lock_conn.close()
+                lock_conn = None
+                return 0
 
         # Find all notifications scheduled for now or earlier that haven't been sent
         scheduled_notifications = Notification.query.filter(
             Notification.scheduled_for.isnot(None),
             Notification.scheduled_for <= now,
-            Notification.sent_at.is_(None)  # Not yet sent
+            Notification.sent_at.is_(None)
         ).all()
 
         if not scheduled_notifications:
@@ -260,8 +290,20 @@ def process_scheduled_notifications() -> int:
 
         processed_count = 0
         skipped_count = 0
-        user_ids = [n.user_id for n in scheduled_notifications]
-        preferences_cache = get_user_preferences_batch(user_ids)
+        notification_user_ids = [n.user_id for n in scheduled_notifications]
+        preferences_cache = get_user_preferences_batch(notification_user_ids)
+
+        # Pre-fetch all required users in a single query to avoid N+1 look-ups inside the loop.
+        unique_user_ids = list({n.user_id for n in scheduled_notifications})
+        users_by_id = {
+            u.id: u
+            for u in User.query.filter(User.id.in_(unique_user_ids)).all()
+        }
+
+        # Collect user_ids that actually received a notification so we can batch the
+        # unread-count WebSocket broadcasts after the commit (one broadcast per user,
+        # not one per notification).
+        users_to_notify_unread: set = set()
 
         for notification in scheduled_notifications:
             try:
@@ -275,22 +317,26 @@ def process_scheduled_notifications() -> int:
                     notification.archived_at = now
                     skipped_count += 1
                     current_app.logger.info(
-                        f"Skipping scheduled notification {notification.id} for user {notification.user_id} "
-                        f"because the notification type is disabled"
+                        "Skipping scheduled notification %d for user %d — type disabled",
+                        notification.id, notification.user_id,
                     )
                     continue
 
                 # Mark as sent
                 notification.sent_at = now
 
-                # Broadcast via WebSocket, push, email (same as immediate notifications)
-                # Broadcast via WebSocket
+                # Broadcast via WebSocket (unread-count broadcast deferred to after commit)
                 try:
+                    nt_value = (
+                        notification.notification_type.value
+                        if hasattr(notification.notification_type, 'value')
+                        else str(notification.notification_type)
+                    )
                     notification_data = {
                         'id': notification.id,
                         'title': notification.title,
                         'message': notification.message,
-                        'notification_type': notification.notification_type.value if hasattr(notification.notification_type, 'value') else str(notification.notification_type),
+                        'notification_type': nt_value,
                         'is_read': notification.is_read,
                         'created_at': notification.created_at.isoformat(),
                         'priority': notification.priority,
@@ -298,56 +344,87 @@ def process_scheduled_notifications() -> int:
                         'related_url': notification.related_url,
                         'group_id': getattr(notification, 'group_id', None),
                         'category': getattr(notification, 'category', None),
-                        'tags': getattr(notification, 'tags', None)
+                        'tags': getattr(notification, 'tags', None),
                     }
                     broadcast_notification(notification.user_id, notification_data)
-
-                    # Update unread count
-                    unread_count = NotificationService.get_unread_count(notification.user_id)
-                    broadcast_unread_count(notification.user_id, unread_count)
+                    users_to_notify_unread.add(notification.user_id)
                 except Exception as e:
-                    current_app.logger.warning(f"Failed to broadcast scheduled notification {notification.id} via WebSocket: {e}")
+                    current_app.logger.warning(
+                        "Failed to broadcast scheduled notification %d via WebSocket: %s",
+                        notification.id, e,
+                    )
 
-                # Send push notification
+                # Send push notification — use pre-fetched user, no extra DB query
                 try:
-                    user = User.query.get(notification.user_id)
+                    user = users_by_id.get(notification.user_id)
                     if user:
                         PushNotificationService.send_push_notification(
                             user_id=notification.user_id,
                             title=notification.title,
                             body=notification.message,
                             data={
-                                'notification_type': notification.notification_type.value if hasattr(notification.notification_type, 'value') else str(notification.notification_type),
+                                'notification_type': nt_value,
                                 'related_url': notification.related_url,
-                                'priority': notification.priority
+                                'priority': notification.priority,
                             } if notification.related_url else None,
-                            priority=notification.priority
+                            priority=notification.priority,
                         )
                 except Exception as e:
-                    current_app.logger.warning(f"Failed to send push notification for scheduled notification {notification.id}: {e}")
+                    current_app.logger.warning(
+                        "Failed to send push notification for scheduled notification %d: %s",
+                        notification.id, e,
+                    )
 
-                # Send email if user preferences allow
+                # Send email — use the same pre-fetched user object
                 try:
-                    user = User.query.get(notification.user_id)
+                    user = users_by_id.get(notification.user_id)
                     if user and user.email:
                         send_instant_notification_email(user, notification, override_preferences=False)
                 except Exception as e:
-                    current_app.logger.warning(f"Failed to send email for scheduled notification {notification.id}: {e}")
+                    current_app.logger.warning(
+                        "Failed to send email for scheduled notification %d: %s",
+                        notification.id, e,
+                    )
 
                 processed_count += 1
 
             except Exception as e:
-                current_app.logger.error(f"Error processing scheduled notification {notification.id}: {e}", exc_info=True)
-                # Continue processing other notifications
+                current_app.logger.error(
+                    "Error processing scheduled notification %d: %s",
+                    notification.id, e, exc_info=True,
+                )
 
         db.session.commit()
+
+        # Broadcast unread counts once per user (after the commit so counts are accurate).
+        for uid in users_to_notify_unread:
+            try:
+                unread_count = NotificationService.get_unread_count(uid)
+                broadcast_unread_count(uid, unread_count)
+            except Exception as e:
+                current_app.logger.warning(
+                    "Failed to broadcast unread count for user %d: %s", uid, e
+                )
+
         current_app.logger.info(
-            f"Processed {processed_count} scheduled notification(s)"
-            + (f", skipped {skipped_count} due to preferences" if skipped_count else "")
+            "Processed %d scheduled notification(s)%s",
+            processed_count,
+            f", skipped {skipped_count} due to preferences" if skipped_count else "",
         )
         return processed_count
 
     except Exception as e:
-        current_app.logger.error(f"Error processing scheduled notifications: {str(e)}", exc_info=True)
+        current_app.logger.error("Error processing scheduled notifications: %s", e, exc_info=True)
         db.session.rollback()
         return 0
+    finally:
+        if lock_conn:
+            try:
+                if lock_acquired and lock_id is not None:
+                    lock_conn.execute(
+                        text("SELECT pg_advisory_unlock(:lock_id)"),
+                        {"lock_id": lock_id},
+                    )
+            except Exception:
+                pass
+            lock_conn.close()

@@ -8,9 +8,9 @@ export const RuleUIMixin = {
             if (!button.dataset.addLabel) {
                 button.dataset.addLabel = String(button.textContent || '').trim();
             }
-            // Best-effort hide label (primarily for English UI)
             if (!button.dataset.hideLabel) {
-                button.dataset.hideLabel = button.dataset.addLabel.replace('Add', 'Hide');
+                const replaced = button.dataset.addLabel.replace(/\bAdd\b/, 'Hide');
+                button.dataset.hideLabel = replaced !== button.dataset.addLabel ? replaced : button.dataset.addLabel;
             }
         });
     },
@@ -55,7 +55,8 @@ export const RuleUIMixin = {
             button.dataset.addLabel = String(button.textContent || '').trim();
         }
         if (!button.dataset.hideLabel) {
-            button.dataset.hideLabel = button.dataset.addLabel.replace('Add', 'Hide');
+            const replaced = button.dataset.addLabel.replace(/\bAdd\b/, 'Hide');
+            button.dataset.hideLabel = replaced !== button.dataset.addLabel ? replaced : button.dataset.addLabel;
         }
 
         const label = state === 'hide' ? button.dataset.hideLabel : button.dataset.addLabel;

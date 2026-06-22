@@ -213,6 +213,31 @@ class TestSectionCRUD:
                 == before_count + 1
             )
 
+    def test_unarchive_section(self, logged_in_sm_client, db_session, app, system_manager_user):
+        with app.app_context():
+            template = create_test_template(
+                db_session,
+                owner_id=system_manager_user.id,
+            )
+            template_id = template.id
+            section = create_test_section(
+                db_session,
+                template,
+                name="Archived Section",
+                archived=True,
+            )
+            section_id = section.id
+            version_id = section.version_id
+
+            resp = logged_in_sm_client.post(
+                f"/admin/sections/unarchive/{section_id}",
+                data={"version_id": str(version_id)},
+                follow_redirects=False,
+            )
+            assert_redirect(resp, f"/admin/templates/edit/{template_id}")
+            restored = db.session.get(FormSection, section_id)
+            assert restored.archived is False
+
 
 @pytest.mark.integration
 class TestItemCRUD:
@@ -347,6 +372,35 @@ class TestItemCRUD:
                 == before_count + 1
             )
 
+    def test_unarchive_item(self, logged_in_sm_client, db_session, app, system_manager_user):
+        with app.app_context():
+            template = create_test_template(
+                db_session,
+                owner_id=system_manager_user.id,
+            )
+            section = create_test_section(db_session, template)
+            template_id = template.id
+            item = create_test_item(
+                db_session,
+                section,
+                template,
+                item_type="question",
+                label="Archived Question",
+                type="text",
+                archived=True,
+            )
+            item_id = item.id
+            version_id = item.version_id
+
+            resp = logged_in_sm_client.post(
+                f"/admin/items/unarchive/{item_id}",
+                json={"version_id": version_id},
+                headers={"Accept": "application/json"},
+            )
+            assert_redirect(resp, f"/admin/templates/edit/{template_id}")
+            restored = db.session.get(FormItem, item_id)
+            assert restored.archived is False
+
 
 @pytest.mark.integration
 class TestVersioningRoutes:
@@ -416,6 +470,83 @@ class TestVersioningRoutes:
             )
             assert_redirect(resp, f"/admin/templates/edit/{template_id}")
             assert db.session.get(FormTemplateVersion, draft_id) is None
+
+    def test_delete_version(self, logged_in_sm_client, db_session, app, system_manager_user):
+        with app.app_context():
+            _grant_role_permission(db_session, "admin_core", "admin.templates.delete")
+            db_session.commit()
+
+            template = create_test_template(
+                db_session,
+                owner_id=system_manager_user.id,
+            )
+            template_id = template.id
+            draft = create_test_draft_version(db_session, template, name="Delete Draft")
+            draft_id = draft.id
+
+            resp = logged_in_sm_client.post(
+                f"/admin/templates/{template_id}/versions/{draft_id}/delete",
+                follow_redirects=False,
+            )
+            assert_redirect(resp, f"/admin/templates/edit/{template_id}")
+            assert db.session.get(FormTemplateVersion, draft_id) is None
+
+    def test_cannot_delete_published_version(self, logged_in_sm_client, db_session, app, system_manager_user):
+        with app.app_context():
+            _grant_role_permission(db_session, "admin_core", "admin.templates.delete")
+            db_session.commit()
+
+            template = create_test_template(
+                db_session,
+                owner_id=system_manager_user.id,
+            )
+            template_id = template.id
+            published_version_id = template.published_version_id
+
+            resp = logged_in_sm_client.post(
+                f"/admin/templates/{template_id}/versions/{published_version_id}/delete",
+                follow_redirects=False,
+            )
+            assert_redirect(resp, f"/admin/templates/edit/{template_id}")
+            assert db.session.get(FormTemplateVersion, published_version_id) is not None
+
+    def test_update_draft_comment(self, logged_in_sm_client, db_session, app, system_manager_user):
+        with app.app_context():
+            template = create_test_template(
+                db_session,
+                owner_id=system_manager_user.id,
+            )
+            template_id = template.id
+            draft = create_test_draft_version(db_session, template, name="Commented Draft")
+            draft_id = draft.id
+
+            resp = logged_in_sm_client.post(
+                f"/admin/templates/{template_id}/draft_comment",
+                data={"comment": "Integration test note"},
+                follow_redirects=False,
+            )
+            assert_redirect(resp, f"/admin/templates/edit/{template_id}")
+            updated_draft = db.session.get(FormTemplateVersion, draft_id)
+            assert updated_draft.comment == "Integration test note"
+
+    def test_update_version_comment(self, logged_in_sm_client, db_session, app, system_manager_user):
+        with app.app_context():
+            template = create_test_template(
+                db_session,
+                owner_id=system_manager_user.id,
+            )
+            template_id = template.id
+            draft = create_test_draft_version(db_session, template, name="Version Note Draft")
+            draft_id = draft.id
+
+            resp = logged_in_sm_client.post(
+                f"/admin/templates/{template_id}/versions/{draft_id}/comment",
+                data={"comment": "Per-version note"},
+                follow_redirects=False,
+            )
+            assert resp.status_code in (302, 303)
+            updated_draft = db.session.get(FormTemplateVersion, draft_id)
+            assert updated_draft.comment == "Per-version note"
 
 
 @pytest.mark.integration
@@ -499,6 +630,46 @@ class TestExcelRoutes:
                 resp.headers.get("Content-Type")
                 == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+
+    def test_import_excel_without_file_redirects(self, logged_in_sm_client, db_session, app, system_manager_user):
+        with app.app_context():
+            _grant_role_permission(db_session, "admin_core", "admin.templates.import_excel")
+            db_session.commit()
+
+            template = create_test_template(
+                db_session,
+                owner_id=system_manager_user.id,
+            )
+            template_id = template.id
+
+            resp = logged_in_sm_client.post(
+                f"/admin/templates/{template_id}/import_excel",
+                data={},
+                follow_redirects=False,
+            )
+            assert_redirect(resp, f"/admin/templates/edit/{template_id}")
+
+    def test_import_excel_invalid_extension_redirects(self, logged_in_sm_client, db_session, app, system_manager_user):
+        import io
+        with app.app_context():
+            _grant_role_permission(db_session, "admin_core", "admin.templates.import_excel")
+            db_session.commit()
+
+            template = create_test_template(
+                db_session,
+                owner_id=system_manager_user.id,
+            )
+            template_id = template.id
+
+            resp = logged_in_sm_client.post(
+                f"/admin/templates/{template_id}/import_excel",
+                data={
+                    "excel_file": (io.BytesIO(b"not an xlsx"), "template.csv"),
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+            assert_redirect(resp, f"/admin/templates/edit/{template_id}")
 
 
 @pytest.mark.integration

@@ -11,7 +11,8 @@ from app.routes.admin.shared import permission_required, check_template_access
 from app.services.user_analytics_service import log_admin_action
 from app.utils.transactions import request_transaction_rollback
 from app.utils.datetime_helpers import utcnow
-from app.utils.request_utils import get_request_data
+from app.utils.request_utils import get_request_data, is_json_request
+from app.utils.api_responses import json_bad_request, json_server_error
 from .helpers import _clone_template_structure
 
 
@@ -19,12 +20,14 @@ from .helpers import _clone_template_structure
 @permission_required('admin.templates.publish')
 def deploy_template_version(template_id):
     current_app.logger.debug(f"VERSIONING_DEBUG: deploy_template_version called for template_id={template_id}, user_id={current_user.id}")
+    is_ajax = is_json_request()
     template = FormTemplate.query.get_or_404(template_id)
     if not check_template_access(template_id, current_user.id):
         current_app.logger.debug(f"VERSIONING_DEBUG: deploy_template_version - access denied for template_id={template_id}, user_id={current_user.id}")
         flash("Access denied.", "warning")
         return redirect(url_for("form_builder.manage_templates"))
 
+    deployed_version_id = None
     try:
         target_version_id = get_request_data().get('version_id')
         current_app.logger.debug(f"VERSIONING_DEBUG: deploy_template_version - target_version_id from form: {target_version_id}")
@@ -41,7 +44,10 @@ def deploy_template_version(template_id):
             current_app.logger.debug(f"VERSIONING_DEBUG: deploy_template_version - found draft version: {version.id if version else None}")
         if not version:
             current_app.logger.warning(f"VERSIONING_DEBUG: deploy_template_version - no target version found for template_id={template_id}")
-            flash('No target version specified and no draft version found to deploy.', 'warning')
+            msg = 'No target version specified and no draft version found to deploy.'
+            if is_ajax:
+                return json_bad_request(msg, success=False)
+            flash(msg, 'warning')
             return redirect(url_for("form_builder.edit_template", template_id=template.id))
 
         invalid_indicator_items = (
@@ -51,11 +57,13 @@ def deploy_template_version(template_id):
             .count()
         )
         if invalid_indicator_items and invalid_indicator_items > 0:
-            flash(
+            msg = (
                 f"Cannot deploy this version: {invalid_indicator_items} indicator item(s) have missing/invalid indicator references. "
-                f"Open the form builder, fix the items marked with an issue, then try deploying again.",
-                "danger",
+                f"Open the form builder, fix the items marked with an issue, then try deploying again."
             )
+            if is_ajax:
+                return json_bad_request(msg, success=False)
+            flash(msg, "danger")
             return redirect(url_for("form_builder.edit_template", template_id=template.id, version_id=version.id))
 
         if template.published_version_id and template.published_version_id != version.id:
@@ -91,12 +99,17 @@ def deploy_template_version(template_id):
             current_app.logger.error(f"Error sending template updated notification: {e}", exc_info=True)
 
         current_app.logger.info(f"VERSIONING_DEBUG: deploy_template_version - successfully deployed version {version.id} for template {template_id}")
+        deployed_version_id = version.id
         flash('Version deployed successfully.', 'success')
     except Exception as e:
         request_transaction_rollback()
         current_app.logger.error(f"Error deploying version for template {template_id}: {e}", exc_info=True)
+        if is_ajax:
+            return json_server_error("An error occurred. Please try again.", success=False)
         flash("An error occurred. Please try again.", "danger")
 
+    if deployed_version_id:
+        return redirect(url_for("form_builder.edit_template", template_id=template.id, version_id=deployed_version_id))
     return redirect(url_for("form_builder.edit_template", template_id=template.id))
 
 
@@ -104,6 +117,7 @@ def deploy_template_version(template_id):
 @permission_required('admin.templates.edit')
 def discard_template_draft(template_id):
     current_app.logger.debug(f"VERSIONING_DEBUG: discard_template_draft called for template_id={template_id}, user_id={current_user.id}")
+    is_ajax = is_json_request()
     template = FormTemplate.query.get_or_404(template_id)
     if not check_template_access(template_id, current_user.id):
         current_app.logger.debug(f"VERSIONING_DEBUG: discard_template_draft - access denied for template_id={template_id}, user_id={current_user.id}")
@@ -114,7 +128,10 @@ def discard_template_draft(template_id):
         draft = FormTemplateVersion.query.filter_by(template_id=template.id, status='draft').first()
         if not draft:
             current_app.logger.debug(f"VERSIONING_DEBUG: discard_template_draft - no draft version found for template_id={template_id}")
-            flash('No draft version to discard.', 'warning')
+            msg = 'No draft version to discard.'
+            if is_ajax:
+                return json_bad_request(msg, success=False)
+            flash(msg, 'warning')
             return redirect(url_for("form_builder.edit_template", template_id=template.id))
 
         current_app.logger.debug(f"VERSIONING_DEBUG: discard_template_draft - deleting draft version {draft.id} and associated rows")
@@ -123,6 +140,15 @@ def discard_template_draft(template_id):
         sections_deleted = FormSection.query.filter_by(template_id=template.id, version_id=draft.id).delete(synchronize_session=False)
         pages_deleted = FormPage.query.filter_by(template_id=template.id, version_id=draft.id).delete(synchronize_session=False)
         current_app.logger.debug(f"VERSIONING_DEBUG: discard_template_draft - deleted {items_deleted} items, {sections_deleted} sections, {pages_deleted} pages")
+
+        dependent_versions = FormTemplateVersion.query.filter_by(template_id=template.id, based_on_version_id=draft.id).all()
+        if dependent_versions:
+            current_app.logger.debug(
+                f"VERSIONING_DEBUG: discard_template_draft - clearing based_on_version_id for {len(dependent_versions)} dependent versions: "
+                f"{[v.id for v in dependent_versions]}"
+            )
+            for dep in dependent_versions:
+                dep.based_on_version_id = None
 
         db.session.delete(draft)
         db.session.flush()
@@ -144,6 +170,8 @@ def discard_template_draft(template_id):
     except Exception as e:
         request_transaction_rollback()
         current_app.logger.error(f"Error discarding draft for template {template_id}: {e}", exc_info=True)
+        if is_ajax:
+            return json_server_error("An error occurred. Please try again.", success=False)
         flash("An error occurred. Please try again.", "danger")
 
     return redirect(url_for("form_builder.edit_template", template_id=template.id))
@@ -153,6 +181,7 @@ def discard_template_draft(template_id):
 @permission_required('admin.templates.delete')
 def delete_template_version(template_id, version_id):
     current_app.logger.debug(f"VERSIONING_DEBUG: delete_template_version called for template_id={template_id}, version_id={version_id}, user_id={current_user.id}")
+    is_ajax = is_json_request()
     template = FormTemplate.query.get_or_404(template_id)
     if not check_template_access(template_id, current_user.id):
         current_app.logger.debug(f"VERSIONING_DEBUG: delete_template_version - access denied for template_id={template_id}, user_id={current_user.id}")
@@ -165,7 +194,10 @@ def delete_template_version(template_id, version_id):
 
         if template.published_version_id == version.id:
             current_app.logger.warning(f"VERSIONING_DEBUG: delete_template_version - attempt to delete published version {version_id}")
-            flash('Cannot delete the published version. Deploy another version first.', 'warning')
+            msg = 'Cannot delete the published version. Deploy another version first.'
+            if is_ajax:
+                return json_bad_request(msg, success=False)
+            flash(msg, 'warning')
             return redirect(url_for("form_builder.edit_template", template_id=template.id))
 
         current_app.logger.debug(f"VERSIONING_DEBUG: delete_template_version - deleting version {version_id} and associated rows")
@@ -188,7 +220,13 @@ def delete_template_version(template_id, version_id):
             current_app.logger.warning(
                 f"VERSIONING_DEBUG: delete_template_version - aborting delete; dependent data rows found: {data_counts}"
             )
-            flash('Cannot delete this version because data exists for its items/sections. Remove data or archive the version.', 'warning')
+            msg = (
+                f'Cannot delete this version: {data_counts} data record(s) are linked to its items or sections. '
+                'Archive the version instead, or contact an administrator to remove the data first.'
+            )
+            if is_ajax:
+                return json_bad_request(msg, success=False)
+            flash(msg, 'warning')
             return redirect(url_for("form_builder.edit_template", template_id=template.id))
 
         items_deleted = FormItem.query.filter_by(template_id=template.id, version_id=version.id).delete(synchronize_session=False)
@@ -225,6 +263,8 @@ def delete_template_version(template_id, version_id):
     except Exception as e:
         request_transaction_rollback()
         current_app.logger.error(f"Error deleting version {version_id} for template {template_id}: {e}", exc_info=True)
+        if is_ajax:
+            return json_server_error("An error occurred. Please try again.", success=False)
         flash("An error occurred. Please try again.", "danger")
 
     return redirect(url_for("form_builder.edit_template", template_id=template.id))
@@ -277,12 +317,35 @@ def update_draft_comment(template_id):
 @permission_required('admin.templates.edit')
 def create_draft_version(template_id):
     current_app.logger.debug(f"VERSIONING_DEBUG: create_draft_version called for template_id={template_id}, user_id={current_user.id}")
+    is_ajax = is_json_request()
     template = FormTemplate.query.get_or_404(template_id)
     if not check_template_access(template_id, current_user.id):
         current_app.logger.debug(f"VERSIONING_DEBUG: create_draft_version - access denied for template_id={template_id}, user_id={current_user.id}")
         flash("Access denied.", "warning")
         return redirect(url_for("form_builder.manage_templates"))
     try:
+        existing_draft = FormTemplateVersion.query.filter_by(template_id=template.id, status='draft').first()
+        if existing_draft:
+            current_app.logger.warning(
+                f"VERSIONING_DEBUG: create_draft_version - draft version {existing_draft.id} already exists for template_id={template_id}"
+            )
+            msg = (
+                f'A draft version (V{existing_draft.version_number}) already exists. '
+                'Open or discard it before creating a new version.'
+            )
+            if is_ajax:
+                return json_bad_request(
+                    msg,
+                    success=False,
+                    redirect_url=url_for(
+                        "form_builder.edit_template",
+                        template_id=template.id,
+                        version_id=existing_draft.id,
+                    ),
+                )
+            flash(msg, 'warning')
+            return redirect(url_for("form_builder.edit_template", template_id=template.id, version_id=existing_draft.id))
+
         source_version_id = get_request_data().get('source_version_id', type=int)
         source_version = None
 

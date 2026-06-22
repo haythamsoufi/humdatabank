@@ -1,4 +1,5 @@
 // Plugin item logic extracted from item-modal.js
+import { fetchBaseTemplate, fetchFieldBuilderConfig } from '../plugin-api.js';
 
 const truthyStrings = new Set(['true', '1', 'yes', 'on']);
 const falsyStrings = new Set(['false', '0', 'no', 'off', '']);
@@ -59,48 +60,7 @@ export const PluginItem = {
      * for backend-provided configuration UIs.
      */
     setSanitizedHtml(container, html) {
-        if (!container) return;
-        container.replaceChildren();
-
-        if (typeof html !== 'string' || !html.trim()) return;
-
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        const root = doc.body;
-        if (!root) return;
-
-        // Remove dangerous elements
-        root.querySelectorAll('script, iframe, object, embed, style, meta, link, base, form').forEach((el) => el.remove());
-
-        // Strip dangerous attributes
-        root.querySelectorAll('*').forEach((el) => {
-            [...el.attributes].forEach((attr) => {
-                const name = String(attr.name || '').toLowerCase();
-                const value = String(attr.value || '').trim();
-                const lower = value.toLowerCase();
-
-                if (name.startsWith('on')) {
-                    el.removeAttribute(attr.name);
-                    return;
-                }
-
-                if (name === 'href' || name === 'src' || name === 'xlink:href' || name === 'formaction') {
-                    const normalized = lower.replace(/[\s\x00-\x1f]/g, '');
-                    if (
-                        normalized.startsWith('javascript:') ||
-                        normalized.startsWith('data:') ||
-                        normalized.startsWith('vbscript:') ||
-                        normalized.startsWith('file:') ||
-                        normalized.startsWith('about:')
-                    ) {
-                        el.removeAttribute(attr.name);
-                    }
-                }
-            });
-        });
-
-        const fragment = document.createDocumentFragment();
-        while (root.firstChild) fragment.appendChild(root.firstChild);
-        container.appendChild(fragment);
+        Utils.setSanitizedHtml(container, html);
     },
 
     setup(modalElement, itemType, pendingPluginData) {
@@ -183,22 +143,7 @@ export const PluginItem = {
         return new Promise((resolve, reject) => {
             const container = document.getElementById('item-plugin-fields-container');
             if (!container) return reject('Plugin fields container not found');
-            const _pfetch = (window.getFetch && window.getFetch()) || fetch;
-            _pfetch('/admin/api/plugins/base-template', {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                }
-            })
-            .then(r => {
-                if (r.redirected || !r.ok) {
-                    const err = new Error(r.redirected ? 'session_expired' : `HTTP ${r.status}`);
-                    err.status = r.status;
-                    throw err;
-                }
-                return r.text();
-            })
+            fetchBaseTemplate()
             .then(html => {
                 this.setSanitizedHtml(container, html);
                 const pluginFields = document.getElementById('item-plugin-fields');
@@ -276,31 +221,13 @@ export const PluginItem = {
             loading.textContent = 'Loading configuration...';
             container.appendChild(loading);
         }
-        const requestData = {
-            method: existingConfig ? 'POST' : 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            }
-        };
-        if (existingConfig) requestData.body = JSON.stringify({ existing_config: existingConfig });
-        const apiUrl = `/admin/api/plugins/field-types/${fieldType.type_id}/render-builder`;
         console.log('[PluginItem] loadConfiguration: Fetching configuration', {
-            url: apiUrl,
-            method: requestData.method,
-            hasBody: !!requestData.body
+            url: `/admin/api/plugins/field-types/${fieldType.type_id}/render-builder`,
+            method: existingConfig ? 'POST' : 'GET',
+            hasExistingConfig: !!existingConfig
         });
 
-        const _pfetch = (window.getFetch && window.getFetch()) || fetch;
-        _pfetch(apiUrl, requestData)
-            .then(r => {
-                console.log('[PluginItem] loadConfiguration: API response received', {
-                    status: r.status,
-                    statusText: r.statusText,
-                    ok: r.ok
-                });
-                return r.json();
-            })
+        fetchFieldBuilderConfig(fieldType.type_id, existingConfig)
             .then(data => {
                 console.log('[PluginItem] loadConfiguration: API data parsed', {
                     success: data.success,

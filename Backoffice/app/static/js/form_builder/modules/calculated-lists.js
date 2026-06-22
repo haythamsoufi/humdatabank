@@ -20,42 +20,7 @@ export const CalculatedLists = {
     },
 
     _setSanitizedHtml(container, html) {
-        if (!container) return;
-        container.replaceChildren();
-        if (typeof html !== 'string' || !html.trim()) return;
-
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        const root = doc.body;
-        if (!root) return;
-
-        root.querySelectorAll('script, iframe, object, embed, style, meta, link, base, form').forEach((el) => el.remove());
-        root.querySelectorAll('*').forEach((el) => {
-            [...el.attributes].forEach((attr) => {
-                const name = String(attr.name || '').toLowerCase();
-                const value = String(attr.value || '').trim().toLowerCase().replace(/[\s\x00-\x1f]/g, '');
-
-                if (name.startsWith('on')) {
-                    el.removeAttribute(attr.name);
-                    return;
-                }
-
-                if (name === 'href' || name === 'src' || name === 'xlink:href' || name === 'formaction') {
-                    if (
-                        value.startsWith('javascript:') ||
-                        value.startsWith('data:') ||
-                        value.startsWith('vbscript:') ||
-                        value.startsWith('file:') ||
-                        value.startsWith('about:')
-                    ) {
-                        el.removeAttribute(attr.name);
-                    }
-                }
-            });
-        });
-
-        const fragment = document.createDocumentFragment();
-        while (root.firstChild) fragment.appendChild(root.firstChild);
-        container.appendChild(fragment);
+        Utils.setSanitizedHtml(container, html);
     },
 
     // Initialize calculated lists functionality
@@ -190,8 +155,11 @@ export const CalculatedLists = {
         const url = `/api/forms/lookup-lists/${encodeURIComponent(listId)}/config-ui?config_b64=${encodeURIComponent(configB64)}`;
         this._debug('[PluginConfig] fetching config UI, restoring config ->', configToLoad);
 
-        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(r => r.json())
+        ((window.getFetch && window.getFetch()) || fetch)(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return r.json();
+            })
             .then(data => {
                 // Discard if a newer call has already started
                 if (this._configUIVersion !== version) return;
@@ -221,7 +189,16 @@ export const CalculatedLists = {
                         .catch(err => console.warn('Failed to load plugin config JS handler:', err));
                 }
             })
-            .catch(err => console.warn('Failed to fetch plugin config UI:', err));
+            .catch(err => {
+                console.warn('Failed to fetch plugin config UI:', err);
+                if (container) {
+                    container.replaceChildren();
+                    const msg = document.createElement('p');
+                    msg.className = 'text-sm text-red-600 mt-1';
+                    msg.textContent = 'Could not load configuration. Please try again.';
+                    container.appendChild(msg);
+                }
+            });
     },
 
     /**
@@ -705,8 +682,10 @@ export const CalculatedLists = {
                         filters.push(obj);
                     }
                 } else {
-                    // Field reference selected
-                    obj.value_field_id = parseInt(valueSelect, 10);
+                    // Field reference selected — extract numeric ID from prefixed format
+                    // (e.g. "question_200018" → 200018), matching updateFiltersJson logic
+                    const match = valueSelect.match(/^(question_|indicator_|document_field_)(\d+)$/);
+                    obj.value_field_id = match ? parseInt(match[2], 10) : parseInt(valueSelect, 10);
                     filters.push(obj);
                 }
             }

@@ -4,9 +4,10 @@ Email Notification Service
 Background tasks for sending notification digests via email.
 """
 
+import threading
 from datetime import datetime, timedelta
 from typing import Optional
-from flask import current_app, render_template_string
+from flask import current_app
 from markupsafe import escape
 from app import db
 from app.services.email.client import send_email
@@ -22,6 +23,39 @@ try:
     PYTZ_AVAILABLE = True
 except ImportError:
     PYTZ_AVAILABLE = False
+
+
+# ---------------------------------------------------------------------------
+# Compiled Jinja2 template cache
+#
+# render_template_string() parses and compiles the template from source on
+# every call.  For digest sends that touch hundreds of users this adds up.
+# We cache the compiled template objects so compilation only happens once.
+# ---------------------------------------------------------------------------
+
+_template_lock = threading.Lock()
+_compiled_digest_template = None
+_compiled_instant_template = None
+
+
+def _get_digest_template():
+    """Return the cached compiled Jinja2 digest-email template."""
+    global _compiled_digest_template
+    if _compiled_digest_template is None:
+        with _template_lock:
+            if _compiled_digest_template is None:
+                _compiled_digest_template = current_app.jinja_env.from_string(_DIGEST_TEMPLATE_SRC)
+    return _compiled_digest_template
+
+
+def _get_instant_template():
+    """Return the cached compiled Jinja2 instant-email template."""
+    global _compiled_instant_template
+    if _compiled_instant_template is None:
+        with _template_lock:
+            if _compiled_instant_template is None:
+                _compiled_instant_template = current_app.jinja_env.from_string(_INSTANT_TEMPLATE_SRC)
+    return _compiled_instant_template
 
 
 def sanitize_for_email(text: str) -> str:
@@ -104,13 +138,28 @@ def _should_trigger_weekly_digest(
 def send_notification_emails():
     """
     Background task to send notification digest emails.
-    Should be called by scheduler hourly - function checks if it's time for each user.
+    Should be called by scheduler periodically — function checks if it's time for each user.
     """
     try:
         now = utcnow()
         current_hour = now.hour
         current_minute = now.minute
         current_day = now.strftime('%A').lower()  # 'monday', 'tuesday', etc.
+
+        # Early-exit: skip the full preferences load when no digest users exist.
+        # This makes the common case (no users, or all users on 'instant') a single
+        # lightweight COUNT query instead of a full table scan + User join.
+        has_digest_user = (
+            db.session.query(NotificationPreferences.user_id)
+            .filter(
+                NotificationPreferences.email_notifications.is_(True),
+                NotificationPreferences.notification_frequency.in_(['daily', 'weekly']),
+            )
+            .limit(1)
+            .first()
+        )
+        if has_digest_user is None:
+            return
 
         # Get all users with email notifications enabled
         preferences = NotificationPreferences.query.filter_by(
@@ -610,9 +659,7 @@ def _translate_notification_for_email(notif, locale: Optional[str]) -> tuple:
         return notif.title, notif.message
 
 
-def render_digest_email(user, notifications, frequency, locale: Optional[str] = None):
-    """Render HTML email template for notification digest."""
-    template = """
+_DIGEST_TEMPLATE_SRC = """
     <!DOCTYPE html>
     <html>
     <head>
@@ -685,6 +732,9 @@ def render_digest_email(user, notifications, frequency, locale: Optional[str] = 
     </html>
     """
 
+
+def render_digest_email(user, notifications, frequency, locale: Optional[str] = None):
+    """Render HTML email template for notification digest."""
     base_url = (current_app.config.get('BASE_URL') or 'http://localhost:5000').rstrip('/')
 
     # Sanitize (and translate) notification content for safe rendering.
@@ -706,24 +756,16 @@ def render_digest_email(user, notifications, frequency, locale: Optional[str] = 
     # Get organization branding
     org_name = get_org_name()
 
-    return render_template_string(
-        template,
+    return _get_digest_template().render(
         user={'name': sanitize_for_email(user.name or user.email), 'email': user.email},
         notifications=sanitized_notifications,
         frequency=sanitize_for_email(frequency),
         base_url=base_url,
-        org_name=org_name
+        org_name=org_name,
     )
 
 
-def render_instant_email(user, notification):
-    """Render HTML email template for instant notification."""
-    # Determine header style: action-required for high/urgent, informational for normal
-    is_action_required = (notification.priority or 'normal') in ('high', 'urgent')
-    header_label = 'Action Required' if is_action_required else 'Notification'
-    header_subtitle = '' if is_action_required else 'For your information'
-
-    template = """
+_INSTANT_TEMPLATE_SRC = """
     <!DOCTYPE html>
     <html>
     <head>
@@ -793,6 +835,14 @@ def render_instant_email(user, notification):
     </html>
     """
 
+
+def render_instant_email(user, notification):
+    """Render HTML email template for instant notification."""
+    # Determine header style: action-required for high/urgent, informational for normal
+    is_action_required = (notification.priority or 'normal') in ('high', 'urgent')
+    header_label = 'Action Required' if is_action_required else 'Notification'
+    header_subtitle = '' if is_action_required else 'For your information'
+
     base_url = (current_app.config.get('BASE_URL') or 'http://localhost:5000').rstrip('/')
 
     # Get organization branding
@@ -811,8 +861,7 @@ def render_instant_email(user, notification):
         'related_url': notification.related_url  # URL is validated separately
     }
 
-    return render_template_string(
-        template,
+    return _get_instant_template().render(
         user={'name': sanitize_for_email(user.name or user.email), 'email': user.email},
         notification=sanitized_notification,
         base_url=base_url,
@@ -820,5 +869,5 @@ def render_instant_email(user, notification):
         button_label=button_label,
         is_action_required=is_action_required,
         header_label=header_label,
-        header_subtitle=header_subtitle
+        header_subtitle=header_subtitle,
     )

@@ -584,9 +584,12 @@ function updateDynamicConfigSummary(sectionId) {
         }
     }
 
+    // Scope all remaining queries to the section's own config container
+    const configContainer = document.getElementById(`dynamic-indicators-config-${sectionId}`);
+
     // Data availability options
-    const dataNotAvailable = document.querySelector(`input[name="allow_data_not_available"]`);
-    const notApplicable = document.querySelector(`input[name="allow_not_applicable"]`);
+    const dataNotAvailable = configContainer ? configContainer.querySelector(`input[name="allow_data_not_available"]`) : null;
+    const notApplicable = configContainer ? configContainer.querySelector(`input[name="allow_not_applicable"]`) : null;
     const dataOptions = [];
     if (dataNotAvailable && dataNotAvailable.checked) dataOptions.push('Data not available');
     if (notApplicable && notApplicable.checked) dataOptions.push('Not applicable');
@@ -595,20 +598,24 @@ function updateDynamicConfigSummary(sectionId) {
     }
 
     // Disaggregation options
-    const disaggCheckboxes = document.querySelectorAll(`input[name="allowed_disaggregation_options"]:checked`);
+    const disaggCheckboxes = configContainer
+        ? configContainer.querySelectorAll(`input[name="allowed_disaggregation_options"]:checked`)
+        : [];
     if (disaggCheckboxes.length > 0) {
         const disaggLabels = Array.from(disaggCheckboxes).map(cb => {
-            const label = document.querySelector(`label:has(input[value="${cb.value}"])`);
+            const label = configContainer.querySelector(`label:has(input[value="${CSS.escape(cb.value)}"])`);
             return label ? label.textContent.trim() : cb.value;
         });
         summaryParts.push(`Disaggregation: ${disaggLabels.join(', ')}`);
     }
 
     // Display filters
-    const displayFilterCheckboxes = document.querySelectorAll(`input[name="data_entry_display_filters"]:checked`);
+    const displayFilterCheckboxes = configContainer
+        ? configContainer.querySelectorAll(`input[name="data_entry_display_filters"]:checked`)
+        : [];
     if (displayFilterCheckboxes.length > 0) {
         const displayFilterLabels = Array.from(displayFilterCheckboxes).map(cb => {
-            const label = document.querySelector(`label:has(input[value="${cb.value}"])`);
+            const label = configContainer.querySelector(`label:has(input[value="${CSS.escape(cb.value)}"])`);
             return label ? label.textContent.trim() : cb.value;
         });
         summaryParts.push(`Display filters: ${displayFilterLabels.join(', ')}`);

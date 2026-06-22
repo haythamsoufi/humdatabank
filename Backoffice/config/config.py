@@ -986,6 +986,12 @@ class Config:
     # without logging noisy APScheduler misfire warnings.
     SCHEDULER_MISFIRE_GRACE_SECONDS = int(os.environ.get('SCHEDULER_MISFIRE_GRACE_SECONDS', '30'))
 
+    # How often (minutes) the digest-email job fires.  The digest trigger window is typically
+    # 60 minutes, so 5-minute polling is sufficient and reduces load 12× vs 1-minute polling.
+    SCHEDULER_DIGEST_EMAIL_INTERVAL_MINUTES = int(
+        os.environ.get('SCHEDULER_DIGEST_EMAIL_INTERVAL_MINUTES', '5')
+    )
+
     # Verbose AI SSE logs (delta sampling, persist/engine summary lines). Default false.
     AI_STREAM_DEBUG = _parse_bool(os.environ.get("AI_STREAM_DEBUG"), default=False)
 
@@ -1129,12 +1135,21 @@ class ProductionConfig(Config):
     # Connection pool — keep totals below PostgreSQL max_connections.
     # total max = GUNICORN_WORKERS × (SQLALCHEMY_POOL_SIZE + SQLALCHEMY_MAX_OVERFLOW)
     # With 5 workers and defaults below: 5 × (5 + 10) = 75 connections.
+    #
+    # connect_timeout:   abort TCP handshake that hangs (e.g. private-endpoint warming up).
+    # statement_timeout: kill runaway queries before they exhaust the pool and cause 504s.
+    #                    Overridable via DB_STATEMENT_TIMEOUT_MS (0 = disabled).
+    _stmt_timeout_ms = int(os.environ.get("DB_STATEMENT_TIMEOUT_MS", "120000"))
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
         "pool_recycle": int(os.environ.get("SQLALCHEMY_POOL_RECYCLE", "300")),
         "pool_size": int(os.environ.get("SQLALCHEMY_POOL_SIZE", "5")),
         "max_overflow": int(os.environ.get("SQLALCHEMY_MAX_OVERFLOW", "10")),
         "pool_timeout": int(os.environ.get("SQLALCHEMY_POOL_TIMEOUT", "30")),
+        "connect_args": {
+            "connect_timeout": int(os.environ.get("DB_CONNECT_TIMEOUT", "10")),
+            **({"options": f"-c statement_timeout={_stmt_timeout_ms}"} if _stmt_timeout_ms > 0 else {}),
+        },
     }
 
     # Set logging level to INFO for better visibility

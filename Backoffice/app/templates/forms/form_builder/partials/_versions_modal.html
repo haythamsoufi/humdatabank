@@ -74,7 +74,7 @@
                         </td>
                         <td class="px-4 py-2 text-sm text-gray-700">
                             {# Editable note for all versions #}
-                            <form id="version-note-form-{{ v.id }}" method="POST" action="{% if v.status|lower == 'draft' %}{{ url_for('form_builder.update_draft_comment', template_id=template.id) }}{% else %}{{ url_for('form_builder.update_version_comment', template_id=template.id, version_id=v.id) }}{% endif %}" class="flex items-start gap-2">
+                            <form id="version-note-form-{{ v.id }}" method="POST" action="{{ url_for('form_builder.update_version_comment', template_id=template.id, version_id=v.id) }}" class="flex items-start gap-2">
                                 <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
                                 <textarea
                                        id="version-note-input-{{ v.id }}"
@@ -104,7 +104,9 @@
             <form id="create-version-form" method="POST" action="{{ url_for('form_builder.create_draft_version', template_id=template.id) }}" class="inline-block">
                 <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
                 <input type="hidden" name="source_version_id" id="create-version-source-id" value="{{ active_version_id }}">
-                <button type="submit" class="btn btn-success">
+                <button type="submit"
+                        class="btn btn-success {% if has_draft %}opacity-50 cursor-not-allowed pointer-events-none{% endif %}"
+                        {% if has_draft %}disabled aria-disabled="true" title="{{ _('A draft version already exists. Open or discard it before creating a new version.') }}"{% endif %}>
                     <i class="fas fa-plus w-4 h-4 mr-2"></i>{{ _('Add New Version') }}
                 </button>
             </form>

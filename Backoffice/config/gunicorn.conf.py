@@ -152,6 +152,10 @@ def worker_exit(server, worker):
     Must not use Flask `current_app` here: there is no app/request context
     in this hook, so the worker would have skipped shutdown every time.
     Gunicorn loads the WSGI callable (e.g. `run:app`) as `worker.wsgi`.
+
+    Also removes the scheduler lock file (written by _is_scheduler_worker in
+    app/scheduler.py) so the next worker that starts can take over the
+    scheduler role after max_requests recycling.
     """
     wsgi = getattr(worker, "wsgi", None)
     if wsgi is None or not hasattr(wsgi, "scheduler"):
@@ -168,6 +172,16 @@ def worker_exit(server, worker):
         pass
     try:
         wsgi.scheduler = None
+    except Exception:
+        pass
+
+    # Release the scheduler lock file so the replacement worker can acquire it.
+    # The lock is keyed on the master PID (server.pid).
+    try:
+        import tempfile
+        lock_path = os.path.join(tempfile.gettempdir(), f'hdb_scheduler_{server.pid}.lock')
+        if os.path.exists(lock_path):
+            os.remove(lock_path)
     except Exception:
         pass
 

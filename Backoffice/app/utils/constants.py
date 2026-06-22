@@ -14,6 +14,10 @@ LOOKUP_ROW_TEMP_ORDER = 999999
 # Default PostgreSQL advisory lock ID for session cleanup (override via SESSION_CLEANUP_LOCK_ID)
 DEFAULT_SESSION_CLEANUP_LOCK_ID = 702345
 
+# Default PostgreSQL advisory lock ID for scheduled-notification processing
+# (prevents two concurrent runs even if the file-based scheduler lock fails)
+DEFAULT_SCHEDULED_NOTIFICATIONS_LOCK_ID = 702346
+
 # ---------------------------------------------------------------------------
 # IFRC API Appeals Type IDs (Unified Planning: Plan, Mid-Year Report, Annual Report)
 # ---------------------------------------------------------------------------

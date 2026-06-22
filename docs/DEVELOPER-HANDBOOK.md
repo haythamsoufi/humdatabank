@@ -439,6 +439,29 @@ The admin interface has been modularized from a single monolithic file (340KB, 7
 az webapp log tail --name <your-webapp-name> --resource-group <your-resource-group>
 ```
 
+### Preventing 502 / 504 errors on Azure App Service
+
+Key env vars to set in **Azure Portal → App Service → Configuration → Application settings**:
+
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `GUNICORN_TIMEOUT` | `120` | Must stay below Azure front-end's ~230s cut-off |
+| `GUNICORN_WORKERS` | `3` or `4` (explicit) | Prevents RAM exhaustion on smaller SKUs |
+| `GUNICORN_MAX_REQUESTS` | `500` | Workers recycle before OOM; jitter prevents mass recycling |
+| `GUNICORN_MAX_REQUESTS_JITTER` | `100` | Spreads recycling across workers |
+| `DB_STATEMENT_TIMEOUT_MS` | `120000` | Kills runaway queries so pool connections are released |
+| `DB_CONNECT_TIMEOUT` | `10` | Aborts stale TCP handshakes to PostgreSQL |
+| `REDIS_URL` | `redis://…` | Cross-worker rate limiting; eliminates ARR Affinity dependency |
+| `SCHEDULER_DISABLE_ALL_WORKERS` | `true` | Stop gunicorn workers from running APScheduler when background jobs run in an Azure Function / Container Job |
+
+**ARR Affinity** (Azure Portal → App Service → Configuration → General settings):
+- Set to **On** when `REDIS_URL` is not configured (required for session consistency).
+- Can be **Off** when `REDIS_URL` is set.
+
+**AI streaming / SSE**: Azure App Service front-end times out at ~230s. If AI agent runs longer, either place an **Application Gateway** (backend timeout ≥ 300s) in front, or lower `AI_AGENT_TIMEOUT_SECONDS` and `AI_SSE_IDLE_TIMEOUT_SECONDS` to fit within 200s.
+
+Detailed runbook: [Incidents → Scenario F (502/504)](Backoffice/docs/runbooks/incidents/general-incident-triage.md#scenario-f-recurring-502--504-errors)
+
 ### Performance
 - Database query optimization
 - Static file serving

@@ -706,6 +706,9 @@ function initializeSectionManagement() {
                     window.location.href = resp.url;
                     return;
                 }
+                if (!resp.ok) {
+                    throw new Error(`Server returned ${resp.status}`);
+                }
                 const ct = (resp.headers.get('content-type') || '').toLowerCase();
                 if (ct.includes('application/json')) {
                     const result = await resp.json();
@@ -713,11 +716,22 @@ function initializeSectionManagement() {
                         window.location.href = result.redirect_url;
                         return;
                     }
+                    window.location.reload();
+                    return;
                 }
-                window.location.reload();
+                const html = await resp.text();
+                if (window.FormBuilderAjax && typeof window.FormBuilderAjax.refreshFromHtml === 'function') {
+                    window.FormBuilderAjax.refreshFromHtml(html);
+                    if (typeof window.FormBuilderAjax.showSuccess === 'function') window.FormBuilderAjax.showSuccess('Saved');
+                } else {
+                    window.location.reload();
+                }
             } catch (err) {
                 console.error('Section save failed:', err);
                 resetButton();
+                if (window.FormBuilderAjax && typeof window.FormBuilderAjax.showError === 'function') {
+                    window.FormBuilderAjax.showError('Failed to save section. Please try again.');
+                }
             }
         });
     }

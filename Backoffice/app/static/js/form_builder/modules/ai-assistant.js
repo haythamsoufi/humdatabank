@@ -415,10 +415,9 @@ class FormBuilderAIAssistant {
         try {
             const form = new FormData();
             form.append('file', file);
-            const resp = await fetch(this.config.extractUrl, {
+            const resp = await ((window.getFetch && window.getFetch()) || fetch)(this.config.extractUrl, {
                 method: 'POST',
                 credentials: 'same-origin',
-                headers: { 'X-CSRFToken': csrfToken() },
                 body: form,
             });
             const data = await resp.json().catch(() => ({}));
@@ -444,10 +443,9 @@ class FormBuilderAIAssistant {
         const form = new FormData();
         form.append('file', file);
         const extractUrl = this.config.extractImageUrl || this.config.extractUrl;
-        const resp = await fetch(extractUrl, {
+        const resp = await ((window.getFetch && window.getFetch()) || fetch)(extractUrl, {
             method: 'POST',
             credentials: 'same-origin',
-            headers: { 'X-CSRFToken': csrfToken() },
             body: form,
         });
         const data = await resp.json().catch(() => ({}));
@@ -795,14 +793,12 @@ class FormBuilderAIAssistant {
         let formBuilderResult = null;
 
         try {
-            const resp = await fetch(this.config.chatStreamUrl, {
+            const resp = await ((window.getFetch && window.getFetch()) || fetch)(this.config.chatStreamUrl, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'text/event-stream',
-                    'X-CSRFToken': csrfToken(),
-                    'X-Requested-With': 'XMLHttpRequest',
                 },
                 body: JSON.stringify(this.buildPayload(messageText, streamOptions)),
                 signal: this.abortController.signal,
@@ -1021,10 +1017,9 @@ class FormBuilderAIAssistant {
         const prevItemIds = this._snapshotIds('tr[data-item-id]', 'data-item-id');
 
         try {
-            const resp = await fetch(url, {
+            const resp = await ((window.getFetch && window.getFetch()) || fetch)(url, {
                 method: 'GET',
                 credentials: 'same-origin',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
             });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const html = await resp.text();

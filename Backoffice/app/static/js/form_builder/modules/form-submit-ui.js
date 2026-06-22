@@ -250,8 +250,8 @@ export const FormSubmitUI = {
           if (window.templateVariablesManager) {
             window.templateVariablesManager.versionId = parsedVersionId;
           }
-          if (window.fbAiAssistant && typeof window.fbAiAssistant === 'object') {
-            window.fbAiAssistant.versionId = parsedVersionId;
+          if (window.formBuilderAIAssistant && typeof window.formBuilderAIAssistant === 'object') {
+            window.formBuilderAIAssistant.versionId = parsedVersionId;
           }
         }
       };

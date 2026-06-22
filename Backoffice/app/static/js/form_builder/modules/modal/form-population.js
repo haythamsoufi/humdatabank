@@ -4,6 +4,10 @@ import { QuestionItem } from '../items/question.js';
 import { IndicatorItem } from '../items/indicator.js';
 import { DocumentItem } from '../items/document.js';
 
+function parseBool(val) {
+    return val === true || val === 'true' || val === 1 || val === '1';
+}
+
 export const FormPopulationMixin = {
     populateForm: function(itemData) {
         if (this.currentItemType.startsWith('plugin_')) {
@@ -125,7 +129,15 @@ export const FormPopulationMixin = {
 
         const relevanceBuilderElDoc = this.modalElement.querySelector('#item-relevance-rule-builder');
         if (relevanceBuilderElDoc) {
-            relevanceBuilderElDoc.setAttribute('data-rule-json', itemData.relevance_condition || '');
+            attachRuleData(relevanceBuilderElDoc, itemData.relevance_condition, 'relevance');
+        }
+        const validationBuilderElDoc = this.modalElement.querySelector('#item-validation-rule-builder');
+        if (validationBuilderElDoc) {
+            attachRuleData(validationBuilderElDoc, itemData.validation_condition, 'validation');
+        }
+        const validationMsgInputDoc = this.modalElement.querySelector('#item-validation-message');
+        if (validationMsgInputDoc) {
+            validationMsgInputDoc.value = itemData.validation_message || '';
         }
 
         this.autoShowRuleSections(itemData);
@@ -212,7 +224,7 @@ export const FormPopulationMixin = {
         const privacySelect = this.modalElement.querySelector('#item-privacy-select');
 
         if (requiredCheckbox) {
-            requiredCheckbox.checked = itemData.is_required === true || itemData.is_required === 'true';
+            requiredCheckbox.checked = parseBool(itemData.is_required);
         }
 
         if (orderInput && itemData.order) {
@@ -220,62 +232,46 @@ export const FormPopulationMixin = {
         }
 
         if (dataNotAvailableCheckbox) {
-            const val = itemData.allow_data_not_available;
-            dataNotAvailableCheckbox.checked = val === true || val === 'true' || val === 1 || val === '1';
+            dataNotAvailableCheckbox.checked = parseBool(itemData.allow_data_not_available);
         }
 
         if (notApplicableCheckbox) {
-            const val2 = itemData.allow_not_applicable;
-            notApplicableCheckbox.checked = val2 === true || val2 === 'true' || val2 === 1 || val2 === '1';
+            notApplicableCheckbox.checked = parseBool(itemData.allow_not_applicable);
         }
 
         const uniqueOptionsCheckbox = this.modalElement.querySelector('#item-unique-options-in-section');
         if (uniqueOptionsCheckbox) {
-            let uniqueVal = false;
-            if (itemData && itemData.config && itemData.config.unique_options_in_section !== undefined) {
-                uniqueVal = itemData.config.unique_options_in_section === true
-                    || itemData.config.unique_options_in_section === 'true'
-                    || itemData.config.unique_options_in_section === 1
-                    || itemData.config.unique_options_in_section === '1';
-            }
+            const uniqueVal = (itemData && itemData.config && itemData.config.unique_options_in_section !== undefined)
+                ? parseBool(itemData.config.unique_options_in_section)
+                : false;
             this._pendingUniqueOptionsInSection = uniqueVal;
             uniqueOptionsCheckbox.checked = uniqueVal;
         }
 
         const repeatTitleCheckbox = this.modalElement.querySelector('#item-use-as-repeat-entry-title');
         if (repeatTitleCheckbox) {
-            let repeatTitleVal = false;
-            if (itemData && itemData.config && itemData.config.use_as_repeat_entry_title !== undefined) {
-                repeatTitleVal = itemData.config.use_as_repeat_entry_title === true
-                    || itemData.config.use_as_repeat_entry_title === 'true'
-                    || itemData.config.use_as_repeat_entry_title === 1
-                    || itemData.config.use_as_repeat_entry_title === '1';
-            }
+            const repeatTitleVal = (itemData && itemData.config && itemData.config.use_as_repeat_entry_title !== undefined)
+                ? parseBool(itemData.config.use_as_repeat_entry_title)
+                : false;
             this._pendingUseAsRepeatEntryTitle = repeatTitleVal;
             repeatTitleCheckbox.checked = repeatTitleVal;
         }
 
         const limitEntriesCheckbox = this.modalElement.querySelector('#item-limit-entries-to-option-count');
         if (limitEntriesCheckbox) {
-            let limitVal = false;
-            if (itemData && itemData.config && itemData.config.limit_entries_to_option_count !== undefined) {
-                limitVal = itemData.config.limit_entries_to_option_count === true
-                    || itemData.config.limit_entries_to_option_count === 'true'
-                    || itemData.config.limit_entries_to_option_count === 1
-                    || itemData.config.limit_entries_to_option_count === '1';
-            }
+            const limitVal = (itemData && itemData.config && itemData.config.limit_entries_to_option_count !== undefined)
+                ? parseBool(itemData.config.limit_entries_to_option_count)
+                : false;
             this._pendingLimitEntriesToOptionCount = limitVal;
             limitEntriesCheckbox.checked = limitVal;
         }
 
         if (disabilityQuestionsCheckbox) {
-            const valDisability = itemData.allow_disability_questions;
-            disabilityQuestionsCheckbox.checked = valDisability === true || valDisability === 'true' || valDisability === 1 || valDisability === '1';
+            disabilityQuestionsCheckbox.checked = parseBool(itemData.allow_disability_questions);
         }
 
         if (indirectReachCheckbox) {
-            const val3 = itemData.indirect_reach;
-            indirectReachCheckbox.checked = val3 === true || val3 === 'true' || val3 === 1 || val3 === '1';
+            indirectReachCheckbox.checked = parseBool(itemData.indirect_reach);
         }
 
         if (layoutWidthSelect && itemData.layout_column_width) {
@@ -283,7 +279,7 @@ export const FormPopulationMixin = {
         }
 
         if (breakAfterCheckbox) {
-            breakAfterCheckbox.checked = itemData.layout_break_after === true || itemData.layout_break_after === 'true';
+            breakAfterCheckbox.checked = parseBool(itemData.layout_break_after);
         }
 
         if (privacySelect) {
@@ -312,10 +308,9 @@ export const FormPopulationMixin = {
             privacySelect.value = privacyValue;
         }
 
-        let allowOver100 = false;
-        if (itemData && itemData.config && itemData.config.allow_over_100 !== undefined) {
-            allowOver100 = itemData.config.allow_over_100 === true || itemData.config.allow_over_100 === 'true' || itemData.config.allow_over_100 === 1 || itemData.config.allow_over_100 === '1';
-        }
+        const allowOver100 = (itemData && itemData.config && itemData.config.allow_over_100 !== undefined)
+            ? parseBool(itemData.config.allow_over_100)
+            : false;
 
         let allowOver100Checkbox = this.modalElement.querySelector('#item-allow-over-100');
 

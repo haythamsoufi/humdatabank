@@ -76,6 +76,62 @@ A newly deployed admin route missing its guard can cause unexpected permission b
 
 ## 4. Scenario-Specific Playbooks
 
+### Scenario F: Recurring 502 / 504 errors
+
+These errors indicate the Azure front-end is not getting a response from a gunicorn worker in time. Work through each cause in order.
+
+#### F1. Azure gateway timeout < gunicorn timeout (most common 504 source)
+
+Azure App Service's front-end load balancer cuts HTTP connections after **230 seconds**. Gunicorn's `GUNICORN_TIMEOUT` defaults to 600s, so long requests (AI agent, Excel export) are killed by Azure before gunicorn gives up — users see 504 but the worker keeps running and holds the pool connection.
+
+- Set `GUNICORN_TIMEOUT=120` in Azure App Service → Configuration → Application settings.
+- For AI streaming (SSE), ensure the Application Gateway backend timeout ≥ 300s, or reduce `AI_SSE_IDLE_TIMEOUT_SECONDS` ≤ 200.
+- `AI_AGENT_TIMEOUT_SECONDS` should be ≤ 100 if no Application Gateway is in front.
+
+#### F2. Worker recycling during high load (intermittent 502)
+
+Gunicorn recycles workers after `GUNICORN_MAX_REQUESTS` requests (default 1000). If ARR Affinity (sticky sessions) routes a user to a recycling worker, they get a 502 for the ~30s restart window.
+
+- Confirm ARR Affinity is **On** in Azure Portal → App Service → Configuration → General settings (required without Redis).
+- Or configure `REDIS_URL` to eliminate the ARR Affinity dependency.
+- Reduce `GUNICORN_MAX_REQUESTS` to 500 with `GUNICORN_MAX_REQUESTS_JITTER=100` to spread recycling more evenly.
+
+#### F3. DB connection pool saturation (cascading 504s)
+
+Symptoms: `QueuePool limit of size X overflow Y reached` in logs, then 504s on otherwise fast pages.
+
+Root cause: scheduler jobs (email retry, notification dispatch) run in **every** gunicorn worker simultaneously (fixed in `app/scheduler.py` — only one worker now runs the scheduler via `_is_scheduler_worker()`). Also common during post-deploy startup when deferred tasks and RBAC seed compete for connections.
+
+- Check `SQLALCHEMY_POOL_SIZE` × workers does not exceed PostgreSQL `max_connections` tier limit (B1ms = 50, B2s = 100, GP-2vCore = 200).
+- Verify `DB_STATEMENT_TIMEOUT_MS=120000` is set (added to `ProductionConfig`) so runaway queries release their connections.
+- Set `DB_CONNECT_TIMEOUT=10` to abort stale TCP handshakes (also added to `ProductionConfig`).
+- Stream logs and grep for `QueuePool`:
+  ```bash
+  az webapp log tail --name <app> --resource-group <rg> | grep -i "queuepool\|pool\|timeout"
+  ```
+
+#### F4. Worker OOM crash → 502 while new worker starts
+
+Large AI agent runs, Excel exports, or form renders can exhaust worker memory. The OS kills the worker and gunicorn starts a new one — during which all requests sticky-routed to that worker get 502.
+
+- Check App Service metrics: **Memory Working Set** → spikes before 502 bursts.
+- Scale up the App Service plan (P2v3 = 8 GB vs P1v3 = 3.5 GB).
+- Set `GUNICORN_WORKERS` explicitly (e.g., `3`) rather than letting gunicorn auto-detect `(2×CPU+1)` on a CPU-rich SKU with limited RAM.
+
+#### F5. SCHEDULER_DISABLE_ALL_WORKERS for external job runner
+
+If background jobs are managed by an Azure Container Job or Function:
+```
+SCHEDULER_DISABLE_ALL_WORKERS=true
+```
+This prevents all gunicorn workers from starting APScheduler, eliminating scheduler-related DB pressure entirely.
+
+#### F6. Verify the health endpoint is configured as the App Service health probe
+
+In Azure Portal → App Service → Monitoring → **Health check**: set path to `/health`. Azure will automatically restart unhealthy instances and stop routing to them — dramatically reducing how long a 502 window lasts.
+
+---
+
 ### Scenario A: All users cannot log in
 
 1. Confirm the app is running: `GET /` — if 502, the app is down.

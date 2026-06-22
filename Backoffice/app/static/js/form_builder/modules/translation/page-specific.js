@@ -357,11 +357,7 @@ function processItemsSequentially(items, index, selectedService, endpoints) {
   const _tpsPayloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(requestPayload))));
   fetchJson(window.autoTranslateModal.config.endpoint, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Requested-With': 'XMLHttpRequest',
-      'X-CSRFToken': (document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '')
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ payload: _tpsPayloadB64 })
   }).then(data => {
       modal.translationState.processedItems++;
@@ -407,11 +403,7 @@ function processItemsSequentially(items, index, selectedService, endpoints) {
         const _tpsBulkB64 = btoa(unescape(encodeURIComponent(JSON.stringify({ items: [itemToUpdate] }))));
         fetchJson(endpoints.bulkUpdateTranslations, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRFToken': (document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '')
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ payload: _tpsBulkB64 })
         }).then(saveData => {
             if (saveData.success) {

@@ -156,6 +156,47 @@ class TestDeployTemplateVersion:
             )
         assert resp.status_code == 302
 
+    def test_deploy_invalid_indicators_ajax_returns_json(
+        self, logged_in_client, db_session, admin_user, app
+    ):
+        """POST with AJAX headers returns JSON error when indicator refs are invalid."""
+        _grant_template_permissions(db_session)
+        template = _make_owned_template(db_session, admin_user)
+        draft = _make_draft(db_session, template)
+        section = create_test_section(db_session, template, version=draft)
+        create_test_item(
+            db_session, section, template, version=draft,
+            item_type='indicator',
+            indicator_bank_id=None,
+        )
+        resp = logged_in_client.post(
+            f'/admin/templates/{template.id}/deploy',
+            json={'version_id': str(draft.id)},
+            headers={'X-Requested-With': 'XMLHttpRequest'},
+        )
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data['success'] is False
+        assert 'indicator' in data.get('error', '').lower()
+
+    def test_deploy_success_redirect_includes_version_id(
+        self, logged_in_client, db_session, admin_user, app
+    ):
+        """POST deploy redirects to edit page with the deployed version_id."""
+        _grant_template_permissions(db_session)
+        template = _make_owned_template(db_session, admin_user)
+        draft = _make_draft(db_session, template)
+        with patch('app.routes.admin.form_builder.versions.log_admin_action'), \
+             patch('app.routes.admin.form_builder.versions.notify_template_updated',
+                   side_effect=None, create=True):
+            resp = logged_in_client.post(
+                f'/admin/templates/{template.id}/deploy',
+                data={'version_id': str(draft.id)},
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+        assert f'version_id={draft.id}' in resp.headers.get('Location', '')
+
 
 # ---------------------------------------------------------------------------
 # discard_template_draft
@@ -207,6 +248,20 @@ class TestDiscardTemplateDraft:
             data={},
         )
         assert resp.status_code == 404
+
+    def test_discard_draft_no_draft_ajax_returns_json(
+        self, logged_in_client, db_session, admin_user, app
+    ):
+        """POST with AJAX headers returns JSON error when no draft exists."""
+        template = _make_owned_template(db_session, admin_user)
+        resp = logged_in_client.post(
+            f'/admin/templates/{template.id}/discard_draft',
+            json={},
+            headers={'X-Requested-With': 'XMLHttpRequest'},
+        )
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data['success'] is False
 
 
 # ---------------------------------------------------------------------------
@@ -266,14 +321,14 @@ class TestDeleteTemplateVersion:
         assert resp.status_code == 404
 
     def test_delete_version_404_version(self, logged_in_client, db_session, admin_user, app):
-        """POST for non-existent version returns 404."""
+        """POST for non-existent version redirects (NotFound is caught by exception handler)."""
         _grant_template_permissions(db_session)
         template = _make_owned_template(db_session, admin_user)
         resp = logged_in_client.post(
             f'/admin/templates/{template.id}/versions/999999/delete',
             data={},
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 302
 
 
 # ---------------------------------------------------------------------------
@@ -422,6 +477,37 @@ class TestCreateDraftVersion:
             )
         assert resp.status_code == 302
 
+    def test_create_draft_blocked_when_draft_already_exists(
+        self, logged_in_client, db_session, admin_user, app
+    ):
+        """POST when a draft already exists redirects to the existing draft."""
+        template = _make_owned_template(db_session, admin_user)
+        existing_draft = _make_draft(db_session, template)
+        with patch('app.routes.admin.form_builder.versions._clone_template_structure'):
+            resp = logged_in_client.post(
+                f'/admin/templates/{template.id}/versions/new',
+                data={},
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+        assert f'version_id={existing_draft.id}' in resp.headers.get('Location', '')
+
+    def test_create_draft_blocked_when_draft_exists_ajax_returns_json(
+        self, logged_in_client, db_session, admin_user, app
+    ):
+        """POST with AJAX headers returns JSON error when draft already exists."""
+        template = _make_owned_template(db_session, admin_user)
+        _make_draft(db_session, template)
+        resp = logged_in_client.post(
+            f'/admin/templates/{template.id}/versions/new',
+            json={'source_version_id': template.published_version_id},
+            headers={'X-Requested-With': 'XMLHttpRequest'},
+        )
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data['success'] is False
+        assert 'draft' in data.get('error', '').lower()
+
 
 # ---------------------------------------------------------------------------
 # update_version_comment
@@ -479,10 +565,10 @@ class TestUpdateVersionComment:
         assert resp.status_code == 404
 
     def test_update_version_comment_404_version(self, logged_in_client, db_session, admin_user, app):
-        """POST for non-existent version returns 404."""
+        """POST for non-existent version redirects (NotFound is caught by exception handler)."""
         template = _make_owned_template(db_session, admin_user)
         resp = logged_in_client.post(
             f'/admin/templates/{template.id}/versions/999999/comment',
             data={'comment': 'Note'},
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 302

@@ -49,40 +49,7 @@ export const ItemModal = {
 
     // Safe HTML insertion helper for server-provided fragments (plugin templates/builders).
     setSanitizedHtml: function(container, html) {
-        if (!container) return;
-        container.replaceChildren();
-        if (typeof html !== 'string' || !html.trim()) return;
-
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        const root = doc.body;
-        if (!root) return;
-
-        root.querySelectorAll('script, iframe, object, embed, style, meta, link, base, form').forEach((el) => el.remove());
-        root.querySelectorAll('*').forEach((el) => {
-            [...el.attributes].forEach((attr) => {
-                const name = String(attr.name || '').toLowerCase();
-                const value = String(attr.value || '').replace(/[\s\x00-\x1f]/g, '').toLowerCase();
-                if (name.startsWith('on')) {
-                    el.removeAttribute(attr.name);
-                    return;
-                }
-                if (name === 'href' || name === 'src' || name === 'xlink:href' || name === 'formaction') {
-                    if (
-                        value.startsWith('javascript:') ||
-                        value.startsWith('data:') ||
-                        value.startsWith('vbscript:') ||
-                        value.startsWith('file:') ||
-                        value.startsWith('about:')
-                    ) {
-                        el.removeAttribute(attr.name);
-                    }
-                }
-            });
-        });
-
-        const fragment = document.createDocumentFragment();
-        while (root.firstChild) fragment.appendChild(root.firstChild);
-        container.appendChild(fragment);
+        Utils.setSanitizedHtml(container, html);
     },
 
     init: function() {

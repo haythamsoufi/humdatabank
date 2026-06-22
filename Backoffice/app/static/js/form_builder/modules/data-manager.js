@@ -34,10 +34,11 @@ export const DataManager = {
     loadIndicatorBankChoices: function() {
         const element = Utils.getElementById('indicator-bank-choices-data');
         if (element) {
-            this.data.indicatorBankChoices = JSON.parse(element.textContent);
-            this.extractUniqueTypes();
-            this.extractUniqueUnits();
-            //Utils.debugLog('Indicator Bank Choices loaded:', this.data.indicatorBankChoices);
+            try {
+                this.data.indicatorBankChoices = JSON.parse(element.textContent);
+                this.extractUniqueTypes();
+                this.extractUniqueUnits();
+            } catch (e) { console.error('[DataManager] Failed to parse indicator-bank-choices-data JSON', e); }
         }
     },
 
@@ -45,8 +46,10 @@ export const DataManager = {
     loadDisaggregationChoices: function() {
         const element = Utils.getElementById('disaggregation-choices-data');
         if (element) {
-            this.data.disaggregationChoices = JSON.parse(element.textContent);
-            Utils.debugLog('Disaggregation Choices loaded:', this.data.disaggregationChoices);
+            try {
+                this.data.disaggregationChoices = JSON.parse(element.textContent);
+                Utils.debugLog('Disaggregation Choices loaded:', this.data.disaggregationChoices);
+            } catch (e) { console.error('[DataManager] Failed to parse disaggregation-choices-data JSON', e); }
         }
     },
 
@@ -54,8 +57,10 @@ export const DataManager = {
     loadAllTemplateItems: function() {
         const element = Utils.getElementById('all-template-items-data');
         if (element) {
-            this.data.allTemplateItems = JSON.parse(element.textContent);
-            Utils.debugLog('All Template Items loaded:', this.data.allTemplateItems);
+            try {
+                this.data.allTemplateItems = JSON.parse(element.textContent);
+                Utils.debugLog('All Template Items loaded:', this.data.allTemplateItems);
+            } catch (e) { console.error('[DataManager] Failed to parse all-template-items-data JSON', e); }
         }
     },
 
@@ -63,8 +68,10 @@ export const DataManager = {
     loadSectionsWithItems: function() {
         const element = Utils.getElementById('sections-with-items-data');
         if (element) {
-            this.data.sectionsWithItems = JSON.parse(element.textContent);
-            Utils.debugLog('Sections With Items loaded:', this.data.sectionsWithItems);
+            try {
+                this.data.sectionsWithItems = JSON.parse(element.textContent);
+                Utils.debugLog('Sections With Items loaded:', this.data.sectionsWithItems);
+            } catch (e) { console.error('[DataManager] Failed to parse sections-with-items-data JSON', e); }
         }
     },
 
@@ -72,8 +79,10 @@ export const DataManager = {
     loadQuestionTypeChoices: function() {
         const element = Utils.getElementById('question-type-choices-data');
         if (element) {
-            this.data.questionTypeChoices = JSON.parse(element.textContent);
-            Utils.debugLog('Question Type Choices loaded:', this.data.questionTypeChoices);
+            try {
+                this.data.questionTypeChoices = JSON.parse(element.textContent);
+                Utils.debugLog('Question Type Choices loaded:', this.data.questionTypeChoices);
+            } catch (e) { console.error('[DataManager] Failed to parse question-type-choices-data JSON', e); }
         }
     },
 
@@ -81,8 +90,10 @@ export const DataManager = {
     loadAllTemplateSections: function() {
         const element = Utils.getElementById('all-template-sections-data');
         if (element) {
-            this.data.allTemplateSections = JSON.parse(element.textContent);
-            Utils.debugLog('All Template Sections loaded:', this.data.allTemplateSections);
+            try {
+                this.data.allTemplateSections = JSON.parse(element.textContent);
+                Utils.debugLog('All Template Sections loaded:', this.data.allTemplateSections);
+            } catch (e) { console.error('[DataManager] Failed to parse all-template-sections-data JSON', e); }
         }
     },
 
@@ -90,8 +101,10 @@ export const DataManager = {
     loadIndicatorFieldsConfig: function() {
         const element = Utils.getElementById('indicator-fields-config-data');
         if (element) {
-            this.data.indicatorFieldsConfig = JSON.parse(element.textContent);
-            Utils.debugLog('Indicator Fields Config loaded:', this.data.indicatorFieldsConfig);
+            try {
+                this.data.indicatorFieldsConfig = JSON.parse(element.textContent);
+                Utils.debugLog('Indicator Fields Config loaded:', this.data.indicatorFieldsConfig);
+            } catch (e) { console.error('[DataManager] Failed to parse indicator-fields-config-data JSON', e); }
         }
     },
 
@@ -204,16 +217,26 @@ export const DataManager = {
         });
     },
 
-    // Get item by ID and type
+    // Get item by ID and type — uses loose equality so string "123" matches numeric 123
     getItemById: function(id, type) {
         if (type === 'indicator') {
-            return this.data.allTemplateItems.find(item => item.type === 'indicator' && item.id === id);
+            return this.data.allTemplateItems.find(item => item.type === 'indicator' && item.id == id);
         } else if (type === 'question') {
-            return this.data.allTemplateItems.find(item => item.type === 'question' && item.id === id);
+            return this.data.allTemplateItems.find(item => item.type === 'question' && item.id == id);
         } else if (type === 'document') {
-            return this.data.allTemplateItems.find(item => item.type === 'document' && item.id === id);
+            return this.data.allTemplateItems.find(item => item.type === 'document' && item.id == id);
         }
         return null;
+    },
+
+    // Get condition types for a given type key.
+    // Falls back to a case-insensitive lookup to handle the 'Number' vs 'number' inconsistency.
+    getConditionTypes: function(typeKey) {
+        if (!typeKey) return [];
+        if (this.data.conditionTypes[typeKey]) return this.data.conditionTypes[typeKey];
+        const lower = String(typeKey).toLowerCase();
+        const key = Object.keys(this.data.conditionTypes).find(k => k.toLowerCase() === lower);
+        return key ? this.data.conditionTypes[key] : [];
     },
 
     // Filter indicators by type and unit

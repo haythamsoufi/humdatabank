@@ -563,6 +563,34 @@ function enhance() {
         });
     }
 
+    const discardFromBanner = document.getElementById('discard-draft-from-banner');
+    if (discardFromBanner && !discardFromBanner.dataset.fbWired) {
+        discardFromBanner.dataset.fbWired = '1';
+        discardFromBanner.addEventListener('click', function() {
+            const form = this.closest('form');
+            if (!form) return;
+            const message = (window.formBuilderMessages && window.formBuilderMessages.discardDraft)
+                || 'Discard this draft? All changes will be lost and cannot be undone.';
+            const doSubmit = () => {
+                form.dataset.confirmed = 'true';
+                if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
+                    window.FormBuilderAjax.submit(form);
+                } else if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            };
+            if (window.showDangerConfirmation) {
+                window.showDangerConfirmation(message, doSubmit, null, 'Discard', 'Cancel', 'Discard Draft?');
+            } else if (window.showConfirmation) {
+                window.showConfirmation(message, doSubmit, null, 'Discard', 'Cancel', 'Discard Draft?');
+            } else {
+                doSubmit();
+            }
+        });
+    }
+
     const openVersionsFromBanner = document.getElementById('open-versions-from-banner');
     if (openVersionsFromBanner && !openVersionsFromBanner.dataset.fbWired) {
         openVersionsFromBanner.dataset.fbWired = '1';

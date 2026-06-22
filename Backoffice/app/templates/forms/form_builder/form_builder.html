@@ -160,7 +160,7 @@
                 {% endif %}
             </div>
         </div>
-        <div class="ml-4 flex-shrink-0">
+        <div class="ml-4 flex-shrink-0 flex items-center gap-2">
             <form method="POST" action="{{ url_for('form_builder.deploy_template_version', template_id=template.id) }}" class="inline-block deploy-version-form-banner">
                 <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
                 <input type="hidden" name="version_id" value="{{ active_version_id }}">
@@ -168,6 +168,12 @@
                         {% if invalid_indicator_items_count and invalid_indicator_items_count > 0 %}disabled aria-disabled="true"{% endif %}
                         class="btn btn-success btn-sm inline-flex items-center {% if invalid_indicator_items_count and invalid_indicator_items_count > 0 %}opacity-50 cursor-not-allowed pointer-events-none{% endif %}">
                     <i class="fas fa-rocket w-4 h-4 mr-2"></i>{{ _('Deploy Version') }}
+                </button>
+            </form>
+            <form method="POST" action="{{ url_for('form_builder.discard_template_draft', template_id=template.id) }}" class="inline-block discard-draft-form-banner">
+                <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
+                <button type="button" id="discard-draft-from-banner" class="btn btn-danger btn-sm inline-flex items-center">
+                    <i class="fas fa-trash-alt w-4 h-4 mr-2"></i>{{ _('Discard Draft') }}
                 </button>
             </form>
         </div>
@@ -215,6 +221,48 @@
                 }
             });
             deployBtn.dataset.fbWired = '1';
+        }
+
+        const discardBtn = document.getElementById('discard-draft-from-banner');
+        if (discardBtn) {
+            discardBtn.addEventListener('click', function () {
+                const form = this.closest('form');
+                if (!form) return;
+                const message = (window.formBuilderMessages && window.formBuilderMessages.discardDraft)
+                    || {{ _("Discard this draft? All changes will be lost and cannot be undone.") | tojson }};
+                const doSubmit = () => {
+                    form.dataset.confirmed = 'true';
+                    if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
+                        window.FormBuilderAjax.submit(form);
+                    } else if (typeof form.requestSubmit === 'function') {
+                        form.requestSubmit();
+                    } else {
+                        form.submit();
+                    }
+                };
+                if (window.showDangerConfirmation) {
+                    window.showDangerConfirmation(
+                        message,
+                        doSubmit,
+                        null,
+                        {{ _('Discard') | tojson }},
+                        {{ _('Cancel') | tojson }},
+                        {{ _('Discard Draft?') | tojson }}
+                    );
+                } else if (window.showConfirmation) {
+                    window.showConfirmation(
+                        message,
+                        doSubmit,
+                        null,
+                        {{ _('Discard') | tojson }},
+                        {{ _('Cancel') | tojson }},
+                        {{ _('Discard Draft?') | tojson }}
+                    );
+                } else {
+                    doSubmit();
+                }
+            });
+            discardBtn.dataset.fbWired = '1';
         }
     });
     </script>
@@ -790,7 +838,8 @@
         // Store template messages for use by external modules
         window.formBuilderMessages = {
             deployVersion: {{ _("Deploy this version? This will publish it as the live version.") | tojson }},
-            deleteVersion: {{ _("Delete this version? This cannot be undone.") | tojson }}
+            deleteVersion: {{ _("Delete this version? This cannot be undone.") | tojson }},
+            discardDraft: {{ _("Discard this draft? All changes will be lost and cannot be undone.") | tojson }}
         };
     </script>
     <script src="{{ static_url('js/floating-progress-banner.js') }}"></script>

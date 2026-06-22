@@ -47,15 +47,38 @@ These carry the app's code-coupled configuration and should travel with the slot
 Azure App Service needs to know how to start the Flask app. Ensure the startup command (or `web.config` / Procfile) is configured to run:
 
 ```bash
-gunicorn --bind=0.0.0.0:8000 --workers=4 run:app
+gunicorn --config=config/gunicorn.conf.py run:app
 ```
 
-Or for single-worker with WebSocket support (`flask-sock`):
+Or inline (override specific settings via env vars listed in §3a):
 ```bash
-gunicorn --bind=0.0.0.0:8000 --worker-class=geventwebsocket.gunicorn.workers.GeventWebSocketWorker --workers=1 run:app
+gunicorn --bind=0.0.0.0:8000 --workers=4 --worker-class=gthread --threads=4 --timeout=120 run:app
 ```
 
-> WebSocket (`/api/ai/v2/ws`) requires a worker class that supports long-lived connections. If WebSocket is not needed, standard sync workers are fine and allow scale-out.
+> WebSocket (`/api/ai/v2/ws`) requires a worker class that supports long-lived connections (`gthread` supports this). If an Application Gateway is in front, set its backend timeout ≥ 300s to accommodate AI SSE streams.
+
+### 3a. Recommended Application Settings (avoid 502/504)
+
+Set these in Azure Portal → App Service → Configuration → Application settings:
+
+| Setting | Recommended value | Why |
+|---------|------------------|-----|
+| `GUNICORN_TIMEOUT` | `120` | Azure's front-end load balancer cuts at ~230s; 120s gives headroom for gunicorn to respond gracefully before Azure gives up |
+| `GUNICORN_WORKERS` | `3` or `4` (explicit) | Prevents auto-detection from over-provisioning workers that exhaust RAM; scale App Service plan instead |
+| `GUNICORN_MAX_REQUESTS` | `500` | Workers recycle more often but with smaller per-worker memory footprint; jitter spreads restarts |
+| `GUNICORN_MAX_REQUESTS_JITTER` | `100` | Prevents all workers from recycling simultaneously |
+| `DB_STATEMENT_TIMEOUT_MS` | `120000` | Kills runaway DB queries (2 min) so pool connections aren't held indefinitely |
+| `DB_CONNECT_TIMEOUT` | `10` | Aborts stalled PostgreSQL TCP handshakes (e.g. private-endpoint cold start) |
+| `REDIS_URL` | `redis://<host>:6379/0` | Enables cross-worker rate limiting; removes ARR Affinity dependency |
+| `SCHEDULER_DISABLE_ALL_WORKERS` | `true` (if using Azure Function/Container Jobs for background tasks) | Prevents N schedulers running the same DB jobs N times in parallel |
+
+> **Without `REDIS_URL`**: enable **ARR Affinity** (Azure Portal → App Service → Configuration → General settings → ARR Affinity = **On**) so Flask sessions are reliably routed to the same worker.
+
+> **With `REDIS_URL`**: ARR Affinity can be **Off**, which improves load distribution.
+
+### 3b. Azure Application Gateway / Front Door timeout
+
+If traffic passes through Application Gateway or Front Door before reaching App Service, set the **backend HTTP settings request timeout** ≥ 300s for AI chat/agent endpoints. The App Service front-end timeout (≈230s) still applies for requests that bypass the gateway.
 
 ---
 

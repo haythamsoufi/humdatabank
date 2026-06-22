@@ -37,6 +37,14 @@ export const CsrfHandler = {
 
     safeFetch: async function(url, options = {}) {
         const fetchFn = (window.getFetch && window.getFetch()) || window.fetch;
+        const token = this.getToken();
+        if (token) {
+            const headers = new Headers(options.headers || {});
+            if (!headers.has('X-CSRFToken')) {
+                headers.set('X-CSRFToken', token);
+            }
+            options = { ...options, headers };
+        }
         return fetchFn.call(null, url, options);
     },
 

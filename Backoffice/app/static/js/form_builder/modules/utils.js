@@ -106,7 +106,7 @@ const Utils = {
 
     // Generate unique ID
     generateUniqueId: function() {
-        return 'id-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        return 'id-' + Date.now() + '-' + Math.random().toString(36).substring(2, 11);
     },
 
     // Deep clone object
@@ -114,11 +114,52 @@ const Utils = {
         return JSON.parse(JSON.stringify(obj));
     },
 
-    // Sanitize HTML
+    // Sanitize HTML (text-only escape for plain strings)
     sanitizeHtml: function(str) {
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
+    },
+
+    // Safe DOM insertion for server-rendered HTML fragments.
+    // Strips scripts, iframes, on* handlers, and dangerous href/src protocols.
+    setSanitizedHtml: function(container, html) {
+        if (!container) return;
+        container.replaceChildren();
+        if (typeof html !== 'string' || !html.trim()) return;
+
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const root = doc.body;
+        if (!root) return;
+
+        root.querySelectorAll('script, iframe, object, embed, style, meta, link, base, form').forEach((el) => el.remove());
+        root.querySelectorAll('*').forEach((el) => {
+            [...el.attributes].forEach((attr) => {
+                const name = String(attr.name || '').toLowerCase();
+                const value = String(attr.value || '').trim().toLowerCase().replace(/[\s\x00-\x1f]/g, '');
+
+                if (name.startsWith('on')) {
+                    el.removeAttribute(attr.name);
+                    return;
+                }
+
+                if (name === 'href' || name === 'src' || name === 'xlink:href' || name === 'formaction') {
+                    if (
+                        value.startsWith('javascript:') ||
+                        value.startsWith('data:') ||
+                        value.startsWith('vbscript:') ||
+                        value.startsWith('file:') ||
+                        value.startsWith('about:')
+                    ) {
+                        el.removeAttribute(attr.name);
+                    }
+                }
+            });
+        });
+
+        const fragment = document.createDocumentFragment();
+        while (root.firstChild) fragment.appendChild(root.firstChild);
+        container.appendChild(fragment);
     }
 };
 

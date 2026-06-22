@@ -13,7 +13,7 @@ import csv
 from flask import request, session, current_app, has_request_context, g
 from flask_babel import gettext as _
 from flask_login import current_user
-from sqlalchemy import and_, or_, func, inspect, text, Integer
+from sqlalchemy import and_, or_, cast, func, inspect, text, Integer
 from app import db
 from app.utils.datetime_helpers import utcnow, ensure_utc
 from app.utils.transactions import atomic, request_transaction_rollback
@@ -1524,53 +1524,66 @@ def cleanup_inactive_sessions(inactivity_hours=None, max_session_hours=None):
         if max_session_hours is None:
             max_session_hours = Config.PERMANENT_SESSION_LIFETIME.total_seconds() / 3600
 
-        inactivity_cutoff = utcnow() - timedelta(hours=inactivity_hours)
-        max_duration_cutoff = utcnow() - timedelta(hours=max_session_hours)
+        now = utcnow()
+        inactivity_cutoff = now - timedelta(hours=inactivity_hours)
+        max_duration_cutoff = now - timedelta(hours=max_session_hours)
 
-        # Find sessions to expire due to inactivity
-        inactive_sessions = UserSessionLog.query.filter(
+        # Bulk UPDATE: three mutually-exclusive groups to preserve the ended_by audit trail.
+        # A single UPDATE per group replaces the previous pattern of loading all sessions into
+        # Python and issuing N individual UPDATE statements — O(1) round-trips instead of O(N).
+        #
+        # duration_minutes is computed in SQL so we never need to hydrate ORM objects.
+        duration_minutes_expr = cast(
+            func.extract('epoch', func.now() - UserSessionLog.session_start) / 60,
+            Integer,
+        )
+        common_fields = {
+            'session_end': now,
+            'is_active': False,
+            'duration_minutes': duration_minutes_expr,
+        }
+
+        count_both = UserSessionLog.query.filter(
             and_(
                 UserSessionLog.is_active == True,
-                UserSessionLog.last_activity < inactivity_cutoff
+                UserSessionLog.last_activity < inactivity_cutoff,
+                UserSessionLog.session_start < max_duration_cutoff,
             )
-        ).all()
+        ).update(
+            {**common_fields, 'ended_by': 'timeout_and_max_duration'},
+            synchronize_session=False,
+        )
 
-        # Find sessions that have exceeded maximum duration
-        long_sessions = UserSessionLog.query.filter(
+        count_inactive = UserSessionLog.query.filter(
             and_(
                 UserSessionLog.is_active == True,
-                UserSessionLog.session_start < max_duration_cutoff
+                UserSessionLog.last_activity < inactivity_cutoff,
+                UserSessionLog.session_start >= max_duration_cutoff,
             )
-        ).all()
+        ).update(
+            {**common_fields, 'ended_by': 'inactivity_timeout'},
+            synchronize_session=False,
+        )
 
-        # Combine and deduplicate sessions to close
-        sessions_to_close = set(inactive_sessions + long_sessions)
+        count_long = UserSessionLog.query.filter(
+            and_(
+                UserSessionLog.is_active == True,
+                UserSessionLog.last_activity >= inactivity_cutoff,
+                UserSessionLog.session_start < max_duration_cutoff,
+            )
+        ).update(
+            {**common_fields, 'ended_by': 'max_duration_exceeded'},
+            synchronize_session=False,
+        )
 
-        count = 0
-        for session_log in sessions_to_close:
-            session_log.session_end = utcnow()
-            session_log.is_active = False
-
-            # Determine why session was ended
-            if session_log in inactive_sessions and session_log in long_sessions:
-                session_log.ended_by = 'timeout_and_max_duration'
-            elif session_log in inactive_sessions:
-                session_log.ended_by = 'inactivity_timeout'
-            else:
-                session_log.ended_by = 'max_duration_exceeded'
-
-            # Calculate duration
-            # Ensure both datetimes are timezone-aware to avoid subtraction errors
-            session_end_aware = ensure_utc(session_log.session_end)
-            session_start_aware = ensure_utc(session_log.session_start)
-            duration = session_end_aware - session_start_aware
-            session_log.duration_minutes = int(duration.total_seconds() / 60)
-
-            count += 1
+        count = count_both + count_inactive + count_long
 
         if count > 0:
             _commit_or_flush()
-            current_app.logger.info(f"Cleaned up {count} inactive/expired sessions")
+            current_app.logger.info(
+                "Cleaned up %d inactive/expired sessions (%d inactivity+duration, %d inactivity, %d max-duration)",
+                count, count_both, count_inactive, count_long,
+            )
 
         return count
 

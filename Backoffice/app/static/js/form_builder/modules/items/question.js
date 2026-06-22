@@ -3,7 +3,7 @@
 
 import { DataManager } from '../data-manager.js';
 import { SelectHelper, RuleHelper } from './shared.js';
-import { appendRuleToFormData } from '../form-serialization.js';
+import { appendRuleToFormData } from '../rules/form-serialization.js';
 
 export const QuestionItem = {
     setup(modalElement) {

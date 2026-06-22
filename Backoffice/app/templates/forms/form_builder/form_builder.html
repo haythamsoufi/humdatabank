@@ -752,7 +752,7 @@
     </script>
     <script src="{{ static_url('js/floating-progress-banner.js') }}"></script>
     <script type="module" src="{{ static_url('js/form_builder/main.js') }}"></script>
-    <script type="module" src="{{ static_url('js/form_builder/modules/section-modal-variables.js') }}"></script>
+    <script type="module" src="{{ static_url('js/form_builder/modules/variables/section-modal-variables.js') }}"></script>
     <script src="{{ static_url('libs/profile-initials.js') }}"></script>
     <script src="{{ static_url('js/template-access-modal.js') }}"></script>
     <script type="module" nonce="{{ csp_nonce() }}">
@@ -802,8 +802,8 @@
             throw e;
         }
     </script>
-    <script type="module" nonce="{{ csp_nonce() }}" src="{{ static_url('js/form_builder/modules/translation-page.js') }}"></script>
-    <script type="module" nonce="{{ csp_nonce() }}" src="{{ static_url('js/form_builder/modules/translation-page-specific.js') }}"></script>
+    <script type="module" nonce="{{ csp_nonce() }}" src="{{ static_url('js/form_builder/modules/translation/page.js') }}"></script>
+    <script type="module" nonce="{{ csp_nonce() }}" src="{{ static_url('js/form_builder/modules/translation/page-specific.js') }}"></script>
 
     <script nonce="{{ csp_nonce() }}">
         // Loading spinner controller (debug logging lives in /static/js/form_builder/modules/debug.js).
@@ -1184,8 +1184,8 @@
 
     {# Variables Management JavaScript - Now in separate module #}
     <script type="module" nonce="{{ csp_nonce() }}">
-        import { TemplateVariablesManager } from '/static/js/form_builder/modules/template-variables.js';
-        import { VariableFormatter } from '/static/js/form_builder/modules/variable-formatting.js';
+        import { TemplateVariablesManager } from '/static/js/form_builder/modules/variables/template-variables.js';
+        import { VariableFormatter } from '/static/js/form_builder/modules/variables/variable-formatting.js';
 
     // Make template variables globally available for use in item modal and matrix
     window.templateVariables = {{ template_variables|tojson|safe }};

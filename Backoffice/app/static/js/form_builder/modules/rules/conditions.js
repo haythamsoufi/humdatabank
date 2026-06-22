@@ -1,5 +1,5 @@
 // Rule Builder Module
-import { DataManager } from './data-manager.js';
+import { DataManager } from '../data-manager.js';
 // Utils is available globally from utils.js
 
 // Mapping of condition types based on item input types – ported from the legacy builder

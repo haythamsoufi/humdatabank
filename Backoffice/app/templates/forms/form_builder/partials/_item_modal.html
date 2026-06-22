@@ -274,7 +274,13 @@
                             const calculatedOriginalParent = calculatedListContainer.parentElement;
                             const gridContainer = optionsSourceContainer.closest('.modal-grid-container');
                             const rightHalf = gridContainer ? gridContainer.querySelector('.modal-right-half') : null;
-                            const modalContent = optionsSourceContainer.closest('.relative.p-6');
+
+                            function syncRightPanelLayout() {
+                                if (window.ItemModal && typeof window.ItemModal.syncRightPanel === 'function') {
+                                    window.ItemModal.modalElement = window.ItemModal.modalElement || document.getElementById('item-modal');
+                                    window.ItemModal.syncRightPanel();
+                                }
+                            }
 
                             // Function to check if question type is choice-based
                             function isChoiceType(type) {
@@ -296,6 +302,13 @@
                                 if (!isChoice) {
                                     Utils.hideElement(manualOptionsContainer);
                                     Utils.hideElement(calculatedListContainer);
+                                    if (manualOriginalParent && !manualOriginalParent.contains(manualOptionsContainer)) {
+                                        manualOriginalParent.appendChild(manualOptionsContainer);
+                                    }
+                                    if (calculatedOriginalParent && !calculatedOriginalParent.contains(calculatedListContainer)) {
+                                        calculatedOriginalParent.appendChild(calculatedListContainer);
+                                    }
+                                    syncRightPanelLayout();
                                     return;
                                 }
 
@@ -306,55 +319,20 @@
                                 const isListLibrary = selectedSource === 'calculated';
 
                                 if (isListLibrary) {
-                                    // Ensure right pane is visible & two-column layout activated
-                                    if (rightHalf && gridContainer) {
-                                        Utils.showElement(rightHalf);
-                                        gridContainer.classList.add('md:grid-cols-2');
-                                        if (modalContent) {
-                                            modalContent.classList.remove('max-w-xl');
-                                            modalContent.classList.add('max-w-6xl');
-                                        }
-
-                                        // Move container into right pane if not already
-                                        if (!rightHalf.contains(calculatedListContainer)) {
-                                            rightHalf.appendChild(calculatedListContainer);
-                                        }
+                                    if (rightHalf && !rightHalf.contains(calculatedListContainer)) {
+                                        rightHalf.appendChild(calculatedListContainer);
                                     }
                                     Utils.showElement(calculatedListContainer);
                                 } else {
-                                    // Hide calculated container & move back to original parent if needed
                                     Utils.hideElement(calculatedListContainer);
                                     if (calculatedOriginalParent && !calculatedOriginalParent.contains(calculatedListContainer)) {
                                         calculatedOriginalParent.appendChild(calculatedListContainer);
                                     }
-
-                                    // If right half has no other visible sections (all children hidden), collapse it
-                                    if (rightHalf && gridContainer) {
-                                        const hasVisibleContent = Array.from(rightHalf.children).some(ch => !ch.classList.contains('hidden'));
-                                        if (!hasVisibleContent) {
-                                            Utils.hideElement(rightHalf);
-                                            gridContainer.classList.remove('md:grid-cols-2');
-                                            if (modalContent) {
-                                                modalContent.classList.remove('max-w-6xl');
-                                                modalContent.classList.add('max-w-xl');
-                                            }
-                                        }
-                                    }
                                 }
 
                                 if (isManual) {
-                                    if (rightHalf && gridContainer) {
-                                        Utils.showElement(rightHalf);
-                                        gridContainer.classList.add('md:grid-cols-2');
-                                        if (modalContent) {
-                                            modalContent.classList.remove('max-w-xl');
-                                            modalContent.classList.add('max-w-6xl');
-                                        }
-
-                                        // Move container into right pane if not already
-                                        if (!rightHalf.contains(manualOptionsContainer)) {
-                                            rightHalf.appendChild(manualOptionsContainer);
-                                        }
+                                    if (rightHalf && !rightHalf.contains(manualOptionsContainer)) {
+                                        rightHalf.appendChild(manualOptionsContainer);
                                     }
                                     Utils.showElement(manualOptionsContainer);
 
@@ -369,19 +347,9 @@
                                     if (manualOriginalParent && !manualOriginalParent.contains(manualOptionsContainer)) {
                                         manualOriginalParent.appendChild(manualOptionsContainer);
                                     }
-
-                                    if (rightHalf && gridContainer) {
-                                        const hasVisibleContent = Array.from(rightHalf.children).some(ch => !ch.classList.contains('hidden'));
-                                        if (!hasVisibleContent) {
-                                            Utils.hideElement(rightHalf);
-                                            gridContainer.classList.remove('md:grid-cols-2');
-                                            if (modalContent) {
-                                                modalContent.classList.remove('max-w-6xl');
-                                                modalContent.classList.add('max-w-xl');
-                                            }
-                                        }
-                                    }
                                 }
+
+                                syncRightPanelLayout();
                             }
 
                             // Add event listeners
@@ -389,6 +357,8 @@
                             optionsSourceRadios.forEach(radio => {
                                 radio.addEventListener('change', updateOptionsVisibility);
                             });
+
+                            window.updateOptionsVisibility = updateOptionsVisibility;
 
                             // Initial visibility check
                             updateOptionsVisibility();
@@ -897,9 +867,9 @@
                     </div>
 
                     {# Properties Section - Common for all item types #}
-                    <div class="mb-3 border-t border-gray-200 pt-4">
+                    <div id="item-properties-section" class="mb-3 border-t border-gray-200 pt-4">
                         <label class="block text-gray-700 text-sm font-semibold mb-3">{{ _('Properties') }}</label>
-                        <div class="grid grid-cols-2 gap-6 items-center">
+                        <div id="item-properties-content" class="grid grid-cols-2 gap-6 items-center">
                             {# Section Selector - Full width, spans both columns #}
                             <div class="col-span-2">
                                 <label for="item-section-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Section') }}</label>

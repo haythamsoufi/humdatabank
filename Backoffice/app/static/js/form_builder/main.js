@@ -6,10 +6,10 @@ import './modules/utils.js';
 // Utils is now available globally from utils.js
 import { CsrfHandler } from './modules/csrf-handler.js';
 import { DataManager } from './modules/data-manager.js';
-import { ItemModal } from './modules/item-modal.js';
+import { ItemModal } from './modules/modal/item-modal.js';
 import { CalculatedLists } from './modules/calculated-lists.js';
-import RuleBuilder from './modules/conditions.js';
-import { serializeRuleForSubmit } from './modules/form-serialization.js';
+import RuleBuilder from './modules/rules/conditions.js';
+import { serializeRuleForSubmit } from './modules/rules/form-serialization.js';
 import { DynamicSections } from './modules/dynamic-sections.js';
 import { FormSubmitUI } from './modules/form-submit-ui.js';
 import { initFormBuilderDebug } from './modules/debug.js';
@@ -1120,56 +1120,15 @@ function initializeModalHandlers() {
                 if (isVisible) {
                     // Hide the rule section
                     Utils.hideElement(targetElement);
-                    button.replaceChildren();
-                    {
-                        const icon = document.createElement('i');
-                        icon.className = 'fas fa-plus-circle mr-1';
-                        button.append(icon, document.createTextNode(' Add Relevance Rule'));
-                    }
-
-                    // Hide the right half if no rules are visible
-                    const modal = targetElement.closest('.modal-grid-container');
-                    if (modal) {
-                        const rightHalf = modal.querySelector('.modal-right-half');
-                        const visibleRules = rightHalf ? rightHalf.querySelectorAll('.rule-section:not(.hidden), div[id$="-rule-section"]:not(.hidden)') : [];
-                        if (visibleRules.length === 0) {
-                            Utils.hideElement(rightHalf);
-                            modal.classList.remove('md:grid-cols-2');
-                            // Revert modal width when no rule sections are visible
-                            const modalContent = modal.closest('.relative.p-6');
-                            if (modalContent) {
-                                modalContent.classList.remove('max-w-4xl');
-                                modalContent.classList.remove('max-w-6xl');
-                                modalContent.classList.remove('max-w-lg');
-                                modalContent.classList.add('max-w-xl');
-                            }
-                        }
-                    }
+                    ItemModal.renderRuleToggleButton(button, 'add');
+                    ItemModal.modalElement = ItemModal.modalElement || document.getElementById('item-modal');
+                    ItemModal.syncRightPanel();
                 } else {
                     // Show the rule section
                     Utils.showElement(targetElement);
-                    button.replaceChildren();
-                    {
-                        const icon = document.createElement('i');
-                        icon.className = 'fas fa-minus-circle mr-1';
-                        button.append(icon, document.createTextNode(' Hide Relevance Rule'));
-                    }
-
-                    // Show the right half and switch to two-column layout
-                    const modal = targetElement.closest('.modal-grid-container');
-                    if (modal) {
-                        const rightHalf = modal.querySelector('.modal-right-half');
-                        if (rightHalf) {
-                            Utils.showElement(rightHalf);
-                            modal.classList.add('md:grid-cols-2');
-                            // Expand modal width when a rule section is shown
-                            const modalContent = modal.closest('.relative.p-6');
-                            if (modalContent) {
-                                modalContent.classList.remove('max-w-lg', 'max-w-xl', 'max-w-4xl');
-                                modalContent.classList.add('max-w-6xl');
-                            }
-                        }
-                    }
+                    ItemModal.renderRuleToggleButton(button, 'hide');
+                    ItemModal.modalElement = ItemModal.modalElement || document.getElementById('item-modal');
+                    ItemModal.syncRightPanel();
 
                     // Initialize rule builder if not already initialized
                     const ruleBuilder = targetElement.querySelector('.rule-builder') || targetElement.querySelector('[id$="-rule-builder"]');

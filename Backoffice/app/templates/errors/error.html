@@ -110,6 +110,8 @@
             text-decoration: none;
             transition: all 0.2s;
             font-size: 14px;
+            border: 0;
+            cursor: pointer;
         }
 
         .btn-primary {
@@ -243,6 +245,23 @@
         <div class="error-code">{{ error_code }}</div>
         <h1 class="error-title">{{ error_title }}</h1>
         <p class="error-message">{{ error_message }}</p>
+
+        {% if primary_action_url or secondary_action_url %}
+        <div class="error-actions">
+            {% if primary_action_url %}
+                <a class="btn btn-primary" href="{{ primary_action_url }}">
+                    <i class="fas fa-sync-alt"></i>
+                    {{ primary_action_label or 'Try Again' }}
+                </a>
+            {% endif %}
+            {% if secondary_action_url %}
+                <a class="btn btn-secondary" href="{{ secondary_action_url }}">
+                    <i class="fas fa-home"></i>
+                    {{ secondary_action_label or 'Go Home' }}
+                </a>
+            {% endif %}
+        </div>
+        {% endif %}
 
         {% if error_details %}
         <div class="error-details">

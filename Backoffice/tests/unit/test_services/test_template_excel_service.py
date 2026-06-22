@@ -1176,6 +1176,63 @@ class TestImportTemplate:
 
             assert result['success'] is True
 
+    def test_import_replaces_removed_subsections(self, db_session, app):
+        """Excel import replaces structure; removed subsections and stale items must not remain."""
+        with app.app_context():
+            admin = create_test_admin(db_session)
+            template = create_test_template(db_session, name="Import Replace Struct Template")
+            draft = create_test_draft_version(db_session, template, name="Draft Replace")
+
+            parent = create_test_section(
+                db_session, template, version=draft,
+                name="Main Section", order=1, section_type="standard",
+            )
+            create_test_section(
+                db_session, template, version=draft,
+                name="Old Subsection", order=1, section_type="standard",
+                parent_section_id=parent.id,
+            )
+
+            section_cols = _excel_columns(app)['sections']
+            item_cols = _excel_columns(app)['items']
+            section_row = _blank_row(section_cols)
+            section_row[section_cols.index('id')] = 1
+            section_row[section_cols.index('order')] = 1.0
+            section_row[section_cols.index('name')] = "Main Section"
+            section_row[section_cols.index('section_type')] = "dynamic"
+            item_row = _blank_row(item_cols)
+            item_row[item_cols.index('id')] = 1
+            item_row[item_cols.index('section_id')] = 1
+            item_row[item_cols.index('item_type')] = "indicator"
+            item_row[item_cols.index('order')] = 1.0
+            item_row[item_cols.index('label')] = "New Item"
+            item_row[item_cols.index('type')] = "Number"
+
+            buf = _make_export_workbook_bytes(
+                sections=[section_row],
+                items=[item_row],
+                app=app,
+            )
+
+            with app.test_request_context():
+                login_user(admin)
+                result = TemplateExcelService.import_template(
+                    template.id, buf, version_id=draft.id
+                )
+
+            assert result['success'] is True
+            sections = FormSection.query.filter_by(
+                template_id=template.id, version_id=draft.id
+            ).all()
+            assert {s.name for s in sections} == {"Main Section"}
+            main = next(s for s in sections if s.name == "Main Section")
+            assert main.section_type == "dynamic"
+            items = FormItem.query.filter_by(
+                template_id=template.id, version_id=draft.id
+            ).all()
+            assert len(items) == 1
+            assert items[0].label == "New Item"
+
     def test_import_with_parent_section_references(self, db_session, app):
         """Parent section references are resolved correctly in third pass."""
         with app.app_context():

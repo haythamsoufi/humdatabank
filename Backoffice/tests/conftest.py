@@ -192,6 +192,7 @@ def _run_test_schema_reset():
 def _register_error_trigger_routes(app):
     """Register /test-error/<code> routes for error handler unit tests."""
     from flask import Blueprint, abort
+    from flask_wtf.csrf import CSRFError
 
     bp = Blueprint("_error_triggers", __name__, url_prefix="/test-error")
 
@@ -222,6 +223,10 @@ def _register_error_trigger_routes(app):
     @bp.route("/503")
     def trigger_503():
         abort(503)
+
+    @bp.route("/csrf", methods=["GET", "POST"])
+    def trigger_csrf():
+        raise CSRFError("The CSRF session token is missing.")
 
     app.register_blueprint(bp)
 

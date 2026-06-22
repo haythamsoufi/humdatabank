@@ -38,6 +38,18 @@ export function initFormEvents() {
     return actionValue;
   }
 
+  function getConfirmDialogOptions(button) {
+    if (!button) {
+      return { message: null, title: 'Submit Form?', confirmText: 'Submit', action: 'submit' };
+    }
+    return {
+      message: button.getAttribute('data-confirm-message'),
+      title: button.getAttribute('data-confirm-title') || 'Submit Form?',
+      confirmText: button.getAttribute('data-confirm-label') || 'Submit',
+      action: button.value || 'submit',
+    };
+  }
+
   // Add CSRF token refresh functionality for public forms (uses page fetch; admin API not available)
   if (form.closest('[data-is-public-submission]') && typeof window.refreshCsrfFromCurrentPage === 'function') {
     window.refreshCsrfFromCurrentPage();
@@ -200,7 +212,7 @@ export function initFormEvents() {
     button.dataset.confirmHandlerBound = 'true';
 
     button.addEventListener('click', function(event) {
-      const confirmMessage = this.getAttribute('data-confirm-message');
+      const { message: confirmMessage, title, confirmText, action } = getConfirmDialogOptions(this);
       if (confirmMessage) {
         // If a confirmation is already open for this button, ignore repeat clicks
         if (button.dataset.confirmInProgress === 'true') {
@@ -215,97 +227,56 @@ export function initFormEvents() {
 
         button.dataset.confirmInProgress = 'true';
 
+        const submitConfirmed = () => {
+          try {
+            const form = document.getElementById('focalDataEntryForm');
+            if (form) {
+              form.dataset.ifrcForcePresave = '1';
+              setHiddenAction(action);
+              if (form.requestSubmit) {
+                form.requestSubmit(button);
+              } else {
+                form.submit();
+              }
+            }
+          } catch (error) {
+            const form = document.getElementById('focalDataEntryForm');
+            if (form) {
+              setHiddenAction(action);
+              if (form.requestSubmit) {
+                form.requestSubmit(button);
+              } else {
+                form.submit();
+              }
+            }
+          }
+          button.dataset.confirmInProgress = 'false';
+        };
+
         // Use custom confirmation dialog with green submit button
         if (window.showSubmitConfirmation) {
           window.showSubmitConfirmation(
             confirmMessage,
-            async () => {
-              try {
-                const form = document.getElementById('focalDataEntryForm');
-                if (form) {
-                  // The submit we'll trigger from this callback is programmatic; mark it as user-intended
-                  // so the presave handler runs once.
-                  form.dataset.ifrcForcePresave = '1';
-                  // Set the action value and submit
-                  const actionInput = form.querySelector('input[name="action"][type="hidden"]');
-                  if (actionInput) {
-                    actionInput.value = 'submit';
-                  } else {
-                    const newActionInput = document.createElement('input');
-                    newActionInput.type = 'hidden';
-                    newActionInput.name = 'action';
-                    newActionInput.value = 'submit';
-                    form.appendChild(newActionInput);
-                  }
-                  // Submit the form
-                  if (form.requestSubmit) {
-                    form.requestSubmit(button);
-                  } else {
-                    form.submit();
-                  }
-                }
-              } catch (error) {
-                const form = document.getElementById('focalDataEntryForm');
-                if (form) {
-                  const actionInput = form.querySelector('input[name="action"][type="hidden"]');
-                  if (actionInput) {
-                    actionInput.value = 'submit';
-                  } else {
-                    const newActionInput = document.createElement('input');
-                    newActionInput.type = 'hidden';
-                    newActionInput.name = 'action';
-                    newActionInput.value = 'submit';
-                    form.appendChild(newActionInput);
-                  }
-                  if (form.requestSubmit) {
-                    form.requestSubmit(button);
-                  } else {
-                    form.submit();
-                  }
-                }
-              }
-              button.dataset.confirmInProgress = 'false';
-            },
+            submitConfirmed,
             () => {
               window.__clientLog && window.__clientLog('Submit cancelled by user');
               button.dataset.confirmInProgress = 'false';
-            }
+            },
+            confirmText,
+            'Cancel',
+            title
           );
         } else if (window.showConfirmation) {
           // Avoid native confirm; use the generic custom confirmation dialog if submit-specific is unavailable
           window.showConfirmation(
             confirmMessage,
-            async () => {
-              // User confirmed - proceed with submission (server saves in the submit request)
-              const form = document.getElementById('focalDataEntryForm');
-              if (form) {
-                // The submit we'll trigger from this callback is programmatic; mark it as user-intended
-                // so the presave handler runs once.
-                form.dataset.ifrcForcePresave = '1';
-                const actionInput = form.querySelector('input[name="action"][type="hidden"]');
-                if (actionInput) {
-                  actionInput.value = 'submit';
-                } else {
-                  const newActionInput = document.createElement('input');
-                  newActionInput.type = 'hidden';
-                  newActionInput.name = 'action';
-                  newActionInput.value = 'submit';
-                  form.appendChild(newActionInput);
-                }
-                if (form.requestSubmit) {
-                  form.requestSubmit(button);
-                } else {
-                  form.submit();
-                }
-              }
-              button.dataset.confirmInProgress = 'false';
-            },
+            submitConfirmed,
             () => {
               button.dataset.confirmInProgress = 'false';
             },
-            'Submit',
+            confirmText,
             'Cancel',
-            'Submit Form?'
+            title
           );
         } else {
           window.__clientWarn && window.__clientWarn('Custom confirmation dialog not available:', confirmMessage);
@@ -462,14 +433,17 @@ export function initFormEvents() {
       const submitSubmitter = form.querySelector('button[type="submit"][name="action"][value="submit"]');
       const sendForReviewSubmitter = form.querySelector('button[type="submit"][name="action"][value="send_for_review"]');
       const activeSubmitter = submitSubmitter || sendForReviewSubmitter;
-      const activeAction = submitSubmitter ? 'submit' : (sendForReviewSubmitter ? 'send_for_review' : 'submit');
+      const activeOptions = getConfirmDialogOptions(activeSubmitter);
+      const activeAction = activeOptions.action;
 
       // Prefer the active submitter's own confirm message; fall back to the FAB menu's submit-confirm
       // only when the action is actually a submission (not a send-for-review).
       const fabMenu = document.getElementById('fab-menu');
-      const confirmMessage = activeSubmitter?.dataset?.confirmMessage ||
+      const confirmMessage = activeOptions.message ||
                             (activeAction === 'submit' ? fabMenu?.dataset?.submitConfirm : null) ||
                             null;
+      const confirmTitle = activeOptions.title;
+      const confirmLabel = activeOptions.confirmText;
 
       const doSubmit = () => {
         if (activeSubmitter) {
@@ -499,7 +473,10 @@ export function initFormEvents() {
           window.showSubmitConfirmation(
             confirmMessage,
             doSubmit,
-            () => { window.__clientLog && window.__clientLog('Submit cancelled by user'); }
+            () => { window.__clientLog && window.__clientLog('Submit cancelled by user'); },
+            confirmLabel,
+            'Cancel',
+            confirmTitle
           );
           return; // Exit early, submission will happen in callback if confirmed
         } else if (window.showConfirmation) {
@@ -508,9 +485,9 @@ export function initFormEvents() {
             confirmMessage,
             doSubmit,
             () => { window.__clientLog && window.__clientLog('Submit cancelled by user'); },
-            'Submit',
+            confirmLabel,
             'Cancel',
-            'Submit Form?'
+            confirmTitle
           );
           return; // Exit early; submission will happen in callback if confirmed
         } else {

@@ -1,8 +1,9 @@
 """HTTP error handlers for the Flask application."""
 
 from contextlib import suppress
-from flask import render_template, request, session, current_app
+from flask import render_template, request, session, current_app, url_for
 from flask_login import current_user
+from flask_wtf.csrf import CSRFError
 
 from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_not_found, json_server_error
 from app.utils.csp_nonce import get_style_nonce
@@ -10,8 +11,51 @@ from app.utils.datetime_helpers import utcnow
 from app.utils.request_utils import is_json_request
 
 
+def _safe_csrf_reload_url():
+    """Prefer the referring page so a failed POST returns to the form with a fresh token."""
+    referrer = (request.referrer or "").strip()
+    if referrer and referrer.startswith(request.host_url):
+        return referrer
+    with suppress(Exception):
+        return url_for("main.dashboard")
+    return "/"
+
+
 def register_error_handlers(app):
     """Register all HTTP error handlers on the Flask app."""
+
+    @app.errorhandler(CSRFError)
+    def csrf_error(error):
+        desc = getattr(error, "description", None) or "CSRF token missing or invalid"
+        current_app.logger.warning(
+            "CSRF validation failed: %s | %s %s",
+            desc,
+            request.method,
+            request.path,
+        )
+
+        if is_json_request():
+            return json_bad_request(
+                "Your form security token expired. Refresh the page and try again.",
+                success=False,
+                error="CSRF validation failed",
+                error_code=400,
+                csrf_refresh_required=True,
+            )
+
+        return render_template(
+            'errors/error.html',
+            error_code=400,
+            error_title='Page Needs Refresh',
+            error_message='Your form security token expired or was missing. Reload the form to get a fresh token, then try again.',
+            error_details=str(error) if app.config.get('DEBUG') else None,
+            primary_action_label='Reload Form',
+            primary_action_url=_safe_csrf_reload_url(),
+            secondary_action_label='Go to Dashboard',
+            secondary_action_url=url_for("main.dashboard"),
+            current_user=current_user,
+            style_nonce=get_style_nonce(),
+        ), 400
 
     @app.errorhandler(400)
     def bad_request(error):

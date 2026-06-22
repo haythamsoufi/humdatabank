@@ -2231,11 +2231,9 @@ class TemplateExcelService:
 
                 current_app.logger.info(f"Created new draft version: ID={new_draft.id}, Version #={new_draft.version_number}")
                 cls._matrix_import_log(
-                    f"Published import: cloned version {target_version.id} -> new draft {new_draft.id}"
+                    f"Published import: created draft {new_draft.id} from version {target_version.id} "
+                    f"(structure will be rebuilt from Excel)"
                 )
-
-                # Clone structure from published version to draft
-                cls._clone_template_structure(template.id, target_version.id, new_draft.id)
 
                 # Use the new draft as target
                 target_version = new_draft
@@ -2255,6 +2253,10 @@ class TemplateExcelService:
                 current_app.logger.warning(f"Template metadata import errors: {template_errors}")
             else:
                 current_app.logger.info("Template metadata imported successfully")
+
+            # Excel import is a full structure replace: drop existing pages/sections/items first
+            # so renamed sections, changed types, and removed subsections don't linger.
+            cls._clear_version_structure(template.id, target_version.id)
 
             # ID mapping dictionaries (export ID -> new database ID)
             # Export IDs are sequential (1, 2, 3...) and map to new database IDs
@@ -2434,6 +2436,11 @@ class TemplateExcelService:
 
             if 'variables' in row_data:
                 raw_variables = row_data.get('variables')
+                current_app.logger.info(
+                    f"Variables cell raw value type={type(raw_variables).__name__} "
+                    f"len={len(str(raw_variables)) if raw_variables is not None else 0}: "
+                    f"{str(raw_variables)[:200]}"
+                )
                 variables = cls._parse_json(raw_variables)
                 if variables is not None:  # Allow empty dict {} to clear variables
                     # Save to version (version-specific template variables)
@@ -2446,6 +2453,8 @@ class TemplateExcelService:
                         f"Could not parse variables JSON from Excel (value truncated or malformed): "
                         f"{str(raw_variables)[:300]}"
                     )
+                else:
+                    current_app.logger.info("variables cell is empty in Excel — skipping (no overwrite)")
 
             db.session.add(template)
             db.session.add(version)
@@ -3058,6 +3067,27 @@ class TemplateExcelService:
             current_app.logger.warning(f"Could not rewrite rule item IDs after item import: {e}", exc_info=True)
 
         return errors
+
+    @classmethod
+    def _clear_version_structure(cls, template_id: int, version_id: int) -> Dict[str, int]:
+        """Delete all pages, sections, and items for a version (keeps the version row itself)."""
+        current_app.logger.info(
+            f"Clearing existing structure for template_id={template_id}, version_id={version_id} before Excel import"
+        )
+        items_deleted = FormItem.query.filter_by(
+            template_id=template_id, version_id=version_id
+        ).delete(synchronize_session=False)
+        sections_deleted = FormSection.query.filter_by(
+            template_id=template_id, version_id=version_id
+        ).delete(synchronize_session=False)
+        pages_deleted = FormPage.query.filter_by(
+            template_id=template_id, version_id=version_id
+        ).delete(synchronize_session=False)
+        db.session.flush()
+        current_app.logger.info(
+            f"Cleared version structure: {pages_deleted} pages, {sections_deleted} sections, {items_deleted} items"
+        )
+        return {'pages': pages_deleted, 'sections': sections_deleted, 'items': items_deleted}
 
     @classmethod
     def _clone_template_structure(cls, template_id: int, source_version_id: int, target_version_id: int) -> None:

@@ -536,6 +536,8 @@
                             {% if can_send_for_review %}
                             <button type="submit" name="action" value="send_for_review"
                                     class="btn btn-success flex-1"
+                                    data-confirm-title="{{ _('Send for Review?') }}"
+                                    data-confirm-label="{{ _('Send for Review') }}"
                                     data-confirm-message="{{ _('Send this assignment to delegation for review? You will not be able to edit it until they return it for changes.') }}">
                                 <i class="fas fa-user-check w-4 h-4 mr-2"></i>
                                 {{ _('Send for Review') }}
@@ -544,6 +546,8 @@
                             {% if can_finalize_submit %}
                             <button type="submit" name="action" value="submit"
                                     class="btn btn-success flex-1"
+                                    data-confirm-title="{{ _('Submit Form?') }}"
+                                    data-confirm-label="{{ _('Submit') }}"
                                     data-confirm-message="{{ _('Are you sure you want to submit this form? You will not be able to edit it after submission.') }}">
                                 <i class="fas fa-paper-plane w-4 h-4 mr-2"></i>
                                 {{ _('Submit') }}

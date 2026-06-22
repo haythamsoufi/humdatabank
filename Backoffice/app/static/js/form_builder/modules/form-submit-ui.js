@@ -194,6 +194,9 @@ export const FormSubmitUI = {
       if (form.getAttribute('target') && form.getAttribute('target') !== '_self') return false;
       // Avoid download-y forms if any (hard to detect perfectly; allow explicit opt-out)
       if (action.includes('export') || action.includes('download')) return false;
+      // Never AJAX-ify file-upload forms — File objects can't survive JSON serialisation
+      const enctype = (form.getAttribute('enctype') || '').toLowerCase();
+      if (enctype.includes('multipart')) return false;
       return true;
     };
 
@@ -202,9 +205,62 @@ export const FormSubmitUI = {
       const doc = new DOMParser().parseFromString(htmlText, 'text/html');
       if (!doc) return;
 
+      const syncVersionUiFromDoc = (sourceDoc) => {
+        if (!sourceDoc) return;
+        const newVersionBtn = sourceDoc.getElementById('versions-modal-btn');
+        const curVersionBtn = document.getElementById('versions-modal-btn');
+        if (newVersionBtn && curVersionBtn) {
+          curVersionBtn.innerHTML = newVersionBtn.innerHTML;
+        }
+
+        const pickActiveVersionId = () => {
+          const fromItemModal = sourceDoc.getElementById('item-modal-version-id')?.value;
+          if (fromItemModal) return fromItemModal;
+          const fromBanner = sourceDoc.querySelector('#form-builder-status-banners input[name="version_id"]')?.value;
+          if (fromBanner) return fromBanner;
+          const fromSectionForm = sourceDoc.querySelector('#section-form input[name="version_id"]')?.value;
+          return fromSectionForm || null;
+        };
+
+        const nextVersionId = pickActiveVersionId();
+        if (!nextVersionId) return;
+
+        const syncFieldValue = (id) => {
+          const src = sourceDoc.getElementById(id);
+          const dst = document.getElementById(id);
+          if (src && dst) dst.value = src.value;
+        };
+        syncFieldValue('item-modal-version-id');
+
+        const srcSectionVersion = sourceDoc.querySelector('#section-form input[name="version_id"]');
+        const dstSectionVersion = document.querySelector('#section-form input[name="version_id"]');
+        if (srcSectionVersion && dstSectionVersion) {
+          dstSectionVersion.value = srcSectionVersion.value;
+        }
+
+        const excelForm = document.getElementById('import-excel-form');
+        const srcExcelVersion = sourceDoc.querySelector('#import-excel-form input[name="version_id"]');
+        const dstExcelVersion = excelForm?.querySelector('input[name="version_id"]');
+        if (srcExcelVersion && dstExcelVersion) {
+          dstExcelVersion.value = srcExcelVersion.value;
+        }
+
+        const parsedVersionId = parseInt(nextVersionId, 10);
+        if (!Number.isNaN(parsedVersionId)) {
+          if (window.templateVariablesManager) {
+            window.templateVariablesManager.versionId = parsedVersionId;
+          }
+          if (window.fbAiAssistant && typeof window.fbAiAssistant === 'object') {
+            window.fbAiAssistant.versionId = parsedVersionId;
+          }
+        }
+      };
+
       const idsToReplace = [
         // Version status banners (draft / published / archived notices)
         'form-builder-status-banners',
+        // Versions list modal (deploy/delete/create actions)
+        'versions-modal',
         // Main builder list
         'sections-container',
         // Template details + pages editor
@@ -231,6 +287,8 @@ export const FormSubmitUI = {
         if (!nextEl || !curEl) return;
         curEl.replaceWith(nextEl);
       });
+
+      syncVersionUiFromDoc(doc);
 
       try {
         document.dispatchEvent(new CustomEvent('formBuilder:domUpdated'));
@@ -449,10 +507,15 @@ export const FormSubmitUI = {
           throw (window.httpErrorSync && window.httpErrorSync(resp)) || new Error(`HTTP ${resp.status}`);
         }
 
-        // If the server followed a redirect to a new version_id, keep URL in sync.
+        // Keep URL in sync when the server redirects (e.g. after deleting the active version).
         try {
-          if (resp.url && typeof resp.url === 'string' && resp.url.includes('version_id=')) {
-            window.history.replaceState({}, document.title, resp.url);
+          if (resp.url && typeof resp.url === 'string') {
+            const currentUrl = window.location.pathname + window.location.search;
+            const nextUrlObj = new URL(resp.url, window.location.origin);
+            const nextUrl = nextUrlObj.pathname + nextUrlObj.search;
+            if (nextUrl !== currentUrl) {
+              window.history.replaceState({}, document.title, resp.url);
+            }
           }
         } catch (_e) {}
 

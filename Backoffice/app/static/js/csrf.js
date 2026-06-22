@@ -12,8 +12,14 @@ function shouldUseAdminCsrfRefresh() {
     return window.location.pathname.startsWith('/admin');
 }
 
+const CSRF_REFRESH_INTERVAL_MS = 45 * 60 * 1000;
+const CSRF_PRE_SUBMIT_REFRESH_AFTER_MS = 40 * 60 * 1000;
+const CSRF_WAKE_REFRESH_AFTER_MS = 20 * 60 * 1000;
+
 let csrfRefreshTimerId = null;
 let csrfSessionExpired = false;
+let csrfLastRefreshAt = Date.now();
+let csrfRefreshPromise = null;
 
 function handleCsrfSessionExpired() {
     if (csrfSessionExpired) return;
@@ -40,6 +46,7 @@ function applyCsrfToken(token) {
         window.rawCsrfTokenValue = token;
     }
 
+    csrfLastRefreshAt = Date.now();
     return token;
 }
 
@@ -79,8 +86,9 @@ async function refreshCSRFTokenViaAdminApi() {
 // Function to refresh CSRF token
 async function refreshCSRFToken() {
     if (csrfSessionExpired) return null;
+    if (csrfRefreshPromise) return csrfRefreshPromise;
 
-    try {
+    csrfRefreshPromise = (async () => {
         if (shouldUseAdminCsrfRefresh()) {
             return await refreshCSRFTokenViaAdminApi();
         }
@@ -88,12 +96,85 @@ async function refreshCSRFToken() {
             return await refreshCsrfFromCurrentPage();
         }
         return null;
+    })();
+
+    try {
+        return await csrfRefreshPromise;
     } catch (error) {
         if (!csrfSessionExpired) {
             console.warn('Error refreshing CSRF token:', error);
         }
         return null;
+    } finally {
+        csrfRefreshPromise = null;
     }
+}
+
+function refreshCSRFTokenIfStale(maxAgeMs = CSRF_PRE_SUBMIT_REFRESH_AFTER_MS) {
+    if (csrfSessionExpired) return Promise.resolve(null);
+    if ((Date.now() - csrfLastRefreshAt) < maxAgeMs) return Promise.resolve(getCSRFToken());
+    return refreshCSRFToken();
+}
+
+function isUnsafeSameOriginForm(form) {
+    if (!(form instanceof HTMLFormElement)) return false;
+
+    const method = (form.getAttribute('method') || 'GET').toUpperCase();
+    if (method === 'GET' || method === 'DIALOG') return false;
+
+    try {
+        const action = form.getAttribute('action') || window.location.href;
+        return new URL(action, window.location.href).origin === window.location.origin;
+    } catch (_) {
+        return false;
+    }
+}
+
+function submitFormAfterCsrfRefresh(form, submitter) {
+    form.dataset.csrfRefreshSubmit = '1';
+
+    if (form.requestSubmit) {
+        try {
+            if (submitter && submitter.form === form) {
+                form.requestSubmit(submitter);
+            } else {
+                form.requestSubmit();
+            }
+            return;
+        } catch (error) {
+            console.warn('CSRF pre-submit requestSubmit failed; falling back to submit()', error);
+        }
+    }
+
+    form.submit();
+}
+
+function handleStaleCsrfFormSubmit(event) {
+    const form = event.target;
+    if (!isUnsafeSameOriginForm(form)) return;
+    if (event.defaultPrevented) return;
+
+    if (form.dataset.csrfRefreshSubmit === '1') {
+        delete form.dataset.csrfRefreshSubmit;
+        return;
+    }
+
+    if ((Date.now() - csrfLastRefreshAt) < CSRF_PRE_SUBMIT_REFRESH_AFTER_MS) return;
+
+    event.preventDefault();
+    const submitter = event.submitter || null;
+
+    refreshCSRFToken()
+        .catch(() => null)
+        .then(() => submitFormAfterCsrfRefresh(form, submitter));
+}
+
+function refreshCsrfOnPageWake(event) {
+    const forceRefresh = event && event.type === 'pageshow' && event.persisted;
+    if (!forceRefresh && document.visibilityState === 'hidden') return;
+
+    const maxAge = forceRefresh ? 0 : CSRF_WAKE_REFRESH_AFTER_MS;
+    refreshCSRFTokenIfStale(maxAge).catch(() => null);
 }
 
 /**
@@ -148,7 +229,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Periodically refresh CSRF token (every 45 minutes).
     // Admin pages use /admin/api/refresh-csrf-token; other pages re-fetch the current page.
-    csrfRefreshTimerId = setInterval(refreshCSRFToken, 45 * 60 * 1000);
+    csrfRefreshTimerId = setInterval(refreshCSRFToken, CSRF_REFRESH_INTERVAL_MS);
+    document.addEventListener('submit', handleStaleCsrfFormSubmit, true);
+    document.addEventListener('visibilitychange', refreshCsrfOnPageWake);
+    window.addEventListener('focus', refreshCsrfOnPageWake);
+    window.addEventListener('pageshow', refreshCsrfOnPageWake);
 });
 
 // Enhanced fetch wrapper that handles CSRF token expiration
@@ -283,7 +368,7 @@ window.csrfFetch = async function(url, options = {}) {
                 console.log('CSRF token expired, attempting to refresh...');
                 retryCount++;
                 const newToken = await refreshCSRFToken();
-                if (newToken && newToken !== getCSRFToken()) {
+                if (newToken) {
                     console.log('CSRF token refreshed, retrying request...');
                     response = await makeRequest(newToken);
                 } else {

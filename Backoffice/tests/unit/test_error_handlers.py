@@ -58,6 +58,25 @@ class TestBadRequestHandler:
         assert resp.status_code == 400
 
 
+class TestCsrfErrorHandler:
+    def test_json_response_marks_csrf_refresh_required(self, client):
+        resp = client.post("/test-error/csrf", headers=JSON_HEADERS)
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data["success"] is False
+        assert data["error"] == "CSRF validation failed"
+        assert data["csrf_refresh_required"] is True
+
+    def test_html_response_shows_reload_action(self, client):
+        resp = client.post(
+            "/test-error/csrf",
+            headers={**HTML_HEADERS, "Referer": "http://localhost/form-page"},
+        )
+        assert resp.status_code == 400
+        assert b"Page Needs Refresh" in resp.data
+        assert b"Reload Form" in resp.data
+
+
 # ===========================================================================
 # 401 Unauthorized
 # ===========================================================================

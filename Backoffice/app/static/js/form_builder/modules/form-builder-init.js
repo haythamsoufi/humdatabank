@@ -26,134 +26,127 @@ function submitBuilderForm(form) {
 }
 
 /**
- * Initialize versions modal functionality
+ * Wire version modal actions (idempotent — safe after AJAX DOM swaps).
  */
-export function initVersionsModal() {
-    document.addEventListener('DOMContentLoaded', function() {
-        const versionsModalBtn = document.getElementById('versions-modal-btn');
-        const versionsModal = document.getElementById('versions-modal');
+export function wireVersionsModal() {
+    const versionsModalBtn = document.getElementById('versions-modal-btn');
+    const versionsModal = document.getElementById('versions-modal');
 
-        // Show modal when button is clicked
-        if (versionsModalBtn && versionsModal) {
-            versionsModalBtn.addEventListener('click', function() {
-                versionsModal.classList.remove('hidden');
-            });
-        }
+    if (versionsModalBtn && versionsModalBtn.dataset.fbWired !== '1') {
+        versionsModalBtn.dataset.fbWired = '1';
+        versionsModalBtn.addEventListener('click', function() {
+            // Resolve modal at click time — #versions-modal is replaced after AJAX refreshes.
+            const modal = document.getElementById('versions-modal');
+            if (modal) modal.classList.remove('hidden');
+        });
+    }
 
-        // Close modal handlers
-        if (versionsModal) {
-            const closeModalBtns = versionsModal.querySelectorAll('.close-modal');
-            closeModalBtns.forEach(btn => {
-                btn.addEventListener('click', function() {
-                    versionsModal.classList.add('hidden');
-                });
-            });
-
-            // Close modal when clicking outside
-            versionsModal.addEventListener('click', function(e) {
-                if (e.target === versionsModal) {
-                    versionsModal.classList.add('hidden');
-                }
-            });
-        }
-
-        // Deploy version handlers for all versions in table
-        document.querySelectorAll('[class*="deploy-version-btn-"]').forEach(btn => {
+    if (versionsModal && versionsModal.dataset.fbBackdropWired !== '1') {
+        versionsModal.dataset.fbBackdropWired = '1';
+        versionsModal.querySelectorAll('.close-modal').forEach(btn => {
             btn.addEventListener('click', function() {
-                const form = this.closest('form');
-                const deployMessage = window.formBuilderMessages?.deployVersion ||
-                    'Deploy this version? This will publish it as the live version.';
-                const doDeploy = () => { if (form) submitBuilderForm(form); };
-                if (form) {
-                    if (window.showConfirmation) {
-                        window.showConfirmation(deployMessage, doDeploy, null, 'Deploy', 'Cancel', 'Deploy Version?');
-                    }
-                }
+                versionsModal.classList.add('hidden');
             });
         });
-
-        // Delete version handlers for all versions in table
-        document.querySelectorAll('[class*="delete-version-btn-"]').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const form = this.closest('form');
-                const deleteMessage = window.formBuilderMessages?.deleteVersion ||
-                    'Delete this version? This cannot be undone.';
-                const doDelete = () => { if (form) submitBuilderForm(form); };
-                if (window.showDangerConfirmation) {
-                    window.showDangerConfirmation(deleteMessage, doDelete, null, 'Delete', 'Cancel', 'Delete Version?');
-                } else if (window.showConfirmation) {
-                    window.showConfirmation(deleteMessage, doDelete, null, 'Delete', 'Cancel', 'Delete Version?');
-                }
-            });
-        });
-
-        // Handle note field editing - show save button when user starts editing
-        document.querySelectorAll('.version-note-input').forEach(input => {
-            const versionId = input.getAttribute('data-version-id');
-            const saveBtn = document.getElementById('version-note-save-btn-' + versionId);
-            const originalValue = input.getAttribute('data-original-value') || '';
-
-            if (saveBtn) {
-                // Show save button when value changes
-                input.addEventListener('input', function() {
-                    if (this.value !== originalValue) {
-                        saveBtn.classList.remove('hidden');
-                    } else {
-                        saveBtn.classList.add('hidden');
-                    }
-                });
-
-                // Also check on focus to handle paste operations
-                input.addEventListener('focus', function() {
-                    // Delay check to allow paste to complete
-                    setTimeout(() => {
-                        if (this.value !== originalValue) {
-                            saveBtn.classList.remove('hidden');
-                        }
-                    }, 100);
-                });
-
-                // Hide save button if user reverts to original value
-                input.addEventListener('blur', function() {
-                    if (this.value === originalValue) {
-                        saveBtn.classList.add('hidden');
-                    }
-                });
+        versionsModal.addEventListener('click', function(e) {
+            if (e.target === versionsModal) {
+                versionsModal.classList.add('hidden');
             }
         });
+    }
 
-        // Convert UTC datetimes to user's local timezone
-        document.querySelectorAll('.version-datetime').forEach(element => {
-            const utcDatetimeStr = element.getAttribute('data-datetime');
-            if (utcDatetimeStr) {
-                try {
-                    // Ensure the datetime string has timezone info (add 'Z' for UTC if missing)
-                    let isoString = utcDatetimeStr.trim();
-                    // Check if it has timezone info (Z, +, or - after the time portion)
-                    if (!isoString.endsWith('Z') && !isoString.match(/[+-]\d{2}:\d{2}$/)) {
-                        // If no timezone indicator, assume UTC (naive datetime from Python)
-                        // Add 'Z' to indicate UTC
-                        isoString = isoString + (isoString.includes('T') ? 'Z' : 'T00:00:00Z');
-                    }
-
-                    // Parse UTC datetime string - JavaScript Date automatically converts to local timezone
-                    const date = new Date(isoString);
-                    if (!isNaN(date.getTime())) {
-                        // Format in user's local timezone using toLocaleString or manual formatting
-                        const year = date.getFullYear();
-                        const month = String(date.getMonth() + 1).padStart(2, '0');
-                        const day = String(date.getDate()).padStart(2, '0');
-                        const hours = String(date.getHours()).padStart(2, '0');
-                        const minutes = String(date.getMinutes()).padStart(2, '0');
-                        element.textContent = `${year}-${month}-${day} ${hours}:${minutes}`;
-                    }
-                } catch (e) {
-                    // If conversion fails, keep the original UTC time
-                    console.warn('Failed to convert datetime to local timezone:', e);
+    document.querySelectorAll('[class*="deploy-version-btn-"]').forEach(btn => {
+        if (btn.dataset.fbWired === '1') return;
+        btn.dataset.fbWired = '1';
+        btn.addEventListener('click', function() {
+            const form = this.closest('form');
+            const deployMessage = window.formBuilderMessages?.deployVersion ||
+                'Deploy this version? This will publish it as the live version.';
+            const doDeploy = () => { if (form) submitBuilderForm(form); };
+            if (form) {
+                if (window.showConfirmation) {
+                    window.showConfirmation(deployMessage, doDeploy, null, 'Deploy', 'Cancel', 'Deploy Version?');
                 }
             }
         });
     });
+
+    document.querySelectorAll('[class*="delete-version-btn-"]').forEach(btn => {
+        if (btn.dataset.fbWired === '1') return;
+        btn.dataset.fbWired = '1';
+        btn.addEventListener('click', function() {
+            const form = this.closest('form');
+            const deleteMessage = window.formBuilderMessages?.deleteVersion ||
+                'Delete this version? This cannot be undone.';
+            const doDelete = () => { if (form) submitBuilderForm(form); };
+            if (window.showDangerConfirmation) {
+                window.showDangerConfirmation(deleteMessage, doDelete, null, 'Delete', 'Cancel', 'Delete Version?');
+            } else if (window.showConfirmation) {
+                window.showConfirmation(deleteMessage, doDelete, null, 'Delete', 'Cancel', 'Delete Version?');
+            }
+        });
+    });
+
+    document.querySelectorAll('.version-note-input').forEach(input => {
+        if (input.dataset.fbWired === '1') return;
+        input.dataset.fbWired = '1';
+        const versionId = input.getAttribute('data-version-id');
+        const saveBtn = document.getElementById('version-note-save-btn-' + versionId);
+        const originalValue = input.getAttribute('data-original-value') || '';
+
+        if (saveBtn) {
+            input.addEventListener('input', function() {
+                if (this.value !== originalValue) {
+                    saveBtn.classList.remove('hidden');
+                } else {
+                    saveBtn.classList.add('hidden');
+                }
+            });
+
+            input.addEventListener('focus', function() {
+                setTimeout(() => {
+                    if (this.value !== originalValue) {
+                        saveBtn.classList.remove('hidden');
+                    }
+                }, 100);
+            });
+
+            input.addEventListener('blur', function() {
+                if (this.value === originalValue) {
+                    saveBtn.classList.add('hidden');
+                }
+            });
+        }
+    });
+
+    document.querySelectorAll('.version-datetime').forEach(element => {
+        const utcDatetimeStr = element.getAttribute('data-datetime');
+        if (!utcDatetimeStr) return;
+        try {
+            let isoString = utcDatetimeStr.trim();
+            if (!isoString.endsWith('Z') && !isoString.match(/[+-]\d{2}:\d{2}$/)) {
+                isoString = isoString + (isoString.includes('T') ? 'Z' : 'T00:00:00Z');
+            }
+            const date = new Date(isoString);
+            if (!isNaN(date.getTime())) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                element.textContent = `${year}-${month}-${day} ${hours}:${minutes}`;
+            }
+        } catch (e) {
+            console.warn('Failed to convert datetime to local timezone:', e);
+        }
+    });
+}
+
+/**
+ * Initialize versions modal functionality
+ */
+export function initVersionsModal() {
+    document.addEventListener('DOMContentLoaded', wireVersionsModal);
 }
 
 /**
@@ -578,6 +571,8 @@ function enhance() {
             if (trigger) trigger.click();
         });
     }
+
+    wireVersionsModal();
 }
 
 // Expose for AJAX refresh calls

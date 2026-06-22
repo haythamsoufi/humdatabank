@@ -730,7 +730,8 @@
         }
     </style>
 </head>
-<body>
+<body{% if show_staging_banner %} class="has-staging-banner"{% endif %}>
+    {% include 'components/_staging_environment_banner.html' %}
     {% set _org_logo = ((ORGANIZATION_BRANDING or {}).get('organization_favicon_path') or 'favicon.svg')|trim %}
     {% set _copyright_year = (ORGANIZATION_BRANDING or {}).get('organization_copyright_year') %}
 

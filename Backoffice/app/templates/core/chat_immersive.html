@@ -78,7 +78,8 @@
     <script src="{{ static_url('js/chatbot.js') }}" defer></script>
     <script src="{{ static_url('js/chat-immersive.js') }}" defer></script>
 </head>
-<body class="chat-immersive" data-language="{{ session.get('language', 'en') }}" data-chat-websocket-enabled="{{ 'true' if websocket_enabled|default(true) else 'false' }}">
+<body class="chat-immersive{% if show_staging_banner %} has-staging-banner{% endif %}" data-language="{{ session.get('language', 'en') }}" data-chat-websocket-enabled="{{ 'true' if websocket_enabled|default(true) else 'false' }}">
+    {% include 'components/_staging_environment_banner.html' %}
     {% if user_is_explicit_beta_tester(current_user) %}
     <div class="chat-immersive-beta-banner" id="chatImmersiveBetaBanner" role="banner">
         <i class="fas fa-flask" aria-hidden="true"></i>

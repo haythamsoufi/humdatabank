@@ -23,7 +23,8 @@
         }
     </style>
 </head>
-<body>
+<body{% if show_staging_banner %} class="has-staging-banner"{% endif %}>
+    {% include 'components/_staging_environment_banner.html' %}
     <div id="swagger-ui"></div>
 
     <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>

@@ -52,7 +52,8 @@
         }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800 antialiased">
+<body class="bg-gray-50 text-gray-800 antialiased{% if show_staging_banner %} has-staging-banner{% endif %}">
+    {% include 'components/_staging_environment_banner.html' %}
 
     <!-- Integrated Header -->
     <header class="absolute top-0 left-0 right-0 z-30 py-8 px-4 md:px-12">

@@ -14,6 +14,31 @@ html, body {
     overflow: hidden;
 }
 
+/* Staging environment banner (FLASK_CONFIG=staging) */
+body.has-staging-banner {
+    --staging-banner-height: 2.25rem;
+    display: flex;
+    flex-direction: column;
+}
+
+body.has-staging-banner .staging-environment-banner {
+    position: sticky;
+    top: 0;
+    flex-shrink: 0;
+}
+
+body.has-staging-banner .staging-app-shell {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    max-height: calc(100vh - var(--staging-banner-height));
+}
+
+body.has-staging-banner #adminSidebar {
+    top: var(--staging-banner-height);
+    height: calc(100vh - var(--staging-banner-height));
+}
+
 /* Desktop Sidebar Styles */
 .admin-sidebar {
     width: 240px;

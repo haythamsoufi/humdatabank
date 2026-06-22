@@ -32,6 +32,7 @@ def create_app(config_name=None):
     selected_config_name = config_name or os.getenv('FLASK_CONFIG', 'default')
     config_class = config_map.get(selected_config_name, Config)
     app.config.from_object(config_class)
+    app.config['FLASK_CONFIG'] = selected_config_name
 
     if app.config.get("DEBUG_SKIP_LOGIN") and not app.config.get("DEBUG", False):
         raise RuntimeError("DEBUG_SKIP_LOGIN is enabled but DEBUG is false. Refusing to start.")

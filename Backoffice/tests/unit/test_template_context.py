@@ -77,6 +77,49 @@ class TestRegisterTemplateContext:
 
 
 # ---------------------------------------------------------------------------
+# inject_staging_environment_banner context processor
+# ---------------------------------------------------------------------------
+
+class TestInjectStagingEnvironmentBanner:
+    def _staging_banner_result(self, app):
+        processors = app.template_context_processors.get(None, [])
+        for proc in processors:
+            try:
+                result = proc()
+                if 'show_staging_banner' in result:
+                    return result
+            except Exception:
+                pass
+        return {}
+
+    def test_true_when_flask_config_is_staging(self, app):
+        app.config['FLASK_CONFIG'] = 'staging'
+        with app.test_request_context('/'):
+            assert self._staging_banner_result(app)['show_staging_banner'] is True
+
+    def test_false_when_flask_config_is_production(self, app):
+        app.config['FLASK_CONFIG'] = 'production'
+        with app.test_request_context('/'):
+            assert self._staging_banner_result(app)['show_staging_banner'] is False
+
+    def test_false_when_flask_config_is_testing(self, app):
+        app.config['FLASK_CONFIG'] = 'testing'
+        with app.test_request_context('/'):
+            assert self._staging_banner_result(app)['show_staging_banner'] is False
+
+
+class TestIsStagingEnvironment:
+    def test_helper_reads_app_config(self, app):
+        from app.template_context import is_staging_environment
+
+        app.config['FLASK_CONFIG'] = 'staging'
+        assert is_staging_environment(app) is True
+
+        app.config['FLASK_CONFIG'] = 'production'
+        assert is_staging_environment(app) is False
+
+
+# ---------------------------------------------------------------------------
 # inject_mobile_webview_embed context processor
 # ---------------------------------------------------------------------------
 

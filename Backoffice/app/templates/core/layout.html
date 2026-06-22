@@ -146,8 +146,9 @@
 {% set nav_documentation_active = request.endpoint and request.endpoint.startswith('help_docs.') %}
 {# Use centralized is_admin_user helper from AuthorizationService #}
 {% set is_admin_user = is_admin_user() %}
-<body class="bg-gray-100 font-sans {% if is_focal_point %}focal-point{% endif %}" data-language="{{ session.get('language', 'en') }}">
-    <div class="flex h-screen">
+<body class="bg-gray-100 font-sans {% if is_focal_point %}focal-point{% endif %}{% if show_staging_banner %} has-staging-banner{% endif %}" data-language="{{ session.get('language', 'en') }}">
+    {% include 'components/_staging_environment_banner.html' %}
+    <div class="flex h-screen staging-app-shell">
         {% if is_admin_user %}
         <aside id="adminSidebar" class="admin-sidebar bg-gray-800 text-white p-4 space-y-2 fixed top-0 left-0 h-full">
             <div class="flex items-center justify-between mb-6 pt-2">

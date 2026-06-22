@@ -1,0 +1,11 @@
+{# Full-width banner shown when FLASK_CONFIG=staging. Inline styles keep this usable on pages that do not load layout.css. #}
+{% if show_staging_banner|default(false) %}
+<div class="staging-environment-banner" role="status" aria-live="polite"
+     style="flex-shrink: 0; background: #ea580c; color: #fff; text-align: center; padding: 0.5rem 1rem; font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; z-index: 50;">
+    <span class="staging-environment-banner__inner" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; max-width: 100%;">
+        <span class="staging-environment-banner__dot" aria-hidden="true"
+              style="width: 8px; height: 8px; border-radius: 50%; background: #fff; flex-shrink: 0;"></span>
+        <span>{{ _('Staging environment — do not enter or rely on data here.') }}</span>
+    </span>
+</div>
+{% endif %}

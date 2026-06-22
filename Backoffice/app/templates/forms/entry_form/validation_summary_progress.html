@@ -193,8 +193,9 @@
         tr.group-header.level-2 td { background: #f8fafc; font-size: 12px; padding-left: 32px; }
     </style>
 </head>
-<body>
-<header>
+<body{% if show_staging_banner %} class="has-staging-banner"{% endif %}>
+    {% include 'components/_staging_environment_banner.html' %}
+    <header>
     <h1>{{ _('Validation Summary') }}</h1>
     <div class="meta">
         <div><strong>{{ _('Assignment:') }}</strong> {{ assignment_display_name or (assignment.template.name if assignment and assignment.template else '-') }}</div>

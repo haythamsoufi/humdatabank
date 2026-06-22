@@ -27,6 +27,16 @@
             color: #1f2937;
         }
 
+        body.has-staging-banner {
+            flex-direction: column;
+            justify-content: flex-start;
+            padding-top: 0;
+        }
+
+        body.has-staging-banner .error-container {
+            margin: auto;
+        }
+
         .error-container {
             background: white;
             border-radius: 24px;
@@ -220,7 +230,8 @@
         .error-503 .btn-primary { background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); }
     </style>
 </head>
-<body class="error-{{ error_code }}">
+<body class="error-{{ error_code }}{% if show_staging_banner %} has-staging-banner{% endif %}">
+    {% include 'components/_staging_environment_banner.html' %}
     <div class="error-container">
         <div class="error-icon">
             {% if error_code == 400 %}

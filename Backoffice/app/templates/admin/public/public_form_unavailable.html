@@ -23,7 +23,8 @@
         }
     </style>
 </head>
-<body>
+<body{% if show_staging_banner %} class="has-staging-banner"{% endif %}>
+    {% include 'components/_staging_environment_banner.html' %}
     <div class="container mx-auto px-4 py-6">
         <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 text-center">
             <div class="text-red-500 mb-4">

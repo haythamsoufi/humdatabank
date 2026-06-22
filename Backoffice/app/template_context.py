@@ -1,8 +1,20 @@
 """Jinja2 filters, globals, and context processors for the Flask application."""
 
+import os
 from datetime import datetime
 from flask import current_app, has_request_context, url_for
 from flask_login import current_user
+
+
+def is_staging_environment(app=None) -> bool:
+    """True when the app runs with FLASK_CONFIG=staging."""
+    target = app or current_app
+    flask_config = (
+        (target.config.get("FLASK_CONFIG") if target else None)
+        or os.environ.get("FLASK_CONFIG")
+        or ""
+    ).strip().lower()
+    return flask_config == "staging"
 
 
 def register_template_context(app, config_class):
@@ -43,6 +55,15 @@ def register_template_context(app, config_class):
     app.jinja_env.globals['LANGUAGE_MODEL_KEY'] = getattr(Config, 'LANGUAGE_MODEL_KEY', {})
     app.jinja_env.globals['TRANSLATABLE_LANGUAGES'] = app.config.get('TRANSLATABLE_LANGUAGES', [])
     app.jinja_env.globals['SHOW_LANGUAGE_FLAGS'] = bool(app.config.get('SHOW_LANGUAGE_FLAGS', True))
+
+    @app.context_processor
+    def inject_staging_environment_banner():
+        """Expose whether to show the staging-environment warning banner."""
+        try:
+            return {"show_staging_banner": is_staging_environment(app)}
+        except Exception as e:
+            current_app.logger.debug("inject_staging_environment_banner failed: %s", e)
+            return {"show_staging_banner": False}
 
     @app.context_processor
     def inject_mobile_webview_embed():

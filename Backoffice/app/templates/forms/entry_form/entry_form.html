@@ -233,6 +233,8 @@
                 <p class="font-bold">{{ _('Read Only') }}</p>
                 {% if assignment_status is defined and assignment_status.is_round_closed_for_entity %}
                 <p>{{ _('This assignment\'s data collection round is closed. You can view the form, but only an administrator can make changes or reopen it for this entity.') }}</p>
+                {% elif assignment_status is defined and assignment_status.status == 'sent_for_review' %}
+                <p>{{ _('This assignment has been sent to %(org)s for review. You cannot make changes until the delegation returns it for revision.', org=ORG_NAME) }}</p>
                 {% else %}
                 <p>{{ _('You cannot make changes to this form because it has been submitted. To request reopening this form, please write to') }} data@{{ get_organization_email_domain() or get_organization_domain() }} {{ _('including your reason for the request.') }}</p>
                 {% endif %}
@@ -531,7 +533,7 @@
                                 {{ _('Save') }}
                             </button>
                             {% endif %}
-                            {% if can_send_for_review and not is_delegation_user %}
+                            {% if can_send_for_review %}
                             <button type="submit" name="action" value="send_for_review"
                                     class="btn btn-success flex-1"
                                     data-confirm-message="{{ _('Send this assignment to delegation for review? You will not be able to edit it until they return it for changes.') }}">

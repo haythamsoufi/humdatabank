@@ -68,6 +68,24 @@ class TestAssignmentNsReviewAuthorization:
                 aes = self._aes(status=AssignmentEntityStatusValue.in_progress)
                 assert AuthorizationService.can_send_for_review(aes, self._user()) is True
 
+    def test_ns_can_send_for_review_from_pending(self, app):
+        """Focal point on a brand-new (pending) assignment must see Send for Review, not Submit."""
+        with app.app_context():
+            with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
+                 patch.object(AuthorizationService, 'has_rbac_permission', return_value=True), \
+                 patch('app.services.assignment_workflow_service.is_organization_email', return_value=False):
+                aes = self._aes(status=AssignmentEntityStatusValue.pending)
+                assert AuthorizationService.can_send_for_review(aes, self._user()) is True
+
+    def test_ns_cannot_submit_from_pending_when_review_required(self, app):
+        """Submit must be hidden for focal points on pending assignments that require delegation review."""
+        with app.app_context():
+            with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
+                 patch.object(AuthorizationService, 'has_rbac_permission', return_value=True), \
+                 patch('app.services.assignment_workflow_service.is_organization_email', return_value=False):
+                aes = self._aes(status=AssignmentEntityStatusValue.pending)
+                assert AuthorizationService.can_submit_assignment(aes, self._user()) is False
+
     def test_org_cannot_send_for_review(self, app):
         with app.app_context():
             with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \

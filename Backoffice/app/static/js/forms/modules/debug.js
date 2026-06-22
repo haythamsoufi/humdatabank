@@ -20,8 +20,8 @@ const DEBUG_CONFIG = {
         'disaggregation-calculator': false,
         'matrix-handler': false,
         'numeric-formatting': false,
-        'plugin-field-loader': true,
-        'plugins': true,
+        'plugin-field-loader': false,
+        'plugins': false,
         'pagination': false,  // Pagination module debugging
         'section-nav-scroll': false,  // Section nav scroll (non-paginated) debugging
         'chatbot': false,  // AI Chatbot debugging

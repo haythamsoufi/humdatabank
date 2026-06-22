@@ -32,8 +32,19 @@ def _status_value(assignment_entity_status: 'AssignmentEntityStatus') -> str:
 
 
 def delegation_review_source_statuses() -> tuple[AssignmentEntityStatusValue, ...]:
-    """Statuses from which NS focal points can send for delegation review."""
-    return (AssignmentEntityStatusValue.in_progress, AssignmentEntityStatusValue.requires_revision)
+    """Statuses from which NS focal points can send for delegation review.
+
+    ``pending`` is included because the first save auto-transitions it to
+    ``in_progress`` before action resolution runs, so a focal point clicking
+    "Send for Review" on a fresh (pending) assignment should work exactly the
+    same as from ``in_progress``.  Excluding it causes the UI to show a
+    "Submit" button instead of "Send for Review" for brand-new assignments.
+    """
+    return (
+        AssignmentEntityStatusValue.pending,
+        AssignmentEntityStatusValue.in_progress,
+        AssignmentEntityStatusValue.requires_revision,
+    )
 
 
 def resolve_submit_action(

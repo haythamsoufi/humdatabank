@@ -718,8 +718,6 @@ def handle_assignment_form(aes_id):
              return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=assignment_entity_status.id))
 
         if csrf_form.validate_on_submit():
-            action = request.form.get('action')
-
             try:
                 submission_result = FormDataService.process_form_submission(
                     assignment_entity_status, all_sections, csrf_form

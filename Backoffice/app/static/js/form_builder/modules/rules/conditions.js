@@ -477,7 +477,7 @@ export const RuleBuilder = {
 
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
-        removeBtn.className = 'text-red-600 hover:text-red-800 remove-condition-btn';
+        removeBtn.className = 'remove-condition-btn fb-icon-btn fb-icon-btn--danger';
         {
             const icon = document.createElement('i');
             icon.className = 'fas fa-times-circle w-5 h-5';

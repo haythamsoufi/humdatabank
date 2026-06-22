@@ -143,7 +143,22 @@ class TestDelegationReviewSourceStatuses:
     def test_returns_tuple(self):
         sources = delegation_review_source_statuses()
         assert isinstance(sources, tuple)
-        assert len(sources) == 2
+        assert len(sources) == 3
+
+    def test_includes_pending(self):
+        from app.models.enums import AssignmentEntityStatusValue
+        sources = delegation_review_source_statuses()
+        assert AssignmentEntityStatusValue.pending in sources
+
+    def test_includes_in_progress(self):
+        from app.models.enums import AssignmentEntityStatusValue
+        sources = delegation_review_source_statuses()
+        assert AssignmentEntityStatusValue.in_progress in sources
+
+    def test_includes_requires_revision(self):
+        from app.models.enums import AssignmentEntityStatusValue
+        sources = delegation_review_source_statuses()
+        assert AssignmentEntityStatusValue.requires_revision in sources
 
 
 # ---------------------------------------------------------------------------

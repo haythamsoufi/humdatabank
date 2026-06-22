@@ -28,33 +28,29 @@
                                 {% else %}
                                 <form method="GET" action="{{ url_for('form_builder.edit_template', template_id=template.id) }}" class="inline-flex items-center">
                                     <input type="hidden" name="version_id" value="{{ v.id }}">
-                                    <button type="submit" class="btn btn-icon btn-xs btn-ghost p-0 shadow-none border-0" title="{{ _('Switch to this version') }}" aria-label="{{ _('Switch to this version') }}">
-                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle;" aria-hidden="true">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                                        </svg>
+                                    <button type="submit" class="fb-icon-btn fb-icon-btn--primary" title="{{ _('Switch to this version') }}" aria-label="{{ _('Switch to this version') }}">
+                                        <i class="fas fa-external-link-alt w-4 h-4"></i>
                                     </button>
                                 </form>
                                 {% endif %}
                                 {# Preview this version #}
-                                <a href="{{ url_for('forms.preview_template', template_id=template.id) }}?version_id={{ v.id }}" target="_blank" class="inline-flex items-center text-gray-600 hover:text-gray-800 p-0 ml-1" title="{{ _('Preview') }}" aria-label="{{ _('Preview version') }}">
+                                <a href="{{ url_for('forms.preview_template', template_id=template.id) }}?version_id={{ v.id }}" target="_blank" class="fb-icon-btn fb-icon-btn--neutral" title="{{ _('Preview') }}" aria-label="{{ _('Preview version') }}">
                                     <i class="fas fa-eye w-4 h-4"></i>
                                 </a>
                                 {% if not is_published %}
                                 <form method="POST" action="{{ url_for('form_builder.deploy_template_version', template_id=template.id) }}" class="inline-flex items-center deploy-version-form-{{ v.id }}">
                                     <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
                                     <input type="hidden" name="version_id" value="{{ v.id }}">
-                                    <button type="button" class="deploy-version-btn-{{ v.id }} btn btn-icon btn-xs btn-success p-0 shadow-none border-0" title="{{ _('Deploy Version') }}" aria-label="{{ _('Deploy Version') }}">
-                                        <i class="fas fa-rocket w-4 h-4 flex-shrink-0"></i>
+                                    <button type="button" class="deploy-version-btn-{{ v.id }} fb-icon-btn fb-icon-btn--success" title="{{ _('Deploy Version') }}" aria-label="{{ _('Deploy Version') }}">
+                                        <i class="fas fa-rocket w-4 h-4"></i>
                                     </button>
                                 </form>
                                 {% endif %}
                                 {% if not is_published %}
                                 <form method="POST" action="{{ url_for('form_builder.delete_template_version', template_id=template.id, version_id=v.id) }}" class="inline-flex items-center delete-version-form-{{ v.id }}">
                                     <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
-                                    <button type="button" class="delete-version-btn-{{ v.id }} btn btn-icon btn-xs btn-danger p-0 shadow-none border-0" title="{{ _('Delete Version') }}" aria-label="{{ _('Delete Version') }}">
-                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle;" aria-hidden="true">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                        </svg>
+                                    <button type="button" class="delete-version-btn-{{ v.id }} fb-icon-btn fb-icon-btn--danger" title="{{ _('Delete Version') }}" aria-label="{{ _('Delete Version') }}">
+                                        <i class="fas fa-trash-alt w-4 h-4"></i>
                                     </button>
                                 </form>
                                 {% endif %}
@@ -91,7 +87,7 @@
                                        aria-label="{{ _('Version note') }}">{{ v.comment or '' }}</textarea>
                                 <button type="submit"
                                         id="version-note-save-btn-{{ v.id }}"
-                                        class="version-note-save-btn btn btn-icon btn-xs btn-secondary hidden mt-1"
+                                        class="version-note-save-btn fb-icon-btn fb-icon-btn--primary hidden mt-1"
                                         title="{{ _('Save Note') }}"
                                         aria-label="{{ _('Save Note') }}">
                                     <i class="fas fa-save w-4 h-4"></i>

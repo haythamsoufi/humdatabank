@@ -4,14 +4,13 @@
  */
 
 // Import debug utilities
-import { debugLog, debugError, debugWarn, isDebugEnabled } from './modules/debug.js';
+import { debugLog, debugError, debugWarn } from './modules/debug.js';
 
 class PluginFieldLoader {
     constructor() {
         this.pluginFields = new Map();
         this.loadedPlugins = new Set();
         this._formsBoundForSerialize = new WeakSet();
-        this.diagnostics = new Map(); // key: `${pluginType}:${fieldId}`
         this.init();
     }
 
@@ -121,103 +120,6 @@ class PluginFieldLoader {
                 this.showError(fieldData.container, `Failed to load plugin: ${error.message}`);
             }
         }
-
-        this._renderDiagnosticsPanelIfEnabled();
-    }
-
-    _diagKey(pluginType, fieldId) {
-        return `${String(pluginType || '')}:${String(fieldId || '')}`;
-    }
-
-    _recordDiagnostic(diag) {
-        try {
-            const key = this._diagKey(diag.pluginType, diag.fieldId);
-            this.diagnostics.set(key, diag);
-            window.PluginDiagnostics = window.PluginDiagnostics || {};
-            window.PluginDiagnostics.fields = window.PluginDiagnostics.fields || {};
-            window.PluginDiagnostics.fields[key] = diag;
-        } catch (e) {
-            // ignore
-        }
-    }
-
-    _shouldShowDiagnosticsPanel() {
-        try {
-            const qs = new URLSearchParams(window.location.search || '');
-            if (qs.get('plugin_diagnostics') === '1') return true;
-        } catch (e) { /* ignore */ }
-        return isDebugEnabled('plugins') || isDebugEnabled('plugin-field-loader');
-    }
-
-    _renderDiagnosticsPanelIfEnabled() {
-        if (!this._shouldShowDiagnosticsPanel()) return;
-        try {
-            const existing = document.getElementById('plugin-diagnostics-panel');
-            if (existing) existing.remove();
-
-            const panel = document.createElement('div');
-            panel.id = 'plugin-diagnostics-panel';
-            panel.style.position = 'fixed';
-            panel.style.right = '12px';
-            panel.style.bottom = '12px';
-            panel.style.zIndex = '99999';
-            panel.style.maxWidth = '420px';
-            panel.style.maxHeight = '45vh';
-            panel.style.overflow = 'auto';
-            panel.style.background = 'rgba(17, 24, 39, 0.95)'; // gray-900
-            panel.style.color = '#fff';
-            panel.style.border = '1px solid rgba(255,255,255,0.15)';
-            panel.style.borderRadius = '10px';
-            panel.style.padding = '10px 12px';
-            panel.style.fontSize = '12px';
-
-            const header = document.createElement('div');
-            header.style.display = 'flex';
-            header.style.justifyContent = 'space-between';
-            header.style.alignItems = 'center';
-            header.style.marginBottom = '8px';
-            header.innerHTML = `<div style="font-weight:600">Plugin diagnostics</div>`;
-
-            const closeBtn = document.createElement('button');
-            closeBtn.type = 'button';
-            closeBtn.textContent = 'Close';
-            closeBtn.style.background = 'transparent';
-            closeBtn.style.border = '1px solid rgba(255,255,255,0.25)';
-            closeBtn.style.color = '#fff';
-            closeBtn.style.borderRadius = '8px';
-            closeBtn.style.padding = '2px 8px';
-            closeBtn.addEventListener('click', () => panel.remove());
-            header.appendChild(closeBtn);
-
-            const list = document.createElement('div');
-            const entries = Array.from(this.diagnostics.values());
-            if (!entries.length) {
-                list.textContent = 'No plugin fields found.';
-            } else {
-                const _diagEsc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                for (const d of entries) {
-                    const row = document.createElement('div');
-                    row.style.padding = '6px 0';
-                    row.style.borderTop = '1px solid rgba(255,255,255,0.08)';
-                    const ok = d.status === 'ok';
-                    row.innerHTML = `
-                        <div style="display:flex;justify-content:space-between;gap:8px">
-                          <div style="font-weight:600">${_diagEsc(d.pluginType)} <span style="opacity:.8">#${_diagEsc(d.fieldId)}</span></div>
-                          <div style="color:${ok ? '#34d399' : '#f87171'}">${ok ? 'OK' : 'ERROR'}</div>
-                        </div>
-                        <div style="opacity:.85;margin-top:2px">
-                          dom=${d.domVerified ? 'yes' : 'no'} • module=${d.moduleImported ? 'yes' : 'no'} • ${Math.round(d.initDurationMs || 0)}ms
-                        </div>
-                    `;
-                    list.appendChild(row);
-                }
-            }
-
-            panel.append(header, list);
-            document.body.appendChild(panel);
-        } catch (e) {
-            // ignore
-        }
     }
 
     async loadPluginField(fieldData) {
@@ -237,34 +139,10 @@ class PluginFieldLoader {
                 this.showLoading(container);
             }
 
-            const start = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-            const result = await this.renderAndInitPluginField(container, fieldId, pluginType);
-            const end = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-
-            this._recordDiagnostic({
-                pluginType,
-                fieldId,
-                status: result?.ok ? 'ok' : 'error',
-                domVerified: !!result?.domVerified,
-                moduleImported: !!result?.moduleImported,
-                initDurationMs: Math.max(0, end - start),
-                error: result?.error || null,
-                templateFetched: !!result?.templateFetched,
-            });
+            await this.renderAndInitPluginField(container, fieldId, pluginType);
         } catch (error) {
             debugError('plugin-field-loader', `Failed to load plugin ${pluginType}:`, error);
             this.showError(container, `Failed to load plugin: ${error.message}`);
-
-            this._recordDiagnostic({
-                pluginType,
-                fieldId,
-                status: 'error',
-                domVerified: false,
-                moduleImported: false,
-                initDurationMs: 0,
-                error: String(error?.message || error || ''),
-                templateFetched: false,
-            });
         }
     }
 

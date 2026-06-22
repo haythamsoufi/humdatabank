@@ -1402,10 +1402,8 @@ class MatrixHandler {
             errors.push('Value cannot be negative');
         }
 
-        // Check if value is too large (optional)
-        if (!isNaN(value) && value > 999999999) {
-            errors.push('Value is too large');
-        }
+        // TODO: Enforce per-cell min/max (and other numeric rules) from matrix item config
+        // configured in the form builder (see TODO in form_builder.html). No hardcoded cap here.
 
         if (errors.length > 0) {
             this.showInputError(input, errors[0]);

@@ -457,75 +457,57 @@ export function initFormEvents() {
       e.preventDefault();
       e.stopPropagation();
 
-      // Get confirmation message from FAB menu container or original submit button
-      const fabMenu = document.getElementById('fab-menu');
+      // Prefer the explicit submit button; fall back to send_for_review when submit is absent
+      // (e.g. when delegation review is enabled and the current user is a focal point).
       const submitSubmitter = form.querySelector('button[type="submit"][name="action"][value="submit"]');
-      const confirmMessage = fabMenu?.dataset?.submitConfirm ||
-                            submitSubmitter?.dataset?.confirmMessage ||
+      const sendForReviewSubmitter = form.querySelector('button[type="submit"][name="action"][value="send_for_review"]');
+      const activeSubmitter = submitSubmitter || sendForReviewSubmitter;
+      const activeAction = submitSubmitter ? 'submit' : (sendForReviewSubmitter ? 'send_for_review' : 'submit');
+
+      // Prefer the active submitter's own confirm message; fall back to the FAB menu's submit-confirm
+      // only when the action is actually a submission (not a send-for-review).
+      const fabMenu = document.getElementById('fab-menu');
+      const confirmMessage = activeSubmitter?.dataset?.confirmMessage ||
+                            (activeAction === 'submit' ? fabMenu?.dataset?.submitConfirm : null) ||
                             null;
+
+      const doSubmit = () => {
+        if (activeSubmitter) {
+          setHiddenAction(activeAction);
+          if (form.requestSubmit) {
+            form.requestSubmit(activeSubmitter);
+          } else {
+            // Fallback: temporarily suppress the confirm attribute to avoid re-prompting
+            const prevConfirm = activeSubmitter.getAttribute('data-confirm-message');
+            activeSubmitter.removeAttribute('data-confirm-message');
+            activeSubmitter.click();
+            if (prevConfirm !== null) activeSubmitter.setAttribute('data-confirm-message', prevConfirm);
+          }
+        } else {
+          setHiddenAction(activeAction);
+          if (form.requestSubmit) {
+            form.requestSubmit();
+          } else {
+            form.submit();
+          }
+        }
+      };
 
       if (confirmMessage) {
         // Use custom confirmation dialog with green submit button
         if (window.showSubmitConfirmation) {
           window.showSubmitConfirmation(
             confirmMessage,
-            () => {
-              // User confirmed - proceed with submission
-              if (submitSubmitter) {
-                // Prefer requestSubmit to trigger normal submit/validation flow without re-opening confirm
-                setHiddenAction('submit');
-                if (form.requestSubmit) {
-                  form.requestSubmit(submitSubmitter);
-                } else {
-                  // Fallback: temporarily remove confirm attribute to avoid re-prompting
-                  const prevConfirm = submitSubmitter.getAttribute('data-confirm-message');
-                  submitSubmitter.removeAttribute('data-confirm-message');
-                  submitSubmitter.click();
-                  if (prevConfirm !== null) submitSubmitter.setAttribute('data-confirm-message', prevConfirm);
-                }
-              } else {
-                // Fallback: submit form with submit action
-                setHiddenAction('submit');
-                if (form.requestSubmit) {
-                  form.requestSubmit();
-                } else {
-                  form.submit();
-                }
-              }
-            },
-            () => {
-              window.__clientLog && window.__clientLog('Submit cancelled by user');
-            }
+            doSubmit,
+            () => { window.__clientLog && window.__clientLog('Submit cancelled by user'); }
           );
           return; // Exit early, submission will happen in callback if confirmed
         } else if (window.showConfirmation) {
           // Avoid native confirm; use generic custom confirmation dialog if submit-specific is unavailable
           window.showConfirmation(
             confirmMessage,
-            () => {
-              // User confirmed - proceed with submission
-              if (submitSubmitter) {
-                setHiddenAction('submit');
-                if (form.requestSubmit) {
-                  form.requestSubmit(submitSubmitter);
-                } else {
-                  const prevConfirm = submitSubmitter.getAttribute('data-confirm-message');
-                  submitSubmitter.removeAttribute('data-confirm-message');
-                  submitSubmitter.click();
-                  if (prevConfirm !== null) submitSubmitter.setAttribute('data-confirm-message', prevConfirm);
-                }
-              } else {
-                setHiddenAction('submit');
-                if (form.requestSubmit) {
-                  form.requestSubmit();
-                } else {
-                  form.submit();
-                }
-              }
-            },
-            () => {
-              window.__clientLog && window.__clientLog('Submit cancelled by user');
-            },
+            doSubmit,
+            () => { window.__clientLog && window.__clientLog('Submit cancelled by user'); },
             'Submit',
             'Cancel',
             'Submit Form?'
@@ -537,26 +519,8 @@ export function initFormEvents() {
         }
       }
 
-      // If no confirmation needed or confirmed via native dialog, proceed with submission
-      if (submitSubmitter) {
-        setHiddenAction('submit');
-        if (form.requestSubmit) {
-          form.requestSubmit(submitSubmitter);
-        } else {
-          const prevConfirm = submitSubmitter.getAttribute('data-confirm-message');
-          submitSubmitter.removeAttribute('data-confirm-message');
-          submitSubmitter.click();
-          if (prevConfirm !== null) submitSubmitter.setAttribute('data-confirm-message', prevConfirm);
-        }
-      } else {
-        // Fallback: submit form with submit action
-        setHiddenAction('submit');
-        if (form.requestSubmit) {
-          form.requestSubmit();
-        } else {
-          form.submit();
-        }
-      }
+      // No confirmation needed — proceed directly
+      doSubmit();
     });
   }
 

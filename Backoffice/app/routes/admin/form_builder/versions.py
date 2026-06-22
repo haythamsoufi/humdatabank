@@ -11,6 +11,7 @@ from app.routes.admin.shared import permission_required, check_template_access
 from app.services.user_analytics_service import log_admin_action
 from app.utils.transactions import request_transaction_rollback
 from app.utils.datetime_helpers import utcnow
+from app.utils.request_utils import get_request_data
 from .helpers import _clone_template_structure
 
 
@@ -25,7 +26,7 @@ def deploy_template_version(template_id):
         return redirect(url_for("form_builder.manage_templates"))
 
     try:
-        target_version_id = request.form.get('version_id')
+        target_version_id = get_request_data().get('version_id')
         current_app.logger.debug(f"VERSIONING_DEBUG: deploy_template_version - target_version_id from form: {target_version_id}")
         version = None
         if target_version_id:
@@ -245,7 +246,7 @@ def update_draft_comment(template_id):
             flash('No draft version to update.', 'warning')
             return redirect(url_for("form_builder.edit_template", template_id=template.id))
 
-        new_comment = request.form.get('comment') or None
+        new_comment = get_request_data().get('comment') or None
         current_app.logger.debug(f"VERSIONING_DEBUG: update_draft_comment - updating draft {draft.id} comment from '{draft.comment}' to '{new_comment}'")
         draft.comment = new_comment
         draft.updated_at = utcnow()
@@ -282,7 +283,7 @@ def create_draft_version(template_id):
         flash("Access denied.", "warning")
         return redirect(url_for("form_builder.manage_templates"))
     try:
-        source_version_id = request.form.get('source_version_id', type=int)
+        source_version_id = get_request_data().get('source_version_id', type=int)
         source_version = None
 
         if source_version_id:
@@ -373,7 +374,7 @@ def update_version_comment(template_id, version_id):
         return redirect(url_for("form_builder.manage_templates"))
     try:
         version = FormTemplateVersion.query.filter_by(id=version_id, template_id=template.id).first_or_404()
-        new_comment = request.form.get('comment') or None
+        new_comment = get_request_data().get('comment') or None
         current_app.logger.debug(f"VERSIONING_DEBUG: update_version_comment - updating version {version_id} comment from '{version.comment}' to '{new_comment}'")
         version.comment = new_comment
         version.updated_at = utcnow()

@@ -2221,6 +2221,9 @@ class TemplateExcelService:
                     enable_export_excel=target_version.enable_export_excel,
                     enable_import_excel=target_version.enable_import_excel,
                     enable_ai_validation=getattr(target_version, 'enable_ai_validation', False),
+                    enable_data_quality=getattr(target_version, 'enable_data_quality', False),
+                    data_quality_methodology=getattr(target_version, 'data_quality_methodology', None),
+                    validation_rule_pack=getattr(target_version, 'validation_rule_pack', None),
                     variables=target_version.variables.copy() if target_version.variables else None
                 )
                 db.session.add(new_draft)
@@ -2430,11 +2433,19 @@ class TemplateExcelService:
                 current_app.logger.info("Updated version name_translations")
 
             if 'variables' in row_data:
-                variables = cls._parse_json(row_data.get('variables'))
+                raw_variables = row_data.get('variables')
+                variables = cls._parse_json(raw_variables)
                 if variables is not None:  # Allow empty dict {} to clear variables
                     # Save to version (version-specific template variables)
                     version.variables = variables if variables else {}
+                    from sqlalchemy.orm.attributes import flag_modified
+                    flag_modified(version, 'variables')
                     current_app.logger.info(f"Updated version variables: {len(variables) if variables else 0} variable(s)")
+                elif raw_variables is not None:
+                    current_app.logger.warning(
+                        f"Could not parse variables JSON from Excel (value truncated or malformed): "
+                        f"{str(raw_variables)[:300]}"
+                    )
 
             db.session.add(template)
             db.session.add(version)

@@ -77,7 +77,7 @@
             {{ svg_icon('users', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Manage Users') }}</span>
             {% if can_review_access_requests and pending_access_requests_count > 0 %}
-            <span class="sidebar-item-badge" aria-label="{{ ngettext('%(num)d pending access request', '%(num)d pending access requests', pending_access_requests_count, num=pending_access_requests_count) }}">{{ pending_access_requests_count }}</span>
+            <span class="sidebar-item-badge" aria-label="{{ ngettext('%(num)d pending access request', '%(num)d pending access requests', pending_access_requests_count) }}">{{ pending_access_requests_count }}</span>
             {% endif %}
         </a>
     </div>

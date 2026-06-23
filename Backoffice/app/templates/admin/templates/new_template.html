@@ -208,7 +208,7 @@
                             </label>
                             <p id="clone-template-count" class="nt-clone-count" aria-live="polite">
                                 {% if available_templates %}
-                                    {{ ngettext('%(num)d template', '%(num)d templates', available_templates|length, num=available_templates|length) }}
+                                    {{ ngettext('%(num)d template', '%(num)d templates', available_templates|length) }}
                                 {% else %}
                                     {{ _('No templates available') }}
                                 {% endif %}

@@ -8,6 +8,7 @@ from __future__ import annotations
 from contextlib import suppress
 import json
 import re
+import time
 
 from flask import current_app, flash, redirect, render_template, request, url_for
 from flask_babel import _
@@ -95,6 +96,13 @@ def register_entry_routes(bp):
 def handle_assignment_form(aes_id):
     """Handle assignment form viewing/editing for focal points - CLEANED VERSION."""
     forms_logger = debug_manager.get_logger('app.routes.forms')
+    _timing_t0 = time.monotonic()
+
+    def _entry_lap(label: str) -> None:
+        nonlocal _timing_t0
+        now = time.monotonic()
+        current_app.logger.debug("[EntryTiming] %s: %.3fs", label, now - _timing_t0)
+        _timing_t0 = now
 
     from app.services import AssignmentService
     assignment_entity_status = AssignmentService.get_assignment_entity_status_by_id(aes_id)
@@ -156,6 +164,7 @@ def handle_assignment_form(aes_id):
     template, all_sections, available_indicators_by_section = TemplatePreparationService.prepare_template_for_rendering(
         form_template, assignment_entity_status, is_preview_mode=False
     )
+    _entry_lap("template_prep")
 
     from app.services.variable_resolution_service import VariableResolutionService
     from app.models import FormTemplateVersion
@@ -413,6 +422,8 @@ def handle_assignment_form(aes_id):
                         except Exception as e:
                             current_app.logger.warning(f"Error resolving variables in matrix row labels for field {field.id}: {e}", exc_info=True)
 
+    _entry_lap("variable_resolution")
+
     db_sections = [s for s in all_sections if s.parent_section_id is None]
 
     # Feature flags — consumed by entry_form.html to emit window.__formFeatures for
@@ -442,12 +453,25 @@ def handle_assignment_form(aes_id):
         ),
     }
 
-    published_pages = (
-        FormPage.query
-        .filter_by(template_id=form_template.id, version_id=form_template.published_version_id)
-        .order_by(FormPage.order)
-        .all()
-    )
+    # FormPage rows are immutable once published.
+    # The cache stores plain page-ID lists (session-safe); re-query on hit.
+    from app.services.template_preparation_service import _pages_cache_key, _template_cache_get
+    _pc_key = _pages_cache_key(form_template.id, form_template.published_version_id)
+    _cached_page_ids = _template_cache_get(_pc_key)
+    if _cached_page_ids is not None:
+        published_pages = (
+            FormPage.query
+            .filter(FormPage.id.in_(_cached_page_ids))
+            .order_by(FormPage.order)
+            .all()
+        )
+    else:
+        published_pages = (
+            FormPage.query
+            .filter_by(template_id=form_template.id, version_id=form_template.published_version_id)
+            .order_by(FormPage.order)
+            .all()
+        )
 
     csrf_form = FlaskForm()
     SEX_CATEGORIES = Config.DEFAULT_SEX_CATEGORIES
@@ -455,6 +479,7 @@ def handle_assignment_form(aes_id):
     existing_data_processed = _load_existing_data_for_assignment(
         assignment_entity_status, form_template
     )
+    _entry_lap("existing_data_load")
 
     for section in all_sections:
         for field in getattr(section, 'fields_ordered', []):
@@ -509,6 +534,9 @@ def handle_assignment_form(aes_id):
                             dv_resolved_str = str(dv_resolved).strip()
                             dv_resolved_str = dv_resolved_str.replace(',', '')
 
+                            if not dv_resolved_str:
+                                continue
+
                             num_value = float(dv_resolved_str)
                             if num_value.is_integer():
                                 num_value = int(num_value)
@@ -547,7 +575,7 @@ def handle_assignment_form(aes_id):
                         for var_name in matches:
                             if var_name in resolved_variables:
                                 var_value = resolved_variables[var_name]
-                                if var_value is not None:
+                                if var_value is not None and str(var_value).strip():
                                     try:
                                         num_value = float(var_value)
                                         existing_data_processed[field_key] = num_value
@@ -561,6 +589,8 @@ def handle_assignment_form(aes_id):
                                         break
                                     except (ValueError, TypeError):
                                         continue
+
+    _entry_lap("default_values")
 
     repeat_instances = RepeatGroupInstance.query.filter_by(
         assignment_entity_status_id=assignment_entity_status.id,
@@ -676,6 +706,7 @@ def handle_assignment_form(aes_id):
         })
 
     existing_data_processed['repeat_dynamic_indicator_data'] = repeat_dynamic_indicator_data
+    _entry_lap("repeat_and_dynamic_data")
 
     submitted_docs = (
         SubmittedDocument.query.filter_by(assignment_entity_status_id=assignment_entity_status.id)
@@ -964,6 +995,7 @@ def handle_assignment_form(aes_id):
     template_structure = form_template
 
     section_statuses = calculate_section_completion_status(all_sections, existing_data_processed, existing_submitted_documents_dict)
+    _entry_lap("section_statuses")
 
     for section in all_sections:
         if section.section_type == 'dynamic_indicators':
@@ -1029,7 +1061,8 @@ def handle_assignment_form(aes_id):
         except Exception:
             open_validation_questions = []
 
-    return render_template(
+    _entry_lap("pre_render")
+    response = render_template(
         "forms/entry_form/entry_form.html",
         open_validation_questions=open_validation_questions,
         # completion_rate is no longer computed server-side; the entry form JS fetches
@@ -1079,6 +1112,8 @@ def handle_assignment_form(aes_id):
         # The chatbot is initialised lazily by entry_form.html after formInitialized instead.
         skip_layout_chatbot=True,
     )
+    _entry_lap("jinja_render")
+    return response
 
 
 def _preview_template_impl(template_id):

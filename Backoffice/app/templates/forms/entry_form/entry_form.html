@@ -3732,9 +3732,9 @@
         })();
         </script>
 
-    <!-- Entry Form Tour Script -->
+    <!-- Entry Form Tour Script (deferred — non-critical for initial render) -->
     {% if current_user.is_authenticated %}
-        <script src="{{ static_url('js/tours/entry-form-tour.js') }}"></script>
+        <script src="{{ static_url('js/tours/entry-form-tour.js') }}" defer></script>
     {% endif %}
 
         {# Tooltip positioning moved to JS module (tooltips.js) #}

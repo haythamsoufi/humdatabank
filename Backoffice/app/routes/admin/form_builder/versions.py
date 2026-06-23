@@ -80,6 +80,14 @@ def deploy_template_version(template_id):
 
         db.session.flush()
 
+        # Evict cached section/item data for this template so the next form load
+        # picks up the freshly published structure instead of stale rows.
+        try:
+            from app.services.template_preparation_service import invalidate_sections_cache
+            invalidate_sections_cache(template.id)
+        except Exception as _ce:
+            current_app.logger.debug("Section cache invalidation skipped: %s", _ce)
+
         try:
             log_admin_action(
                 action_type='template_version_deploy',

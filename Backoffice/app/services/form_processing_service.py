@@ -910,18 +910,59 @@ def get_form_items_for_section(section_obj: FormSection, assignment_entity_statu
 
     return current_section_fields
 
-def _process_dynamic_indicators_for_section(section_obj: FormSection, assignment_entity_status) -> List:
-    """Process section-level dynamic indicators (repeat_instance_number IS NULL)."""
+def _load_all_dynamic_indicators_for_aes(assignment_entity_status_id: int) -> dict:
+    """Batch-load all section-level DynamicIndicatorData (repeat_instance_number IS NULL)
+    for one assignment in a single query with eager-loaded indicator_bank.
+
+    Returns a dict keyed by section_id → sorted list of DynamicIndicatorData rows.
+    Call once per request; pass the result to _process_dynamic_indicators_for_section
+    to avoid one query + N lazy-loads per dynamic_indicators section.
+    """
+    from sqlalchemy.orm import joinedload as _jl
+    rows = (
+        DynamicIndicatorData.query
+        .filter(
+            DynamicIndicatorData.assignment_entity_status_id == assignment_entity_status_id,
+            DynamicIndicatorData.repeat_instance_number.is_(None),
+        )
+        .options(_jl(DynamicIndicatorData.indicator_bank))
+        .order_by(DynamicIndicatorData.section_id, DynamicIndicatorData.order)
+        .all()
+    )
+    grouped: dict = {}
+    for row in rows:
+        grouped.setdefault(row.section_id, []).append(row)
+    return grouped
+
+
+def _process_dynamic_indicators_for_section(
+    section_obj: FormSection,
+    assignment_entity_status,
+    prefetched: dict | None = None,
+) -> List:
+    """Process section-level dynamic indicators (repeat_instance_number IS NULL).
+
+    Args:
+        prefetched: optional dict from _load_all_dynamic_indicators_for_aes().
+                    When supplied, no additional DB query is issued for this section.
+    """
     dynamic_fields = []
 
-    dynamic_assignments = DynamicIndicatorData.query.filter(
-        DynamicIndicatorData.assignment_entity_status_id == assignment_entity_status.id,
-        DynamicIndicatorData.section_id == section_obj.id,
-        DynamicIndicatorData.repeat_instance_number.is_(None)
-    ).order_by(DynamicIndicatorData.order).all()
+    if prefetched is not None:
+        dynamic_assignments = prefetched.get(section_obj.id, [])
+    else:
+        dynamic_assignments = (
+            DynamicIndicatorData.query
+            .filter(
+                DynamicIndicatorData.assignment_entity_status_id == assignment_entity_status.id,
+                DynamicIndicatorData.section_id == section_obj.id,
+                DynamicIndicatorData.repeat_instance_number.is_(None),
+            )
+            .order_by(DynamicIndicatorData.order)
+            .all()
+        )
 
     for dynamic_assignment in dynamic_assignments:
-        # Create a pseudo-indicator object from the dynamic assignment
         dynamic_indicator = _create_dynamic_indicator_object(dynamic_assignment, section_obj)
         dynamic_fields.append(dynamic_indicator)
 

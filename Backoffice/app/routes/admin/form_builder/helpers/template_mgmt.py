@@ -108,6 +108,12 @@ def _get_or_create_draft_version(template: FormTemplate, user_id: int) -> FormTe
         template.published_version_id = published.id
         db.session.flush()
 
+        try:
+            from app.services.template_preparation_service import invalidate_sections_cache
+            invalidate_sections_cache(template.id)
+        except Exception:
+            pass
+
     # Get the next version number for this template
     max_version = db.session.query(func.max(FormTemplateVersion.version_number)).filter_by(template_id=template.id).scalar()
     next_version_number = (max_version + 1) if max_version else 1

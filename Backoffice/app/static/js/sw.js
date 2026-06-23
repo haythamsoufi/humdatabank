@@ -265,37 +265,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Authenticated assignment form navigations: network-first, cache for offline reopen.
+  // Authenticated assignment forms: do not intercept navigations.
+  // These pages are large (~1.9 MB HTML) with per-assignment data and CSRF tokens.
+  // Intercepting forces an SW-proxied fetch (DevTools shows Referer: sw.js) and caches
+  // a stale copy with little offline benefit at this size.
   if (isAssignmentFormNavigation(url, request)) {
-    event.respondWith(
-      fetch(request, { mode: 'same-origin' })
-        .then((response) => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match(request, { ignoreSearch: false });
-          if (cached) return cached;
-          // Minimal offline fallback shell
-          return new Response(
-            `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-            <title>Offline</title>
-            <style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;padding:24px;background:#f9fafb;color:#111827}
-            .card{max-width:720px;margin:40px auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px}
-            .muted{color:#6b7280}</style></head>
-            <body><div class="card">
-              <h2>You are offline</h2>
-              <p class="muted">This form page isn't available offline yet. Reconnect and open it once to cache it. If the form is already open, you can keep working and use “Save Draft” to save locally.</p>
-            </div></body></html>`,
-            { headers: { 'Content-Type': 'text/html; charset=utf-8' }, status: 200 }
-          );
-        })
-    );
     return;
   }
+
+  // (Removed: network-first assignment navigation handler that cloned ~1.9 MB HTML into SW cache.)
 
   // (same-origin only from here on)
 

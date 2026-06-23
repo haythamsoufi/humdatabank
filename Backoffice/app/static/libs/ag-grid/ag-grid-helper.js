@@ -1275,7 +1275,16 @@
                         return false;
                     }
                 } catch (e) { /* ignore */ }
-                return !!el.querySelector('h1, h2, h3, h4, [data-ag-grid-title-group]');
+                // matches() covers data-ag-grid-title-group (or headings) on the element itself;
+                // querySelector() only finds those markers on descendants.
+                return !!(el.matches && el.matches('h1, h2, h3, h4, [data-ag-grid-title-group]')) ||
+                    !!el.querySelector('h1, h2, h3, h4, [data-ag-grid-title-group]');
+            }
+
+            function isColvisOnlyWrapper(parent, ph) {
+                return !!(parent && ph && parent !== ph &&
+                    parent.children && parent.children.length === 1 &&
+                    parent.firstElementChild === ph);
             }
 
             if (placeholderId) {
@@ -1318,6 +1327,17 @@
                 }
 
                 if (titleGroup) {
+                    // Drop counts previously injected into the colvis wrapper (layout bug on narrow wrappers).
+                    if (headerRow) {
+                        Array.prototype.forEach.call(
+                            headerRow.querySelectorAll('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]'),
+                            function(el) {
+                                if (!titleGroup.contains(el)) {
+                                    el.remove();
+                                }
+                            }
+                        );
+                    }
                     const existing = titleGroup.querySelector('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]');
                     if (existing) {
                         self.resultCountElement = existing;
@@ -1347,10 +1367,20 @@
                     return true;
                 }
 
-                const toolbarRow = placeholderParent;
+                // Placeholder wrapped alone (e.g. session/login logs colvis toolbar): use header row,
+                // not the inner wrapper — width:100% on the wrapper collapses the title column.
+                const colvisWrapper = isColvisOnlyWrapper(placeholderParent, placeholder);
+                const toolbarRow = colvisWrapper && headerRow ? headerRow : placeholderParent;
                 const existing = toolbarRow.querySelector('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]');
                 if (existing) {
                     self.resultCountElement = existing;
+                    return true;
+                }
+
+                if (colvisWrapper) {
+                    countEl.style.marginLeft = '0';
+                    countEl.style.marginRight = 'auto';
+                    toolbarRow.insertBefore(countEl, placeholderParent);
                     return true;
                 }
 

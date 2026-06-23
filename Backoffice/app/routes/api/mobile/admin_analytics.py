@@ -320,7 +320,7 @@ def session_logs():
                 min_parts.append(active_min_sql >= min_duration)
             query = query.filter(or_(*min_parts))
 
-        query = query.order_by(desc(UserSessionLog.session_start))
+        query = query.order_by(desc(UserSessionLog.is_active), desc(UserSessionLog.session_start))
         paginated = query.paginate(page=page, per_page=per_page, error_out=False)
 
         items = []

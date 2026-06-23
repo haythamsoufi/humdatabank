@@ -51,7 +51,7 @@ export function initFormEvents() {
   }
 
   // Add CSRF token refresh functionality for public forms (uses page fetch; admin API not available)
-  if (form.closest('[data-is-public-submission]') && typeof window.refreshCsrfFromCurrentPage === 'function') {
+  if (form.closest('[data-is-public-submission="true"]') && typeof window.refreshCsrfFromCurrentPage === 'function') {
     window.refreshCsrfFromCurrentPage();
   }
 
@@ -337,7 +337,7 @@ export function initFormEvents() {
 
     if (actionValue === 'submit') {
       // Refresh CSRF token before submission for public forms
-      if (form.closest('[data-is-public-submission]') && form.dataset.csrfRefreshed !== 'true') {
+      if (form.closest('[data-is-public-submission="true"]') && form.dataset.csrfRefreshed !== 'true') {
         event.preventDefault();
         const originalSubmitter = submitButton;
         debugLog(MODULE_NAME, '🧩 submit bubble: public form CSRF refresh intercept', { hasSubmitter: !!originalSubmitter });

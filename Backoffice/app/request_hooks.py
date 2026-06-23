@@ -59,6 +59,22 @@ def register_request_hooks(app):
         log_request_performance_end()
         return response
 
+    @app.before_request
+    def track_slow_request_start():
+        from app.services.monitoring.slow_requests import track_slow_request_start as _track
+        _track()
+
+    @app.after_request
+    def track_slow_request_end(response):
+        from app.services.monitoring.slow_requests import track_slow_request_end as _track_end
+        _track_end()
+        return response
+
+    @app.teardown_request
+    def track_slow_request_teardown(exc):
+        from app.services.monitoring.slow_requests import track_slow_request_teardown
+        track_slow_request_teardown(exc)
+
     @app.after_request
     def clear_flashes_for_xhr(response):
         try:

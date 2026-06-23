@@ -1002,6 +1002,13 @@ class Config:
     # System Monitoring Configuration (CPU, Disk, Database, etc.)
     SYSTEM_MONITORING_ENABLED = _parse_bool(os.environ.get('SYSTEM_MONITORING_ENABLED'), default=False)
 
+    # Slow / stuck request logging (stdout; on by default — surfaces in Azure Log Stream)
+    SLOW_REQUEST_LOG_ENABLED = _parse_bool(os.environ.get('SLOW_REQUEST_LOG_ENABLED'), default=True)
+    SLOW_REQUEST_THRESHOLD_SECONDS = float(os.environ.get('SLOW_REQUEST_THRESHOLD_SECONDS', '30'))
+    # In-flight warnings before Gunicorn worker timeout (default GUNICORN_TIMEOUT=120)
+    SLOW_REQUEST_STUCK_WARNING_SECONDS = float(os.environ.get('SLOW_REQUEST_STUCK_WARNING_SECONDS', '60'))
+    SLOW_REQUEST_STUCK_CRITICAL_SECONDS = float(os.environ.get('SLOW_REQUEST_STUCK_CRITICAL_SECONDS', '100'))
+
     # Logging Performance Optimization Configuration
     # tracemalloc has 5-20% CPU overhead - disable by default in staging/production
     # Set TRACEMALLOC_ENABLED=true only when actively debugging memory issues
@@ -1175,6 +1182,7 @@ class TestingConfig(Config):
     WTF_CSRF_ENABLED = False
     MEMORY_MONITORING_ENABLED = False
     SYSTEM_MONITORING_ENABLED = False
+    SLOW_REQUEST_LOG_ENABLED = False
     # Avoid RotatingFileHandler on instance/logs/application.log during pytest — on Windows
     # the file is often locked by a running dev server, causing PermissionError on rollover.
     APPLICATION_LOG_FILE_ENABLED = False

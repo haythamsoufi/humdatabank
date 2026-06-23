@@ -27,43 +27,8 @@ function summarizeEmOpsTypes(rows) {
 const _pendingFetches = new Map(); // url → Promise<object>  (in-flight)
 const _responseCache  = new Map(); // url → { json, ts }    (completed)
 const CACHE_TTL_MS = 30_000;       // 30 s — covers rapid re-renders / Add Entry clicks
-const EMOPS_SESSION_CACHE_TTL_MS = 45_000;
-
-function emOpsCacheKey(urlString) {
-    return `emops_list_v1_${urlString}`;
-}
-
-function loadEmOpsSessionCache(urlString) {
-    try {
-        const raw = window.sessionStorage?.getItem(emOpsCacheKey(urlString));
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        if (!parsed || !parsed.json || !parsed.ts) return null;
-        if (Date.now() - parsed.ts > EMOPS_SESSION_CACHE_TTL_MS) return null;
-        return parsed.json;
-    } catch (_) {
-        return null;
-    }
-}
-
-function saveEmOpsSessionCache(urlString, json) {
-    try {
-        window.sessionStorage?.setItem(emOpsCacheKey(urlString), JSON.stringify({ json, ts: Date.now() }));
-    } catch (_) {
-        // ignore quota / disabled storage
-    }
-}
 
 function cachedFetch(urlString) {
-    const isEmOps = urlString.includes('/emergency_operations/api/list-data');
-    if (isEmOps) {
-        const sessionCached = loadEmOpsSessionCache(urlString);
-        if (sessionCached) {
-            debugLog(MODULE, `📦 EmOps session cache hit for ${urlString}`);
-            return Promise.resolve(sessionCached);
-        }
-    }
-
     const cached = _responseCache.get(urlString);
     if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
         debugLog(MODULE, `📦 Cache hit for ${urlString}`);
@@ -84,9 +49,6 @@ function cachedFetch(urlString) {
         })
         .then(json => {
             _responseCache.set(urlString, { json, ts: Date.now() });
-            if (isEmOps) {
-                saveEmOpsSessionCache(urlString, json);
-            }
             _pendingFetches.delete(urlString);
             return json;
         })
@@ -408,35 +370,59 @@ function setupCalculatedSelect(selectElement) {
     attachStaleSavedValueListener(selectElement);
     if (lookupListId === 'emergency_operations') {
         attachEmergencyMetadataListener(selectElement);
-    }
-
-    const needsEarlyLoad = selectElement.dataset.useAsRepeatEntryTitle === 'true';
-    if (lookupListId === 'emergency_operations' && !needsEarlyLoad) {
-        scheduleDeferredCalculatedRefresh(selectElement, refresh);
+        // Defer the first EmOps fetch until the field is visible. The response is expensive
+        // (~989 ms) and the field is often on a later page or below the fold. Once the first
+        // fetch completes the normal dependency-change listeners handle subsequent refreshes.
+        deferRefreshUntilVisible(selectElement, refresh);
     } else {
         refresh();
     }
 }
 
-function scheduleDeferredCalculatedRefresh(selectElement, refreshFn) {
-    let started = false;
-    const start = () => {
-        if (started) return;
-        started = true;
-        refreshFn();
-    };
+/**
+ * Defer the first options fetch for a calculated select until the element enters
+ * the viewport (IntersectionObserver) or receives focus, whichever comes first.
+ * After the first fetch, the observer is disconnected and normal change-event
+ * listeners take over.
+ *
+ * @param {Element} el      The select element to observe.
+ * @param {Function} refresh  The zero-argument function that triggers a fetch.
+ */
+function deferRefreshUntilVisible(el, refresh) {
+    let fetched = false;
 
-    selectElement.addEventListener('focus', start, { once: true });
-    selectElement.addEventListener('mousedown', start, { once: true });
+    function doFetch() {
+        if (fetched) return;
+        fetched = true;
+        debugLog(MODULE, `[deferred] EmOps field now visible/focused, triggering initial refresh for ${el.id || el.name}`);
+        if (observer) {
+            try { observer.disconnect(); } catch (_) { /* no-op */ }
+        }
+        el.removeEventListener('focus', onFocus, true);
+        refresh();
+    }
 
+    // IntersectionObserver fires when the element scrolls into view.
+    let observer = null;
     if (typeof IntersectionObserver !== 'undefined') {
-        const observer = new IntersectionObserver((entries) => {
-            if (entries.some(entry => entry.isIntersecting)) {
-                observer.disconnect();
-                start();
-            }
-        }, { rootMargin: '120px' });
-        observer.observe(selectElement);
+        observer = new IntersectionObserver((entries) => {
+            if (entries.some(e => e.isIntersecting)) doFetch();
+        }, { threshold: 0.1 });
+        observer.observe(el);
+    }
+
+    // Focus fallback: covers fields on pagination pages that are shown via display:block
+    // without a scroll event (IntersectionObserver may fire but selector may be off-screen).
+    const onFocus = () => doFetch();
+    el.addEventListener('focus', onFocus, true);
+
+    // Safety net: fetch after a short idle period so the field is never left permanently
+    // empty if the user never scrolls to it (e.g. single-page forms where intersection
+    // fires immediately but page is very tall).
+    if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(() => { if (!fetched) doFetch(); }, { timeout: 5000 });
+    } else {
+        setTimeout(() => { if (!fetched) doFetch(); }, 5000);
     }
 }
 

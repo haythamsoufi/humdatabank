@@ -53,7 +53,6 @@ from config import Config
 
 from .helpers import (
     _load_existing_data_for_assignment,
-    calculate_assignment_completion_rate,
     calculate_section_completion_status,
     process_existing_data_for_template,
 )
@@ -155,7 +154,7 @@ def handle_assignment_form(aes_id):
     form_template = assignment.template
 
     template, all_sections, available_indicators_by_section = TemplatePreparationService.prepare_template_for_rendering(
-        form_template, assignment_entity_status, is_preview_mode=False, embed_indicator_catalog=False
+        form_template, assignment_entity_status, is_preview_mode=False
     )
 
     from app.services.variable_resolution_service import VariableResolutionService
@@ -416,6 +415,33 @@ def handle_assignment_form(aes_id):
 
     db_sections = [s for s in all_sections if s.parent_section_id is None]
 
+    # Feature flags — consumed by entry_form.html to emit window.__formFeatures for
+    # conditional dynamic import() of heavy JS modules in main.js.
+    _section_types = {s.section_type for s in all_sections}
+    _has_document_fields = any(
+        getattr(f, 'item_type', None) == 'document_field'
+        for s in all_sections
+        for f in getattr(s, 'fields_ordered', [])
+    )
+    _has_calculated_list_fields = any(
+        getattr(f, 'lookup_list_id', None)
+        for s in all_sections
+        for f in getattr(s, 'fields_ordered', [])
+    )
+    form_features = {
+        'matrix': 'matrix' in _section_types,
+        'repeat': 'repeat' in _section_types,
+        'dynamicIndicators': 'dynamic_indicators' in _section_types,
+        'documents': _has_document_fields,
+        'calculatedLists': _has_calculated_list_fields,
+        # PDF export is always available (validation summary + doc export use it)
+        'pdfExport': True,
+        'excelExport': bool(
+            getattr(form_template, 'enable_export_excel', False) or
+            getattr(form_template, 'enable_import_excel', False)
+        ),
+    }
+
     published_pages = (
         FormPage.query
         .filter_by(template_id=form_template.id, version_id=form_template.published_version_id)
@@ -632,7 +658,12 @@ def handle_assignment_form(aes_id):
 
     existing_data_processed['repeat_groups_data'] = repeat_groups_data
 
-    # Metadata for repeat-instance dynamic indicators; HTML is fetched client-side via render API.
+    # Build per-repeat-instance dynamic indicator ID map so the frontend can lazy-fetch
+    # rendered HTML via GET /api/forms/dynamic-indicators/<id>/render after page load.
+    # Structure: { section_id: { instance_number: [ { assignment_id } ] } }
+    # Previously this block pre-rendered each indicator via render_template() in a loop
+    # (one Jinja render call per saved indicator), which was a major TTFB contributor.
+    # The client now calls the render API on init instead.
     repeat_dynamic_indicator_data: dict = {}
     per_instance_assignments = DynamicIndicatorData.query.filter(
         DynamicIndicatorData.assignment_entity_status_id == assignment_entity_status.id,
@@ -640,9 +671,7 @@ def handle_assignment_form(aes_id):
     ).order_by(DynamicIndicatorData.section_id, DynamicIndicatorData.repeat_instance_number, DynamicIndicatorData.order).all()
 
     for _did in per_instance_assignments:
-        sid_key = _did.section_id
-        inst_key = _did.repeat_instance_number
-        repeat_dynamic_indicator_data.setdefault(sid_key, {}).setdefault(inst_key, []).append({
+        repeat_dynamic_indicator_data.setdefault(_did.section_id, {}).setdefault(_did.repeat_instance_number, []).append({
             'assignment_id': _did.id,
         })
 
@@ -1000,17 +1029,12 @@ def handle_assignment_form(aes_id):
         except Exception:
             open_validation_questions = []
 
-    defer_completion_rate = True
-
     return render_template(
         "forms/entry_form/entry_form.html",
         open_validation_questions=open_validation_questions,
-        completion_rate=None if defer_completion_rate else calculate_assignment_completion_rate(
-            assignment_entity_status.id,
-            form_template.id,
-            form_template.published_version_id,
-        ),
-        defer_completion_rate=defer_completion_rate,
+        # completion_rate is no longer computed server-side; the entry form JS fetches
+        # it via GET /api/forms/assignment/<id>/completion-rate after page load.
+        assignment_entity_status_id_for_rate=assignment_entity_status.id,
         template_structure=template_structure,
         sections=db_sections,
         all_sections=all_sections,
@@ -1049,7 +1073,11 @@ def handle_assignment_form(aes_id):
         form_integration=current_app.form_integration if hasattr(current_app, 'form_integration') else None,
         template_id=form_template.id,
         assignment_entity_status_id=assignment_entity_status.id,
-        template_variables=variable_configs if 'variable_configs' in locals() else {}
+        template_variables=variable_configs if 'variable_configs' in locals() else {},
+        form_features=form_features,
+        # Defer heavy chatbot modules (12 ES modules, ~567 KB) on entry form pages.
+        # The chatbot is initialised lazily by entry_form.html after formInitialized instead.
+        skip_layout_chatbot=True,
     )
 
 

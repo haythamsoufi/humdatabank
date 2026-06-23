@@ -50,77 +50,6 @@ function applyCsrfToken(token) {
     return token;
 }
 
-async function refreshCSRFTokenViaSessionApi() {
-    const response = await fetch('/api/v1/csrf-token', {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        credentials: 'same-origin',
-        cache: 'no-cache'
-    });
-
-    if (response.status === 401 || response.status === 403) {
-        handleCsrfSessionExpired();
-        return null;
-    }
-
-    const contentType = response.headers.get('content-type') || '';
-    if (!response.ok || !contentType.includes('application/json')) {
-        if (response.redirected || contentType.includes('text/html')) {
-            handleCsrfSessionExpired();
-            return null;
-        }
-        throw new Error('Session CSRF refresh returned non-JSON response');
-    }
-
-    const data = await response.json();
-    if (data.csrf_token) {
-        return applyCsrfToken(data.csrf_token);
-    }
-
-    throw new Error('Failed to refresh CSRF token');
-}
-
-function getPublicFormToken() {
-    const root = document.querySelector('.entry-form-root[data-is-public-submission="true"]');
-    return (root && root.dataset.publicToken) ? root.dataset.publicToken : '';
-}
-
-async function refreshCSRFTokenViaPublicApi() {
-    const publicToken = getPublicFormToken();
-    if (!publicToken) return null;
-
-    const url = `/api/forms/public/csrf-token?token=${encodeURIComponent(publicToken)}`;
-    const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        credentials: 'same-origin',
-        cache: 'no-cache'
-    });
-
-    if (response.status === 401 || response.status === 403) {
-        handleCsrfSessionExpired();
-        return null;
-    }
-
-    const contentType = response.headers.get('content-type') || '';
-    if (!response.ok || !contentType.includes('application/json')) {
-        throw new Error('Public CSRF refresh returned non-JSON response');
-    }
-
-    const data = await response.json();
-    if (data.csrf_token) {
-        return applyCsrfToken(data.csrf_token);
-    }
-
-    throw new Error('Failed to refresh CSRF token');
-}
-
 async function refreshCSRFTokenViaAdminApi() {
     const response = await fetch('/admin/api/refresh-csrf-token', {
         method: 'GET',
@@ -154,6 +83,43 @@ async function refreshCSRFTokenViaAdminApi() {
     throw new Error('Failed to refresh CSRF token');
 }
 
+/**
+ * Refresh CSRF token via GET /api/v1/csrf-token for any logged-in (non-admin) session.
+ * Avoids re-fetching the full page HTML (~1.9 MB) that refreshCsrfFromCurrentPage() would do.
+ */
+async function refreshCSRFTokenViaSessionApi() {
+    const response = await fetch('/api/v1/csrf-token', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin',
+        cache: 'no-cache'
+    });
+
+    if (response.status === 401 || response.status === 403) {
+        handleCsrfSessionExpired();
+        return null;
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!response.ok || !contentType.includes('application/json')) {
+        if (response.redirected || contentType.includes('text/html')) {
+            handleCsrfSessionExpired();
+            return null;
+        }
+        throw new Error('Session CSRF refresh returned non-JSON response');
+    }
+
+    const data = await response.json();
+    if (data.csrf_token) {
+        return applyCsrfToken(data.csrf_token);
+    }
+
+    throw new Error('Failed to refresh CSRF token via session API');
+}
+
 // Function to refresh CSRF token
 async function refreshCSRFToken() {
     if (csrfSessionExpired) return null;
@@ -163,16 +129,12 @@ async function refreshCSRFToken() {
         if (shouldUseAdminCsrfRefresh()) {
             return await refreshCSRFTokenViaAdminApi();
         }
-        if (getPublicFormToken()) {
-            const publicToken = await refreshCSRFTokenViaPublicApi();
-            if (publicToken) return publicToken;
+        // For authenticated non-admin sessions use the lightweight JSON endpoint to avoid
+        // re-fetching the full page HTML (~1.9 MB on large assignment forms).
+        if (window.__userIsAuthenticated) {
+            return await refreshCSRFTokenViaSessionApi();
         }
-        try {
-            const sessionToken = await refreshCSRFTokenViaSessionApi();
-            if (sessionToken) return sessionToken;
-        } catch (error) {
-            console.warn('Session CSRF refresh failed, falling back to page fetch:', error);
-        }
+        // Fallback for anonymous public form sessions (no login, /api/v1/csrf-token not available).
         if (typeof refreshCsrfFromCurrentPage === 'function') {
             return await refreshCsrfFromCurrentPage();
         }

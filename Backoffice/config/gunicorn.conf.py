@@ -139,7 +139,10 @@ def on_exit(server):
 
 def worker_int(worker):
     """Called when a worker receives INT or QUIT signal."""
-    worker.log.info("Worker received INT or QUIT signal")
+    worker.log.warning(
+        "Worker received INT/QUIT (pid=%s) — shutting down; in-flight requests may be interrupted",
+        worker.pid,
+    )
 
 def pre_fork(server, worker):
     """Called just before a worker is forked."""
@@ -194,5 +197,10 @@ def worker_exit(server, worker):
 
 
 def worker_abort(worker):
-    """Called when a worker receives the ABRT signal."""
-    worker.log.warning("Worker received ABRT signal")
+    """Called when a worker is killed after exceeding GUNICORN_TIMEOUT."""
+    worker.log.error(
+        "Worker timed out (ABRT, pid=%s): silent for >%ss — "
+        "check logs for [STUCK_REQUEST] / [SLOW_REQUEST] before this line",
+        worker.pid,
+        timeout,
+    )

@@ -248,34 +248,21 @@
         credentials: 'same-origin',
         body: '{}'
       });
-      if (res && res.status === 400) {
-        const refreshFn = window.refreshCSRFToken;
-        if (typeof refreshFn === 'function') {
-          const newToken = await refreshFn().catch(() => null);
-          if (newToken) {
-            const retry = await fetchFn(`/api/forms/presence/assignment/${aesId}/heartbeat`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': newToken,
-                'X-Requested-With': 'XMLHttpRequest'
-              },
-              credentials: 'same-origin',
-              body: '{}'
-            });
-            if (retry && retry.ok) {
-              hbBackoffMs = 0;
-              scheduleNext(heartbeat, HEARTBEAT_BASE_MS, hbBackoffMs, t => (heartbeatTimer = t));
-              return;
-            }
-          }
-        }
-      }
       if (res && res.status === 429) {
         const ra = await getRetryAfterSeconds(res);
         const base = Math.max(ra * 1000, HEARTBEAT_BASE_MS);
         // Cap so that base + backoff + jitter never exceeds PRESENCE_TTL_MS.
         hbBackoffMs = Math.min(hbBackoffMs ? hbBackoffMs * 2 : base, HB_BACKOFF_CAP_MS);
+      } else if (res && res.status === 400) {
+        // CSRF token may have expired (~1 h). Refresh once; the next scheduled beat will
+        // pick up the new token automatically (no immediate retry to avoid error loops).
+        try {
+          const body = await res.clone().text();
+          if (body.includes('CSRF') && typeof window.refreshCSRFToken === 'function') {
+            window.refreshCSRFToken().catch(() => null);
+          }
+        } catch (_) { /* ignore body read errors */ }
+        hbBackoffMs = 0;
       } else {
         hbBackoffMs = 0;
       }

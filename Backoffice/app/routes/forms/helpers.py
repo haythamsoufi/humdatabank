@@ -192,9 +192,12 @@ def _load_existing_data_for_assignment(assignment_entity_status, form_template):
                 continue
             existing_data_processed.update(_process_form_data_entry(entry, form_item))
 
-    dynamic_data_entries = DynamicIndicatorData.query.filter(
-        DynamicIndicatorData.assignment_entity_status_id == assignment_entity_status.id
-    ).all()
+    dynamic_data_entries = (
+        DynamicIndicatorData.query
+        .filter_by(assignment_entity_status_id=assignment_entity_status.id)
+        .options(joinedload(DynamicIndicatorData.indicator_bank))
+        .all()
+    )
     for dynamic_data_entry in dynamic_data_entries:
         dynamic_key = f'field_value[dynamic_{dynamic_data_entry.id}]'
         if dynamic_data_entry.disagg_data:

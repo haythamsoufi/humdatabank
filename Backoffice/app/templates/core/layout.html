@@ -2,7 +2,6 @@
 {% from "components/_profile_icon.html" import profile_icon, profile_icon_button, profile_icon_tooltip %}
 <!DOCTYPE html>
 <html lang="en"{% if mobile_app_embedded|default(false) %} data-mobile-app="true" class="mobile-app mobile-app-embedded"{% endif %}>
-{% set defer_heavy_layout = request.path.startswith('/forms/assignment/') or request.path.startswith('/forms/public/') %}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -33,7 +32,7 @@
         // Workflow tour debug logging (disabled by default)
         window.WORKFLOW_TOUR_DEBUG = false;
     </script>
-    {% if current_user.is_authenticated and not defer_heavy_layout|default(false) %}
+    {% if current_user.is_authenticated and not skip_layout_chatbot|default(false) %}
     <script src="{{ static_url('js/chatbot/messages.js') }}" defer></script>
     <script src="{{ static_url('js/tours/interactive-tour.js') }}" defer></script>
     <script src="{{ static_url('js/tours/workflow-tour-parser.js') }}" defer></script>
@@ -61,11 +60,12 @@
             mobileAppEmbedded: {{ mobile_app_embedded|default(false)|tojson }},
             swRegister: {{ (current_user.is_authenticated and not mobile_app_embedded|default(false))|tojson }}
         };
+        // Used by csrf.js to route token refresh to the lightweight /api/v1/csrf-token endpoint
+        // instead of re-fetching the full page HTML (which can be ~1.9 MB on large entry forms).
+        window.__userIsAuthenticated = {{ current_user.is_authenticated|tojson }};
     </script>
     <!-- Tours Component -->
-    {% if not defer_heavy_layout|default(false) %}
     {% include 'tours/tours.html' %}
-    {% endif %}
 
     <!-- Prevent sidebar flicker by applying collapsed state immediately (pre-render critical) -->
     <script nonce="{{ csp_nonce() }}">
@@ -90,7 +90,7 @@
     <link rel="stylesheet" href="{{ static_url('css/layout.css') }}">
     <link rel="stylesheet" href="{{ static_url('css/components.css') }}">
     <link rel="stylesheet" href="{{ static_url('css/excel-io.css') }}">
-    <link rel="stylesheet" href="{{ static_url('css/chatbot.css') }}">
+    {% if not skip_layout_chatbot|default(false) %}<link rel="stylesheet" href="{{ static_url('css/chatbot.css') }}">{% endif %}
     <link rel="stylesheet" href="{{ static_url('css/responsive.css') }}">
     <link rel="stylesheet" href="{{ static_url('css/rtl.css') }}">
 
@@ -444,7 +444,7 @@
     {% endif %}
 
     <!-- AI Chatbot -->
-    {% if current_user.is_authenticated and CHATBOT_ENABLED and current_user.chatbot_enabled and (not CHATBOT_ORG_ONLY or is_organization_email(current_user.email)) and user_has_ai_beta_access(current_user) %}
+    {% if not skip_layout_chatbot|default(false) and current_user.is_authenticated and CHATBOT_ENABLED and current_user.chatbot_enabled and (not CHATBOT_ORG_ONLY or is_organization_email(current_user.email)) and user_has_ai_beta_access(current_user) %}
     <button id="aiChatbotFAB" aria-label="{{ _('Open %(assistant)s', assistant=CHATBOT_NAME) if CHATBOT_NAME else _('Open AI Assistant') }}">
         <span class="fab-icon-slot">
             <div class="robot-face">

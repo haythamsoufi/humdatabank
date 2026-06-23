@@ -103,10 +103,12 @@ def create_app(config_name=None):
 
     from app.services.monitoring.memory import memory_monitor
     from app.services.monitoring.system import system_monitor
+    from app.services.monitoring import slow_requests
     from app.services.security.monitoring import security_monitor
 
     memory_monitor.configure(app, enabled=app.config.get('MEMORY_MONITORING_ENABLED', False))
     system_monitor.configure(app, enabled=app.config.get('SYSTEM_MONITORING_ENABLED', False))
+    slow_requests.configure(app)
     app.security_monitor = security_monitor
 
     if app.config.get('SECURITY_HEADERS_ENABLED', True):

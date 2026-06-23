@@ -8,6 +8,7 @@ replacing direct database queries in route handlers.
 from typing import Optional, List
 from app.models import AssignmentEntityStatus, AssignedForm
 from app import db
+from sqlalchemy.orm import joinedload
 
 
 class AssignmentService:
@@ -23,7 +24,14 @@ class AssignmentService:
         Returns:
             AssignmentEntityStatus instance or None if not found
         """
-        return AssignmentEntityStatus.query.get(aes_id)
+        return (
+            AssignmentEntityStatus.query
+            .options(
+                joinedload(AssignmentEntityStatus.assigned_form)
+                .joinedload(AssignedForm.template)
+            )
+            .get(aes_id)
+        )
 
     @staticmethod
     def get_assignment_entity_status_or_404(aes_id: int) -> AssignmentEntityStatus:

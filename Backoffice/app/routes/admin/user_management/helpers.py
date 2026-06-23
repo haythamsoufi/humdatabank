@@ -11,7 +11,7 @@ from app.models import (
     Notification, NotificationPreferences, NotificationCampaign,
     EmailDeliveryLog, EntityActivityLog, UserLoginLog, UserActivityLog,
     UserSessionLog, AdminActionLog, SecurityEvent, TemplateShare,
-    DynamicIndicatorData, RepeatGroupInstance, SubmittedDocument,
+    DynamicIndicatorData, RepeatGroupInstance, RepeatGroupData, SubmittedDocument,
     IndicatorBankHistory, IndicatorSuggestion, CommonWord,
     FormTemplate, FormTemplateVersion, SystemSettings, APIKey,
     PasswordResetToken, AIConversation, AIMessage,
@@ -476,6 +476,14 @@ def _cascade_delete_user_related(user: User) -> None:
         db.or_(TemplateShare.shared_by_user_id == uid, TemplateShare.shared_with_user_id == uid)
     ).delete(synchronize_session=False)
     DynamicIndicatorData.query.filter_by(added_by_user_id=uid).delete(synchronize_session=False)
+    # repeat_group_data.repeat_instance_id → repeat_group_instance.id has no DB CASCADE;
+    # delete child rows before the instances to avoid FK violations.
+    user_instance_ids_sq = db.session.query(RepeatGroupInstance.id).filter_by(
+        created_by_user_id=uid
+    ).subquery()
+    RepeatGroupData.query.filter(
+        RepeatGroupData.repeat_instance_id.in_(user_instance_ids_sq)
+    ).delete(synchronize_session=False)
     RepeatGroupInstance.query.filter_by(created_by_user_id=uid).delete(synchronize_session=False)
     SubmittedDocument.query.filter_by(uploaded_by_user_id=uid).delete(synchronize_session=False)
     IndicatorBankHistory.query.filter_by(user_id=uid).delete(synchronize_session=False)

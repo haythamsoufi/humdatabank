@@ -26,7 +26,7 @@ from app.utils.error_handling import handle_view_exception, handle_json_view_exc
 from app.utils.transactions import request_transaction_rollback
 from app.utils.datetime_helpers import utcnow
 from app.utils.advanced_validation import validate_upload_extension_and_mime
-from app.utils.file_parsing import EXCEL_EXTENSIONS
+from app.utils.file_parsing import EXCEL_EXTENSIONS, XLSX_EXTENSIONS
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.api_responses import json_forbidden, json_bad_request, json_not_found, json_ok, json_server_error
 from config.config import Config
@@ -293,11 +293,11 @@ def validate_excel_import():
     if not excel_file or excel_file.filename == '':
         return json_bad_request(message=_('No file selected.'))
 
-    valid, error_msg, ext = validate_upload_extension_and_mime(excel_file, EXCEL_EXTENSIONS)
+    valid, error_msg, ext = validate_upload_extension_and_mime(excel_file, XLSX_EXTENSIONS)
     if not valid:
-        return json_ok(
+        return json_bad_request(
+            message=error_msg or _('Invalid file type. Please upload an Excel file (.xlsx).'),
             valid=False,
-            message=error_msg or _('Invalid file type. Please upload an Excel file (.xlsx or .xls).'),
             errors=[error_msg or _('Invalid file type.')],
             preview={'name': None, 'pages': 0, 'sections': 0, 'items': 0},
         )
@@ -606,9 +606,9 @@ def new_template():
                 return redirect(url_for("form_builder.edit_template", template_id=template_id))
 
             # SECURITY: Validate file extension and MIME type
-            valid, error_msg, ext = validate_upload_extension_and_mime(excel_file, EXCEL_EXTENSIONS)
+            valid, error_msg, ext = validate_upload_extension_and_mime(excel_file, XLSX_EXTENSIONS)
             if not valid:
-                flash(_(error_msg or "Invalid file type. Please upload an Excel file (.xlsx or .xls)."), "danger")
+                flash(_(error_msg or "Invalid file type. Please upload an Excel file (.xlsx)."), "danger")
                 if ext:
                     current_app.logger.warning(f"Rejected Excel import - MIME type mismatch (ext: {ext})")
                 return redirect(url_for("form_builder.edit_template", template_id=template_id))
@@ -1454,6 +1454,7 @@ def delete_template(template_id):
             RepeatGroupInstance,
             RepeatGroupData,
             DynamicIndicatorData,
+            DynamicSectionContext,
         )
 
         # Delete template sharing records first
@@ -1472,11 +1473,13 @@ def delete_template(template_id):
             PublicSubmission.assigned_form_id.in_(assignment_ids_subq)
         ).scalar_subquery()
 
-        # Delete data rows that reference this template's items/sections first
+        # Delete data rows that reference this template's items/sections first.
+        # Order matters: FK children must go before their parent rows.
         formdata_deleted = FormData.query.filter(FormData.form_item_id.in_(item_ids_subq)).delete(synchronize_session=False)
         repeat_data_deleted = RepeatGroupData.query.filter(RepeatGroupData.form_item_id.in_(item_ids_subq)).delete(synchronize_session=False)
         repeat_instances_deleted = RepeatGroupInstance.query.filter(RepeatGroupInstance.section_id.in_(section_ids_subq)).delete(synchronize_session=False)
         dynamic_data_deleted = DynamicIndicatorData.query.filter(DynamicIndicatorData.section_id.in_(section_ids_subq)).delete(synchronize_session=False)
+        dynamic_context_deleted = DynamicSectionContext.query.filter(DynamicSectionContext.section_id.in_(section_ids_subq)).delete(synchronize_session=False)
 
         # Delete submitted documents (children of entity statuses and public submissions)
         # Must happen before AssignmentEntityStatus deletion — bulk delete bypasses ORM cascade
@@ -1695,6 +1698,24 @@ def export_template_excel(template_id):
         current_app.logger.error(f"Error exporting template {template_id} to Excel: {e}", exc_info=True)
         flash("An error occurred. Please try again.", "danger")
         return redirect(url_for("form_builder.edit_template", template_id=template_id))
+
+@bp.route("/templates/<int:template_id>/import_excel/preflight", methods=["GET"])
+@permission_required('admin.templates.import_excel')
+def preflight_import_excel(template_id):
+    """Return counts of submission data that would be deleted by an Excel template import.
+
+    Called by the UI before submitting the import form so the admin can confirm they
+    understand any existing submission data (repeat rows, dynamic indicators, etc.) will
+    be permanently removed.
+    """
+    from flask import jsonify
+    if not check_template_access(template_id, current_user.id):
+        return jsonify({'error': 'Access denied'}), 403
+
+    version_id = request.args.get('version_id', type=int)
+    impact = TemplateExcelService._count_deletion_impact(template_id, version_id)
+    return jsonify(impact)
+
 
 @bp.route("/templates/<int:template_id>/import_excel", methods=["POST"])
 @permission_required('admin.templates.import_excel')

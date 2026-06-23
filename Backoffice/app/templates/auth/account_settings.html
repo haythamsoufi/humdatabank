@@ -856,7 +856,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (window.showDangerConfirmation) {
                 window.showDangerConfirmation(msg, () => { void doRemove(); }, null, 'Remove', 'Cancel', 'Remove Device?');
             } else {
-                void doRemove();
+                if (window.confirm(msg)) void doRemove();
             }
         });
     }

@@ -325,7 +325,7 @@ function confirmDeleteList(listId, listName) {
     } else if (window.showConfirmation) {
         window.showConfirmation(msg, doDelete, null, 'Delete', 'Cancel', 'Delete List?');
     } else {
-        doDelete();
+        if (window.confirm(msg)) doDelete();
     }
 }
 

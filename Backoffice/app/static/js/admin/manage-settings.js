@@ -448,7 +448,7 @@
       if (window.showConfirmation) {
         window.showConfirmation(msg, doReset, null, cfg.t.resetBtn, cfg.t.cancel, cfg.t.resetAiTitle);
       } else {
-        doReset();
+        if (window.confirm(msg)) doReset();
       }
     });
   }

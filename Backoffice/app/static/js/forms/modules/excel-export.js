@@ -36,7 +36,6 @@ export class ExcelExportManager {
         // Find DOM elements
         this.modal = document.getElementById('excel-options-modal');
         this.exportButton = document.getElementById('excel-options-btn');
-        this.closeButtons = document.querySelectorAll('.close-modal-btn');
         this.importForm = document.getElementById('modalImportExcelForm');
         this.overlay = document.querySelector('#excel-options-modal');
 
@@ -44,6 +43,9 @@ export class ExcelExportManager {
             debugLog('excel-export', 'Excel export elements not found - feature may not be available');
             return;
         }
+
+        // Scope close buttons to this modal only to avoid interfering with other modals on the page.
+        this.closeButtons = this.modal.querySelectorAll('.close-modal-btn');
 
         this.bindEvents();
         this.setupFormValidation();
@@ -77,7 +79,7 @@ export class ExcelExportManager {
         // Show modal when Excel Options button is clicked
         this.exportButton.addEventListener('click', this.boundShowModal);
 
-        // Close modal when close buttons are clicked
+        // Close modal when close buttons inside this modal are clicked
         this.closeButtons.forEach(button => {
             button.addEventListener('click', this.boundHideModal);
         });
@@ -358,8 +360,12 @@ export class ExcelExportManager {
                 this.hideImportLoading(submitButton);
                 this.hideModal();
 
-                // Show success message briefly before reload
-                this.showSuccess(data.message || `Import completed: ${data.updated_count || 0} values saved.`);
+                // Show warning when import partially succeeded with per-field errors
+                if (data.errors && data.errors.length > 0) {
+                    this.showWarning(data.message || `Import completed with warnings: ${data.updated_count || 0} values saved.`);
+                } else {
+                    this.showSuccess(data.message || `Import completed: ${data.updated_count || 0} values saved.`);
+                }
 
                 setTimeout(() => {
                     window.location.reload();
@@ -371,6 +377,30 @@ export class ExcelExportManager {
             this.hideImportLoading(submitButton);
             this.showError(`Import failed: ${error.message || 'Unknown error occurred. Please try again.'}`);
         });
+    }
+
+    showWarning(message) {
+        let warningElement = this.modal.querySelector('.excel-warning-message');
+        if (!warningElement) {
+            warningElement = document.createElement('div');
+            warningElement.className = 'excel-warning-message bg-yellow-50 border border-yellow-400 text-yellow-800 px-4 py-3 rounded mb-4';
+            warningElement.setAttribute('role', 'alert');
+            const modalContent = this.modal.querySelector('.relative');
+            if (modalContent) {
+                modalContent.insertBefore(warningElement, modalContent.firstChild.nextSibling);
+            }
+        }
+        const inner = document.createElement('div');
+        inner.className = 'flex items-center';
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-exclamation-triangle mr-2';
+        const span = document.createElement('span');
+        span.textContent = message;
+        inner.appendChild(icon);
+        inner.appendChild(span);
+        warningElement.replaceChildren();
+        warningElement.appendChild(inner);
+        setTimeout(() => { if (warningElement.parentNode) warningElement.remove(); }, 4000);
     }
 
     showSuccess(message) {
@@ -669,22 +699,5 @@ export class ExcelExportManager {
     }
 }
 
-// Initialize the Excel export manager when DOM is ready
-let excelExportManager;
-
-function initializeExcelExport() {
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            excelExportManager = new ExcelExportManager();
-        });
-    } else {
-        excelExportManager = new ExcelExportManager();
-    }
-}
-
-// Auto-initialize
-initializeExcelExport();
-
 // Export for external use
-export { excelExportManager };
 export default ExcelExportManager;

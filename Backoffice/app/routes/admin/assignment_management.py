@@ -29,7 +29,7 @@ from app.utils.error_handling import handle_json_view_exception
 from app.routes.admin.shared import admin_required, permission_required
 from app.utils.request_utils import is_json_request
 from sqlalchemy import func
-from app.models.forms import FormData, DynamicIndicatorData, RepeatGroupInstance, RepeatGroupData
+from app.models.forms import FormData, DynamicIndicatorData, DynamicSectionContext, RepeatGroupInstance, RepeatGroupData
 from app.utils.form_localization import get_localized_country_name
 from app.utils.country_utils import get_countries_by_region
 from app.services.entity_service import EntityService
@@ -47,6 +47,7 @@ def _delete_assignment_entity_status_with_children(aes):
     This removes:
       - FormData linked via assignment_entity_status_id
       - DynamicIndicatorData linked via assignment_entity_status_id
+      - DynamicSectionContext linked via assignment_entity_status_id
       - RepeatGroupData for RepeatGroupInstances linked via assignment_entity_status_id
       - RepeatGroupInstances linked via assignment_entity_status_id
       - SubmittedDocument linked via assignment_entity_status_id
@@ -55,6 +56,7 @@ def _delete_assignment_entity_status_with_children(aes):
     # Delete simple children that directly FK the AES
     FormData.query.filter_by(assignment_entity_status_id=aes.id).delete(synchronize_session=False)
     DynamicIndicatorData.query.filter_by(assignment_entity_status_id=aes.id).delete(synchronize_session=False)
+    DynamicSectionContext.query.filter_by(assignment_entity_status_id=aes.id).delete(synchronize_session=False)
 
     # Delete repeat structures in correct order (data -> instances)
     instances = RepeatGroupInstance.query.filter_by(assignment_entity_status_id=aes.id).all()

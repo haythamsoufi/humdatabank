@@ -440,7 +440,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (window.showDangerConfirmation) {
             window.showDangerConfirmation(clearMsg, doClear, null, '{{ _("Clear") }}', '{{ _("Cancel") }}', '{{ _("Clear Logs?") }}');
         } else {
-            doClear();
+            if (window.confirm(clearMsg)) doClear();
         }
     });
 

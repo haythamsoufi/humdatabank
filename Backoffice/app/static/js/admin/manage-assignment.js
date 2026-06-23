@@ -754,7 +754,7 @@
             if (window.showConfirmation) {
                 window.showConfirmation(msg, doRemove, function() {}, cfg.t.remove, cfg.t.cancel, cfg.t.removeEntities);
             } else {
-                doRemove();
+                if (window.confirm(msg)) doRemove();
             }
         });
 
@@ -2836,7 +2836,7 @@
                     cfg.t.cancel,
                     cfg.t.confirmAction
                 );
-            } else if (form) {
+            } else if (form && window.confirm(confirmMsg)) {
                 HTMLFormElement.prototype.submit.call(form);
             }
             return false;

@@ -220,11 +220,9 @@
                     </div>
                     <div class="mb-4">
                         <div class="flex items-center">
-                            {{ form.enable_export_excel(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=true) }}
-                            {{ form.enable_export_excel.label(class="ml-2 block text-gray-700 text-sm font-semibold opacity-50") }}
+                            {{ form.enable_export_excel(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                            {{ form.enable_export_excel.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
                         </div>
-                        <input type="hidden" name="{{ form.enable_export_excel.name }}" value="">
-                        <p class="mt-1 text-xs text-gray-500 italic">{{ _('Coming soon') }}</p>
                         {% if form.enable_export_excel.errors %}
                             {% for error in form.enable_export_excel.errors %}
                                 <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
@@ -233,11 +231,9 @@
                     </div>
                     <div class="mb-4">
                         <div class="flex items-center">
-                            {{ form.enable_import_excel(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=true) }}
-                            {{ form.enable_import_excel.label(class="ml-2 block text-gray-700 text-sm font-semibold opacity-50") }}
+                            {{ form.enable_import_excel(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                            {{ form.enable_import_excel.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
                         </div>
-                        <input type="hidden" name="{{ form.enable_import_excel.name }}" value="">
-                        <p class="mt-1 text-xs text-gray-500 italic">{{ _('Coming soon') }}</p>
                         {% if form.enable_import_excel.errors %}
                             {% for error in form.enable_import_excel.errors %}
                                 <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>

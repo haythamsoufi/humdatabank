@@ -46,7 +46,7 @@ if [ -f "config/gunicorn.conf.py" ]; then
     exec gunicorn --config config/gunicorn.conf.py run:app
 else
     # Fallback to command-line configuration
-    WORKERS=${GUNICORN_WORKERS:-4}
+    WORKERS=${GUNICORN_WORKERS:-3}
     THREADS=${GUNICORN_THREADS:-4}
     WORKER_CLASS=${GUNICORN_WORKER_CLASS:-gthread}
     TIMEOUT=${GUNICORN_TIMEOUT:-120}

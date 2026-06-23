@@ -112,7 +112,23 @@ class NotificationCenter {
             window.ActionRouter.register('notifications-center:mark-read', singleIdHandler(this.markAsRead));
             window.ActionRouter.register('notifications-center:mark-unread', singleIdHandler(this.markAsUnread));
             window.ActionRouter.register('notifications-center:archive', singleIdHandler(this.archiveNotifications));
-            window.ActionRouter.register('notifications-center:delete', singleIdHandler(this.deleteNotifications));
+            window.ActionRouter.register('notifications-center:delete', (el, event) => {
+                event?.preventDefault?.();
+                const id = parseInt(el.getAttribute('data-notification-id') || '', 10);
+                if (!Number.isFinite(id)) return;
+                const doDelete = () => this.deleteNotifications([id]);
+                const msg = this.getTranslation('Delete this notification?');
+                if (window.showDangerConfirmation) {
+                    window.showDangerConfirmation(
+                        msg, doDelete, null,
+                        this.getTranslation('Delete'),
+                        this.getTranslation('Cancel'),
+                        this.getTranslation('Delete Notification?')
+                    );
+                } else {
+                    if (window.confirm(msg)) doDelete();
+                }
+            });
 
             window.ActionRouter.register('notifications-center:view-related', (el, event) => {
                 event?.preventDefault?.();

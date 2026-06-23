@@ -14,6 +14,7 @@ from app import get_locale
 from app.models import (
     db, AssignedForm, AssignmentEntityStatus, Country, FormItem, FormPage,
     FormSection, PublicSubmission, PublicSubmissionStatus, QuestionType,
+    RepeatGroupInstance, RepeatGroupData, DynamicIndicatorData, DynamicSectionContext,
 )
 from app.services.authorization_service import AuthorizationService
 from app.services.entity_service import EntityService
@@ -119,6 +120,21 @@ def register_submission_routes(bp):
                     except Exception as e:
                         current_app.logger.error(f"Error deleting document file {doc.storage_path}: {e}", exc_info=True)
 
+                # Explicitly remove children that are not ORM-cascaded from PublicSubmission
+                # (only FormData and SubmittedDocument are cascade-covered; repeat/dynamic are not).
+                instance_ids = [
+                    row[0] for row in
+                    db.session.query(RepeatGroupInstance.id)
+                    .filter_by(public_submission_id=submission.id).all()
+                ]
+                if instance_ids:
+                    RepeatGroupData.query.filter(
+                        RepeatGroupData.repeat_instance_id.in_(instance_ids)
+                    ).delete(synchronize_session=False)
+                RepeatGroupInstance.query.filter_by(public_submission_id=submission.id).delete(synchronize_session=False)
+                DynamicIndicatorData.query.filter_by(public_submission_id=submission.id).delete(synchronize_session=False)
+                DynamicSectionContext.query.filter_by(public_submission_id=submission.id).delete(synchronize_session=False)
+
                 db.session.delete(submission)
                 db.session.flush()
                 flash(f"Public Submission for {country_name} deleted successfully.", "success")
@@ -220,6 +236,26 @@ def register_submission_routes(bp):
                 from app.utils.api_serialization import _country_for_aes
                 _sub_country = _country_for_aes(assignment_entity_status)
                 country_name = _sub_country.name if _sub_country else "Unknown"
+
+                # Explicitly remove children not ORM-cascaded from AssignmentEntityStatus.
+                instance_ids = [
+                    row[0] for row in
+                    db.session.query(RepeatGroupInstance.id)
+                    .filter_by(assignment_entity_status_id=assignment_entity_status.id).all()
+                ]
+                if instance_ids:
+                    RepeatGroupData.query.filter(
+                        RepeatGroupData.repeat_instance_id.in_(instance_ids)
+                    ).delete(synchronize_session=False)
+                RepeatGroupInstance.query.filter_by(
+                    assignment_entity_status_id=assignment_entity_status.id
+                ).delete(synchronize_session=False)
+                DynamicIndicatorData.query.filter_by(
+                    assignment_entity_status_id=assignment_entity_status.id
+                ).delete(synchronize_session=False)
+                DynamicSectionContext.query.filter_by(
+                    assignment_entity_status_id=assignment_entity_status.id
+                ).delete(synchronize_session=False)
 
                 db.session.delete(assignment_entity_status)
                 db.session.flush()

@@ -4616,7 +4616,7 @@ async function deleteDocument(id, title) {
             cfg.t.delete_document_616cd122
         );
     } else {
-        proceedWithDelete();
+        if (window.confirm(confirmMsg)) proceedWithDelete();
     }
 }
 

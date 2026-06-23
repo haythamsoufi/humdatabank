@@ -13,7 +13,9 @@ from flask import current_app
 from flask_login import current_user
 from app import db
 from app.models import (
-    FormTemplate, FormPage, FormSection, FormItem, FormTemplateVersion
+    FormTemplate, FormPage, FormSection, FormItem, FormTemplateVersion,
+    FormData,
+    RepeatGroupInstance, RepeatGroupData, DynamicIndicatorData, DynamicSectionContext,
 )
 from app.models.indicator_bank import IndicatorBank
 from contextlib import suppress
@@ -3069,11 +3071,141 @@ class TemplateExcelService:
         return errors
 
     @classmethod
+    def _count_deletion_impact(cls, template_id: int, version_id: Optional[int]) -> Dict[str, Any]:
+        """Return counts of submission-data rows that would be removed by a structure clear.
+
+        Used by the preflight endpoint so the UI can warn the admin before the import
+        actually destroys any data.  No data is modified.
+        """
+        if not version_id:
+            return {'has_data': False, 'counts': {}}
+
+        section_ids: List[int] = [
+            row[0]
+            for row in db.session.query(FormSection.id).filter_by(
+                template_id=template_id, version_id=version_id
+            ).all()
+        ]
+        if not section_ids:
+            return {'has_data': False, 'counts': {}}
+
+        item_ids_sq = db.session.query(FormItem.id).filter_by(
+            template_id=template_id, version_id=version_id
+        ).subquery()
+
+        form_data: int = db.session.query(
+            db.func.count(FormData.id)
+        ).filter(FormData.form_item_id.in_(item_ids_sq)).scalar() or 0
+
+        repeat_instances: int = db.session.query(
+            db.func.count(RepeatGroupInstance.id)
+        ).filter(RepeatGroupInstance.section_id.in_(section_ids)).scalar() or 0
+
+        repeat_data: int = 0
+        if repeat_instances:
+            instance_ids_sq = db.session.query(RepeatGroupInstance.id).filter(
+                RepeatGroupInstance.section_id.in_(section_ids)
+            ).subquery()
+            repeat_data = db.session.query(
+                db.func.count(RepeatGroupData.id)
+            ).filter(RepeatGroupData.repeat_instance_id.in_(instance_ids_sq)).scalar() or 0
+
+        dynamic_indicators: int = db.session.query(
+            db.func.count(DynamicIndicatorData.id)
+        ).filter(DynamicIndicatorData.section_id.in_(section_ids)).scalar() or 0
+
+        dynamic_contexts: int = db.session.query(
+            db.func.count(DynamicSectionContext.id)
+        ).filter(DynamicSectionContext.section_id.in_(section_ids)).scalar() or 0
+
+        total = form_data + repeat_instances + repeat_data + dynamic_indicators + dynamic_contexts
+        return {
+            'has_data': total > 0,
+            'counts': {
+                'form_data': form_data,
+                'repeat_instances': repeat_instances,
+                'repeat_data': repeat_data,
+                'dynamic_indicators': dynamic_indicators,
+                'dynamic_contexts': dynamic_contexts,
+            },
+        }
+
+    @classmethod
     def _clear_version_structure(cls, template_id: int, version_id: int) -> Dict[str, int]:
-        """Delete all pages, sections, and items for a version (keeps the version row itself)."""
+        """Delete all pages, sections, and items for a version (keeps the version row itself).
+
+        Bulk .delete(synchronize_session=False) bypasses SQLAlchemy ORM cascade rules, so
+        child records that have FK constraints pointing to form_section / form_item must be
+        removed explicitly before the structural rows are deleted.
+        """
         current_app.logger.info(
             f"Clearing existing structure for template_id={template_id}, version_id={version_id} before Excel import"
         )
+
+        # Collect the IDs of sections and items that are about to be removed so we can
+        # clean up submission-data rows that hold FK references to them.
+        section_ids: List[int] = [
+            row[0]
+            for row in db.session.query(FormSection.id).filter_by(
+                template_id=template_id, version_id=version_id
+            ).all()
+        ]
+        item_ids: List[int] = [
+            row[0]
+            for row in db.session.query(FormItem.id).filter_by(
+                template_id=template_id, version_id=version_id
+            ).all()
+        ]
+
+        if section_ids:
+            # repeat_group_data.repeat_instance_id → repeat_group_instance.id has no DB CASCADE
+            instance_ids_sq = db.session.query(RepeatGroupInstance.id).filter(
+                RepeatGroupInstance.section_id.in_(section_ids)
+            ).subquery()
+            rgd_deleted = RepeatGroupData.query.filter(
+                RepeatGroupData.repeat_instance_id.in_(instance_ids_sq)
+            ).delete(synchronize_session=False)
+
+            # repeat_group_instance.section_id → form_section.id has no DB CASCADE
+            rgi_deleted = RepeatGroupInstance.query.filter(
+                RepeatGroupInstance.section_id.in_(section_ids)
+            ).delete(synchronize_session=False)
+
+            # dynamic_indicator_data.section_id → form_section.id has no DB CASCADE
+            did_deleted = DynamicIndicatorData.query.filter(
+                DynamicIndicatorData.section_id.in_(section_ids)
+            ).delete(synchronize_session=False)
+
+            # dynamic_section_context.section_id → form_section.id has no DB CASCADE
+            dsc_deleted = DynamicSectionContext.query.filter(
+                DynamicSectionContext.section_id.in_(section_ids)
+            ).delete(synchronize_session=False)
+
+            if any([rgd_deleted, rgi_deleted, did_deleted, dsc_deleted]):
+                current_app.logger.info(
+                    f"Cleared submission data tied to version structure: "
+                    f"{rgi_deleted} repeat_group_instance(s), {rgd_deleted} repeat_group_data row(s), "
+                    f"{did_deleted} dynamic_indicator_data row(s), {dsc_deleted} dynamic_section_context row(s)"
+                )
+
+        if item_ids:
+            # form_data.form_item_id → form_item.id has no DB CASCADE
+            fd_deleted = FormData.query.filter(
+                FormData.form_item_id.in_(item_ids)
+            ).delete(synchronize_session=False)
+
+            # Catch any repeat_group_data rows referencing these items that were not already
+            # removed via the section/instance path above (edge-case guard).
+            rgd_by_item = RepeatGroupData.query.filter(
+                RepeatGroupData.form_item_id.in_(item_ids)
+            ).delete(synchronize_session=False)
+
+            if fd_deleted or rgd_by_item:
+                current_app.logger.info(
+                    f"Cleared {fd_deleted} form_data row(s) and "
+                    f"{rgd_by_item} additional repeat_group_data row(s) tied to version items"
+                )
+
         items_deleted = FormItem.query.filter_by(
             template_id=template_id, version_id=version_id
         ).delete(synchronize_session=False)

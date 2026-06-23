@@ -14,9 +14,15 @@ bind = f"0.0.0.0:{os.environ.get('PORT', '5000')}"
 backlog = 2048
 
 # Worker processes
-# Formula: (2 x CPU cores) + 1
-# For production, adjust based on your server's CPU cores
-workers = int(os.environ.get('GUNICORN_WORKERS', multiprocessing.cpu_count() * 2 + 1))
+# Default 3 on Azure P1v3 (2 vCPU, ~3.5 GB RAM): avoids auto (2×CPU+1) over-provisioning
+# that exhausts memory and DB pool. Scale out App Service instances instead of workers.
+# Override via GUNICORN_WORKERS; auto-detect only when GUNICORN_WORKERS=auto.
+_workers_env = os.environ.get('GUNICORN_WORKERS', '3').strip()
+workers = (
+    multiprocessing.cpu_count() * 2 + 1
+    if _workers_env.lower() == 'auto'
+    else int(_workers_env)
+)
 
 # Worker class - use gthread for WebSocket support
 # gthread provides threading support needed for non-blocking WebSocket operations
@@ -33,9 +39,10 @@ worker_connections = int(os.environ.get('GUNICORN_WORKER_CONNECTIONS', '1000'))
 
 # Timeout
 # Workers silent for more than this many seconds are killed and restarted.
-# Use at least 600 for AI chat/agent (multi-tool + LLM); shorter values can
-# cause "timed out" during long agent runs even when client/app timeouts are higher.
-timeout = int(os.environ.get('GUNICORN_TIMEOUT', '600'))
+# Azure App Service front-end cuts HTTP at ~230s; default 120s so gunicorn fails
+# gracefully before the gateway returns 504 while the worker still holds DB connections.
+# Override via GUNICORN_TIMEOUT (e.g. 600) only behind Application Gateway with ≥300s backend timeout.
+timeout = int(os.environ.get('GUNICORN_TIMEOUT', '120'))
 
 # Keep-alive
 # Seconds to wait for requests on a Keep-Alive connection
@@ -78,8 +85,8 @@ tmp_upload_dir = None
 preload_app = os.environ.get('GUNICORN_PRELOAD', 'false').lower() == 'true'
 
 # Max requests per worker before restart (prevents memory leaks)
-max_requests = int(os.environ.get('GUNICORN_MAX_REQUESTS', '1000'))
-max_requests_jitter = int(os.environ.get('GUNICORN_MAX_REQUESTS_JITTER', '50'))
+max_requests = int(os.environ.get('GUNICORN_MAX_REQUESTS', '500'))
+max_requests_jitter = int(os.environ.get('GUNICORN_MAX_REQUESTS_JITTER', '100'))
 
 # Graceful timeout for worker shutdown
 graceful_timeout = int(os.environ.get('GUNICORN_GRACEFUL_TIMEOUT', '30'))

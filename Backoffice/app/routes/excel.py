@@ -1,8 +1,6 @@
 from flask import Blueprint, send_file, current_app, request, flash, redirect, url_for
 from flask_login import login_required, current_user
 from app.models import db, FormSection, FormItem, FormData
-from app.models.assignments import AssignmentEntityStatus
-from app.utils.route_helpers import get_unified_form_item_id  # reuse helper
 from app.services.form_data_service import FormDataService
 from app.services import get_aes_with_joins, get_formdata_map
 from app.services.monitoring.memory import memory_tracker
@@ -23,33 +21,24 @@ bp = excel_bp
 MAX_EXCEL_FILE_SIZE = 10 * 1024 * 1024
 
 
-def _user_can_access_aes(aes: AssignmentEntityStatus):
-    """Utility to check if the current user may access the given assignment-entity-status."""
-    from app.services.authorization_service import AuthorizationService
-    if AuthorizationService.is_admin(current_user):
-        return True
-    user_country_ids = [c.id for c in current_user.countries.all()]
-    # Get country_id from entity_id when entity_type is 'country'
-    country_id = aes.entity_id if aes.entity_type == 'country' else None
-    if not country_id:
-        return False
-    return country_id in user_country_ids
-
-
 @excel_bp.route("/assignment/<int:aes_id>/export", methods=["GET"])
 @login_required
 @memory_tracker("Excel Route Export", log_top_allocations=True)
 def export_assignment_excel(aes_id):
-    """Export a very simple, machine-readable Excel template for the assignment.
+    """Export a form-like Excel workbook for the assignment.
 
-    The workbook contains a single sheet called **Data Entry** with the following columns:
-        A  item_id   – unified form_item_id to be stored in DB
-        B  section   – section title (for human readability)
-        C  label     – field label (human readability)
-        D  type      – field type (question/indicator/etc.)
-        E  value     – where the user will type data (initially filled with current value, if any)
+    The workbook contains one **Data Entry** sheet per template page (or a single
+    sheet for non-paginated templates).  Each item occupies one row with columns:
 
-    Because every row carries its own *item_id*, the importer can reliably map cells back to DB fields.
+        A  item_id  – unified form_item_id used by the importer
+        B  label    – merged across B–C for readability (human-readable only)
+        C  (merged with B)
+        D  value    – current value; editable by the user
+        E  Mode     – disaggregation mode string, e.g. "Mode: sex" (if applicable)
+        F  values   – JSON-serialised disaggregation values (if applicable)
+
+    Document-type fields are skipped.  The importer in *import_assignment_excel*
+    uses the item_id in column A to map rows back to DB records.
     """
     # Use service to get AssignmentEntityStatus with joins and RBAC check
     aes = get_aes_with_joins(aes_id)

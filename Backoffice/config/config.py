@@ -331,7 +331,7 @@ class Config:
     # Keep this well below PostgreSQL's max_connections.
     # Azure PostgreSQL Flexible Server max_connections varies by tier
     # (e.g. 50 for B1ms, 100 for B2s, 200 for GP-2vCore).
-    # Default here: 5 workers × (5 + 10) = 75 connections — safe for most tiers.
+    # Default here: 3 workers × (5 + 10) = 45 connections — safe for most tiers.
     # Override via env vars to tune per environment.
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
@@ -753,9 +753,10 @@ class Config:
     # Agent Configuration
     AI_AGENT_ENABLED = _parse_bool(os.environ.get('AI_AGENT_ENABLED'), default=True)
     AI_AGENT_MAX_ITERATIONS = 25
-    AI_AGENT_TIMEOUT_SECONDS = 300
-    # SSE stream: max seconds without completion before yielding stream_idle_timeout (default 3 min)
-    AI_SSE_IDLE_TIMEOUT_SECONDS = 420
+    # Dev-friendly defaults; ProductionConfig overrides for Azure (~230s gateway limit).
+    AI_AGENT_TIMEOUT_SECONDS = int(os.environ.get('AI_AGENT_TIMEOUT_SECONDS', '300'))
+    # SSE stream: max seconds without completion before yielding stream_idle_timeout
+    AI_SSE_IDLE_TIMEOUT_SECONDS = int(os.environ.get('AI_SSE_IDLE_TIMEOUT_SECONDS', '420'))
     AI_AGENT_MAX_TOOLS_PER_QUERY = 50
     # Max number of search_documents/search_documents_hybrid calls per agent run.
     # Lower (e.g. 3) on staging if traces show many broad search_documents calls and narrative fails.
@@ -856,7 +857,7 @@ class Config:
     AI_CHAT_MAINTENANCE_BATCH_SIZE = int(os.environ.get('AI_CHAT_MAINTENANCE_BATCH_SIZE', '200'))
 
     # HTTP timeouts for outbound AI calls (embedding, LLM). Prevents hung requests.
-    AI_HTTP_TIMEOUT_SECONDS = 120
+    AI_HTTP_TIMEOUT_SECONDS = int(os.environ.get('AI_HTTP_TIMEOUT_SECONDS', '120'))
     # Dedicated timeout (seconds) for the small AIQueryPlanner routing LLM call (default: min(HTTP, 45)).
     AI_AGENT_PLANNER_TIMEOUT_SECONDS = int(os.environ.get("AI_AGENT_PLANNER_TIMEOUT_SECONDS", "45") or "45")
     # Max pagination batches when document_list fast-path fetches search_documents batches.
@@ -1134,7 +1135,7 @@ class ProductionConfig(Config):
 
     # Connection pool — keep totals below PostgreSQL max_connections.
     # total max = GUNICORN_WORKERS × (SQLALCHEMY_POOL_SIZE + SQLALCHEMY_MAX_OVERFLOW)
-    # With 5 workers and defaults below: 5 × (5 + 10) = 75 connections.
+    # With 3 workers and defaults below: 3 × (5 + 10) = 45 connections.
     #
     # connect_timeout:   abort TCP handshake that hangs (e.g. private-endpoint warming up).
     # statement_timeout: kill runaway queries before they exhaust the pool and cause 504s.
@@ -1151,6 +1152,11 @@ class ProductionConfig(Config):
             **({"options": f"-c statement_timeout={_stmt_timeout_ms}"} if _stmt_timeout_ms > 0 else {}),
         },
     }
+
+    # Azure App Service front-end HTTP timeout is ~230s. Keep in-app limits below that
+    # so workers release DB connections before the gateway returns 504.
+    AI_AGENT_TIMEOUT_SECONDS = int(os.environ.get('AI_AGENT_TIMEOUT_SECONDS', '100'))
+    AI_SSE_IDLE_TIMEOUT_SECONDS = int(os.environ.get('AI_SSE_IDLE_TIMEOUT_SECONDS', '180'))
 
     # Set logging level to INFO for better visibility
     LOG_LEVEL = "INFO"

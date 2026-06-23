@@ -1,4 +1,13 @@
-"""PDF / Excel export and import routes for forms."""
+"""PDF / Excel export and import routes for forms.
+
+.. deprecated::
+   The Excel export/import endpoints in this module
+   (``export_excel`` / ``import_excel``) are superseded by the dedicated
+   ``excel_bp`` blueprint in ``app/routes/excel.py``
+   (``/excel/assignment/<aes_id>/export`` and ``/excel/assignment/<aes_id>/import``).
+   New callers should use the ``excel`` blueprint routes.  These legacy endpoints
+   are kept for backward compatibility only and will be removed in a future release.
+"""
 from __future__ import annotations
 
 from contextlib import suppress

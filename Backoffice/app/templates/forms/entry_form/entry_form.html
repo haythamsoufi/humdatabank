@@ -2620,10 +2620,11 @@
         {% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('Excel Options') }}{% endset %}
         {% if not is_preview_mode and not is_public_submission %}
             {% set tmpl = assignment_status.assigned_form.template if assignment_status and assignment_status.assigned_form else None %}
-            {% set aes_id = assignment_status.id if assignment_status and assignment_status.id is not none else 0 %}
-            {% set _show_export = tmpl and tmpl.enable_export_excel %}
-            {% set _show_import = tmpl and tmpl.enable_import_excel %}
+            {% set aes_id = assignment_status.id if assignment_status and assignment_status.id is not none and assignment_status.id != 0 else none %}
+            {% set _show_export = tmpl and tmpl.enable_export_excel and aes_id %}
+            {% set _show_import = tmpl and tmpl.enable_import_excel and aes_id %}
             {% set _csrf_field %}{{ form.csrf_token if form else '' }}{% endset %}
+            {% if _show_export or _show_import %}
             {% call excel_io_modal(
                 'excel-options-modal',
                 modal_title=excel_title,
@@ -2647,6 +2648,7 @@
                 import_hidden_fields=_csrf_field,
                 import_note=_('Supported formats: .xlsx') ~ ' • ' ~ _('Maximum file size: 10MB')
             ) %}{% endcall %}
+            {% endif %}
         {% else %}
         {% call modal_shell('excel-options-modal', excel_title, aria_label=_('Excel Options'), max_width='max-w-sm', title_safe=true, close_class='close-modal-btn') %}
                 <div class="text-center py-8">

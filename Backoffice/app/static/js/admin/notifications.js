@@ -1639,20 +1639,18 @@ class AdminNotifications {
     }
 
     async deleteCampaign(campaignId) {
+        const _deleteCampaignMsg = 'Are you sure you want to delete this campaign? This action cannot be undone.';
         if (window.showDangerConfirmation) {
             window.showDangerConfirmation(
-                'Are you sure you want to delete this campaign? This action cannot be undone.',
-                () => {
-                    this.performDeleteCampaign(campaignId);
-                },
+                _deleteCampaignMsg,
+                () => { this.performDeleteCampaign(campaignId); },
                 null,
                 'Delete',
                 'Cancel',
                 'Delete Campaign?'
             );
-            return;
         } else {
-            this.performDeleteCampaign(campaignId);
+            if (window.confirm(_deleteCampaignMsg)) this.performDeleteCampaign(campaignId);
         }
     }
 

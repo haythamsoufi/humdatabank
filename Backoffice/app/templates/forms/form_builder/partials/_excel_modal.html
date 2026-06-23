@@ -19,6 +19,7 @@
 {% set _hidden_fields %}
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 <input type="hidden" name="version_id" value="{{ active_version_id if active_version_id else '' }}"/>
+<input type="hidden" id="excel-import-preflight-url" value="{{ url_for('form_builder.preflight_import_excel', template_id=template.id) }}"/>
 {% endset %}
 
 {% call excel_io_modal(
@@ -41,5 +42,5 @@
     import_submit_disabled=true,
     import_alert=_published_alert,
     import_hidden_fields=_hidden_fields,
-    import_note=_('Supported formats: .xlsx, .xls')
+    import_note=_('Supported formats: .xlsx')
 ) %}{% endcall %}

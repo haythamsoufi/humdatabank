@@ -11,6 +11,8 @@ from werkzeug.datastructures import FileStorage
 # Extensions for CSV and Excel
 CSV_EXCEL_EXTENSIONS = {".csv", ".xlsx", ".xls"}
 EXCEL_EXTENSIONS = {".xlsx", ".xls"}
+# Strict subset for routes backed by openpyxl (which only reads .xlsx natively)
+XLSX_EXTENSIONS = {".xlsx"}
 
 
 def _decode_csv_content(file_content: bytes) -> str:

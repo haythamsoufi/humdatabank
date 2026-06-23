@@ -264,7 +264,7 @@
                         {{ _('Discard Draft?') | tojson }}
                     );
                 } else {
-                    doSubmit();
+                    if (window.confirm(message)) doSubmit();
                 }
             });
             discardBtn.dataset.fbWired = '1';

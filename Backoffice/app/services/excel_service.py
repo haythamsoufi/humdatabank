@@ -529,7 +529,16 @@ class ExcelService:
                         values = disagg_data.get('values', {})
 
                         if mode and values:
-                            data_entry.set_disaggregated_data(mode, values)
+                            if mode == 'matrix':
+                                # Matrix data has its own structure; calling set_disaggregated_data
+                                # would run _calculate_disagg_total on a non-numeric matrix dict and
+                                # produce an incorrect row total.  Store directly instead.
+                                data_entry.disagg_data = {'mode': 'matrix', 'values': values}
+                                data_entry.disagg_type = 'matrix'
+                                data_entry.data_not_available = False
+                                data_entry.not_applicable = False
+                            else:
+                                data_entry.set_disaggregated_data(mode, values)
                             updated_count += 1
                         else:
                             errors.append(f"Field {form_item_id}: Invalid disaggregation data structure")

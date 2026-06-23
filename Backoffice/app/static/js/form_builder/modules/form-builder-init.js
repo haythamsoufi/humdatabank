@@ -227,12 +227,130 @@ export function initExcelModal() {
             });
 
             if (importForm) {
-                importForm.addEventListener('submit', () => {
-                    importForm.dataset.excelImportSubmitting = '1';
+                const preflightUrl = document.getElementById('excel-import-preflight-url')?.value || null;
+
+                importForm.addEventListener('submit', async (e) => {
                     const submitBtn = importForm.querySelector('button[type="submit"]');
+
+                    // User already confirmed deletion in this session — let the form submit.
+                    if (importForm.querySelector('input[name="confirm_deletion"]')) {
+                        importForm.dataset.excelImportSubmitting = '1';
+                        if (submitBtn) {
+                            submitBtn.disabled = true;
+                            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Importing template\u2026';
+                        }
+                        return;
+                    }
+
+                    // No preflight URL available — just submit normally.
+                    if (!preflightUrl) {
+                        importForm.dataset.excelImportSubmitting = '1';
+                        if (submitBtn) {
+                            submitBtn.disabled = true;
+                            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Importing template\u2026';
+                        }
+                        return;
+                    }
+
+                    // Intercept and run the preflight check first.
+                    e.preventDefault();
+                    const originalBtnHtml = submitBtn?.innerHTML || '';
                     if (submitBtn) {
                         submitBtn.disabled = true;
-                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Importing template…';
+                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Checking\u2026';
+                    }
+
+                    try {
+                        const versionId = importForm.querySelector('input[name="version_id"]')?.value;
+                        const url = versionId ? `${preflightUrl}?version_id=${encodeURIComponent(versionId)}` : preflightUrl;
+                        const resp = await fetch(url, { credentials: 'same-origin' });
+                        const data = await resp.json();
+
+                        if (data.has_data) {
+                            // Build a human-readable summary of what would be lost.
+                            const c = data.counts || {};
+                            const lines = [];
+                            if (c.form_data > 0) lines.push(`${c.form_data} form data entr${c.form_data !== 1 ? 'ies' : 'y'}`);
+                            if (c.repeat_instances > 0) lines.push(`${c.repeat_instances} repeat-group row${c.repeat_instances !== 1 ? 's' : ''}`);
+                            if (c.repeat_data > 0) lines.push(`${c.repeat_data} repeat data entr${c.repeat_data !== 1 ? 'ies' : 'y'}`);
+                            if (c.dynamic_indicators > 0) lines.push(`${c.dynamic_indicators} dynamic indicator record${c.dynamic_indicators !== 1 ? 's' : ''}`);
+                            if (c.dynamic_contexts > 0) lines.push(`${c.dynamic_contexts} section context binding${c.dynamic_contexts !== 1 ? 's' : ''}`);
+                            const summary = lines.join(', ');
+
+                            // Inject a warning banner with confirm / cancel actions above the submit button.
+                            importForm.querySelector('.excel-import-deletion-warning')?.remove();
+                            const warning = document.createElement('div');
+                            warning.className = 'excel-import-deletion-warning bg-red-50 border border-red-300 rounded-md p-3 text-sm mt-2';
+                            warning.innerHTML = `
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-exclamation-triangle text-red-600 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
+                                    <div class="text-red-800">
+                                        <p class="font-semibold mb-1">This import will permanently delete existing submission data:</p>
+                                        <p class="mb-1">${summary}</p>
+                                        <p class="text-xs text-red-600">This action cannot be undone.</p>
+                                    </div>
+                                </div>
+                                <div class="flex gap-2 mt-3">
+                                    <button type="button" class="btn btn-danger btn-sm excel-import-confirm-btn flex-1">
+                                        <i class="fas fa-trash mr-1"></i> Delete data &amp; import
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-sm excel-import-cancel-btn flex-1">
+                                        Cancel
+                                    </button>
+                                </div>`;
+
+                            submitBtn.insertAdjacentElement('beforebegin', warning);
+                            submitBtn.style.display = 'none';
+
+                            warning.querySelector('.excel-import-confirm-btn').addEventListener('click', () => {
+                                const confirmInput = document.createElement('input');
+                                confirmInput.type = 'hidden';
+                                confirmInput.name = 'confirm_deletion';
+                                confirmInput.value = '1';
+                                importForm.appendChild(confirmInput);
+                                warning.remove();
+                                submitBtn.style.display = '';
+                                importForm.dataset.excelImportSubmitting = '1';
+                                submitBtn.disabled = true;
+                                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Importing template\u2026';
+                                try { importForm.requestSubmit(submitBtn); } catch (_) { importForm.submit(); }
+                            });
+
+                            warning.querySelector('.excel-import-cancel-btn').addEventListener('click', () => {
+                                warning.remove();
+                                submitBtn.style.display = '';
+                                if (submitBtn) {
+                                    submitBtn.disabled = false;
+                                    submitBtn.innerHTML = originalBtnHtml;
+                                }
+                            });
+                        } else {
+                            // No data at risk — submit immediately.
+                            importForm.dataset.excelImportSubmitting = '1';
+                            if (submitBtn) {
+                                submitBtn.disabled = true;
+                                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Importing template\u2026';
+                            }
+                            try { importForm.requestSubmit(submitBtn); } catch (_) { importForm.submit(); }
+                        }
+                    } catch (_err) {
+                        // Preflight request failed — restore the button and inform the user.
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalBtnHtml;
+                        }
+                        importForm.querySelector('.excel-import-deletion-warning')?.remove();
+                        const errBanner = document.createElement('div');
+                        errBanner.className = 'excel-import-deletion-warning bg-red-50 border border-red-300 rounded-md p-3 text-sm mt-2';
+                        errBanner.innerHTML = `
+                            <div class="flex items-start gap-2">
+                                <i class="fas fa-exclamation-triangle text-red-600 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
+                                <div class="text-red-800">
+                                    <p class="font-semibold">Could not check for existing data. Please try again.</p>
+                                </div>
+                            </div>`;
+                        submitBtn.insertAdjacentElement('beforebegin', errBanner);
+                        setTimeout(() => errBanner.remove(), 6000);
                     }
                 });
             }
@@ -558,7 +676,7 @@ function enhance() {
             if (window.showConfirmation) {
                 window.showConfirmation(message, doSubmit, null, 'Deploy', 'Cancel', 'Deploy Version?');
             } else {
-                doSubmit();
+                if (window.confirm(message)) doSubmit();
             }
         });
     }
@@ -586,7 +704,7 @@ function enhance() {
             } else if (window.showConfirmation) {
                 window.showConfirmation(message, doSubmit, null, 'Discard', 'Cancel', 'Discard Draft?');
             } else {
-                doSubmit();
+                if (window.confirm(message)) doSubmit();
             }
         });
     }

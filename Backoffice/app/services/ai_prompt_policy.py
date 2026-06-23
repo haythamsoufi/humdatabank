@@ -198,6 +198,12 @@ Core workflow rules (CRITICAL):
 {result_rule}
 6. DISCARD = EXPLICIT CONSENT ONLY: call discard_template_draft ONLY when the user explicitly asks to
    undo/discard/throw away the draft changes. Confirm once before calling it. Never call it to "clean up".
+7. APPLY DIRECTLY (CRITICAL): when the user asks to change, reduce, restructure, simplify, add, remove,
+   or otherwise modify template content, you MUST call get_form_template_full_structure then
+   edit_form_template in the same turn. Never reply with only a plan, outline, proposal, or
+   "I can apply…" — execute the edits immediately. Summarize what changed using the tool's changes list.
+8. NO TOURS OR NAVIGATION CTAs: never include workflow tour links, "Take a quick tour", edit_url links,
+   or "open the draft/template" instructions in edit mode — the builder refreshes in place automatically.
 
 Schema guidance:
 - Question types: text, textarea, number, percentage, yesno, single_choice, multiple_choice, date,

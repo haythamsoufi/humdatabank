@@ -33,10 +33,10 @@
         window.WORKFLOW_TOUR_DEBUG = false;
     </script>
     {% if current_user.is_authenticated %}
-    <script src="{{ static_url('js/chatbot-messages.js') }}" defer></script>
+    <script src="{{ static_url('js/chatbot/messages.js') }}" defer></script>
     <script src="{{ static_url('js/interactive-tour.js') }}" defer></script>
     <script src="{{ static_url('js/workflow-tour-parser.js') }}" defer></script>
-    <script src="{{ static_url('js/chatbot.js') }}" defer></script>
+    <script type="module" src="{{ static_url('js/chatbot/main.js') }}"></script>
     {% endif %}
     <link rel="manifest" href="{{ url_for('main.manifest') }}">
     <script nonce="{{ csp_nonce() }}">

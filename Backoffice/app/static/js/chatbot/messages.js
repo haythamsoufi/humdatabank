@@ -274,7 +274,7 @@ const ChatbotMessages = {
     }
 };
 
-// Export for use in chatbot.js
+// Export for use in chatbot/main.js
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = ChatbotMessages;
 }

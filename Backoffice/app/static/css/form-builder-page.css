@@ -180,3 +180,145 @@
     font-weight: 600;
     color: #0f766e;
 }
+
+/* AI-generated / AI-modified element highlight animations (chatbot.js form-builder mode) */
+@keyframes fb-ai-section-enter {
+    from { opacity: 0; transform: translateX(14px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes fb-ai-row-enter {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+@keyframes fb-ai-neon-section {
+    0%   { box-shadow: 0 0  0px  0px rgba(168, 85, 247, 0); }
+    18%  { box-shadow: 0 0 14px  4px rgba(168, 85, 247, 0.80), 0 0 32px  8px rgba(124, 58, 237, 0.45), 0 0 55px 14px rgba(99,  102, 241, 0.20); }
+    50%  { box-shadow: 0 0 20px  6px rgba(168, 85, 247, 0.95), 0 0 42px 10px rgba(124, 58, 237, 0.52), 0 0 70px 18px rgba(99,  102, 241, 0.24); }
+    82%  { box-shadow: 0 0 14px  4px rgba(168, 85, 247, 0.65), 0 0 30px  7px rgba(124, 58, 237, 0.35); }
+    100% { box-shadow: 0 0  0px  0px rgba(168, 85, 247, 0); }
+}
+@keyframes fb-ai-neon-row {
+    0%   { box-shadow: -3px 0 0 rgba(168, 85, 247, 0), -3px 0 0px rgba(168, 85, 247, 0); }
+    20%  { box-shadow: -3px 0 0 rgba(168, 85, 247, 1), -3px 0 12px rgba(168, 85, 247, 0.70), -5px 0 20px rgba(124, 58, 237, 0.40); }
+    52%  { box-shadow: -3px 0 0 rgba(168, 85, 247, 1), -3px 0 16px rgba(168, 85, 247, 0.85), -6px 0 28px rgba(124, 58, 237, 0.48), -2px 0 38px rgba(99,  102, 241, 0.20); }
+    84%  { box-shadow: -3px 0 0 rgba(168, 85, 247, 0.60), -3px 0 10px rgba(168, 85, 247, 0.35); }
+    100% { box-shadow: -3px 0 0 rgba(168, 85, 247, 0), -3px 0 0px rgba(168, 85, 247, 0); }
+}
+@keyframes fb-ai-neon-modified {
+    0%   { box-shadow: 0 0  0px 0px rgba(99, 102, 241, 0); }
+    35%  { box-shadow: 0 0 10px 3px rgba(99, 102, 241, 0.70), 0 0 22px 6px rgba(79,  70, 229, 0.35); }
+    70%  { box-shadow: 0 0 14px 4px rgba(99, 102, 241, 0.80), 0 0 28px 8px rgba(79,  70, 229, 0.40); }
+    100% { box-shadow: 0 0  0px 0px rgba(99, 102, 241, 0); }
+}
+@keyframes fb-ai-neon-modified-row {
+    0%   { box-shadow: -3px 0 0 rgba(99, 102, 241, 0); }
+    35%  { box-shadow: -3px 0 0 rgba(99, 102, 241, 1), -3px 0 10px rgba(99, 102, 241, 0.60), -5px 0 18px rgba(79,  70, 229, 0.35); }
+    70%  { box-shadow: -3px 0 0 rgba(99, 102, 241, 0.95), -3px 0 14px rgba(99, 102, 241, 0.70), -5px 0 24px rgba(79,  70, 229, 0.40); }
+    100% { box-shadow: -3px 0 0 rgba(99, 102, 241, 0); }
+}
+.fb-ai-new-section {
+    animation: fb-ai-section-enter 0.40s cubic-bezier(0.22, 1, 0.36, 1) both, fb-ai-neon-section 3.8s ease-in-out 0.15s forwards;
+    border: 1.5px solid rgba(168, 85, 247, 0.60) !important;
+    border-radius: 0.5rem;
+    transition: border-color 1.6s ease-out, box-shadow 0.6s ease-out;
+}
+.fb-ai-new-section.fb-ai-done {
+    border-color: #e5e7eb !important;
+    box-shadow: none !important;
+}
+.fb-ai-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px 2px 5px;
+    border-radius: 9999px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
+    color: #fff;
+    margin-left: 8px;
+    vertical-align: middle;
+    white-space: nowrap;
+    box-shadow: 0 0 6px 2px rgba(124, 58, 237, 0.55), 0 0 14px 4px rgba(124, 58, 237, 0.25);
+    transition: opacity 1.6s ease, box-shadow 1.6s ease;
+}
+.fb-ai-badge.fb-ai-done {
+    opacity: 0;
+    box-shadow: none;
+}
+.fb-ai-new-row {
+    animation: fb-ai-row-enter 0.35s ease-out both;
+}
+.fb-ai-new-row > td {
+    background-color: rgba(168, 85, 247, 0.05);
+    transition: background-color 2.6s ease-out;
+}
+.fb-ai-new-row.fb-ai-done > td {
+    background-color: transparent;
+}
+.fb-ai-new-row > td:first-child {
+    animation: fb-ai-neon-row 3.8s ease-in-out 0.1s forwards;
+    transition: box-shadow 0.6s ease-out;
+}
+.fb-ai-new-row.fb-ai-done > td:first-child {
+    box-shadow: none;
+}
+.fb-ai-modified-section {
+    animation: fb-ai-neon-modified 2.8s ease-in-out forwards;
+    border: 1.5px solid rgba(99, 102, 241, 0.55) !important;
+    border-radius: 0.5rem;
+    transition: border-color 1.4s ease-out, box-shadow 0.6s ease-out;
+}
+.fb-ai-modified-section.fb-ai-done {
+    border-color: #e5e7eb !important;
+    box-shadow: none !important;
+}
+.fb-ai-modified-row > td {
+    background-color: rgba(99, 102, 241, 0.05);
+    transition: background-color 2.0s ease-out;
+}
+.fb-ai-modified-row.fb-ai-done > td {
+    background-color: transparent;
+}
+.fb-ai-modified-row > td:first-child {
+    animation: fb-ai-neon-modified-row 2.8s ease-in-out forwards;
+    transition: box-shadow 0.6s ease-out;
+}
+.fb-ai-modified-row.fb-ai-done > td:first-child {
+    box-shadow: none;
+}
+.fb-ai-new-row.opacity-60 > td,
+.fb-ai-modified-row.opacity-60 > td {
+    background-color: transparent;
+}
+
+/* Form builder AI apply summary + undo/redo (in floating chatbot) */
+.fb-ai-apply-actions {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+.fb-ai-changes-summary-title {
+    margin: 0 0 0.35rem;
+    font-size: 0.875rem;
+}
+.fb-ai-changes-list {
+    margin: 0 0 0.75rem 1.1rem;
+    padding: 0;
+    font-size: 0.8125rem;
+    color: #374151;
+}
+.fb-ai-apply-actions-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.fb-ai-status-bubble .chat-message-content {
+    font-size: 0.875rem;
+    color: #065f46;
+}
+.fb-ai-status-bubble.fb-ai-status-error .chat-message-content {
+    color: #b91c1c;
+}

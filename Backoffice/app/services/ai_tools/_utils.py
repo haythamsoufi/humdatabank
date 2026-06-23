@@ -338,6 +338,8 @@ def extract_form_builder_result_from_steps(steps: Any) -> Optional[Dict[str, Any
             "warnings": list(inner.get("warnings") or []),
             "changes": list(inner.get("changes") or []),
             "refs": refs if isinstance(refs, dict) else {},
+            "undo_structure": inner.get("undo_structure"),
+            "redo_structure": inner.get("redo_structure"),
         }
     return None
 

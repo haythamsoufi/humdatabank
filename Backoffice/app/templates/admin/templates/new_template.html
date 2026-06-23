@@ -415,9 +415,9 @@
 
 </div>
 
-{# AI Form Assistant panel (create-new mode: no template context) #}
+{# Form builder AI config for chatbot.js (create-new mode: no template context) #}
 {% with fb_ai_template_id = none, fb_ai_version_id = none %}
-    {% include "components/form_builder_ai_panel.html" with context %}
+    {% include "components/_fb_ai_config.html" with context %}
 {% endwith %}
 
 {# Template Name Translations Modal #}
@@ -468,7 +468,7 @@
                 c.classList.toggle('nt-method-card--active', c === card);
             });
             if (activeId !== 'ai-assistant-btn') {
-                window.formBuilderAIAssistant?.hide();
+                window.humdatabankChatbot?.toggleChat(false);
             }
             setPanelVisible(detailsCard, activeId === 'blank-template-btn');
             setPanelVisible(cloneSection, activeId === 'clone-template-btn');

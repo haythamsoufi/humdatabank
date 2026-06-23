@@ -446,6 +446,7 @@ class FormTemplateAIService:
         try:
             draft = self._get_or_create_draft(template, user.id)
             draft.updated_by = user.id
+            undo_structure = self.get_full_structure(template_id, user, version_id=draft.id)
 
             for idx, op in enumerate(operations):
                 if not isinstance(op, dict):
@@ -469,6 +470,7 @@ class FormTemplateAIService:
             if changes:
                 self._append_change_log(draft, "; ".join(changes))
 
+            redo_structure = self.get_full_structure(template_id, user, version_id=draft.id)
             db.session.commit()
         except FormTemplateAIError:
             db.session.rollback()
@@ -487,7 +489,195 @@ class FormTemplateAIService:
             "warnings": warnings,
             "edit_url": self._edit_url(template.id, draft.id),
             "note": "Draft updated.",
+            "undo_structure": undo_structure,
+            "redo_structure": redo_structure,
         }
+
+    def restore_draft_structure(
+        self, template_id: int, structure: Dict[str, Any], user
+    ) -> Dict[str, Any]:
+        """Replace the current draft's pages/sections/items with a captured snapshot."""
+        self._require_permission(user, "admin.templates.edit")
+        template = self._require_template_access(template_id, user)
+
+        if not isinstance(structure, dict):
+            raise FormTemplateAIError("Structure snapshot must be an object.")
+        if not isinstance(structure.get("sections"), list):
+            raise FormTemplateAIError("Structure snapshot must include a 'sections' list.")
+
+        draft = self._get_or_create_draft(template, user.id)
+        warnings: List[str] = []
+
+        existing_items = FormItem.query.filter_by(
+            template_id=template.id, version_id=draft.id
+        ).all()
+        for item in existing_items:
+            if self._item_has_data(item):
+                raise FormTemplateAIError(
+                    "Cannot restore this snapshot because some fields already have "
+                    "submitted data."
+                )
+
+        try:
+            FormItem.query.filter_by(
+                template_id=template.id, version_id=draft.id
+            ).delete(synchronize_session=False)
+            FormSection.query.filter_by(
+                template_id=template.id, version_id=draft.id
+            ).delete(synchronize_session=False)
+            FormPage.query.filter_by(
+                template_id=template.id, version_id=draft.id
+            ).delete(synchronize_session=False)
+            db.session.flush()
+
+            draft.name = _clean_str(structure.get("name"), 100) or draft.name
+            draft.description = structure.get("description")
+            draft.name_translations = structure.get("name_translations")
+            draft.description_translations = structure.get("description_translations")
+            draft.is_paginated = _as_bool(structure.get("is_paginated"))
+            draft.updated_by = user.id
+
+            ref_map: Dict[str, Tuple[str, int]] = {}
+            deferred_rules: List[Dict[str, Any]] = []
+
+            page_ref_by_id: Dict[int, str] = {}
+            pages_schema: List[Dict[str, Any]] = []
+            for page in structure.get("pages") or []:
+                if not isinstance(page, dict):
+                    continue
+                old_id = _as_int(page.get("id"))
+                ref = f"__restore_page_{old_id}" if old_id is not None else None
+                if old_id is not None and ref:
+                    page_ref_by_id[old_id] = ref
+                pages_schema.append(
+                    {
+                        "name": page.get("name"),
+                        "order": page.get("order"),
+                        "ref": ref,
+                        "name_translations": page.get("name_translations"),
+                    }
+                )
+            if pages_schema:
+                self._build_pages(pages_schema, template, draft, ref_map, warnings)
+
+            raw_sections = [
+                s for s in (structure.get("sections") or []) if isinstance(s, dict)
+            ]
+            raw_sections.sort(key=lambda s: _as_float(s.get("order"), 0.0) or 0.0)
+            section_id_to_ref: Dict[int, str] = {}
+            sections_schema: List[Dict[str, Any]] = []
+            for section in raw_sections:
+                old_id = _as_int(section.get("id"))
+                ref = f"__restore_sec_{old_id}" if old_id is not None else None
+                if old_id is not None and ref:
+                    section_id_to_ref[old_id] = ref
+                sections_schema.append(
+                    self._structure_section_to_schema(section, page_ref_by_id, ref)
+                )
+            for section_schema, section in zip(sections_schema, raw_sections):
+                parent_id = _as_int(section.get("parent_section_id"))
+                if parent_id is not None and parent_id in section_id_to_ref:
+                    section_schema["parent_ref"] = section_id_to_ref[parent_id]
+
+            self._validate_structure_size(sections_schema)
+            counts = self._build_sections(
+                sections_schema, template, draft, ref_map, warnings, deferred_rules
+            )
+            self._apply_deferred_rules(draft, ref_map, deferred_rules, warnings)
+            self._append_change_log(
+                draft,
+                f"Restored draft structure ({counts['sections']} section(s), "
+                f"{counts['items']} item(s)).",
+            )
+            db.session.commit()
+        except FormTemplateAIError:
+            db.session.rollback()
+            raise
+        except Exception as exc:
+            db.session.rollback()
+            logger.error("restore_draft_structure failed: %s", exc, exc_info=True)
+            raise FormTemplateAIError(f"Failed to restore draft structure: {exc}") from exc
+
+        return {
+            "template_id": template.id,
+            "version_id": draft.id,
+            "version_status": "draft",
+            "edit_url": self._edit_url(template.id, draft.id),
+            "sections_restored": counts["sections"],
+            "items_restored": counts["items"],
+            "warnings": warnings,
+        }
+
+    @staticmethod
+    def _structure_section_to_schema(
+        section: Dict[str, Any],
+        page_ref_by_id: Dict[int, str],
+        section_ref: Optional[str],
+    ) -> Dict[str, Any]:
+        schema: Dict[str, Any] = {
+            "name": section.get("name"),
+            "order": section.get("order"),
+            "section_type": section.get("section_type") or "standard",
+            "name_translations": section.get("name_translations"),
+            "relevance_condition": section.get("relevance_condition"),
+            "ref": section_ref,
+        }
+        page_id = _as_int(section.get("page_id"))
+        if page_id is not None and page_id in page_ref_by_id:
+            schema["page_ref"] = page_ref_by_id[page_id]
+        for key in (
+            "max_entries",
+            "max_dynamic_indicators",
+            "indicator_filters",
+            "allowed_disaggregation_options",
+        ):
+            if section.get(key) is not None:
+                schema[key] = section.get(key)
+        items = []
+        for item in section.get("items") or []:
+            if isinstance(item, dict):
+                items.append(FormTemplateAIService._structure_item_to_schema(item))
+        schema["items"] = items
+        return schema
+
+    @staticmethod
+    def _structure_item_to_schema(item: Dict[str, Any]) -> Dict[str, Any]:
+        schema: Dict[str, Any] = {
+            "item_type": item.get("item_type") or "question",
+            "label": item.get("label"),
+            "order": item.get("order"),
+            "is_required": item.get("is_required"),
+            "label_translations": item.get("label_translations"),
+            "relevance_condition": item.get("relevance_condition"),
+            "validation_condition": item.get("validation_condition"),
+            "validation_message": item.get("validation_message"),
+        }
+        item_type = schema["item_type"]
+        if item_type == "question":
+            for key in (
+                "question_type",
+                "definition",
+                "definition_translations",
+                "options",
+                "options_translations",
+                "lookup_list_id",
+                "list_display_column",
+                "list_filters",
+            ):
+                if item.get(key) is not None:
+                    schema[key] = item.get(key)
+        elif item_type == "indicator":
+            for key in ("indicator_bank_id", "allowed_disaggregation_options",):
+                if item.get(key) is not None:
+                    schema[key] = item.get(key)
+        elif item_type == "document_field":
+            if item.get("description") is not None:
+                schema["description"] = item.get("description")
+            if item.get("max_documents") is not None:
+                schema["max_documents"] = item.get("max_documents")
+        elif item_type == "matrix" and item.get("matrix_config") is not None:
+            schema["matrix_config"] = item.get("matrix_config")
+        return schema
 
     # ------------------------------------------------------------------
     # Public API: translations (phase 3)
@@ -769,6 +959,8 @@ class FormTemplateAIService:
                 name=name,
                 order=_as_int(page_schema.get("order"), i + 1),
             )
+            if page_schema.get("name_translations") is not None:
+                page.name_translations = page_schema.get("name_translations")
             db.session.add(page)
             db.session.flush()
             self._register_ref(ref_map, page_schema.get("ref"), "page", page.id)
@@ -854,6 +1046,11 @@ class FormTemplateAIService:
         )
 
         self._apply_section_config(section, schema, warnings)
+
+        if schema.get("name_translations") is not None:
+            section.name_translations = schema.get("name_translations")
+        if schema.get("relevance_condition") is not None:
+            section.relevance_condition = schema.get("relevance_condition")
 
         db.session.add(section)
         db.session.flush()
@@ -988,6 +1185,17 @@ class FormTemplateAIService:
                     item.list_filters_json = config["matrix_config"]["list_filters"]
 
         item.config = config
+
+        if schema.get("label_translations") is not None:
+            item.label_translations = schema.get("label_translations")
+        if item.is_question and schema.get("definition_translations") is not None:
+            item.definition_translations = schema.get("definition_translations")
+        if item.is_question and schema.get("options_translations") is not None:
+            item.options_translations = schema.get("options_translations")
+        if schema.get("relevance_condition") is not None:
+            item.relevance_condition = schema.get("relevance_condition")
+        if schema.get("validation_condition") is not None:
+            item.validation_condition = schema.get("validation_condition")
 
         validation_message = _clean_str(schema.get("validation_message"), 2000)
         if validation_message:

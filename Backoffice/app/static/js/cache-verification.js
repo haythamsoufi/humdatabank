@@ -19,7 +19,8 @@
                 'css/layout.css',
                 'js/layout.js',
                 'js/csrf.js',
-                'js/chatbot.js',
+                'js/chatbot/messages.js',
+                'js/chatbot/main.js',
                 'js/components.js',
                 'js/flash-messages.js'
             ],

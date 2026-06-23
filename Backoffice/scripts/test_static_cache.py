@@ -31,7 +31,8 @@ TEST_FILES = [
     'css/layout.css',
     'js/layout.js',
     'js/csrf.js',
-    'js/chatbot.js',
+    'js/chatbot/messages.js',
+    'js/chatbot/main.js',
 ]
 
 # Expected cache headers

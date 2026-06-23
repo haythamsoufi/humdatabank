@@ -261,9 +261,7 @@ export const TranslationModal = {
       // Multiple openers may share one modal + cssPrefix (e.g. indicator vs question → same
       // translation-modal); each needs its own listener, so the guard MUST include openButtonId.
       const guardAttr = `data-tm-attached-${cssPrefix}-${openButtonId}`;
-      if (autoBtn.getAttribute(guardAttr) === 'true') {
-        try { console.debug('[TranslationModal] Skipping duplicate auto-translate binding', { cssPrefix, openButtonId }); } catch (_) {}
-      } else {
+      if (autoBtn.getAttribute(guardAttr) !== 'true') {
         autoBtn.setAttribute(guardAttr, 'true');
         autoBtn.addEventListener('click', function() {
           // Ensure only the handler for the active opener runs

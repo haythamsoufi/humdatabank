@@ -229,6 +229,15 @@
     animation: fabBounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
+/* Shift up when covering page/modal action buttons; JS sets transform inline + --fab-avoidance-shift */
+#aiChatbotFAB.fab-avoiding-controls:not(.fab-dragging):not(.chat-open) {
+    transform: translateY(calc(0px - var(--fab-avoidance-shift, 0px))) !important;
+}
+
+#aiChatbotFAB.fab-avoiding-controls:hover:not(.fab-dragging):not(.chat-open) {
+    transform: translateY(calc(0px - var(--fab-avoidance-shift, 0px) - 2px)) !important;
+}
+
 /* Robot Animation Keyframes */
 @keyframes robotBlink {
     0%, 100% { transform: scaleY(1); }

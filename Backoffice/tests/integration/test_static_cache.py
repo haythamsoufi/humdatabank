@@ -18,7 +18,8 @@ class TestStaticCache:
         'css/layout.css',
         'js/layout.js',
         'js/csrf.js',
-        'js/chatbot.js',
+        'js/chatbot/messages.js',
+        'js/chatbot/main.js',
     ]
 
     def parse_cache_control(self, header_value):

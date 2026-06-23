@@ -277,6 +277,34 @@ def register_template_context(app, config_class):
             "is_admin_user": is_admin_user,
         }
 
+    @app.context_processor
+    def inject_pending_access_requests_count():
+        """Pending country access requests for admin sidebar badge (Manage Users)."""
+        if not has_request_context():
+            return {"pending_access_requests_count": 0}
+        try:
+            if not current_user.is_authenticated:
+                return {"pending_access_requests_count": 0}
+
+            from app.services.authorization_service import AuthorizationService
+
+            can_review = AuthorizationService.is_system_manager(current_user) or AuthorizationService.has_rbac_permission(
+                current_user, "admin.access_requests.view"
+            )
+            if not can_review:
+                return {"pending_access_requests_count": 0}
+
+            from app.models import CountryAccessRequest
+            from app.models.enums import CountryAccessRequestStatus
+
+            count = CountryAccessRequest.query.filter_by(
+                status=CountryAccessRequestStatus.PENDING
+            ).count()
+            return {"pending_access_requests_count": int(count or 0)}
+        except Exception as e:
+            current_app.logger.debug("inject_pending_access_requests_count failed: %s", e)
+            return {"pending_access_requests_count": 0}
+
     app.jinja_env.globals['CHATBOT_ENABLED'] = app.config.get('CHATBOT_ENABLED', True)
     app.jinja_env.globals['ASSET_VERSION'] = app.config.get('ASSET_VERSION')
     app.jinja_env.globals['config'] = app.config

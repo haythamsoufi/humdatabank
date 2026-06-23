@@ -50,6 +50,9 @@ def _strip_form_builder_boilerplate(text: str, *, edit_mode: bool) -> str:
             r"(?im)^.*\breview the draft and deploy\b.*$",
             r"(?im)\[open the draft in the form builder\]\(/admin/templates/edit/[^)]+\)\s*",
             r"(?im)\[open the template in the form builder\]\(/admin/templates/edit/[^)]+\)\s*",
+            r"(?im)^.*\bi can apply\b.*$",
+            r"(?im)^.*\bopen the draft to review\b.*$",
+            r"(?im)^.*\bnext step\b.*$",
         ):
             cleaned = re.sub(pat, "", cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()

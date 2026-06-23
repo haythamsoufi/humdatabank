@@ -78,6 +78,11 @@
     actions=actions
 ) }}
 
+{# Form builder AI config for chatbot.js (early in page so chatbot can read it on init) #}
+{% with fb_ai_template_id = template.id, fb_ai_version_id = active_version_id %}
+    {% include "components/_fb_ai_config.html" with context %}
+{% endwith %}
+
 <script nonce="{{ csp_nonce() }}">
     (function(){ try { document.documentElement.classList.add('form-builder-loading'); } catch(e) {} })();
 </script>
@@ -718,11 +723,6 @@
 
 {# Include centralized auto-translate modal JavaScript #}
 {% include "components/auto_translate_modal_js.html" with context %}
-
-{# AI Form Assistant panel #}
-{% with fb_ai_template_id = template.id, fb_ai_version_id = active_version_id %}
-    {% include "components/form_builder_ai_panel.html" with context %}
-{% endwith %}
 
 {# Template data for JavaScript #}
 <script type="application/json" id="template-data">

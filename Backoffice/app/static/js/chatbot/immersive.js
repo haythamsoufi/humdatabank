@@ -1,7 +1,7 @@
 /**
  * Immersive chat page – sidebar chat list and New chat.
  * Runs only on the immersive chat page (body.chat-immersive).
- * Depends on chatbot.js (window.humdatabankChatbot) being initialized first.
+ * Depends on chatbot/main.js (window.humdatabankChatbot) being initialized first.
  */
 (function () {
     'use strict';
@@ -3521,7 +3521,7 @@
         });
         try {
             if (window.debug && window.debug.getConfig && window.debug.getConfig().modules.chatbot) {
-                console.log('[Chatbot tables] chat-immersive.js loaded; chatbot-structured-response listener registered');
+                console.log('[Chatbot tables] chatbot/immersive.js loaded; chatbot-structured-response listener registered');
             }
         } catch (e) { /* debug not loaded */ }
 

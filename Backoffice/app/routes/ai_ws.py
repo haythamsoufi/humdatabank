@@ -1242,6 +1242,15 @@ def register_ai_ws(app) -> None:
                         tid = getattr(result, "trace_id", None)
                         if tid is not None:
                             done_payload["trace_id"] = tid
+                        fb_result = getattr(result, "form_builder_result", None)
+                        if fb_result:
+                            done_payload["form_builder_result"] = fb_result
+                        confidence = getattr(result, "confidence", None)
+                        if confidence is not None:
+                            done_payload["confidence"] = confidence
+                        grounding_score = getattr(result, "grounding_score", None)
+                        if grounding_score is not None:
+                            done_payload["grounding_score"] = grounding_score
                         _ws_send_json(ws, done_payload)
                     _clear_inflight_snapshot()
                 except QuotaExceededError as e:

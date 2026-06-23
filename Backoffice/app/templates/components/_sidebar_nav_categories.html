@@ -64,6 +64,8 @@
 
 {# User Management Category - Only show if user has admin.users.view permission #}
 {% set can_view_users = is_system_manager or has_permission('admin.users.view') %}
+{% set can_review_access_requests = is_system_manager or has_permission('admin.access_requests.view') %}
+{% set pending_access_requests_count = pending_access_requests_count | default(0) %}
 {% if can_view_users %}
 <div class="space-y-2 mt-4" data-category="user-management">
      <div class="collapsable-category-title">
@@ -71,9 +73,12 @@
         {{ svg_icon('chevron-right', 'collapsable-icon w-4 h-4') }}
     </div>
     <div class="collapsable-content">
-        <a href="{{ url_for('user_management.manage_users') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Manage Users') }}">
+        <a href="{{ url_for('user_management.manage_users') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Manage Users') }}{% if can_review_access_requests and pending_access_requests_count > 0 %} — {{ pending_access_requests_count }} {{ _('pending access requests') }}{% endif %}">
             {{ svg_icon('users', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Manage Users') }}</span>
+            {% if can_review_access_requests and pending_access_requests_count > 0 %}
+            <span class="sidebar-item-badge" aria-label="{{ ngettext('%(num)d pending access request', '%(num)d pending access requests', pending_access_requests_count, num=pending_access_requests_count) }}">{{ pending_access_requests_count }}</span>
+            {% endif %}
         </a>
     </div>
 </div>

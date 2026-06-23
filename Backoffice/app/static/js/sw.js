@@ -31,9 +31,9 @@ const CORE_ASSETS = [
   '/static/js/components.js',
   '/static/js/flash-messages.js',
   '/static/js/robot-personality.js',
-  '/static/js/chatbot-messages.js',
+  '/static/js/chatbot/messages.js',
   '/static/js/csrf.js',
-  '/static/js/chatbot.js'
+  '/static/js/chatbot/main.js'
 ];
 
 // Forms assets are relatively heavy; cache them ONLY when the user actually visits forms.

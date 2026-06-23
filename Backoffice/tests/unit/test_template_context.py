@@ -557,3 +557,50 @@ class TestGetOrgBranding:
                             assert isinstance(result['ORG_NAME'], str)
                     except Exception:
                         pass  # Other processors may fail without request context
+
+
+# ---------------------------------------------------------------------------
+# inject_pending_access_requests_count context processor
+# ---------------------------------------------------------------------------
+
+class TestInjectPendingAccessRequestsCount:
+    def _pending_count_result(self, app):
+        processors = app.template_context_processors.get(None, [])
+        for proc in processors:
+            try:
+                result = proc()
+                if "pending_access_requests_count" in result:
+                    return result
+            except Exception:
+                pass
+        return {}
+
+    def test_returns_zero_when_not_authenticated(self, app):
+        with app.test_request_context("/"):
+            assert self._pending_count_result(app)["pending_access_requests_count"] == 0
+
+    def test_returns_zero_without_review_permission(self, app):
+        mock_user = MagicMock()
+        mock_user.is_authenticated = True
+        with app.test_request_context("/"):
+            with patch("flask_login.utils._get_user", return_value=mock_user), patch(
+                "app.services.authorization_service.AuthorizationService.is_system_manager",
+                return_value=False,
+            ), patch(
+                "app.services.authorization_service.AuthorizationService.has_rbac_permission",
+                return_value=False,
+            ):
+                assert self._pending_count_result(app)["pending_access_requests_count"] == 0
+
+    def test_returns_count_for_reviewer(self, app):
+        mock_user = MagicMock()
+        mock_user.is_authenticated = True
+        with app.test_request_context("/"):
+            with patch("flask_login.utils._get_user", return_value=mock_user), patch(
+                "app.services.authorization_service.AuthorizationService.is_system_manager",
+                return_value=True,
+            ), patch(
+                "app.models.CountryAccessRequest.query"
+            ) as mock_query:
+                mock_query.filter_by.return_value.count.return_value = 3
+                assert self._pending_count_result(app)["pending_access_requests_count"] == 3

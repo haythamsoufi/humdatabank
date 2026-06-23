@@ -9,21 +9,19 @@ export const PropertiesMixin = {
         if (!propertiesSection) return;
         const propertiesContent = propertiesSection.querySelector('#item-properties-content') || propertiesSection.querySelector('.grid.grid-cols-2.gap-6.items-center');
         if (!propertiesContent) return;
+        const slot = propertiesContent.querySelector('#item-privacy-field') || propertiesContent;
         // Avoid duplicates
-        if (propertiesContent.querySelector('#item-privacy-select')) {
+        if (slot.querySelector('#item-privacy-select')) {
             return;
         }
-        // Build field container
-        const container = document.createElement('div');
-        container.className = 'flex flex-col';
         const label = document.createElement('label');
-        label.className = 'block text-gray-700 text-sm font-semibold mb-2';
+        label.className = 'shrink-0 w-20 text-sm font-semibold text-gray-700';
         label.setAttribute('for', 'item-privacy-select');
         label.textContent = 'Privacy';
         const select = document.createElement('select');
         select.name = 'privacy';
         select.id = 'item-privacy-select';
-        select.className = 'shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md';
+        select.className = 'flex-1 min-w-0 py-1.5 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md';
         // Options
         const optPublic = document.createElement('option');
         optPublic.value = 'public';
@@ -35,10 +33,8 @@ export const PropertiesMixin = {
         select.appendChild(optIfrc);
         // Default to Public for new items
         select.value = 'public';
-        container.appendChild(label);
-        container.appendChild(select);
-        // Append to properties content
-        propertiesContent.appendChild(container);
+        slot.appendChild(label);
+        slot.appendChild(select);
     },
 
     ensureAllowOver100Field: function(itemType) {
@@ -62,7 +58,7 @@ export const PropertiesMixin = {
         let preservedCheckedState = false;
         if (existingCheckbox) {
             preservedCheckedState = existingCheckbox.checked;
-            existingCheckbox.closest('.flex.flex-col').remove();
+            existingCheckbox.closest('.item-properties-cell')?.remove();
         }
 
         // Only add checkbox for percentage items
@@ -77,7 +73,7 @@ export const PropertiesMixin = {
 
         // Build field container
         const container = document.createElement('div');
-        container.className = 'flex flex-col';
+        container.className = 'item-properties-cell min-h-[1.5rem] flex items-center';
 
         const label = document.createElement('label');
         label.className = 'flex items-center cursor-pointer';

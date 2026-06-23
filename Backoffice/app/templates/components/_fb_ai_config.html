@@ -1,0 +1,44 @@
+{# Form Builder AI config for chatbot.js (shared by form_builder.html and new_template.html).
+   Set before include:
+     - fb_ai_template_id: current template id (none on the new template page)
+     - fb_ai_version_id: currently viewed version id (optional)
+   A trigger element with id="ai-assistant-btn" must exist on the page. #}
+
+<script type="application/json" id="fb-ai-assistant-config">
+{
+    "templateId": {{ fb_ai_template_id | default(none, true) | tojson }},
+    "versionId": {{ fb_ai_version_id | default(none, true) | tojson }},
+    "chatStreamUrl": "/api/ai/v2/chat/stream",
+    "extractUrl": {{ url_for('form_builder.ai_extract_document') | tojson }},
+    "extractImageUrl": {{ url_for('form_builder.ai_extract_image') | tojson }},
+    "restoreStructureUrl": {{ url_for('form_builder.ai_restore_structure', template_id=0) | tojson }},
+    "maxMessageChars": {{ config.get('AI_FORM_BUILDER_MAX_MESSAGE_CHARS', 16000) | int }},
+    "labels": {
+        "thinking": {{ _('Working…') | tojson }},
+        "send": {{ _('Send') | tojson }},
+        "stop": {{ _('Stop') | tojson }},
+        "error": {{ _('Something went wrong. Please try again.') | tojson }},
+        "attached": {{ _('Attached questionnaire:') | tojson }},
+        "attachedImage": {{ _('Attached image:') | tojson }},
+        "extracting": {{ _('Extracting text from document…') | tojson }},
+        "extractingImage": {{ _('Reading image before sending…') | tojson }},
+        "extractFailed": {{ _('Could not extract text from the document.') | tojson }},
+        "extractImageFailed": {{ _('Could not read the pasted image.') | tojson }},
+        "reload": {{ _('Reload the builder to see the draft changes') | tojson }},
+        "openTemplate": {{ _('Open the template in the form builder') | tojson }},
+        "reloading": {{ _('Draft updated — refreshing the builder…') | tojson }},
+        "refreshing": {{ _('Refreshing the form builder…') | tojson }},
+        "viewImage": {{ _('View full size image') | tojson }},
+        "dlpTitle": {{ _('Sensitive information detected') | tojson }},
+        "dlpBody": {{ _('Your message appears to include sensitive information (often from pasted forms or screenshots). Choose how to proceed:') | tojson }},
+        "dlpSendAnyway": {{ _('Send anyway') | tojson }},
+        "dlpCancel": {{ _('Cancel') | tojson }},
+        "dlpBlocked": {{ _('Sensitive information detected. Please remove it before sending.') | tojson }},
+        "changesApplied": {{ _('Changes applied') | tojson }},
+        "undo": {{ _('Undo') | tojson }},
+        "redo": {{ _('Redo') | tojson }},
+        "undoFailed": {{ _('Could not undo changes.') | tojson }},
+        "redoFailed": {{ _('Could not redo changes.') | tojson }}
+    }
+}
+</script>

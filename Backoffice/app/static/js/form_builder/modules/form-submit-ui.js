@@ -200,12 +200,62 @@ export const FormSubmitUI = {
       return true;
     };
 
-    const refreshFromHtml = (htmlText) => {
-      if (!htmlText || typeof htmlText !== 'string') return;
-      const doc = new DOMParser().parseFromString(htmlText, 'text/html');
-      if (!doc) return;
+    const FORM_BUILDER_DOM_REPLACE_IDS = [
+      'form-builder-status-banners',
+      'versions-modal',
+      'sections-container',
+      'template-details-display',
+      'edit-template-details-form-container',
+      'manage-pages-fields-container',
+      'pages-list-container',
+      'csrf-token-data',
+      'indicator-bank-choices-data',
+      'disaggregation-choices-data',
+      'all-template-items-data',
+      'sections-with-items-data',
+      'question-type-choices-data',
+      'all-template-sections-data',
+      'all-template-pages-data',
+      'indicator-fields-config-data',
+      'custom-field-types-data',
+    ];
 
-      const syncVersionUiFromDoc = (sourceDoc) => {
+    const reinitFormBuilderAfterDomSwap = (sourceDoc) => {
+      if (sourceDoc) syncVersionUiFromDoc(sourceDoc);
+      try {
+        document.dispatchEvent(new CustomEvent('formBuilder:domUpdated'));
+      } catch (_e) {}
+      try {
+        if (window.DataManager && typeof window.DataManager.init === 'function') {
+          window.DataManager.init();
+        }
+      } catch (e) {
+        console.warn('[FormBuilderAjax] DataManager re-init failed', e);
+      }
+      try {
+        if (typeof window.initializeRuleDisplays === 'function') {
+          window.initializeRuleDisplays();
+        }
+      } catch (e) {
+        console.warn('[FormBuilderAjax] initializeRuleDisplays failed', e);
+      }
+      try {
+        if (window.DynamicSections && typeof window.DynamicSections.init === 'function') {
+          window.DynamicSections.init();
+        }
+      } catch (e) {
+        console.warn('[FormBuilderAjax] DynamicSections re-init failed', e);
+      }
+      try {
+        if (window.FormBuilderEnhance && typeof window.FormBuilderEnhance.enhance === 'function') {
+          window.FormBuilderEnhance.enhance();
+        }
+      } catch (e) {
+        console.warn('[FormBuilderAjax] enhance failed', e);
+      }
+    };
+
+    const syncVersionUiFromDoc = (sourceDoc) => {
         if (!sourceDoc) return;
         const newVersionBtn = sourceDoc.getElementById('versions-modal-btn');
         const curVersionBtn = document.getElementById('versions-modal-btn');
@@ -213,16 +263,7 @@ export const FormSubmitUI = {
           curVersionBtn.innerHTML = newVersionBtn.innerHTML;
         }
 
-        const pickActiveVersionId = () => {
-          const fromItemModal = sourceDoc.getElementById('item-modal-version-id')?.value;
-          if (fromItemModal) return fromItemModal;
-          const fromBanner = sourceDoc.querySelector('#form-builder-status-banners input[name="version_id"]')?.value;
-          if (fromBanner) return fromBanner;
-          const fromSectionForm = sourceDoc.querySelector('#section-form input[name="version_id"]')?.value;
-          return fromSectionForm || null;
-        };
-
-        const nextVersionId = pickActiveVersionId();
+        const nextVersionId = pickActiveVersionIdFromDoc(sourceDoc);
         if (!nextVersionId) return;
 
         const syncFieldValue = (id) => {
@@ -245,91 +286,99 @@ export const FormSubmitUI = {
           dstExcelVersion.value = srcExcelVersion.value;
         }
 
-        const parsedVersionId = parseInt(nextVersionId, 10);
-        if (!Number.isNaN(parsedVersionId)) {
-          if (window.templateVariablesManager) {
-            window.templateVariablesManager.versionId = parsedVersionId;
-          }
-          if (window.formBuilderAIAssistant && typeof window.formBuilderAIAssistant === 'object') {
-            window.formBuilderAIAssistant.versionId = parsedVersionId;
-          }
-        }
+        applyVersionIdToBuilder(nextVersionId);
       };
 
-      const idsToReplace = [
-        // Version status banners (draft / published / archived notices)
-        'form-builder-status-banners',
-        // Versions list modal (deploy/delete/create actions)
-        'versions-modal',
-        // Main builder list
-        'sections-container',
-        // Template details + pages editor
-        'template-details-display',
-        'edit-template-details-form-container',
-        'manage-pages-fields-container',
-        'pages-list-container',
-        // Data blobs consumed by JS
-        'csrf-token-data',
-        'indicator-bank-choices-data',
-        'disaggregation-choices-data',
-        'all-template-items-data',
-        'sections-with-items-data',
-        'question-type-choices-data',
-        'all-template-sections-data',
-        'all-template-pages-data',
-        'indicator-fields-config-data',
-        'custom-field-types-data'
-      ];
+    const pickActiveVersionIdFromDoc = (sourceDoc) => {
+      if (!sourceDoc) return null;
+      const fromItemModal = sourceDoc.getElementById('item-modal-version-id')?.value;
+      if (fromItemModal) return fromItemModal;
+      const fromBanner = sourceDoc.querySelector('#form-builder-status-banners input[name="version_id"]')?.value;
+      if (fromBanner) return fromBanner;
+      const fromSectionForm = sourceDoc.querySelector('#section-form input[name="version_id"]')?.value;
+      return fromSectionForm || null;
+    };
 
-      idsToReplace.forEach((id) => {
+    const applyVersionIdToBuilder = (versionIdRaw) => {
+      const parsedVersionId = parseInt(versionIdRaw, 10);
+      if (Number.isNaN(parsedVersionId)) return;
+      if (window.templateVariablesManager) {
+        window.templateVariablesManager.versionId = parsedVersionId;
+      }
+      if (window.humdatabankChatbot && typeof window.humdatabankChatbot.updateFormBuilderVersionId === 'function') {
+        window.humdatabankChatbot.updateFormBuilderVersionId(parsedVersionId);
+      }
+    };
+
+    const captureDomSnapshot = () => {
+      const parts = {};
+      FORM_BUILDER_DOM_REPLACE_IDS.forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) parts[id] = el.outerHTML;
+      });
+      return {
+        parts,
+        versionBtnHtml: document.getElementById('versions-modal-btn')?.innerHTML || null,
+        versionId: pickActiveVersionIdFromDoc(document) || null,
+        pageUrl: `${window.location.pathname}${window.location.search}`,
+      };
+    };
+
+    const restoreDomSnapshot = (snapshot) => {
+      if (!snapshot || !snapshot.parts || typeof snapshot.parts !== 'object') return false;
+      let replaced = false;
+      FORM_BUILDER_DOM_REPLACE_IDS.forEach((id) => {
+        const html = snapshot.parts[id];
+        const curEl = document.getElementById(id);
+        if (!html || !curEl) return;
+        const tpl = document.createElement('template');
+        tpl.innerHTML = html;
+        const nextEl = tpl.content.firstElementChild;
+        if (nextEl) {
+          curEl.replaceWith(nextEl);
+          replaced = true;
+        }
+      });
+      if (!replaced) return false;
+
+      const curVersionBtn = document.getElementById('versions-modal-btn');
+      if (curVersionBtn && snapshot.versionBtnHtml != null) {
+        curVersionBtn.innerHTML = snapshot.versionBtnHtml;
+      }
+      if (snapshot.versionId) {
+        const syncFieldValue = (fieldId) => {
+          const dst = document.getElementById(fieldId);
+          if (dst) dst.value = String(snapshot.versionId);
+        };
+        syncFieldValue('item-modal-version-id');
+        const dstSectionVersion = document.querySelector('#section-form input[name="version_id"]');
+        if (dstSectionVersion) dstSectionVersion.value = String(snapshot.versionId);
+        const dstExcelVersion = document.querySelector('#import-excel-form input[name="version_id"]');
+        if (dstExcelVersion) dstExcelVersion.value = String(snapshot.versionId);
+        applyVersionIdToBuilder(snapshot.versionId);
+      }
+      if (snapshot.pageUrl) {
+        try {
+          window.history.replaceState({}, document.title, snapshot.pageUrl);
+        } catch (_e) {}
+      }
+      reinitFormBuilderAfterDomSwap(null);
+      return true;
+    };
+
+    const refreshFromHtml = (htmlText) => {
+      if (!htmlText || typeof htmlText !== 'string') return;
+      const doc = new DOMParser().parseFromString(htmlText, 'text/html');
+      if (!doc) return;
+
+      FORM_BUILDER_DOM_REPLACE_IDS.forEach((id) => {
         const nextEl = doc.getElementById(id);
         const curEl = document.getElementById(id);
         if (!nextEl || !curEl) return;
         curEl.replaceWith(nextEl);
       });
 
-      syncVersionUiFromDoc(doc);
-
-      try {
-        document.dispatchEvent(new CustomEvent('formBuilder:domUpdated'));
-      } catch (_e) {}
-
-      // Keep data manager in sync with updated JSON blobs.
-      try {
-        if (window.DataManager && typeof window.DataManager.init === 'function') {
-          window.DataManager.init();
-        }
-      } catch (e) {
-        console.warn('[FormBuilderAjax] DataManager re-init failed', e);
-      }
-
-      // Recompute human-readable rule summaries (relevance/validation) in the refreshed DOM.
-      // Without this, rule display placeholders like "Loading..." can stick after AJAX swaps.
-      try {
-        if (typeof window.initializeRuleDisplays === 'function') {
-          window.initializeRuleDisplays();
-        }
-      } catch (e) {
-        console.warn('[FormBuilderAjax] initializeRuleDisplays failed', e);
-      }
-
-      // Re-initialise dynamic sections (idempotent; will wire new forms).
-      try {
-        if (window.DynamicSections && typeof window.DynamicSections.init === 'function') {
-          window.DynamicSections.init();
-        }
-      } catch (e) {
-        console.warn('[FormBuilderAjax] DynamicSections re-init failed', e);
-      }
-
-      // Re-bind any UI handlers that are element-attached (toggles, etc.)
-      try {
-        if (window.FormBuilderEnhance && typeof window.FormBuilderEnhance.enhance === 'function') {
-          window.FormBuilderEnhance.enhance();
-        }
-      } catch (e) {
-        console.warn('[FormBuilderAjax] enhance failed', e);
-      }
+      reinitFormBuilderAfterDomSwap(doc);
     };
 
     const submitViaAjax = async (form) => {
@@ -613,6 +662,8 @@ export const FormSubmitUI = {
       showError: (t, d, r) => this.showError(t, d, r),
       // Expose for external callers (e.g. the AI assistant after it updates the template).
       refreshFromHtml: (html) => refreshFromHtml(html),
+      captureDomSnapshot: () => captureDomSnapshot(),
+      restoreDomSnapshot: (snapshot) => restoreDomSnapshot(snapshot),
     };
 
     // Global submit interception (bubble) for POST forms in builder UI.

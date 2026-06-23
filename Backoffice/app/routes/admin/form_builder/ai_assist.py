@@ -244,3 +244,26 @@ def ai_extract_image():
     except Exception as exc:
         current_app.logger.error("ai_extract_image failed: %s", exc, exc_info=True)
         return json_server_error("Failed to read the pasted image.")
+
+
+@bp.route("/templates/<int:template_id>/ai-restore-structure", methods=["POST"])
+@permission_required_any("admin.templates.edit")
+def ai_restore_structure(template_id):
+    """Restore the template draft from a structure snapshot (AI undo/redo)."""
+    from app.services.form_template_ai_service import FormTemplateAIError, FormTemplateAIService
+
+    payload = request.get_json(silent=True) or {}
+    structure = payload.get("structure")
+    if not isinstance(structure, dict):
+        return json_bad_request("Request body must include a 'structure' object.")
+
+    try:
+        result = FormTemplateAIService().restore_draft_structure(
+            int(template_id), structure, current_user
+        )
+        return json_ok(**result)
+    except FormTemplateAIError as exc:
+        return json_bad_request(str(exc), success=False)
+    except Exception as exc:
+        current_app.logger.error("ai_restore_structure failed: %s", exc, exc_info=True)
+        return json_server_error("Failed to restore the draft structure.")

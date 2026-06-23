@@ -47,20 +47,31 @@ def create_app(config_name=None):
     )
     app.config.setdefault('SEND_FILE_MAX_AGE_DEFAULT', None)
 
-    if selected_config_name != 'development':
-        app.config.setdefault('COMPRESS_ALGORITHM', 'gzip')
-        app.config.setdefault('COMPRESS_LEVEL', 6)
-        app.config.setdefault('COMPRESS_MIN_SIZE', 512)
-        app.config.setdefault('COMPRESS_MIMETYPES', [
-            'text/html', 'text/css', 'text/javascript', 'application/javascript',
-            'application/json', 'image/svg+xml',
-        ])
-        try:
-            from flask_compress import Compress  # type: ignore[reportMissingImports]
-            Compress(app)
-            app.logger.debug("Flask-Compress initialized")
-        except Exception as e:
-            app.logger.warning("Flask-Compress not initialized: %s", e)
+    # Compression: Brotli preferred (20-30% smaller than gzip); gzip as fallback.
+    # Brotli is always available — it ships with Flask-Compress 1.14.
+    # Enable in all environments so local HAR captures match production wire sizes.
+    app.config.setdefault('COMPRESS_ALGORITHM', ['br', 'gzip'])
+    app.config.setdefault('COMPRESS_LEVEL', 6)
+    app.config.setdefault('COMPRESS_MIN_SIZE', 512)
+    app.config.setdefault('COMPRESS_MIMETYPES', [
+        'text/html', 'text/css', 'text/javascript', 'application/javascript',
+        'application/json', 'image/svg+xml',
+    ])
+    # COMPRESS_STREAMS: compress streaming (chunked) responses incrementally
+    # so stream_template gets compressed transfer with low TTFB simultaneously.
+    app.config.setdefault('COMPRESS_STREAMS', True)
+    try:
+        from flask_compress import Compress  # type: ignore[reportMissingImports]
+        Compress(app)
+        app.logger.debug("Flask-Compress initialized (br+gzip, streaming enabled)")
+    except Exception as e:
+        app.logger.warning("Flask-Compress not initialized: %s", e)
+
+    # Jinja2 whitespace trimming — removes the newline after every {%…%} tag
+    # (trim_blocks) and strips leading tabs/spaces from block lines (lstrip_blocks).
+    # Together these shave ~15–25% off rendered HTML without altering semantics.
+    app.jinja_env.trim_blocks = True
+    app.jinja_env.lstrip_blocks = True
 
     try:
         from werkzeug.middleware.proxy_fix import ProxyFix

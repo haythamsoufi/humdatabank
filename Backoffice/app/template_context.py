@@ -310,7 +310,21 @@ def register_template_context(app, config_class):
     app.jinja_env.globals['config'] = app.config
 
     def static_url(filename):
+        """Return a cache-busted URL for a static asset.
+
+        When STATIC_CDN_URL is set (e.g. an Azure Blob Storage / CDN origin), the
+        asset is served from that base URL instead of from the Flask/Gunicorn process.
+        This completely offloads static-file traffic from application workers, which
+        eliminates the 504 timeouts observed when all Gunicorn workers are busy.
+
+        Local dev and CI: STATIC_CDN_URL is unset → falls back to the Flask static route.
+        Production: set STATIC_CDN_URL=https://<account>.blob.core.windows.net/static
+                    (or an Azure CDN / Front Door URL pointing at that container).
+        """
         asset_version = str(app.config.get('ASSET_VERSION') or 'v1')
+        cdn_base = (app.config.get('STATIC_CDN_URL') or '').rstrip('/')
+        if cdn_base:
+            return f"{cdn_base}/{filename}?v={asset_version}"
         base_url = url_for('static', filename=filename)
         return f"{base_url}?v={asset_version}"
     app.jinja_env.globals['static_url'] = static_url

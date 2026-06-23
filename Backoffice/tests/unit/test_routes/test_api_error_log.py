@@ -213,6 +213,23 @@ class TestLogPlatformError:
             resp = self._post(client, {"error_code": 503, "url": "https://example.com/"})
         assert resp.status_code == 200
 
+    def test_valid_504_logged_successfully(self, client, db_session):
+        captured = {}
+
+        def capture_call(**kwargs):
+            captured.update(kwargs)
+
+        with patch(
+            "app.services.security.monitoring.SecurityMonitor.log_security_event",
+            side_effect=capture_call,
+        ):
+            resp = self._post(client, {
+                "error_code": 504,
+                "url": "https://databank.ifrc.org/static/js/forms/modules/formatting.js",
+            })
+        assert resp.status_code == 200
+        assert captured.get("event_type") == "platform_504_gateway_timeout"
+
     def test_sensitive_url_params_stripped(self, client, db_session):
         """URL with sensitive params is sanitized before logging."""
         captured = {}

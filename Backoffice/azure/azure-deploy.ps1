@@ -186,6 +186,34 @@ az storage container create `
 
 Write-Success "✓ Storage container created: uploads"
 
+# Create a public "static" container so Gunicorn never has to serve JS/CSS/images.
+Write-Info "  Creating public 'static' blob container for static assets..."
+az storage container create `
+    --name static `
+    --connection-string $storageConnectionString `
+    --public-access blob `
+    --output none
+
+Write-Success "✓ Storage container created: static (public read)"
+
+Write-Info "  Uploading static assets with immutable cache headers..."
+$staticSrc = Join-Path $PSScriptRoot "..\app\static"
+if (Test-Path $staticSrc) {
+    az storage blob upload-batch `
+        --account-name $storageAccount `
+        --destination static `
+        --source $staticSrc `
+        --content-cache-control "max-age=31536000, public, immutable" `
+        --overwrite `
+        --output none
+    Write-Success "✓ Static assets uploaded"
+} else {
+    Write-Warning "  ⚠ Static source not found at $staticSrc — upload skipped. Run manually after deployment."
+}
+
+$staticBlobUrl = "https://$storageAccount.blob.core.windows.net/static"
+Write-Success "✓ Static CDN URL: $staticBlobUrl"
+
 # Step 4: Create App Service Plan
 Write-Info ""
 Write-Info "Step 4: Creating App Service Plan..."
@@ -270,6 +298,7 @@ az webapp config appsettings set `
         SQLALCHEMY_POOL_SIZE="10" `
         SQLALCHEMY_MAX_OVERFLOW="20" `
         WEB_CONCURRENCY="4" `
+        STATIC_CDN_URL="$staticBlobUrl" `
     --output none
 
 Write-Success "✓ App Settings configured"

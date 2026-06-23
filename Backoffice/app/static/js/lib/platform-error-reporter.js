@@ -1,5 +1,5 @@
 /**
- * Reports platform-level errors (WAF 403, 502, 503) to /api/v1/platform-error.
+ * Reports platform-level errors (WAF 403, 502, 503, 504) to /api/v1/platform-error.
  *
  * When a WAF or reverse-proxy intercepts an AJAX request the beacon script
  * embedded in the Azure custom error page never executes (the browser receives
@@ -25,7 +25,7 @@
 (function () {
   'use strict';
 
-  var REPORTABLE_CODES = [403, 502, 503];
+  var REPORTABLE_CODES = [403, 502, 503, 504];
   var ENDPOINT = '/api/v1/platform-error';
   var WRAP_FLAG = '__humdbPlatformErrorFetchWrapped';
   var JQ_FLAG   = '__humdbPlatformErrorJqBound';

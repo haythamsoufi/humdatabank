@@ -2,7 +2,7 @@
 Platform Error Logging API endpoint.
 Part of the /api/v1 blueprint.
 
-This endpoint allows Azure platform error pages (403, 502, 503) to log errors
+This endpoint allows Azure platform error pages and the client reporter (403, 502, 503, 504) to log errors
 for monitoring and debugging purposes.
 
 SECURITY: This endpoint is public but protected by:
@@ -87,14 +87,14 @@ def sanitize_url(url):
 @limiter.limit("10 per minute", override_defaults=True)
 def log_platform_error():
     """
-    Log platform-level errors (403, 502, 503) from Azure error pages.
+    Log platform-level errors (403, 502, 503, 504) from Azure error pages or the client reporter.
 
     This endpoint is intentionally public (no auth required) since it's called
-    from static error pages. Rate limiting should be handled at the infrastructure level.
+    from static error pages and fetch/ajax interceptors. Rate limiting should be handled at the infrastructure level.
 
     Expected JSON payload:
     {
-        "error_code": 403|502|503,
+        "error_code": 403|502|503|504,
         "url": "full URL where error occurred",
         "referrer": "referrer URL (optional)",
         "user_agent": "browser user agent (optional)",
@@ -123,8 +123,8 @@ def log_platform_error():
         except (ValueError, TypeError):
             return json_bad_request('Invalid error_code. Must be an integer.', success=False)
 
-        if error_code not in [403, 502, 503]:
-            return json_bad_request('Invalid error_code. Must be 403, 502, or 503.', success=False)
+        if error_code not in [403, 502, 503, 504]:
+            return json_bad_request('Invalid error_code. Must be 403, 502, 503, or 504.', success=False)
 
         # Extract and sanitize URL (with length limits)
         url = sanitize_url(data.get('url'))
@@ -149,7 +149,8 @@ def log_platform_error():
         error_mapping = {
             403: ('platform_403_forbidden', 'high'),
             502: ('platform_502_bad_gateway', 'high'),
-            503: ('platform_503_service_unavailable', 'high')
+            503: ('platform_503_service_unavailable', 'high'),
+            504: ('platform_504_gateway_timeout', 'high'),
         }
 
         event_type, severity = error_mapping[error_code]

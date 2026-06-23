@@ -189,6 +189,42 @@ az storage container create \
 
 print_success "✓ Storage container created: uploads"
 
+# Create a public "static" container for JS/CSS/images so Gunicorn never
+# has to serve them.  Static files are served directly from Azure Blob Storage
+# (optionally fronted by Azure CDN), which eliminates the 504 Gateway Timeouts
+# that occur when all Gunicorn workers are busy with slow HTML requests.
+print_info "  Creating public 'static' blob container..."
+az storage container create \
+    --name static \
+    --connection-string "$STORAGE_CONNECTION_STRING" \
+    --public-access blob \
+    --output none
+
+print_success "✓ Storage container created: static (public read)"
+print_info "  Uploading static assets with immutable cache headers..."
+
+# Upload all files from app/static/ into the 'static' blob container.
+# The ?v=<ASSET_VERSION> cache-buster means files can be cached indefinitely —
+# any content change ships a new ASSET_VERSION which creates a new URL.
+STATIC_SRC="$(dirname "$0")/../app/static"
+if [ -d "$STATIC_SRC" ]; then
+    az storage blob upload-batch \
+        --account-name "$STORAGE_ACCOUNT" \
+        --destination static \
+        --source "$STATIC_SRC" \
+        --content-cache-control "max-age=31536000, public, immutable" \
+        --overwrite \
+        --output none
+    print_success "✓ Static assets uploaded to blob container"
+else
+    print_warning "  ⚠ Static source directory not found at $STATIC_SRC — upload skipped"
+    print_warning "  Run manually: az storage blob upload-batch --account-name $STORAGE_ACCOUNT --destination static --source <path-to>/app/static/ --content-cache-control 'max-age=31536000, public, immutable' --overwrite"
+fi
+
+STATIC_BLOB_URL="https://${STORAGE_ACCOUNT}.blob.core.windows.net/static"
+print_success "✓ Static CDN URL: $STATIC_BLOB_URL"
+print_info "  Set this as the STATIC_CDN_URL app setting to route static traffic away from Gunicorn."
+
 # Step 4: Create App Service Plan
 echo ""
 print_info "Step 4: Creating App Service Plan..."
@@ -273,6 +309,7 @@ az webapp config appsettings set \
         SQLALCHEMY_POOL_SIZE="10" \
         SQLALCHEMY_MAX_OVERFLOW="20" \
         WEB_CONCURRENCY="4" \
+        STATIC_CDN_URL="$STATIC_BLOB_URL" \
     --output none
 
 print_success "✓ App Settings configured"

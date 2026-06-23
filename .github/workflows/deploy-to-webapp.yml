@@ -289,6 +289,9 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
       - name: Set deployment target
         id: config
         run: |
@@ -304,3 +307,33 @@ jobs:
           app-name: ${{ steps.config.outputs.app_name }}
           images: 'ifrcimage.azurecr.io/databank_backend:${{ env.EFFECTIVE_VERSION }}'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+
+      - name: Set static blob target for environment
+        id: static_config
+        run: |
+          if [ "${{ env.EFFECTIVE_ENV }}" = "Production" ]; then
+            echo "container=static" >> "$GITHUB_OUTPUT"
+          else
+            echo "container=static-staging" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Static JS/CSS/images are served from Azure Blob Storage (STATIC_CDN_URL), not Gunicorn.
+      # The container app does NOT copy files on startup — this step runs on every deploy.
+      # Production → container "static"   Staging → container "static-staging" (isolated assets).
+      # Required GitHub secret: AZURE_STORAGE_CONNECTION_STRING (same storage account as uploads).
+      - name: Upload static assets to Azure Blob Storage
+        id: static_upload
+        env:
+          AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+          STATIC_BLOB_CONTAINER: ${{ steps.static_config.outputs.container }}
+        run: |
+          set -euo pipefail
+          chmod +x Backoffice/azure/upload-static-assets.sh
+          STATIC_CDN_URL="$(Backoffice/azure/upload-static-assets.sh | sed -n 's/^STATIC_CDN_URL=//p' | tail -1)"
+          if [ -z "${STATIC_CDN_URL}" ]; then
+            echo "ERROR: upload-static-assets.sh did not print STATIC_CDN_URL"
+            exit 1
+          fi
+          echo "static_cdn_url=${STATIC_CDN_URL}" >> "$GITHUB_OUTPUT"
+          echo "Uploaded static assets to container '${STATIC_BLOB_CONTAINER}'; STATIC_CDN_URL=${STATIC_CDN_URL}"
+          echo "Ensure this Web App has app setting STATIC_CDN_URL=${STATIC_CDN_URL} (set once per app)."

@@ -76,11 +76,20 @@ def add_security_headers(response):
         "'sha256-xG5vOuTJfko1kfw3c6cQOiOXhaZxr2Yhc5uF1ybVo+c=' "  # Plugin settings inline script 4
         "'sha256-ofVqu4ZzAuGbayuRZeenPtqaKeG7wyBnn5XRT9+Pyew='"   # Plugin settings inline script 5
     )
-    script_src = f"'self' {nonce_directive} {script_hashes} https://cdnjs.cloudflare.com https://code.jquery.com https://cdn.jsdelivr.net https://unpkg.com https://www.gstatic.com".strip()
+    # Allow ES module scripts/styles from the static CDN (Azure Blob / CDN) when configured.
+    static_cdn = (current_app.config.get('STATIC_CDN_URL') or '').strip().rstrip('/')
+    cdn_origin = ''
+    if static_cdn:
+        from urllib.parse import urlparse
+        parsed = urlparse(static_cdn)
+        if parsed.scheme and parsed.netloc:
+            cdn_origin = f"{parsed.scheme}://{parsed.netloc}"
+
+    script_src = f"'self' {nonce_directive} {script_hashes} {cdn_origin} https://cdnjs.cloudflare.com https://code.jquery.com https://cdn.jsdelivr.net https://unpkg.com https://www.gstatic.com".strip()
     # NOTE: 'unsafe-inline' is required for style-src because third-party libraries
     # (Leaflet, Font Awesome, etc.) and some dynamic UI components inject inline styles.
     # Migrating to nonce-based styles would require patching all inline style usage.
-    style_src = f"'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com https://www.gstatic.com".strip()
+    style_src = f"'self' 'unsafe-inline' {cdn_origin} https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com https://www.gstatic.com".strip()
 
     # Iframe embeds (Power BI, Tableau Public) — keep in sync with embed_content allowlists
     _frame_hosts = " ".join(
@@ -93,8 +102,8 @@ def add_security_headers(response):
         f"script-src {script_src}; "
         f"style-src {style_src}; "
         "img-src 'self' data: blob: https:; "
-        "font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; "
-        "connect-src 'self' https://unpkg.com https://www.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://nominatim.openstreetmap.org https://ipapi.co https://api.mapbox.com; "
+        f"font-src 'self' data: {cdn_origin} https://cdnjs.cloudflare.com https://fonts.gstatic.com; "
+        f"connect-src 'self' {cdn_origin} https://unpkg.com https://www.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://nominatim.openstreetmap.org https://ipapi.co https://api.mapbox.com; "
         f"frame-src {frame_src}; "
         "frame-ancestors 'none'; "
         "base-uri 'self'; "

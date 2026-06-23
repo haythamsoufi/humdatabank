@@ -10,7 +10,7 @@ import json
 import re
 import time
 
-from flask import current_app, flash, redirect, render_template, request, url_for
+from flask import current_app, flash, redirect, render_template, request, stream_template, url_for
 from flask_babel import _
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
@@ -1062,7 +1062,12 @@ def handle_assignment_form(aes_id):
             open_validation_questions = []
 
     _entry_lap("pre_render")
-    response = render_template(
+    # stream_template returns a Response with a Jinja2 generator body.
+    # Flask sends the <head> and first blocks to the browser immediately, so CSS/JS
+    # loading begins in parallel while the rest of the template renders.
+    # The transaction middleware detects is_streamed=True and defers the DB session
+    # cleanup to response.call_on_close, keeping ORM objects live throughout render.
+    response = stream_template(
         "forms/entry_form/entry_form.html",
         open_validation_questions=open_validation_questions,
         # completion_rate is no longer computed server-side; the entry form JS fetches
@@ -1112,7 +1117,7 @@ def handle_assignment_form(aes_id):
         # The chatbot is initialised lazily by entry_form.html after formInitialized instead.
         skip_layout_chatbot=True,
     )
-    _entry_lap("jinja_render")
+    _entry_lap("stream_setup")  # ~0 ms — rendering happens lazily as client reads chunks
     return response
 
 

@@ -203,7 +203,7 @@ EXTERNAL_API_REGISTRY = [
      'description': 'Resolve matrix auto-load entity IDs for a saved context (template/period/item/AES)'},
     {'group': 'System', 'path': '/api/v1/platform-error', 'methods': ['POST'],
      'auth': 'public', 'rate_limited': True,
-     'description': 'Accept JSON from static error pages (403/502/503) to log platform events'},
+     'description': 'Accept JSON from static error pages and client reporter (403/502/503/504) to log platform events'},
 ]
 
 # ── AI Chat API  /api/ai/v2/* ─────────────────────────────────────────────────

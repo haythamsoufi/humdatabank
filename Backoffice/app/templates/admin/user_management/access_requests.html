@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
 {% block title %}{{ _('Country Access Requests') }}{% endblock %}
 
@@ -25,6 +26,26 @@
 
 {% block content %}
 
+{% set header_actions = namespace(items=[]) %}
+{% if pending_requests %}
+    {% set __ = header_actions.items.append({
+        'type': 'form',
+        'url': url_for('user_management.approve_all_access_requests'),
+        'form_attributes': {'data-confirm': _('Are you sure you want to approve all pending requests?')},
+        'csrf': True,
+        'classes': 'professional-action-btn professional-action-btn-green',
+        'icon': 'fas fa-check-double',
+        'text': _('Approve All') ~ ' (' ~ pending_requests|length ~ ')'
+    }) %}
+{% endif %}
+{% set __ = header_actions.items.append({
+    'type': 'link',
+    'text': _('Back to Users'),
+    'url': url_for('user_management.manage_users'),
+    'icon': 'fas fa-users',
+    'classes': 'professional-action-btn'
+}) %}
+
 {{ page_header(
     title=_('Country Access Requests'),
     icon='fas fa-flag',
@@ -33,15 +54,7 @@
         {'name': _('User Management'), 'url': url_for('user_management.manage_users')},
         {'name': _('Country Access Requests')}
     ],
-    actions=[
-        {
-            'type': 'link',
-            'text': _('Back to Users'),
-            'url': url_for('user_management.manage_users'),
-            'icon': 'fas fa-users',
-            'classes': 'professional-action-btn'
-        }
-    ]
+    actions=header_actions.items
 ) }}
 
 {% if auto_approve_enabled %}
@@ -61,54 +74,61 @@
 </div>
 {% endif %}
 
-{% if pending_requests %}
-<!-- Approve All -->
-<div class="flex justify-end mb-4">
-  <form action="{{ url_for('user_management.approve_all_access_requests') }}" method="POST"
-        data-confirm="{{ _('Are you sure you want to approve all pending requests?') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button type="submit" class="btn btn-success">
-      <i class="fas fa-check-double mr-2"></i> {{ _('Approve All') }} ({{ pending_requests|length }})
-    </button>
-  </form>
-</div>
-{% endif %}
-
-<div class="flex justify-end mb-4">
-  <label for="groupByRequestToggle" class="inline-flex items-center gap-2.5 cursor-pointer select-none text-sm text-gray-700">
-    <span>{{ _('Group by request') }}</span>
-    <span class="relative inline-flex shrink-0 items-center">
-      <input type="checkbox" id="groupByRequestToggle" class="sr-only peer" aria-describedby="groupByRequestToggleHint" />
-      <div class="relative w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-    </span>
-  </label>
-  <span id="groupByRequestToggleHint" class="sr-only">{{ _('Show each access request on its own row') }}</span>
-</div>
-
 {% from "components/ag_grid_includes.html" import ag_grid_container %}
-<div class="space-y-6">
-  <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative">
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="text-lg font-semibold">{{ _('Pending Requests') }}</h3>
-      <div id="pending-column-visibility-button-placeholder" class="flex-shrink-0"></div>
+<div class="bg-white shadow-md border border-gray-200">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between border-b border-gray-200">
+    <div class="min-w-0 flex-1">
+      {% call scroll_tab_bar(inner_id='access-requests-tabs', aria_label=_('Access request sections'), border_bottom=false, wrapper_class='mb-0') %}
+        <button type="button" role="tab" id="tab-pending" data-tab="pending" aria-selected="true"
+                class="{{ admin_underline_tab_btn_classes(true) }}">
+          <i class="fas fa-inbox mr-1.5"></i>{{ _('Pending Requests') }} ({{ pending_requests|length }})
+        </button>
+        <button type="button" role="tab" id="tab-processed" data-tab="processed" aria-selected="false"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+          <i class="fas fa-history mr-1.5"></i>{{ _('Recently Processed') }} ({{ processed_requests|length }})
+        </button>
+      {% endcall %}
     </div>
-    {% if pending_requests %}
-      {{ ag_grid_container('pendingRequestsGrid', loading_text=_('Loading requests...'), placeholder_id='pending-column-visibility-button-placeholder', show_placeholder=false, grid_height='600px', include_card=false) }}
-    {% else %}
-      <p class="text-gray-700">{{ _('There are no pending requests.') }}</p>
-    {% endif %}
+    <div class="flex shrink-0 items-center px-4 pb-3 sm:px-6 sm:pb-3">
+      <label for="groupByUserToggle" class="inline-flex items-center gap-2.5 cursor-pointer select-none text-sm text-gray-700">
+        <span>{{ _('Group by user') }}</span>
+        <span class="relative inline-flex shrink-0 items-center">
+          <input type="checkbox" id="groupByUserToggle" checked class="sr-only peer" aria-describedby="groupByUserToggleHint" />
+          <div class="relative w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </span>
+      </label>
+      <span id="groupByUserToggleHint" class="sr-only">{{ _('Combine multiple country requests from the same user into one row') }}</span>
+    </div>
   </div>
 
-  <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative">
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="text-lg font-semibold">{{ _('Recently Processed') }}</h3>
-      <div id="processed-column-visibility-button-placeholder" class="flex-shrink-0"></div>
+  <div class="p-4 sm:p-6">
+    <div id="panel-pending" class="access-requests-panel">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 mb-4">
+        <div class="min-w-0 flex-1 flex items-baseline gap-2 flex-wrap" data-ag-grid-title-group></div>
+        <div class="flex flex-shrink-0 justify-end">
+          <div id="pending-column-visibility-button-placeholder"></div>
+        </div>
+      </div>
+      {% if pending_requests %}
+        {{ ag_grid_container('pendingRequestsGrid', loading_text=_('Loading requests...'), placeholder_id='pending-column-visibility-button-placeholder', show_placeholder=false, grid_height='600px', include_card=false) }}
+      {% else %}
+        <p class="text-gray-700">{{ _('There are no pending requests.') }}</p>
+      {% endif %}
     </div>
-    {% if processed_requests %}
-      {{ ag_grid_container('processedRequestsGrid', loading_text=_('Loading requests...'), placeholder_id='processed-column-visibility-button-placeholder', show_placeholder=false, grid_height='600px', include_card=false) }}
-    {% else %}
-      <p class="text-gray-700">{{ _('No processed requests yet.') }}</p>
-    {% endif %}
+
+    <div id="panel-processed" class="access-requests-panel hidden">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 mb-4">
+        <div class="min-w-0 flex-1 flex items-baseline gap-2 flex-wrap" data-ag-grid-title-group></div>
+        <div class="flex flex-shrink-0 justify-end">
+          <div id="processed-column-visibility-button-placeholder"></div>
+        </div>
+      </div>
+      {% if processed_requests %}
+        {{ ag_grid_container('processedRequestsGrid', loading_text=_('Loading requests...'), placeholder_id='processed-column-visibility-button-placeholder', show_placeholder=false, grid_height='600px', include_card=false) }}
+      {% else %}
+        <p class="text-gray-700">{{ _('No processed requests yet.') }}</p>
+      {% endif %}
+    </div>
   </div>
 </div>
 
@@ -120,29 +140,33 @@
     {{ ag_grid_js() }}
 
     <script nonce="{{ csp_nonce() }}">
-    const GROUP_BY_REQUEST_STORAGE_KEY = 'accessRequestsGroupByRequest';
-    const LEGACY_GROUP_BY_USER_STORAGE_KEY = 'accessRequestsGroupByUser';
+    const GROUP_BY_USER_STORAGE_KEY = 'accessRequestsGroupByUser';
+    const LEGACY_GROUP_BY_REQUEST_STORAGE_KEY = 'accessRequestsGroupByRequest';
     const CSRF_TOKEN = {{ csrf_token()|tojson|safe }};
     const COUNTRIES_CELL_MAX_HEIGHT_PX = 120;
     const COUNTRIES_ROW_HEIGHT_PADDING_PX = 36;
+    const ACCESS_REQUESTS_BASE_URL = {{ url_for('user_management.access_requests')|tojson|safe }};
+
+    function userAccessRequestsActionUrl(userId, action) {
+        return ACCESS_REQUESTS_BASE_URL.replace(/\/?$/, '') + '/user/' + userId + '/' + action;
+    }
 
     let pendingGridHelper = null;
     let pendingGridApi = null;
     let processedGridHelper = null;
     let processedGridApi = null;
 
-    let groupByRequest = localStorage.getItem(GROUP_BY_REQUEST_STORAGE_KEY);
-    if (groupByRequest === null) {
-        const legacyGroupByUser = localStorage.getItem(LEGACY_GROUP_BY_USER_STORAGE_KEY);
-        if (legacyGroupByUser !== null) {
-            groupByRequest = legacyGroupByUser === 'false';
+    let groupByUser = localStorage.getItem(GROUP_BY_USER_STORAGE_KEY);
+    if (groupByUser === null) {
+        const legacyGroupByRequest = localStorage.getItem(LEGACY_GROUP_BY_REQUEST_STORAGE_KEY);
+        if (legacyGroupByRequest !== null) {
+            groupByUser = legacyGroupByRequest !== 'true';
         } else {
-            groupByRequest = false;
+            groupByUser = true;
         }
     } else {
-        groupByRequest = groupByRequest === 'true';
+        groupByUser = groupByUser === 'true';
     }
-    let groupByUser = !groupByRequest;
 
     const STATUS_SUMMARY_LABELS = {
         allApproved: {{ _('All approved')|tojson|safe }},
@@ -248,16 +272,36 @@
     function renderPendingActionsCell(params, grouped) {
         const requests = grouped ? (params.data.requests || []) : [params.data];
         const multi = grouped && requests.length > 1;
+
+        if (multi) {
+            const userId = params.data.user_id;
+            const approveAllUrl = userAccessRequestsActionUrl(userId, 'approve-all');
+            const rejectAllUrl = userAccessRequestsActionUrl(userId, 'reject-all');
+            const count = requests.length;
+            const approveConfirm = {{ _('Approve all __COUNT__ pending requests for this user?')|tojson|safe }}.replace('__COUNT__', String(count));
+            const rejectConfirm = {{ _('Reject all __COUNT__ pending requests for this user?')|tojson|safe }}.replace('__COUNT__', String(count));
+            return '<div class="flex flex-col gap-1.5 py-1">' +
+                '<form action="' + approveAllUrl + '" method="POST" class="inline-block" data-confirm="' +
+                AgGridRenderers.escapeHtmlAttr(approveConfirm) + '">' +
+                '<input type="hidden" name="csrf_token" value="' + CSRF_TOKEN + '">' +
+                '<button type="submit" class="btn btn-success btn-sm">' +
+                '<i class="fas fa-check-double mr-1"></i> {{ _("Approve all") }}' +
+                '</button>' +
+                '</form>' +
+                '<form action="' + rejectAllUrl + '" method="POST" class="inline-block" data-confirm="' +
+                AgGridRenderers.escapeHtmlAttr(rejectConfirm) + '" data-confirm-danger="true">' +
+                '<input type="hidden" name="csrf_token" value="' + CSRF_TOKEN + '">' +
+                '<button type="submit" class="btn btn-danger btn-sm">' +
+                '<i class="fas fa-times-circle mr-1"></i> {{ _("Reject all") }}' +
+                '</button>' +
+                '</form>' +
+                '</div>';
+        }
+
         const rows = requests.map(function(r) {
             const approveUrl = r.approve_url || '';
             const rejectUrl = r.reject_url || '';
-            const countryLabel = multi
-                ? '<span class="text-xs text-gray-600 min-w-[5rem] max-w-[8rem] truncate" title="' +
-                    AgGridRenderers.escapeHtmlAttr(r.country_name || '') + '">' +
-                    AgGridRenderers.escapeHtml(r.country_name || '') + '</span>'
-                : '';
-            return '<div class="flex items-center justify-center gap-2' + (multi ? ' flex-wrap' : '') + '">' +
-                countryLabel +
+            return '<div class="flex items-center justify-center gap-2">' +
                 '<form action="' + approveUrl + '" method="POST" class="inline-block">' +
                 '<input type="hidden" name="csrf_token" value="' + CSRF_TOKEN + '">' +
                 '<button type="submit" class="btn btn-success btn-sm">' +
@@ -272,9 +316,6 @@
                 '</form>' +
                 '</div>';
         });
-        if (multi) {
-            return '<div class="flex flex-col gap-1 py-1">' + rows.join('') + '</div>';
-        }
         return rows.join('');
     }
 
@@ -374,6 +415,7 @@
 
     function createUserColumnDef() {
         return {
+            colId: 'user_name',
             field: 'user_name',
             headerName: '{{ _("User") }}',
             width: 200,
@@ -399,6 +441,7 @@
 
     function createMessageColumnDef() {
         return {
+            colId: 'request_message',
             field: 'request_message',
             headerName: '{{ _("Message") }}',
             width: 300,
@@ -418,6 +461,7 @@
 
     function createCountriesColumnDef() {
         return {
+            colId: 'country',
             field: 'country_names_display',
             headerName: '{{ _("Countries") }}',
             width: 260,
@@ -478,21 +522,44 @@
         }
     }
 
+    function createPendingColumnOrder(grouped) {
+        if (grouped) {
+            return ['request_count', 'user_name', 'user_email', 'country', 'created_at', 'request_message', 'actions'];
+        }
+        return ['id', 'user_name', 'user_email', 'country', 'created_at', 'request_message', 'actions'];
+    }
+
+    function createProcessedColumnOrder(grouped) {
+        if (grouped) {
+            return ['request_count', 'user_name', 'user_email', 'country', 'status', 'processed_by_email', 'processed_at', 'request_message'];
+        }
+        return ['id', 'user_name', 'user_email', 'country', 'status', 'processed_by_email', 'processed_at', 'request_message'];
+    }
+
+    function applyAccessRequestsColumnOrder(api, helper, columnOrder) {
+        if (!api || !columnOrder || typeof AgGridHelper.pinActionsColumn !== 'function') {
+            return;
+        }
+        AgGridHelper.pinActionsColumn(api, columnOrder, helper && helper.columnVisibilityManager);
+    }
+
     function createPendingColumnDefs(grouped) {
         const cols = [];
         if (grouped) {
             cols.push({
+                colId: 'request_count',
                 field: 'request_count',
                 headerName: '{{ _("Requests") }}',
-                width: 110,
-                minWidth: 90,
-                maxWidth: 130,
+                width: 120,
+                minWidth: 110,
+                maxWidth: 140,
                 filter: 'agNumberColumnFilter',
                 sortable: true,
                 cellStyle: { 'white-space': 'nowrap', 'text-align': 'center' }
             });
         } else {
             cols.push({
+                colId: 'id',
                 field: 'id',
                 headerName: '{{ _("Request ID") }}',
                 width: 120,
@@ -508,6 +575,7 @@
         cols.push(
             createUserColumnDef(),
             {
+                colId: 'user_email',
                 field: 'user_email',
                 headerName: '{{ _("Email") }}',
                 width: 250,
@@ -519,6 +587,7 @@
             grouped
                 ? createCountriesColumnDef()
                 : {
+                    colId: 'country',
                     field: 'country_name',
                     headerName: '{{ _("Country") }}',
                     width: 200,
@@ -528,6 +597,7 @@
                     sortable: true
                 },
             {
+                colId: 'created_at',
                 field: 'created_at',
                 headerName: '{{ _("Requested At") }}',
                 width: 180,
@@ -539,11 +609,14 @@
             },
             createMessageColumnDef(),
             {
+                colId: 'actions',
                 field: 'actions',
                 headerName: '{{ _("Actions") }}',
-                width: grouped ? 280 : 200,
-                minWidth: grouped ? 240 : 180,
-                maxWidth: grouped ? 360 : 250,
+                width: grouped ? 160 : 200,
+                minWidth: grouped ? 140 : 180,
+                maxWidth: grouped ? 200 : 250,
+                pinned: 'right',
+                lockPinned: true,
                 lockVisible: true,
                 sortable: false,
                 filter: false,
@@ -559,17 +632,19 @@
         const cols = [];
         if (grouped) {
             cols.push({
+                colId: 'request_count',
                 field: 'request_count',
                 headerName: '{{ _("Requests") }}',
-                width: 110,
-                minWidth: 90,
-                maxWidth: 130,
+                width: 120,
+                minWidth: 110,
+                maxWidth: 140,
                 filter: 'agNumberColumnFilter',
                 sortable: true,
                 cellStyle: { 'white-space': 'nowrap', 'text-align': 'center' }
             });
         } else {
             cols.push({
+                colId: 'id',
                 field: 'id',
                 headerName: '{{ _("Request ID") }}',
                 width: 120,
@@ -585,6 +660,7 @@
         cols.push(
             createUserColumnDef(),
             {
+                colId: 'user_email',
                 field: 'user_email',
                 headerName: '{{ _("Email") }}',
                 width: 250,
@@ -596,6 +672,7 @@
             grouped
                 ? createCountriesColumnDef()
                 : {
+                    colId: 'country',
                     field: 'country_name',
                     headerName: '{{ _("Country") }}',
                     width: 200,
@@ -605,6 +682,7 @@
                     sortable: true
                 },
             {
+                colId: 'status',
                 field: 'status',
                 headerName: '{{ _("Status") }}',
                 width: 150,
@@ -629,6 +707,7 @@
                 cellStyle: { 'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis' }
             },
             {
+                colId: 'processed_by_email',
                 field: 'processed_by_email',
                 headerName: '{{ _("Processed By") }}',
                 width: 250,
@@ -652,6 +731,7 @@
                 }
             },
             {
+                colId: 'processed_at',
                 field: 'processed_at',
                 headerName: '{{ _("Processed At") }}',
                 width: 180,
@@ -673,7 +753,7 @@
         return groupByUser ? groupProcessedByUser(processedRequestsData) : processedRequestsData;
     }
 
-    function updateGridView(helper, api, createColumnDefs, rowData) {
+    function updateGridView(helper, api, createColumnDefs, createColumnOrder, rowData) {
         if (!helper || !api) return;
         const columnDefs = createColumnDefs(groupByUser);
         helper.config.columnDefs = columnDefs;
@@ -684,20 +764,21 @@
         }
         helper.setRowData(rowData);
         refreshAccessRequestsRowHeights(api);
+        applyAccessRequestsColumnOrder(api, helper, createColumnOrder(groupByUser));
         if (typeof helper.refresh === 'function') {
             helper.refresh();
         }
     }
 
     function applyGroupByUserView() {
-        updateGridView(pendingGridHelper, pendingGridApi, createPendingColumnDefs, getPendingRowData());
-        updateGridView(processedGridHelper, processedGridApi, createProcessedColumnDefs, getProcessedRowData());
+        updateGridView(pendingGridHelper, pendingGridApi, createPendingColumnDefs, createPendingColumnOrder, getPendingRowData());
+        updateGridView(processedGridHelper, processedGridApi, createProcessedColumnDefs, createProcessedColumnOrder, getProcessedRowData());
     }
 
-    function syncGroupByRequestToggle() {
-        const toggle = document.getElementById('groupByRequestToggle');
+    function syncGroupByUserToggle() {
+        const toggle = document.getElementById('groupByUserToggle');
         if (toggle) {
-            toggle.checked = groupByRequest;
+            toggle.checked = groupByUser;
         }
     }
 
@@ -710,7 +791,10 @@
             getPendingRowData(),
             {
                 columnVisibility: { enableExport: true, buttonPlaceholderId: 'pending-column-visibility-button-placeholder' },
-                gridOptions: createAccessRequestsGridOptions()
+                gridOptions: createAccessRequestsGridOptions(),
+                onReady: function(api, helper) {
+                    applyAccessRequestsColumnOrder(api, helper, createPendingColumnOrder(groupByUser));
+                }
             }
         );
         pendingGridHelper = result.helper;
@@ -728,7 +812,10 @@
             getProcessedRowData(),
             {
                 columnVisibility: { enableExport: true, buttonPlaceholderId: 'processed-column-visibility-button-placeholder' },
-                gridOptions: createAccessRequestsGridOptions()
+                gridOptions: createAccessRequestsGridOptions(),
+                onReady: function(api, helper) {
+                    applyAccessRequestsColumnOrder(api, helper, createProcessedColumnOrder(groupByUser));
+                }
             }
         );
         processedGridHelper = result.helper;
@@ -737,14 +824,13 @@
         window.processedGridHelper = processedGridHelper;
     }
 
-    function setupGroupByRequestToggle() {
-        const toggle = document.getElementById('groupByRequestToggle');
+    function setupGroupByUserToggle() {
+        const toggle = document.getElementById('groupByUserToggle');
         if (!toggle) return;
-        syncGroupByRequestToggle();
+        syncGroupByUserToggle();
         toggle.addEventListener('change', function() {
-            groupByRequest = toggle.checked;
-            groupByUser = !groupByRequest;
-            localStorage.setItem(GROUP_BY_REQUEST_STORAGE_KEY, groupByRequest ? 'true' : 'false');
+            groupByUser = toggle.checked;
+            localStorage.setItem(GROUP_BY_USER_STORAGE_KEY, groupByUser ? 'true' : 'false');
             applyGroupByUserView();
         });
     }
@@ -752,7 +838,56 @@
     function initializeAccessRequestsGrids() {
         initializePendingGrid();
         initializeProcessedGrid();
-        setupGroupByRequestToggle();
+        setupGroupByUserToggle();
+        setupAccessRequestsTabs();
+    }
+
+    function refreshAccessRequestsGridForTab(tabId) {
+        const helper = tabId === 'processed' ? processedGridHelper : pendingGridHelper;
+        const api = tabId === 'processed' ? processedGridApi : pendingGridApi;
+        window.setTimeout(function() {
+            if (helper && typeof helper.refresh === 'function') {
+                helper.refresh();
+            }
+            if (api && typeof api.doLayout === 'function') {
+                api.doLayout();
+            }
+        }, 50);
+    }
+
+    function setupAccessRequestsTabs() {
+        const A = window.AdminUnderlineTabs;
+        const tabs = document.querySelectorAll('#access-requests-tabs .settings-tab');
+        if (!A || !tabs.length) {
+            return;
+        }
+
+        function activate(tabId) {
+            A.activateStripTab('#access-requests-tabs', tabId, {
+                panelSelector: '.access-requests-panel'
+            });
+            refreshAccessRequestsGridForTab(tabId);
+        }
+
+        tabs.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const tabId = btn.getAttribute('data-tab');
+                if (!tabId) {
+                    return;
+                }
+                activate(tabId);
+                try {
+                    history.replaceState(null, '', '#' + tabId);
+                } catch (e) {
+                    // ignore opaque origins
+                }
+            });
+        });
+
+        const hash = (location.hash || '').replace('#', '');
+        if (hash === 'processed' && document.getElementById('panel-processed')) {
+            activate('processed');
+        }
     }
 
     if (document.readyState === 'loading') {

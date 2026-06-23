@@ -291,6 +291,115 @@ def approve_all_access_requests():
     return redirect(url_for("user_management.access_requests"))
 
 
+@bp.route("/access-requests/user/<int:user_id>/approve-all", methods=["POST"])
+@permission_required('admin.access_requests.approve')
+def approve_user_access_requests(user_id):
+    """Approve all pending country access requests for one user."""
+    user = User.query.get_or_404(user_id)
+    pending = CountryAccessRequest.query.filter_by(user_id=user_id, status='pending').all()
+    if not pending:
+        flash("No pending requests to approve for this user.", "info")
+        return redirect(url_for("user_management.access_requests"))
+
+    approved_count = 0
+    errors = []
+    for req in pending:
+        try:
+            country = Country.query.get(req.country_id)
+            if not country:
+                continue
+            user.add_entity_permission(entity_type='country', entity_id=country.id)
+            req.status = 'approved'
+            req.processed_by_user_id = current_user.id
+            req.processed_at = db.func.now()
+            db.session.flush()
+
+            log_admin_action(
+                action_type='access_request_approve',
+                description=f'Bulk-approved country access request for {user.email} to {country.name}',
+                target_type='country_access_request',
+                target_id=req.id,
+                target_description=f'User: {user.email}, Country: {country.name}',
+                new_values={
+                    'user_id': user.id,
+                    'user_email': user.email,
+                    'country_id': country.id,
+                    'country_name': country.name,
+                    'status': 'approved'
+                },
+                risk_level='low'
+            )
+            db.session.flush()
+
+            try:
+                from app.services.notification.core import notify_user_added_to_country
+                notify_user_added_to_country(user.id, country.id)
+            except Exception as e:
+                current_app.logger.debug("notify_user_added_to_country failed: %s", e)
+
+            approved_count += 1
+        except Exception:
+            errors.append("Validation error.")
+
+    if approved_count:
+        flash(f"Approved {approved_count} request(s) for {user.email}.", "success")
+    if errors:
+        flash(f"{len(errors)} request(s) could not be approved.", "danger")
+    return redirect(url_for("user_management.access_requests"))
+
+
+@bp.route("/access-requests/user/<int:user_id>/reject-all", methods=["POST"])
+@permission_required('admin.access_requests.reject')
+def reject_user_access_requests(user_id):
+    """Reject all pending country access requests for one user."""
+    user = User.query.get_or_404(user_id)
+    pending = CountryAccessRequest.query.filter_by(user_id=user_id, status='pending').all()
+    if not pending:
+        flash("No pending requests to reject for this user.", "info")
+        return redirect(url_for("user_management.access_requests"))
+
+    rejected_count = 0
+    errors = []
+    for req in pending:
+        try:
+            country = Country.query.get(req.country_id)
+            req.status = 'rejected'
+            req.processed_by_user_id = current_user.id
+            req.processed_at = db.func.now()
+            db.session.flush()
+
+            log_admin_action(
+                action_type='access_request_reject',
+                description=(
+                    f'Bulk-rejected country access request for {user.email} '
+                    f'to {country.name if country else "unknown"}'
+                ),
+                target_type='country_access_request',
+                target_id=req.id,
+                target_description=(
+                    f'User: {user.email}, Country: {country.name if country else "unknown"}'
+                ),
+                new_values={
+                    'user_id': user.id,
+                    'user_email': user.email,
+                    'country_id': req.country_id,
+                    'country_name': country.name if country else None,
+                    'status': 'rejected'
+                },
+                risk_level='low'
+            )
+            db.session.flush()
+            rejected_count += 1
+        except Exception:
+            errors.append("Validation error.")
+
+    if rejected_count:
+        flash(f"Rejected {rejected_count} request(s) for {user.email}.", "info")
+    if errors:
+        flash(f"{len(errors)} request(s) could not be rejected.", "danger")
+    return redirect(url_for("user_management.access_requests"))
+
+
 @bp.route("/users/new", methods=["GET", "POST"])
 @permission_required('admin.users.create')
 def new_user():

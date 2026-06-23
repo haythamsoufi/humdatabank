@@ -36,7 +36,7 @@ export const FormSubmitUI = {
       this._bannerBar = document.getElementById('form-builder-save-banner-bar');
       this._bannerRetry = document.getElementById('form-builder-save-banner-retry');
       this._bannerClose = document.getElementById('form-builder-save-banner-close');
-      // Shared banner controller (provided by /static/js/floating-progress-banner.js)
+      // Shared banner controller (provided by /static/js/core/floating-progress-banner.js)
       try {
         if (window.FloatingProgressBanner && typeof window.FloatingProgressBanner.fromIds === 'function') {
           this._bannerUI = window.FloatingProgressBanner.fromIds({

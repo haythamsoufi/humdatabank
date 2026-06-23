@@ -71,7 +71,7 @@
     {% if user_access_level(current_user) in ['admin', 'system_manager'] %}
         <script src="{{ static_url('js/admin/tour.js') }}"></script>
     {% else %}
-        <script src="{{ static_url('js/focal-tour.js') }}"></script>
+        <script src="{{ static_url('js/tours/focal-tour.js') }}"></script>
     {% endif %}
 
     <!-- Tour Styles -->

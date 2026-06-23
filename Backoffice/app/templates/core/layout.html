@@ -17,8 +17,8 @@
     <script src="{{ static_url('libs/jquery-3.7.1.min.js') }}"></script>
     <link href="{{ static_url('libs/select2.min.css') }}" rel="stylesheet" />
     <script src="{{ static_url('libs/select2.min.js') }}" defer></script>
-    <script src="{{ static_url('js/csrf.js') }}" defer></script>
-    <script src="{{ static_url('js/debug-indexeddb.js') }}" defer></script>
+    <script src="{{ static_url('js/core/csrf.js') }}" defer></script>
+    <script src="{{ static_url('js/core/debug-indexeddb.js') }}" defer></script>
     <script src="{{ static_url('js/lib/indexeddb-error-guard.js') }}" defer></script>
     <script src="{{ static_url('js/forms/modules/debug.js') }}" type="module"></script>
     <script nonce="{{ csp_nonce() }}">
@@ -34,8 +34,8 @@
     </script>
     {% if current_user.is_authenticated %}
     <script src="{{ static_url('js/chatbot/messages.js') }}" defer></script>
-    <script src="{{ static_url('js/interactive-tour.js') }}" defer></script>
-    <script src="{{ static_url('js/workflow-tour-parser.js') }}" defer></script>
+    <script src="{{ static_url('js/tours/interactive-tour.js') }}" defer></script>
+    <script src="{{ static_url('js/tours/workflow-tour-parser.js') }}" defer></script>
     <script type="module" src="{{ static_url('js/chatbot/main.js') }}"></script>
     {% endif %}
     <link rel="manifest" href="{{ url_for('main.manifest') }}">
@@ -538,24 +538,24 @@
     <script src="{{ static_url('js/lib/safe-dom.js') }}"></script>
     <script src="{{ static_url('js/lib/action-router.js') }}"></script>
     <script src="{{ static_url('js/lib/form-submit-guard.js') }}"></script>
-    <script src="{{ static_url('js/layout.js') }}"></script>
-    <script src="{{ static_url('js/page-header-pin.js') }}"></script>
-    <script src="{{ static_url('js/confirm-dialogs.js') }}"></script>
+    <script src="{{ static_url('js/core/layout.js') }}"></script>
+    <script src="{{ static_url('js/core/page-header-pin.js') }}"></script>
+    <script src="{{ static_url('js/core/confirm-dialogs.js') }}"></script>
     <script src="{{ static_url('js/lib/modal-utils.js') }}"></script>
     <script src="{{ static_url('js/lib/platform-error-reporter.js') }}"></script>
     <script src="{{ static_url('js/lib/api-fetch.js') }}"></script>
     <script src="{{ static_url('js/lib/auto-translate-service.js') }}"></script>
     <script src="{{ static_url('js/components/status-labels.js') }}"></script>
     <script src="{{ static_url('js/components/assignment-status-pipeline.js') }}"></script>
-    <script src="{{ static_url('js/components.js') }}"></script>
+    <script src="{{ static_url('js/core/components.js') }}"></script>
     <script src="{{ static_url('js/components/country-region-select.js') }}"></script>
     <script src="{{ static_url('js/components/thumbnail-upload.js') }}"></script>
-    <script src="{{ static_url('js/flash-messages.js') }}"></script>
-    <script src="{{ static_url('js/robot-personality.js') }}"></script>
+    <script src="{{ static_url('js/core/flash-messages.js') }}"></script>
+    <script src="{{ static_url('js/core/robot-personality.js') }}"></script>
 
     <!-- Cache verification helper (only loaded in debug mode) -->
     {% if config.DEBUG %}
-    <script src="{{ static_url('js/cache-verification.js') }}"></script>
+    <script src="{{ static_url('js/core/cache-verification.js') }}"></script>
     {% endif %}
 
     {# Global config for user hover profile popups #}

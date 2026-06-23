@@ -3722,7 +3722,7 @@
 
     <!-- Entry Form Tour Script -->
     {% if current_user.is_authenticated %}
-        <script src="{{ static_url('js/entry-form-tour.js') }}"></script>
+        <script src="{{ static_url('js/tours/entry-form-tour.js') }}"></script>
     {% endif %}
 
         {# Tooltip positioning moved to JS module (tooltips.js) #}
@@ -3820,7 +3820,7 @@
             width='24rem'
         ) }}
 
-        <script src="{{ static_url('js/floating-progress-banner.js') }}"></script>
+        <script src="{{ static_url('js/core/floating-progress-banner.js') }}"></script>
 
         {# Numeric formatting for thousands separators (moved earlier) #}
 

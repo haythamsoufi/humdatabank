@@ -342,7 +342,7 @@ npm run dev:safe
 - Use `is_json_request()` from `app.utils.request_utils` instead of ad-hoc checks (`request.is_json`, `Accept` headers, etc.).
 
 ### Client-Side Fetch (Backoffice JS)
-- Use `getFetch()` or `getApiFetch()` from `app/static/js/csrf.js` / `app/static/js/lib/api-fetch.js`: `(window.getFetch && window.getFetch()) || fetch` for raw CSRF-aware fetch, or `window.apiFetch` for JSON + optional error display.
+- Use `getFetch()` or `getApiFetch()` from `app/static/js/core/csrf.js` / `app/static/js/lib/api-fetch.js`: `(window.getFetch && window.getFetch()) || fetch` for raw CSRF-aware fetch, or `window.apiFetch` for JSON + optional error display.
 - Avoid duplicating the inline pattern; prefer `getFetch()` / `getApiFetch()`.
 
 ### Template Safety Checklist (Backoffice Jinja)

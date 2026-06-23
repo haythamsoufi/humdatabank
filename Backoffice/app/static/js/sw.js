@@ -25,14 +25,14 @@ const CORE_ASSETS = [
   '/static/libs/select2.min.js',
   '/static/js/lib/safe-dom.js',
   '/static/js/lib/action-router.js',
-  '/static/js/layout.js',
-  '/static/js/page-header-pin.js',
-  '/static/js/confirm-dialogs.js',
-  '/static/js/components.js',
-  '/static/js/flash-messages.js',
-  '/static/js/robot-personality.js',
+  '/static/js/core/layout.js',
+  '/static/js/core/page-header-pin.js',
+  '/static/js/core/confirm-dialogs.js',
+  '/static/js/core/components.js',
+  '/static/js/core/flash-messages.js',
+  '/static/js/core/robot-personality.js',
   '/static/js/chatbot/messages.js',
-  '/static/js/csrf.js',
+  '/static/js/core/csrf.js',
   '/static/js/chatbot/main.js'
 ];
 

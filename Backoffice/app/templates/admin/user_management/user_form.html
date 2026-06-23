@@ -1300,7 +1300,7 @@ window.userFormConfig = {
 {{ datetime_utils_js() }}
 
 
-<script src="{{ static_url('js/hierarchical-entity-selector.js') }}"></script>
+<script src="{{ static_url('js/components/hierarchical-entity-selector.js') }}"></script>
 <script src="{{ static_url('js/admin/user-form.js') }}" nonce="{{ csp_nonce() }}"></script>
 {% if not read_only and form.profile_color is defined %}
 {# Profile colour picker modal ΓÇö rendered at body level so fixed positioning is never clipped #}

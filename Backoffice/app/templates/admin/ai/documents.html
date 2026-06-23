@@ -481,7 +481,7 @@
 {{ super() }}
 {% from "components/ag_grid_includes.html" import ag_grid_js %}
 {{ ag_grid_js() }}
-<script src="{{ static_url('js/floating-progress-banner.js') }}"></script>
+<script src="{{ static_url('js/core/floating-progress-banner.js') }}"></script>
 <script type="application/json" id="ai-documents-rows">
 [
     {% for doc in documents %}

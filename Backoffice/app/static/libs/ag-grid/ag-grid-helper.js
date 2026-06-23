@@ -223,7 +223,7 @@
     AgGridHelper.prototype.getDefaultGridOptions = function() {
         const localeText = getAgGridLocaleText();
         // Detect RTL mode from the global page direction and/or language markers.
-        // Note: the app sets html[dir="rtl"] at runtime for Arabic in `static/js/layout.js`.
+        // Note: the app sets html[dir="rtl"] at runtime for Arabic in `static/js/core/layout.js`.
         const docDir = document.documentElement.getAttribute('dir');
         const dataLang = (document.documentElement.getAttribute('data-language') || document.body.getAttribute('data-language') || '').toLowerCase();
         const isRtl = docDir === 'rtl' || dataLang === 'ar';

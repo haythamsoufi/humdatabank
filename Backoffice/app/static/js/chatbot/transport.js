@@ -502,18 +502,10 @@ export const TransportMixin = {
             const useWebSocket = wsEnabled && (typeof WebSocket !== 'undefined');
             let streamSucceeded = false;
 
-            if (!wsEnabled) {
-                console.info('[Chatbot] Transport: WebSocket disabled by server config (WEBSOCKET_ENABLED=false), using SSE');
-            } else if (!useWebSocket) {
-                console.info('[Chatbot] Transport: WebSocket not available in this browser, using SSE');
-            }
-
             if (useWebSocket) {
-                console.info('[Chatbot] Transport: attempting WebSocket (wss://)');
                 try {
                     await this.streamResponseWithWebSocket(message, sendOptions, abortRef, detachRef, inflightKey);
                     streamSucceeded = true;
-                    console.info('[Chatbot] Transport: WebSocket succeeded');
                 } catch (wsError) {
                     const isAbort = wsError && (wsError.name === 'AbortError' || /aborted|cancelled|canceled/i.test(String(wsError.message || '')));
                     if (isAbort) {
@@ -535,11 +527,9 @@ export const TransportMixin = {
             }
 
             if (useStreaming && !streamSucceeded) {
-                console.info('[Chatbot] Transport: SSE (event-stream)');
                 try {
                     await this.streamResponseWithSSE(message, sendOptions, abortRef, detachRef, inflightKey);
                     streamSucceeded = true;
-                    console.info('[Chatbot] Transport: SSE succeeded');
                 } catch (sseError) {
                     const isUserAbort = sseError && (sseError.name === 'AbortError' || /aborted|cancelled|canceled/i.test(String(sseError.message || '')));
                     if (isUserAbort) {
@@ -713,17 +703,9 @@ export const TransportMixin = {
     processStreamingMessage(msg, ctx) {
         if (!msg || !msg.type || !ctx) return;
 
-        if (msg.type === 'step') {
-            console.info('[Chatbot] WS step:', msg.message || '(detail-only)', msg.detail ? '| detail: ' + String(msg.detail).slice(0, 80) : '');
-        } else if (msg.type === 'meta') {
-            console.info('[Chatbot] WS meta: request_id=' + (msg.request_id || '?') + ' conversation_id=' + (msg.conversation_id || '?'));
-        } else if (msg.type === 'done') {
-            console.info('[Chatbot] WS done: deduped=' + (msg.deduped || false) + ' provider=' + (msg.provider || '?'));
-        } else if (msg.type === 'error') {
-            console.warn('[Chatbot] WS error from server:', msg.message || msg.error || '(no message)');
-        } else if (msg.type === 'cancelled') {
-            console.info('[Chatbot] WS: request cancelled by server');
-        } else if (msg.type !== 'delta' && msg.type !== 'step_detail' && msg.type !== 'pong') {
+        if (msg.type !== 'delta' && msg.type !== 'step_detail' && msg.type !== 'pong'
+            && msg.type !== 'step' && msg.type !== 'meta' && msg.type !== 'done'
+            && msg.type !== 'error' && msg.type !== 'cancelled') {
             this._log('Stream Received:', msg.type, '');
         }
 
@@ -1127,11 +1109,6 @@ export const TransportMixin = {
             const finish = (success = true, errorMsg = 'WebSocket error') => {
                 if (done) return;
                 done = true;
-                if (success) {
-                    console.info('[Chatbot] WS: finished successfully');
-                } else {
-                    console.warn('[Chatbot] WS: finished with error:', errorMsg);
-                }
                 clearTimeout(timeout);
                 closeWsQuietly();
 
@@ -1181,7 +1158,6 @@ export const TransportMixin = {
 
             let messageSent = false; // true once ws.send() has dispatched the query to the server
             ws.onopen = () => {
-                console.info('[Chatbot] WS: connection opened, sending message');
                 const payload = Object.assign(
                     { type: 'message' },
                     this._buildUnifiedChatPayload(userMessage, sendOptions)
@@ -1206,9 +1182,6 @@ export const TransportMixin = {
                 // After a successful stream we call ws.close(); some browsers still emit `error`
                 // then `close` with 1006. That is not a user-facing failure.
                 if (done) {
-                    try {
-                        console.debug('[Chatbot] WS: error event after stream finished (ignored)', error);
-                    } catch (_) { /* ignore */ }
                     return;
                 }
                 console.error('[Chatbot] WS: connection error:', error);
@@ -1228,15 +1201,8 @@ export const TransportMixin = {
 
             ws.onclose = (event) => {
                 if (done) {
-                    try {
-                        console.debug(
-                            '[Chatbot] WS: socket closed after completion code=' + event.code +
-                            (event.reason ? ' reason=' + event.reason : '')
-                        );
-                    } catch (_) { /* ignore */ }
                     return;
                 }
-                console.info('[Chatbot] WS: closed code=' + event.code + (event.reason ? ' reason=' + event.reason : ''));
                 if (ctx.buffer) {
                     // We got some data, consider it a success
                     finish(true);

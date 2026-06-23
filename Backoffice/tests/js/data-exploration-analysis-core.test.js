@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const core = require('../../app/static/js/data-exploration-analysis-core.js');
+const core = require('../../app/static/js/data-exploration/data-exploration-analysis-core.js');
 
 const countries = [
     { id: 1, name: 'Freedonia', region: 'Europe' },

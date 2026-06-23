@@ -16,8 +16,8 @@ class TestStaticCache:
         'css/output.css',
         'css/forms.css',
         'css/layout.css',
-        'js/layout.js',
-        'js/csrf.js',
+        'js/core/layout.js',
+        'js/core/csrf.js',
         'js/chatbot/messages.js',
         'js/chatbot/main.js',
     ]

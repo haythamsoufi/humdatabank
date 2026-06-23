@@ -5,7 +5,7 @@
 
 {% macro page_header(title, breadcrumbs=None, icon=None, actions=None, subtitle=None, info_tooltip=None, pin_actions_on_scroll=False) %}
 {# Executive Page Header - styles in css/executive-header.css #}
-{# pin_actions_on_scroll: when True and actions are present, header sticks to the scroll area top and compacts while scrolled (see js/page-header-pin.js). #}
+{# pin_actions_on_scroll: when True and actions are present, header sticks to the scroll area top and compacts while scrolled (see js/core/page-header-pin.js). #}
 {# Use {% call page_header(...) %}...{% endcall %} to inject markup before action buttons (e.g. entity dropdown on Documents). #}
 {% if pin_actions_on_scroll and (actions or (caller is defined)) %}
 {# Sentinel sits above the sticky header; IntersectionObserver uses it so compact mode does not depend on header height (avoids scroll↔layout feedback loops). #}

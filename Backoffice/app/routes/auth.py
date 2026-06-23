@@ -1121,6 +1121,12 @@ def forgot_password():
         flash(_('If an account exists for that email, a reset link has been sent.'), 'info')
         return redirect(url_for('auth.login'))
     # Validation errors
+    if is_azure_b2c_configured():
+        flash(
+            _('Password reset is not available. Please sign in with your organization account.'),
+            'warning',
+        )
+        return redirect(url_for('auth.login'))
     flask_config = os.environ.get('FLASK_CONFIG', '').lower()
     return render_template('auth/login.html', form=LoginForm(), register_form=RegisterForm(), forgot_form=form, open_modal='forgot', title='Login', flask_config=flask_config, test_passwords=_get_test_passwords())
 

@@ -248,6 +248,29 @@
         credentials: 'same-origin',
         body: '{}'
       });
+      if (res && res.status === 400) {
+        const refreshFn = window.refreshCSRFToken;
+        if (typeof refreshFn === 'function') {
+          const newToken = await refreshFn().catch(() => null);
+          if (newToken) {
+            const retry = await fetchFn(`/api/forms/presence/assignment/${aesId}/heartbeat`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': newToken,
+                'X-Requested-With': 'XMLHttpRequest'
+              },
+              credentials: 'same-origin',
+              body: '{}'
+            });
+            if (retry && retry.ok) {
+              hbBackoffMs = 0;
+              scheduleNext(heartbeat, HEARTBEAT_BASE_MS, hbBackoffMs, t => (heartbeatTimer = t));
+              return;
+            }
+          }
+        }
+      }
       if (res && res.status === 429) {
         const ra = await getRetryAfterSeconds(res);
         const base = Math.max(ra * 1000, HEARTBEAT_BASE_MS);

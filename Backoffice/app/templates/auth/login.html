@@ -683,7 +683,6 @@ body.modal-open {
     </form>
   </div>
   </div>
-{% endif %}
 
 <!-- Forgot Password Modal -->
 <div id="forgotModal" class="fixed inset-0 hidden items-center justify-center bg-black/50">
@@ -701,6 +700,7 @@ body.modal-open {
     </form>
   </div>
   </div>
+{% endif %}
 
 
 <!-- Fullscreen Network Animation Container -->
@@ -1355,8 +1355,8 @@ function setupModal(openBtnId, modalId, closeBtnId) {
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
 }
 
-setupModal('openForgotModal', 'forgotModal', 'closeForgotModal');
 {% if not (azure_b2c_configured | default(false)) %}
+setupModal('openForgotModal', 'forgotModal', 'closeForgotModal');
 setupModal('openRegisterModal', 'registerModal', 'closeRegisterModal');
 {% endif %}
 
@@ -1375,9 +1375,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 {% endif %}
     } else if (openModalType === 'forgot') {
-        document.getElementById('forgotModal').classList.remove('hidden');
-        document.getElementById('forgotModal').classList.add('flex');
-        document.body.classList.add('modal-open');
+{% if not (azure_b2c_configured | default(false)) %}
+        const forgotModalEl = document.getElementById('forgotModal');
+        if (forgotModalEl) {
+            forgotModalEl.classList.remove('hidden');
+            forgotModalEl.classList.add('flex');
+            document.body.classList.add('modal-open');
+        }
+{% endif %}
     }
 });
 

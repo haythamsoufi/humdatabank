@@ -23,6 +23,7 @@ import hashlib
 import json
 import logging
 import re
+import time
 from typing import Dict, List, Optional
 
 from app.extensions import db
@@ -34,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 PROVIDER_ID = 'emergency_operations'
 MAX_SLOTS = 3
+_EO_OPS_CACHE_TTL_SECONDS = 300
+_eo_ops_cache: Dict[str, tuple] = {}
 
 # Matches the [EOn] placeholder used in emergency section names (n = 1..N).
 _EO_SLOT_RE = re.compile(r'\[EO(\d+)\]', re.IGNORECASE)
@@ -114,6 +117,12 @@ def _fetch_ordered_operations(country_iso: Optional[str], eo_cfg: Dict) -> List[
     Sort: newest start_date first (missing dates last), tie-break appeal code ascending. This makes the
     "fill remaining slots" step reproducible regardless of raw API ordering.
     """
+    cache_key = f"{country_iso or ''}:{_filters_hash(country_iso, eo_cfg)}"
+    now = time.time()
+    cached = _eo_ops_cache.get(cache_key)
+    if cached and cached[0] > now:
+        return cached[1]
+
     if not country_iso:
         return []
     try:
@@ -151,6 +160,7 @@ def _fetch_ordered_operations(country_iso: Optional[str], eo_cfg: Dict) -> List[
     # Two-stage stable sort -> code asc, then start_date desc (missing dates sort last).
     deduped.sort(key=lambda op: (op.get('code') or ''))
     deduped.sort(key=lambda op: (str(op.get('start_date') or '')[:10]), reverse=True)
+    _eo_ops_cache[cache_key] = (now + _EO_OPS_CACHE_TTL_SECONDS, deduped)
     return deduped
 
 

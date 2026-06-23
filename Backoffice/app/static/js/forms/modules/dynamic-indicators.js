@@ -116,7 +116,7 @@ function setupSingleDynamicSection(sectionContainer) {
             const repeatInstance = sectionContainer.getAttribute('data-repeat-instance')
                 ? parseInt(sectionContainer.getAttribute('data-repeat-instance'), 10)
                 : null;
-            handleAddIndicator(sectionContainer, sectionId, repeatInstance);
+            void handleAddIndicator(sectionContainer, sectionId, repeatInstance);
         });
     }
 }
@@ -137,11 +137,55 @@ export function setupPerEntryDynamicInterface(interfaceContainer, sectionId, rep
         debugWarn('dynamic-indicators', `Per-entry add button not found: ${addBtnId}`);
         return;
     }
-    addBtn.addEventListener('click', () => handleAddIndicator(interfaceContainer, sectionId, repeatInstance));
+    addBtn.addEventListener('click', () => { void handleAddIndicator(interfaceContainer, sectionId, repeatInstance); });
     debugLog('dynamic-indicators', `Per-entry dynamic interface ready: section=${sectionId} instance=${repeatInstance}`);
 }
 
-function handleAddIndicator(sectionContainer, sectionId, repeatInstance = null) {
+function getAssignmentEntityStatusId() {
+    const hidden = document.querySelector('input[name="assignment_entity_status_id"]');
+    if (hidden && hidden.value) return hidden.value;
+    const presence = document.querySelector('[data-aes-id]');
+    return presence ? presence.getAttribute('data-aes-id') : '';
+}
+
+const sectionIndicatorsLoading = {};
+
+async function ensureSectionIndicatorsLoaded(sectionId) {
+    const key = String(sectionId);
+    if (Array.isArray(window.availableIndicatorsData?.[key]) && window.availableIndicatorsData[key].length) {
+        return window.availableIndicatorsData[key];
+    }
+    if (sectionIndicatorsLoading[key]) {
+        return sectionIndicatorsLoading[key];
+    }
+
+    const aesId = getAssignmentEntityStatusId();
+    if (!aesId) return [];
+
+    const fetchFn = (window.getFetch && window.getFetch()) || fetch;
+    sectionIndicatorsLoading[key] = fetchFn(
+        `/api/forms/dynamic-sections/${encodeURIComponent(key)}/available-indicators?assignment_entity_status_id=${encodeURIComponent(aesId)}`,
+        { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' }
+    )
+        .then(res => (res.ok ? res.json() : { indicators: [] }))
+        .then(data => {
+            const indicators = data.indicators || [];
+            window.availableIndicatorsData = window.availableIndicatorsData || {};
+            window.availableIndicatorsData[key] = indicators;
+            return indicators;
+        })
+        .catch(err => {
+            debugError('dynamic-indicators', 'Failed to lazy-load indicators for section', key, err);
+            return [];
+        })
+        .finally(() => {
+            delete sectionIndicatorsLoading[key];
+        });
+
+    return sectionIndicatorsLoading[key];
+}
+
+async function handleAddIndicator(sectionContainer, sectionId, repeatInstance = null) {
     // Check maximum indicators limit (same logic for all sections)
     const maxIndicators = sectionContainer.getAttribute('data-max-dynamic-indicators');
     if (maxIndicators && exceedsMaximumLimit(sectionContainer, sectionId, maxIndicators)) {
@@ -151,6 +195,7 @@ function handleAddIndicator(sectionContainer, sectionId, repeatInstance = null) 
     // For per-entry cloned widgets the sectionId might be "416-ri-2"; resolve the
     // canonical section ID (stored in data-dynamic-section-id or derived by stripping "-ri-N").
     const canonicalSectionId = sectionContainer.getAttribute('data-dynamic-section-id') || sectionId.replace(/-ri-\d+$/, '');
+    await ensureSectionIndicatorsLoaded(canonicalSectionId);
     const availableIndicators = window.availableIndicatorsData[canonicalSectionId] || [];
     addIndicatorRow(canonicalSectionId, availableIndicators, repeatInstance);
 }
@@ -1333,6 +1378,6 @@ function setupRecreatedButtons(sectionContainer, sectionId) {
     const addBtn = document.getElementById(`add-indicator-row-btn-${sectionId}`);
 
     if (addBtn) {
-        addBtn.addEventListener('click', () => handleAddIndicator(sectionContainer, sectionId));
+        addBtn.addEventListener('click', () => { void handleAddIndicator(sectionContainer, sectionId); });
     }
 }

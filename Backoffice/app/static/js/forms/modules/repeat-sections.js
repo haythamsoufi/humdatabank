@@ -711,27 +711,43 @@ function createPerEntryDynamicWidget(sectionId, instanceNumber, aesId, sectionLa
  * Inject pre-rendered HTML for indicators that were previously saved for a
  * specific (sectionId, instanceNumber) combination.
  */
-function injectExistingRepeatIndicators(containerEl, sectionId, instanceNumber) {
+async function injectExistingRepeatIndicators(containerEl, sectionId, instanceNumber) {
     const allData = window.REPEAT_DYNAMIC_INDICATOR_DATA || {};
     const sectionData = allData[sectionId] || allData[String(sectionId)] || {};
     const items = sectionData[instanceNumber] || sectionData[String(instanceNumber)] || [];
     if (!items.length) return;
 
-    // Insert items before the interface element (the Add-Indicator button row)
+    const fetchFn = (window.getFetch && window.getFetch()) || fetch;
     const ifaceEl = containerEl.querySelector('[id^="dynamic-indicator-interface-"]');
-    items.forEach(item => {
+
+    for (const item of items) {
+        let html = item.html;
+        if (!html && item.assignment_id) {
+            try {
+                const res = await fetchFn(`/api/forms/dynamic-indicators/${item.assignment_id}/render`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    html = data.html;
+                }
+            } catch (e) {
+                debugWarn('repeat-sections', 'Failed to render repeat dynamic indicator', item.assignment_id, e);
+            }
+        }
+        if (!html) continue;
+
         const parser = new DOMParser();
-        const doc = parser.parseFromString(item.html.trim(), 'text/html');
+        const doc = parser.parseFromString(String(html).trim(), 'text/html');
         const el = doc.body.firstElementChild;
-        if (!el) return;
+        if (!el) continue;
         if (ifaceEl) {
-            // insertBefore requires a direct-child reference; ifaceEl may be nested
-            // inside a collapsible wrapper, so use its own parentNode
             ifaceEl.parentNode.insertBefore(el, ifaceEl);
         } else {
             containerEl.appendChild(el);
         }
-    });
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -908,7 +924,7 @@ function createRepeatEntry(sectionId, isInitialEntry = false) {
             repeatEntry.appendChild(subSection);
             // Inject any existing DB indicators for instance 1
             const subSectionId = subSection.id.replace('section-container-', '');
-            injectExistingRepeatIndicators(subSection, subSectionId, 1);
+            void injectExistingRepeatIndicators(subSection, subSectionId, 1);
         });
     } else {
         // For Entry #2+ find the originating sub-sections via Entry #1 as a reference.
@@ -929,7 +945,7 @@ function createRepeatEntry(sectionId, isInitialEntry = false) {
                 const widget = createPerEntryDynamicWidget(subSectionId, instanceNumber, aesId, sectionLabel);
                 repeatEntry.appendChild(widget);
                 // Inject existing DB indicators for this instance
-                injectExistingRepeatIndicators(widget, subSectionId, instanceNumber);
+                void injectExistingRepeatIndicators(widget, subSectionId, instanceNumber);
                 // Wire up the "Add Indicator" button
                 setupPerEntryDynamicInterface(widget, subSectionId, instanceNumber);
             });

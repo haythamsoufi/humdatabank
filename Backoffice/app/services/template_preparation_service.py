@@ -29,7 +29,7 @@ class TemplatePreparationService:
     """
 
     @classmethod
-    def prepare_template_for_rendering(cls, template, assignment_entity_status=None, is_preview_mode: bool = False) -> tuple:
+    def prepare_template_for_rendering(cls, template, assignment_entity_status=None, is_preview_mode: bool = False, embed_indicator_catalog: bool = True) -> tuple:
         """
         Unified template preparation for all form types (assignment, public, preview).
 
@@ -68,6 +68,7 @@ class TemplatePreparationService:
 
         # Prefetch all FormItems for this template to avoid N+1 queries per section (exclude archived items and sections for entry form)
         try:
+            from sqlalchemy.orm import joinedload
             section_ids = [s.id for s in all_sections]
             # Bulk load items with related indicator_bank to minimize lazy loads
             all_items = (
@@ -77,6 +78,11 @@ class TemplatePreparationService:
                     FormItem.version_id == template.published_version_id,
                     FormItem.section_id.in_(section_ids),
                     FormItem.archived == False
+                )
+                .options(
+                    joinedload(FormItem.indicator_bank),
+                    joinedload(FormItem.measurement_type),
+                    joinedload(FormItem.measurement_unit),
                 )
                 .order_by(FormItem.section_id, FormItem.order)
                 .all()
@@ -138,7 +144,9 @@ class TemplatePreparationService:
         cls._apply_template_translations(template, all_sections)
 
         # Prepare available indicators by section for dynamic sections
-        available_indicators_by_section = cls._prepare_available_indicators(all_sections)
+        available_indicators_by_section = cls._prepare_available_indicators(
+            all_sections, embed_full=embed_indicator_catalog
+        )
 
         if verbose_section_log:
             current_app.logger.debug(
@@ -191,7 +199,14 @@ class TemplatePreparationService:
             section.display_name = get_localized_section_name(section)
 
     @classmethod
-    def _prepare_available_indicators(cls, all_sections: List[FormSection]) -> Dict[int, List]:
+    def build_available_indicators_for_section(cls, section: FormSection) -> List[Dict[str, Any]]:
+        """Build indicator picker options for one dynamic_indicators section."""
+        if section.section_type != 'dynamic_indicators':
+            return []
+        return cls._prepare_available_indicators([section], embed_full=True).get(section.id, [])
+
+    @classmethod
+    def _prepare_available_indicators(cls, all_sections: List[FormSection], embed_full: bool = True) -> Dict[int, List]:
         """Prepare available indicators by section for dynamic sections."""
         from sqlalchemy.orm import joinedload
 
@@ -200,6 +215,9 @@ class TemplatePreparationService:
         # Fast-path: if no dynamic_indicators sections exist, skip all DB work.
         if not any(s.section_type == 'dynamic_indicators' for s in all_sections):
             return {s.id: [] for s in all_sections}
+
+        if not embed_full:
+            return {s.id: [] for s in all_sections if s.section_type == 'dynamic_indicators'}
 
         # Pre-build type/unit code → display-label caches so legacy string columns resolve
         # the same way as indicator bank grids (get_indicator_bank_*_display).

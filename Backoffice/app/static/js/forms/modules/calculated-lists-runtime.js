@@ -27,8 +27,43 @@ function summarizeEmOpsTypes(rows) {
 const _pendingFetches = new Map(); // url → Promise<object>  (in-flight)
 const _responseCache  = new Map(); // url → { json, ts }    (completed)
 const CACHE_TTL_MS = 30_000;       // 30 s — covers rapid re-renders / Add Entry clicks
+const EMOPS_SESSION_CACHE_TTL_MS = 45_000;
+
+function emOpsCacheKey(urlString) {
+    return `emops_list_v1_${urlString}`;
+}
+
+function loadEmOpsSessionCache(urlString) {
+    try {
+        const raw = window.sessionStorage?.getItem(emOpsCacheKey(urlString));
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !parsed.json || !parsed.ts) return null;
+        if (Date.now() - parsed.ts > EMOPS_SESSION_CACHE_TTL_MS) return null;
+        return parsed.json;
+    } catch (_) {
+        return null;
+    }
+}
+
+function saveEmOpsSessionCache(urlString, json) {
+    try {
+        window.sessionStorage?.setItem(emOpsCacheKey(urlString), JSON.stringify({ json, ts: Date.now() }));
+    } catch (_) {
+        // ignore quota / disabled storage
+    }
+}
 
 function cachedFetch(urlString) {
+    const isEmOps = urlString.includes('/emergency_operations/api/list-data');
+    if (isEmOps) {
+        const sessionCached = loadEmOpsSessionCache(urlString);
+        if (sessionCached) {
+            debugLog(MODULE, `📦 EmOps session cache hit for ${urlString}`);
+            return Promise.resolve(sessionCached);
+        }
+    }
+
     const cached = _responseCache.get(urlString);
     if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
         debugLog(MODULE, `📦 Cache hit for ${urlString}`);
@@ -49,6 +84,9 @@ function cachedFetch(urlString) {
         })
         .then(json => {
             _responseCache.set(urlString, { json, ts: Date.now() });
+            if (isEmOps) {
+                saveEmOpsSessionCache(urlString, json);
+            }
             _pendingFetches.delete(urlString);
             return json;
         })
@@ -371,7 +409,35 @@ function setupCalculatedSelect(selectElement) {
     if (lookupListId === 'emergency_operations') {
         attachEmergencyMetadataListener(selectElement);
     }
-    refresh();
+
+    const needsEarlyLoad = selectElement.dataset.useAsRepeatEntryTitle === 'true';
+    if (lookupListId === 'emergency_operations' && !needsEarlyLoad) {
+        scheduleDeferredCalculatedRefresh(selectElement, refresh);
+    } else {
+        refresh();
+    }
+}
+
+function scheduleDeferredCalculatedRefresh(selectElement, refreshFn) {
+    let started = false;
+    const start = () => {
+        if (started) return;
+        started = true;
+        refreshFn();
+    };
+
+    selectElement.addEventListener('focus', start, { once: true });
+    selectElement.addEventListener('mousedown', start, { once: true });
+
+    if (typeof IntersectionObserver !== 'undefined') {
+        const observer = new IntersectionObserver((entries) => {
+            if (entries.some(entry => entry.isIntersecting)) {
+                observer.disconnect();
+                start();
+            }
+        }, { rootMargin: '120px' });
+        observer.observe(selectElement);
+    }
 }
 
 function setupCalculatedMultiSelect(multiSelectDiv) {

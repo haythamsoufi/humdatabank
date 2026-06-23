@@ -2,6 +2,7 @@
 {% from "components/_profile_icon.html" import profile_icon, profile_icon_button, profile_icon_tooltip %}
 <!DOCTYPE html>
 <html lang="en"{% if mobile_app_embedded|default(false) %} data-mobile-app="true" class="mobile-app mobile-app-embedded"{% endif %}>
+{% set defer_heavy_layout = request.path.startswith('/forms/assignment/') or request.path.startswith('/forms/public/') %}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -32,7 +33,7 @@
         // Workflow tour debug logging (disabled by default)
         window.WORKFLOW_TOUR_DEBUG = false;
     </script>
-    {% if current_user.is_authenticated %}
+    {% if current_user.is_authenticated and not defer_heavy_layout|default(false) %}
     <script src="{{ static_url('js/chatbot/messages.js') }}" defer></script>
     <script src="{{ static_url('js/tours/interactive-tour.js') }}" defer></script>
     <script src="{{ static_url('js/tours/workflow-tour-parser.js') }}" defer></script>
@@ -62,7 +63,9 @@
         };
     </script>
     <!-- Tours Component -->
+    {% if not defer_heavy_layout|default(false) %}
     {% include 'tours/tours.html' %}
+    {% endif %}
 
     <!-- Prevent sidebar flicker by applying collapsed state immediately (pre-render critical) -->
     <script nonce="{{ csp_nonce() }}">

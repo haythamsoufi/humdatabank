@@ -1444,14 +1444,62 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Always check WebSocket status (even if previously disabled)
         // This allows picking up configuration changes (e.g., switching from Flask dev server to Waitress)
-        if (typeof WebSocket !== 'undefined') {
-            // Check WebSocket status - will clear cache if now enabled
-            checkWebSocketStatusOnce();
-        } else {
-            // Browser doesn't support WebSocket, use polling
-            console.warn('WebSocket not supported, using polling');
-            fallbackToPolling();
+        function scheduleNotificationsRealtime() {
+            const run = () => {
+                if (typeof WebSocket !== 'undefined') {
+                    checkWebSocketStatusOnce();
+                } else {
+                    console.warn('WebSocket not supported, using polling');
+                    fallbackToPolling();
+                }
+            };
+
+            let started = false;
+            const start = () => {
+                if (started) return;
+                started = true;
+                run();
+            };
+
+            try {
+                const path = window.location.pathname || '';
+                const deferForEntryForm = path.startsWith('/forms/assignment/') || path.startsWith('/forms/public/');
+                if (!deferForEntryForm) {
+                    start();
+                    return;
+                }
+            } catch (_) {
+                start();
+                return;
+            }
+
+            const tryAfterFormReady = () => {
+                if (document.body && document.body.dataset.formInitialized === 'true') {
+                    start();
+                    return true;
+                }
+                return false;
+            };
+
+            if (tryAfterFormReady()) return;
+
+            const observer = new MutationObserver(() => {
+                if (tryAfterFormReady()) {
+                    observer.disconnect();
+                }
+            });
+            if (document.body) {
+                observer.observe(document.body, { attributes: true, attributeFilter: ['data-form-initialized'] });
+            }
+
+            if (typeof requestIdleCallback === 'function') {
+                requestIdleCallback(start, { timeout: 12000 });
+            } else {
+                setTimeout(start, 3000);
+            }
         }
+
+        scheduleNotificationsRealtime();
 
         // Expose helper function for debugging WebSocket status
         window.clearWebSocketCache = function() {

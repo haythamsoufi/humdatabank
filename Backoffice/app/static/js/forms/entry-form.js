@@ -42,9 +42,6 @@ import './modules/collapsible.js';
 // Plugin fields are rendered client-side on entry forms
 import './plugin-field-loader.js';
 
-// Local drafts for authenticated forms
-import './modules/auth-drafts.js';
-
 // Main form initialization (sets document.body.dataset.formInitialized = 'true' when done)
 import './main.js';
 

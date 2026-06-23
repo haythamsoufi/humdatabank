@@ -155,7 +155,7 @@ def handle_assignment_form(aes_id):
     form_template = assignment.template
 
     template, all_sections, available_indicators_by_section = TemplatePreparationService.prepare_template_for_rendering(
-        form_template, assignment_entity_status, is_preview_mode=False
+        form_template, assignment_entity_status, is_preview_mode=False, embed_indicator_catalog=False
     )
 
     from app.services.variable_resolution_service import VariableResolutionService
@@ -632,56 +632,19 @@ def handle_assignment_form(aes_id):
 
     existing_data_processed['repeat_groups_data'] = repeat_groups_data
 
-    # Build per-repeat-instance dynamic indicator HTML map so the frontend can populate existing
-    # indicators into each repeat entry when the form loads.
-    # Structure: { section_id: { instance_number: [ { assignment_id, html } ] } }
+    # Metadata for repeat-instance dynamic indicators; HTML is fetched client-side via render API.
     repeat_dynamic_indicator_data: dict = {}
     per_instance_assignments = DynamicIndicatorData.query.filter(
         DynamicIndicatorData.assignment_entity_status_id == assignment_entity_status.id,
         DynamicIndicatorData.repeat_instance_number.isnot(None)
     ).order_by(DynamicIndicatorData.section_id, DynamicIndicatorData.repeat_instance_number, DynamicIndicatorData.order).all()
 
-    if per_instance_assignments:
-        # Pre-load sections needed for rendering
-        _section_cache: dict = {}
-        for _did in per_instance_assignments:
-            _sid = _did.section_id
-            if _sid not in _section_cache:
-                _section_cache[_sid] = FormSection.query.get(_sid)
-
-        for _did in per_instance_assignments:
-            _sec = _section_cache.get(_did.section_id)
-            if _sec is None:
-                continue
-            _field = _create_dynamic_indicator_object(_did, _sec)
-            _template_structure = getattr(_sec, 'template', None)
-            if not _template_structure and assignment_entity_status:
-                _template_structure = getattr(getattr(assignment_entity_status, 'assigned_form', None), 'template', None)
-            if not _template_structure:
-                _template_structure = type('TemplateStructure', (), {'display_order_visible': True})()
-            _html = render_template(
-                'forms/entry_form/partials/dynamic_indicator_item.html',
-                field=_field,
-                section=_sec,
-                existing_data=existing_data_processed,
-                template_structure=_template_structure,
-                config=Config,
-                can_edit=can_edit,
-                translation_key=get_translation_key(),
-                get_localized_indicator_definition=get_localized_indicator_definition,
-                get_localized_indicator_type=get_localized_indicator_type,
-                get_localized_indicator_unit=get_localized_indicator_unit,
-                isinstance=isinstance,
-                json=json,
-                hasattr=hasattr,
-                slugify_age_group=slugify_age_group,
-            )
-            sid_key = _did.section_id
-            inst_key = _did.repeat_instance_number
-            repeat_dynamic_indicator_data.setdefault(sid_key, {}).setdefault(inst_key, []).append({
-                'assignment_id': _did.id,
-                'html': _html,
-            })
+    for _did in per_instance_assignments:
+        sid_key = _did.section_id
+        inst_key = _did.repeat_instance_number
+        repeat_dynamic_indicator_data.setdefault(sid_key, {}).setdefault(inst_key, []).append({
+            'assignment_id': _did.id,
+        })
 
     existing_data_processed['repeat_dynamic_indicator_data'] = repeat_dynamic_indicator_data
 
@@ -1037,16 +1000,17 @@ def handle_assignment_form(aes_id):
         except Exception:
             open_validation_questions = []
 
-    completion_rate = calculate_assignment_completion_rate(
-        assignment_entity_status.id,
-        form_template.id,
-        form_template.published_version_id,
-    )
+    defer_completion_rate = True
 
     return render_template(
         "forms/entry_form/entry_form.html",
         open_validation_questions=open_validation_questions,
-        completion_rate=completion_rate,
+        completion_rate=None if defer_completion_rate else calculate_assignment_completion_rate(
+            assignment_entity_status.id,
+            form_template.id,
+            form_template.published_version_id,
+        ),
+        defer_completion_rate=defer_completion_rate,
         template_structure=template_structure,
         sections=db_sections,
         all_sections=all_sections,

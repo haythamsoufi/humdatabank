@@ -153,7 +153,10 @@
                                 <span class="font-medium">{{ _('Status:') }}</span>
                                 {% set aes_status = assignment_status.status.value if assignment_status.status is not none and assignment_status.status.value is defined else assignment_status.status %}
                                 {{ assignment_status_pipeline_badge(assignment_status.status, assignment_status.is_closed|default(false), translation_key if translation_key is defined else 'en', assignment_status.entity_status if assignment_status.entity_status is defined else none) }}
-                                {% if completion_rate is defined %}
+                                {% if defer_completion_rate|default(false) and assignment_entity_status_id is defined %}
+                                <span class="mx-2">•</span>
+                                <span class="font-medium">{{ _('Completion:') }}</span>&nbsp;<span id="assignment-completion-rate" data-aes-id="{{ assignment_entity_status_id }}" class="font-medium text-gray-500"><span data-completion-value>…</span></span>
+                                {% elif completion_rate is defined %}
                                 {# Completion tiers match dashboard.html / MobileApp AssignmentCard._getCompletionColor #}
                                 {% set cr = completion_rate|default(0)|float %}
                                 <span class="mx-2">•</span>

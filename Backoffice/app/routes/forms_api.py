@@ -15,13 +15,14 @@ All endpoints require authentication and maintain JavaScript compatibility.
 """
 
 from flask import Blueprint, request, current_app, render_template
+from flask_wtf.csrf import generate_csrf
 from flask_login import login_required, current_user
 from flask_limiter.util import get_remote_address
 from app.extensions import limiter
 from app.models import (
     db, IndicatorBank, DynamicIndicatorData,
     FormSection, RepeatGroupInstance, LookupList, LookupListRow,
-    User, Country, NationalSociety, Config
+    User, Country, NationalSociety, Config, AssignedForm
 )
 from app.utils.form_localization import (
     get_localized_indicator_name, get_localized_sector_name, get_localized_subsector_name,
@@ -1049,3 +1050,73 @@ def api_presence_active_users(aes_id):
         return json_ok(users=users)
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+# ===================== Performance / lazy-load APIs =====================
+
+@bp.route('/public/csrf-token', methods=['GET'])
+def api_public_csrf_token():
+    """Issue a CSRF token for anonymous public form sessions."""
+    try:
+        public_token = (request.args.get('token') or request.args.get('public_token') or '').strip()
+        if not public_token:
+            return json_bad_request('Missing token')
+
+        assigned_form = AssignedForm.query.filter_by(unique_token=str(public_token)).first()
+        if not assigned_form or not assigned_form.is_public_active:
+            return json_forbidden('Invalid or inactive public form')
+
+        return json_ok(csrf_token=generate_csrf())
+    except Exception as e:
+        return handle_json_view_exception(e, 'Could not issue CSRF token', status_code=500)
+
+
+@bp.route('/assignment/<int:aes_id>/completion-rate', methods=['GET'])
+@login_required
+def api_assignment_completion_rate(aes_id):
+    """Deferred completion rate for assignment entry forms."""
+    try:
+        access_result = ensure_aes_access(aes_id)
+        if 'error' in access_result:
+            return json_forbidden(access_result['error'])
+        aes = access_result['aes']
+        template = getattr(getattr(aes, 'assigned_form', None), 'template', None)
+        if not template or not template.published_version_id:
+            return json_ok(completion_rate=0.0)
+
+        from app.services.assignment_completion_service import calculate_assignment_completion_rate
+
+        rate = calculate_assignment_completion_rate(
+            aes.id,
+            template.id,
+            template.published_version_id,
+        )
+        return json_ok(completion_rate=float(rate or 0.0))
+    except Exception as e:
+        return handle_json_view_exception(e, 'Failed to compute completion rate', status_code=500)
+
+
+@bp.route('/dynamic-sections/<int:section_id>/available-indicators', methods=['GET'])
+@login_required
+def api_section_available_indicators(section_id):
+    """Lazy-load indicator picker options for one dynamic_indicators section."""
+    try:
+        aes_id_raw = request.args.get('assignment_entity_status_id')
+        if not aes_id_raw:
+            return json_bad_request('Missing assignment_entity_status_id')
+        assignment_entity_status_id = int(aes_id_raw)
+
+        access_result = ensure_aes_access(assignment_entity_status_id)
+        if 'error' in access_result:
+            return json_forbidden(access_result['error'])
+
+        section = FormSection.query.get_or_404(section_id)
+        if section.section_type != 'dynamic_indicators':
+            return json_bad_request('Section is not a dynamic indicators section')
+
+        from app.services.template_preparation_service import TemplatePreparationService
+
+        indicators = TemplatePreparationService.build_available_indicators_for_section(section)
+        return json_ok(indicators=indicators)
+    except Exception as e:
+        return handle_json_view_exception(e, 'Failed to load indicators', status_code=500)

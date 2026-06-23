@@ -321,6 +321,17 @@ jobs:
       # The container app does NOT copy files on startup — this step runs on every deploy.
       # Production → container "static"   Staging → container "static-staging" (isolated assets).
       # Required GitHub secret: AZURE_STORAGE_CONNECTION_STRING (same storage account as uploads).
+      - name: Install AzCopy
+        run: |
+          if command -v azcopy >/dev/null 2>&1; then
+            azcopy --version
+            exit 0
+          fi
+          curl -fsSL https://aka.ms/downloadazcopy-v10-linux -o /tmp/azcopy.tar.gz
+          tar -xzf /tmp/azcopy.tar.gz -C /tmp
+          sudo mv /tmp/azcopy_linux_*/azcopy /usr/local/bin/azcopy
+          azcopy --version
+
       - name: Upload static assets to Azure Blob Storage
         id: static_upload
         env:

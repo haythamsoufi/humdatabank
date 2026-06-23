@@ -45,11 +45,15 @@
         (function() {
             // Get per-boot asset version from template global
             const assetVersion = '{{ ASSET_VERSION }}';
+            const staticCdnBase = {{ STATIC_CDN_URL | tojson }};
             window.getStaticUrl = function(filename) {
                 // Remove leading slash if present
                 filename = filename.replace(/^\//, '');
                 // Remove /static/ prefix if present (for consistency)
                 filename = filename.replace(/^static\//, '');
+                if (staticCdnBase) {
+                    return `${staticCdnBase.replace(/\/$/, '')}/${filename}?v=${assetVersion}`;
+                }
                 return `/static/${filename}?v=${assetVersion}`;
             };
             // Also expose version for service worker and other uses

@@ -22,6 +22,49 @@ function summarizeEmOpsTypes(rows) {
     return counts;
 }
 
+/** Coerce API/list row values to safe display strings (never "[object Object]"). */
+function scalarDisplayText(value) {
+    if (value == null || value === '') return '';
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed === '[object Object]' ? '' : trimmed;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (typeof value === 'object') {
+        const name = scalarDisplayText(value.name ?? value.label ?? value.title);
+        const code = scalarDisplayText(value.code ?? value.id);
+        if (name && code) return `${name} (${code})`;
+        return name || code || '';
+    }
+    const text = String(value);
+    return text === '[object Object]' ? '' : text;
+}
+
+function formatEmergencyOperationLabel(row) {
+    if (!row || typeof row !== 'object') return '';
+    const combined = scalarDisplayText(row.name_with_code);
+    if (combined) return combined;
+    const name = scalarDisplayText(row.name);
+    const code = scalarDisplayText(row.code);
+    if (name && code) return `${name} (${code})`;
+    return name || code || '';
+}
+
+function resolveCalculatedListRowDisplay(row, displayColumn, lookupListId) {
+    if (lookupListId === 'emergency_operations') {
+        const preferred = formatEmergencyOperationLabel(row);
+        if (preferred) return preferred;
+        if (row && displayColumn && Object.prototype.hasOwnProperty.call(row, displayColumn)) {
+            return scalarDisplayText(row[displayColumn]);
+        }
+        return '';
+    }
+    if (!row || !displayColumn || !Object.prototype.hasOwnProperty.call(row, displayColumn)) {
+        return '';
+    }
+    return scalarDisplayText(row[displayColumn]);
+}
+
 // Deduplication + short-lived cache so concurrent repeat-entry selects that share
 // the same lookup URL make exactly ONE network request instead of N.
 const _pendingFetches = new Map(); // url → Promise<object>  (in-flight)
@@ -539,13 +582,15 @@ function parseEmergencyDisplayValue(value) {
 }
 
 function applyEmergencyRowToOption(option, row, displayValue) {
-    if (row?.name) option.dataset.emergencyName = row.name;
-    if (row?.code) option.dataset.emergencyCode = row.code;
+    const name = scalarDisplayText(row?.name);
+    const code = scalarDisplayText(row?.code);
+    if (name) option.dataset.emergencyName = name;
+    if (code) option.dataset.emergencyCode = code;
     if (!option.dataset.emergencyName && !option.dataset.emergencyCode && displayValue) {
-        const parsed = parseEmergencyDisplayValue(displayValue);
+        const parsed = parseEmergencyDisplayValue(scalarDisplayText(displayValue));
         if (parsed) {
-            option.dataset.emergencyName = parsed.name;
-            option.dataset.emergencyCode = parsed.code;
+            if (parsed.name) option.dataset.emergencyName = parsed.name;
+            if (parsed.code) option.dataset.emergencyCode = parsed.code;
         }
     }
 }
@@ -1040,20 +1085,20 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
         debugLog(MODULE, `Added placeholder option`);
 
         rows.forEach((row, idx) => {
-            if (row.hasOwnProperty(displayColumn)) {
-                const val = row[displayColumn];
-                const opt = document.createElement('option');
-                opt.value = val;
-                opt.textContent = val;
-                if (lookupListId === 'emergency_operations') {
-                    applyEmergencyRowToOption(opt, row, val);
-                }
-                selectElement.appendChild(opt);
-                debugLog(MODULE, `Added option ${idx + 1}: "${val}"`);
-                debugLog(MODULE, `   Added option ${idx + 1}:`, val);
-            } else {
-                debugWarn(MODULE, `⚠️ Row ${idx + 1} missing display column "${displayColumn}":`, row);
+            const val = resolveCalculatedListRowDisplay(row, displayColumn, lookupListId);
+            if (!val) {
+                debugWarn(MODULE, `⚠️ Row ${idx + 1} has no display value (column "${displayColumn}"):`, row);
+                return;
             }
+            const opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = val;
+            if (lookupListId === 'emergency_operations') {
+                applyEmergencyRowToOption(opt, row, val);
+            }
+            selectElement.appendChild(opt);
+            debugLog(MODULE, `Added option ${idx + 1}: "${val}"`);
+            debugLog(MODULE, `   Added option ${idx + 1}:`, val);
         });
 
         debugLog(MODULE, `✅ Options refreshed. Total ${rows.length} rows, select now has ${selectElement.options.length - 1} options.`);
@@ -1069,6 +1114,7 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
             }
             debugLog(MODULE, `Restored previous selection: "${previousValue}"`);
             debugLog(MODULE, `✅ Restored previous selection: "${previousValue}"`);
+            syncEmergencyOperationMetadata(selectElement);
 
             // Add verification that the value actually stuck
             setTimeout(() => {
@@ -1226,42 +1272,42 @@ async function refreshMultiSelectOptions(multiSelectDiv, fieldId, lookupListId, 
         debugLog(MODULE, `Cleared existing options`);
 
         rows.forEach((row, idx) => {
-            if (row.hasOwnProperty(displayColumn)) {
-                const val = row[displayColumn];
-
-                const optionDiv = document.createElement('div');
-                optionDiv.className = 'px-3 py-2 hover:bg-gray-100 cursor-pointer';
-
-                const label = document.createElement('label');
-                label.className = 'inline-flex items-center cursor-pointer w-full';
-
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.name = `field_value[${fieldId}]`;
-                checkbox.value = val;
-                checkbox.className = 'form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500';
-
-                // Restore selection if this value was previously selected
-                if (existingValues.includes(val)) {
-                    checkbox.checked = true;
-                    debugLog(MODULE, `Restored selection for: "${val}"`);
-                    debugLog(MODULE, `✅ Restored multi-select selection: "${val}"`);
-                }
-
-                const span = document.createElement('span');
-                span.className = 'ml-2 text-sm text-gray-700';
-                span.textContent = val;
-
-                label.appendChild(checkbox);
-                label.appendChild(span);
-                optionDiv.appendChild(label);
-                dropdown.appendChild(optionDiv);
-
-                debugLog(MODULE, `Added multi-select option ${idx + 1}: "${val}"`);
-                debugLog(MODULE, `   Added multi-select option ${idx + 1}:`, val);
-            } else {
-                debugWarn(MODULE, `⚠️ Multi-select row ${idx + 1} missing display column "${displayColumn}":`, row);
+            const val = resolveCalculatedListRowDisplay(row, displayColumn, lookupListId);
+            if (!val) {
+                debugWarn(MODULE, `⚠️ Multi-select row ${idx + 1} has no display value (column "${displayColumn}"):`, row);
+                return;
             }
+
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'px-3 py-2 hover:bg-gray-100 cursor-pointer';
+
+            const label = document.createElement('label');
+            label.className = 'inline-flex items-center cursor-pointer w-full';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.name = `field_value[${fieldId}]`;
+            checkbox.value = val;
+            checkbox.className = 'form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500';
+
+            // Restore selection if this value was previously selected
+            if (existingValues.includes(val)) {
+                checkbox.checked = true;
+                debugLog(MODULE, `Restored selection for: "${val}"`);
+                debugLog(MODULE, `✅ Restored multi-select selection: "${val}"`);
+            }
+
+            const span = document.createElement('span');
+            span.className = 'ml-2 text-sm text-gray-700';
+            span.textContent = val;
+
+            label.appendChild(checkbox);
+            label.appendChild(span);
+            optionDiv.appendChild(label);
+            dropdown.appendChild(optionDiv);
+
+            debugLog(MODULE, `Added multi-select option ${idx + 1}: "${val}"`);
+            debugLog(MODULE, `   Added multi-select option ${idx + 1}:`, val);
         });
 
         debugLog(MODULE, `✅ Multi-select options refreshed. Total ${rows.length} rows, dropdown now has ${dropdown.children.length} options.`);

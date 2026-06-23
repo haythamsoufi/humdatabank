@@ -628,6 +628,35 @@ class TestLoadExistingDataForAssignment:
         assert result["field_value[dynamic_13]"] == {"male": 50, "female": 60}
 
 
+class TestExistingDataForDynamicAssignment:
+    def test_scalar_value(self):
+        from app.routes.forms.helpers import existing_data_for_dynamic_assignment
+
+        entry = MagicMock()
+        entry.id = 25
+        entry.disagg_data = None
+        entry.value = "456"
+        entry.data_not_available = False
+        entry.not_applicable = False
+
+        result = existing_data_for_dynamic_assignment(entry)
+        assert result == {"field_value[dynamic_25]": "456"}
+
+    def test_flags_and_disagg_data(self):
+        from app.routes.forms.helpers import existing_data_for_dynamic_assignment
+
+        entry = MagicMock()
+        entry.id = 7
+        entry.disagg_data = {"mode": "total", "values": {"total": 10}}
+        entry.value = "10"
+        entry.data_not_available = True
+        entry.not_applicable = False
+
+        result = existing_data_for_dynamic_assignment(entry)
+        assert result["field_value[dynamic_7]"] == {"mode": "total", "values": {"total": 10}}
+        assert result["dynamic_7_data_not_available"] is True
+
+
 # ---------------------------------------------------------------------------
 # _load_existing_data_for_public_submission
 # ---------------------------------------------------------------------------

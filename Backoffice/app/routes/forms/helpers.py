@@ -199,17 +199,24 @@ def _load_existing_data_for_assignment(assignment_entity_status, form_template):
         .all()
     )
     for dynamic_data_entry in dynamic_data_entries:
-        dynamic_key = f'field_value[dynamic_{dynamic_data_entry.id}]'
-        if dynamic_data_entry.disagg_data:
-            existing_data_processed[dynamic_key] = dynamic_data_entry.disagg_data
-        else:
-            existing_data_processed[dynamic_key] = dynamic_data_entry.value
-        if dynamic_data_entry.data_not_available:
-            existing_data_processed[f'dynamic_{dynamic_data_entry.id}_data_not_available'] = True
-        if dynamic_data_entry.not_applicable:
-            existing_data_processed[f'dynamic_{dynamic_data_entry.id}_not_applicable'] = True
+        existing_data_processed.update(existing_data_for_dynamic_assignment(dynamic_data_entry))
 
     return existing_data_processed
+
+
+def existing_data_for_dynamic_assignment(dynamic_assignment) -> dict:
+    """Build existing_data entries for rendering one saved dynamic indicator."""
+    existing_data = {}
+    dynamic_key = f'field_value[dynamic_{dynamic_assignment.id}]'
+    if dynamic_assignment.disagg_data:
+        existing_data[dynamic_key] = dynamic_assignment.disagg_data
+    else:
+        existing_data[dynamic_key] = dynamic_assignment.value
+    if dynamic_assignment.data_not_available:
+        existing_data[f'dynamic_{dynamic_assignment.id}_data_not_available'] = True
+    if dynamic_assignment.not_applicable:
+        existing_data[f'dynamic_{dynamic_assignment.id}_not_applicable'] = True
+    return existing_data
 
 
 def _load_existing_data_for_public_submission(submission):

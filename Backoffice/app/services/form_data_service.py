@@ -2396,8 +2396,9 @@ class FormDataService:
 
                         if existing_entry:
                             # Track old values before updating - handle both simple values and disaggregated data
-                            # Get old value - prefer disagg_data if present, otherwise use value
-                            if existing_entry.disagg_data:
+                            if existing_entry.disagg_type == 'emergency_operation' and existing_entry.value:
+                                old_value = existing_entry.value
+                            elif existing_entry.disagg_data:
                                 old_value = existing_entry.disagg_data
                             else:
                                 old_value = existing_entry.get_effective_value()

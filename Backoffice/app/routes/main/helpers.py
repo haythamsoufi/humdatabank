@@ -306,6 +306,29 @@ def _is_metadata_only_dict(data):
         return False
     return all(isinstance(v, bool) or v is None or v == '' for v in data.values())
 
+
+def _format_emergency_operation_metadata(value):
+    """Format emergency-operation disagg_data {name, code} for activity display."""
+    if not isinstance(value, dict):
+        return None
+    keys = set(value.keys())
+    if not keys or not keys.issubset({'name', 'code'}):
+        return None
+    name = str(value.get('name') or '').strip()
+    code = str(value.get('code') or '').strip()
+    if name == '[object Object]':
+        name = ''
+    if code == '[object Object]':
+        code = ''
+    if name and code:
+        return f"{name} ({code})"
+    if name:
+        return name
+    if code:
+        return code
+    return None
+
+
 def _parse_field_value_for_display(value, data_not_available=None, not_applicable=None, form_item_id=None):
     """Parse field value to extract meaningful information for display in activity summaries."""
     # Handle data availability flags first
@@ -319,15 +342,25 @@ def _parse_field_value_for_display(value, data_not_available=None, not_applicabl
 
     # Helper for number formatting
     def _fmt_number(n):
-        try:
-            return f"{int(n):,}"
-        except Exception as e:
-            current_app.logger.debug("_fmt_number int failed for %r: %s", n, e)
+        if isinstance(n, bool):
+            return str(n)
+        if isinstance(n, str):
+            cleaned = n.strip().replace(',', '')
+            if not cleaned:
+                return n
             try:
-                return f"{float(n):,}"
-            except Exception as e:
-                current_app.logger.debug("_fmt_number failed: %s", e)
-                return str(n)
+                num = float(cleaned)
+                n = int(num) if num.is_integer() else num
+            except ValueError:
+                return n
+        elif not _is_numeric_scalar(n):
+            return str(n)
+        try:
+            if isinstance(n, float) and n.is_integer():
+                return f"{int(n):,}"
+            return f"{int(n):,}" if isinstance(n, int) else f"{n:,}"
+        except (ValueError, TypeError, OverflowError):
+            return str(n)
 
     # Helper to format matrix data with row/column labels
     def _format_matrix_data(matrix_dict, form_item_id):
@@ -414,6 +447,10 @@ def _parse_field_value_for_display(value, data_not_available=None, not_applicabl
             value = parsed
 
     if isinstance(value, dict):
+        emergency_display = _format_emergency_operation_metadata(value)
+        if emergency_display:
+            return emergency_display
+
         # Special handling for trimmed matrix changes coming from activity logs
         if value.get('_matrix_change'):
             # Remove sentinel and format only the changed cells
@@ -503,6 +540,8 @@ def _parse_field_value_for_display(value, data_not_available=None, not_applicabl
                     label = _format_metadata_label(k)
                     if isinstance(v, bool):
                         parts.append(f"{label}: {_format_boolean_for_display(v)}")
+                    elif isinstance(v, str):
+                        parts.append(f"{label}: {v}")
                     else:
                         parts.append(f"{label}: {_fmt_number(v)}")
                 if parts:
@@ -515,6 +554,8 @@ def _parse_field_value_for_display(value, data_not_available=None, not_applicabl
                 for k, v in value.items():
                     if isinstance(v, bool):
                         metadata_parts.append(f"{_format_metadata_label(k)}: {_format_boolean_for_display(v)}")
+                    elif isinstance(v, str) and v.strip():
+                        metadata_parts.append(f"{_format_metadata_label(k)}: {v}")
                     elif _is_numeric_scalar(v) and v != 0:
                         numeric_parts.append(f"{_format_metadata_label(k)}: {_fmt_number(v)}")
                     elif isinstance(v, dict):
@@ -536,6 +577,8 @@ def _parse_field_value_for_display(value, data_not_available=None, not_applicabl
                     return ", ".join(parts)
                 return ""
     elif isinstance(value, str):
+        if value.strip() == '[object Object]':
+            return "N/A"
         return value
     else:
         return str(value)

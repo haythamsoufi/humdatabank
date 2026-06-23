@@ -9,6 +9,8 @@
 {% block title %}{{ get_localized_template_name(template_structure) if template_structure and get_localized_template_name else (template_structure.name if template_structure else '') }}{% endblock %}
 
 {% block head %}
+{# Must precede layout module scripts so relative imports resolve to versioned URLs. #}
+<script type="importmap" nonce="{{ csp_nonce() }}">{{ forms_module_import_map() | tojson }}</script>
 {{ super() }}
 {# Expose current UI language to JS (used by matrix-handler and other modules) #}
 {% set _lang_for_meta = (translation_key if translation_key is defined else (session.get('language', 'en') or 'en')) %}

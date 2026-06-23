@@ -335,6 +335,7 @@ class TestEntryFormFormsApiDynamicIndicators:
                 section_id=section_id,
                 indicator_bank_id=indicator_id,
                 added_by_user_id=user.id,
+                value="456",
             )
             db_session.add(dynamic_assignment)
             db_session.flush()
@@ -352,6 +353,7 @@ class TestEntryFormFormsApiDynamicIndicators:
             assert isinstance(html, str) and html.strip()
             assert f'data-assignment-id="{assignment_id}"' in html
             assert indicator_name in html
+            assert 'value="456"' in html
 
 
 @pytest.mark.integration

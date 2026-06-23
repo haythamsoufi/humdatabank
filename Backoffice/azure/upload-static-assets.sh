@@ -82,12 +82,28 @@ _upload_with_azcopy() {
 
   echo "Syncing static assets with AzCopy (parallel; skips unchanged files) ..."
   # Trailing slash on source: sync contents of the directory into the container root.
+  # Note: azcopy sync does not support --cache-control; headers are applied after sync.
   azcopy sync "${SOURCE_DIR}/" "${dest}" \
     --recursive \
     --delete-destination=false \
-    --cache-control "${CACHE_CONTROL}" \
     --log-level=WARNING \
     --output-type=text
+
+  _apply_cache_control_headers
+}
+
+_apply_cache_control_headers() {
+  # Metadata-only updates (no blob body re-upload). upload-batch sets this inline;
+  # AzCopy does not, so patch Cache-Control after sync.
+  local parallel="${STATIC_CACHE_CONTROL_PARALLEL:-32}"
+  echo "Setting Cache-Control on blobs (metadata only, parallel=${parallel}) ..."
+  # GNU find (-printf) — available on GitHub Actions ubuntu runners.
+  find "${SOURCE_DIR}" -type f -printf '%P\0' | xargs -0 -P "${parallel}" -I {} az storage blob update \
+    --container-name "${CONTAINER}" \
+    --name "{}" \
+    --content-cache-control "${CACHE_CONTROL}" \
+    --connection-string "${AZURE_STORAGE_CONNECTION_STRING}" \
+    --output none
 }
 
 _upload_with_az_cli() {

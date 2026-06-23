@@ -41,6 +41,7 @@ from app.utils.request_utils import get_json_or_form, is_json_request
 from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error, require_json_keys
 from app.utils.error_handling import handle_json_view_exception
 from app.services.form_processing_service import _create_dynamic_indicator_object
+from app.routes.forms.helpers import existing_data_for_dynamic_assignment
 
 # Create the API blueprint
 # Changed from /forms to /api/forms to avoid prefix conflict with forms.py
@@ -358,7 +359,7 @@ def api_render_dynamic_indicator(assignment_id):
             'forms/entry_form/partials/dynamic_indicator_item.html',
             field=dynamic_field,
             section=section,
-            existing_data={},
+            existing_data=existing_data_for_dynamic_assignment(dynamic_assignment),
             template_structure=template_structure,
             config=Config,
             can_edit=True,

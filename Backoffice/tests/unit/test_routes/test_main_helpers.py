@@ -557,6 +557,36 @@ class TestParseFieldValueForDisplay:
         assert "645" in result
         assert "Disaggregated by disability" not in result
 
+    def test_string_dict_values_displayed_without_number_formatting(self, app):
+        with app.app_context():
+            result = self._call({
+                "operation_name": "Afghanistan - Earthquake",
+                "operation_code": "MDRAF019",
+            })
+        assert "Afghanistan - Earthquake" in result
+        assert "MDRAF019" in result
+
+    def test_object_object_string_displayed_as_is(self, app):
+        with app.app_context():
+            result = self._call({"selection": "[object Object]"})
+        assert "[object Object]" in result
+
+    def test_emergency_operation_metadata_dict(self, app):
+        with app.app_context():
+            result = self._call({"name": "Afghanistan - Earthquake", "code": "MDRAF019"})
+        assert "Afghanistan - Earthquake" in result
+        assert "MDRAF019" in result
+
+    def test_emergency_operation_metadata_rejects_object_object_name(self, app):
+        with app.app_context():
+            result = self._call({"name": "[object Object]", "code": "MDRAF019"})
+        assert result == "MDRAF019"
+
+    def test_literal_object_object_string_returns_na(self, app):
+        with app.app_context():
+            result = self._call("[object Object]")
+        assert result == "N/A"
+
 
 # ---------------------------------------------------------------------------
 # _extract_changed_matrix_values

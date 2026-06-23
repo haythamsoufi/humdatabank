@@ -307,6 +307,7 @@ def register_template_context(app, config_class):
 
     app.jinja_env.globals['CHATBOT_ENABLED'] = app.config.get('CHATBOT_ENABLED', True)
     app.jinja_env.globals['ASSET_VERSION'] = app.config.get('ASSET_VERSION')
+    app.jinja_env.globals['STATIC_CDN_URL'] = (app.config.get('STATIC_CDN_URL') or '').strip().rstrip('/')
     app.jinja_env.globals['config'] = app.config
 
     def static_url(filename):
@@ -328,6 +329,13 @@ def register_template_context(app, config_class):
         base_url = url_for('static', filename=filename)
         return f"{base_url}?v={asset_version}"
     app.jinja_env.globals['static_url'] = static_url
+
+    def forms_module_import_map():
+        """Scoped import map so entry-form relative imports keep ?v= cache keys."""
+        from flask import request
+        from app.static_import_map import forms_module_import_map as _build_map
+        return _build_map(app, request.url_root)
+    app.jinja_env.globals['forms_module_import_map'] = forms_module_import_map
 
     from app.services.app_settings_service import organization_visual_asset_href
     app.jinja_env.globals['org_visual_asset_url'] = organization_visual_asset_href

@@ -18,6 +18,7 @@ import { applyLayoutToContainer } from './layout.js';
 import { setupNumberInputFormatting } from './formatting.js';
 import { reinitializeDisaggregationCalculator } from './disaggregation-calculator.js';
 import { setupPerEntryDynamicInterface } from './dynamic-indicators.js';
+import { initializeFieldListeners } from './form-item-utils.js';
 
 /**
  * Parse a field value that might contain data availability flags in various formats
@@ -717,11 +718,23 @@ function _insertRepeatIndicatorHtml(containerEl, html) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html.trim(), 'text/html');
     const el = doc.body.firstElementChild;
-    if (!el) return;
+    if (!el) return null;
     if (ifaceEl) {
         ifaceEl.parentNode.insertBefore(el, ifaceEl);
     } else {
         containerEl.appendChild(el);
+    }
+    return el;
+}
+
+function _finalizeRepeatIndicatorElement(indicatorEl) {
+    if (!indicatorEl) return;
+    initializeFieldListeners(indicatorEl);
+    if (window.reinitializeDisaggregationCalculator) {
+        reinitializeDisaggregationCalculator();
+    }
+    if (window.cleanupInputValues) {
+        window.cleanupInputValues();
     }
 }
 
@@ -744,7 +757,7 @@ function injectExistingRepeatIndicators(containerEl, sectionId, instanceNumber) 
     items.forEach(item => {
         if (item.html) {
             // Legacy: server pre-rendered HTML available — insert immediately.
-            _insertRepeatIndicatorHtml(containerEl, item.html);
+            _finalizeRepeatIndicatorElement(_insertRepeatIndicatorHtml(containerEl, item.html));
         } else if (item.assignment_id != null) {
             // New path: fetch rendered HTML from the render API and insert asynchronously.
             const fetchFn = (window.getCsrfAwareFetch && window.getCsrfAwareFetch()) || fetch;
@@ -759,7 +772,7 @@ function injectExistingRepeatIndicators(containerEl, sectionId, instanceNumber) 
                 })
                 .then(data => {
                     if (data && data.html) {
-                        _insertRepeatIndicatorHtml(containerEl, data.html);
+                        _finalizeRepeatIndicatorElement(_insertRepeatIndicatorHtml(containerEl, data.html));
                     }
                 })
                 .catch(err => {

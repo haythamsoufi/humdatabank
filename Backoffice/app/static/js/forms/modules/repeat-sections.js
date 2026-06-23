@@ -816,48 +816,51 @@ function createRepeatEntry(sectionId, isInitialEntry = false) {
     entryLabel.className = 'repeat-entry__label';
     entryLabel.appendChild(document.createTextNode(`${window.REPEAT_SECTION_LABELS?.entry || 'Entry'} #${instanceNumber}`));
 
-    const deleteButton = document.createElement('button');
-    deleteButton.type = 'button';
-    deleteButton.className = 'w-5 h-5 flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors repeat-entry-delete-btn';
-    const deleteIcon = document.createElement('i');
-    deleteIcon.className = 'fas fa-trash';
-    deleteButton.appendChild(deleteIcon);
-    deleteButton.title = window.REPEAT_SECTION_LABELS?.deleteThisEntry || 'Delete this entry';
-    deleteButton.addEventListener('click', function() {
-        const confirmMessage = window.REPEAT_SECTION_LABELS?.confirmDeleteEntry || 'Are you sure you want to delete this entry?';
-        if (window.showDangerConfirmation) {
-            window.showDangerConfirmation(
-                confirmMessage,
-                () => {
-                    repeatEntry.remove();
-                    debugLog('repeat-sections', `Deleted repeat entry #${instanceNumber} for section ${sectionId}`);
-                    finalizeRepeatEntryDeletion(sectionId, instanceNumber);
-                },
-                null,
-                'Delete',
-                'Cancel',
-                'Delete Entry?'
-            );
-        } else if (window.showConfirmation) {
-            window.showConfirmation(
-                confirmMessage,
-                () => {
-                    repeatEntry.remove();
-                    debugLog('repeat-sections', `Deleted repeat entry #${instanceNumber} for section ${sectionId}`);
-                    finalizeRepeatEntryDeletion(sectionId, instanceNumber);
-                },
-                null,
-                'Delete',
-                'Cancel',
-                'Delete Entry?'
-            );
-        } else {
-            (window.__clientWarn || console.warn)('Confirmation dialog not available:', confirmMessage);
-        }
-    });
-
     header.appendChild(entryLabel);
-    header.appendChild(deleteButton);
+
+    if (instanceNumber !== 1) {
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'w-5 h-5 flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors repeat-entry-delete-btn';
+        const deleteIcon = document.createElement('i');
+        deleteIcon.className = 'fas fa-trash';
+        deleteButton.appendChild(deleteIcon);
+        deleteButton.title = window.REPEAT_SECTION_LABELS?.deleteThisEntry || 'Delete this entry';
+        deleteButton.addEventListener('click', function() {
+            const confirmMessage = window.REPEAT_SECTION_LABELS?.confirmDeleteEntry || 'Are you sure you want to delete this entry?';
+            if (window.showDangerConfirmation) {
+                window.showDangerConfirmation(
+                    confirmMessage,
+                    () => {
+                        repeatEntry.remove();
+                        debugLog('repeat-sections', `Deleted repeat entry #${instanceNumber} for section ${sectionId}`);
+                        finalizeRepeatEntryDeletion(sectionId, instanceNumber);
+                    },
+                    null,
+                    'Delete',
+                    'Cancel',
+                    'Delete Entry?'
+                );
+            } else if (window.showConfirmation) {
+                window.showConfirmation(
+                    confirmMessage,
+                    () => {
+                        repeatEntry.remove();
+                        debugLog('repeat-sections', `Deleted repeat entry #${instanceNumber} for section ${sectionId}`);
+                        finalizeRepeatEntryDeletion(sectionId, instanceNumber);
+                    },
+                    null,
+                    'Delete',
+                    'Cancel',
+                    'Delete Entry?'
+                );
+            } else {
+                (window.__clientWarn || console.warn)('Confirmation dialog not available:', confirmMessage);
+            }
+        });
+        header.appendChild(deleteButton);
+    }
+
     repeatEntry.appendChild(header);
 
     // Process fields - move for first entry, clone for subsequent entries

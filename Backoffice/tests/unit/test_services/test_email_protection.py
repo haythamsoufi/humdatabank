@@ -6,6 +6,7 @@ Covers:
 - check_email_recipients_allowed
 - EmailProtectionResult dataclass
 """
+import os
 import pytest
 from flask import Flask
 from unittest.mock import patch
@@ -109,13 +110,49 @@ class TestEmailProtectionResult:
 # ---------------------------------------------------------------------------
 
 class TestCheckEmailRecipientsAllowed:
-    def test_always_enabled_false(self, prot_app):
+    def test_production_disables_protection(self, prot_app):
+        prot_app.config["FLASK_CONFIG"] = "production"
         with prot_app.app_context():
             result = check_email_recipients_allowed(["user@example.com"])
         assert result.enabled is False
+        assert result.allowed_requested == ["user@example.com"]
+        assert result.blocked_requested == []
 
-    def test_all_emails_allowed(self, prot_app):
+    def test_staging_enforces_allowlist(self, prot_app):
+        prot_app.config["FLASK_CONFIG"] = "staging"
+        prot_app.config["ALLOWED_EMAIL_RECIPIENTS_DEV"] = ["allowed@example.com"]
+        with prot_app.app_context():
+            result = check_email_recipients_allowed(
+                ["allowed@example.com", "blocked@example.com"]
+            )
+        assert result.enabled is True
+        assert result.environment == "staging"
+        assert result.allowed_requested == ["allowed@example.com"]
+        assert result.blocked_requested == ["blocked@example.com"]
+
+    def test_development_enforces_allowlist(self, prot_app):
+        prot_app.config["FLASK_CONFIG"] = "development"
+        prot_app.config["ALLOWED_EMAIL_RECIPIENTS_DEV"] = ["dev@example.com"]
+        with prot_app.app_context():
+            result = check_email_recipients_allowed(["dev@example.com"])
+        assert result.enabled is True
+        assert result.allowed_requested == ["dev@example.com"]
+        assert result.blocked_requested == []
+
+    def test_non_production_without_allowlist_blocks_all(self, prot_app):
+        prot_app.config["FLASK_CONFIG"] = "staging"
+        prot_app.config["ALLOWED_EMAIL_RECIPIENTS_DEV"] = []
+        with prot_app.app_context():
+            result = check_email_recipients_allowed(["user@example.com"])
+        assert result.enabled is True
+        assert result.allowed == []
+        assert result.allowed_requested == []
+        assert result.blocked_requested == ["user@example.com"]
+        assert "ALLOWED_EMAIL_RECIPIENTS_DEV" in (result.reason or "")
+
+    def test_all_emails_allowed_when_on_allowlist(self, prot_app):
         emails = ["user1@example.com", "user2@test.org"]
+        prot_app.config["ALLOWED_EMAIL_RECIPIENTS_DEV"] = emails
         with prot_app.app_context():
             result = check_email_recipients_allowed(emails)
         assert result.allowed_requested == ["user1@example.com", "user2@test.org"]
@@ -128,17 +165,8 @@ class TestCheckEmailRecipientsAllowed:
         assert result.blocked_requested == []
         assert result.requested == []
 
-    def test_reason_is_none(self, prot_app):
-        with prot_app.app_context():
-            result = check_email_recipients_allowed(["x@y.com"])
-        assert result.reason is None
-
-    def test_allowed_list_is_empty(self, prot_app):
-        with prot_app.app_context():
-            result = check_email_recipients_allowed(["x@y.com"])
-        assert result.allowed == []
-
     def test_emails_normalized_to_lowercase(self, prot_app):
+        prot_app.config["ALLOWED_EMAIL_RECIPIENTS_DEV"] = ["user@example.com"]
         with prot_app.app_context():
             result = check_email_recipients_allowed(["USER@EXAMPLE.COM"])
         assert "user@example.com" in result.requested
@@ -157,12 +185,14 @@ class TestCheckEmailRecipientsAllowed:
         assert result.blocked_requested == []
 
     def test_strips_whitespace_from_emails(self, prot_app):
+        prot_app.config["ALLOWED_EMAIL_RECIPIENTS_DEV"] = ["admin@example.com"]
         with prot_app.app_context():
             result = check_email_recipients_allowed(["  admin@example.com  "])
         assert "admin@example.com" in result.allowed_requested
 
     def test_multiple_emails(self, prot_app):
         emails = [f"user{i}@example.com" for i in range(10)]
+        prot_app.config["ALLOWED_EMAIL_RECIPIENTS_DEV"] = emails
         with prot_app.app_context():
             result = check_email_recipients_allowed(emails)
         assert len(result.allowed_requested) == 10
@@ -170,12 +200,14 @@ class TestCheckEmailRecipientsAllowed:
 
     def test_missing_flask_config(self):
         app = Flask(__name__)
-        # No FLASK_CONFIG set
-        with app.app_context():
-            result = check_email_recipients_allowed(["a@b.com"])
+        app.config["ALLOWED_EMAIL_RECIPIENTS_DEV"] = ["a@b.com"]
+        with patch.dict(os.environ, {"FLASK_CONFIG": ""}, clear=False):
+            with app.app_context():
+                result = check_email_recipients_allowed(["a@b.com"])
         assert result.environment == ""
 
     def test_result_requested_matches_normalized_input(self, prot_app):
+        prot_app.config["ALLOWED_EMAIL_RECIPIENTS_DEV"] = ["a@b.com", "c@d.org"]
         with prot_app.app_context():
             result = check_email_recipients_allowed(["A@B.COM", "C@D.ORG"])
         assert result.requested == ["a@b.com", "c@d.org"]

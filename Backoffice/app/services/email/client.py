@@ -6,6 +6,7 @@ import requests
 from requests import Response
 from typing import Iterable, Optional, List, Tuple
 from flask import current_app
+from app.services.email.protection import _is_production_flask_config
 from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 
 # Response headers logged to help IT compare edge/WAF/proxy vs origin (values truncated).
@@ -126,10 +127,6 @@ def _to_list(values: Optional[Iterable[str]]) -> List[str]:
     return [str(v).strip() for v in values if str(v).strip()]
 
 
-def _is_production_flask_config() -> bool:
-    return (os.environ.get("FLASK_CONFIG", "") or "").lower() == "production"
-
-
 def _failure_warrants_security_event(fail: dict) -> bool:
     code = (fail or {}).get("code") or ""
     if code in ("email_api_http_error", "email_api_request_error"):
@@ -185,7 +182,7 @@ def _filter_recipients_for_environment(recipients: List[str], cc: List[str], bcc
     local development and staging; **never applied in production** (``FLASK_CONFIG=production``)
     so a mis-set env var cannot block real recipients.
     """
-    if (os.environ.get("FLASK_CONFIG", "") or "").lower() == "production":
+    if _is_production_flask_config():
         return recipients, cc, bcc
     allowed = current_app.config.get("ALLOWED_EMAIL_RECIPIENTS_DEV") or []
     if not allowed:

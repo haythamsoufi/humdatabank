@@ -363,20 +363,28 @@ class TestIfrcHttpErrorDiag:
 # ---------------------------------------------------------------------------
 
 class TestIsProductionFlaskConfig:
-    def test_production_returns_true(self):
-        with patch.dict(os.environ, {"FLASK_CONFIG": "production"}):
+    def test_production_returns_true(self, email_app_prod):
+        with email_app_prod.app_context():
             assert _is_production_flask_config() is True
 
-    def test_testing_returns_false(self):
-        with patch.dict(os.environ, {"FLASK_CONFIG": "testing"}):
+    def test_testing_returns_false(self, email_app):
+        email_app.config["FLASK_CONFIG"] = "testing"
+        with email_app.app_context():
             assert _is_production_flask_config() is False
 
-    def test_empty_returns_false(self):
-        with patch.dict(os.environ, {"FLASK_CONFIG": ""}):
+    def test_staging_returns_false(self, email_app):
+        email_app.config["FLASK_CONFIG"] = "staging"
+        with email_app.app_context():
             assert _is_production_flask_config() is False
 
-    def test_production_case_insensitive(self):
-        with patch.dict(os.environ, {"FLASK_CONFIG": "PRODUCTION"}):
+    def test_empty_returns_false(self, email_app):
+        email_app.config["FLASK_CONFIG"] = ""
+        with email_app.app_context():
+            assert _is_production_flask_config() is False
+
+    def test_production_case_insensitive(self, email_app):
+        email_app.config["FLASK_CONFIG"] = "PRODUCTION"
+        with email_app.app_context():
             assert _is_production_flask_config() is True
 
 
@@ -484,7 +492,8 @@ class TestFilterRecipientsForEnvironment:
         assert "a@x.com" in r
         assert "b@x.com" in r
 
-    def test_allowlist_filters_recipients(self, email_app):
+    def test_staging_applies_allowlist(self, email_app):
+        email_app.config["FLASK_CONFIG"] = "staging"
         email_app.config["ALLOWED_EMAIL_RECIPIENTS_DEV"] = ["allowed@x.com"]
         with email_app.app_context():
             r, cc, bcc = _filter_recipients_for_environment(

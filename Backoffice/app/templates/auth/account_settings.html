@@ -248,7 +248,7 @@
                                 <span class="text-sm font-medium text-gray-900">
                                     {{ request.country.name if request.country else ('Unknown Country (ID: ' ~ request.country_id ~ ')') }}
                                 </span>
-                                {{ status_label_for_access_request(request.status, is_revoked) }}
+                                {{ status_label_for_access_request(request.status, is_revoked, request._auto_resolved|default(false)) }}
                             </div>
                             {% if request.request_message %}
                             <p class="text-xs text-gray-600 mt-2"><span class="font-medium">Your note:</span> {{ request.request_message }}</p>

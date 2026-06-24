@@ -33,7 +33,7 @@ UPR_TEMPLATE_CHOICES = [
     {"id": 24, "name": "Unified Country Plan — planning country data (P*)"},
     {"id": 22, "name": "Annual Planning – International Bilateral Support — PNS staff (P*)"},
     # Reporting (rounds AR*, MYR*)
-    {"id": 25, "name": "Reporting – Country — NS Data, indicators, funding, support (AR*, MYR*)"},
+    {"id": 33, "name": "Reporting – Country — NS Data, indicators, funding, support (AR*, MYR*)"},
     {"id": 23, "name": "Reporting – PNS — PNS funding totals (AR* only)"},
 ]
 

@@ -9,14 +9,14 @@ Planning templates (rounds P*):
     22  Annual Planning – International Bilateral Support
 
 Reporting templates:
-    25  Reporting – Country  (rounds AR*, MYR*)
+    33  Reporting – Country  (rounds AR*, MYR*)
     23  Reporting – PNS      (rounds AR*)
 
 Usage:
     python scripts/import_upr_excel_data.py --input path/to/UPR\\ Master.xlsx
     python scripts/import_upr_excel_data.py --input path/to/file.xlsx --rounds P25,P26 --dry-run
-    python scripts/import_upr_excel_data.py --input path/to/file.xlsx --rounds AR25 --templates 25,23
-    python scripts/import_upr_excel_data.py --input path/to/file.xlsx --rounds MYR26 --templates 25
+    python scripts/import_upr_excel_data.py --input path/to/file.xlsx --rounds AR25 --templates 33,23
+    python scripts/import_upr_excel_data.py --input path/to/file.xlsx --rounds MYR26 --templates 33
     python scripts/import_upr_excel_data.py --input path/to/file.xlsx --templates 24,22
 """
 
@@ -77,7 +77,7 @@ UPR_TEMPLATE_PROFILES: Dict[int, Dict[str, Any]] = {
         "sections": frozenset({"Staff"}),
     },
     # ── Reporting ─────────────────────────────────────────────────────────────
-    25: {
+    33: {
         "name": "Reporting - Country",
         "round_prefixes": ("AR", "MYR"),
         # Emergency 1/2/3 sections are skipped (complex MDR-scoped indicators).
@@ -114,21 +114,24 @@ ITEM_COMMENTS = 956
 ITEM_FUNDING_REQUIREMENTS_T22 = 1303  # Template 22 – Funding Requirements (rows=country_map)
 EMERGENCY_APPEALS_COLUMN = "Total People to be reached"
 
-# ── Reporting template items ───────────────────────────────────────────────────
-ITEM_REPORTING_COUNTRY_FUNDING = 1260   # T25 – NS Total Funding (manual rows)
-ITEM_REPORTING_COUNTRY_EXPENDITURE = 1271  # T25 – NS Total Expenditure (scalar, bank=734, Attribute=Total)
-ITEM_REPORTING_COUNTRY_SP_BREAKDOWN = 1279  # T25 – Optional breakdown by SP/EF (manual matrix)
-ITEM_REPORTING_COUNTRY_SUPPORT = 1261   # T25 – Received Support (list_library national_society)
+# ── Reporting country template (T33) ───────────────────────────────────────────
+REPORTING_COUNTRY_TEMPLATE_ID = 33
+
+# Matrix / special items on the published T33 version (resolve by label if these change).
+ITEM_REPORTING_COUNTRY_FUNDING = 1403   # NS Total Funding (manual rows)
+ITEM_REPORTING_COUNTRY_EXPENDITURE = 1404  # NS Total Expenditure (scalar, bank=734, Attribute=Total)
+ITEM_REPORTING_COUNTRY_SP_BREAKDOWN = 1405  # Optional breakdown by SP/EF (manual matrix)
+ITEM_REPORTING_COUNTRY_SUPPORT = 1407   # Received Support (list_library national_society)
 ITEM_REPORTING_PNS_FUNDING = 952        # T23 – PNS Funding matrix (list_library national_society)
 
-# Row names in T25 item 1260 (manual matrix, column = T25_FUNDING_COLUMN)
-T25_FUNDING_ROW_IFRC = "IFRC Secretariat"
-T25_FUNDING_ROW_PNS = "PNSs"
-T25_FUNDING_ROW_OTHER = "HNS other sources"
-T25_FUNDING_COLUMN = "NS 2025 Total Funding"
+# Row names in country-reporting Total Funding matrix (column = REPORTING_FUNDING_COLUMN)
+REPORTING_FUNDING_ROW_IFRC = "IFRC Secretariat"
+REPORTING_FUNDING_ROW_PNS = "PNSs"
+REPORTING_FUNDING_ROW_OTHER = "HNS other sources"
+REPORTING_FUNDING_COLUMN = "NS 2025 Total Funding"
 
-# T25 item 1279: Excel Area → manual matrix row label
-T25_SP_BREAKDOWN_AREA_TO_ROW: Dict[str, str] = {
+# SP/EF breakdown matrix: Excel Area → manual matrix row label
+REPORTING_SP_BREAKDOWN_AREA_TO_ROW: Dict[str, str] = {
     "SP1": "Resilience - Climate and environment",
     "SP2": "Response - Disasters and crises",
     "SP3": "Resilience - Health and wellbeing",
@@ -137,15 +140,15 @@ T25_SP_BREAKDOWN_AREA_TO_ROW: Dict[str, str] = {
     "EFs": "Enabling functions",
 }
 
-# T25 item 1279: indicator bank id → matrix column name
-T25_SP_BREAKDOWN_COLUMNS: Dict[int, str] = {
+# SP/EF breakdown matrix: indicator bank id → matrix column name
+REPORTING_SP_BREAKDOWN_COLUMNS: Dict[int, str] = {
     733: "Funding (CHF)",
     734: "Expenditure (CHF)",
 }
 
-# T25 Core/Other indicators: Excel Area → form section name (when the same bank id
+# Core/Other indicators: Excel Area → form section name (when the same bank id
 # appears on multiple section-scoped items, e.g. 619 on Cross Cutting + SP2).
-T25_EXCEL_AREA_TO_SECTION: Dict[str, str] = {
+REPORTING_EXCEL_AREA_TO_SECTION: Dict[str, str] = {
     "Cross-cutting": "Cross Cutting",
     "SP1": "Resilience - Climate and environment",
     "SP2": "Response - Disasters and crises",
@@ -620,10 +623,10 @@ def _resolve_item_by_bank_and_area(
     bank_id: int,
     area: str,
 ) -> Optional[int]:
-    """Resolve a form item when indicator bank ids repeat across T25 sections."""
+    """Resolve a form item when indicator bank ids repeat across reporting-country sections."""
     section_map = ctx.items_by_bank_section.get(template_id, {}).get(bank_id)
     if section_map:
-        section_name = T25_EXCEL_AREA_TO_SECTION.get(area)
+        section_name = REPORTING_EXCEL_AREA_TO_SECTION.get(area)
         if section_name and section_name in section_map:
             return section_map[section_name]
         if len(section_map) == 1:
@@ -814,10 +817,10 @@ def transform_to_import_rows(
     pns_t22_staging: Dict[Tuple[int, int, str], Tuple[Optional[float], Optional[float]]] = {}
     pns_t22_has_pns: Set[Tuple[int, int]] = set()  # (pns_aes_id, host_country_id) with any pns_val
 
-    # ── Reporting T25 funding staging ─────────────────────────────────────────
+    # ── Reporting country funding staging ─────────────────────────────────────
     # Entity=IFRC/PNS/Other rows (Attribute=Funding Source only, Indicator=Funding) accumulated
-    # per aes_id into item 1260 rows.  Keyed by (aes_id, row_name) → accumulated total.
-    t25_funding_staging: Dict[Tuple[int, str], float] = defaultdict(float)
+    # per aes_id into item 1403 rows.  Keyed by (aes_id, row_name) → accumulated total.
+    reporting_funding_staging: Dict[Tuple[int, str], float] = defaultdict(float)
 
     for row in filtered:
         iso3 = str(row.get("ISO3") or "").strip().upper()
@@ -828,7 +831,7 @@ def transform_to_import_rows(
             continue
 
         # Classify round type so planning and reporting handlers don't cross-fire when
-        # both planning (T24/T22) and reporting (T25/T23) templates are imported together.
+        # both planning (T24/T22) and reporting (T33/T23) templates are imported together.
         rnd_is_planning = rnd.startswith("P")
         rnd_is_reporting = rnd.startswith("AR") or rnd.startswith("MYR")
 
@@ -1021,13 +1024,13 @@ def transform_to_import_rows(
         # REPORTING HANDLERS  (rounds AR*, MYR*)
         # ════════════════════════════════════════════════════════════════════════
 
-        # --- Template 25: NS Data ---
+        # --- Template 33: NS Data ---
         # Same 4 KPI indicators as planning (723/724/727/1117); Data_EO/MDR text fields skipped.
-        if 25 in tids and sec == "NS Data" and rnd_is_reporting:
+        if REPORTING_COUNTRY_TEMPLATE_ID in tids and sec == "NS Data" and rnd_is_reporting:
             if not indicator_id or value_num is None:
                 continue
-            aes_id = ctx.assignment_by_template.get(25, {}).get((period, iso3))
-            item_id = ctx.items_by_bank_id.get(25, {}).get(indicator_id)
+            aes_id = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get((period, iso3))
+            item_id = ctx.items_by_bank_id.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(indicator_id)
             if not aes_id or not item_id:
                 continue
             built = _scalar_row(
@@ -1042,20 +1045,20 @@ def transform_to_import_rows(
                 import_rows.append(built)
             continue
 
-        # --- Template 25: Core indicators + Other indicators ---
+        # --- Template 33: Core indicators + Other indicators ---
         # Write scalar per indicator_bank_id. When the row is marked "data not available",
         # write a flag row instead of a value.
-        if 25 in tids and sec in ("Core indicators", "Other indicators") and rnd_is_reporting:
+        if REPORTING_COUNTRY_TEMPLATE_ID in tids and sec in ("Core indicators", "Other indicators") and rnd_is_reporting:
             if not indicator_id:
                 continue
             if not area or area in AGGREGATE_AREA:
                 continue
-            aes_id = ctx.assignment_by_template.get(25, {}).get((period, iso3))
-            item_id = _resolve_item_by_bank_and_area(ctx, 25, indicator_id, area)
+            aes_id = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get((period, iso3))
+            item_id = _resolve_item_by_bank_and_area(ctx, REPORTING_COUNTRY_TEMPLATE_ID, indicator_id, area)
             if not aes_id or not item_id:
                 if aes_id and indicator_id:
                     ctx.warnings.append(
-                        f"No T25 form item for bank {indicator_id} area {area!r} ({iso3} {rnd})"
+                        f"No reporting-country form item for bank {indicator_id} area {area!r} ({iso3} {rnd})"
                     )
                 continue
             applicable_raw = str(row.get("Applicable/Data not available") or "").strip().lower()
@@ -1082,7 +1085,7 @@ def transform_to_import_rows(
                     import_rows.append(built)
             continue
 
-        # --- Reporting Funding (T25 items 1260 + 1271 + 1279; T23 item 952) ---
+        # --- Reporting Funding (T33 items 1403 + 1404 + 1405; T23 item 952) ---
         if sec == "Funding" and rnd_is_reporting:
             if value_num is None:
                 continue
@@ -1090,41 +1093,41 @@ def transform_to_import_rows(
             attr = str(row.get("Attribute") or "").strip()
             attr_lower = attr.lower()
 
-            # ── T25: SP Breakdown (Attribute=SP Breakdown, Entity=HNS) → item 1279 ──
+            # ── T33: SP Breakdown (Attribute=SP Breakdown, Entity=HNS) → item 1405 ──
             # Area (SP1–SP5, EFs) → matrix row; Funding/Expenditure → column.
             if (
-                25 in tids
+                REPORTING_COUNTRY_TEMPLATE_ID in tids
                 and ent_upper == "HNS"
                 and attr_lower == "sp breakdown"
                 and area
                 and area not in AGGREGATE_AREA
             ):
-                row_name = T25_SP_BREAKDOWN_AREA_TO_ROW.get(area)
-                col_name = T25_SP_BREAKDOWN_COLUMNS.get(indicator_id)
+                row_name = REPORTING_SP_BREAKDOWN_AREA_TO_ROW.get(area)
+                col_name = REPORTING_SP_BREAKDOWN_COLUMNS.get(indicator_id)
                 if not col_name and indicator.lower() == "funding":
-                    col_name = T25_SP_BREAKDOWN_COLUMNS[733]
+                    col_name = REPORTING_SP_BREAKDOWN_COLUMNS[733]
                 elif not col_name and indicator.lower() == "expenditure":
-                    col_name = T25_SP_BREAKDOWN_COLUMNS[734]
+                    col_name = REPORTING_SP_BREAKDOWN_COLUMNS[734]
                 if not row_name:
                     ctx.warnings.append(
-                        f"Unknown SP/EF area for T25 SP breakdown: {area!r} ({iso3} {rnd})"
+                        f"Unknown SP/EF area for reporting SP breakdown: {area!r} ({iso3} {rnd})"
                     )
                 elif col_name and value_num:
-                    aes_id = ctx.assignment_by_template.get(25, {}).get((period, iso3))
+                    aes_id = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get((period, iso3))
                     if aes_id:
                         cell_key = f"{row_name}_{col_name}"
                         matrix_cells[(aes_id, ITEM_REPORTING_COUNTRY_SP_BREAKDOWN)][cell_key] = value_num
                 continue
 
-            # ── T25: HNS Expenditure total (Attribute=Total, bank=734) → scalar item 1271 ──
+            # ── T33: HNS Expenditure total (Attribute=Total, bank=734) → scalar item 1404 ──
             if (
-                25 in tids
+                REPORTING_COUNTRY_TEMPLATE_ID in tids
                 and ent_upper == "HNS"
                 and attr_lower == "total"
                 and indicator_id == 734
             ):
-                aes_id = ctx.assignment_by_template.get(25, {}).get((period, iso3))
-                item_id = ctx.items_by_bank_id.get(25, {}).get(734)
+                aes_id = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get((period, iso3))
+                item_id = ctx.items_by_bank_id.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(734)
                 if aes_id and item_id:
                     built = _scalar_row(
                         aes_id=aes_id,
@@ -1132,27 +1135,27 @@ def transform_to_import_rows(
                         value=value_num,
                         iso3=iso3,
                         period=period,
-                        debug_kpi="T25_Expenditure",
+                        debug_kpi="Reporting_Expenditure",
                     )
                     if built:
                         import_rows.append(built)
                 continue
 
-            # ── T25: Funding by source (Attribute=Funding Source only, Indicator=Funding) → item 1260 ──
+            # ── T33: Funding by source (Attribute=Funding Source only, Indicator=Funding) → item 1403 ──
             is_funding_source_row = (
                 attr_lower == "funding source"
                 and indicator_id == 733
             )
 
-            if 25 in tids and is_funding_source_row:
-                aes_id = ctx.assignment_by_template.get(25, {}).get((period, iso3))
+            if REPORTING_COUNTRY_TEMPLATE_ID in tids and is_funding_source_row:
+                aes_id = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get((period, iso3))
                 if aes_id:
                     if ent_upper == "IFRC SECRETARIAT":
-                        t25_funding_staging[(aes_id, T25_FUNDING_ROW_IFRC)] += value_num
+                        reporting_funding_staging[(aes_id, REPORTING_FUNDING_ROW_IFRC)] += value_num
                     elif ent_upper == "PNS" and ns_name and ns_name.lower() not in ("country", ""):
-                        t25_funding_staging[(aes_id, T25_FUNDING_ROW_PNS)] += value_num
+                        reporting_funding_staging[(aes_id, REPORTING_FUNDING_ROW_PNS)] += value_num
                     elif ent_upper == "OTHER SOURCES":
-                        t25_funding_staging[(aes_id, T25_FUNDING_ROW_OTHER)] += value_num
+                        reporting_funding_staging[(aes_id, REPORTING_FUNDING_ROW_OTHER)] += value_num
 
             # ── T23: PNS-reported Funding / Expenditure / Transferred → item 952 ──
             # AES is keyed by PNS home country ISO3; row is the host country's NS id.
@@ -1173,15 +1176,15 @@ def transform_to_import_rows(
                                 ctx.warnings.append(f"No active NS found for host country: {iso3!r}")
             continue
 
-        # --- Template 25: Support (Received Support) ---
+        # --- Template 33: Support (Received Support) ---
         # Records which PNSs provided support per SP/EF area in the reporting year.
-        # Writes to the "{area} Supported" column of item 1261 (list_library national_society).
-        if 25 in tids and sec == "Support" and rnd_is_reporting:
+        # Writes to the "{area} Supported" column of item 1407 (list_library national_society).
+        if REPORTING_COUNTRY_TEMPLATE_ID in tids and sec == "Support" and rnd_is_reporting:
             if entity.upper() != "PNS" or not area or area in AGGREGATE_AREA:
                 continue
             if value_num != 1:
                 continue
-            aes_id = ctx.assignment_by_template.get(25, {}).get((period, iso3))
+            aes_id = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get((period, iso3))
             ns_id = _resolve_ns_row_id(ctx, ns_name)
             if not aes_id or ns_id is None:
                 continue
@@ -1203,10 +1206,10 @@ def transform_to_import_rows(
             "isModified": is_modified,
         }
 
-    # ── Post-loop: T25 funding staging → item 1260 matrix cells ──
-    for (aes_id, row_name), total in t25_funding_staging.items():
+    # ── Post-loop: reporting country funding staging → item 1403 matrix cells ──
+    for (aes_id, row_name), total in reporting_funding_staging.items():
         if total:
-            cell_key = f"{row_name}_{T25_FUNDING_COLUMN}"
+            cell_key = f"{row_name}_{REPORTING_FUNDING_COLUMN}"
             matrix_cells[(aes_id, ITEM_REPORTING_COUNTRY_FUNDING)][cell_key] = total
 
     # Build reverse map: aes_id → (iso3, period) across ALL templates.

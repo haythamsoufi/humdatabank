@@ -476,15 +476,11 @@ def api_access_requests_list():
         from app.services.app_settings_service import get_auto_approve_access_requests
         from app.services.country_access_request_service import (
             pending_country_access_requests_query,
+            processed_country_access_requests_query,
             reconcile_fulfilled_pending_country_access_requests,
         )
 
         reconcile_fulfilled_pending_country_access_requests()
-        base = CountryAccessRequest.query.options(
-            joinedload(CountryAccessRequest.user),
-            joinedload(CountryAccessRequest.country),
-            joinedload(CountryAccessRequest.processed_by),
-        )
         pending_requests = (
             pending_country_access_requests_query()
             .options(
@@ -496,7 +492,12 @@ def api_access_requests_list():
             .all()
         )
         processed_requests = (
-            base.filter(CountryAccessRequest.status.in_(["approved", "rejected"]))
+            processed_country_access_requests_query()
+            .options(
+                joinedload(CountryAccessRequest.user),
+                joinedload(CountryAccessRequest.country),
+                joinedload(CountryAccessRequest.processed_by),
+            )
             .order_by(
                 CountryAccessRequest.processed_at.desc().nullslast(),
                 CountryAccessRequest.created_at.desc(),

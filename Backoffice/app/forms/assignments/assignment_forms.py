@@ -9,6 +9,7 @@ from wtforms import StringField, SubmitField, SelectField, SelectMultipleField, 
 from wtforms.validators import DataRequired, Optional
 from wtforms.widgets import ListWidget, CheckboxInput
 from app.models import FormTemplate, Country, User
+from app.utils.form_localization import build_template_select_choices
 from app.models.rbac import RbacUserRole, RbacRole, RbacRolePermission, RbacPermission
 from app.models.enums import AssignmentEntityStatusValue
 from ..base import BaseForm
@@ -62,9 +63,7 @@ class AssignedFormForm(BaseForm):
         templates = FormTemplate.query.filter(
             FormTemplate.published_version_id.isnot(None)
         ).all()
-        # Sort by name (from published version) in Python since it's a property
-        templates.sort(key=lambda t: t.name if t.name else "")
-        self.template_id.choices = [(t.id, t.name) for t in templates]
+        self.template_id.choices = build_template_select_choices(templates)
         self.countries.choices = [(c.id, c.name) for c in Country.query.order_by(Country.name).all()]
         # Populate data owner choices: only active users with admin-level assignment access
         from app import db

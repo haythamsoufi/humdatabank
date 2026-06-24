@@ -4,7 +4,7 @@
 > **Last updated:** June 2026  
 > **Primary files:** `Backoffice/scripts/import_upr_excel_data.py` · `Backoffice/app/services/upr_excel_import_service.py` · `Backoffice/app/routes/admin/upr_excel_import.py` · `Backoffice/app/templates/admin/templates/upr_excel_import.html`
 
-> **Scope (June 2026):** Planning templates 24 + 22 and Reporting templates 25 + 23 are all implemented. Emergency 1/2/3 sections are intentionally skipped for the first reporting release.
+> **Scope (June 2026):** Planning templates 24 + 22 and Reporting templates 33 + 23 are all implemented. Emergency 1/2/3 sections are intentionally skipped for the first reporting release.
 
 ---
 
@@ -18,7 +18,7 @@ Sync planning and reporting data from **UPR Master.xlsx** (sheet `UPR Data`) int
 |-------------|------|----------------|-------------------|
 | **24** | Unified Country Plan | `P*` | NS Data, Funding (country-reported), Reach, Support, Comments |
 | **22** | Annual Planning – International Bilateral Support | `P*` | Funding (PNS-reported), Staff |
-| **25** | Reporting – Country | `AR*`, `MYR*` | NS Data, Core indicators, Other indicators, Funding, Support |
+| **33** | Reporting – Country | `AR*`, `MYR*` | NS Data, Core indicators, Other indicators, Funding, Support |
 | **23** | Reporting – PNS | `AR*` | Funding (PNS-reported totals) |
 
 **Emergency 1/2/3 sections** (MDR-scoped indicators) are intentionally skipped for now — see §13.
@@ -61,7 +61,7 @@ Sync planning and reporting data from **UPR Master.xlsx** (sheet `UPR Data`) int
 | `AR25` | `"2025"` | `2000 + int(round[2:])` |
 | `MYR26` | `"Jan-Jun 2026"` | `f"Jan-Jun {2000 + int(round[3:])}"` |
 
-The MYR format matches the period_name created for template 25 Mid-Year Review assignments.
+The MYR format matches the period_name created for template 33 Mid-Year Review assignments.
 
 ---
 
@@ -101,7 +101,7 @@ UPR_TEMPLATE_PROFILES = {
     22: {"name": "Annual Planning - International Bilateral Support",
          "round_prefixes": ("P",),
          "sections": frozenset({"Staff"})},  # PNS Funding handled inside Funding section when 22 ∈ tids
-    25: {"name": "Reporting - Country",
+    33: {"name": "Reporting - Country",
          "round_prefixes": ("AR", "MYR"),
          "sections": frozenset({"NS Data", "Funding", "Core indicators", "Other indicators", "Support"})},
     23: {"name": "Reporting - PNS",
@@ -125,7 +125,7 @@ Built once per import run by `build_import_context()`. Caches all DB lookups so 
 | `assignment_by_template` | `{template_id: {(period, iso3): aes_id}}` — per-template, no key collisions |
 | `assignment_by_period_iso` | Same as `assignment_by_template[24]` — backwards-compat shortcut for non-Funding sections |
 | `items_by_bank_id` | `{template_id: {indicator_bank_id: form_item_id}}` — fallback when bank id is unique |
-| `items_by_bank_section` | `{template_id: {bank_id: {section_name: form_item_id}}}` — disambiguates duplicate bank ids on T25 |
+| `items_by_bank_section` | `{template_id: {bank_id: {section_name: form_item_id}}}` — disambiguates duplicate bank ids on reporting-country template |
 | `item_ids_by_label` | `{template_id: {label_lower: form_item_id}}` |
 | `ns_name_to_id` | `{ns_name_lower: NationalSociety.id}` — for bilateral support and PNS funding rows |
 | `ns_home_country_iso3` | `{ns_name_lower: Country.iso3}` — maps PNS name to its home country for template 22 AES lookup |
@@ -311,15 +311,15 @@ Unknown `Comments_*` slugs are title-cased automatically.
 
 ---
 
-### 6.7 NS Data → Template 25 (reporting, scalar)
+### 6.7 NS Data → Template 33 (reporting, scalar)
 
 - Same `indicatorId` lookup as T24: bank IDs 723 / 724 / 727 / 1117
 - `Data_EO*` and `Data_MDR*` indicators (no `indicatorId`) are **skipped**
-- AES resolved by `(period, ISO3)` → template 25 assignment map
+- AES resolved by `(period, ISO3)` → template 33 assignment map
 
 ---
 
-### 6.8 Core indicators + Other indicators → Template 25
+### 6.8 Core indicators + Other indicators → Template 33
 
 - Sections `Core indicators` and `Other indicators`, `Entity = HNS`
 - `indicatorId` + Excel `Area` → `FormItem` (same bank id can appear on multiple section-scoped items)
@@ -338,22 +338,22 @@ Unknown `Comments_*` slugs are title-cased automatically.
 | `EF3` | Humanitarian diplomacy and communication |
 | `EF4` | Accountability and agility |
 
-> **Example:** bank id **619** exists on item **1263** (Cross Cutting) and **1298** (Response - Disasters and crises). The Cross-cutting Excel row (2,927,657) must land on 1263; the SP2 row (1,732,907) on 1298.
+> **Example:** bank id **619** exists on two section-scoped items (Cross Cutting and Response - Disasters and crises). The Cross-cutting Excel row must land on the Cross Cutting item; the SP2 row on the SP2 section item. Resolved via `items_by_bank_section` + Excel `Area`.
 
 - If `Applicable/Data not available` contains "data not available" → writes `is_data_not_available = True` (no value)
 - Otherwise uses `ValueNum` as a scalar
 
 ---
 
-### 6.9 Funding → Templates 25 and 23 (reporting)
+### 6.9 Funding → Templates 33 and 23 (reporting)
 
-**Template 25 — HNS Expenditure (scalar, item 1271):**
+**Template 33 — HNS Expenditure (scalar, item 1404):**
 - `Entity = HNS`, `Attribute = Total`, `Indicator = Expenditure` (`indicatorId = 734`), `ValueNum`
-- Resolved via `items_by_bank_id[25][734]`
+- Resolved via `items_by_bank_id[33][734]`
 
-**Template 25 — Optional SP/EF breakdown (matrix, item 1279):**
+**Template 33 — Optional SP/EF breakdown (matrix, item 1405):**
 - Rows collected where `Section = Funding`, `Entity = HNS`, `Attribute = "SP Breakdown"`
-- `Area` → matrix row (SP1–SP5, EFs mapped to the manual row labels on item 1279)
+- `Area` → matrix row (SP1–SP5, EFs mapped to the manual row labels on item 1405)
 - `Indicator = Funding` (`indicatorId = 733`) → column `Funding (CHF)`
 - `Indicator = Expenditure` (`indicatorId = 734`) → column `Expenditure (CHF)`
 - Cell key: `{row_label}_{column}` e.g. `Resilience - Climate and environment_Funding (CHF)`
@@ -367,7 +367,7 @@ Unknown `Comments_*` slugs are title-cased automatically.
 | `SP5` | Respect - Values, power and inclusion |
 | `EFs` | Enabling functions |
 
-**Template 25 — Total Funding by source (matrix, item 1260):**
+**Template 33 — Total Funding by source (matrix, item 1403):**
 - Rows collected where `Attribute = "Funding Source"` AND `indicatorId = 733`
 - `Entity = IFRC Secretariat` → row `IFRC Secretariat`
 - `Entity = PNS` (excluding NS name `Country`) → accumulated into row `PNSs`
@@ -382,10 +382,10 @@ Unknown `Comments_*` slugs are title-cased automatically.
 
 ---
 
-### 6.10 Support → Template 25 (Received Support)
+### 6.10 Support → Template 33 (Received Support)
 
 - Section `Support`, `Entity = PNS`, `ValueNum = 1`, non-aggregate Area
-- Target: **item 1261** (`Received Support`, list_library national_society)
+- Target: **item 1407** (`Received Support`, list_library national_society)
 - Row key: `NationalSociety.id` of the PNS (from `NS` column)
 - Column key: `{area} Supported` — e.g. `SP1 Supported`, `EFs Supported`
 - Paired `{area} Planned` columns are pre-filled from planning (variable/readonly) — not written by import
@@ -420,10 +420,10 @@ Unknown `Comments_*` slugs are title-cased automatically.
 
 | Item / section | Row key | Column part | Example key |
 |----------------|---------|-------------|-------------|
-| 1271 T25 Expenditure | — | — | plain scalar (`Attribute = Total`) |
-| 1279 T25 SP/EF breakdown | manual row label | `Funding (CHF)` / `Expenditure (CHF)` | `Resilience - Climate and environment_Funding (CHF)` |
-| 1260 T25 Total Funding | row name string | `NS 2025 Total Funding` | `PNSs_NS 2025 Total Funding` |
-| 1261 T25 Received Support | `NationalSociety.id` (PNS) | `{area} Supported` | `49_SP1 Supported` |
+| 1404 Reporting Expenditure | — | — | plain scalar (`Attribute = Total`) |
+| 1405 Reporting SP/EF breakdown | manual row label | `Funding (CHF)` / `Expenditure (CHF)` | `Resilience - Climate and environment_Funding (CHF)` |
+| 1403 Reporting Total Funding | row name string | `NS 2025 Total Funding` | `PNSs_NS 2025 Total Funding` |
+| 1407 Reporting Received Support | `NationalSociety.id` (PNS) | `{area} Supported` | `49_SP1 Supported` |
 | 952 T23 PNS Funding | host `NationalSociety.id` (HNS) | column name | `49_Total Funding` |
 
 ---
@@ -490,18 +490,18 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 | Template 22 (Bilateral Support) 2026 assignments created | Required for PNS funding (item 1303) and staff — one assignment per PNS home country |
 | GO API reachable (for Emergency Appeals resolution) | Runtime dependency |
 
-### Reporting (AR rounds — templates 25 + 23)
+### Reporting (AR rounds — templates 33 + 23)
 
 | Requirement | Status |
 |-------------|--------|
-| Template 25 (Reporting – Country) assignments created with `period_name = '{year}'` | Required per AR round year |
+| Template 33 (Reporting – Country) assignments created with `period_name = '{year}'` | Required per AR round year |
 | Template 23 (Reporting – PNS) assignments created with `period_name = '{year}'` | Required — one per PNS home country |
 
-### Reporting (MYR rounds — template 25 only)
+### Reporting (MYR rounds — template 33 only)
 
 | Requirement | Status |
 |-------------|--------|
-| Template 25 (Reporting – Country) assignments created with `period_name = 'Jan-Jun {year}'` | Required — e.g. `'Jan-Jun 2026'` (✅ done for MYR26) |
+| Template 33 (Reporting – Country) assignments created with `period_name = 'Jan-Jun {year}'` | Required — e.g. `'Jan-Jun 2026'` (✅ done for MYR26) |
 
 ---
 
@@ -534,10 +534,10 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 - [x] Template 22: Staff — AES via PNS home country ISO3; row key = host `NationalSociety.id` → item 1367
 
 ### Reporting (rounds AR*, MYR*)
-- [x] Template 25: NS Data scalars (bank IDs 723/724/727/1117); `Data_EO*`/`Data_MDR*` skipped
-- [x] Template 25: Core indicators + Other indicators → scalar by `indicator_bank_id`; `is_data_not_available` flag written when Excel marks row as unavailable
-- [x] Template 25: Funding — HNS Expenditure total → item 1271 (scalar, `Attribute = Total`); SP/EF breakdown → item 1279 (matrix, `Attribute = SP Breakdown`); IFRC/PNS/Other by Funding Source rows → item 1260 (manual matrix)
-- [x] Template 25: Support — bilateral ticks → item 1261 `{area} Supported` columns
+- [x] Template 33: NS Data scalars (bank IDs 723/724/727/1117); `Data_EO*`/`Data_MDR*` skipped
+- [x] Template 33: Core indicators + Other indicators → scalar by `indicator_bank_id`; `is_data_not_available` flag written when Excel marks row as unavailable
+- [x] Template 33: Funding — HNS Expenditure total → item 1404 (scalar, `Attribute = Total`); SP/EF breakdown → item 1405 (matrix, `Attribute = SP Breakdown`); IFRC/PNS/Other by Funding Source rows → item 1403 (manual matrix)
+- [x] Template 33: Support — bilateral ticks → item 1407 `{area} Supported` columns
 - [x] Template 23: Funding — PNS totals (Funding/Expenditure/Transferred) → item 952; row = host `NationalSociety.id`; AES via PNS home country
 - [x] Form UI: variable matrix cells honour `modified: ""` as cleared (not fallback to `original`)
 
@@ -611,30 +611,30 @@ python scripts/import_upr_excel_data.py \
 python scripts/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds AR25 \
-  --templates 25,23 \
+  --templates 33,23 \
   --dry-run
 
 # Live import AR25
 python scripts/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds AR25 \
-  --templates 25,23
+  --templates 33,23
 
 # ── Reporting — Mid-Year Review (MYR) ─────────────────────────────────────────
-# T23 has no MYR assignments — use template 25 only.
+# T23 has no MYR assignments — use template 33 only.
 
 # Dry run for MYR26
 python scripts/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds MYR26 \
-  --templates 25 \
+  --templates 33 \
   --dry-run
 
 # Live import MYR26
 python scripts/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds MYR26 \
-  --templates 25
+  --templates 33
 ```
 
 All commands require the Flask app context (`FLASK_CONFIG=development` is set automatically by the script).

@@ -1283,6 +1283,7 @@ def account_settings():
     pending_access_requests = []
     try:
         from app.services.country_access_request_service import (
+            is_auto_resolved_country_access_request,
             reconcile_fulfilled_pending_country_access_requests,
         )
 
@@ -1296,6 +1297,7 @@ def account_settings():
         entity_permission_keys = {(p.entity_type, p.entity_id) for p in entity_permissions}
         user_is_system_manager = AuthorizationService.is_system_manager(current_user)
         for req in all_access_requests:
+            req._auto_resolved = is_auto_resolved_country_access_request(req)
             if req.status == CountryAccessRequestStatus.APPROVED and req.country_id:
                 country_key = (EntityType.country.value, req.country_id)
                 has_access = user_is_system_manager or country_key in entity_permission_keys

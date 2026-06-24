@@ -7,6 +7,7 @@ from app.models.enums import CountryAccessRequestStatusValue, EntityType
 from app.services.country_access_request_service import (
     AUTO_RESOLVED_ADMIN_NOTE,
     count_pending_country_access_requests_needing_action,
+    is_auto_resolved_country_access_request,
     pending_country_access_requests_query,
     reconcile_fulfilled_pending_country_access_requests,
 )
@@ -79,3 +80,21 @@ class TestCountryAccessRequestReconciliation:
         assert resolved == 0
         assert req.status == CountryAccessRequestStatusValue.pending.value
         assert count_pending_country_access_requests_needing_action() == 1
+
+    def test_processed_query_includes_auto_resolved_requests(self, db_session, admin_user):
+        country = create_test_country(db_session)
+        user = create_test_user(db_session, email="auto-resolved-processed@example.com")
+        req = _make_access_request(db_session, user, country)
+        _grant_country_permission(db_session, user, country)
+
+        reconcile_fulfilled_pending_country_access_requests(
+            user_id=user.id,
+            processed_by_user_id=admin_user.id,
+        )
+
+        db_session.refresh(req)
+        from app.services.country_access_request_service import processed_country_access_requests_query
+
+        processed_ids = {r.id for r in processed_country_access_requests_query().all()}
+        assert req.id in processed_ids
+        assert is_auto_resolved_country_access_request(req)

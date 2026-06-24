@@ -33,6 +33,22 @@
         .ag-theme-alpine .ag-cell[col-id="actions"] .ag-cell-wrapper {
             overflow: visible !important;
         }
+        .ag-theme-alpine .ag-cell[col-id="actions"] .access-req-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.375rem;
+            padding: 0.25rem 0;
+            width: 100%;
+        }
+        .ag-theme-alpine .ag-cell[col-id="actions"] .access-req-actions form {
+            display: block;
+            width: 100%;
+            margin: 0;
+        }
+        .ag-theme-alpine .ag-cell[col-id="actions"] .access-req-actions .btn {
+            width: 100%;
+            justify-content: center;
+        }
     </style>
 {% endblock %}
 
@@ -109,7 +125,7 @@
           <div class="relative w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
         </span>
       </label>
-      <span id="groupByRequestToggleHint" class="sr-only">{{ _('Show each access request on its own row') }}</span>
+      <span id="groupByRequestToggleHint" class="sr-only">{{ _('Combine requests from the same user into one row') }}</span>
     </div>
   </div>
 
@@ -167,6 +183,11 @@
     const ACCESS_REQUESTS_BASE_URL = {{ url_for('user_management.access_requests')|tojson|safe }};
     const processedRequestsTotal = {{ processed_requests_total|tojson|safe }};
     const processedRequestsLoaded = {{ processed_requests|length|tojson|safe }};
+    const AUTO_RESOLVED_ADMIN_NOTE = {{ auto_resolved_admin_note|tojson|safe }};
+    const GRANTED_DIRECTLY_LABEL = {{ _('Granted directly')|tojson|safe }};
+    const USER_NOTE_LABEL = {{ _('User note')|tojson|safe }};
+    const RESOLUTION_NOTE_LABEL = {{ _('Resolution')|tojson|safe }};
+    const ADMIN_NOTE_LABEL = {{ _('Admin note')|tojson|safe }};
 
     function userAccessRequestsActionUrl(userId, action) {
         return ACCESS_REQUESTS_BASE_URL.replace(/\/?$/, '') + '/user/' + userId + '/' + action;
@@ -228,14 +249,20 @@
         allApproved: {{ _('All approved')|tojson|safe }},
         allRejected: {{ _('All rejected')|tojson|safe }},
         allPending: {{ _('All pending')|tojson|safe }},
+        allGrantedDirectly: {{ _('All granted directly')|tojson|safe }},
         approved: {{ _('approved')|tojson|safe }},
         rejected: {{ _('rejected')|tojson|safe }},
-        pending: {{ _('pending')|tojson|safe }}
+        pending: {{ _('pending')|tojson|safe }},
+        grantedDirectly: {{ _('granted directly')|tojson|safe }}
     };
 
     function summarizeRequestStatuses(requests) {
-        const counts = { approved: 0, rejected: 0, pending: 0 };
+        const counts = { approved: 0, rejected: 0, pending: 0, granted_directly: 0 };
         (requests || []).forEach(function(r) {
+            if (r.auto_resolved) {
+                counts.granted_directly += 1;
+                return;
+            }
             const status = (r.status || '').toLowerCase();
             if (status === 'approved') {
                 counts.approved += 1;
@@ -245,7 +272,7 @@
                 counts.pending += 1;
             }
         });
-        const activeTypes = ['approved', 'rejected', 'pending'].filter(function(type) {
+        const activeTypes = ['approved', 'rejected', 'pending', 'granted_directly'].filter(function(type) {
             return counts[type] > 0;
         });
         if (activeTypes.length === 1) {
@@ -256,9 +283,15 @@
             if (type === 'rejected') {
                 return { text: STATUS_SUMMARY_LABELS.allRejected, variant: 'danger', filterValue: 'rejected' };
             }
+            if (type === 'granted_directly') {
+                return { text: STATUS_SUMMARY_LABELS.allGrantedDirectly, variant: 'neutral', filterValue: 'granted_directly' };
+            }
             return { text: STATUS_SUMMARY_LABELS.allPending, variant: 'pending', filterValue: 'pending' };
         }
         const parts = [];
+        if (counts.granted_directly) {
+            parts.push(counts.granted_directly + ' ' + STATUS_SUMMARY_LABELS.grantedDirectly);
+        }
         if (counts.approved) {
             parts.push(counts.approved + ' ' + STATUS_SUMMARY_LABELS.approved);
         }
@@ -320,7 +353,10 @@
             processed_by_active: {{ (r.processed_by.active if r.processed_by else True)|tojson|safe }},
             processed_by_profile_color: {{ ((r.processed_by.profile_color if r.processed_by and r.processed_by.profile_color else '') or '')|tojson|safe }},
             processed_at: {{ (r.processed_at|datetime_iso if r.processed_at else '')|tojson|safe }},
-            request_message: {{ (r.request_message or '')|tojson|safe }}
+            created_at: {{ (r.created_at|datetime_iso if r.created_at else '')|tojson|safe }},
+            request_message: {{ (r.request_message or '')|tojson|safe }},
+            admin_notes: {{ (r.admin_notes or '')|tojson|safe }},
+            auto_resolved: {{ ((r.admin_notes or '') == auto_resolved_admin_note)|tojson|safe }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
@@ -336,15 +372,15 @@
             const count = requests.length;
             const approveConfirm = {{ _('Approve all __COUNT__ pending requests for this user?')|tojson|safe }}.replace('__COUNT__', String(count));
             const rejectConfirm = {{ _('Reject all __COUNT__ pending requests for this user?')|tojson|safe }}.replace('__COUNT__', String(count));
-            return '<div class="flex flex-col gap-1.5 py-1">' +
-                '<form action="' + approveAllUrl + '" method="POST" class="inline-block" data-confirm="' +
+            return '<div class="access-req-actions">' +
+                '<form action="' + approveAllUrl + '" method="POST" data-confirm="' +
                 AgGridRenderers.escapeHtmlAttr(approveConfirm) + '">' +
                 '<input type="hidden" name="csrf_token" value="' + CSRF_TOKEN + '">' +
                 '<button type="submit" class="btn btn-success btn-sm">' +
                 '<i class="fas fa-check-double mr-1"></i> {{ _("Approve all") }}' +
                 '</button>' +
                 '</form>' +
-                '<form action="' + rejectAllUrl + '" method="POST" class="inline-block" data-confirm="' +
+                '<form action="' + rejectAllUrl + '" method="POST" data-confirm="' +
                 AgGridRenderers.escapeHtmlAttr(rejectConfirm) + '" data-confirm-danger="true">' +
                 '<input type="hidden" name="csrf_token" value="' + CSRF_TOKEN + '">' +
                 '<button type="submit" class="btn btn-danger btn-sm">' +
@@ -357,14 +393,14 @@
         const rows = requests.map(function(r) {
             const approveUrl = r.approve_url || '';
             const rejectUrl = r.reject_url || '';
-            return '<div class="flex items-center justify-center gap-2">' +
-                '<form action="' + approveUrl + '" method="POST" class="inline-block">' +
+            return '<div class="access-req-actions">' +
+                '<form action="' + approveUrl + '" method="POST">' +
                 '<input type="hidden" name="csrf_token" value="' + CSRF_TOKEN + '">' +
                 '<button type="submit" class="btn btn-success btn-sm">' +
                 '<i class="fas fa-check mr-1"></i> {{ _("Approve") }}' +
                 '</button>' +
                 '</form>' +
-                '<form action="' + rejectUrl + '" method="POST" class="inline-block">' +
+                '<form action="' + rejectUrl + '" method="POST">' +
                 '<input type="hidden" name="csrf_token" value="' + CSRF_TOKEN + '">' +
                 '<button type="submit" class="btn btn-danger btn-sm">' +
                 '<i class="fas fa-times mr-1"></i> {{ _("Reject") }}' +
@@ -426,6 +462,7 @@
                     requests: [],
                     country_names: [],
                     request_messages: [],
+                    created_at: row.created_at || '',
                     processed_at: row.processed_at || '',
                     processed_by_emails: []
                 });
@@ -435,6 +472,9 @@
             group.country_names.push(row.country_name);
             if (row.request_message) {
                 group.request_messages.push(row.request_message);
+            }
+            if (row.created_at && (!group.created_at || row.created_at < group.created_at)) {
+                group.created_at = row.created_at;
             }
             if (row.processed_at && (!group.processed_at || row.processed_at > group.processed_at)) {
                 group.processed_at = row.processed_at;
@@ -515,6 +555,133 @@
         };
     }
 
+    function renderProcessedRequestMessage(row) {
+        const parts = [];
+        if (row.request_message) {
+            parts.push(
+                '<div class="mb-1"><span class="font-medium text-gray-600">' +
+                AgGridRenderers.escapeHtml(USER_NOTE_LABEL) + ':</span> ' +
+                AgGridRenderers.escapeHtml(row.request_message) + '</div>'
+            );
+        }
+        if (row.auto_resolved && row.admin_notes) {
+            parts.push(
+                '<div><span class="font-medium text-gray-600">' +
+                AgGridRenderers.escapeHtml(RESOLUTION_NOTE_LABEL) + ':</span> ' +
+                AgGridRenderers.escapeHtml(row.admin_notes) + '</div>'
+            );
+        } else if (!row.auto_resolved && row.admin_notes) {
+            parts.push(
+                '<div><span class="font-medium text-gray-600">' +
+                AgGridRenderers.escapeHtml(ADMIN_NOTE_LABEL) + ':</span> ' +
+                AgGridRenderers.escapeHtml(row.admin_notes) + '</div>'
+            );
+        }
+        return parts.join('');
+    }
+
+    function renderGroupedProcessedRequestMessages(rows) {
+        const uniqueUserNotes = [];
+        const seenUserNotes = new Set();
+        const uniqueResolutionNotes = [];
+        const seenResolutionNotes = new Set();
+        const uniqueAdminNotes = [];
+        const seenAdminNotes = new Set();
+
+        (rows || []).forEach(function(row) {
+            const userNote = (row.request_message || '').trim();
+            if (userNote && !seenUserNotes.has(userNote)) {
+                seenUserNotes.add(userNote);
+                uniqueUserNotes.push(userNote);
+            }
+            if (row.auto_resolved && row.admin_notes) {
+                const note = (row.admin_notes || '').trim();
+                if (note && !seenResolutionNotes.has(note)) {
+                    seenResolutionNotes.add(note);
+                    uniqueResolutionNotes.push(note);
+                }
+            } else if (!row.auto_resolved && row.admin_notes) {
+                const note = (row.admin_notes || '').trim();
+                if (note && !seenAdminNotes.has(note)) {
+                    seenAdminNotes.add(note);
+                    uniqueAdminNotes.push(note);
+                }
+            }
+        });
+
+        const parts = [];
+        uniqueUserNotes.forEach(function(note) {
+            parts.push(
+                '<div class="mb-1"><span class="font-medium text-gray-600">' +
+                AgGridRenderers.escapeHtml(USER_NOTE_LABEL) + ':</span> ' +
+                AgGridRenderers.escapeHtml(note) + '</div>'
+            );
+        });
+        uniqueResolutionNotes.forEach(function(note) {
+            parts.push(
+                '<div><span class="font-medium text-gray-600">' +
+                AgGridRenderers.escapeHtml(RESOLUTION_NOTE_LABEL) + ':</span> ' +
+                AgGridRenderers.escapeHtml(note) + '</div>'
+            );
+        });
+        uniqueAdminNotes.forEach(function(note) {
+            parts.push(
+                '<div><span class="font-medium text-gray-600">' +
+                AgGridRenderers.escapeHtml(ADMIN_NOTE_LABEL) + ':</span> ' +
+                AgGridRenderers.escapeHtml(note) + '</div>'
+            );
+        });
+        return parts.join('');
+    }
+
+    function createProcessedMessageColumnDef() {
+        return {
+            colId: 'request_message',
+            field: 'request_message',
+            headerName: '{{ _("Message") }}',
+            width: 300,
+            minWidth: 200,
+            flex: 1,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' },
+            cellRenderer: function(params) {
+                const groupedRows = params.data && params.data.requests;
+                const html = (groupedRows && groupedRows.length > 1)
+                    ? renderGroupedProcessedRequestMessages(groupedRows)
+                    : renderProcessedRequestMessage(groupedRows ? groupedRows[0] : params.data);
+                if (!html) {
+                    return '<span class="text-gray-400">—</span>';
+                }
+                return '<div class="text-gray-700 whitespace-pre-wrap">' + html + '</div>';
+            }
+        };
+    }
+
+    function renderProcessedRequestStatus(row) {
+        if (row && row.auto_resolved) {
+            if (window.StatusLabels && typeof window.StatusLabels.render === 'function') {
+                return window.StatusLabels.render(GRANTED_DIRECTLY_LABEL, 'neutral');
+            }
+            return '<span class="status-label status-label--neutral">' +
+                AgGridRenderers.escapeHtml(GRANTED_DIRECTLY_LABEL) + '</span>';
+        }
+        return AgGridRenderers.approvalStatus({ value: row ? row.status : '' });
+    }
+
+    function renderProcessedStatusCell(params, grouped) {
+        if (grouped) {
+            const requests = params.data.requests || [];
+            if (requests.length <= 1) {
+                return renderProcessedRequestStatus(requests[0]);
+            }
+            return renderGroupedStatusSummary(
+                params.data.status_summary || summarizeRequestStatuses(requests)
+            );
+        }
+        return renderProcessedRequestStatus(params.data);
+    }
+
     function createCountriesColumnDef() {
         return {
             colId: 'country',
@@ -580,16 +747,16 @@
 
     function createPendingColumnOrder(grouped) {
         if (grouped) {
-            return ['request_count', 'user_name', 'user_email', 'country', 'created_at', 'request_message', 'actions'];
+            return ['created_at', 'user_name', 'country', 'request_message', 'actions'];
         }
-        return ['id', 'user_name', 'user_email', 'country', 'created_at', 'request_message', 'actions'];
+        return ['created_at', 'user_name', 'country', 'request_message', 'id', 'actions'];
     }
 
     function createProcessedColumnOrder(grouped) {
         if (grouped) {
-            return ['request_count', 'user_name', 'user_email', 'country', 'status', 'processed_by_email', 'processed_at', 'request_message'];
+            return ['created_at', 'user_name', 'country', 'request_message', 'status', 'processed_by_email', 'processed_at'];
         }
-        return ['id', 'user_name', 'user_email', 'country', 'status', 'processed_by_email', 'processed_at', 'request_message'];
+        return ['created_at', 'user_name', 'country', 'request_message', 'status', 'processed_by_email', 'processed_at', 'id'];
     }
 
     function createPendingActionsColumnDef(grouped) {
@@ -597,9 +764,9 @@
             colId: 'actions',
             field: 'actions',
             headerName: '{{ _("Actions") }}',
-            /* Two btn-sm labels (Approve + Reject) side by side; grouped rows can still be non-multi. */
-            width: 252,
-            minWidth: 252,
+            width: 132,
+            minWidth: 120,
+            maxWidth: 148,
             pinned: 'right',
             lockPinned: true,
             lockVisible: true,
@@ -629,19 +796,7 @@
 
     function createPendingColumnDefs(grouped) {
         const cols = [];
-        if (grouped) {
-            cols.push({
-                colId: 'request_count',
-                field: 'request_count',
-                headerName: '{{ _("Requests") }}',
-                width: 120,
-                minWidth: 110,
-                maxWidth: 140,
-                filter: 'agNumberColumnFilter',
-                sortable: true,
-                cellStyle: { 'white-space': 'nowrap', 'text-align': 'center' }
-            });
-        } else {
+        if (!grouped) {
             cols.push({
                 colId: 'id',
                 field: 'id',
@@ -657,29 +812,6 @@
             });
         }
         cols.push(
-            createUserColumnDef(),
-            {
-                colId: 'user_email',
-                field: 'user_email',
-                headerName: '{{ _("Email") }}',
-                width: 250,
-                minWidth: 200,
-                maxWidth: 400,
-                filter: 'agTextColumnFilter',
-                sortable: true
-            },
-            grouped
-                ? createCountriesColumnDef()
-                : {
-                    colId: 'country',
-                    field: 'country_name',
-                    headerName: '{{ _("Country") }}',
-                    width: 200,
-                    minWidth: 150,
-                    maxWidth: 300,
-                    filter: 'agTextColumnFilter',
-                    sortable: true
-                },
             {
                 colId: 'created_at',
                 field: 'created_at',
@@ -691,6 +823,19 @@
                 sortable: true,
                 cellRenderer: AgGridRenderers.dateTime
             },
+            createUserColumnDef(),
+            grouped
+                ? createCountriesColumnDef()
+                : {
+                    colId: 'country',
+                    field: 'country_name',
+                    headerName: '{{ _("Country") }}',
+                    width: 200,
+                    minWidth: 150,
+                    maxWidth: 300,
+                    filter: 'agTextColumnFilter',
+                    sortable: true
+                },
             createMessageColumnDef(),
             createPendingActionsColumnDef(grouped)
         );
@@ -699,19 +844,7 @@
 
     function createProcessedColumnDefs(grouped) {
         const cols = [];
-        if (grouped) {
-            cols.push({
-                colId: 'request_count',
-                field: 'request_count',
-                headerName: '{{ _("Requests") }}',
-                width: 120,
-                minWidth: 110,
-                maxWidth: 140,
-                filter: 'agNumberColumnFilter',
-                sortable: true,
-                cellStyle: { 'white-space': 'nowrap', 'text-align': 'center' }
-            });
-        } else {
+        if (!grouped) {
             cols.push({
                 colId: 'id',
                 field: 'id',
@@ -727,17 +860,18 @@
             });
         }
         cols.push(
-            createUserColumnDef(),
             {
-                colId: 'user_email',
-                field: 'user_email',
-                headerName: '{{ _("Email") }}',
-                width: 250,
-                minWidth: 200,
-                maxWidth: 400,
-                filter: 'agTextColumnFilter',
-                sortable: true
+                colId: 'created_at',
+                field: 'created_at',
+                headerName: '{{ _("Requested At") }}',
+                width: 180,
+                minWidth: 150,
+                maxWidth: 250,
+                filter: 'agDateColumnFilter',
+                sortable: true,
+                cellRenderer: AgGridRenderers.dateTime
             },
+            createUserColumnDef(),
             grouped
                 ? createCountriesColumnDef()
                 : {
@@ -750,6 +884,7 @@
                     filter: 'agTextColumnFilter',
                     sortable: true
                 },
+            createProcessedMessageColumnDef(),
             {
                 colId: 'status',
                 field: 'status',
@@ -760,18 +895,7 @@
                 filter: 'customSetFilter',
                 sortable: true,
                 cellRenderer: function(params) {
-                    if (grouped) {
-                        const requests = params.data.requests || [];
-                        if (requests.length <= 1) {
-                            return AgGridRenderers.approvalStatus({
-                                value: requests[0] ? requests[0].status : params.value
-                            });
-                        }
-                        return renderGroupedStatusSummary(
-                            params.data.status_summary || summarizeRequestStatuses(requests)
-                        );
-                    }
-                    return AgGridRenderers.approvalStatus({ value: params.data.status });
+                    return renderProcessedStatusCell(params, grouped);
                 },
                 cellStyle: { 'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis' }
             },
@@ -808,8 +932,7 @@
                 maxWidth: 250,
                 filter: 'agTextColumnFilter',
                 sortable: true
-            },
-            createMessageColumnDef()
+            }
         );
         return cols;
     }
@@ -882,7 +1005,7 @@
     function syncGroupByRequestToggle() {
         const toggle = document.getElementById('groupByRequestToggle');
         if (toggle) {
-            toggle.checked = getActiveGroupByRequest();
+            toggle.checked = !getActiveGroupByRequest();
         }
     }
 
@@ -941,14 +1064,15 @@
         if (!toggle) return;
         syncGroupByRequestToggle();
         toggle.addEventListener('change', function() {
+            const groupByRequest = !toggle.checked;
             if (activeAccessRequestsTab === 'processed') {
-                processedGroupByRequest = toggle.checked;
+                processedGroupByRequest = groupByRequest;
                 localStorage.setItem(
                     GROUP_BY_REQUEST_PROCESSED_STORAGE_KEY,
                     processedGroupByRequest ? 'true' : 'false'
                 );
             } else {
-                pendingGroupByRequest = toggle.checked;
+                pendingGroupByRequest = groupByRequest;
                 localStorage.setItem(
                     GROUP_BY_REQUEST_PENDING_STORAGE_KEY,
                     pendingGroupByRequest ? 'true' : 'false'

@@ -13,6 +13,7 @@ from app.models import User, Country, UserEntityPermission, CountryAccessRequest
 from app.services.country_access_request_service import (
     count_pending_country_access_requests_needing_action,
     pending_country_access_requests_query,
+    processed_country_access_requests_query,
     reconcile_fulfilled_pending_country_access_requests,
 )
 from app.models.enums import EntityType
@@ -133,6 +134,7 @@ def manage_users():
 def access_requests():
     """List and manage country access requests."""
     from app.services.app_settings_service import get_auto_approve_access_requests
+    from app.services.country_access_request_service import AUTO_RESOLVED_ADMIN_NOTE
 
     reconcile_fulfilled_pending_country_access_requests()
     pending_requests = (
@@ -142,9 +144,7 @@ def access_requests():
     )
     from sqlalchemy.orm import joinedload
 
-    processed_base = CountryAccessRequest.query.filter(
-        CountryAccessRequest.status.in_(['approved', 'rejected'])
-    )
+    processed_base = processed_country_access_requests_query()
     processed_requests_total = processed_base.count()
     processed_requests_limit = 500
     processed_requests = (
@@ -167,7 +167,8 @@ def access_requests():
         processed_requests=processed_requests,
         processed_requests_total=processed_requests_total,
         processed_requests_limit=processed_requests_limit,
-        auto_approve_enabled=get_auto_approve_access_requests()
+        auto_approve_enabled=get_auto_approve_access_requests(),
+        auto_resolved_admin_note=AUTO_RESOLVED_ADMIN_NOTE,
     )
 
 @bp.route("/access-requests/<int:request_id>/approve", methods=["POST"])

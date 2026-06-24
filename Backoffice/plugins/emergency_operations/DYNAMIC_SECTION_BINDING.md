@@ -4,7 +4,7 @@ This document describes how dynamic-indicator sections that use `[EO1]`, `[EO2]`
 
 ## Problem
 
-Templates such as **Unified Country Report** (template 25) define three dynamic-indicator sections under “Emergency Appeals Indicators”, named e.g. `Emergency Appeal 1 Indicators: [EO1]`. Focal points add indicators and values into those sections; rows are stored in `dynamic_indicator_data` keyed by `(assignment_entity_status_id, section_id, indicator_bank_id)`.
+Templates such as **Reporting – Country** (template 33) define three dynamic-indicator sections under “Emergency Appeals Indicators”, named e.g. `Emergency Appeal 1 Indicators: [EO1]`. Focal points add indicators and values into those sections; rows are stored in `dynamic_indicator_data` keyed by `(assignment_entity_status_id, section_id, indicator_bank_id)`.
 
 Before binding, two defects compounded:
 
@@ -29,7 +29,7 @@ Table: `dynamic_section_context` ([`Backoffice/app/models/forms.py`](../../app/m
 | Column | Purpose |
 |--------|---------|
 | `assignment_entity_status_id` / `public_submission_id` | Parent submission (same dual-FK pattern as other data tables) |
-| `section_id` | The dynamic section (e.g. section 384 = EO1 slot) |
+| `section_id` | The dynamic section (e.g. the EO1 slot section) |
 | `provider_id` | e.g. `emergency_operations` |
 | `slot` | Positional slot the section references (1 = EO1, 2 = EO2, 3 = EO3) |
 | `context_key` | Stable external key — appeal **code** |
@@ -67,7 +67,7 @@ flowchart TD
 ```
 
 1. **First visit, no binding:** slots are filled from the deterministic ordered list; section headings show current appeals; no row in `dynamic_section_context` until save.
-2. **Save with indicators in section 384 (EO1):** binding created, e.g. `context_key=MDRAF019`, `slot=1`.
+2. **Save with indicators in the EO1 section:** binding created, e.g. `context_key=MDRAF019`, `slot=1`.
 3. **Later visit, API order changed:** slot 1 still shows `MDRAF019`; remaining appeals fill slots 2 and 3 without displacing bound codes.
 4. **Bound appeal no longer matches filters:** binding `status=dropped`, label from `label_snapshot`; data in `dynamic_indicator_data` unchanged and still tied to that section/binding.
 
@@ -75,7 +75,7 @@ flowchart TD
 
 - Section names (or translations) must contain `[EO1]`, `[EO2]`, or `[EO3]` for the binder to detect the slot (`slot_for_section`).
 - Relevance on `plugin_*_operations_count` is unchanged (see [RELEVANCE_RULES_EXAMPLE.md](RELEVANCE_RULES_EXAMPLE.md)).
-- **Known quirk:** section 386 in template 25 uses `equal_to 3` for operations count; with 4+ appeals, EO3’s section can be hidden. Consider `greater_than_or_equal_to` / `>= 3` in the form builder.
+- **Known quirk:** the EO3 section on template 33 uses `equal_to 3` for operations count; with 4+ appeals, EO3’s section can be hidden. Consider `greater_than_or_equal_to` / `>= 3` in the form builder.
 
 ## Backfill and limits
 

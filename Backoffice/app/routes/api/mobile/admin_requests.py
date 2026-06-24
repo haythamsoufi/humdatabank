@@ -21,6 +21,7 @@ def list_access_requests():
     from sqlalchemy.orm import joinedload
     from app.services.country_access_request_service import (
         pending_country_access_requests_query,
+        processed_country_access_requests_query,
         reconcile_fulfilled_pending_country_access_requests,
     )
 
@@ -30,9 +31,7 @@ def list_access_requests():
         joinedload(CountryAccessRequest.country),
     ).order_by(CountryAccessRequest.created_at.desc()).all()
 
-    processed_requests = CountryAccessRequest.query.filter(
-        CountryAccessRequest.status.in_(['approved', 'rejected'])
-    ).options(
+    processed_requests = processed_country_access_requests_query().options(
         joinedload(CountryAccessRequest.user),
         joinedload(CountryAccessRequest.country),
     ).order_by(CountryAccessRequest.created_at.desc()).limit(100).all()

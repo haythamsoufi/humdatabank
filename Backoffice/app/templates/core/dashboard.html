@@ -1920,7 +1920,7 @@
                                              {% endif %}
                                          </h4>
                                          <div class="flex items-center gap-3 flex-wrap">
-                                             {{ status_label_for_access_request(request.status, is_revoked) }}
+                                             {{ status_label_for_access_request(request.status, is_revoked, request._auto_resolved|default(false)) }}
                                              <span class="text-xs text-gray-500">
                                                  <i class="far fa-calendar mr-1"></i>
                                                  {{ request.created_at|datetime_local('datetime') }}
@@ -2087,7 +2087,7 @@
                                             {{ _('Unknown Country') }} (ID: {{ request.country_id }})
                                         {% endif %}
                                     </span>
-                                    {{ status_label_for_access_request(request.status, is_revoked) }}
+                                    {{ status_label_for_access_request(request.status, is_revoked, request._auto_resolved|default(false)) }}
                                 </div>
                             </div>
                         {% endfor %}

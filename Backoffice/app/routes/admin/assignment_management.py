@@ -30,7 +30,7 @@ from app.routes.admin.shared import admin_required, permission_required
 from app.utils.request_utils import is_json_request
 from sqlalchemy import func
 from app.models.forms import FormData, DynamicIndicatorData, DynamicSectionContext, RepeatGroupInstance, RepeatGroupData
-from app.utils.form_localization import get_localized_country_name
+from app.utils.form_localization import get_localized_country_name, build_template_select_choices
 from app.utils.country_utils import get_countries_by_region
 from app.services.entity_service import EntityService
 from flask_wtf import FlaskForm
@@ -97,9 +97,7 @@ class EditAssignmentDetailsForm(FlaskForm):
         templates = FormTemplate.query.filter(
             FormTemplate.published_version_id.isnot(None)
         ).all()
-        # Sort by name (from published version) in Python since it's a property
-        templates.sort(key=lambda t: t.name if t.name else "")
-        self.template_id.choices = [(t.id, t.name) for t in templates]
+        self.template_id.choices = build_template_select_choices(templates)
         # Populate data owner choices
         active_users = User.query.filter_by(active=True).order_by(User.name).all()
         self.data_owner_id.choices = [("", "— Select data owner —")] + [

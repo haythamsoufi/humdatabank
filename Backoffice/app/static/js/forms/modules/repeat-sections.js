@@ -382,8 +382,32 @@ export function initRepeatSections() {
     setupRepeatSections();
     loadExistingRepeatData();
     setupAllRepeatEntryTitleDropdowns();
+    hideDynamicSubSectionsInNavigation();
     initRepeatEntryNavigation();
     window.revealRepeatEntryTitleSelect = revealRepeatEntryTitleSelect;
+}
+
+/**
+ * Remove side-nav links for dynamic indicator sub-sections nested under repeat sections.
+ * Those sections are rendered per repeat entry, so a single sidebar link is misleading.
+ */
+function hideDynamicSubSectionsInNavigation() {
+    document.querySelectorAll('[data-exclude-from-section-nav="true"]').forEach((sectionEl) => {
+        const sectionId = sectionEl.getAttribute('data-dynamic-section-id')
+            || sectionEl.id.replace('section-container-', '').replace(/-ri-\d+$/, '');
+        const navLink = document.querySelector(
+            `a.section-link[data-section-id="section-container-${sectionId}"]`
+        );
+        navLink?.closest('li')?.remove();
+    });
+
+    document.querySelectorAll('#section-navigation-sidebar ul.ml-6').forEach((ul) => {
+        if (!ul.querySelector('li')) {
+            ul.remove();
+        }
+    });
+
+    window.__ifrcSectionNavScrollSpy?.refresh();
 }
 
 function setupRepeatSections() {
@@ -653,6 +677,7 @@ function createPerEntryDynamicWidget(sectionId, instanceNumber, aesId, sectionLa
     wrapper.setAttribute('data-section-type', 'dynamic_indicators');
     wrapper.setAttribute('data-dynamic-section-id', sectionId);
     wrapper.setAttribute('data-repeat-instance', instanceNumber);
+    wrapper.setAttribute('data-exclude-from-section-nav', 'true');
     wrapper.className = 'pt-4 sm:pt-6 border-t border-gray-300 mt-4 sm:mt-6 scroll-mt-20';
 
     // Section title heading (mirrors the server-rendered <h4> for the original sub-section)

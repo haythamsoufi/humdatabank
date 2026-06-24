@@ -453,6 +453,35 @@ def get_localized_template_name(template, locale: Optional[str] = None, version=
     return name_to_use
 
 
+def build_template_select_choices(templates):
+    """
+    Build (id, label) pairs for template SelectField choices.
+
+    When multiple templates share the same localized name, append ``(id:N)``
+    to disambiguate — matching the templates admin list behaviour.
+    """
+    if not templates:
+        return []
+
+    sorted_templates = sorted(
+        templates,
+        key=lambda t: get_localized_template_name(t) or "",
+    )
+
+    name_counts = {}
+    for template in sorted_templates:
+        name = get_localized_template_name(template)
+        name_counts[name] = name_counts.get(name, 0) + 1
+    duplicate_names = {name for name, count in name_counts.items() if count > 1}
+
+    choices = []
+    for template in sorted_templates:
+        name = get_localized_template_name(template)
+        label = f"{name} (id:{template.id})" if name in duplicate_names else name
+        choices.append((template.id, label))
+    return choices
+
+
 def get_localized_country_name(country):
     """
     Get the localized country name based on the current session language.

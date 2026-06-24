@@ -27,11 +27,13 @@
     {{ status_label(text, variant|trim, extra_class) }}
 {% endmacro %}
 
-{% macro status_label_for_access_request(status, is_revoked=false, extra_class='') %}
+{% macro status_label_for_access_request(status, is_revoked=false, auto_resolved=false, extra_class='') %}
     {% if status == 'pending' %}
         {{ status_label(_('Pending'), 'pending', extra_class) }}
     {% elif is_revoked %}
         {{ status_label(_('Access Revoked'), 'warning', extra_class) }}
+    {% elif auto_resolved %}
+        {{ status_label(_('Granted directly'), 'neutral', extra_class) }}
     {% elif status == 'approved' %}
         {{ status_label(_('Approved'), 'success', extra_class) }}
     {% elif status == 'rejected' %}

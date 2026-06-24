@@ -39,6 +39,22 @@ def count_pending_country_access_requests_needing_action() -> int:
     return int(pending_country_access_requests_query().count() or 0)
 
 
+def is_auto_resolved_country_access_request(req: CountryAccessRequest) -> bool:
+    return (req.admin_notes or "").strip() == AUTO_RESOLVED_ADMIN_NOTE
+
+
+def processed_country_access_requests_query():
+    """Approved/rejected requests for the admin processed list."""
+    return CountryAccessRequest.query.filter(
+        CountryAccessRequest.status.in_(
+            [
+                CountryAccessRequestStatusValue.approved.value,
+                CountryAccessRequestStatusValue.rejected.value,
+            ]
+        )
+    )
+
+
 def reconcile_fulfilled_pending_country_access_requests(
     *,
     user_id: int | None = None,

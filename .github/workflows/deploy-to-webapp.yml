@@ -318,11 +318,6 @@ jobs:
               echo "Static files changed in latest commit:"
               echo "${changed_files}"
               echo "changed=true" >> "$GITHUB_OUTPUT"
-              {
-                echo "changed_files<<EOF"
-                echo "${changed_files}" | sed 's|^Backoffice/app/static/||'
-                echo "EOF"
-              } >> "$GITHUB_OUTPUT"
             else
               echo "No static file changes in latest commit; skipping static upload."
               echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -379,7 +374,6 @@ jobs:
         env:
           AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
           STATIC_BLOB_CONTAINER: ${{ steps.static_config.outputs.container }}
-          STATIC_CHANGED_FILES: ${{ steps.static.outputs.changed_files }}
         run: |
           set -euo pipefail
           chmod +x Backoffice/azure/upload-static-assets.sh

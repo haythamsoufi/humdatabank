@@ -18,8 +18,6 @@
 #   STATIC_CONFIGURE_CORS=1          one-time blob CORS setup (account-level)
 #   STATIC_CORS_ORIGINS              space-separated origins when STATIC_CONFIGURE_CORS=1
 #   STATIC_FORCE_UPLOAD=1            skip dry-run short-circuit (full sync + cache-control on changed)
-#   STATIC_CHANGED_FILES             newline-separated blob paths (relative to static root);
-#                                    used for Cache-Control when set; CI may pass git diff output
 
 set -euo pipefail
 
@@ -86,11 +84,20 @@ _blob_relative_path() {
   printf '%s' "$rel"
 }
 
-_read_changed_files_env() {
-  if [[ -z "${STATIC_CHANGED_FILES:-}" ]]; then
+# Extract blob-relative path from an AzCopy dry-run Source/Destination value.
+_dry_run_blob_path() {
+  local value="$1"
+  if [[ -z "$value" ]]; then
     return 0
   fi
-  printf '%s\n' "${STATIC_CHANGED_FILES}" | sed '/^[[:space:]]*$/d'
+  if [[ "$value" == http://* || "$value" == https://* ]]; then
+    # https://account.blob.core.windows.net/container/js/foo.js?... -> js/foo.js
+    value="${value#*://${ACCOUNT_NAME}.blob.core.windows.net/${CONTAINER}/}"
+    value="${value%%\?*}"
+    printf '%s' "$value"
+    return 0
+  fi
+  _blob_relative_path "$value"
 }
 
 # Write blob-relative paths (one per line) for files AzCopy would copy.
@@ -115,12 +122,12 @@ _collect_dry_run_files() {
       select(.MessageType == "Dryrun")
       | .MessageContent
       | fromjson?
-      | select(.EntityType == "File" and (.Source // "" | length) > 0)
-      | .Source
-    ' "$dry_out" 2>/dev/null | while IFS= read -r src_path; do
-      [[ -z "$src_path" ]] && continue
-      _blob_relative_path "$src_path"
-    done | sort -u >>"$out_file" || true
+      | select(.EntityType == "File")
+      | if (.Source // "" | test("^https?://")) then .Destination // .Source else .Source end
+    ' "$dry_out" 2>/dev/null | while IFS= read -r raw_path; do
+      [[ -z "$raw_path" ]] && continue
+      _dry_run_blob_path "$raw_path"
+    done | sed '/^[[:space:]]*$/d' | sort -u >>"$out_file" || true
   fi
 
   if [[ ! -s "$out_file" ]]; then
@@ -128,10 +135,10 @@ _collect_dry_run_files() {
     if [[ -n "$log_path" && -f "$log_path" ]]; then
       grep -iE 'MessageType":"Dryrun|"MessageType":"Dryrun"' "$log_path" 2>/dev/null \
         | sed -n 's/.*"Source":"\([^"]*\)".*/\1/p' \
-        | while IFS= read -r src_path; do
-            [[ -z "$src_path" ]] && continue
-            _blob_relative_path "$src_path"
-          done | sort -u >>"$out_file" || true
+        | while IFS= read -r raw_path; do
+            [[ -z "$raw_path" ]] && continue
+            _dry_run_blob_path "$raw_path"
+          done | sed '/^[[:space:]]*$/d' | sort -u >>"$out_file" || true
     fi
   fi
 
@@ -140,7 +147,7 @@ _collect_dry_run_files() {
 
 _apply_cache_control_headers() {
   local list_file="$1"
-  local parallel count
+  local parallel count xargs_status
 
   if [[ ! -s "$list_file" ]]; then
     echo "No files need Cache-Control metadata updates."
@@ -148,17 +155,42 @@ _apply_cache_control_headers() {
   fi
 
   parallel="${STATIC_CACHE_CONTROL_PARALLEL:-32}"
-  count="$(wc -l < "$list_file" | tr -d ' ')"
-  echo "Setting Cache-Control on ${count} blob(s) (metadata only, parallel=${parallel}) ..."
+  count="$(grep -cve '^[[:space:]]*$' "$list_file" || true)"
+  echo "Setting Cache-Control on ${count} synced blob(s) (parallel=${parallel}) ..."
 
-  # GNU xargs — available on GitHub Actions ubuntu runners.
-  xargs -P "${parallel}" -I {} az storage blob update \
-    --container-name "${CONTAINER}" \
-    --name "{}" \
-    --content-cache-control "${CACHE_CONTROL}" \
-    --connection-string "${AZURE_STORAGE_CONNECTION_STRING}" \
-    --output none \
-    < "$list_file"
+  # Re-upload with --content-cache-control (AzCopy sync cannot set headers).
+  # Use the AzCopy dry-run file list — not git diff — so blob names match what was synced.
+  export CONTAINER SOURCE_DIR CACHE_CONTROL AZURE_STORAGE_CONNECTION_STRING
+
+  set +e
+  tr -d '\r' < "$list_file" \
+    | sed '/^[[:space:]]*$/d' \
+    | xargs -P "${parallel}" -I {} bash -c '
+        rel="$1"
+        local_file="${SOURCE_DIR}/${rel}"
+        if [[ ! -f "${local_file}" ]]; then
+          echo "WARN: skipping Cache-Control for missing local file: ${rel}" >&2
+          exit 0
+        fi
+        if ! az storage blob upload \
+          --container-name "${CONTAINER}" \
+          --file "${local_file}" \
+          --name "${rel}" \
+          --content-cache-control "${CACHE_CONTROL}" \
+          --connection-string "${AZURE_STORAGE_CONNECTION_STRING}" \
+          --overwrite \
+          --output none; then
+          echo "ERROR: Cache-Control upload failed for: ${rel}" >&2
+          exit 1
+        fi
+      ' _ {}
+  xargs_status=$?
+  set -e
+
+  if [[ "${xargs_status}" -ne 0 ]]; then
+    echo "ERROR: Cache-Control pass failed (xargs exit ${xargs_status})." >&2
+    return 1
+  fi
 }
 
 _upload_with_azcopy() {
@@ -198,12 +230,7 @@ _upload_with_azcopy() {
     --log-level=WARNING \
     --output-type=text
 
-  if [[ -n "${STATIC_CHANGED_FILES:-}" ]]; then
-    _read_changed_files_env | sort -u >"$cache_control_files"
-  else
-    cp "$files_to_sync" "$cache_control_files"
-  fi
-
+  tr -d '\r' < "$files_to_sync" | sed '/^[[:space:]]*$/d' | sort -u >"$cache_control_files"
   _apply_cache_control_headers "$cache_control_files"
 }
 

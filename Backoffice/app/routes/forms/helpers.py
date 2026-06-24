@@ -8,15 +8,26 @@ from contextlib import suppress
 import json
 import logging
 
-from flask import current_app
+from flask import current_app, render_template
 from sqlalchemy.orm import joinedload
 
 from app.models import (
-    FormData, FormItem, DynamicIndicatorData,
+    FormData, FormItem, DynamicIndicatorData, FormSection,
     SubmittedDocument,
 )
 from app.services.assignment_completion_service import AssignmentCompletionService
-from app.services.form_processing_service import get_form_items_for_section
+from app.services.form_processing_service import (
+    get_form_items_for_section,
+    _create_dynamic_indicator_object,
+    slugify_age_group,
+)
+from app.utils.form_localization import (
+    get_localized_indicator_definition,
+    get_localized_indicator_type,
+    get_localized_indicator_unit,
+    get_translation_key,
+)
+from config import Config as AppConfig
 
 
 def debug_numeric_value(logger, context, field_id, field_type, value, processed_value):
@@ -217,6 +228,43 @@ def existing_data_for_dynamic_assignment(dynamic_assignment) -> dict:
     if dynamic_assignment.not_applicable:
         existing_data[f'dynamic_{dynamic_assignment.id}_not_applicable'] = True
     return existing_data
+
+
+def render_dynamic_indicator_item_html(
+    dynamic_assignment,
+    section,
+    assignment_entity_status,
+    *,
+    can_edit: bool = True,
+) -> str:
+    """Render the HTML partial for one saved dynamic indicator assignment."""
+    dynamic_field = _create_dynamic_indicator_object(dynamic_assignment, section)
+
+    template_structure = None
+    if assignment_entity_status and getattr(assignment_entity_status, 'assigned_form', None):
+        template_structure = assignment_entity_status.assigned_form.template
+    if not template_structure and getattr(section, 'template', None):
+        template_structure = section.template
+    if not template_structure:
+        template_structure = type('TemplateStructure', (), {'display_order_visible': True})()
+
+    return render_template(
+        'forms/entry_form/partials/dynamic_indicator_item.html',
+        field=dynamic_field,
+        section=section,
+        existing_data=existing_data_for_dynamic_assignment(dynamic_assignment),
+        template_structure=template_structure,
+        config=AppConfig,
+        can_edit=can_edit,
+        translation_key=get_translation_key(),
+        get_localized_indicator_definition=get_localized_indicator_definition,
+        get_localized_indicator_type=get_localized_indicator_type,
+        get_localized_indicator_unit=get_localized_indicator_unit,
+        isinstance=isinstance,
+        json=json,
+        hasattr=hasattr,
+        slugify_age_group=slugify_age_group,
+    )
 
 
 def _load_existing_data_for_public_submission(submission):

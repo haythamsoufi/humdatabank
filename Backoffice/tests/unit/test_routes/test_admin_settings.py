@@ -888,6 +888,52 @@ class TestCheckUpdates:
         assert "GITHUB_REPO" in body.get("error", "")
         assert "GITHUB_TOKEN" in body.get("error", "")
 
+    def test_check_updates_not_available_when_current_is_ahead(self, logged_in_client, db_session, app):
+        """Deploy image tag (1.0.5) ahead of GitHub latest release (1.0.4) must not prompt update."""
+        mock_release = {
+            "tag_name": "v1.0.4",
+            "name": "v1.0.4",
+            "html_url": "https://github.com/repo/releases/tag/v1.0.4",
+            "published_at": "2026-04-11T00:00:00Z",
+        }
+        with _auth(), \
+             patch("app.routes.admin.settings._github_update_check_config",
+                   return_value=("haythamsoufi/humdatabank", "", "1.0.5")), \
+             patch("urllib.request.urlopen") as mock_urlopen:
+            mock_resp = MagicMock()
+            mock_resp.read.return_value = json.dumps(mock_release).encode("utf-8")
+            mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+            mock_resp.__exit__ = MagicMock(return_value=False)
+            mock_urlopen.return_value = mock_resp
+            resp = logged_in_client.get("/admin/api/settings/check-updates")
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body.get("success") is True
+        assert body.get("update_available") is False
+        assert body.get("current_version") == "1.0.5"
+        assert body.get("latest_version") == "1.0.4"
+
+    def test_check_updates_available_when_current_is_behind(self, logged_in_client, db_session, app):
+        mock_release = {
+            "tag_name": "v1.0.4",
+            "name": "v1.0.4",
+            "html_url": "https://github.com/repo/releases/tag/v1.0.4",
+            "published_at": "2026-04-11T00:00:00Z",
+        }
+        with _auth(), \
+             patch("app.routes.admin.settings._github_update_check_config",
+                   return_value=("haythamsoufi/humdatabank", "", "1.0.1")), \
+             patch("urllib.request.urlopen") as mock_urlopen:
+            mock_resp = MagicMock()
+            mock_resp.read.return_value = json.dumps(mock_release).encode("utf-8")
+            mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+            mock_resp.__exit__ = MagicMock(return_value=False)
+            mock_urlopen.return_value = mock_resp
+            resp = logged_in_client.get("/admin/api/settings/check-updates")
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body.get("update_available") is True
+
     def test_check_updates_unauthenticated(self, client, db_session):
         resp = client.get("/admin/api/settings/check-updates", follow_redirects=False)
         assert resp.status_code in (302, 401)

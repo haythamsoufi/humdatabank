@@ -152,7 +152,7 @@
                             <div class="text-sm text-gray-600 mt-2 inline-flex flex-wrap items-center gap-x-0">
                                 <span class="font-medium">{{ _('Due Date:') }}</span> {{ assignment_status.due_date|datetime_local('date') if assignment_status.due_date else _('N/A') }}
                                 <span class="mx-2">•</span>
-                                <span class="font-medium">{{ _('Status:') }}</span>
+                                <span class="font-medium mr-1">{{ _('Status:') }}</span>
                                 {% set aes_status = assignment_status.status.value if assignment_status.status is not none and assignment_status.status.value is defined else assignment_status.status %}
                                 {{ assignment_status_pipeline_badge(assignment_status.status, assignment_status.is_closed|default(false), translation_key if translation_key is defined else 'en', assignment_status.entity_status if assignment_status.entity_status is defined else none) }}
                                 {# Completion rate is loaded asynchronously after page init to keep it off the critical render path. #}

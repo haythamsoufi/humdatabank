@@ -1896,6 +1896,33 @@ def _github_repo_not_found_message(repo, token):
     )
 
 
+def _parse_semver_tuple(version_str):
+    """Parse numeric semver segments (optional leading v) for ordered comparison."""
+    if not version_str or not isinstance(version_str, str):
+        return None
+    raw = version_str.strip().lstrip("vV")
+    if not raw:
+        return None
+    parts = []
+    for piece in raw.split("."):
+        if not piece.isdigit():
+            return None
+        parts.append(int(piece))
+    return tuple(parts) if parts else None
+
+
+def _github_release_is_newer(latest_version, current_version):
+    """True only when *latest_version* is strictly newer than *current_version*."""
+    latest = _parse_semver_tuple(latest_version)
+    current = _parse_semver_tuple(current_version)
+    if latest is None or current is None:
+        return False
+    width = max(len(latest), len(current))
+    latest = latest + (0,) * (width - len(latest))
+    current = current + (0,) * (width - len(current))
+    return latest > current
+
+
 @bp.route("/api/settings/check-updates", methods=["GET"])
 @admin_permission_required('admin.settings.manage')
 def api_check_updates():
@@ -1938,7 +1965,7 @@ def api_check_updates():
             latest_name=data.get("name", tag),
             release_url=data.get("html_url", ""),
             published_at=data.get("published_at", ""),
-            update_available=bool(tag and tag != current),
+            update_available=_github_release_is_newer(tag, current),
         )
     except urllib.error.HTTPError as e:
         if e.code != 404:
@@ -1962,7 +1989,7 @@ def api_check_updates():
                 latest_name=tag,
                 release_url=tag_url,
                 published_at="",
-                update_available=bool(tag and tag != current),
+                update_available=_github_release_is_newer(tag, current),
             )
         return json_ok(current_version=current, update_available=False, message="No releases or tags found")
     except urllib.error.HTTPError as e:

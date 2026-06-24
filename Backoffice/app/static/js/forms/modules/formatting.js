@@ -100,13 +100,14 @@ export function setupNumberInputFormatting(input) {
         }
     });
 
-    // Add additional safety event for touch devices
+    // Add additional safety event for touch devices.
+    // passive: true — handler only focuses; no preventDefault (avoids scroll-blocking violation).
     container.addEventListener('touchstart', (e) => {
         if (e.target === formattedDisplay || e.target === container) {
             debugLog('formatting', `Touch started, focusing input`);
             input.focus();
         }
-    });
+    }, { passive: true });
 
     // Add input validation
     input.addEventListener('input', (e) => {

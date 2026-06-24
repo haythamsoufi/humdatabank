@@ -48,7 +48,7 @@ from app.utils.request_utils import get_json_or_form, is_json_request
 from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error, require_json_keys
 from app.utils.error_handling import handle_json_view_exception
 from app.services.form_processing_service import _create_dynamic_indicator_object
-from app.routes.forms.helpers import existing_data_for_dynamic_assignment
+from app.routes.forms.helpers import existing_data_for_dynamic_assignment, render_dynamic_indicator_item_html
 
 # Create the API blueprint
 # Changed from /forms to /api/forms to avoid prefix conflict with forms.py
@@ -386,32 +386,11 @@ def api_render_dynamic_indicator(assignment_id):
 
         assignment_entity_status = access_result['aes']
         section = FormSection.query.get_or_404(dynamic_assignment.section_id)
-        dynamic_field = _create_dynamic_indicator_object(dynamic_assignment, section)
 
-        template_structure = None
-        if assignment_entity_status and getattr(assignment_entity_status, 'assigned_form', None):
-            template_structure = assignment_entity_status.assigned_form.template
-        if not template_structure and getattr(section, 'template', None):
-            template_structure = section.template
-        if not template_structure:
-            template_structure = type('TemplateStructure', (), {'display_order_visible': True})()
-
-        html = render_template(
-            'forms/entry_form/partials/dynamic_indicator_item.html',
-            field=dynamic_field,
-            section=section,
-            existing_data=existing_data_for_dynamic_assignment(dynamic_assignment),
-            template_structure=template_structure,
-            config=Config,
-            can_edit=True,
-            translation_key=get_translation_key(),
-            get_localized_indicator_definition=get_localized_indicator_definition,
-            get_localized_indicator_type=get_localized_indicator_type,
-            get_localized_indicator_unit=get_localized_indicator_unit,
-            isinstance=isinstance,
-            json=json,
-            hasattr=hasattr,
-            slugify_age_group=slugify_age_group
+        html = render_dynamic_indicator_item_html(
+            dynamic_assignment,
+            section,
+            assignment_entity_status,
         )
 
         return json_ok(html=html)

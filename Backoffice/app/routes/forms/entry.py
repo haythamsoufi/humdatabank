@@ -56,6 +56,7 @@ from .helpers import (
     _load_existing_data_for_assignment,
     calculate_section_completion_status,
     process_existing_data_for_template,
+    render_dynamic_indicator_item_html,
 )
 
 # Late import to avoid circular reference at module level
@@ -688,22 +689,57 @@ def handle_assignment_form(aes_id):
 
     existing_data_processed['repeat_groups_data'] = repeat_groups_data
 
-    # Build per-repeat-instance dynamic indicator ID map so the frontend can lazy-fetch
-    # rendered HTML via GET /api/forms/dynamic-indicators/<id>/render after page load.
-    # Structure: { section_id: { instance_number: [ { assignment_id } ] } }
-    # Previously this block pre-rendered each indicator via render_template() in a loop
-    # (one Jinja render call per saved indicator), which was a major TTFB contributor.
-    # The client now calls the render API on init instead.
+    # Build per-repeat-instance dynamic indicator data for the frontend.
+    # Structure: { section_id: { instance_number: [ { assignment_id, html? } ] } }
+    # Repeat-instance indicators are pre-rendered here (typically a small count per entry)
+    # so the client can insert them synchronously without N lazy-fetch round trips that
+    # were failing intermittently under slow networks or page reloads.
     repeat_dynamic_indicator_data: dict = {}
     per_instance_assignments = DynamicIndicatorData.query.filter(
         DynamicIndicatorData.assignment_entity_status_id == assignment_entity_status.id,
         DynamicIndicatorData.repeat_instance_number.isnot(None)
-    ).order_by(DynamicIndicatorData.section_id, DynamicIndicatorData.repeat_instance_number, DynamicIndicatorData.order).all()
+    ).options(
+        joinedload(DynamicIndicatorData.indicator_bank),
+    ).order_by(
+        DynamicIndicatorData.section_id,
+        DynamicIndicatorData.repeat_instance_number,
+        DynamicIndicatorData.order,
+    ).all()
+
+    section_ids = {row.section_id for row in per_instance_assignments}
+    sections_by_id = {}
+    if section_ids:
+        sections_by_id = {
+            section.id: section
+            for section in FormSection.query.filter(FormSection.id.in_(section_ids))
+            .options(joinedload(FormSection.template))
+            .all()
+        }
 
     for _did in per_instance_assignments:
-        repeat_dynamic_indicator_data.setdefault(_did.section_id, {}).setdefault(_did.repeat_instance_number, []).append({
-            'assignment_id': _did.id,
-        })
+        section = sections_by_id.get(_did.section_id)
+        if not section:
+            continue
+        try:
+            indicator_html = render_dynamic_indicator_item_html(
+                _did,
+                section,
+                assignment_entity_status,
+            )
+        except Exception as exc:
+            current_app.logger.exception(
+                'Failed to pre-render repeat dynamic indicator %s: %s',
+                _did.id,
+                exc,
+            )
+            indicator_html = None
+
+        payload = {'assignment_id': _did.id}
+        if indicator_html:
+            payload['html'] = indicator_html
+        repeat_dynamic_indicator_data.setdefault(_did.section_id, {}).setdefault(
+            _did.repeat_instance_number, []
+        ).append(payload)
 
     existing_data_processed['repeat_dynamic_indicator_data'] = repeat_dynamic_indicator_data
     _entry_lap("repeat_and_dynamic_data")

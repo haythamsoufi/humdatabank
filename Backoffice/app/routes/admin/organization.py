@@ -789,6 +789,17 @@ FDS_MEMBER_EMAIL_COL = 'FDS Member Email'
 FDS_MEMBER_NAME_COL = 'FDS Member Name'
 
 
+def _parse_excel_row_id(raw_value):
+    """Return a positive integer ID from an Excel cell, or None if blank/invalid."""
+    if raw_value is None or (isinstance(raw_value, float) and pd.isna(raw_value)):
+        return None
+    try:
+        parsed = int(float(raw_value))
+        return parsed if parsed > 0 else None
+    except (ValueError, TypeError):
+        return None
+
+
 @bp.route('/countries/export', methods=['GET'])
 @permission_required_any('admin.countries.view', 'admin.countries.edit', 'admin.organization.manage')
 def export_countries():
@@ -953,10 +964,17 @@ def import_countries():
                 iso3 = str(row['ISO3']).strip().upper() if pd.notna(row.get('ISO3')) else ''
                 if not name or not iso3:
                     continue
-                existing = Country.query.filter_by(iso3=iso3).first()
-                if existing and not overwrite:
-                    errors.append(f'ISO3 "{iso3}" already exists (row {idx + 2})')
-                    continue
+                row_id = _parse_excel_row_id(row.get('ID')) if 'ID' in df.columns else None
+                existing = None
+                if overwrite and row_id:
+                    existing = db.session.get(Country, row_id)
+                elif not overwrite:
+                    existing = Country.query.filter_by(iso3=iso3).first()
+                    if existing:
+                        errors.append(f'ISO3 "{iso3}" already exists (row {idx + 2})')
+                        continue
+                elif overwrite:
+                    existing = Country.query.filter_by(iso3=iso3).first()
                 trans = {}
                 for code in translatable:
                     header = display_names.get(code, code.upper())
@@ -977,8 +995,9 @@ def import_countries():
                 currency = str(row['Currency Code']).strip().upper() if 'Currency Code' in df.columns and pd.notna(row.get('Currency Code')) else None
                 currency = currency or None
                 target_country = existing
-                if existing and overwrite:
+                if existing:
                     existing.name = name
+                    existing.iso3 = iso3
                     existing.short_name = short_name
                     existing.iso2 = iso2
                     existing.region = region
@@ -988,7 +1007,7 @@ def import_countries():
                     existing.name_translations = trans
                     updated += 1
                 else:
-                    target_country = Country(
+                    create_kwargs = dict(
                         name=name,
                         short_name=short_name,
                         iso3=iso3,
@@ -999,6 +1018,9 @@ def import_countries():
                         currency_code=currency,
                         name_translations=trans,
                     )
+                    if row_id:
+                        create_kwargs['id'] = row_id
+                    target_country = Country(**create_kwargs)
                     db.session.add(target_country)
                     imported += 1
 
@@ -1264,14 +1286,23 @@ def import_national_societies():
                     continue
                 code_val = str(row['Code']).strip() if 'Code' in df.columns and pd.notna(row.get('Code')) else None
                 code_val = code_val or None
+                row_id = _parse_excel_row_id(row.get('ID')) if 'ID' in df.columns else None
                 existing = None
-                if code_val:
-                    existing = NationalSociety.query.filter_by(code=code_val).first()
-                if not existing:
-                    existing = NationalSociety.query.filter_by(name=name, country_id=country.id).first()
-                if existing and not overwrite:
-                    errors.append(f'NS "{name}" for {country_iso3} already exists (row {idx + 2})')
-                    continue
+                if overwrite and row_id:
+                    existing = db.session.get(NationalSociety, row_id)
+                elif not overwrite:
+                    if code_val:
+                        existing = NationalSociety.query.filter_by(code=code_val).first()
+                    if not existing:
+                        existing = NationalSociety.query.filter_by(name=name, country_id=country.id).first()
+                    if existing:
+                        errors.append(f'NS "{name}" for {country_iso3} already exists (row {idx + 2})')
+                        continue
+                elif overwrite:
+                    if code_val:
+                        existing = NationalSociety.query.filter_by(code=code_val).first()
+                    if not existing:
+                        existing = NationalSociety.query.filter_by(name=name, country_id=country.id).first()
                 trans = {}
                 for code in translatable:
                     header = display_names.get(code, code.upper())
@@ -1297,7 +1328,7 @@ def import_national_societies():
                     raw = str(row[part_of_col]).strip()
                     if raw:
                         part_of = [p.strip() for p in raw.split(',') if p.strip()]
-                if existing and overwrite:
+                if existing:
                     existing.name = name
                     existing.code = code_val
                     existing.description = description
@@ -1309,7 +1340,7 @@ def import_national_societies():
                         existing.part_of = part_of
                     updated += 1
                 else:
-                    ns = NationalSociety(
+                    create_kwargs = dict(
                         name=name,
                         code=code_val,
                         description=description,
@@ -1319,6 +1350,9 @@ def import_national_societies():
                         name_translations=trans,
                         part_of=part_of,
                     )
+                    if row_id:
+                        create_kwargs['id'] = row_id
+                    ns = NationalSociety(**create_kwargs)
                     db.session.add(ns)
                     imported += 1
             except Exception as e:

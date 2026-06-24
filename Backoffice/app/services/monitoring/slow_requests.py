@@ -44,14 +44,24 @@ def _should_track() -> bool:
     return not _is_long_lived_connection_request()
 
 
-def _format_request_context() -> str:
-    method = getattr(g, 'slow_request_method', None) or request.method
-    path = getattr(g, 'slow_request_path', None) or request.path
+def _format_request_context(
+    *,
+    method: Optional[str] = None,
+    path: Optional[str] = None,
+    query: Optional[str] = None,
+    endpoint: Optional[str] = None,
+) -> str:
+    if method is None:
+        method = getattr(g, 'slow_request_method', None) or request.method
+    if path is None:
+        path = getattr(g, 'slow_request_path', None) or request.path
+    if query is None:
+        query = getattr(g, 'slow_request_query', '')
+    if endpoint is None:
+        endpoint = getattr(g, 'slow_request_endpoint', None)
     parts = [f'pid={os.getpid()}', f'method={method}', f'path={path}']
-    query = getattr(g, 'slow_request_query', '')
     if query:
         parts.append(f'query={query!r}')
-    endpoint = getattr(g, 'slow_request_endpoint', None)
     if endpoint:
         parts.append(f'endpoint={endpoint}')
     return ' '.join(parts)
@@ -66,11 +76,20 @@ def _append_pool_stats(message: str) -> str:
     return message
 
 
-def _log_inflight(level: str, tag: str, elapsed: float) -> None:
+def _log_inflight(
+    level: str,
+    tag: str,
+    elapsed: float,
+    *,
+    method: str,
+    path: str,
+    query: str = '',
+    endpoint: Optional[str] = None,
+) -> None:
     logger = current_app.logger
     message = (
         f'[{tag}] Request still in progress after {elapsed:.1f}s | '
-        f'{_format_request_context()}'
+        f'{_format_request_context(method=method, path=path, query=query, endpoint=endpoint)}'
     )
     message = _append_pool_stats(message)
     log_fn = getattr(logger, level, logger.warning)
@@ -87,12 +106,21 @@ class _InflightTimer:
         delay_seconds: float,
         level: str,
         tag: str,
+        *,
+        method: str,
+        path: str,
+        query: str = '',
+        endpoint: Optional[str] = None,
     ):
         self._app = app
         self._start_time = start_time
         self._delay_seconds = delay_seconds
         self._level = level
         self._tag = tag
+        self._method = method
+        self._path = path
+        self._query = query
+        self._endpoint = endpoint
         self._cancelled = False
         self._timer: Optional[threading.Timer] = None
 
@@ -108,7 +136,15 @@ class _InflightTimer:
             return
         with self._app.app_context():
             elapsed = time.time() - self._start_time
-            _log_inflight(self._level, self._tag, elapsed)
+            _log_inflight(
+                self._level,
+                self._tag,
+                elapsed,
+                method=self._method,
+                path=self._path,
+                query=self._query,
+                endpoint=self._endpoint,
+            )
 
     def cancel(self) -> None:
         self._cancelled = True
@@ -145,7 +181,17 @@ def track_slow_request_start() -> None:
     for delay_seconds, level, tag in schedule:
         if delay_seconds <= 0:
             continue
-        timer = _InflightTimer(app, start_time, delay_seconds, level, tag)
+        timer = _InflightTimer(
+            app,
+            start_time,
+            delay_seconds,
+            level,
+            tag,
+            method=g.slow_request_method,
+            path=g.slow_request_path,
+            query=g.slow_request_query,
+            endpoint=g.slow_request_endpoint,
+        )
         g.slow_request_timers.append(timer)
         timer.start()
 

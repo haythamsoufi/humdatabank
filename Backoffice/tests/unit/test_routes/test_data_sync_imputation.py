@@ -9,7 +9,7 @@ import uuid
 import pytest
 import tempfile
 import os
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from unittest.mock import patch, MagicMock
 
 from tests.factories import create_test_template, create_test_country
@@ -23,6 +23,46 @@ pytestmark = [pytest.mark.unit]
 
 def _json_headers():
     return {"Content-Type": "application/json", "Accept": "application/json"}
+
+
+def _create_data_sync_test_job(
+    template_id,
+    user_id,
+    *,
+    status="running",
+    download_ready=False,
+    preview_path=None,
+):
+    from app.services.async_import_job_store import (
+        FDRS_DATA_SYNC_JOB_TYPE,
+        create_import_job,
+        update_import_job,
+    )
+
+    job_id = uuid.uuid4().hex
+    create_import_job(
+        job_id=job_id,
+        job_type=FDRS_DATA_SYNC_JOB_TYPE,
+        user_id=user_id,
+        initial={
+            "template_id": template_id,
+            "stage": "running",
+            "message": "Running...",
+            "current": 10,
+            "total": 100,
+            "percent": 10.0,
+            "preview_path": preview_path,
+            "download_ready": download_ready,
+        },
+    )
+    update_import_job(
+        job_id,
+        force=True,
+        status=status,
+        download_ready=download_ready,
+        preview_path=preview_path,
+    )
+    return job_id
 
 
 @contextmanager
@@ -738,30 +778,7 @@ class TestRunDataSync:
 
 class TestDataSyncStatus:
     def _inject_job(self, template_id, user_id, status="running"):
-        from app.routes.admin.data_sync_imputation import _DATA_SYNC_JOBS, _DATA_SYNC_LOCK
-        job_id = uuid.uuid4().hex
-        with _DATA_SYNC_LOCK:
-            _DATA_SYNC_JOBS[job_id] = {
-                "job_id": job_id,
-                "template_id": template_id,
-                "user_id": user_id,
-                "status": status,
-                "stage": "running",
-                "message": "Running...",
-                "current": 10,
-                "total": 100,
-                "percent": 10.0,
-                "stats": None,
-                "error": None,
-                "preview_path": None,
-                "download_ready": False,
-                "started_at": "2026-01-01T00:00:00+00:00",
-                "updated_at": "2026-01-01T00:00:01+00:00",
-                "started_ts": time.time(),
-                "updated_ts": time.time(),
-                "last_logged_pct": None,
-            }
-        return job_id
+        return _create_data_sync_test_job(template_id, user_id, status=status)
 
     def test_nonexistent_job_returns_404(self, logged_in_client, db_session, app):
         template = create_test_template(db_session, name="FDRS Status No Job Template")
@@ -783,9 +800,9 @@ class TestDataSyncStatus:
             )
         assert resp.status_code == 404
 
-    def test_job_different_user_returns_403(self, logged_in_client, db_session, app, admin_user):
+    def test_job_different_user_returns_403(self, logged_in_client, db_session, app, admin_user, test_user):
         template = create_test_template(db_session, name="FDRS Status Denied Template")
-        job_id = self._inject_job(template.id, user_id=99999)  # Different user
+        job_id = self._inject_job(template.id, user_id=test_user.id)
         with _auth():
             resp = logged_in_client.get(
                 f"/admin/templates/data-sync/{template.id}/data-sync-status/{job_id}"
@@ -804,11 +821,13 @@ class TestDataSyncStatus:
         assert "job" in data
 
     def test_job_with_download_ready_includes_url(self, logged_in_client, db_session, app, admin_user):
-        from app.routes.admin.data_sync_imputation import _DATA_SYNC_JOBS, _DATA_SYNC_LOCK
         template = create_test_template(db_session, name="FDRS Status Download Template")
-        job_id = self._inject_job(template.id, user_id=admin_user.id, status="completed")
-        with _DATA_SYNC_LOCK:
-            _DATA_SYNC_JOBS[job_id]["download_ready"] = True
+        job_id = _create_data_sync_test_job(
+            template.id,
+            user_id=admin_user.id,
+            status="completed",
+            download_ready=True,
+        )
         with _auth():
             resp = logged_in_client.get(
                 f"/admin/templates/data-sync/{template.id}/data-sync-status/{job_id}"
@@ -828,30 +847,7 @@ class TestDataSyncStatus:
 
 class TestDataSyncCancel:
     def _inject_job(self, template_id, user_id, status="running"):
-        from app.routes.admin.data_sync_imputation import _DATA_SYNC_JOBS, _DATA_SYNC_LOCK
-        job_id = uuid.uuid4().hex
-        with _DATA_SYNC_LOCK:
-            _DATA_SYNC_JOBS[job_id] = {
-                "job_id": job_id,
-                "template_id": template_id,
-                "user_id": user_id,
-                "status": status,
-                "stage": "running",
-                "message": "Running...",
-                "current": 10,
-                "total": 100,
-                "percent": 10.0,
-                "stats": None,
-                "error": None,
-                "preview_path": None,
-                "download_ready": False,
-                "started_at": "2026-01-01T00:00:00+00:00",
-                "updated_at": "2026-01-01T00:00:01+00:00",
-                "started_ts": time.time(),
-                "updated_ts": time.time(),
-                "last_logged_pct": None,
-            }
-        return job_id
+        return _create_data_sync_test_job(template_id, user_id, status=status)
 
     def test_nonexistent_job_returns_404(self, logged_in_client, db_session, app):
         template = create_test_template(db_session, name="FDRS Cancel No Job Template")
@@ -861,9 +857,9 @@ class TestDataSyncCancel:
             )
         assert resp.status_code == 404
 
-    def test_wrong_user_returns_403(self, logged_in_client, db_session, app, admin_user):
+    def test_wrong_user_returns_403(self, logged_in_client, db_session, app, admin_user, test_user):
         template = create_test_template(db_session, name="FDRS Cancel Denied Template")
-        job_id = self._inject_job(template.id, user_id=99999)
+        job_id = self._inject_job(template.id, user_id=test_user.id)
         with _auth():
             resp = logged_in_client.post(
                 f"/admin/templates/data-sync/{template.id}/data-sync-cancel/{job_id}"
@@ -912,35 +908,19 @@ class TestDataSyncCancel:
 
 class TestDataSyncDownload:
     def _inject_job_with_file(self, template_id, user_id, create_file=True):
-        from app.routes.admin.data_sync_imputation import _DATA_SYNC_JOBS, _DATA_SYNC_LOCK
-        job_id = uuid.uuid4().hex
         preview_path = None
         if create_file:
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
             tmp.write(b"PK fake xlsx content")
             tmp.close()
             preview_path = tmp.name
-        with _DATA_SYNC_LOCK:
-            _DATA_SYNC_JOBS[job_id] = {
-                "job_id": job_id,
-                "template_id": template_id,
-                "user_id": user_id,
-                "status": "completed",
-                "stage": "completed",
-                "message": "Done",
-                "current": 100,
-                "total": 100,
-                "percent": 100.0,
-                "stats": None,
-                "error": None,
-                "preview_path": preview_path,
-                "download_ready": True,
-                "started_at": "2026-01-01T00:00:00+00:00",
-                "updated_at": "2026-01-01T00:00:01+00:00",
-                "started_ts": time.time(),
-                "updated_ts": time.time(),
-                "last_logged_pct": None,
-            }
+        job_id = _create_data_sync_test_job(
+            template_id,
+            user_id,
+            status="completed",
+            download_ready=True,
+            preview_path=preview_path,
+        )
         return job_id, preview_path
 
     def test_nonexistent_job_returns_404(self, logged_in_client, db_session, app):
@@ -951,9 +931,9 @@ class TestDataSyncDownload:
             )
         assert resp.status_code == 404
 
-    def test_wrong_user_returns_403(self, logged_in_client, db_session, app, admin_user):
+    def test_wrong_user_returns_403(self, logged_in_client, db_session, app, admin_user, test_user):
         template = create_test_template(db_session, name="FDRS Download Denied Template")
-        job_id, _ = self._inject_job_with_file(template.id, user_id=99999)
+        job_id, _ = self._inject_job_with_file(template.id, user_id=test_user.id)
         with _auth():
             resp = logged_in_client.get(
                 f"/admin/templates/data-sync/{template.id}/data-sync-download/{job_id}"
@@ -971,7 +951,8 @@ class TestDataSyncDownload:
             assert resp.status_code in (200, 404)
         finally:
             if preview_path and os.path.isfile(preview_path):
-                os.unlink(preview_path)
+                with suppress(OSError):
+                    os.unlink(preview_path)
 
     def test_file_missing_returns_404(self, logged_in_client, db_session, app, admin_user):
         template = create_test_template(db_session, name="FDRS Download Missing File Template")
@@ -993,51 +974,54 @@ class TestDataSyncDownload:
 
 class TestInternalHelpers:
     def test_utc_iso_returns_string(self):
-        from app.routes.admin.data_sync_imputation import _utc_iso
-        result = _utc_iso()
+        from app.services.async_import_job_store import utc_iso
+        result = utc_iso()
         assert isinstance(result, str)
         assert "T" in result
 
-    def test_cleanup_data_sync_jobs_locked_removes_old_jobs(self):
-        from app.routes.admin.data_sync_imputation import (
-            _DATA_SYNC_JOBS, _DATA_SYNC_LOCK, _DATA_SYNC_TTL_SECONDS,
-            _cleanup_data_sync_jobs_locked
-        )
-        old_ts = time.time() - _DATA_SYNC_TTL_SECONDS - 100
-        job_id = uuid.uuid4().hex
-        with _DATA_SYNC_LOCK:
-            _DATA_SYNC_JOBS[job_id] = {
-                "job_id": job_id,
-                "template_id": 1,
-                "user_id": 1,
-                "status": "completed",
-                "updated_ts": old_ts,
-                "started_ts": old_ts,
-                "preview_path": None,
-            }
-            _cleanup_data_sync_jobs_locked(time.time())
-        assert job_id not in _DATA_SYNC_JOBS
+    def test_cleanup_data_sync_jobs_locked_removes_old_jobs(self, db_session, admin_user):
+        from datetime import datetime, timedelta
 
-    def test_cleanup_data_sync_jobs_locked_preserves_fresh_jobs(self):
-        from app.routes.admin.data_sync_imputation import (
-            _DATA_SYNC_JOBS, _DATA_SYNC_LOCK, _cleanup_data_sync_jobs_locked
-        )
+        from app.models import AIJob
+        from app.routes.admin.data_sync_imputation import _cleanup_data_sync_jobs_locked
+        from app.services.async_import_job_store import FDRS_DATA_SYNC_JOB_TYPE, IMPORT_JOB_TTL_SECONDS
+
         job_id = uuid.uuid4().hex
-        with _DATA_SYNC_LOCK:
-            _DATA_SYNC_JOBS[job_id] = {
-                "job_id": job_id,
-                "template_id": 1,
-                "user_id": 1,
-                "status": "running",
-                "updated_ts": time.time(),
-                "started_ts": time.time(),
-                "preview_path": None,
-            }
-            _cleanup_data_sync_jobs_locked(time.time())
-        assert job_id in _DATA_SYNC_JOBS
-        # Clean up
-        with _DATA_SYNC_LOCK:
-            _DATA_SYNC_JOBS.pop(job_id, None)
+        old_created = datetime.utcnow() - timedelta(seconds=IMPORT_JOB_TTL_SECONDS + 100)
+        db_session.add(
+            AIJob(
+                id=job_id,
+                job_type=FDRS_DATA_SYNC_JOB_TYPE,
+                user_id=admin_user.id,
+                status="completed",
+                total_items=0,
+                created_at=old_created,
+                meta={"template_id": 1},
+            )
+        )
+        db_session.commit()
+        _cleanup_data_sync_jobs_locked(time.time())
+        assert AIJob.query.get(job_id) is None
+
+    def test_cleanup_data_sync_jobs_locked_preserves_fresh_jobs(self, db_session, admin_user):
+        from app.models import AIJob
+        from app.routes.admin.data_sync_imputation import _cleanup_data_sync_jobs_locked
+        from app.services.async_import_job_store import FDRS_DATA_SYNC_JOB_TYPE
+
+        job_id = uuid.uuid4().hex
+        db_session.add(
+            AIJob(
+                id=job_id,
+                job_type=FDRS_DATA_SYNC_JOB_TYPE,
+                user_id=admin_user.id,
+                status="running",
+                total_items=0,
+                meta={"template_id": 1},
+            )
+        )
+        db_session.commit()
+        _cleanup_data_sync_jobs_locked(time.time())
+        assert AIJob.query.get(job_id) is not None
 
     def test_get_data_sync_cancel_event_creates_event(self):
         from app.routes.admin.data_sync_imputation import _get_data_sync_cancel_event

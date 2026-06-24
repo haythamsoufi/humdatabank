@@ -92,6 +92,15 @@
           <span>{{ _('Dry run (preview counts + Excel, no DB write)') }}</span>
         </label>
       </div>
+      <div class="mt-6 pt-4 border-t border-gray-200">
+        <p class="text-sm font-medium text-gray-900">{{ _('Import preview (optional)') }}</p>
+        <p class="text-xs text-gray-500 mt-1">
+          {{ _('Configure templates and rounds above, then use Preview import below for row counts and warnings. You can run the import without preview.') }}
+        </p>
+      </div>
+      <div id="preview-stale-hint" class="hidden mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+        {{ _('Settings changed since the last preview — click Preview import for updated counts.') }}
+      </div>
       <div id="preview-loading" class="hidden text-center py-8 mt-4 border-t border-gray-200 pt-4"
            role="status" aria-live="polite">
         <div class="upr-wizard-spinner mx-auto mb-4" aria-hidden="true"></div>
@@ -123,7 +132,8 @@
               class="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hidden">
         {{ _('Back') }}
       </button>
-      <div class="ml-auto flex gap-2">
+      <div class="ml-auto flex flex-wrap justify-end gap-2">
+        <button type="button" id="wizard-preview" class="btn btn-secondary hidden">{{ _('Preview import') }}</button>
         <button type="button" id="wizard-next" class="btn btn-primary" disabled>{{ _('Next') }}</button>
         <button type="button" id="wizard-run" class="btn btn-purple hidden">{{ _('Run import') }}</button>
         {# shown when the import job reaches a terminal state (completed / failed) #}
@@ -157,6 +167,8 @@ document.addEventListener('DOMContentLoaded', function () {
   var analyzeLoaded = false;
   var analyzeData   = null;
   var previewLoading = false;
+  var previewLoaded = false;
+  var previewStale = false;
   var activeJobId   = null;
   var pollTimer     = null;
 
@@ -165,11 +177,16 @@ document.addEventListener('DOMContentLoaded', function () {
   var connectors = document.querySelectorAll('#wizard-steps .wizard-step-connector');
   var btnBack   = document.getElementById('wizard-back');
   var btnNext   = document.getElementById('wizard-next');
+  var btnPreview = document.getElementById('wizard-preview');
   var btnRun    = document.getElementById('wizard-run');
   var doneActions = document.getElementById('wizard-done-actions');
   var btnRestart  = document.getElementById('wizard-restart');
   var previewLoadingEl = document.getElementById('preview-loading');
   var previewSummaryEl = document.getElementById('preview-summary');
+  var previewStaleHintEl = document.getElementById('preview-stale-hint');
+  var roundsInput = document.getElementById('upr-rounds');
+  var batchSizeInput = document.getElementById('upr-batch-size');
+  var dryRunInput = document.getElementById('upr-dry-run');
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -198,13 +215,38 @@ document.addEventListener('DOMContentLoaded', function () {
     return raw.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
   }
 
+  function canRunImport() {
+    return selectedTemplateIds().length > 0;
+  }
+
+  function markPreviewStale() {
+    if (!previewLoaded || previewLoading) return;
+    previewStale = true;
+    if (previewStaleHintEl) previewStaleHintEl.classList.remove('hidden');
+  }
+
+  function clearPreviewState() {
+    previewLoaded = false;
+    previewStale = false;
+    previewSummaryEl.classList.add('hidden');
+    previewSummaryEl.innerHTML = '';
+    if (previewStaleHintEl) previewStaleHintEl.classList.add('hidden');
+  }
+
+  function resetConfigureStep() {
+    clearPreviewState();
+    previewLoading = false;
+    previewLoadingEl.classList.add('hidden');
+  }
+
   // ── Navigation ───────────────────────────────────────────────────────────
 
   function updateNavButtons() {
     var busy = step === 2 && previewLoading;
-    btnBack.disabled  = busy;
-    // btnNext is only rendered on step 1; keep its disabled state consistent
-    btnNext.disabled  = !analyzeLoaded;
+    btnBack.disabled = busy;
+    btnNext.disabled = !analyzeLoaded;
+    if (btnPreview) btnPreview.disabled = busy || !canRunImport();
+    btnRun.disabled = busy || !canRunImport();
   }
 
   function showStep(n) {
@@ -225,16 +267,63 @@ document.addEventListener('DOMContentLoaded', function () {
     btnBack.classList.toggle('hidden', n !== 2);
     // Next: visible only on upload step (step 1)
     btnNext.classList.toggle('hidden', n !== 1);
-    // Run: visible only on configure step (step 2)
+    // Run + preview: visible only on configure step (step 2)
     btnRun.classList.toggle('hidden', n !== 2);
+    if (btnPreview) btnPreview.classList.toggle('hidden', n !== 2);
     // Done actions: hidden whenever we change step (shown by pollStatus on terminal state)
     doneActions.classList.add('hidden');
-    if (n === 2) loadPreview();
     updateNavButtons();
   }
 
-  btnNext.addEventListener('click', function () { if (step === 1 && analyzeLoaded) showStep(2); });
+  btnNext.addEventListener('click', function () {
+    if (step === 1 && analyzeLoaded) {
+      resetConfigureStep();
+      showStep(2);
+    }
+  });
   btnBack.addEventListener('click', function () { if (step > 1) showStep(step - 1); });
+
+  function loadPreview() {
+    if (previewLoading || !canRunImport()) return;
+    previewLoading = true;
+    previewSummaryEl.classList.add('hidden');
+    previewSummaryEl.innerHTML = '';
+    if (previewStaleHintEl) previewStaleHintEl.classList.add('hidden');
+    previewLoadingEl.classList.remove('hidden');
+    updateNavButtons();
+
+    postJSON(previewUrl, { template_ids: selectedTemplateIds(), rounds: selectedRounds() })
+      .then(function (data) {
+        previewLoaded = !!data.success;
+        previewStale = false;
+        previewSummaryEl.classList.remove('hidden');
+        previewSummaryEl.innerHTML = data.success
+          ? renderPreviewSummary(data)
+          : '<p class="text-red-600">' + escapeHtml(data.message || '{{ _("Preview failed") }}') + '</p>';
+      })
+      .catch(function (err) {
+        previewLoaded = false;
+        previewSummaryEl.classList.remove('hidden');
+        previewSummaryEl.innerHTML = '<p class="text-red-600">' + escapeHtml(err.message || '{{ _("Preview failed") }}') + '</p>';
+      })
+      .finally(function () {
+        previewLoading = false;
+        previewLoadingEl.classList.add('hidden');
+        updateNavButtons();
+      });
+  }
+
+  if (btnPreview) btnPreview.addEventListener('click', loadPreview);
+
+  document.querySelectorAll('.template-checkbox').forEach(function (el) {
+    el.addEventListener('change', function () {
+      markPreviewStale();
+      updateNavButtons();
+    });
+  });
+  if (roundsInput) roundsInput.addEventListener('input', markPreviewStale);
+  if (batchSizeInput) batchSizeInput.addEventListener('input', markPreviewStale);
+  if (dryRunInput) dryRunInput.addEventListener('change', markPreviewStale);
 
   // ── Configure preview ────────────────────────────────────────────────────
 
@@ -255,37 +344,10 @@ document.addEventListener('DOMContentLoaded', function () {
     return html;
   }
 
-  function loadPreview() {
-    if (previewLoading) return;
-    previewLoading = true;
-    previewSummaryEl.classList.add('hidden');
-    previewSummaryEl.innerHTML = '';
-    previewLoadingEl.classList.remove('hidden');
-    btnRun.disabled = true;
-    updateNavButtons();
-
-    postJSON(previewUrl, { template_ids: selectedTemplateIds(), rounds: selectedRounds() })
-      .then(function (data) {
-        previewSummaryEl.classList.remove('hidden');
-        previewSummaryEl.innerHTML = data.success
-          ? renderPreviewSummary(data)
-          : '<p class="text-red-600">' + escapeHtml(data.message || '{{ _("Preview failed") }}') + '</p>';
-      })
-      .catch(function (err) {
-        previewSummaryEl.classList.remove('hidden');
-        previewSummaryEl.innerHTML = '<p class="text-red-600">' + escapeHtml(err.message || '{{ _("Preview failed") }}') + '</p>';
-      })
-      .finally(function () {
-        previewLoading = false;
-        previewLoadingEl.classList.add('hidden');
-        btnRun.disabled = false;
-        updateNavButtons();
-      });
-  }
-
   // ── Import job polling ───────────────────────────────────────────────────
 
   btnRun.addEventListener('click', function () {
+    if (!canRunImport() || previewLoading) return;
     showStep(3);
     document.getElementById('import-progress').classList.remove('hidden');
     postJSON(runUrl, {

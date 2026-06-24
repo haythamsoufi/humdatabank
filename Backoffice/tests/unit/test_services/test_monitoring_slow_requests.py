@@ -108,7 +108,29 @@ class TestInflightTimer:
             delay_seconds=0.05,
             level='warning',
             tag='STUCK_REQUEST',
+            method='GET',
+            path='/slow',
         )
         timer.start()
         timer.cancel()
         time.sleep(0.08)
+
+    def test_fires_outside_request_context(self, app):
+        timer = slow_requests._InflightTimer(
+            app,
+            start_time=time.time(),
+            delay_seconds=0.05,
+            level='warning',
+            tag='STUCK_REQUEST',
+            method='GET',
+            path='/slow',
+            query='id=1',
+        )
+        with patch.object(app.logger, 'warning') as mock_warning:
+            timer.start()
+            time.sleep(0.1)
+        mock_warning.assert_called_once()
+        message = mock_warning.call_args[0][0]
+        assert '[STUCK_REQUEST]' in message
+        assert '/slow' in message
+        assert 'method=GET' in message

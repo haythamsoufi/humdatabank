@@ -54,6 +54,7 @@ from config import Config
 
 from .helpers import (
     _load_existing_data_for_assignment,
+    build_entry_form_features,
     calculate_section_completion_status,
     process_existing_data_for_template,
     render_dynamic_indicator_item_html,
@@ -429,30 +430,7 @@ def handle_assignment_form(aes_id):
 
     # Feature flags — consumed by entry_form.html to emit window.__formFeatures for
     # conditional dynamic import() of heavy JS modules in main.js.
-    _section_types = {s.section_type for s in all_sections}
-    _has_document_fields = any(
-        getattr(f, 'item_type', None) == 'document_field'
-        for s in all_sections
-        for f in getattr(s, 'fields_ordered', [])
-    )
-    _has_calculated_list_fields = any(
-        getattr(f, 'lookup_list_id', None)
-        for s in all_sections
-        for f in getattr(s, 'fields_ordered', [])
-    )
-    form_features = {
-        'matrix': 'matrix' in _section_types,
-        'repeat': 'repeat' in _section_types,
-        'dynamicIndicators': 'dynamic_indicators' in _section_types,
-        'documents': _has_document_fields,
-        'calculatedLists': _has_calculated_list_fields,
-        # PDF export is always available (validation summary + doc export use it)
-        'pdfExport': True,
-        'excelExport': bool(
-            getattr(form_template, 'enable_export_excel', False) or
-            getattr(form_template, 'enable_import_excel', False)
-        ),
-    }
+    form_features = build_entry_form_features(all_sections, form_template)
 
     # FormPage rows are immutable once published.
     # The cache stores plain page-ID lists (session-safe); re-query on hit.
@@ -1480,6 +1458,8 @@ def _preview_template_impl(template_id):
 
     section_statuses = {section.name: 'Not Started' for section in all_sections}
 
+    form_features = build_entry_form_features(all_sections, template)
+
     return render_template("forms/entry_form/entry_form.html",
                          title=_("Preview: %(name)s", name=get_localized_template_name(template)),
                          assignment=mock_acs.assigned_form,
@@ -1513,5 +1493,6 @@ def _preview_template_impl(template_id):
                          preview_selected_period_name=selected_period_name,
                          preview_view_as_options=preview_view_as_options,
                          preview_period_name_options=preview_period_name_options,
+                         form_features=form_features,
                          plugin_manager=current_app.plugin_manager if hasattr(current_app, 'plugin_manager') else None,
                          form_integration=current_app.form_integration if hasattr(current_app, 'form_integration') else None)

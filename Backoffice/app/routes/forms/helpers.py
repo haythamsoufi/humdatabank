@@ -344,6 +344,47 @@ def calculate_assignment_completion_rate(assignment_entity_status_id, template_i
     ).completion_rate
 
 
+def build_entry_form_features(all_sections, form_template=None):
+    """Build ``window.__formFeatures`` flags for conditional JS module loading.
+
+    Section-level features (repeat, dynamic indicators) are detected via
+    ``section_type``. Field-level features (matrix, documents, calculated lists)
+    are detected by scanning ``fields_ordered`` on each section.
+
+    Matrix list-library items carry ``lookup_list_id`` but are handled by
+    ``matrix-handler.js``, so they are excluded from ``calculatedLists``.
+    """
+    section_types = {getattr(s, 'section_type', None) for s in (all_sections or [])}
+
+    def _iter_fields():
+        for section in (all_sections or []):
+            for field in getattr(section, 'fields_ordered', []) or []:
+                if field:
+                    yield field
+
+    fields = list(_iter_fields())
+
+    has_matrix_fields = any(getattr(f, 'item_type', None) == 'matrix' for f in fields)
+    has_document_fields = any(getattr(f, 'item_type', None) == 'document_field' for f in fields)
+    has_calculated_list_fields = any(
+        getattr(f, 'lookup_list_id', None) and getattr(f, 'item_type', None) != 'matrix'
+        for f in fields
+    )
+
+    enable_export_excel = bool(getattr(form_template, 'enable_export_excel', False)) if form_template else False
+    enable_import_excel = bool(getattr(form_template, 'enable_import_excel', False)) if form_template else False
+
+    return {
+        'matrix': has_matrix_fields,
+        'repeat': 'repeat' in section_types,
+        'dynamicIndicators': 'dynamic_indicators' in section_types,
+        'documents': has_document_fields,
+        'calculatedLists': has_calculated_list_fields,
+        'pdfExport': True,
+        'excelExport': enable_export_excel or enable_import_excel,
+    }
+
+
 def calculate_section_completion_status(all_sections, existing_data_processed, existing_submitted_documents_dict):
     """Calculate completion status for sections - returns dict format expected by template."""
     section_statuses = {}

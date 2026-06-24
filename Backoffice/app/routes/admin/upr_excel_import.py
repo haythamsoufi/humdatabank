@@ -19,11 +19,17 @@ from app.utils.file_parsing import EXCEL_EXTENSIONS
 
 from app.routes.admin.data_sync_imputation import (
     _DATA_SYNC_CANCEL_EVENTS,
-    _DATA_SYNC_JOBS,
     _DATA_SYNC_LOCK,
     _cleanup_data_sync_jobs_locked,
     _get_data_sync_cancel_event,
-    _utc_iso,
+)
+from app.services.async_import_job_store import (
+    UPR_EXCEL_IMPORT_JOB_TYPE,
+    create_import_job,
+    get_import_job,
+    is_import_job_cancel_requested,
+    request_import_job_cancel,
+    update_import_job,
 )
 
 bp = Blueprint("upr_excel_import", __name__, url_prefix="/admin/templates/upr-excel-import")
@@ -130,14 +136,15 @@ def run_import():
             return json_server_error(str(exc))
 
     job_id = uuid.uuid4().hex
-    now_ts = time.time()
 
     with _DATA_SYNC_LOCK:
-        _cleanup_data_sync_jobs_locked(now_ts)
-        _DATA_SYNC_JOBS[job_id] = {
-            "job_id": job_id,
+        _cleanup_data_sync_jobs_locked(time.time())
+    create_import_job(
+        job_id=job_id,
+        job_type=UPR_EXCEL_IMPORT_JOB_TYPE,
+        user_id=int(getattr(current_user, "id", 0) or 0),
+        initial={
             "kind": "upr_excel",
-            "user_id": int(getattr(current_user, "id", 0) or 0),
             "status": "queued",
             "stage": "queued",
             "message": "Queued",
@@ -146,51 +153,52 @@ def run_import():
             "percent": 0.0,
             "stats": None,
             "error": None,
-            # preview_path is set from stats["preview_path"] after the worker completes
             "preview_path": None,
             "download_ready": False,
-            "started_at": _utc_iso(),
-            "updated_at": _utc_iso(),
-            "started_ts": now_ts,
-            "updated_ts": now_ts,
-        }
+        },
+    )
 
     cancel_ev = _get_data_sync_cancel_event(job_id)
-    logger = current_app.logger
+    worker_app = current_app._get_current_object()
 
-    def _worker() -> None:
-        from app import create_app
-
-        app = create_app()
+    def _worker(app=worker_app) -> None:
+        last_cancel_db_check = 0.0
 
         def _progress_cb(payload: Dict[str, Any]) -> None:
-            with _DATA_SYNC_LOCK:
-                job = _DATA_SYNC_JOBS.get(job_id)
-                if not job:
-                    return
-                job["status"] = "running"
-                job["stage"] = payload.get("stage") or job.get("stage")
-                job["message"] = payload.get("message") or job.get("message")
-                job["current"] = payload.get("current")
-                job["total"] = payload.get("total")
-                if payload.get("percent") is not None:
-                    job["percent"] = float(payload["percent"])
-                if payload.get("stats"):
-                    job["stats"] = dict(payload["stats"])
-                job["updated_at"] = _utc_iso()
-                job["updated_ts"] = time.time()
+            fields: Dict[str, Any] = {
+                "status": "running",
+                "stage": payload.get("stage"),
+                "message": payload.get("message"),
+                "current": payload.get("current"),
+                "total": payload.get("total"),
+            }
+            if payload.get("percent") is not None:
+                fields["percent"] = float(payload["percent"])
+            if payload.get("stats"):
+                fields["stats"] = dict(payload["stats"])
+            update_import_job(job_id, **fields)
 
         def _cancel_check() -> bool:
-            return cancel_ev.is_set()
+            nonlocal last_cancel_db_check
+            if cancel_ev.is_set():
+                return True
+            now = time.time()
+            if now - last_cancel_db_check >= 1.0:
+                last_cancel_db_check = now
+                if is_import_job_cancel_requested(job_id):
+                    cancel_ev.set()
+                    return True
+            return False
 
         with app.app_context():
             try:
-                with _DATA_SYNC_LOCK:
-                    job = _DATA_SYNC_JOBS.get(job_id)
-                    if job:
-                        job["status"] = "running"
-                        job["stage"] = "starting"
-                        job["message"] = "Starting UPR import..."
+                update_import_job(
+                    job_id,
+                    force=True,
+                    status="running",
+                    stage="starting",
+                    message="Starting UPR import...",
+                )
                 stats = UprExcelImportService.run_import(
                     file_path=file_path,
                     template_ids=template_ids,
@@ -201,36 +209,38 @@ def run_import():
                     progress_cb=_progress_cb,
                     cancel_check=_cancel_check,
                 )
-                with _DATA_SYNC_LOCK:
-                    job = _DATA_SYNC_JOBS.get(job_id)
-                    if not job:
-                        return
-                    preview_file = stats.get("preview_path")
-                    job["status"] = "completed"
-                    job["stage"] = "complete"
-                    job["message"] = "Import completed"
-                    job["percent"] = 100.0
-                    job["stats"] = stats
-                    job["preview_path"] = preview_file
-                    job["download_ready"] = bool(dry_run and preview_file)
-                    if job["download_ready"]:
-                        job["download_url"] = f"/admin/templates/upr-excel-import/download/{job_id}"
-                    job["updated_at"] = _utc_iso()
-                    job["updated_ts"] = time.time()
+                preview_file = stats.get("preview_path")
+                download_ready = bool(dry_run and preview_file)
+                update_import_job(
+                    job_id,
+                    force=True,
+                    status="completed",
+                    stage="complete",
+                    message="Import completed",
+                    percent=100.0,
+                    stats=stats,
+                    preview_path=preview_file,
+                    download_ready=download_ready,
+                    download_url=f"/admin/templates/upr-excel-import/download/{job_id}" if download_ready else None,
+                )
             except Exception as exc:
-                logger.error("UPR async import failed: %s", exc, exc_info=True)
-                with _DATA_SYNC_LOCK:
-                    job = _DATA_SYNC_JOBS.get(job_id)
-                    if job:
-                        job["status"] = "failed"
-                        job["error"] = str(exc)
-                        job["message"] = str(exc)
-                        job["updated_at"] = _utc_iso()
-                        job["updated_ts"] = time.time()
+                app.logger.error("UPR async import failed: %s", exc, exc_info=True)
+                update_import_job(
+                    job_id,
+                    force=True,
+                    status="failed",
+                    error=str(exc),
+                    message=str(exc),
+                )
             finally:
                 _DATA_SYNC_CANCEL_EVENTS.pop(job_id, None)
+                from app.extensions import db
+                db.session.remove()
 
-    threading.Thread(target=_worker, daemon=True).start()
+    if current_app.config.get("TESTING"):
+        _worker(worker_app)
+    else:
+        threading.Thread(target=_worker, args=(worker_app,), daemon=True).start()
     return json_accepted(success=True, job_id=job_id)
 
 
@@ -238,8 +248,7 @@ def run_import():
 @admin_permission_required("admin.templates.view")
 @system_manager_required
 def job_status(job_id: str):
-    with _DATA_SYNC_LOCK:
-        job = _DATA_SYNC_JOBS.get(job_id)
+    job = get_import_job(job_id)
     if not job or job.get("kind") != "upr_excel":
         return json_bad_request("Job not found")
     return json_ok(success=True, job=job)
@@ -249,11 +258,10 @@ def job_status(job_id: str):
 @admin_permission_required("admin.templates.edit")
 @system_manager_required
 def cancel_job(job_id: str):
-    with _DATA_SYNC_LOCK:
-        job = _DATA_SYNC_JOBS.get(job_id)
-        if not job or job.get("kind") != "upr_excel":
-            return json_bad_request("Job not found")
-        job["status"] = "cancel_requested"
+    job = get_import_job(job_id)
+    if not job or job.get("kind") != "upr_excel":
+        return json_bad_request("Job not found")
+    request_import_job_cancel(job_id)
     ev = _get_data_sync_cancel_event(job_id)
     ev.set()
     return json_ok(success=True)
@@ -263,8 +271,7 @@ def cancel_job(job_id: str):
 @admin_permission_required("admin.templates.view")
 @system_manager_required
 def download_preview(job_id: str):
-    with _DATA_SYNC_LOCK:
-        job = _DATA_SYNC_JOBS.get(job_id)
+    job = get_import_job(job_id)
     if not job or not job.get("download_ready"):
         return json_bad_request("Preview not available")
     path = job.get("preview_path")

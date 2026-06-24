@@ -337,6 +337,179 @@ class TestImportCountries:
         )
         assert resp.status_code == 302
 
+    def test_import_overwrite_by_id_updates_instead_of_inserting(self, logged_in_client, db_session, app):
+        import openpyxl
+        from app.models.core import Country
+
+        country = create_test_country(db_session, name="Original Country", iso3="OLD", iso2="OL")
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["ID", "Name", "ISO3", "ISO2", "Region", "Status", "Preferred Language", "Currency Code"])
+        ws.append([country.id, "Renamed Country", "NEW", "NW", "Europe", "Active", "en", "EUR"])
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        with patch(
+            "app.utils.advanced_validation.AdvancedValidator.validate_mime_type",
+            return_value=(True, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        ):
+            resp = logged_in_client.post(
+                "/admin/organization/countries/import",
+                data={
+                    "excel_file": (buf, "countries.xlsx"),
+                    "overwrite_existing": "on",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+
+        with app.app_context():
+            updated = db_session.get(Country, country.id)
+            assert updated is not None
+            assert updated.name == "Renamed Country"
+            assert updated.iso3 == "NEW"
+            assert updated.iso2 == "NW"
+            assert Country.query.count() == 1
+
+    def test_import_overwrite_without_id_still_matches_iso3(self, logged_in_client, db_session, app):
+        import openpyxl
+        from app.models.core import Country
+
+        country = create_test_country(db_session, name="Template Country", iso3="TPL", iso2="TP")
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["Name", "ISO3", "ISO2", "Region", "Status", "Preferred Language", "Currency Code"])
+        ws.append(["Updated Template Country", "TPL", "TP", "Europe", "Active", "en", "USD"])
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        with patch(
+            "app.utils.advanced_validation.AdvancedValidator.validate_mime_type",
+            return_value=(True, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        ):
+            resp = logged_in_client.post(
+                "/admin/organization/countries/import",
+                data={
+                    "excel_file": (buf, "countries.xlsx"),
+                    "overwrite_existing": "on",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+
+        with app.app_context():
+            updated = db_session.get(Country, country.id)
+            assert updated.name == "Updated Template Country"
+            assert Country.query.count() == 1
+
+    def test_import_overwrite_with_unknown_id_inserts(self, logged_in_client, db_session, app):
+        import openpyxl
+        from app.models.core import Country
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["ID", "Name", "ISO3", "ISO2", "Region", "Status", "Preferred Language", "Currency Code"])
+        ws.append([99991, "New Country", "NC9", "N9", "Europe", "Active", "en", "USD"])
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        with patch(
+            "app.utils.advanced_validation.AdvancedValidator.validate_mime_type",
+            return_value=(True, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        ):
+            resp = logged_in_client.post(
+                "/admin/organization/countries/import",
+                data={
+                    "excel_file": (buf, "countries.xlsx"),
+                    "overwrite_existing": "on",
+                },
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+
+        with app.app_context():
+            created = db_session.get(Country, 99991)
+            assert created is not None
+            assert created.name == "New Country"
+            assert created.iso3 == "NC9"
+
+
+class TestImportNationalSocietiesOverwrite:
+    def test_import_overwrite_by_id_updates_instead_of_inserting(self, logged_in_client, db_session, app):
+        import openpyxl
+        from app.models.core import Country
+        from app.models.organization import NationalSociety
+
+        country_a = create_test_country(db_session, name="Country A", iso3="CTA", iso2="CA")
+        country_b = create_test_country(db_session, name="Country B", iso3="CTB", iso2="CB")
+        ns = NationalSociety(name="Original NS", code="ORG", country_id=country_a.id, is_active=True)
+        db_session.add(ns)
+        db_session.commit()
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["ID", "Name", "Code", "Description", "Country ISO3", "Is Active", "Display Order"])
+        ws.append([ns.id, "Renamed NS", "REN", "Updated", "CTB", "Yes", 5])
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        resp = logged_in_client.post(
+            "/admin/organization/national-societies/import",
+            data={
+                "excel_file": (buf, "nss.xlsx"),
+                "overwrite_existing": "on",
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+
+        with app.app_context():
+            updated = db_session.get(NationalSociety, ns.id)
+            assert updated is not None
+            assert updated.name == "Renamed NS"
+            assert updated.code == "REN"
+            assert updated.country_id == country_b.id
+            assert updated.display_order == 5
+            assert NationalSociety.query.count() == 1
+
+    def test_import_overwrite_with_unknown_id_inserts(self, logged_in_client, db_session, app):
+        import openpyxl
+        from app.models.organization import NationalSociety
+
+        country = create_test_country(db_session, name="NS Insert Country", iso3="NIC", iso2="NI")
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["ID", "Name", "Code", "Description", "Country ISO3", "Is Active", "Display Order"])
+        ws.append([99992, "Brand New NS", "BNW", "", "NIC", "Yes", 0])
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        resp = logged_in_client.post(
+            "/admin/organization/national-societies/import",
+            data={
+                "excel_file": (buf, "nss.xlsx"),
+                "overwrite_existing": "on",
+            },
+            content_type="multipart/form-data",
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+
+        with app.app_context():
+            created = db_session.get(NationalSociety, 99992)
+            assert created is not None
+            assert created.name == "Brand New NS"
+            assert created.country_id == country.id
+
 
 # ---------------------------------------------------------------------------
 # National Societies CRUD

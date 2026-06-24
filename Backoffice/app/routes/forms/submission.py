@@ -39,6 +39,7 @@ from config import Config
 from .helpers import (
     _load_existing_data_for_public_submission,
     _prepare_submitted_documents_for_template,
+    build_entry_form_features,
 )
 
 
@@ -460,6 +461,8 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
     else:
         title = f"View Submission: {submission.country.name} - {submission.submitted_at.strftime('%Y-%m-%d %H:%M')}"
 
+    form_features = build_entry_form_features(all_sections, form_template)
+
     return render_template("forms/entry_form/entry_form.html",
                          title=title,
                          assignment=submission.assigned_form,
@@ -490,6 +493,7 @@ def handle_public_submission_form(submission_id, is_edit_mode=False):
                          is_public_submission=True,
                          country_select_form=country_select_form,
                          submission_details_form=submission_details_form,
+                         form_features=form_features,
                          plugin_manager=current_app.plugin_manager if hasattr(current_app, 'plugin_manager') else None,
                          form_integration=current_app.form_integration if hasattr(current_app, 'form_integration') else None)
 
@@ -741,6 +745,8 @@ def _fill_public_form_impl(public_token):
         if section.section_type == 'dynamic_indicators':
             section.data_entry_display_filters_config = getattr(section, 'data_entry_display_filters_list', [])
 
+    form_features = build_entry_form_features(sections, form_template)
+
     return render_template("forms/entry_form/entry_form.html",
                            title=get_localized_template_name(form_template),
                            assignment=assigned_form,
@@ -772,5 +778,6 @@ def _fill_public_form_impl(public_token):
                            submission_details_form=submission_details_form,
                            public_token=public_token,
                            form_action=url_for('forms.fill_public_form', public_token=public_token),
+                           form_features=form_features,
                            plugin_manager=current_app.plugin_manager if hasattr(current_app, 'plugin_manager') else None,
                            form_integration=current_app.form_integration if hasattr(current_app, 'form_integration') else None)

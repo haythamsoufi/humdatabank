@@ -11,6 +11,7 @@ Covers:
   - map_unified_item_to_original
   - calculate_assignment_completion_rate
   - calculate_section_completion_status
+  - build_entry_form_features
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 import pytest
 
 from app.routes.forms.helpers import (
+    build_entry_form_features,
     calculate_section_completion_status,
     debug_numeric_value,
     map_unified_item_to_original,
@@ -906,3 +908,61 @@ class TestCalculateSectionCompletionStatus:
         result = calculate_section_completion_status([s1, s2], data, {})
         assert result["S1"] == "Completed"
         assert result["S2"] == "Not Started"
+
+
+# ---------------------------------------------------------------------------
+# build_entry_form_features
+# ---------------------------------------------------------------------------
+
+class TestBuildEntryFormFeatures:
+    def _field(self, *, item_type='question', lookup_list_id=None):
+        return SimpleNamespace(item_type=item_type, lookup_list_id=lookup_list_id)
+
+    def _section(self, section_type='standard', fields=None):
+        return SimpleNamespace(section_type=section_type, fields_ordered=fields or [])
+
+    def test_matrix_field_in_standard_section_enables_matrix(self):
+        sections = [self._section(fields=[self._field(item_type='matrix')])]
+        features = build_entry_form_features(sections)
+        assert features['matrix'] is True
+        assert features['calculatedLists'] is False
+
+    def test_matrix_list_library_does_not_enable_calculated_lists(self):
+        sections = [self._section(fields=[
+            self._field(item_type='matrix', lookup_list_id='national_society'),
+        ])]
+        features = build_entry_form_features(sections)
+        assert features['matrix'] is True
+        assert features['calculatedLists'] is False
+
+    def test_question_with_lookup_list_enables_calculated_lists(self):
+        sections = [self._section(fields=[
+            self._field(item_type='question', lookup_list_id='emergency_operations'),
+        ])]
+        features = build_entry_form_features(sections)
+        assert features['calculatedLists'] is True
+        assert features['matrix'] is False
+
+    def test_repeat_and_dynamic_indicators_use_section_type(self):
+        sections = [
+            self._section(section_type='repeat'),
+            self._section(section_type='dynamic_indicators'),
+        ]
+        features = build_entry_form_features(sections)
+        assert features['repeat'] is True
+        assert features['dynamicIndicators'] is True
+
+    def test_document_field_flag(self):
+        sections = [self._section(fields=[self._field(item_type='document_field')])]
+        features = build_entry_form_features(sections)
+        assert features['documents'] is True
+
+    def test_excel_export_follows_template_flags(self):
+        template = SimpleNamespace(enable_export_excel=True, enable_import_excel=False)
+        features = build_entry_form_features([], template)
+        assert features['excelExport'] is True
+
+    def test_pdf_export_always_enabled(self):
+        features = build_entry_form_features([])
+        assert features['pdfExport'] is True
+        assert features['excelExport'] is False

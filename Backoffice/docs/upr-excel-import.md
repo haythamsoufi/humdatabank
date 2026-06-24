@@ -436,7 +436,7 @@ Accessible from the "UPR Excel Sync" button in the Data Sync & Imputation header
 | Step | Panel | What happens |
 |------|-------|-------------|
 | 1 Upload | `panel-1` | Drag/drop or click to select file. The dropzone validates the file type/size client-side, then POSTs to `/upload` (server-side MIME + extension check), then immediately POSTs to `/analyze` (reads the "UPR Data" sheet). The workbook summary (rows, countries, rounds, sections) appears in the dropzone status panel on success, or an error message on failure. The **Next** button is only enabled after analyze succeeds. |
-| 2 Configure | `panel-2` | Template checkboxes, round filter (blank = all P*), batch size, dry-run toggle. Auto-calls `/preview` on arrival → shows transformed row count, countries, and deduplicated warnings in a scrollable panel. |
+| 2 Configure | `panel-2` | Template checkboxes, round filter (blank = all P*), batch size, dry-run toggle. **Preview import** (optional) calls `/preview` on demand and shows transformed row count, countries, and deduplicated warnings. **Run import** is available immediately after configuring settings; preview is not required. |
 | 3 Import | `panel-3` | Async background job via `/run`; polls `/status/<job_id>` every second; shows progress bar. |
 
 ### Warning display

@@ -722,6 +722,7 @@ def manage_settings():
     ai_beta_enabled = bool(ai_beta_settings.get("enabled", False))
     ai_beta_allowed_user_ids = [int(uid) for uid in (ai_beta_settings.get("allowed_user_ids") or []) if str(uid).strip().isdigit()]
     ai_beta_user_options = []
+    email_test_user_options = []
     with suppress(Exception):
         from app.models import User
 
@@ -739,6 +740,7 @@ def manage_settings():
             for user in users
             if getattr(user, "id", None)
         ]
+    email_test_user_options = [u for u in ai_beta_user_options if u.get("email")]
 
     # Notification priorities (per notification type)
     from app.models.enums import NotificationType
@@ -1338,6 +1340,7 @@ def manage_settings():
         ai_beta_enabled=ai_beta_enabled,
         ai_beta_allowed_user_ids=ai_beta_allowed_user_ids,
         ai_beta_user_options=ai_beta_user_options,
+        email_test_user_options=email_test_user_options,
         notification_priorities=notification_priorities,
         notification_delivery_catalog=notification_delivery_catalog,
         notification_feature_flags=notification_feature_flags,
@@ -1638,12 +1641,75 @@ def _response_for_email_test_send_failure(failure: list, msg: str):
     return json_server_error(msg)
 
 
+def _personalize_email_preview_context_for_user(context: dict, user) -> dict:
+    """Substitute sample names/emails in preview context when test-sending to a real user."""
+    if not context or not user:
+        return context or {}
+    out = dict(context)
+    display = (
+        str(getattr(user, "name", "") or "").strip()
+        or str(getattr(user, "email", "") or "").strip()
+    )
+    first = display.split()[0] if display else ""
+    email = str(getattr(user, "email", "") or "").strip()
+    uid = getattr(user, "id", None)
+    if "user_name" in out and first:
+        out["user_name"] = first
+    if "submitter_name" in out and display:
+        out["submitter_name"] = display
+    if "submitter_email" in out and email:
+        out["submitter_email"] = email
+    if "user_email" in out and email:
+        out["user_email"] = email
+    if "user_id" in out and uid is not None:
+        out["user_id"] = uid
+    return out
+
+
+def _resolve_email_template_test_recipient(data: dict):
+    """
+    Resolve test-send recipient from POST body.
+
+    Returns ``(recipient_email, recipient_user, error_response)``.
+    Default (no ``recipient_user_id``): signed-in admin's email.
+    """
+    from app.models import User
+
+    if not current_user.is_authenticated:
+        return None, None, json_bad_request("You must be signed in to send a test message.")
+
+    raw_uid = data.get("recipient_user_id")
+    if raw_uid is None or raw_uid == "":
+        email = str(getattr(current_user, "email", "") or "").strip()
+        if not email:
+            return None, None, json_bad_request(
+                "Your account has no email address; cannot send a test message."
+            )
+        return email, current_user, None
+
+    try:
+        uid = int(raw_uid)
+    except (TypeError, ValueError):
+        return None, None, json_bad_request("recipient_user_id must be a valid user id.")
+
+    user = User.query.filter(User.id == uid, User.active.is_(True)).first()
+    if not user:
+        return None, None, json_bad_request("Selected user was not found or is inactive.")
+    email = str(getattr(user, "email", "") or "").strip()
+    if not email:
+        return None, None, json_bad_request("Selected user has no email address.")
+    return email, user, None
+
+
 @bp.route("/api/settings/email-template-test-send", methods=["POST"])
 @admin_permission_required("admin.settings.manage")
 def api_settings_email_template_test_send():
     """
-    Send one test email to the signed-in user's address using the same HTML and sample
-    context as the preview (unsaved editor content for the given language).
+    Send one test email using the same HTML and sample context as the preview
+    (unsaved editor content for the given language).
+
+    Optional ``recipient_user_id`` in JSON sends to that active user's email;
+    otherwise the message goes to the signed-in admin's address.
 
     Accepts the same JSON shape as :func:`api_settings_email_template_preview` (flat or
     ``payload`` / ``payload_b64`` wrapper).
@@ -1659,14 +1725,14 @@ def api_settings_email_template_test_send():
         sanitize_admin_email_html_for_api,
     )
 
-    if not current_user.is_authenticated:
-        return json_bad_request("You must be signed in to send a test message.")
-    if not getattr(current_user, "email", None):
-        return json_bad_request("Your account has no email address; cannot send a test message.")
-
     data, parse_err = _parse_email_template_api_request_body()
     if parse_err:
         return parse_err
+
+    recipient_email, recipient_user, recipient_err = _resolve_email_template_test_recipient(data)
+    if recipient_err:
+        return recipient_err
+
     template_key = (data.get("template_key") or "").strip()
     html_b64 = data.get("html_b64")
     template_language = data.get("template_language") or data.get("lang")
@@ -1685,6 +1751,8 @@ def api_settings_email_template_test_send():
     context = get_email_template_preview_context(
         template_key, template_language=template_language
     )
+    if recipient_user is not None:
+        context = _personalize_email_preview_context_for_user(context, recipient_user)
     rendered, err = render_admin_email_template_for_preview(source, **context)
     if err:
         return json_bad_request(err)
@@ -1698,7 +1766,7 @@ def api_settings_email_template_test_send():
         failure: list = []
         ok = send_email(
             subject=subject,
-            recipients=[current_user.email],
+            recipients=[recipient_email],
             html=sanitize_admin_email_html_for_api(rendered),
             sender=current_app.config.get("MAIL_DEFAULT_SENDER"),
             _failure_info=failure,
@@ -1715,7 +1783,7 @@ def api_settings_email_template_test_send():
             "email template test send failed: template=%s tlang=%s user_id=%s failure=%r message=%s",
             template_key,
             tlang,
-            getattr(current_user, "id", None),
+            getattr(recipient_user, "id", None),
             failure,
             msg,
         )
@@ -1725,10 +1793,10 @@ def api_settings_email_template_test_send():
         "Test email sent for template %s (%s) to user id %s (%s)",
         template_key,
         tlang,
-        getattr(current_user, "id", None),
-        current_user.email,
+        getattr(recipient_user, "id", None),
+        recipient_email,
     )
-    return json_ok(sent_to=current_user.email, subject=subject)
+    return json_ok(sent_to=recipient_email, subject=subject)
 
 
 @bp.route("/api/settings/email-templates/seed", methods=["POST"])

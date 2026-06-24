@@ -233,7 +233,7 @@ function setupRepeatObserver() {
         });
     });
 
-    const repeatContainers = document.querySelectorAll('.repeat-entries-container');
+    const repeatContainers = document.querySelectorAll('[id^="repeat-entries-"]');
     debugLog('layout', `Found ${repeatContainers.length} repeat containers to observe`);
 
     repeatContainers.forEach(container => {

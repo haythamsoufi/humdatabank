@@ -5,6 +5,11 @@
     'use strict';
     var cfg = window.settingsPageConfig || {};
 
+    function escCssSelector(s) {
+      if (window.escapeCssSelector) return window.escapeCssSelector(s);
+      return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    }
+
     // --- Block 1 (original lines 1401-1718) ---
 (function () {
   'use strict';
@@ -33,11 +38,6 @@
       .replace(/'/g, '&#39;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
-  }
-
-  function escCssSelector(s) {
-    if (window.escapeCssSelector) return window.escapeCssSelector(s);
-    return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   }
 
   function waitForAg(cb, tries) {
@@ -1497,6 +1497,7 @@
   } catch (_) {}
   var MSG_EMAIL_AUTOTRANS_EN_EMPTY = cfg.t.enTemplateEmpty;
   var MSG_TEST_EMAIL_NO_ADDR = cfg.t.noEmailAddr;
+  var MSG_TEST_EMAIL_SELECT_USER = cfg.t.testSendSelectUser;
   var MSG_TEST_EMAIL_SENT = cfg.t.testEmailSent;
   var MSG_TEST_EMAIL_FAIL = cfg.t.testEmailFail;
 
@@ -2433,62 +2434,130 @@
 
   (function initEmailTemplateTestSend() {
     var panel = document.getElementById('panel-emails');
-    if (!panel) return;
+    var modal = document.getElementById('email-template-test-send-modal');
+    var recipientRoot = document.getElementById('email-template-test-recipient');
+    var userWrap = document.getElementById('email-template-test-user-wrap');
+    var userSelect = document.getElementById('email-template-test-user-select');
+    var confirmBtn = modal ? modal.querySelector('.email-template-test-send-confirm') : null;
+    if (!panel || !modal || !recipientRoot || !userWrap || !userSelect || !confirmBtn) return;
     if (!EMAIL_TEST_SEND_URL) return;
 
-    panel.addEventListener('click', function (e) {
-      var btn = e.target.closest('.email-template-test-send-btn');
-      if (!btn || !panel.contains(btn)) return;
-      if (btn.disabled) {
-        if (window.showAlert) window.showAlert(MSG_TEST_EMAIL_NO_ADDR, 'warning');
-        return;
-      }
-      var templateKey = btn.getAttribute('data-template-key') || '';
-      if (!templateKey) return;
-      var textarea = document.getElementById(templateKey);
-      if (!textarea) return;
+    var currentUserEmail = (recipientRoot.getAttribute('data-current-user-email') || '').trim();
+    var pendingSend = null;
+    var select2Ready = false;
 
-      syncActiveEmailTemplateToMap();
-      var lang = (textarea.dataset && textarea.dataset.currentLang) ? String(textarea.dataset.currentLang).trim() : 'en';
-      var html = '';
-      if (templateLangData[templateKey] && typeof templateLangData[templateKey][lang] === 'string') {
-        html = templateLangData[templateKey][lang];
-      } else {
-        html = textarea.value;
-      }
-      var trimmed = (html || '').trim();
-      if (!trimmed) {
-        if (window.showAlert) {
-          window.showAlert(cfg.t.noTemplateContent, 'warning');
-        }
-        return;
-      }
-      var b64;
+    function isOtherUserMode() {
+      var other = modal.querySelector('input[name="email_test_recipient_mode"][value="user"]');
+      return !!(other && other.checked && !other.disabled);
+    }
+
+    function initEmailTestUserSelect2() {
+      var $ = window.jQuery;
+      if (!$ || !$.fn || !$.fn.select2) return false;
+      if ($(userSelect).data('select2')) return true;
       try {
-        b64 = base64EncodeUtf8Preview(trimmed);
-      } catch (err) {
-        if (window.showAlert) window.showAlert(String(err), 'error');
+        $(userSelect).select2({
+          width: '100%',
+          placeholder: cfg.t.selectUsers || '',
+          allowClear: true,
+          dropdownParent: $(modal)
+        });
+        select2Ready = true;
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function resetRecipientForm() {
+      var selfRadio = modal.querySelector('input[name="email_test_recipient_mode"][value="self"]');
+      if (selfRadio) selfRadio.checked = true;
+      userSelect.value = '';
+      if (window.jQuery && window.jQuery(userSelect).data('select2')) {
+        try { window.jQuery(userSelect).val('').trigger('change'); } catch (_) {}
+      }
+      syncRecipientUi();
+    }
+
+    function canConfirmSend() {
+      if (isOtherUserMode()) return !!(userSelect.value || '').trim();
+      return !!currentUserEmail;
+    }
+
+    function updateConfirmButtonState() {
+      var ok = canConfirmSend();
+      confirmBtn.disabled = !ok;
+      confirmBtn.classList.toggle('opacity-50', !ok);
+      confirmBtn.classList.toggle('cursor-not-allowed', !ok);
+    }
+
+    function syncRecipientUi() {
+      var other = isOtherUserMode();
+      userWrap.classList.toggle('hidden', !other);
+      userSelect.disabled = !other;
+      if (other) initEmailTestUserSelect2();
+      updateConfirmButtonState();
+    }
+
+    function getEmailTestRecipientPayload() {
+      if (!isOtherUserMode()) return {};
+      var uid = userSelect.value ? parseInt(String(userSelect.value), 10) : 0;
+      if (!uid || Number.isNaN(uid)) return null;
+      return { recipient_user_id: uid };
+    }
+
+    function closeTestSendModal() {
+      modal.classList.add('hidden');
+      pendingSend = null;
+      confirmBtn.classList.remove('btn-loading');
+      updateConfirmButtonState();
+    }
+
+    function openTestSendModal(data) {
+      pendingSend = data;
+      resetRecipientForm();
+      modal.classList.remove('hidden');
+      if (!select2Ready) {
+        var n = 0;
+        var t = setInterval(function () {
+          if (initEmailTestUserSelect2() || ++n >= 40) clearInterval(t);
+        }, 100);
+      }
+      try { confirmBtn.focus(); } catch (_) {}
+    }
+
+    function restoreConfirmBtn() {
+      confirmBtn.classList.remove('btn-loading');
+      updateConfirmButtonState();
+    }
+
+    function executeTestSend() {
+      if (!pendingSend) return;
+      var recipientPayload = getEmailTestRecipientPayload();
+      if (recipientPayload === null) {
+        if (window.showAlert) window.showAlert(MSG_TEST_EMAIL_SELECT_USER, 'warning');
         return;
       }
-      if (!b64) {
-        if (window.showAlert) window.showAlert(cfg.t.couldNotPrepareEmailBody, 'error');
+      if (!canConfirmSend()) {
+        var msg = isOtherUserMode() ? MSG_TEST_EMAIL_SELECT_USER : MSG_TEST_EMAIL_NO_ADDR;
+        if (window.showAlert) window.showAlert(msg, 'warning');
         return;
       }
 
-      var origNodes = Array.from(btn.childNodes).map(function (n) { return n.cloneNode(true); });
-      function restoreTestBtn() {
-        btn.replaceChildren.apply(btn, origNodes.map(function (n) { return n.cloneNode(true); }));
-        btn.classList.remove('btn-loading');
-        btn.disabled = false;
-      }
-      btn.classList.add('btn-loading');
-      btn.disabled = true;
+      var templateKey = pendingSend.templateKey;
+      var lang = pendingSend.lang;
+      var b64 = pendingSend.b64;
+      confirmBtn.classList.add('btn-loading');
+      confirmBtn.disabled = true;
 
       var csrf = getCsrfForEmailPreview();
-      var testBodyInner = { template_key: templateKey, html_b64: b64, template_language: lang };
+      var testBodyInner = Object.assign(
+        { template_key: templateKey, html_b64: b64, template_language: lang },
+        recipientPayload
+      );
       var testBodyStr = wrapEmailTemplateApiJsonBody(testBodyInner);
       if (!testBodyStr) {
-        restoreTestBtn();
+        restoreConfirmBtn();
         if (window.showAlert) window.showAlert(cfg.t.couldNotPrepareEmailBody, 'error');
         return;
       }
@@ -2496,8 +2565,6 @@
         url: EMAIL_TEST_SEND_URL,
         template_key: templateKey,
         template_language: lang,
-        html_len: trimmed.length,
-        html_b64_len: b64.length,
         body_wrapped: true,
         post_body_len: testBodyStr.length
       });
@@ -2523,8 +2590,9 @@
           message: p.message,
           payload: p
         });
-        restoreTestBtn();
+        restoreConfirmBtn();
         if (result.ok && p.success) {
+          closeTestSendModal();
           var to = p.sent_to || '';
           if (window.showAlert) {
             window.showAlert(MSG_TEST_EMAIL_SENT + (to ? ' ' + to : ''), 'success');
@@ -2536,10 +2604,66 @@
         else if (window.__clientWarn) window.__clientWarn(errMsg);
       }).catch(function (err) {
         _debugEmailSettingsApi('test-send error', { name: err && err.name, message: err && err.message });
-        restoreTestBtn();
+        restoreConfirmBtn();
         if (window.showAlert) window.showAlert(cfg.t.networkErrorSendingEmail, 'error');
       });
+    }
+
+    modal.querySelectorAll('input[name="email_test_recipient_mode"]').forEach(function (radio) {
+      radio.addEventListener('change', syncRecipientUi);
     });
+    userSelect.addEventListener('change', updateConfirmButtonState);
+    if (window.jQuery) {
+      window.jQuery(userSelect).on('change select2:select select2:clear', updateConfirmButtonState);
+    }
+
+    modal.querySelectorAll('.email-template-test-send-cancel, .close-modal').forEach(function (btn) {
+      btn.addEventListener('click', closeTestSendModal);
+    });
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeTestSendModal();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeTestSendModal();
+    });
+    confirmBtn.addEventListener('click', executeTestSend);
+
+    panel.addEventListener('click', function (e) {
+      var btn = e.target.closest('.email-template-test-send-btn');
+      if (!btn || !panel.contains(btn)) return;
+      var templateKey = btn.getAttribute('data-template-key') || '';
+      if (!templateKey) return;
+      var textarea = document.getElementById(templateKey);
+      if (!textarea) return;
+
+      syncActiveEmailTemplateToMap();
+      var lang = (textarea.dataset && textarea.dataset.currentLang) ? String(textarea.dataset.currentLang).trim() : 'en';
+      var html = '';
+      if (templateLangData[templateKey] && typeof templateLangData[templateKey][lang] === 'string') {
+        html = templateLangData[templateKey][lang];
+      } else {
+        html = textarea.value;
+      }
+      var trimmed = (html || '').trim();
+      if (!trimmed) {
+        if (window.showAlert) window.showAlert(cfg.t.noTemplateContent, 'warning');
+        return;
+      }
+      var b64;
+      try {
+        b64 = base64EncodeUtf8Preview(trimmed);
+      } catch (err) {
+        if (window.showAlert) window.showAlert(String(err), 'error');
+        return;
+      }
+      if (!b64) {
+        if (window.showAlert) window.showAlert(cfg.t.couldNotPrepareEmailBody, 'error');
+        return;
+      }
+      openTestSendModal({ templateKey: templateKey, lang: lang, b64: b64 });
+    });
+
+    syncRecipientUi();
   })();
 
   /* ── Seed default email templates (flask seed-email-templates) ── */

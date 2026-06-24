@@ -6,6 +6,7 @@
 {% block content %}
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+{% from "macros/modal_shell.html" import modal_shell %}
 
 {% set version_action %}
 <span id="version-badge" class="inline-flex items-center gap-2 text-xs text-gray-500">
@@ -961,14 +962,12 @@
         <div class="email-template-workspace rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
           <div class="email-template-workspace-top flex flex-col gap-2.5 sm:flex-row-reverse sm:items-end sm:justify-between sm:gap-3 px-3 py-2.5 border-b border-gray-200 bg-slate-50/90">
             <div class="flex flex-wrap items-center gap-2 sm:justify-end sm:flex-shrink-0">
-              {# TEMP: hide “Send me test email” until the test-send flow is fully implemented. Remove `hidden` from the wrapper to re-enable. #}
-              <div class="email-template-test-send-wrap max-w-full hidden" aria-hidden="true">
+              <div class="email-template-test-send-wrap max-w-full">
                 <button type="button"
-                        class="btn btn-sm btn-primary email-template-test-send-btn inline-flex items-center gap-1.5 whitespace-nowrap{% if not current_user.email %} opacity-50 cursor-not-allowed{% endif %}"
+                        class="btn btn-sm btn-primary email-template-test-send-btn inline-flex items-center gap-1.5 whitespace-nowrap"
                         data-template-key="{{ template.key }}"
-                        disabled
-                        title="{{ _('This feature is temporarily unavailable.') }}">
-                  <i class="fas fa-paper-plane text-[10px]" aria-hidden="true"></i>{{ _('Send me test email') }}
+                        title="{{ _('Send a test email using the current template content.') }}">
+                  <i class="fas fa-paper-plane text-[10px]" aria-hidden="true"></i>{{ _('Send test email') }}
                 </button>
               </div>
               <div class="inline-flex" role="group" aria-label="{{ _('Switch between HTML and visual editor') }}">
@@ -1108,6 +1107,55 @@
     </div>
 
     <input type="hidden" id="template-metadata-json" data-settings-email-metadata-hidden="1" value="{{ current_template_metadata | tojson | forceescape }}" />
+
+    {% call modal_shell('email-template-test-send-modal', _('Send test email'), max_width='max-w-md', z_index=60) %}
+      <p class="text-sm text-gray-600 mb-4">
+        {{ _('Choose who should receive this test message. It uses the current template content and sample placeholder values.') }}
+      </p>
+      <div id="email-template-test-recipient"
+           data-current-user-email="{{ (current_user.email or '')|e }}">
+        <p class="text-xs font-medium text-gray-700 mb-2">{{ _('Recipient') }}</p>
+        <div class="flex flex-col gap-3">
+          <label class="inline-flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+            <input type="radio"
+                   name="email_test_recipient_mode"
+                   value="self"
+                   class="mt-0.5 h-3.5 w-3.5 text-blue-600 border-gray-300 focus:ring-blue-500"
+                   checked>
+            <span>{{ _('Send to me') }}{% if current_user.email %}<span class="block text-gray-400 text-xs mt-0.5">{{ current_user.email }}</span>{% endif %}</span>
+          </label>
+          <label class="inline-flex items-start gap-2 text-sm text-gray-700 cursor-pointer{% if not email_test_user_options %} opacity-50{% endif %}">
+            <input type="radio"
+                   name="email_test_recipient_mode"
+                   value="user"
+                   class="mt-0.5 h-3.5 w-3.5 text-blue-600 border-gray-300 focus:ring-blue-500"
+                   {% if not email_test_user_options %}disabled{% endif %}>
+            <span>{{ _('Send to another user') }}</span>
+          </label>
+          <div id="email-template-test-user-wrap" class="hidden pl-5">
+            <select id="email-template-test-user-select"
+                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                    disabled
+                    aria-label="{{ _('Select user to receive test email') }}">
+              <option value="">{{ _('Select user…') }}</option>
+              {% for u in email_test_user_options %}
+              <option value="{{ u.id }}">{{ u.name }} ({{ u.email }})</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+        <button type="button"
+                class="btn btn-secondary email-template-test-send-cancel w-full sm:w-auto">
+          {{ _('Cancel') }}
+        </button>
+        <button type="button"
+                class="btn btn-primary email-template-test-send-confirm inline-flex items-center justify-center gap-1.5 w-full sm:w-auto">
+          <i class="fas fa-paper-plane text-[10px]" aria-hidden="true"></i>{{ _('Send test email') }}
+        </button>
+      </div>
+    {% endcall %}
 
     </div>{# /panel-emails #}
 
@@ -1459,6 +1507,7 @@ window.settingsPageConfig = {
         leftUnchanged: {{ _('left unchanged')|tojson }},
         enTemplateEmpty: {{ _('The English version of this template is empty. Add or save English text first, then try again.')|tojson }},
         noEmailAddr: {{ _('Your user account has no email address. Add one in your profile, then try again.')|tojson }},
+        testSendSelectUser: {{ _('Select a user to receive the test email.')|tojson }},
         testEmailSent: {{ _('Test email sent to')|tojson }},
         testEmailFail: {{ _('Test email could not be sent. Check the message below or your mail settings.')|tojson }},
         editorLoadFailed: {{ _('The visual editor could not be loaded. Check your network, then refresh the page.')|tojson }},

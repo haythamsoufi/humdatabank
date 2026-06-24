@@ -637,6 +637,28 @@ class TestEmailTemplateTestSend:
         resp = client.post("/admin/api/settings/email-template-test-send", follow_redirects=False)
         assert resp.status_code == 302
 
+    def test_test_send_invalid_recipient_user_id(self, logged_in_client, db_session, app):
+        with _auth():
+            payload = self._valid_payload()
+            payload["recipient_user_id"] = "not-a-number"
+            resp = logged_in_client.post(
+                "/admin/api/settings/email-template-test-send",
+                json=payload,
+                headers=_json_headers(),
+            )
+        assert resp.status_code == 400
+
+    def test_test_send_unknown_recipient_user_id(self, logged_in_client, db_session, app):
+        with _auth():
+            payload = self._valid_payload()
+            payload["recipient_user_id"] = 999999999
+            resp = logged_in_client.post(
+                "/admin/api/settings/email-template-test-send",
+                json=payload,
+                headers=_json_headers(),
+            )
+        assert resp.status_code == 400
+
 
 # ---------------------------------------------------------------------------
 # POST /admin/api/settings/email-templates/seed
@@ -908,6 +930,23 @@ class TestSettingsInternalHelpers:
             from app.routes.admin.settings import _message_for_email_test_send_failure
             msg = _message_for_email_test_send_failure([])
             assert isinstance(msg, str)
+
+    def test_personalize_email_preview_context_for_user(self, app):
+        with app.app_context():
+            from app.routes.admin.settings import _personalize_email_preview_context_for_user
+
+            class _U:
+                id = 42
+                name = "Jamie Example"
+                email = "jamie@example.org"
+
+            ctx = _personalize_email_preview_context_for_user(
+                {"user_name": "Sample", "user_email": "x@y.z", "user_id": 1},
+                _U(),
+            )
+            assert ctx["user_name"] == "Jamie"
+            assert ctx["user_email"] == "jamie@example.org"
+            assert ctx["user_id"] == 42
 
     def test_manage_settings_form_baseline_callable(self, app):
         with app.app_context():

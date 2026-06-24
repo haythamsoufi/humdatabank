@@ -1282,6 +1282,11 @@ def account_settings():
     all_access_requests = []
     pending_access_requests = []
     try:
+        from app.services.country_access_request_service import (
+            reconcile_fulfilled_pending_country_access_requests,
+        )
+
+        reconcile_fulfilled_pending_country_access_requests(user_id=current_user.id)
         all_access_requests = (
             CountryAccessRequest.query.filter_by(user_id=current_user.id)
             .options(joinedload(CountryAccessRequest.country))

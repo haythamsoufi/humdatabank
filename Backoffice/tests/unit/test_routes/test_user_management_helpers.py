@@ -459,7 +459,7 @@ class TestApplyRoleTypeAndImplications:
             )
             assert admin_role.id not in result
 
-    def test_focal_point_adds_required_roles(self, app, db_session):
+    def test_focal_point_adds_viewer_when_no_assignment_roles(self, app, db_session):
         with app.app_context():
             from app.routes.admin.user_management.helpers import (
                 _apply_role_type_and_implications,
@@ -484,7 +484,36 @@ class TestApplyRoleTypeAndImplications:
             db_session.commit()
             result = _apply_role_type_and_implications([], role_type="focal_point")
             assert viewer_role.id in result
-            assert editor_role.id in result
+            assert editor_role.id not in result
+
+    def test_focal_point_viewer_only_does_not_add_editor(self, app, db_session):
+        with app.app_context():
+            from app.routes.admin.user_management.helpers import (
+                _apply_role_type_and_implications,
+            )
+            from app.models.rbac import RbacRole
+            viewer_role = db_session.query(RbacRole).filter_by(
+                code="assignment_viewer"
+            ).first()
+            if not viewer_role:
+                viewer_role = RbacRole(code="assignment_viewer", name="AV")
+                db_session.add(viewer_role)
+                db_session.flush()
+            editor_role = db_session.query(RbacRole).filter_by(
+                code="assignment_editor_submitter"
+            ).first()
+            if not editor_role:
+                editor_role = RbacRole(
+                    code="assignment_editor_submitter", name="AES"
+                )
+                db_session.add(editor_role)
+                db_session.flush()
+            db_session.commit()
+            result = _apply_role_type_and_implications(
+                [viewer_role.id], role_type="focal_point"
+            )
+            assert viewer_role.id in result
+            assert editor_role.id not in result
 
     def test_drops_deprecated_role(self, app, db_session):
         with app.app_context():

@@ -10,6 +10,11 @@ from flask_login import current_user
 
 from app import db
 from app.models import User, Country, UserEntityPermission, CountryAccessRequest
+from app.services.country_access_request_service import (
+    count_pending_country_access_requests_needing_action,
+    pending_country_access_requests_query,
+    reconcile_fulfilled_pending_country_access_requests,
+)
 from app.models.enums import EntityType
 from app.forms.system import UserForm
 from app.routes.admin.shared import permission_required
@@ -110,7 +115,7 @@ def manage_users():
         region_name = country.region if country.region else "Unassigned Region"
         countries_by_region[region_name].append(country)
 
-    pending_requests_count = CountryAccessRequest.query.filter_by(status='pending').count()
+    pending_requests_count = count_pending_country_access_requests_needing_action()
 
     return render_template("admin/user_management/users.html",
                            users=users,
@@ -128,14 +133,40 @@ def manage_users():
 def access_requests():
     """List and manage country access requests."""
     from app.services.app_settings_service import get_auto_approve_access_requests
-    pending_requests = CountryAccessRequest.query.filter_by(status='pending').order_by(CountryAccessRequest.created_at.asc()).all()
-    processed_requests = CountryAccessRequest.query.filter(CountryAccessRequest.status.in_(['approved', 'rejected'])) \
-        .order_by(CountryAccessRequest.processed_at.desc().nullslast(), CountryAccessRequest.created_at.desc()).limit(100).all()
+
+    reconcile_fulfilled_pending_country_access_requests()
+    pending_requests = (
+        pending_country_access_requests_query()
+        .order_by(CountryAccessRequest.created_at.asc())
+        .all()
+    )
+    from sqlalchemy.orm import joinedload
+
+    processed_base = CountryAccessRequest.query.filter(
+        CountryAccessRequest.status.in_(['approved', 'rejected'])
+    )
+    processed_requests_total = processed_base.count()
+    processed_requests_limit = 500
+    processed_requests = (
+        processed_base.options(
+            joinedload(CountryAccessRequest.user),
+            joinedload(CountryAccessRequest.country),
+            joinedload(CountryAccessRequest.processed_by),
+        )
+        .order_by(
+            CountryAccessRequest.processed_at.desc().nullslast(),
+            CountryAccessRequest.created_at.desc(),
+        )
+        .limit(processed_requests_limit)
+        .all()
+    )
     return render_template(
         "admin/user_management/access_requests.html",
         title="Country Access Requests",
         pending_requests=pending_requests,
         processed_requests=processed_requests,
+        processed_requests_total=processed_requests_total,
+        processed_requests_limit=processed_requests_limit,
         auto_approve_enabled=get_auto_approve_access_requests()
     )
 
@@ -238,7 +269,8 @@ def reject_access_request(request_id):
 @permission_required('admin.access_requests.approve')
 def approve_all_access_requests():
     """Approve all pending country access requests at once."""
-    pending = CountryAccessRequest.query.filter_by(status='pending').all()
+    reconcile_fulfilled_pending_country_access_requests()
+    pending = pending_country_access_requests_query().all()
     if not pending:
         flash("No pending requests to approve.", "info")
         return redirect(url_for("user_management.access_requests"))
@@ -296,7 +328,8 @@ def approve_all_access_requests():
 def approve_user_access_requests(user_id):
     """Approve all pending country access requests for one user."""
     user = User.query.get_or_404(user_id)
-    pending = CountryAccessRequest.query.filter_by(user_id=user_id, status='pending').all()
+    reconcile_fulfilled_pending_country_access_requests(user_id=user_id)
+    pending = pending_country_access_requests_query().filter_by(user_id=user_id).all()
     if not pending:
         flash("No pending requests to approve for this user.", "info")
         return redirect(url_for("user_management.access_requests"))
@@ -353,7 +386,8 @@ def approve_user_access_requests(user_id):
 def reject_user_access_requests(user_id):
     """Reject all pending country access requests for one user."""
     user = User.query.get_or_404(user_id)
-    pending = CountryAccessRequest.query.filter_by(user_id=user_id, status='pending').all()
+    reconcile_fulfilled_pending_country_access_requests(user_id=user_id)
+    pending = pending_country_access_requests_query().filter_by(user_id=user_id).all()
     if not pending:
         flash("No pending requests to reject for this user.", "info")
         return redirect(url_for("user_management.access_requests"))
@@ -528,6 +562,13 @@ def new_user():
                                 entity_id=country.id
                             )
                             db.session.add(perm)
+
+                    reconcile_fulfilled_pending_country_access_requests(
+                        user_id=new_user.id,
+                        processed_by_user_id=current_user.id,
+                        country_ids=assigned_country_ids or None,
+                        log_actions=True,
+                    )
 
                     # Assign RBAC roles (best-effort; no-op if RBAC not migrated)
                     if can_assign_rbac_roles and getattr(form, "rbac_roles", None) is not None and getattr(form.rbac_roles, "choices", None):
@@ -847,6 +888,14 @@ def edit_user(user_id):
             else:
                 # Preserve existing assignments when countries are disabled
                 selected_country_ids = [c.id for c in user.countries.all()] if hasattr(user, "countries") else []
+
+            if 'countries' in enabled_entity_groups:
+                reconcile_fulfilled_pending_country_access_requests(
+                    user_id=user.id,
+                    processed_by_user_id=current_user.id,
+                    country_ids=selected_country_ids or None,
+                    log_actions=True,
+                )
 
             # Handle notification preferences
             from app.services.notification.service import NotificationService

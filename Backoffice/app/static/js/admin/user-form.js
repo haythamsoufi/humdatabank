@@ -51,14 +51,54 @@
                       const roleTypeSelect = document.getElementById('role_type_select');
                       const adminSectionsContainer = document.getElementById('admin-sections');
 
-                      function handleRoleTypeChange() {
+                      function getAssignmentRoleInputs() {
+                        if (!assignmentGroup) return { viewer: null, editorSubmitter: null, approver: null, all: [] };
+                        const aInputs = Array.from(
+                          assignmentGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]')
+                        );
+                        let viewer = null;
+                        let editorSubmitter = null;
+                        let approver = null;
+                        for (const input of aInputs) {
+                          const txt = (getLabelSpanText(input) || '').toLowerCase();
+                          if (txt === 'viewer') viewer = input;
+                          if (txt === 'editor & submitter' || txt === 'editor and submitter') editorSubmitter = input;
+                          if (txt === 'approver') approver = input;
+                        }
+                        return { viewer, editorSubmitter, approver, all: aInputs };
+                      }
+
+                      function ensureMinimumFocalPointAssignmentRoles() {
+                        const { viewer, all } = getAssignmentRoleInputs();
+                        const hasAnyAssignmentRole = all.some(function (input) { return input.checked; });
+                        if (!hasAnyAssignmentRole && viewer && !viewer.disabled) {
+                          viewer.checked = true;
+                          viewer.dataset.userWanted = '1';
+                          if (typeof markAutoChecked === 'function') markAutoChecked(viewer, false);
+                        }
+                      }
+
+                      function syncRoleTypeUi() {
                         const selectedType = roleTypeSelect?.value || 'admin';
                         const isFocalPoint = selectedType === 'focal_point';
 
-                        // Show/hide admin sections
                         if (adminSectionsContainer) {
                           adminSectionsContainer.classList.toggle('hidden', isFocalPoint);
                         }
+
+                        if (assignmentGroup) {
+                          const approverRoles = assignmentGroup.querySelectorAll('.assignment-approver-role');
+                          approverRoles.forEach(function(role) {
+                            role.classList.toggle('hidden', isFocalPoint);
+                          });
+                        }
+                      }
+
+                      function handleRoleTypeChangeFromUser() {
+                        const selectedType = roleTypeSelect?.value || 'admin';
+                        const isFocalPoint = selectedType === 'focal_point';
+
+                        syncRoleTypeUi();
 
                         // If switching to Focal Point, clear ALL admin roles (including Full/Core/System Manager presets).
                         // This keeps the submitted form aligned with what the UI is showing.
@@ -76,60 +116,33 @@
                           }
                         }
 
-                        // Show/hide Approver roles in Assignments section
-                        if (assignmentGroup) {
+                        // Uncheck Approver when switching to Focal Point (approver is admin-only in the UI).
+                        if (isFocalPoint && assignmentGroup) {
                           const approverRoles = assignmentGroup.querySelectorAll('.assignment-approver-role');
                           approverRoles.forEach(function(role) {
-                            role.classList.toggle('hidden', isFocalPoint);
-                            // Uncheck Approver roles when switching to Focal Point
-                            if (isFocalPoint) {
-                              const checkbox = role.querySelector('input[type="checkbox"]');
-                              if (checkbox) {
-                                checkbox.checked = false;
-                                checkbox.dataset.userWanted = '0';
-                              }
+                            const checkbox = role.querySelector('input[type="checkbox"]');
+                            if (checkbox) {
+                              checkbox.checked = false;
+                              checkbox.dataset.userWanted = '0';
                             }
                           });
                         }
 
-                        // When "Focal Point" is selected, pre-tick the minimal required roles.
-                        // - Assignment: Editor & Submitter
-                        // - Assignment: Viewer (also implied by Editor & Submitter, but we tick it explicitly)
                         if (isFocalPoint) {
-                          function ensureChecked(input) {
-                            if (!input || input.disabled) return;
-                            input.checked = true;
-                            input.dataset.userWanted = '1';
-                            // Ensure it isn't treated as "auto-checked" (so it won't be cleared by recomputeLocks)
-                            if (typeof markAutoChecked === 'function') markAutoChecked(input, false);
-                          }
-
-                          // Assignment roles live in the Assignments group.
-                          if (assignmentGroup) {
-                            const aInputs = Array.from(
-                              assignmentGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]')
-                            );
-                            let viewer = null;
-                            let editorSubmitter = null;
-                            for (const input of aInputs) {
-                              const txt = (getLabelSpanText(input) || '').toLowerCase();
-                              if (txt === 'viewer') viewer = input;
-                              if (txt === 'editor & submitter' || txt === 'editor and submitter') editorSubmitter = input;
-                            }
-                            ensureChecked(editorSubmitter);
-                            ensureChecked(viewer);
-                          }
+                          ensureMinimumFocalPointAssignmentRoles();
                         }
 
-                        // Recompute implied roles / locks after role-type changes.
                         try { recomputeLocks(); } catch (e) {}
                       }
 
                       // Add event listener to role type dropdown
                       if (roleTypeSelect) {
-                        roleTypeSelect.addEventListener('change', handleRoleTypeChange);
-                        // Initialize on page load
-                        handleRoleTypeChange();
+                        roleTypeSelect.addEventListener('change', handleRoleTypeChangeFromUser);
+                        syncRoleTypeUi();
+                        if (roleTypeSelect.value === 'focal_point') {
+                          ensureMinimumFocalPointAssignmentRoles();
+                        }
+                        try { recomputeLocks(); } catch (e) {}
                       }
 
                       function normalize(s) {

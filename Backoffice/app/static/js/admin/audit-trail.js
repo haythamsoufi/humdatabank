@@ -188,7 +188,7 @@ const EMPTY_VALUE_PLACEHOLDER = '-';
             var parts = [];
             if (o.logic !== undefined && o.logic !== null && String(o.logic).length) {
                 parts.push(
-                    '<p class="audit-form-item-cond-line audit-form-item-cond-line-top"><span class="audit-form-item-kv-label"> + cfg.t.logic_35ba1271 + :</span> ' +
+                    '<p class="audit-form-item-cond-line audit-form-item-cond-line-top"><span class="audit-form-item-kv-label">' + cfg.t.logic_35ba1271 + ':</span> ' +
                     '<code class="audit-form-item-code">' + escapeHtml(String(o.logic)) + '</code></p>'
                 );
             }
@@ -206,7 +206,7 @@ const EMPTY_VALUE_PLACEHOLDER = '-';
                         inner = '<p class="audit-form-item-cond-line">' + renderValuePretty(c, depth + 1) + '</p>';
                     }
                     parts.push(
-                        '<div class="audit-form-item-cond-box"><p class="audit-form-item-cond-title"> + cfg.t.condition_9e2941b3 +  ' + (i + 1) + '</p>' + inner + '</div>'
+                        '<div class="audit-form-item-cond-box"><p class="audit-form-item-cond-title">' + cfg.t.condition_9e2941b3 + ' ' + (i + 1) + '</p>' + inner + '</div>'
                     );
                 });
             }
@@ -249,7 +249,7 @@ const EMPTY_VALUE_PLACEHOLDER = '-';
             }
             if (Array.isArray(v)) {
                 if (!v.length) {
-                    return '<span class="text-xs text-gray-500 italic">cfg.t.empty_list_07e1a7a2</span>';
+                    return '<span class="text-xs text-gray-500 italic">' + cfg.t.empty_list_07e1a7a2 + '</span>';
                 }
                 var hasObjects = v.some(function (x) {
                     return x !== null && typeof x === 'object' && !Array.isArray(x);
@@ -284,7 +284,7 @@ const EMPTY_VALUE_PLACEHOLDER = '-';
                 }
                 var keys = Object.keys(v);
                 if (!keys.length) {
-                    return '<span class="text-xs text-gray-500 italic">cfg.t.empty_ce2c8aed</span>';
+                    return '<span class="text-xs text-gray-500 italic">' + cfg.t.empty_ce2c8aed + '</span>';
                 }
                 keys.sort();
                 var rows = keys.map(function (key) {
@@ -782,24 +782,24 @@ $(document).ready(function() {
 
     // Helper function to render status badge
     function renderStatusBadge(entry) {
-        const successBadge = '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i> cfg.t.success_505a83f2</span>';
+        const successBadge = '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i> ' + cfg.t.success_505a83f2 + '</span>';
 
         if (entry.type === 'admin_action' && entry.requires_review) {
-            return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800"><i class="fas fa-exclamation-circle mr-1"></i> cfg.t.needs_review_994f197b</span>';
+            return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800"><i class="fas fa-exclamation-circle mr-1"></i> ' + cfg.t.needs_review_994f197b + '</span>';
         } else if (entry.type === 'activity' && entry.response_status_code !== null && entry.response_status_code !== undefined) {
             const statusCode = Number(entry.response_status_code);
             const statusCategory = getHttpStatusCategory(statusCode);
             if (statusCategory === 'server_error' || statusCategory === 'error') {
-                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800" title="HTTP ' + statusCode + '"><i class="fas fa-times-circle mr-1"></i>cfg.t.error_902b0d55</span>';
+                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800" title="HTTP ' + statusCode + '"><i class="fas fa-times-circle mr-1"></i>' + cfg.t.error_902b0d55 + '</span>';
             }
             if (statusCategory === 'success') {
-                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800" title="HTTP ' + statusCode + '"><i class="fas fa-check-circle mr-1"></i>cfg.t.success_505a83f2</span>';
+                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800" title="HTTP ' + statusCode + '"><i class="fas fa-check-circle mr-1"></i>' + cfg.t.success_505a83f2 + '</span>';
             }
             if (statusCategory === 'redirect') {
-                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800" title="HTTP ' + statusCode + '"><i class="fas fa-random mr-1"></i>cfg.t.redirect_4202ef11</span>';
+                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800" title="HTTP ' + statusCode + '"><i class="fas fa-random mr-1"></i>' + cfg.t.redirect_4202ef11 + '</span>';
             }
             if (statusCategory === 'informational') {
-                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-700" title="HTTP ' + statusCode + '"><i class="fas fa-info-circle mr-1"></i>cfg.t.info_4059b025</span>';
+                return '<span class="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-700" title="HTTP ' + statusCode + '"><i class="fas fa-info-circle mr-1"></i>' + cfg.t.info_4059b025 + '</span>';
             }
             return successBadge;
         }

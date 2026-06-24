@@ -30,7 +30,8 @@ def _apply_role_type_and_implications(
     """
     Backend enforcement for role-type defaults and role implications.
 
-    - If role_type == 'focal_point': ensure Assignment Viewer + Assignment Editor & Submitter are present.
+    - If role_type == 'focal_point': ensure at least one assignment role is present
+      (default to Assignment Viewer when none are selected).
     - Always drop deprecated "documents upload only" role(s) from the request (we treat upload as part of Editor & Submitter).
 
     Best-effort: if RBAC tables aren't available, returns cleaned ints only.
@@ -82,13 +83,16 @@ def _apply_role_type_and_implications(
 
     _log.debug("[_apply_role_type] normalized_role_type=%s", normalized_role_type)
 
+    _FOCAL_POINT_ASSIGNMENT_CODES = frozenset(
+        {"assignment_viewer", "assignment_editor_submitter", "assignment_approver"}
+    )
+
     required_codes: list[str] = []
     if normalized_role_type == "focal_point":
-        required_codes = ["assignment_viewer", "assignment_editor_submitter"]
-
         # IMPORTANT: Role Type is mutually exclusive between "Admin" and "Focal Point".
         # If the user is saved as a focal point, strip all admin roles regardless of what the form submitted
         # (UI may hide admin sections but not uncheck them).
+        code_by_id: dict[int, str] = {}
         try:
             cleaned_rows = (
                 RbacRole.query.with_entities(RbacRole.id, RbacRole.code)
@@ -101,8 +105,14 @@ def _apply_role_type_and_implications(
                 for rid in cleaned
                 if not (code_by_id.get(int(rid), "").startswith("admin_") or code_by_id.get(int(rid), "") == "system_manager")
             ]
+            has_assignment_role = any(
+                code_by_id.get(int(rid), "") in _FOCAL_POINT_ASSIGNMENT_CODES for rid in cleaned
+            )
+            if not has_assignment_role:
+                required_codes = ["assignment_viewer"]
         except Exception as e:
             current_app.logger.debug("RBAC code_by_id query failed: %s", e)
+            required_codes = ["assignment_viewer"]
 
     # Assignment roles are now independent of admin_core — they must be explicitly assigned.
     # Do not auto-inject assignment roles based on admin role presence.

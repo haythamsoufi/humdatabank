@@ -181,12 +181,15 @@ export const CalculatedLists = {
                 if (window[jsHandler]) {
                     doSetup(window[jsHandler]);
                 } else {
-                    // Dynamic import for the EO plugin (same path matrix.js uses)
-                    import('/plugins/static/emergency_operations/js/matrix_config_handler.js')
+                    // Derive plugin name from the list ID (convention: list ID === plugin name).
+                    // Same path as matrix.js: /plugins/static/{plugin}/js/matrix_config_handler.js
+                    import(`/plugins/static/${listId}/js/matrix_config_handler.js`)
                         .then(mod => {
-                            if (mod[jsHandler]) doSetup(mod[jsHandler]);
+                            const fn = mod[jsHandler] || mod.default;
+                            if (fn) doSetup(fn);
+                            else console.warn(`Plugin handler "${jsHandler}" not found in module for list "${listId}"`);
                         })
-                        .catch(err => console.warn('Failed to load plugin config JS handler:', err));
+                        .catch(err => console.warn(`Failed to load plugin config JS handler for "${listId}":`, err));
                 }
             })
             .catch(err => {

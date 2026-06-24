@@ -3648,6 +3648,28 @@
                 '{{ static_url("js/forms/entry-form.js") }}'
             ];
 
+            // Compute an app-origin fallback URL for a CDN module URL.
+            // When the storage-account CORS list is missing the current hostname
+            // (e.g. a new staging domain), ES-module fetches from CDN are blocked
+            // by the browser even though the server returns 200 — CORS headers are
+            // absent so the browser rejects the response.  Retrying the same CDN
+            // URL will never succeed in that case; loading from /static/ (same
+            // origin) bypasses CORS entirely and keeps the form usable.
+            // The import map already includes app-origin scopes (see static_import_map.py)
+            // so relative imports inside the fallback module still get versioned URLs.
+            function getAppOriginFallback(src) {
+                const cdnBase = (typeof window !== 'undefined' && window.__staticCdnBase) || null;
+                if (!cdnBase) return null;
+                const srcNoQuery = src.replace(/\?.*$/, '');
+                const normalizedCdn = cdnBase.replace(/\/$/, '');
+                if (!srcNoQuery.startsWith(normalizedCdn + '/')) return null;
+                const path = srcNoQuery.slice(normalizedCdn.length + 1);
+                const version = (typeof window !== 'undefined' && window.ASSET_VERSION) || '';
+                const fallback = '/static/' + path + (version ? '?v=' + version : '');
+                if (fallback === src) return null; // already on app origin
+                return fallback;
+            }
+
             // Function to load a module with retry
             function loadModuleWithRetry(src, isCritical = false, retryCount = 0) {
                 return new Promise((resolve, reject) => {
@@ -3698,6 +3720,21 @@
                                     .catch(reject);
                             }, RETRY_DELAY * (retryCount + 1)); // Exponential backoff
                         } else {
+                            // All CDN retries exhausted.  Before giving up, attempt one load from
+                            // the app origin — this sidesteps CORS issues that arise when the
+                            // blob-storage CORS list doesn't include the current hostname (common
+                            // on staging or when a new custom domain is added).
+                            const fallbackSrc = getAppOriginFallback(src);
+                            if (fallbackSrc) {
+                                if (DEBUG_MODULES) {
+                                    // eslint-disable-next-line no-console
+                                    window.__clientDebug && window.__clientDebug('[forms-loader] CDN CORS failure suspected — trying app-origin fallback:', fallbackSrc);
+                                }
+                                loadModuleWithRetry(fallbackSrc, isCritical, 0)
+                                    .then(resolve)
+                                    .catch(reject);
+                                return;
+                            }
                             // eslint-disable-next-line no-console
                             console.error('Module load failed after retries:', src);
                             if (isCritical) {

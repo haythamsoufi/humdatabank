@@ -457,7 +457,11 @@ def api_users_profile_summary():
 def api_access_requests_count():
     """API endpoint to get pending access requests count"""
     try:
-        count = CountryAccessRequest.query.filter_by(status='pending').count()
+        from app.services.country_access_request_service import (
+            count_pending_country_access_requests_needing_action,
+        )
+
+        count = count_pending_country_access_requests_needing_action()
         return json_ok(status='success', data={'count': count})
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
@@ -470,14 +474,24 @@ def api_access_requests_list():
     try:
         from sqlalchemy.orm import joinedload
         from app.services.app_settings_service import get_auto_approve_access_requests
+        from app.services.country_access_request_service import (
+            pending_country_access_requests_query,
+            reconcile_fulfilled_pending_country_access_requests,
+        )
 
+        reconcile_fulfilled_pending_country_access_requests()
         base = CountryAccessRequest.query.options(
             joinedload(CountryAccessRequest.user),
             joinedload(CountryAccessRequest.country),
             joinedload(CountryAccessRequest.processed_by),
         )
         pending_requests = (
-            base.filter_by(status="pending")
+            pending_country_access_requests_query()
+            .options(
+                joinedload(CountryAccessRequest.user),
+                joinedload(CountryAccessRequest.country),
+                joinedload(CountryAccessRequest.processed_by),
+            )
             .order_by(CountryAccessRequest.created_at.asc())
             .all()
         )
@@ -599,7 +613,13 @@ def api_reject_access_request(request_id):
 @permission_required('admin.access_requests.approve')
 def api_approve_all_access_requests():
     """Approve all pending country access requests (JSON)."""
-    pending = CountryAccessRequest.query.filter_by(status="pending").all()
+    from app.services.country_access_request_service import (
+        pending_country_access_requests_query,
+        reconcile_fulfilled_pending_country_access_requests,
+    )
+
+    reconcile_fulfilled_pending_country_access_requests()
+    pending = pending_country_access_requests_query().all()
     if not pending:
         return json_ok(approved_count=0, message="No pending requests to approve.")
 

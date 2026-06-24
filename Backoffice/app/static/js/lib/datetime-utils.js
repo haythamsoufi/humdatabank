@@ -359,7 +359,9 @@
             return '<span class="text-gray-400">' + emptyValue + '</span>';
         }
 
-        var formatted = format(value, formatType, options);
+        // When timezone is shown on a separate line, do not append it to the main value.
+        var lineOptions = Object.assign({}, options, { showTimezone: false });
+        var formatted = format(value, formatType, lineOptions);
         if (!formatted) {
             return '<span class="text-gray-400">' + emptyValue + '</span>';
         }
@@ -404,8 +406,10 @@
             return '<span class="text-gray-400">' + emptyValue + '</span>';
         }
 
-        var dateFormatted = format(date, 'date', options);
-        var timeFormatted = format(date, 'time', options);
+        // Timezone is rendered on its own line below; do not append it to date/time lines.
+        var lineOptions = Object.assign({}, options, { showTimezone: false });
+        var dateFormatted = format(date, 'date', lineOptions);
+        var timeFormatted = format(date, 'time', lineOptions);
 
         var html = '<div class="datetime-cell-dual">';
         html += '<div class="text-sm text-gray-900">' + escapeHtml(dateFormatted) + '</div>';

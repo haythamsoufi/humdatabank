@@ -10,7 +10,13 @@
     {% include 'components/_client_console_guard.html' %}
     <title>{% block title %}{{ title }}{% endblock %} - {{ ORG_NAME }}</title>
     <link rel="icon" href="{{ org_visual_asset_url((ORGANIZATION_BRANDING or {}).get('organization_favicon_path'), 'favicon.svg') }}" type="image/svg+xml">
-    <link rel="stylesheet" href="{{ static_url('libs/fontawesome-6.5.0.min.css') }}">
+    {# Font Awesome is intentionally served from the app origin (not CDN).
+       Its @font-face declarations use relative paths (../webfonts/), so loading
+       the CSS from CDN causes the browser to fetch woff2/ttf files cross-origin.
+       Browsers enforce CORS on fonts; if the storage-account CORS list is missing
+       the current hostname (e.g. a new staging domain) icons disappear entirely.
+       Serving the CSS from /static/ resolves font paths to same-origin URLs. #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='libs/fontawesome-6.5.0.min.css') }}?v={{ ASSET_VERSION }}">
     <link rel="stylesheet" href="{{ static_url('css/theme.css') }}">
     <link rel="stylesheet" href="{{ static_url('css/output.css') }}">
     <link rel="stylesheet" href="{{ static_url('css/executive-header.css') }}">
@@ -58,6 +64,9 @@
             };
             // Also expose version for service worker and other uses
             window.ASSET_VERSION = assetVersion;
+            // Expose CDN base so module loaders can compute app-origin fallback URLs
+            // when CDN is unreachable or returns CORS errors for the current hostname.
+            window.__staticCdnBase = staticCdnBase || null;
         })();
 
         window.__layoutConfig = {

@@ -108,6 +108,18 @@ Entry form routes pass `config=Config` (the **class**), which shadowed the Jinja
 
 ---
 
+## Bug Fix — Plugin JS 404 from Blob CDN
+
+**Symptom:** `https://ifrcdatabankstorage2.blob.core.windows.net/plugins/static/emergency_operations/js/emergency_operations_field.js` returned 404 in production.
+
+**Root cause:** ES module `import()` resolves root-relative paths (`/plugins/static/…`) against the **importing module's origin**, not the page origin. `plugin-field-loader.js` is served from `https://ifrcdatabankstorage2.blob.core.windows.net/static/js/forms/`, so `import('/plugins/static/…')` resolves to the blob host — where plugin files are never uploaded.
+
+**Fix:** `Backoffice/app/static/js/forms/plugin-field-loader.js` — added `_resolveModuleUrl(path)` helper that prepends `window.location.origin` to any root-relative path before calling `import()`. Applied at both dynamic import call sites (`renderAndInitPluginField` and `loadESModule`).
+
+**Plugin static files stay on Flask**, not CDN (correct — their internal `import '/static/…'` would re-introduce the same problem if they were CDN-served).
+
+---
+
 ## Out of Scope / Not Done
 
 - Page-scoped Jinja rendering (options 1 and 5 from earlier discussion — user declined).

@@ -3,6 +3,7 @@
 from collections import defaultdict
 
 from flask import request, current_app
+from flask_login import current_user
 from sqlalchemy.orm import contains_eager
 
 from app import db
@@ -134,6 +135,18 @@ def add_user_entity(user_id):
                 user.countries.append(country)
 
         db.session.flush()
+
+        if entity_type == EntityType.country.value:
+            from app.services.country_access_request_service import (
+                reconcile_fulfilled_pending_country_access_requests,
+            )
+
+            reconcile_fulfilled_pending_country_access_requests(
+                user_id=user_id,
+                processed_by_user_id=current_user.id,
+                country_ids=[entity_id],
+                log_actions=True,
+            )
 
         return json_ok(
             permission_id=new_perm.id,

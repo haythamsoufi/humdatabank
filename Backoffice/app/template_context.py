@@ -295,11 +295,11 @@ def register_template_context(app, config_class):
                 return {"pending_access_requests_count": 0}
 
             from app.models import CountryAccessRequest
-            from app.models.enums import CountryAccessRequestStatus
+            from app.services.country_access_request_service import (
+                count_pending_country_access_requests_needing_action,
+            )
 
-            count = CountryAccessRequest.query.filter_by(
-                status=CountryAccessRequestStatus.PENDING
-            ).count()
+            count = count_pending_country_access_requests_needing_action()
             return {"pending_access_requests_count": int(count or 0)}
         except Exception as e:
             current_app.logger.debug("inject_pending_access_requests_count failed: %s", e)

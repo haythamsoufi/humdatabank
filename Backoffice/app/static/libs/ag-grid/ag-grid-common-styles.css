@@ -92,6 +92,31 @@
     position: relative;
 }
 
+/* Pinned-column horizontal spacers sit beside the main scrollbar row. AG Grid keeps
+   them scrollable for sync but only the center viewport should show scrollbar chrome. */
+.ag-theme-alpine .ag-horizontal-left-spacer,
+.ag-theme-balham .ag-horizontal-left-spacer,
+.ag-theme-quartz .ag-horizontal-left-spacer,
+.ag-theme-material .ag-horizontal-left-spacer,
+.ag-theme-alpine .ag-horizontal-right-spacer,
+.ag-theme-balham .ag-horizontal-right-spacer,
+.ag-theme-quartz .ag-horizontal-right-spacer,
+.ag-theme-material .ag-horizontal-right-spacer {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+}
+
+.ag-theme-alpine .ag-horizontal-left-spacer::-webkit-scrollbar,
+.ag-theme-balham .ag-horizontal-left-spacer::-webkit-scrollbar,
+.ag-theme-quartz .ag-horizontal-left-spacer::-webkit-scrollbar,
+.ag-theme-material .ag-horizontal-left-spacer::-webkit-scrollbar,
+.ag-theme-alpine .ag-horizontal-right-spacer::-webkit-scrollbar,
+.ag-theme-balham .ag-horizontal-right-spacer::-webkit-scrollbar,
+.ag-theme-quartz .ag-horizontal-right-spacer::-webkit-scrollbar,
+.ag-theme-material .ag-horizontal-right-spacer::-webkit-scrollbar {
+    display: none !important;
+}
+
 /* Allow touch/trackpad scroll to chain to the page once the grid body reaches its edge */
 .ag-theme-alpine .ag-body-viewport,
 .ag-theme-balham .ag-body-viewport,

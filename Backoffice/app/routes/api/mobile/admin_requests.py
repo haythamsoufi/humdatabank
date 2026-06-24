@@ -19,8 +19,13 @@ def list_access_requests():
     from app.models import CountryAccessRequest, Country
     from app.models import User as UserModel
     from sqlalchemy.orm import joinedload
+    from app.services.country_access_request_service import (
+        pending_country_access_requests_query,
+        reconcile_fulfilled_pending_country_access_requests,
+    )
 
-    pending_requests = CountryAccessRequest.query.filter_by(status='pending').options(
+    reconcile_fulfilled_pending_country_access_requests()
+    pending_requests = pending_country_access_requests_query().options(
         joinedload(CountryAccessRequest.user),
         joinedload(CountryAccessRequest.country),
     ).order_by(CountryAccessRequest.created_at.desc()).all()
@@ -114,8 +119,13 @@ def approve_all_access_requests():
     """Bulk-approve all pending access requests."""
     from app.models import CountryAccessRequest, Country
     from app.models import User as UserModel
+    from app.services.country_access_request_service import (
+        pending_country_access_requests_query,
+        reconcile_fulfilled_pending_country_access_requests,
+    )
 
-    pending = CountryAccessRequest.query.filter_by(status='pending').all()
+    reconcile_fulfilled_pending_country_access_requests()
+    pending = pending_country_access_requests_query().all()
     if not pending:
         return mobile_ok(message='No pending requests to approve', data={'approved_count': 0})
 

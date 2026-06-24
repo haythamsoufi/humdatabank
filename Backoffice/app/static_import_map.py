@@ -104,17 +104,43 @@ def _cached_forms_import_map(
 
 
 def forms_module_import_map(app, origin: str) -> dict:
-    """Import map for the entry-form ES module graph under ``js/forms/``."""
+    """Import map for the entry-form ES module graph under ``js/forms/``.
+
+    When a CDN is configured the map contains *two* sets of scopes:
+
+    1. CDN-origin scopes (primary) — used when modules load from CDN as normal.
+    2. App-origin scopes (fallback) — used when the module loader falls back to
+       loading entry-form.js from ``/static/`` after CDN CORS failures.  Without
+       these scopes the fallback module's relative imports (``./modules/foo.js``)
+       would resolve without ``?v=`` cache-busting.  With them every sub-module
+       still gets a versioned URL, whether the CDN is reachable or not.
+    """
     cdn_base = (app.config.get("STATIC_CDN_URL") or "").strip().rstrip("/")
     asset_version = str(app.config.get("ASSET_VERSION") or "v1")
-    static_root = _static_root(app)
-    return _cached_forms_import_map(
-        str(static_root.resolve()),
+    static_root_str = str(_static_root(app).resolve())
+
+    cdn_map = _cached_forms_import_map(
+        static_root_str,
         "js/forms",
         cdn_base,
         origin,
         asset_version,
     )
+
+    if not cdn_base:
+        return cdn_map
+
+    # Build app-origin scopes (cdn_base="" → /static/ paths) so the CDN-fallback
+    # loader can resolve relative imports to versioned app-origin URLs.
+    app_map = _cached_forms_import_map(
+        static_root_str,
+        "js/forms",
+        "",
+        origin,
+        asset_version,
+    )
+    merged_scopes = {**cdn_map.get("scopes", {}), **app_map.get("scopes", {})}
+    return {"scopes": merged_scopes}
 
 
 def clear_import_map_cache() -> None:

@@ -600,7 +600,7 @@ class TestInjectPendingAccessRequestsCount:
                 "app.services.authorization_service.AuthorizationService.is_system_manager",
                 return_value=True,
             ), patch(
-                "app.models.CountryAccessRequest.query"
-            ) as mock_query:
-                mock_query.filter_by.return_value.count.return_value = 3
+                "app.services.country_access_request_service.count_pending_country_access_requests_needing_action",
+                return_value=3,
+            ):
                 assert self._pending_count_result(app)["pending_access_requests_count"] == 3

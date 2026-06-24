@@ -30,6 +30,18 @@ class PluginFieldLoader {
         );
     }
 
+    _resolveModuleUrl(path) {
+        // Root-relative paths like /plugins/static/... must resolve to the
+        // document origin, NOT the CDN origin this module may be served from.
+        // ES module import() resolves "/" paths against the importing module's
+        // host, so when this file is served from blob CDN the path would
+        // incorrectly hit the CDN host instead of the app server.
+        if (typeof path === 'string' && path.startsWith('/') && !path.startsWith('//')) {
+            return window.location.origin + path;
+        }
+        return path;
+    }
+
     _sanitizeAndAppendHtml(container, html) {
         if (!container) return;
         container.replaceChildren();
@@ -343,8 +355,9 @@ class PluginFieldLoader {
         let mod = null;
         if (esModulePath) {
             try {
-                debugLog('plugin-field-loader', 'dynamic importing', esModulePath, 'for', pluginType);
-                mod = await import(esModulePath);
+                const resolvedModulePath = this._resolveModuleUrl(esModulePath);
+                debugLog('plugin-field-loader', 'dynamic importing', resolvedModulePath, 'for', pluginType);
+                mod = await import(resolvedModulePath);
                 moduleImported = true;
 
                 // Optional schema migration hook (host-owned):
@@ -561,8 +574,9 @@ class PluginFieldLoader {
 
         try {
             // Use dynamic import from within this ES module to avoid inline scripts (CSP-friendly)
-            debugLog('plugin-field-loader', 'dynamic importing', jsPath, 'for', pluginType);
-            const module = await import(jsPath);
+            const resolvedJsPath = this._resolveModuleUrl(jsPath);
+            debugLog('plugin-field-loader', 'dynamic importing', resolvedJsPath, 'for', pluginType);
+            const module = await import(resolvedJsPath);
             const PluginClass = module[className] || module.default;
 
             if (PluginClass) {

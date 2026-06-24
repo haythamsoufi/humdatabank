@@ -21,6 +21,18 @@
             padding-right: 2px;
             -webkit-overflow-scrolling: touch;
         }
+        /* Actions: two btn-sm controls need room; avoid clipping from default cell overflow */
+        .ag-theme-alpine .ag-cell[col-id="actions"],
+        .ag-theme-alpine .ag-header-cell[col-id="actions"] {
+            padding-left: 8px !important;
+            padding-right: 8px !important;
+        }
+        .ag-theme-alpine .ag-cell[col-id="actions"] .ag-cell-value {
+            overflow: visible !important;
+        }
+        .ag-theme-alpine .ag-cell[col-id="actions"] .ag-cell-wrapper {
+            overflow: visible !important;
+        }
     </style>
 {% endblock %}
 
@@ -85,19 +97,19 @@
         </button>
         <button type="button" role="tab" id="tab-processed" data-tab="processed" aria-selected="false"
                 class="{{ admin_underline_tab_btn_classes(false) }}">
-          <i class="fas fa-history mr-1.5"></i>{{ _('Recently Processed') }} ({{ processed_requests|length }})
+          <i class="fas fa-history mr-1.5"></i>{{ _('Recently Processed') }} (<span id="processedTabCount">{{ processed_requests_total }}</span>)
         </button>
       {% endcall %}
     </div>
     <div class="flex shrink-0 items-center px-4 pb-3 sm:px-6 sm:pb-3">
-      <label for="groupByUserToggle" class="inline-flex items-center gap-2.5 cursor-pointer select-none text-sm text-gray-700">
-        <span>{{ _('Group by user') }}</span>
+      <label for="groupByRequestToggle" class="inline-flex items-center gap-2.5 cursor-pointer select-none text-sm text-gray-700">
+        <span>{{ _('Group by request') }}</span>
         <span class="relative inline-flex shrink-0 items-center">
-          <input type="checkbox" id="groupByUserToggle" checked class="sr-only peer" aria-describedby="groupByUserToggleHint" />
+          <input type="checkbox" id="groupByRequestToggle" class="sr-only peer" aria-describedby="groupByRequestToggleHint" />
           <div class="relative w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
         </span>
       </label>
-      <span id="groupByUserToggleHint" class="sr-only">{{ _('Combine multiple country requests from the same user into one row') }}</span>
+      <span id="groupByRequestToggleHint" class="sr-only">{{ _('Show each access request on its own row') }}</span>
     </div>
   </div>
 
@@ -117,6 +129,11 @@
     </div>
 
     <div id="panel-processed" class="access-requests-panel hidden">
+      {% if processed_requests_total > processed_requests|length %}
+      <p class="mb-4 text-sm text-gray-600" id="processedRequestsTruncationNotice">
+        {{ _('Showing the %(loaded)d most recent of %(total)d processed requests.', loaded=processed_requests|length, total=processed_requests_total) }}
+      </p>
+      {% endif %}
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 mb-4">
         <div class="min-w-0 flex-1 flex items-baseline gap-2 flex-wrap" data-ag-grid-title-group></div>
         <div class="flex flex-shrink-0 justify-end">
@@ -140,12 +157,16 @@
     {{ ag_grid_js() }}
 
     <script nonce="{{ csp_nonce() }}">
-    const GROUP_BY_USER_STORAGE_KEY = 'accessRequestsGroupByUser';
+    const GROUP_BY_REQUEST_PENDING_STORAGE_KEY = 'accessRequestsGroupByRequestPending';
+    const GROUP_BY_REQUEST_PROCESSED_STORAGE_KEY = 'accessRequestsGroupByRequestProcessed';
+    const LEGACY_GROUP_BY_USER_STORAGE_KEY = 'accessRequestsGroupByUser';
     const LEGACY_GROUP_BY_REQUEST_STORAGE_KEY = 'accessRequestsGroupByRequest';
     const CSRF_TOKEN = {{ csrf_token()|tojson|safe }};
     const COUNTRIES_CELL_MAX_HEIGHT_PX = 120;
     const COUNTRIES_ROW_HEIGHT_PADDING_PX = 36;
     const ACCESS_REQUESTS_BASE_URL = {{ url_for('user_management.access_requests')|tojson|safe }};
+    const processedRequestsTotal = {{ processed_requests_total|tojson|safe }};
+    const processedRequestsLoaded = {{ processed_requests|length|tojson|safe }};
 
     function userAccessRequestsActionUrl(userId, action) {
         return ACCESS_REQUESTS_BASE_URL.replace(/\/?$/, '') + '/user/' + userId + '/' + action;
@@ -155,17 +176,48 @@
     let pendingGridApi = null;
     let processedGridHelper = null;
     let processedGridApi = null;
+    let processedGridInitialized = false;
+    let activeAccessRequestsTab = 'pending';
 
-    let groupByUser = localStorage.getItem(GROUP_BY_USER_STORAGE_KEY);
-    if (groupByUser === null) {
-        const legacyGroupByRequest = localStorage.getItem(LEGACY_GROUP_BY_REQUEST_STORAGE_KEY);
-        if (legacyGroupByRequest !== null) {
-            groupByUser = legacyGroupByRequest !== 'true';
-        } else {
-            groupByUser = true;
+    function readGroupByRequestSetting(storageKey, defaultValue) {
+        const stored = localStorage.getItem(storageKey);
+        if (stored === null) {
+            return defaultValue;
         }
-    } else {
-        groupByUser = groupByUser === 'true';
+        return stored === 'true';
+    }
+
+    function migrateLegacyGroupByRequestSetting() {
+        const legacyGroupByUser = localStorage.getItem(LEGACY_GROUP_BY_USER_STORAGE_KEY);
+        const legacyGroupByRequest = localStorage.getItem(LEGACY_GROUP_BY_REQUEST_STORAGE_KEY);
+        if (legacyGroupByUser !== null && localStorage.getItem(GROUP_BY_REQUEST_PENDING_STORAGE_KEY) === null) {
+            localStorage.setItem(GROUP_BY_REQUEST_PENDING_STORAGE_KEY, legacyGroupByUser !== 'true' ? 'false' : 'true');
+        }
+        if (legacyGroupByRequest !== null && localStorage.getItem(GROUP_BY_REQUEST_PROCESSED_STORAGE_KEY) === null) {
+            localStorage.setItem(GROUP_BY_REQUEST_PROCESSED_STORAGE_KEY, legacyGroupByRequest);
+        }
+    }
+
+    migrateLegacyGroupByRequestSetting();
+
+    // Pending: default grouped by user. Processed: default one row per request.
+    let pendingGroupByRequest = readGroupByRequestSetting(GROUP_BY_REQUEST_PENDING_STORAGE_KEY, false);
+    let processedGroupByRequest = readGroupByRequestSetting(GROUP_BY_REQUEST_PROCESSED_STORAGE_KEY, true);
+
+    function isGroupByUserForPending() {
+        return !pendingGroupByRequest;
+    }
+
+    function isGroupByUserForProcessed() {
+        return !processedGroupByRequest;
+    }
+
+    function isGroupByUserForTab(tabId) {
+        return tabId === 'processed' ? isGroupByUserForProcessed() : isGroupByUserForPending();
+    }
+
+    function getActiveGroupByRequest() {
+        return activeAccessRequestsTab === 'processed' ? processedGroupByRequest : pendingGroupByRequest;
     }
 
     const STATUS_SUMMARY_LABELS = {
@@ -492,7 +544,7 @@
     }
 
     function getAccessRequestsRowHeight(params) {
-        if (!groupByUser || !params || !params.data) {
+        if (!params || !params.data) {
             return undefined;
         }
         const count = params.data.request_count;
@@ -502,18 +554,18 @@
         return undefined;
     }
 
-    function createAccessRequestsGridOptions() {
+    function createAccessRequestsGridOptions(useGroupedRows) {
         const options = {};
-        if (groupByUser) {
+        if (useGroupedRows) {
             options.getRowHeight = getAccessRequestsRowHeight;
         }
         return options;
     }
 
-    function refreshAccessRequestsRowHeights(api) {
+    function refreshAccessRequestsRowHeights(api, useGroupedRows) {
         if (!api) return;
         if (typeof api.setGridOption === 'function') {
-            api.setGridOption('getRowHeight', groupByUser ? getAccessRequestsRowHeight : undefined);
+            api.setGridOption('getRowHeight', useGroupedRows ? getAccessRequestsRowHeight : undefined);
         }
         if (typeof api.onRowHeightChanged === 'function') {
             api.onRowHeightChanged();
@@ -536,11 +588,39 @@
         return ['id', 'user_name', 'user_email', 'country', 'status', 'processed_by_email', 'processed_at', 'request_message'];
     }
 
+    function createPendingActionsColumnDef(grouped) {
+        return {
+            colId: 'actions',
+            field: 'actions',
+            headerName: '{{ _("Actions") }}',
+            /* Two btn-sm labels (Approve + Reject) side by side; grouped rows can still be non-multi. */
+            width: 252,
+            minWidth: 252,
+            pinned: 'right',
+            lockPinned: true,
+            lockVisible: true,
+            suppressSizeToFit: true,
+            sortable: false,
+            filter: false,
+            autoHeight: grouped,
+            wrapText: grouped,
+            cellStyle: grouped
+                ? { 'white-space': 'normal', 'overflow': 'visible' }
+                : { 'white-space': 'nowrap', 'overflow': 'visible' },
+            cellRenderer: function(params) {
+                return renderPendingActionsCell(params, grouped);
+            }
+        };
+    }
+
     function applyAccessRequestsColumnOrder(api, helper, columnOrder) {
         if (!api || !columnOrder || typeof AgGridHelper.pinActionsColumn !== 'function') {
             return;
         }
         AgGridHelper.pinActionsColumn(api, columnOrder, helper && helper.columnVisibilityManager);
+        if (typeof AgGridHelper.enforceColumnMinWidths === 'function') {
+            AgGridHelper.enforceColumnMinWidths(api);
+        }
     }
 
     function createPendingColumnDefs(grouped) {
@@ -608,22 +688,7 @@
                 cellRenderer: AgGridRenderers.dateTime
             },
             createMessageColumnDef(),
-            {
-                colId: 'actions',
-                field: 'actions',
-                headerName: '{{ _("Actions") }}',
-                width: grouped ? 160 : 200,
-                minWidth: grouped ? 140 : 180,
-                maxWidth: grouped ? 200 : 250,
-                pinned: 'right',
-                lockPinned: true,
-                lockVisible: true,
-                sortable: false,
-                filter: false,
-                cellRenderer: function(params) {
-                    return renderPendingActionsCell(params, grouped);
-                }
-            }
+            createPendingActionsColumnDef(grouped)
         );
         return cols;
     }
@@ -746,16 +811,34 @@
     }
 
     function getPendingRowData() {
-        return groupByUser ? groupPendingByUser(pendingRequestsData) : pendingRequestsData;
+        return isGroupByUserForPending() ? groupPendingByUser(pendingRequestsData) : pendingRequestsData;
     }
 
     function getProcessedRowData() {
-        return groupByUser ? groupProcessedByUser(processedRequestsData) : processedRequestsData;
+        return isGroupByUserForProcessed() ? groupProcessedByUser(processedRequestsData) : processedRequestsData;
     }
 
-    function updateGridView(helper, api, createColumnDefs, createColumnOrder, rowData) {
+    function updateAccessRequestTabLabels() {
+        const pendingTab = document.getElementById('tab-pending');
+        const processedCountEl = document.getElementById('processedTabCount');
+        if (pendingTab) {
+            const pendingReqCount = pendingRequestsData.length;
+            const pendingRowCount = getPendingRowData().length;
+            let pendingLabel = String(pendingReqCount);
+            if (isGroupByUserForPending() && pendingRowCount !== pendingReqCount) {
+                pendingLabel = pendingRowCount + ' / ' + pendingReqCount;
+            }
+            pendingTab.innerHTML =
+                '<i class="fas fa-inbox mr-1.5"></i>{{ _("Pending Requests") }} (' + pendingLabel + ')';
+        }
+        if (processedCountEl) {
+            processedCountEl.textContent = String(processedRequestsTotal);
+        }
+    }
+
+    function updateGridView(helper, api, createColumnDefs, createColumnOrder, rowData, useGroupedRows) {
         if (!helper || !api) return;
-        const columnDefs = createColumnDefs(groupByUser);
+        const columnDefs = createColumnDefs(useGroupedRows);
         helper.config.columnDefs = columnDefs;
         if (typeof api.setGridOption === 'function') {
             api.setGridOption('columnDefs', columnDefs);
@@ -763,22 +846,39 @@
             api.setColumnDefs(columnDefs);
         }
         helper.setRowData(rowData);
-        refreshAccessRequestsRowHeights(api);
-        applyAccessRequestsColumnOrder(api, helper, createColumnOrder(groupByUser));
+        refreshAccessRequestsRowHeights(api, useGroupedRows);
+        applyAccessRequestsColumnOrder(api, helper, createColumnOrder(useGroupedRows));
         if (typeof helper.refresh === 'function') {
             helper.refresh();
         }
     }
 
     function applyGroupByUserView() {
-        updateGridView(pendingGridHelper, pendingGridApi, createPendingColumnDefs, createPendingColumnOrder, getPendingRowData());
-        updateGridView(processedGridHelper, processedGridApi, createProcessedColumnDefs, createProcessedColumnOrder, getProcessedRowData());
+        updateGridView(
+            pendingGridHelper,
+            pendingGridApi,
+            createPendingColumnDefs,
+            createPendingColumnOrder,
+            getPendingRowData(),
+            isGroupByUserForPending()
+        );
+        if (processedGridInitialized) {
+            updateGridView(
+                processedGridHelper,
+                processedGridApi,
+                createProcessedColumnDefs,
+                createProcessedColumnOrder,
+                getProcessedRowData(),
+                isGroupByUserForProcessed()
+            );
+        }
+        updateAccessRequestTabLabels();
     }
 
-    function syncGroupByUserToggle() {
-        const toggle = document.getElementById('groupByUserToggle');
+    function syncGroupByRequestToggle() {
+        const toggle = document.getElementById('groupByRequestToggle');
         if (toggle) {
-            toggle.checked = groupByUser;
+            toggle.checked = getActiveGroupByRequest();
         }
     }
 
@@ -787,13 +887,13 @@
         var result = AgGridHelper.create(
             'pendingRequestsGrid',
             'pending-access-requests',
-            createPendingColumnDefs(groupByUser),
+            createPendingColumnDefs(isGroupByUserForPending()),
             getPendingRowData(),
             {
                 columnVisibility: { enableExport: true, buttonPlaceholderId: 'pending-column-visibility-button-placeholder' },
-                gridOptions: createAccessRequestsGridOptions(),
+                gridOptions: createAccessRequestsGridOptions(isGroupByUserForPending()),
                 onReady: function(api, helper) {
-                    applyAccessRequestsColumnOrder(api, helper, createPendingColumnOrder(groupByUser));
+                    applyAccessRequestsColumnOrder(api, helper, createPendingColumnOrder(isGroupByUserForPending()));
                 }
             }
         );
@@ -804,42 +904,61 @@
     }
 
     function initializeProcessedGrid() {
-        if (processedRequestsData.length === 0) return;
+        if (processedRequestsData.length === 0 || processedGridInitialized) return;
         var result = AgGridHelper.create(
             'processedRequestsGrid',
             'processed-access-requests',
-            createProcessedColumnDefs(groupByUser),
+            createProcessedColumnDefs(isGroupByUserForProcessed()),
             getProcessedRowData(),
             {
                 columnVisibility: { enableExport: true, buttonPlaceholderId: 'processed-column-visibility-button-placeholder' },
-                gridOptions: createAccessRequestsGridOptions(),
+                gridOptions: createAccessRequestsGridOptions(isGroupByUserForProcessed()),
                 onReady: function(api, helper) {
-                    applyAccessRequestsColumnOrder(api, helper, createProcessedColumnOrder(groupByUser));
+                    applyAccessRequestsColumnOrder(api, helper, createProcessedColumnOrder(isGroupByUserForProcessed()));
                 }
             }
         );
         processedGridHelper = result.helper;
         processedGridApi = result.api;
+        processedGridInitialized = true;
         window.processedGridApi = processedGridApi;
         window.processedGridHelper = processedGridHelper;
     }
 
-    function setupGroupByUserToggle() {
-        const toggle = document.getElementById('groupByUserToggle');
+    function ensureProcessedGridInitialized() {
+        if (processedRequestsData.length === 0) {
+            return;
+        }
+        initializeProcessedGrid();
+    }
+
+    function setupGroupByRequestToggle() {
+        const toggle = document.getElementById('groupByRequestToggle');
         if (!toggle) return;
-        syncGroupByUserToggle();
+        syncGroupByRequestToggle();
         toggle.addEventListener('change', function() {
-            groupByUser = toggle.checked;
-            localStorage.setItem(GROUP_BY_USER_STORAGE_KEY, groupByUser ? 'true' : 'false');
+            if (activeAccessRequestsTab === 'processed') {
+                processedGroupByRequest = toggle.checked;
+                localStorage.setItem(
+                    GROUP_BY_REQUEST_PROCESSED_STORAGE_KEY,
+                    processedGroupByRequest ? 'true' : 'false'
+                );
+            } else {
+                pendingGroupByRequest = toggle.checked;
+                localStorage.setItem(
+                    GROUP_BY_REQUEST_PENDING_STORAGE_KEY,
+                    pendingGroupByRequest ? 'true' : 'false'
+                );
+            }
             applyGroupByUserView();
         });
     }
 
     function initializeAccessRequestsGrids() {
         initializePendingGrid();
-        initializeProcessedGrid();
-        setupGroupByUserToggle();
+        setupGroupByRequestToggle();
         setupAccessRequestsTabs();
+        updateAccessRequestTabLabels();
     }
 
     function refreshAccessRequestsGridForTab(tabId) {
@@ -849,8 +968,13 @@
             if (helper && typeof helper.refresh === 'function') {
                 helper.refresh();
             }
-            if (api && typeof api.doLayout === 'function') {
-                api.doLayout();
+            if (api) {
+                if (typeof api.onRowHeightChanged === 'function') {
+                    api.onRowHeightChanged();
+                }
+                if (typeof api.doLayout === 'function') {
+                    api.doLayout();
+                }
             }
         }, 50);
     }
@@ -863,6 +987,11 @@
         }
 
         function activate(tabId) {
+            activeAccessRequestsTab = tabId;
+            syncGroupByRequestToggle();
+            if (tabId === 'processed') {
+                ensureProcessedGridInitialized();
+            }
             A.activateStripTab('#access-requests-tabs', tabId, {
                 panelSelector: '.access-requests-panel'
             });

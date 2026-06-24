@@ -151,11 +151,20 @@
         {# Admin + only when admin_core plus at least one admin_* role that adds capability beyond core (and beyond redundant viewers). #}
         {% set has_more_than_essentials = has_admin_core and extra_admin_role_count.count > 0 %}
         {% set has_many_admin_roles = admin_role_count.count >= 8 %}
-        {% set is_focal_point = (has_assignment_editor_submitter and (not is_admin_user)) %}
-        {# Focal Point already implies Editor (and viewer capability); only surface extra assignment e.g. Approver. #}
+        {% set is_focal_point = (not is_admin_user) and (has_assignment_viewer or has_assignment_editor_submitter or has_assignment_approver) %}
+        {# Surface assignment capabilities that differ from the default Focal Point label. #}
         {% set focal_point_assignment_extra = '' %}
-        {% if is_focal_point and has_assignment_approver %}
-            {% set focal_point_assignment_extra = _('Assignment') ~ ': ' ~ _('Approver') %}
+        {% if is_focal_point %}
+            {% set focal_point_extra_parts = [] %}
+            {% if has_assignment_viewer and not has_assignment_editor_submitter %}
+                {% set __discard = focal_point_extra_parts.append(_('Viewer')) %}
+            {% endif %}
+            {% if has_assignment_approver %}
+                {% set __discard = focal_point_extra_parts.append(_('Approver')) %}
+            {% endif %}
+            {% if focal_point_extra_parts %}
+                {% set focal_point_assignment_extra = _('Assignment') ~ ': ' ~ focal_point_extra_parts|join(', ') %}
+            {% endif %}
         {% endif %}
         {# Put Assignment:… on its own line when combined with a primary role or other role names. #}
         {% set other_non_admin_joined = (other_non_admin_roles|join(', ')) if other_non_admin_roles else '' %}

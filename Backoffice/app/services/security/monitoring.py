@@ -1,5 +1,6 @@
 # Security monitoring and alerting utilities
 import logging
+import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from flask import request, current_app, g, has_request_context
@@ -131,8 +132,6 @@ class SecurityMonitor:
                 f"(IP: {event.ip_address}, User: {event.user_id})"
             )
 
-            from app.services.email.service import send_security_alert
-
             manager_emails = SecurityMonitor._get_active_system_manager_emails()
             if not manager_emails:
                 current_app.logger.warning(
@@ -140,18 +139,70 @@ class SecurityMonitor:
                 )
                 return
 
-            timestamp = (
-                event.timestamp.isoformat()
-                if hasattr(event.timestamp, 'isoformat')
-                else str(event.timestamp)
+            # Email delivery can block up to EMAIL API timeout (15s). Run in a background
+            # thread in production so platform-error / auth paths do not hold Gunicorn workers.
+            if current_app.config.get('TESTING'):
+                SecurityMonitor._deliver_security_alert_email(event, manager_emails)
+            else:
+                app = current_app._get_current_object()
+                snapshot = {
+                    'event_type': event.event_type,
+                    'severity': event.severity,
+                    'description': event.description,
+                    'ip_address': event.ip_address,
+                    'user_id': event.user_id,
+                    'timestamp': event.timestamp,
+                }
+
+                def _worker():
+                    with app.app_context():
+                        SecurityMonitor._deliver_security_alert_email_from_snapshot(
+                            snapshot, manager_emails
+                        )
+
+                threading.Thread(
+                    target=_worker,
+                    daemon=True,
+                    name=f"security-alert-{event.event_type}",
+                ).start()
+
+        except Exception as e:
+            current_app.logger.error(f"Failed to send security alert: {e}")
+
+    @staticmethod
+    def _deliver_security_alert_email(event: SecurityEvent, manager_emails: List[str]) -> None:
+        SecurityMonitor._deliver_security_alert_email_from_snapshot(
+            {
+                'event_type': event.event_type,
+                'severity': event.severity,
+                'description': event.description,
+                'ip_address': event.ip_address,
+                'user_id': event.user_id,
+                'timestamp': event.timestamp,
+            },
+            manager_emails,
+        )
+
+    @staticmethod
+    def _deliver_security_alert_email_from_snapshot(
+        snapshot: Dict[str, Any], manager_emails: List[str]
+    ) -> None:
+        try:
+            from app.services.email.service import send_security_alert
+
+            timestamp = snapshot.get('timestamp')
+            timestamp_str = (
+                timestamp.isoformat()
+                if hasattr(timestamp, 'isoformat')
+                else str(timestamp)
             )
             success = send_security_alert(
-                event_type=event.event_type,
-                severity=event.severity,
-                description=event.description,
-                ip_address=event.ip_address,
-                user_id=event.user_id,
-                timestamp=timestamp,
+                event_type=snapshot['event_type'],
+                severity=snapshot['severity'],
+                description=snapshot['description'],
+                ip_address=snapshot['ip_address'],
+                user_id=snapshot['user_id'],
+                timestamp=timestamp_str,
                 recipients=manager_emails,
             )
             if success:
@@ -163,7 +214,6 @@ class SecurityMonitor:
                 current_app.logger.error(
                     "Failed to send security alert to system managers"
                 )
-
         except Exception as e:
             current_app.logger.error(f"Failed to send security alert: {e}")
 

@@ -39,6 +39,9 @@ from app.services.presence_store import (
     record_presence,
     remove_presence,
 )
+from sqlalchemy import select
+
+from app.models import AssignmentEntityStatus, AssignedForm, FormTemplate
 from app.services import check_aes_access_light, check_country_access, ensure_aes_access
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.request_utils import get_json_or_form, is_json_request
@@ -1034,24 +1037,32 @@ def api_assignment_completion_rate(aes_id):
     queries are off the critical render path.
     """
     try:
-        access_result = ensure_aes_access(aes_id)
-        if 'error' in access_result:
-            return json_forbidden(access_result['error'])
-        aes = access_result['aes']
+        if not check_aes_access_light(aes_id):
+            return json_forbidden('Assignment not found or access denied')
 
-        assigned_form = aes.assigned_form
-        if not assigned_form:
+        row = db.session.execute(
+            select(FormTemplate.id, FormTemplate.published_version_id)
+            .join(AssignedForm, AssignedForm.template_id == FormTemplate.id)
+            .join(
+                AssignmentEntityStatus,
+                AssignmentEntityStatus.assigned_form_id == AssignedForm.id,
+            )
+            .where(AssignmentEntityStatus.id == aes_id)
+        ).first()
+        if not row:
             return json_not_found('Assignment form not found')
 
-        template = assigned_form.template
-        if not template or not template.published_version_id:
+        template_id, published_version_id = row
+        if not published_version_id:
             return json_ok(completion_rate=0.0)
 
         from app.services.assignment_completion_service import AssignmentCompletionService
         metrics = AssignmentCompletionService.compute_for_assignment(
-            aes_id, template.id, template.published_version_id
+            aes_id, template_id, published_version_id
         )
-        return json_ok(completion_rate=round(metrics.completion_rate, 1))
+        response = json_ok(completion_rate=round(metrics.completion_rate, 1))
+        response.headers['Cache-Control'] = 'private, max-age=30'
+        return response
     except Exception as e:
         return handle_json_view_exception(e, 'Failed to compute completion rate', status_code=500)
 

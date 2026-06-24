@@ -27,6 +27,9 @@ def register_commands(app):
     from app.cli_commands.indicatorbank_sync import register_indicatorbank_commands
     register_indicatorbank_commands(app)
 
+    from app.cli_commands.dev_tools import register_dev_tools_commands
+    register_dev_tools_commands(app)
+
     # AI regression testing
     from app.cli_commands.ai_regression import ai_regression_cli
     app.cli.add_command(ai_regression_cli)

@@ -3,13 +3,13 @@ import { getFieldValue, getCurrentFieldValue } from './field-management.js';
 
 const MODULE = 'calculated-lists-runtime';
 
-/** Always-on EmOps type-filter tracing (filter DevTools console by "[EmOpsFilter]"). */
+/** EmOps type-filter tracing (filter DevTools console by "[EmOpsFilter]"). Gated by calculated-lists-runtime debug module. */
 function traceEmOpsFilter(fieldId, step, detail) {
     const id = fieldId != null && fieldId !== '' ? String(fieldId) : '?';
     if (detail !== undefined) {
-        console.log(`[EmOpsFilter] field=${id} | ${step}`, detail);
+        debugLog(MODULE, `[EmOpsFilter] field=${id} | ${step}`, detail);
     } else {
-        console.log(`[EmOpsFilter] field=${id} | ${step}`);
+        debugLog(MODULE, `[EmOpsFilter] field=${id} | ${step}`);
     }
 }
 

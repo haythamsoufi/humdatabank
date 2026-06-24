@@ -46,7 +46,7 @@ Backoffice/
    python run.py
    ```
 
-   On Windows PowerShell, if `flask` commands fail, set: `$env:FLASK_APP = "run.py"`
+   Custom Flask CLI commands (`seed-test-data`, `create-admin`, etc.) are registered via `create_app` — no `FLASK_APP` setup required.
 
 ## 📋 Key Files
 

@@ -290,6 +290,32 @@ class TestConfigureLogging:
         # openai logger should have been configured
         assert "openai" in captured_loggers
 
+    def test_azure_storage_loggers_suppressed_to_warning(self):
+        """Azure Blob SDK HTTP wire logs are capped at WARNING (like urllib3)."""
+        mgr = _fresh_debug_manager()
+        app = _make_mock_app({})
+        captured_loggers = {}
+
+        def mock_get_logger(name=None):
+            mock = MagicMock(spec=logging.Logger, handlers=[])
+            if name:
+                captured_loggers[name] = mock
+            return mock
+
+        with (
+            patch("os.makedirs"),
+            patch("logging.getLogger", side_effect=mock_get_logger),
+        ):
+            mgr.configure_logging(app)
+
+        for logger_name in (
+            "azure",
+            "azure.core.pipeline.policies.http_logging_policy",
+            "azure.storage.blob",
+        ):
+            assert logger_name in captured_loggers
+            captured_loggers[logger_name].setLevel.assert_any_call(logging.WARNING)
+
     def test_openai_verbose_env_var_enabled_skips_suppression(self):
         """When AI_VERBOSE_OPENAI_HTTP is truthy, openai loggers are NOT suppressed."""
         mgr = _fresh_debug_manager()

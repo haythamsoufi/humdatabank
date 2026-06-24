@@ -228,6 +228,17 @@ class DebugManager:
         for _noisy_http in ('urllib3', 'urllib3.connectionpool', 'requests'):
             logging.getLogger(_noisy_http).setLevel(logging.WARNING)
 
+        # Azure Blob SDK logs every HEAD/get_blob_properties wire call at INFO
+        # (Request method, headers, etc.). Cap unless debugging storage issues.
+        for _noisy_azure in (
+            'azure',
+            'azure.core',
+            'azure.core.pipeline.policies.http_logging_policy',
+            'azure.storage',
+            'azure.storage.blob',
+        ):
+            logging.getLogger(_noisy_azure).setLevel(logging.WARNING)
+
         # OpenAI + httpx log entire request JSON (tools + huge user payloads) at DEBUG,
         # which fills the terminal and log files. Keep them quiet unless explicitly enabled.
         _verbose_openai_http = bool(

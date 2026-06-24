@@ -191,7 +191,11 @@
         const legacyGroupByUser = localStorage.getItem(LEGACY_GROUP_BY_USER_STORAGE_KEY);
         const legacyGroupByRequest = localStorage.getItem(LEGACY_GROUP_BY_REQUEST_STORAGE_KEY);
         if (legacyGroupByUser !== null && localStorage.getItem(GROUP_BY_REQUEST_PENDING_STORAGE_KEY) === null) {
-            localStorage.setItem(GROUP_BY_REQUEST_PENDING_STORAGE_KEY, legacyGroupByUser !== 'true' ? 'false' : 'true');
+            // Legacy key stored groupByUser; current keys store groupByRequest (inverse).
+            localStorage.setItem(
+                GROUP_BY_REQUEST_PENDING_STORAGE_KEY,
+                legacyGroupByUser === 'true' ? 'false' : 'true'
+            );
         }
         if (legacyGroupByRequest !== null && localStorage.getItem(GROUP_BY_REQUEST_PROCESSED_STORAGE_KEY) === null) {
             localStorage.setItem(GROUP_BY_REQUEST_PROCESSED_STORAGE_KEY, legacyGroupByRequest);

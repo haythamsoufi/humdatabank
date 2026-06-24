@@ -2,15 +2,15 @@
 const DEBUG_CONFIG = {
     global: true,  // Master switch for all debugging
     modules: {
-        'forms-loader': false,
+        'forms-loader': true,
         'data-availability': false,
         'conditions': false,
         'field-management': false,
-        'dynamic-indicators': false,
+        'dynamic-indicators': true,
         'layout': false,
         'multi-select': false,
-        'repeat-sections': false,
-        'form-optimization': false,
+        'repeat-sections': true,
+        'form-optimization': true,
         'form-events': false,
         'ajax-save': false,
         'form_validation': false,

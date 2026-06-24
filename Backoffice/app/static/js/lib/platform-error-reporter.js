@@ -221,6 +221,44 @@
     });
   }
 
+  /* ── Navigation status check (full-page 504/502/503) ─────────────────── */
+
+  function installNavigationStatusCheck() {
+    try {
+      var entries = performance.getEntriesByType('navigation');
+      if (!entries || !entries.length) return;
+      var status = entries[0].responseStatus;
+      if (!status || !shouldReport(status)) return;
+
+      var url = window.location.href;
+      if (alreadyReported(status, url)) return;
+
+      markReported(status, url);
+
+      var payload = {
+        error_code: status,
+        url: url,
+        referrer: document.referrer || null,
+        user_agent: navigator.userAgent || null,
+        timestamp: new Date().toISOString()
+      };
+
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(
+          ENDPOINT,
+          new Blob([JSON.stringify(payload)], { type: 'application/json' })
+        );
+      } else if (nativeFetch) {
+        nativeFetch(ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          keepalive: true
+        }).catch(function () {});
+      }
+    } catch (_) {}
+  }
+
   /* ── Bootstrap ─────────────────────────────────────────────────────────── */
 
   if (typeof window !== 'undefined') {
@@ -229,5 +267,6 @@
     installFetchWrapper();
     installJQueryHandler();
     installUnhandledRejectionHandler();
+    installNavigationStatusCheck();
   }
 })();

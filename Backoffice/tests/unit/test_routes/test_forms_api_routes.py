@@ -998,6 +998,68 @@ class TestGetReportingCurrencyOptions:
 
 
 # =====================================================================
+# api_presence_sync
+# =====================================================================
+
+
+class TestApiPresenceSync:
+    def test_sync_access_denied_returns_403(self, app, admin_user, db_session, client):
+        client = _make_logged_in_client(client, admin_user.id)
+        with patch("app.routes.forms_api.check_aes_access_light", return_value=False):
+            resp = _json_post(client, "/api/forms/presence/assignment/1/sync", {})
+        assert resp.status_code == 403
+
+    def test_sync_success_returns_users(self, app, admin_user, db_session, client):
+        from app.utils.datetime_helpers import utcnow
+
+        client = _make_logged_in_client(client, admin_user.id)
+        mock_user = MagicMock()
+        mock_user.id = 2
+        mock_user.name = "Bob"
+        mock_user.email = "bob@example.com"
+        mock_user.profile_color = "#00FF00"
+        presence_map = {2: utcnow()}
+
+        with patch("app.routes.forms_api.check_aes_access_light", return_value=True), \
+             patch("app.routes.forms_api.record_presence"), \
+             patch("app.routes.forms_api.get_active_presence", return_value=presence_map), \
+             patch("app.routes.forms_api._build_presence_users", return_value=[{
+                 "id": 2,
+                 "name": "Bob",
+                 "email": "bob@example.com",
+                 "profile_color": "#00FF00",
+                 "last_seen": presence_map[2].isoformat(),
+             }]):
+            resp = _json_post(client, "/api/forms/presence/assignment/1/sync", {})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data.get("success") is True
+        assert len(data.get("users", [])) == 1
+        assert data["users"][0]["name"] == "Bob"
+
+
+# =====================================================================
+# api_presence_leave
+# =====================================================================
+
+
+class TestApiPresenceLeave:
+    def test_leave_success_returns_200(self, app, admin_user, db_session, client):
+        client = _make_logged_in_client(client, admin_user.id)
+        with patch("app.routes.forms_api.remove_presence"):
+            resp = _json_post(client, "/api/forms/presence/assignment/1/leave", {})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data.get("success") is True
+
+    def test_leave_swallows_errors(self, app, admin_user, db_session, client):
+        client = _make_logged_in_client(client, admin_user.id)
+        with patch("app.routes.forms_api.remove_presence", side_effect=Exception("boom")):
+            resp = _json_post(client, "/api/forms/presence/assignment/1/leave", {})
+        assert resp.status_code == 200
+
+
+# =====================================================================
 # api_presence_heartbeat
 # =====================================================================
 
@@ -1050,6 +1112,7 @@ class TestApiPresenceActiveUsers:
         mock_user = MagicMock()
         mock_user.id = 1
         mock_user.name = "Alice"
+        mock_user.email = "alice@example.com"
         mock_user.profile_color = "#FF0000"
 
         presence_map = {1: utcnow()}
@@ -1061,7 +1124,8 @@ class TestApiPresenceActiveUsers:
             resp = client.get("/api/forms/presence/assignment/1/active-users")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert len(data.get("users", [])) >= 0  # may be 0 if user_id not matched
+        assert len(data.get("users", [])) == 1
+        assert data["users"][0]["name"] == "Alice"
 
 
 # =====================================================================

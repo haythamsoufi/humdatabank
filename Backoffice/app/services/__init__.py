@@ -30,6 +30,7 @@ _LAZY_EXPORT_MODULES = {
     'check_country_access': 'data_retrieval_service',
     'get_formdata_map': 'data_retrieval_service',
     'get_aes_with_joins': 'data_retrieval_service',
+    'check_aes_access_light': 'data_retrieval_service',
     'ensure_aes_access': 'data_retrieval_service',
     'get_user_countries': 'data_retrieval_service',
     'get_user_country_ids': 'data_retrieval_service',

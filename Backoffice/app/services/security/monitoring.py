@@ -99,6 +99,29 @@ class SecurityMonitor:
         }
 
     @staticmethod
+    def _get_active_system_manager_emails() -> list[str]:
+        """Email addresses of active users with the system_manager RBAC role."""
+        from app.models import User
+
+        try:
+            from app.models.rbac import RbacUserRole, RbacRole
+
+            managers = (
+                User.query.join(RbacUserRole, User.id == RbacUserRole.user_id)
+                .join(RbacRole, RbacUserRole.role_id == RbacRole.id)
+                .filter(RbacRole.code == "system_manager")
+                .filter(User.active.is_(True))
+                .all()
+            )
+        except Exception as exc:
+            current_app.logger.debug(
+                "RBAC join for system managers failed, using empty list: %s", exc
+            )
+            return []
+
+        return [m.email for m in managers if m.email]
+
+    @staticmethod
     def _send_security_alert(event: SecurityEvent):
         """Send security alert for high-severity events."""
         try:
@@ -108,17 +131,38 @@ class SecurityMonitor:
                 f"(IP: {event.ip_address}, User: {event.user_id})"
             )
 
-            # Send email alert to administrators for high/critical severity events
             from app.services.email.service import send_security_alert
 
-            send_security_alert(
+            manager_emails = SecurityMonitor._get_active_system_manager_emails()
+            if not manager_emails:
+                current_app.logger.warning(
+                    "No active system managers with email addresses configured for security alerts"
+                )
+                return
+
+            timestamp = (
+                event.timestamp.isoformat()
+                if hasattr(event.timestamp, 'isoformat')
+                else str(event.timestamp)
+            )
+            success = send_security_alert(
                 event_type=event.event_type,
                 severity=event.severity,
                 description=event.description,
                 ip_address=event.ip_address,
                 user_id=event.user_id,
-                timestamp=event.timestamp.isoformat() if hasattr(event.timestamp, 'isoformat') else str(event.timestamp)
+                timestamp=timestamp,
+                recipients=manager_emails,
             )
+            if success:
+                current_app.logger.info(
+                    "Security alert sent to %s system managers",
+                    len(manager_emails),
+                )
+            else:
+                current_app.logger.error(
+                    "Failed to send security alert to system managers"
+                )
 
         except Exception as e:
             current_app.logger.error(f"Failed to send security alert: {e}")

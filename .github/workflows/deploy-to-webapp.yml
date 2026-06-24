@@ -29,6 +29,11 @@ on:
         required: true
         default: 'v1.7'
         type: string
+      force_static_upload:
+        description: 'Upload static assets even when Backoffice/app/static did not change in the latest commit'
+        required: false
+        default: false
+        type: boolean
 
 env:
   # When triggered by a release event, always deploy to Staging using the release tag.
@@ -291,6 +296,41 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Detect static asset changes
+        id: static
+        env:
+          FORCE_STATIC_UPLOAD: ${{ inputs.force_static_upload }}
+        run: |
+          set -euo pipefail
+
+          if [ "${FORCE_STATIC_UPLOAD}" = "true" ]; then
+            echo "force_static_upload enabled — will upload static assets."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            changed_files="$(git diff --name-only HEAD^..HEAD -- Backoffice/app/static || true)"
+            if [ -n "${changed_files}" ]; then
+              echo "Static files changed in latest commit:"
+              echo "${changed_files}"
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              {
+                echo "changed_files<<EOF"
+                echo "${changed_files}" | sed 's|^Backoffice/app/static/||'
+                echo "EOF"
+              } >> "$GITHUB_OUTPUT"
+            else
+              echo "No static file changes in latest commit; skipping static upload."
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "No previous commit available; uploading static assets."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set deployment target
         id: config
@@ -318,10 +358,11 @@ jobs:
           fi
 
       # Static JS/CSS/images are served from Azure Blob Storage (STATIC_CDN_URL), not Gunicorn.
-      # The container app does NOT copy files on startup — this step runs on every deploy.
+      # The container app does NOT copy files on startup — upload when static files change (or forced).
       # Production → container "static"   Staging → container "static-staging" (isolated assets).
       # Required GitHub secret: AZURE_STORAGE_CONNECTION_STRING (same storage account as uploads).
       - name: Install AzCopy
+        if: steps.static.outputs.changed == 'true'
         run: |
           if command -v azcopy >/dev/null 2>&1; then
             azcopy --version
@@ -333,10 +374,12 @@ jobs:
           azcopy --version
 
       - name: Upload static assets to Azure Blob Storage
+        if: steps.static.outputs.changed == 'true'
         id: static_upload
         env:
           AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
           STATIC_BLOB_CONTAINER: ${{ steps.static_config.outputs.container }}
+          STATIC_CHANGED_FILES: ${{ steps.static.outputs.changed_files }}
         run: |
           set -euo pipefail
           chmod +x Backoffice/azure/upload-static-assets.sh

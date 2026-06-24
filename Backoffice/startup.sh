@@ -49,7 +49,7 @@ else
     WORKERS=${GUNICORN_WORKERS:-3}
     THREADS=${GUNICORN_THREADS:-4}
     WORKER_CLASS=${GUNICORN_WORKER_CLASS:-gthread}
-    TIMEOUT=${GUNICORN_TIMEOUT:-120}
+    TIMEOUT=${GUNICORN_TIMEOUT:-25}
     echo "Workers: ${WORKERS}, Threads: ${THREADS}, Worker Class: ${WORKER_CLASS}, Timeout: ${TIMEOUT}s"
 
     exec gunicorn --bind=0.0.0.0:${PORT:-5000} \

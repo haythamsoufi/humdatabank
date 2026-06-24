@@ -39,10 +39,11 @@ worker_connections = int(os.environ.get('GUNICORN_WORKER_CONNECTIONS', '1000'))
 
 # Timeout
 # Workers silent for more than this many seconds are killed and restarted.
-# Azure App Service front-end cuts HTTP at ~230s; default 120s so gunicorn fails
-# gracefully before the gateway returns 504 while the worker still holds DB connections.
-# Override via GUNICORN_TIMEOUT (e.g. 600) only behind Application Gateway with ≥300s backend timeout.
-timeout = int(os.environ.get('GUNICORN_TIMEOUT', '120'))
+# Production uses Azure Application Gateway with a 30s backend timeout. Default 25s
+# so Gunicorn recycles stuck workers (and releases DB connections) before the gateway
+# returns an opaque 504 while the worker is still busy.
+# Override via GUNICORN_TIMEOUT (e.g. 120) only when a longer upstream timeout is configured.
+timeout = int(os.environ.get('GUNICORN_TIMEOUT', '25'))
 
 # Keep-alive
 # Seconds to wait for requests on a Keep-Alive connection

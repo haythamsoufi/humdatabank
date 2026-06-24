@@ -20,7 +20,7 @@ from typing import Dict, List, Optional, Union, Any
 from datetime import timedelta
 
 from flask_login import current_user
-from sqlalchemy import desc, literal, text, func, or_
+from sqlalchemy import desc, literal, select, text, func, or_
 
 from app.models import (
     User, Country, FormTemplate, FormTemplateVersion, FormSection, IndicatorBank,
@@ -545,6 +545,25 @@ from app.services.upr.data_retrieval import (  # noqa: E402,F401
 )
 
 
+def check_aes_access_light(aes_id: int) -> bool:
+    """Presence-only RBAC check — no template/assigned_form joins needed."""
+    try:
+        from app.services.entity_service import EntityService
+
+        row = db.session.execute(
+            select(AssignmentEntityStatus.entity_type, AssignmentEntityStatus.entity_id)
+            .where(AssignmentEntityStatus.id == aes_id)
+        ).first()
+        if not row:
+            return False
+        return EntityService.check_user_entity_access(
+            current_user, row.entity_type, row.entity_id
+        )
+    except Exception as e:
+        logger.exception("Error checking AES access (light) for %s: %s", aes_id, e)
+        return False
+
+
 def ensure_aes_access(aes_id: int) -> Dict[str, Any]:
     """Ensure user has access to an AssignmentEntityStatus."""
     try:
@@ -575,6 +594,7 @@ __all__ = [
     '_user_allowed_country_ids',
     'get_formdata_map',
     'get_aes_with_joins',
+    'check_aes_access_light',
     'ensure_aes_access',
     'get_user_countries',
     'get_user_country_ids',

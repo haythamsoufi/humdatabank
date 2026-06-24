@@ -547,7 +547,13 @@
     let gridHelper = null;
     let gridApi = null;
 
+    const documentsLoadAsync = {{ documents_load_async|default(false)|tojson|safe }};
+    const documentsJsonUrl = {{ (documents_json_url if documents_json_url is defined else '')|tojson|safe }};
+
     // Transform documents data for ag-grid
+    {% if documents_load_async %}
+    const documentsData = [];
+    {% else %}
     const documentsData = [
         {% for doc, status, country, user, uploaded_at, assignment_period, entity_access in documents %}
         {% set doc_country_id = (country.id if country else None) %}
@@ -605,8 +611,12 @@
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
+    {% endif %}
 
     (function logDocumentsGridActionsDebug() {
+        if (documentsLoadAsync) {
+            return;
+        }
         var summary = {
             rowCount: documentsData.length,
             currentUserId: {{ (current_user.id if current_user.is_authenticated else none)|tojson|safe }},
@@ -808,6 +818,54 @@
     ];
 
     // Initialize grid using helper
+    function loadDocumentsAsync(api) {
+        if (!documentsLoadAsync || !documentsJsonUrl) {
+            return Promise.resolve();
+        }
+        var perPage = 200;
+        var page = 1;
+        var allRows = [];
+
+        function fetchPage() {
+            var url = documentsJsonUrl + (documentsJsonUrl.indexOf('?') >= 0 ? '&' : '?')
+                + 'page=' + page + '&per_page=' + perPage;
+            return fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            }).then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Failed to load documents (' + response.status + ')');
+                }
+                return response.json();
+            }).then(function (payload) {
+                var rows = (payload && payload.documents) ? payload.documents : [];
+                allRows = allRows.concat(rows);
+                var total = payload && typeof payload.total === 'number' ? payload.total : allRows.length;
+                if (allRows.length < total && rows.length === perPage) {
+                    page += 1;
+                    return fetchPage();
+                }
+                if (api && typeof api.setGridOption === 'function') {
+                    api.setGridOption('rowData', allRows);
+                } else if (api && typeof api.setRowData === 'function') {
+                    api.setRowData(allRows);
+                }
+            });
+        }
+
+        return fetchPage().catch(function (error) {
+            if (typeof showToast === 'function') {
+                showToast(error && error.message ? error.message : 'Failed to load documents.', 'error');
+            } else if (window.__clientWarn) {
+                window.__clientWarn('Failed to load documents:', error);
+            }
+        });
+    }
+
     function initializeGrid() {
         var result = AgGridHelper.create('documentsGrid', 'documents', columnDefs, documentsData, {
             {% if user_entities is defined and user_entities %}
@@ -826,6 +884,7 @@
                 } catch (e) {
                     window.__clientWarn && window.__clientWarn('Could not apply column order:', e);
                 }
+                loadDocumentsAsync(api);
             }
         });
         gridHelper = result.helper;

@@ -377,13 +377,33 @@ class TestSendSecurityAlert:
         )
 
         with app.app_context():
-            with patch("app.services.email.service.send_security_alert") as mock_send:
+            with patch.object(
+                SecurityMonitor,
+                "_get_active_system_manager_emails",
+                return_value=["manager@ifrc.org"],
+            ), patch("app.services.email.service.send_security_alert", return_value=True) as mock_send:
                 SecurityMonitor._send_security_alert(event)
 
         mock_send.assert_called_once()
         kwargs = mock_send.call_args[1]
         assert kwargs["event_type"] == "brute_force"
         assert kwargs["severity"] == "high"
+        assert kwargs["recipients"] == ["manager@ifrc.org"]
+
+    def test_skips_email_when_no_system_managers(self, app, db_session):
+        from app.services.security.monitoring import SecurityMonitor
+
+        event = _make_security_event(event_type="brute_force", severity="high")
+
+        with app.app_context():
+            with patch.object(
+                SecurityMonitor,
+                "_get_active_system_manager_emails",
+                return_value=[],
+            ), patch("app.services.email.service.send_security_alert") as mock_send:
+                SecurityMonitor._send_security_alert(event)
+
+        mock_send.assert_not_called()
 
     def test_send_email_exception_logged(self, app, db_session):
         from app.services.security.monitoring import SecurityMonitor
@@ -394,7 +414,11 @@ class TestSendSecurityAlert:
         )
 
         with app.app_context():
-            with patch(
+            with patch.object(
+                SecurityMonitor,
+                "_get_active_system_manager_emails",
+                return_value=["manager@ifrc.org"],
+            ), patch(
                 "app.services.email.service.send_security_alert",
                 side_effect=Exception("email server down"),
             ), patch("app.services.security.monitoring.current_app.logger") as mock_logger:
@@ -409,7 +433,11 @@ class TestSendSecurityAlert:
         event.timestamp = "2026-01-01 12:00:00"  # plain string, no isoformat method
 
         with app.app_context():
-            with patch("app.services.email.service.send_security_alert") as mock_send:
+            with patch.object(
+                SecurityMonitor,
+                "_get_active_system_manager_emails",
+                return_value=["manager@ifrc.org"],
+            ), patch("app.services.email.service.send_security_alert", return_value=True) as mock_send:
                 SecurityMonitor._send_security_alert(event)
 
         kwargs = mock_send.call_args[1]

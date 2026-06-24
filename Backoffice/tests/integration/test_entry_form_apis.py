@@ -358,6 +358,62 @@ class TestEntryFormFormsApiDynamicIndicators:
 
 @pytest.mark.integration
 class TestEntryFormFormsApiPresence:
+    def test_presence_sync_returns_success(self, client, db_session, app):
+        with app.app_context():
+            user = create_test_user(db_session, role="admin")
+            _login(client, user.id)
+
+            country = create_test_country(db_session)
+            template = create_test_template(db_session)
+            assigned_form = AssignedForm(template_id=template.id, period_name="2024")
+            db_session.add(assigned_form)
+            db_session.flush()
+            aes = AssignmentEntityStatus(
+                assigned_form_id=assigned_form.id,
+                entity_type=EntityType.country.value,
+                entity_id=country.id,
+                status="in_progress",
+            )
+            db_session.add(aes)
+            db_session.flush()
+            aes_id = aes.id
+            db_session.commit()
+
+            with patch("app.routes.forms_api.check_aes_access_light", return_value=True), \
+                 patch("app.utils.user_analytics.log_user_activity", return_value=None):
+                resp = client.post(f"/api/forms/presence/assignment/{aes_id}/sync")
+                assert resp.status_code == 200
+                data = resp.get_json()
+                assert data["success"] is True
+                assert isinstance(data["users"], list)
+
+    def test_presence_leave_returns_success(self, client, db_session, app):
+        with app.app_context():
+            user = create_test_user(db_session, role="admin")
+            _login(client, user.id)
+
+            country = create_test_country(db_session)
+            template = create_test_template(db_session)
+            assigned_form = AssignedForm(template_id=template.id, period_name="2024")
+            db_session.add(assigned_form)
+            db_session.flush()
+            aes = AssignmentEntityStatus(
+                assigned_form_id=assigned_form.id,
+                entity_type=EntityType.country.value,
+                entity_id=country.id,
+                status="in_progress",
+            )
+            db_session.add(aes)
+            db_session.flush()
+            aes_id = aes.id
+            db_session.commit()
+
+            with patch("app.utils.user_analytics.log_user_activity", return_value=None):
+                resp = client.post(f"/api/forms/presence/assignment/{aes_id}/leave")
+                assert resp.status_code == 200
+                data = resp.get_json()
+                assert data["success"] is True
+
     def test_presence_heartbeat_returns_success(self, client, db_session, app):
         with app.app_context():
             user = create_test_user(db_session, role="admin")

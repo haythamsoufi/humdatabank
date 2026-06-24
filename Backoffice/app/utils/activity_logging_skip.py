@@ -16,6 +16,8 @@ SKIP_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
         "public.health_check",
         "forms_api.api_presence_heartbeat",
         "forms_api.api_presence_active_users",
+        "forms_api.api_presence_sync",
+        "forms_api.api_presence_leave",
         "main.api_get_notifications_count",
         "main.api_get_notifications",
         "notifications.api_get_notification_count",
@@ -77,6 +79,8 @@ SKIP_ACTIVITY_ENDPOINT_SUFFIXES: frozenset[str] = frozenset(
     {
         "get_workflow_tour",
         "api_presence_heartbeat",
+        "api_presence_sync",
+        "api_presence_leave",
         "api_notification_stream_status",
         "api_get_notification_count",
         "api_get_notification_preferences",

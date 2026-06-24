@@ -11,7 +11,6 @@
   if (window.__ifrcPresenceInit[aesId]) return;
   window.__ifrcPresenceInit[aesId] = true;
 
-  const currentUserId = Number(presenceBar.getAttribute('data-current-user-id') || 0);
   const teamsIconUrl = presenceBar.getAttribute('data-teams-icon-url') || '';
   const teamsChatLabel = presenceBar.getAttribute('data-teams-chat-label') || 'Chat';
   const usersContainer    = document.getElementById('presence-users');       // collapsed avatars
@@ -26,28 +25,24 @@
   let isExpanded = false;
   let isWarningDismissed = false;
   let lastUserIds = '';
-  // Counts consecutive fetchActive failures; resets on success or tab focus.
-  let fetchErrorCount = 0;
+  let lastRenderedIds = '';
+  // Counts consecutive sync failures; resets on success or tab focus.
+  let syncErrorCount = 0;
 
   const AUTO_COLLAPSE_MS = 30000;
   let autoCollapseTimer = null;
 
-  // Must match backend ttl_seconds (forms_api.py).
+  // Must match PRESENCE_TTL_SECONDS in presence_store.py (120 s).
   const PRESENCE_TTL_MS    = 120 * 1000;
-  const HEARTBEAT_BASE_MS  = 30000;
-  const REFRESH_BASE_MS    = 30000;
+  const SYNC_BASE_MS       = 30000;
   const MAX_BACKOFF_MS     = 5 * 60 * 1000;
-  // Heartbeat backoff cap: base + backoff + max-jitter (2 s) must stay under TTL.
-  // 120 000 - 30 000 - 2 000 - 3 000 (safety) = 85 000 ms
-  const HB_BACKOFF_CAP_MS  = PRESENCE_TTL_MS - HEARTBEAT_BASE_MS - 5000;
-  // Tolerate this many consecutive fetchActive errors before hiding the bar.
-  const MAX_FETCH_ERRORS_BEFORE_HIDE = 3;
+  // Sync backoff cap: base + backoff + max-jitter (2 s) must stay under TTL.
+  const SYNC_BACKOFF_CAP_MS = PRESENCE_TTL_MS - SYNC_BASE_MS - 5000;
+  const MAX_SYNC_ERRORS_BEFORE_HIDE = 3;
 
-  let heartbeatTimer = null;
-  let activeTimer = null;
+  let syncTimer = null;
   let stopped = false;
-  let hbBackoffMs = 0;
-  let auBackoffMs = 0;
+  let syncBackoffMs = 0;
 
   function getInitials(name) {
     if (!name) return '?';
@@ -101,81 +96,109 @@
     }
   }
 
+  function buildCollapsedAvatar(u, index) {
+    const wrap = document.createElement('div');
+    wrap.className = 'presence-collapsed-avatar-wrap';
+    wrap.style.setProperty('--presence-avatar-color', u.profile_color || '#3B82F6');
+    wrap.style.setProperty('--presence-anim-delay', `${index * 0.55}s`);
+    wrap.style.setProperty('--presence-stack', String(index));
+
+    const el = document.createElement('div');
+    el.className = 'presence-collapsed-avatar';
+    el.title = u.name || 'User';
+    el.style.backgroundColor = u.profile_color || '#3B82F6';
+    el.textContent = getInitials(u.name);
+
+    wrap.appendChild(el);
+    return wrap;
+  }
+
+  function buildExpandedRow(u) {
+    const row = document.createElement('div');
+    row.className = 'presence-user-row';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'presence-user-avatar';
+    avatar.style.backgroundColor = u.profile_color || '#3B82F6';
+    avatar.textContent = getInitials(u.name);
+
+    const name = document.createElement('span');
+    name.className = 'presence-user-name';
+    name.textContent = u.name || 'User';
+    name.title = u.name || 'User';
+
+    row.appendChild(avatar);
+    row.appendChild(name);
+
+    const teamsUrl = buildTeamsUrl(u.email);
+    if (teamsUrl) {
+      const teamsBtn = document.createElement('a');
+      teamsBtn.href = teamsUrl;
+      teamsBtn.target = '_blank';
+      teamsBtn.rel = 'noopener noreferrer';
+      teamsBtn.className = 'presence-teams-btn';
+      teamsBtn.title = 'Chat on Microsoft Teams';
+      teamsBtn.setAttribute('aria-label', 'Chat with ' + (u.name || 'user') + ' on Microsoft Teams');
+      if (teamsIconUrl) {
+        const icon = document.createElement('img');
+        icon.src = teamsIconUrl;
+        icon.alt = '';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.className = 'presence-teams-icon';
+        teamsBtn.appendChild(icon);
+      }
+      const label = document.createElement('span');
+      label.className = 'presence-teams-label';
+      label.textContent = teamsChatLabel;
+      teamsBtn.appendChild(label);
+      row.appendChild(teamsBtn);
+    }
+
+    return row;
+  }
+
   function renderUsers(users) {
-    // -- Collapsed: stacked avatars with active orbit animation --
+    const list = users || [];
+    const currentUserIds = list.map(u => String(u.id)).sort().join(',');
+    const usersChanged = currentUserIds !== lastUserIds;
+
+    // Skip DOM rebuild when the visible user set is unchanged.
+    if (currentUserIds === lastRenderedIds) {
+      const hasOtherUsers = list.length > 0;
+      if (usersChanged && lastUserIds !== '') {
+        isWarningDismissed = false;
+      }
+      if (hasOtherUsers && usersChanged) {
+        expandByDefault();
+      }
+      if (!hasOtherUsers) {
+        clearAutoCollapseTimer();
+        if (isExpanded) {
+          setExpanded(false);
+        }
+      }
+      lastUserIds = currentUserIds;
+      showOrHideBar(list.length > 0);
+      showOrHideWarning(list.length > 0);
+      return;
+    }
+
     if (usersContainer) {
       usersContainer.replaceChildren();
-      (users || []).forEach((u, index) => {
-        const wrap = document.createElement('div');
-        wrap.className = 'presence-collapsed-avatar-wrap';
-        wrap.style.setProperty('--presence-avatar-color', u.profile_color || '#3B82F6');
-        wrap.style.setProperty('--presence-anim-delay', `${index * 0.55}s`);
-        wrap.style.setProperty('--presence-stack', String(index));
-
-        const el = document.createElement('div');
-        el.className = 'presence-collapsed-avatar';
-        el.title = u.name || 'User';
-        el.style.backgroundColor = u.profile_color || '#3B82F6';
-        el.textContent = getInitials(u.name);
-
-        wrap.appendChild(el);
-        usersContainer.appendChild(wrap);
+      list.forEach((u, index) => {
+        usersContainer.appendChild(buildCollapsedAvatar(u, index));
       });
     }
 
-    // -- Expanded: full name + Teams link per user --
     if (usersListEl) {
       usersListEl.replaceChildren();
-      (users || []).forEach(u => {
-        const row = document.createElement('div');
-        row.className = 'presence-user-row';
-
-        const avatar = document.createElement('div');
-        avatar.className = 'presence-user-avatar';
-        avatar.style.backgroundColor = u.profile_color || '#3B82F6';
-        avatar.textContent = getInitials(u.name);
-
-        const name = document.createElement('span');
-        name.className = 'presence-user-name';
-        name.textContent = u.name || 'User';
-        name.title = u.name || 'User';
-
-        row.appendChild(avatar);
-        row.appendChild(name);
-
-        const teamsUrl = buildTeamsUrl(u.email);
-        if (teamsUrl) {
-          const teamsBtn = document.createElement('a');
-          teamsBtn.href = teamsUrl;
-          teamsBtn.target = '_blank';
-          teamsBtn.rel = 'noopener noreferrer';
-          teamsBtn.className = 'presence-teams-btn';
-          teamsBtn.title = 'Chat on Microsoft Teams';
-          teamsBtn.setAttribute('aria-label', 'Chat with ' + (u.name || 'user') + ' on Microsoft Teams');
-          if (teamsIconUrl) {
-            const icon = document.createElement('img');
-            icon.src = teamsIconUrl;
-            icon.alt = '';
-            icon.setAttribute('aria-hidden', 'true');
-            icon.className = 'presence-teams-icon';
-            teamsBtn.appendChild(icon);
-          }
-          const label = document.createElement('span');
-          label.className = 'presence-teams-label';
-          label.textContent = teamsChatLabel;
-          teamsBtn.appendChild(label);
-          row.appendChild(teamsBtn);
-        }
-
-        usersListEl.appendChild(row);
+      list.forEach(u => {
+        usersListEl.appendChild(buildExpandedRow(u));
       });
     }
 
-    const hasOtherUsers = (users || []).length > 0;
+    const hasOtherUsers = list.length > 0;
 
-    // Reset dismissed state if the list of users has changed
-    const currentUserIds = (users || []).map(u => String(u.id)).sort().join(',');
-    const usersChanged = currentUserIds !== lastUserIds;
     if (usersChanged && lastUserIds !== '') {
       isWarningDismissed = false;
     }
@@ -192,28 +215,24 @@
     }
 
     lastUserIds = currentUserIds;
+    lastRenderedIds = currentUserIds;
 
     showOrHideBar(hasOtherUsers);
     showOrHideWarning(hasOtherUsers);
   }
 
   function clearTimers() {
-    if (heartbeatTimer) {
-      clearTimeout(heartbeatTimer);
-      heartbeatTimer = null;
-    }
-    if (activeTimer) {
-      clearTimeout(activeTimer);
-      activeTimer = null;
+    if (syncTimer) {
+      clearTimeout(syncTimer);
+      syncTimer = null;
     }
     clearAutoCollapseTimer();
   }
 
-  function scheduleNext(fn, baseMs, backoffMs, setTimer) {
-    // Small jitter avoids synchronized bursts across many users/tabs.
-    const jitter = Math.floor(Math.random() * 2000); // 0-2s
+  function scheduleNext(fn, baseMs, backoffMs) {
+    const jitter = Math.floor(Math.random() * 2000);
     const delay = Math.min(baseMs + (backoffMs || 0), MAX_BACKOFF_MS) + jitter;
-    setTimer(setTimeout(fn, delay));
+    syncTimer = setTimeout(fn, delay);
   }
 
   async function getRetryAfterSeconds(res) {
@@ -233,15 +252,16 @@
     return 60;
   }
 
-  async function heartbeat() {
+  async function sync() {
     if (stopped || document.visibilityState !== 'visible') return;
     try {
       const fetchFn = (window.getFetch && window.getFetch()) || fetch;
       const csrfToken = (window.getCSRFToken && window.getCSRFToken()) || CSRF_TOKEN;
-      const res = await fetchFn(`/api/forms/presence/assignment/${aesId}/heartbeat`, {
+      const res = await fetchFn(`/api/forms/presence/assignment/${aesId}/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
           'X-CSRFToken': csrfToken,
           'X-Requested-With': 'XMLHttpRequest'
         },
@@ -250,70 +270,56 @@
       });
       if (res && res.status === 429) {
         const ra = await getRetryAfterSeconds(res);
-        const base = Math.max(ra * 1000, HEARTBEAT_BASE_MS);
-        // Cap so that base + backoff + jitter never exceeds PRESENCE_TTL_MS.
-        hbBackoffMs = Math.min(hbBackoffMs ? hbBackoffMs * 2 : base, HB_BACKOFF_CAP_MS);
-      } else if (res && res.status === 400) {
-        // CSRF token may have expired (~1 h). Refresh once; the next scheduled beat will
-        // pick up the new token automatically (no immediate retry to avoid error loops).
+        const base = Math.max(ra * 1000, SYNC_BASE_MS);
+        syncBackoffMs = Math.min(syncBackoffMs ? syncBackoffMs * 2 : base, SYNC_BACKOFF_CAP_MS);
+        scheduleNext(sync, SYNC_BASE_MS, syncBackoffMs);
+        return;
+      }
+      if (res && res.status === 400) {
         try {
           const body = await res.clone().text();
           if (body.includes('CSRF') && typeof window.refreshCSRFToken === 'function') {
             window.refreshCSRFToken().catch(() => null);
           }
         } catch (_) { /* ignore body read errors */ }
-        hbBackoffMs = 0;
-      } else {
-        hbBackoffMs = 0;
-      }
-    } catch (e) {
-      // Silent fail — TTL (120 s) tolerates up to 3 missed 30 s beats.
-    }
-    scheduleNext(heartbeat, HEARTBEAT_BASE_MS, hbBackoffMs, t => (heartbeatTimer = t));
-  }
-
-  async function fetchActive() {
-    if (stopped || document.visibilityState !== 'visible') return;
-    try {
-      const fetchFn = (window.getFetch && window.getFetch()) || fetch;
-      const res = await fetchFn(`/api/forms/presence/assignment/${aesId}/active-users`, {
-        headers: { 'Accept': 'application/json' }
-      });
-      if (res && res.status === 429) {
-        const ra = await getRetryAfterSeconds(res);
-        const base = Math.max(ra * 1000, REFRESH_BASE_MS);
-        auBackoffMs = Math.min(auBackoffMs ? auBackoffMs * 2 : base, MAX_BACKOFF_MS);
-        scheduleNext(fetchActive, REFRESH_BASE_MS, auBackoffMs, t => (activeTimer = t));
+        syncBackoffMs = 0;
+        scheduleNext(sync, SYNC_BASE_MS, syncBackoffMs);
         return;
       }
       if (!res.ok) {
-        // Tolerate transient server errors: only hide bar after persistent failures.
-        fetchErrorCount++;
-        if (fetchErrorCount >= MAX_FETCH_ERRORS_BEFORE_HIDE) {
+        syncErrorCount++;
+        if (syncErrorCount >= MAX_SYNC_ERRORS_BEFORE_HIDE) {
           showOrHideBar(false);
           showOrHideWarning(false);
         }
-        scheduleNext(fetchActive, REFRESH_BASE_MS, 0, t => (activeTimer = t));
+        scheduleNext(sync, SYNC_BASE_MS, 0);
         return;
       }
       const data = await res.json();
       const users = Array.isArray(data.users) ? data.users : [];
-      const others = users.filter(u => Number(u.id) !== currentUserId);
-      fetchErrorCount = 0;
-      renderUsers(others);
-      auBackoffMs = 0;
+      syncErrorCount = 0;
+      syncBackoffMs = 0;
+      renderUsers(users);
     } catch (e) {
-      // Tolerate transient network errors: only hide bar after persistent failures.
-      fetchErrorCount++;
-      if (fetchErrorCount >= MAX_FETCH_ERRORS_BEFORE_HIDE) {
+      syncErrorCount++;
+      if (syncErrorCount >= MAX_SYNC_ERRORS_BEFORE_HIDE) {
         showOrHideBar(false);
         showOrHideWarning(false);
       }
     }
-    scheduleNext(fetchActive, REFRESH_BASE_MS, auBackoffMs, t => (activeTimer = t));
+    scheduleNext(sync, SYNC_BASE_MS, syncBackoffMs);
   }
 
-  // Expand/collapse toggle buttons
+  function sendLeaveBeacon() {
+    if (stopped) return;
+    try {
+      navigator.sendBeacon(
+        `/api/forms/presence/assignment/${aesId}/leave`,
+        new Blob(['{}'], { type: 'application/json' })
+      );
+    } catch (_) {}
+  }
+
   if (expandBtn) {
     expandBtn.addEventListener('click', () => {
       clearAutoCollapseTimer();
@@ -327,7 +333,6 @@
     });
   }
 
-  // Handle dismiss button for concurrent users warning
   if (concurrentDismissBtn) {
     concurrentDismissBtn.addEventListener('click', function() {
       isWarningDismissed = true;
@@ -337,12 +342,10 @@
 
   function start() {
     stopped = false;
-    // Give fresh error tolerance whenever the polling loop (re)starts.
-    fetchErrorCount = 0;
+    syncErrorCount = 0;
     clearTimers();
     if (document.visibilityState === 'visible') {
-      heartbeat();
-      fetchActive();
+      sync();
     }
   }
 
@@ -359,6 +362,7 @@
     }
   });
 
-  // Kick off immediately and then self-schedule (with backoff/jitter)
+  window.addEventListener('pagehide', sendLeaveBeacon);
+
   start();
 })();

@@ -57,6 +57,15 @@ class TestShouldSkipActivityEndpoint:
     def test_suffix_api_presence_heartbeat(self):
         assert should_skip_activity_endpoint("forms_api.api_presence_heartbeat") is True
 
+    def test_exact_skip_presence_sync(self):
+        assert should_skip_activity_endpoint("forms_api.api_presence_sync") is True
+
+    def test_exact_skip_presence_leave(self):
+        assert should_skip_activity_endpoint("forms_api.api_presence_leave") is True
+
+    def test_suffix_api_presence_leave(self):
+        assert should_skip_activity_endpoint("forms_api.api_presence_leave") is True
+
     def test_suffix_get_workflow_tour(self):
         assert should_skip_activity_endpoint("bp.get_workflow_tour") is True
 

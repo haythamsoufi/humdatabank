@@ -9,7 +9,7 @@ import uuid
 
 from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app, abort
 from flask_login import current_user
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, literal, union_all
 from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
 
@@ -221,36 +221,291 @@ def _serialize_document_row(doc_row: tuple) -> dict:
 
     Row layout: (SubmittedDocument, status, Country|None, User|user_name, uploaded_at, assignment_period, entity_access)
     """
+    return _serialize_document_grid_row(doc_row)
+
+
+def _language_display_name(language_code: str | None) -> str:
+    from config import Config
+
+    lang = (language_code or "").split("_")[0].split("-")[0]
+    return (
+        Config.LANGUAGE_DISPLAY_NAMES.get(lang)
+        or Config.ALL_LANGUAGES_DISPLAY_NAMES.get(lang)
+        or language_code
+        or "N/A"
+    )
+
+
+def _serialize_document_grid_row(
+    doc_row: tuple,
+    *,
+    next_url: str | None = None,
+    team_pending_edit: bool = False,
+) -> dict:
+    """Serialize a document row for the admin documents AG Grid."""
+    from app.services.authorization_service import AuthorizationService
+
     doc = doc_row[0]
     status = doc_row[1]
     country = doc_row[2]
     user_or_name = doc_row[3]
     uploaded_at = doc_row[4]
     assignment_period = doc_row[5]
+    entity_access = doc_row[6] if len(doc_row) > 6 else True
 
-    if hasattr(user_or_name, 'name'):
-        uploaded_by_name = user_or_name.name
+    can_manage_documents = AuthorizationService.has_rbac_permission(
+        current_user, "admin.documents.manage"
+    )
+    can_upload_documents = can_manage_documents or AuthorizationService.has_rbac_permission(
+        current_user, "assignment.documents.upload"
+    )
+
+    doc_review_status = (str(status if status is not None else doc.status or "")).strip().lower()
+    is_approved_doc = doc_review_status == "approved"
+    is_owner = (
+        current_user.is_authenticated
+        and doc.uploaded_by_user_id == current_user.id
+    )
+    can_edit_doc = can_manage_documents or (
+        can_upload_documents
+        and entity_access
+        and not is_approved_doc
+        and (is_owner or team_pending_edit)
+    )
+    can_delete_doc = can_edit_doc
+
+    entity_display_name = doc.standalone_linked_display or (getattr(country, "name", None) if country else "") or ""
+    country_id = getattr(country, "id", None) if country else None
+    linked_entity_id = (
+        doc.linked_entity_id
+        if doc.linked_entity_id is not None
+        else doc.country_id
+    )
+
+    if hasattr(user_or_name, "name"):
+        uploaded_by_name = user_or_name.name or user_or_name.email
+        uploaded_by_email = user_or_name.email or ""
+        uploaded_by_title = getattr(user_or_name, "title", None) or ""
+        uploaded_by_active = getattr(user_or_name, "active", True)
+        uploaded_by_profile_color = getattr(user_or_name, "profile_color", None) or ""
     elif isinstance(user_or_name, str):
         uploaded_by_name = user_or_name
+        uploaded_by_email = ""
+        uploaded_by_title = ""
+        uploaded_by_active = True
+        uploaded_by_profile_color = ""
     else:
         uploaded_by_name = None
+        uploaded_by_email = ""
+        uploaded_by_title = ""
+        uploaded_by_active = True
+        uploaded_by_profile_color = ""
+
+    period_display = (doc.period or "").strip() or assignment_period or "N/A"
+    delete_url = ""
+    if can_delete_doc:
+        delete_url = (
+            url_for("content_management.delete_document", doc_id=doc.id, next=next_url)
+            if next_url
+            else url_for("content_management.delete_document", doc_id=doc.id)
+        )
 
     return {
-        'id': doc.id,
-        'file_name': doc.filename,
-        'document_type': doc.document_type,
-        'language': doc.language,
-        'period': doc.period,
-        'status': str(status) if status else None,
-        'country_name': getattr(country, 'name', None) if country else None,
-        'entity_display_name': doc.standalone_linked_display or (getattr(country, 'name', None) if country else None),
-        'linked_entity_type': doc.linked_entity_type,
-        'linked_entity_id': doc.linked_entity_id,
-        'uploaded_by_name': uploaded_by_name,
-        'uploaded_at': uploaded_at.isoformat() if uploaded_at else None,
-        'assignment_period': assignment_period,
-        'is_public': doc.public_submission_id is not None,
+        "id": doc.id,
+        "country_name": entity_display_name,
+        "country_id": country_id,
+        "linked_entity_type": doc.linked_entity_type or "country",
+        "linked_entity_id": linked_entity_id,
+        "document_type": doc.document_label or "",
+        "filename": doc.filename or "",
+        "download_url": url_for("content_management.download_document", doc_id=doc.id),
+        "language": doc.language or "",
+        "language_display": _language_display_name(doc.language),
+        "period": period_display,
+        "is_public": doc.public_submission_id is not None,
+        "uploaded_by_user_id": doc.uploaded_by_user_id,
+        "uploaded_by": uploaded_by_name or "",
+        "uploaded_by_email": uploaded_by_email,
+        "uploaded_by_title": uploaded_by_title,
+        "uploaded_by_active": uploaded_by_active,
+        "uploaded_by_profile_color": uploaded_by_profile_color,
+        "uploaded_at": uploaded_at.isoformat() if uploaded_at else None,
+        "status": str(status) if status is not None else "",
+        "can_edit": can_edit_doc,
+        "can_delete": can_delete_doc,
+        "delete_url": delete_url,
+        "approve_url": (
+            url_for("content_management.approve_document", doc_id=doc.id)
+            if can_manage_documents
+            else ""
+        ),
+        "decline_url": "",
+        "has_thumbnail": bool(doc.thumbnail_relative_path),
+        "thumbnail_filename": doc.thumbnail_filename or "",
     }
+
+
+def _standalone_admin_documents_query():
+    from app.models import User
+
+    return (
+        db.session.query(
+            SubmittedDocument,
+            SubmittedDocument.status.label("status"),
+            Country,
+            User,
+            SubmittedDocument.uploaded_at.label("uploaded_at"),
+            db.literal(None).label("assignment_period"),
+        )
+        .join(User, SubmittedDocument.uploaded_by_user_id == User.id)
+        .outerjoin(Country, SubmittedDocument.country_id == Country.id)
+        .filter(SubmittedDocument.assignment_entity_status_id.is_(None))
+        .filter(SubmittedDocument.public_submission_id.is_(None))
+        .filter(
+            db.or_(
+                SubmittedDocument.country_id.isnot(None),
+                SubmittedDocument.linked_entity_id.isnot(None),
+            )
+        )
+    )
+
+
+def _assignment_admin_documents_query():
+    from app.models import User, AssignedForm
+
+    return (
+        db.session.query(
+            SubmittedDocument,
+            SubmittedDocument.status.label("status"),
+            Country,
+            User,
+            SubmittedDocument.uploaded_at.label("uploaded_at"),
+            AssignedForm.period_name.label("assignment_period"),
+        )
+        .join(User, SubmittedDocument.uploaded_by_user_id == User.id)
+        .join(
+            AssignmentEntityStatus,
+            SubmittedDocument.assignment_entity_status_id == AssignmentEntityStatus.id,
+        )
+        .join(
+            Country,
+            and_(
+                AssignmentEntityStatus.entity_id == Country.id,
+                AssignmentEntityStatus.entity_type == "country",
+            ),
+        )
+        .join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+        .filter(SubmittedDocument.assignment_entity_status_id.isnot(None))
+    )
+
+
+def _public_admin_documents_query():
+    return (
+        db.session.query(
+            SubmittedDocument,
+            SubmittedDocument.status.label("status"),
+            Country,
+            PublicSubmission.submitter_name.label("user_name"),
+            PublicSubmission.submitted_at.label("uploaded_at"),
+            db.literal(None).label("assignment_period"),
+        )
+        .join(
+            PublicSubmission,
+            SubmittedDocument.public_submission_id == PublicSubmission.id,
+        )
+        .join(Country, PublicSubmission.country_id == Country.id)
+    )
+
+
+def _admin_documents_union_subquery():
+    standalone_ids = (
+        db.session.query(
+            SubmittedDocument.id.label("doc_id"),
+            SubmittedDocument.uploaded_at.label("sort_at"),
+            literal("standalone").label("source"),
+        )
+        .filter(SubmittedDocument.assignment_entity_status_id.is_(None))
+        .filter(SubmittedDocument.public_submission_id.is_(None))
+        .filter(
+            db.or_(
+                SubmittedDocument.country_id.isnot(None),
+                SubmittedDocument.linked_entity_id.isnot(None),
+            )
+        )
+    )
+    assignment_ids = (
+        db.session.query(
+            SubmittedDocument.id.label("doc_id"),
+            SubmittedDocument.uploaded_at.label("sort_at"),
+            literal("assignment").label("source"),
+        )
+        .filter(SubmittedDocument.assignment_entity_status_id.isnot(None))
+    )
+    public_ids = (
+        db.session.query(
+            SubmittedDocument.id.label("doc_id"),
+            PublicSubmission.submitted_at.label("sort_at"),
+            literal("public").label("source"),
+        )
+        .join(
+            PublicSubmission,
+            SubmittedDocument.public_submission_id == PublicSubmission.id,
+        )
+    )
+    return union_all(standalone_ids, assignment_ids, public_ids).subquery("admin_documents_union")
+
+
+def _hydrate_admin_document_rows(page_entries: list[tuple[int, str]]) -> list[tuple]:
+    from collections import defaultdict
+
+    by_source: dict[str, list[int]] = defaultdict(list)
+    for doc_id, source in page_entries:
+        by_source[source].append(doc_id)
+
+    resolved: dict[tuple[int, str], tuple] = {}
+
+    if by_source.get("standalone"):
+        rows = (
+            _standalone_admin_documents_query()
+            .filter(SubmittedDocument.id.in_(by_source["standalone"]))
+            .all()
+        )
+        for row in rows:
+            resolved[(row[0].id, "standalone")] = _row_with_focal_entity_access(row)
+
+    if by_source.get("assignment"):
+        rows = (
+            _assignment_admin_documents_query()
+            .filter(SubmittedDocument.id.in_(by_source["assignment"]))
+            .all()
+        )
+        for row in rows:
+            resolved[(row[0].id, "assignment")] = _row_with_focal_entity_access(row)
+
+    if by_source.get("public"):
+        rows = (
+            _public_admin_documents_query()
+            .filter(SubmittedDocument.id.in_(by_source["public"]))
+            .all()
+        )
+        for row in rows:
+            resolved[(row[0].id, "public")] = _row_with_focal_entity_access(row)
+
+    return [resolved[(doc_id, source)] for doc_id, source in page_entries if (doc_id, source) in resolved]
+
+
+def _fetch_admin_documents_page(page: int, per_page: int) -> tuple[list[tuple], int]:
+    union_sq = _admin_documents_union_subquery()
+    total = db.session.query(func.count()).select_from(union_sq).scalar() or 0
+    offset = (page - 1) * per_page
+    page_entries = (
+        db.session.query(union_sq.c.doc_id, union_sq.c.source)
+        .order_by(union_sq.c.sort_at.desc())
+        .offset(offset)
+        .limit(per_page)
+        .all()
+    )
+    return _hydrate_admin_document_rows(page_entries), total
 
 
 def _folder_prefix_for_submitted_document_storage(rel_path: str | None) -> str:
@@ -949,7 +1204,6 @@ def delete_resource_thumbnail(resource_id, language_code):
 @permission_required("admin.documents.manage")
 def manage_documents():
     """Manage submitted documents (both regular and public)"""
-    from app.models import User, AssignedForm
     from app.services.app_settings_service import get_document_types
     from config import Config
 
@@ -960,80 +1214,16 @@ def manage_documents():
     with suppress(Exception):
         current_app.jinja_env.globals['DOCUMENT_TYPES'] = document_types
 
-    # Permission is enforced by decorator: @permission_required("admin.documents.manage")
-
-    # Standalone library documents: linked to country and/or other entity types
-    standalone_docs_query = db.session.query(
-        SubmittedDocument,
-        SubmittedDocument.status.label('status'),
-        Country,
-        User,
-        SubmittedDocument.uploaded_at.label('uploaded_at'),
-        db.literal(None).label('assignment_period')
-    ).join(User, SubmittedDocument.uploaded_by_user_id == User.id)\
-     .outerjoin(Country, SubmittedDocument.country_id == Country.id)\
-     .filter(SubmittedDocument.assignment_entity_status_id.is_(None))\
-     .filter(SubmittedDocument.public_submission_id.is_(None))\
-     .filter(
-         db.or_(
-             SubmittedDocument.country_id.isnot(None),
-             SubmittedDocument.linked_entity_id.isnot(None),
-         )
-     )\
-     .order_by(SubmittedDocument.uploaded_at.desc())
-
-    # Query assignment-linked documents (with assignment_entity_status_id)
-    assignment_docs_query = db.session.query(
-        SubmittedDocument,
-        SubmittedDocument.status.label('status'),
-        Country,
-        User,
-        SubmittedDocument.uploaded_at.label('uploaded_at'),
-        AssignedForm.period_name.label('assignment_period')
-    ).join(User, SubmittedDocument.uploaded_by_user_id == User.id)\
-     .join(AssignmentEntityStatus, SubmittedDocument.assignment_entity_status_id == AssignmentEntityStatus.id)\
-     .join(Country, and_(AssignmentEntityStatus.entity_id == Country.id, AssignmentEntityStatus.entity_type == 'country'))\
-     .join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)\
-     .filter(SubmittedDocument.assignment_entity_status_id.isnot(None))\
-     .order_by(SubmittedDocument.uploaded_at.desc())
-
     show_country_column = True
-
-    standalone_docs = [_row_with_focal_entity_access(r) for r in standalone_docs_query.all()]
-    assignment_docs = [_row_with_focal_entity_access(r) for r in assignment_docs_query.all()]
-    regular_docs = standalone_docs + assignment_docs
-
-    # Get public submitted documents with related data
-    # Note: SubmittedDocument now handles both internal and public submissions
-    # These come from the parent PublicSubmission
-    # PublicSubmission doesn't have a submitted_by field, it has submitter_name and submitter_email
-    public_docs_query = db.session.query(
-        SubmittedDocument,
-        SubmittedDocument.status.label('status'),
-        Country,
-        PublicSubmission.submitter_name.label('user_name'),
-        PublicSubmission.submitted_at.label('uploaded_at'),
-        db.literal(None).label('assignment_period')
-    ).join(
-        PublicSubmission,
-        SubmittedDocument.public_submission_id == PublicSubmission.id
-    ).join(
-        Country,
-        PublicSubmission.country_id == Country.id
-    ).order_by(PublicSubmission.submitted_at.desc())
-
-    public_docs = [_row_with_focal_entity_access(r) for r in public_docs_query.all()]
-
-    documents = regular_docs + public_docs
 
     if is_json_request():
         from app.utils.api_pagination import validate_pagination_params
-        page, per_page = validate_pagination_params(request.args, default_per_page=50, max_per_page=200)
-        total = len(documents)
-        start = (page - 1) * per_page
-        page_slice = documents[start:start + per_page]
 
-        documents_data = [_serialize_document_row(r) for r in page_slice]
+        page, per_page = validate_pagination_params(
+            request.args, default_per_page=50, max_per_page=200
+        )
+        documents, total = _fetch_admin_documents_page(page, per_page)
+        documents_data = [_serialize_document_grid_row(r) for r in documents]
         return json_ok(
             documents=documents_data,
             count=len(documents_data),
@@ -1052,7 +1242,9 @@ def manage_documents():
 
     return render_template(
         "admin/documents/documents.html",
-        documents=documents,
+        documents=[],
+        documents_load_async=True,
+        documents_json_url=url_for("content_management.manage_documents"),
         countries=countries,
         show_country_column=show_country_column,
         title="Manage Documents",

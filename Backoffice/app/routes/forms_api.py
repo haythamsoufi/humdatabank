@@ -17,7 +17,7 @@ All endpoints require authentication and maintain JavaScript compatibility.
 from flask import Blueprint, request, current_app, render_template
 from flask_login import login_required, current_user
 from flask_limiter.util import get_remote_address
-from app.extensions import limiter
+from app.extensions import csrf, limiter
 from app.models import (
     db, IndicatorBank, DynamicIndicatorData,
     FormSection, RepeatGroupInstance, LookupList, LookupListRow,
@@ -34,8 +34,12 @@ from datetime import datetime
 import base64
 import re
 import json
-from app.services.presence_store import get_active_presence, record_presence
-from app.services import check_country_access, ensure_aes_access
+from app.services.presence_store import (
+    get_active_presence,
+    record_presence,
+    remove_presence,
+)
+from app.services import check_aes_access_light, check_country_access, ensure_aes_access
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.request_utils import get_json_or_form, is_json_request
 from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error, require_json_keys
@@ -70,6 +74,40 @@ def _presence_rate_limit_key():
     if user_id:
         return f"presence_u{user_id}_aes{aes_id or 'x'}"
     return f"presence_ip{get_remote_address()}_aes{aes_id or 'x'}"
+
+
+def _build_presence_users(presence_map, exclude_user_id=None):
+    """Build ordered user payload from a presence map; optionally exclude one user."""
+    if not presence_map:
+        return []
+
+    user_ids = [
+        uid for uid in presence_map.keys()
+        if exclude_user_id is None or uid != exclude_user_id
+    ]
+    if not user_ids:
+        return []
+
+    users_q = User.query.filter(User.id.in_(user_ids)).all()
+    users_by_id = {u.id: u for u in users_q}
+
+    ordered_user_ids = sorted(
+        (uid for uid in user_ids if uid in users_by_id),
+        key=lambda uid: presence_map[uid],
+        reverse=True,
+    )
+
+    users = []
+    for uid in ordered_user_ids:
+        user_obj = users_by_id[uid]
+        users.append({
+            'id': user_obj.id,
+            'name': (user_obj.name or ''),
+            'email': (user_obj.email or ''),
+            'profile_color': (user_obj.profile_color or '#3B82F6'),
+            'last_seen': presence_map[uid].isoformat() if presence_map.get(uid) else None,
+        })
+    return users
 
 
 from app.models.assignments import AssignmentEntityStatus
@@ -1020,6 +1058,36 @@ def api_assignment_completion_rate(aes_id):
 
 # ===================== Presence (Live Users) APIs =====================
 
+@bp.route('/presence/assignment/<int:aes_id>/sync', methods=['POST'])
+@login_required
+@limiter.limit("30 per minute", key_func=_presence_rate_limit_key, override_defaults=True)
+def api_presence_sync(aes_id):
+    """Record presence and return other active editors in one request."""
+    try:
+        if not check_aes_access_light(aes_id):
+            return json_forbidden('Assignment not found or access denied')
+
+        record_presence(aes_id=aes_id, user_id=current_user.id)
+        presence_map = get_active_presence(aes_id=aes_id)
+        users = _build_presence_users(presence_map, exclude_user_id=current_user.id)
+        return json_ok(users=users)
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route('/presence/assignment/<int:aes_id>/leave', methods=['POST'])
+@login_required
+@csrf.exempt  # sendBeacon cannot set X-CSRFToken; only removes caller's own presence
+def api_presence_leave(aes_id):
+    """Remove the current user's presence immediately (tab close / navigation)."""
+    try:
+        remove_presence(aes_id=aes_id, user_id=current_user.id)
+    except Exception as e:
+        current_app.logger.debug("presence leave failed for aes=%s user=%s: %s", aes_id, current_user.id, e)
+    return json_ok()
+
+
+# DEPRECATED: use /sync — kept for one release cycle.
 @bp.route('/presence/assignment/<int:aes_id>/heartbeat', methods=['POST'])
 @login_required
 @limiter.limit("30 per minute", key_func=_presence_rate_limit_key, override_defaults=True)
@@ -1030,56 +1098,28 @@ def api_presence_heartbeat(aes_id):
         access_result = ensure_aes_access(aes_id)
         if 'error' in access_result:
             return json_forbidden(access_result['error'])
-        aes = access_result['aes']
 
-        # Keep live presence out of user_activity_log; store in cache/memory.
-        # TTL must match PRESENCE_TTL_MS in presence.js (120 000 ms).
-        record_presence(aes_id=aes_id, user_id=current_user.id, ttl_seconds=120)
+        record_presence(aes_id=aes_id, user_id=current_user.id)
 
         return json_ok()
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
+# DEPRECATED: use /sync — kept for one release cycle.
 @bp.route('/presence/assignment/<int:aes_id>/active-users', methods=['GET'])
 @login_required
 @limiter.limit("30 per minute", key_func=_presence_rate_limit_key, override_defaults=True)
 def api_presence_active_users(aes_id):
-    """Return users active in this assignment in the last 120 seconds."""
+    """Return users active in this assignment in the last PRESENCE_TTL_SECONDS."""
     try:
         # Verify access to assignment
         access_result = ensure_aes_access(aes_id)
         if 'error' in access_result:
             return json_forbidden(access_result['error'])
-        aes = access_result['aes']
 
-        # TTL must match record_presence call above and PRESENCE_TTL_MS in presence.js.
-        presence_map = get_active_presence(aes_id=aes_id, ttl_seconds=120)
-        if not presence_map:
-            return json_ok(users=[])
-
-        user_ids = list(presence_map.keys())
-        users_q = User.query.filter(User.id.in_(user_ids)).all()
-        users_by_id = {u.id: u for u in users_q}
-
-        # Order by most recent heartbeat first.
-        ordered_user_ids = sorted(
-            (uid for uid in user_ids if uid in users_by_id),
-            key=lambda uid: presence_map[uid],
-            reverse=True,
-        )
-
-        users = []
-        for uid in ordered_user_ids:
-            user_obj = users_by_id[uid]
-            users.append({
-                'id': user_obj.id,
-                'name': (user_obj.name or ''),
-                'email': (user_obj.email or ''),
-                'profile_color': (user_obj.profile_color or '#3B82F6'),
-                'last_seen': presence_map[uid].isoformat() if presence_map.get(uid) else None,
-            })
-
+        presence_map = get_active_presence(aes_id=aes_id)
+        users = _build_presence_users(presence_map)
         return json_ok(users=users)
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)

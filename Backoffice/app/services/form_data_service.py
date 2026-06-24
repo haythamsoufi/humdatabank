@@ -1114,6 +1114,65 @@ class FormDataService:
         entry.disagg_type = 'emergency_operation'
 
     @classmethod
+    def _format_emergency_operation_metadata_dict(cls, meta):
+        """Format emergency-operation {name, code} metadata as the canonical display string."""
+        if not isinstance(meta, dict):
+            return None
+        keys = set(meta.keys())
+        if not keys or not keys.issubset({'name', 'code'}):
+            return None
+        name = str(meta.get('name') or '').strip()
+        code = str(meta.get('code') or '').strip()
+        if name == '[object Object]':
+            name = ''
+        if code == '[object Object]':
+            code = ''
+        if name and code:
+            return f"{name} ({code})"
+        return name or code or None
+
+    @classmethod
+    def _normalize_emergency_operation_value(cls, value, metadata=None):
+        """Normalize emergency-operation values to a canonical display string."""
+        if isinstance(value, dict):
+            formatted = cls._format_emergency_operation_metadata_dict(value)
+            if formatted:
+                return formatted
+        text = str(value or '').strip()
+        if text:
+            return text
+        if metadata:
+            return cls._format_emergency_operation_metadata_dict(metadata)
+        return None
+
+    @classmethod
+    def _normalize_emergency_operation_from_entry(cls, entry):
+        """Read an emergency-operation value from a stored entry in display form."""
+        if not entry:
+            return None
+        if getattr(entry, 'disagg_type', None) == 'emergency_operation':
+            display = str(getattr(entry, 'value', '') or '').strip()
+            if display:
+                return display
+        meta = getattr(entry, 'disagg_data', None)
+        if isinstance(meta, dict):
+            formatted = cls._format_emergency_operation_metadata_dict(meta)
+            if formatted:
+                return formatted
+        effective = entry.get_effective_value() if hasattr(entry, 'get_effective_value') else getattr(entry, 'value', None)
+        return str(effective or '').strip() or None
+
+    @classmethod
+    def _emergency_operation_values_equal(cls, old_value, new_value, old_entry=None, new_metadata=None):
+        """Compare emergency-operation values regardless of dict vs display-string storage."""
+        if old_entry is not None:
+            old_normalized = cls._normalize_emergency_operation_from_entry(old_entry)
+        else:
+            old_normalized = cls._normalize_emergency_operation_value(old_value)
+        new_normalized = cls._normalize_emergency_operation_value(new_value, new_metadata)
+        return old_normalized == new_normalized
+
+    @classmethod
     def _store_scalar_question_value(cls, data_entry, question, processed_value):
         """Store a scalar question value and any emergency-operation metadata."""
         if isinstance(processed_value, dict) and 'mode' in processed_value and 'values' in processed_value:
@@ -1215,7 +1274,17 @@ class FormDataService:
                 db.session.add(data_entry)
 
                 # Determine if there's a meaningful change
-                value_changed = old_value != processed_value
+                if cls._is_emergency_operations_choice(question):
+                    emergency_metadata = cls._get_emergency_metadata_from_request(form_item_id=question.id)
+                    old_display = cls._normalize_emergency_operation_from_entry(data_entry)
+                    new_display = cls._normalize_emergency_operation_value(processed_value, emergency_metadata)
+                    value_changed = old_display != new_display
+                    activity_old_value = old_display
+                    activity_new_value = new_display
+                else:
+                    value_changed = old_value != processed_value
+                    activity_old_value = old_value
+                    activity_new_value = processed_value
                 availability_changed = (old_data_not_available != data_not_available) or (old_not_applicable != not_applicable)
 
                 if value_changed or availability_changed:
@@ -1224,8 +1293,8 @@ class FormDataService:
                         'type': 'updated',
                         'form_item_id': form_item_id,
                         'field_name': get_english_field_name(question),
-                        'old_value': old_value,
-                        'new_value': processed_value,
+                        'old_value': activity_old_value,
+                        'new_value': activity_new_value,
                         'old_data_not_available': old_data_not_available,
                         'new_data_not_available': data_not_available,
                         'old_not_applicable': old_not_applicable,
@@ -2396,7 +2465,9 @@ class FormDataService:
 
                         if existing_entry:
                             # Track old values before updating - handle both simple values and disaggregated data
-                            if existing_entry.disagg_type == 'emergency_operation' and existing_entry.value:
+                            if cls._is_emergency_operations_choice(field):
+                                old_value = cls._normalize_emergency_operation_from_entry(existing_entry)
+                            elif existing_entry.disagg_type == 'emergency_operation' and existing_entry.value:
                                 old_value = existing_entry.value
                             elif existing_entry.disagg_data:
                                 old_value = existing_entry.disagg_data
@@ -2436,11 +2507,26 @@ class FormDataService:
                         # Record the change if value actually changed
                         # Compare values properly - handle dict comparison for disaggregated data
                         values_changed = False
-                        if isinstance(old_value, dict) and isinstance(processed_value, dict):
+                        if cls._is_emergency_operations_choice(field):
+                            values_changed = not cls._emergency_operation_values_equal(
+                                old_value,
+                                processed_value,
+                                old_entry=existing_entry,
+                                new_metadata=emergency_metadata,
+                            )
+                            activity_old_value = old_value
+                            activity_new_value = cls._normalize_emergency_operation_value(
+                                processed_value, emergency_metadata
+                            )
+                        elif isinstance(old_value, dict) and isinstance(processed_value, dict):
                             # Compare dictionaries
                             values_changed = json.dumps(old_value, sort_keys=True) != json.dumps(processed_value, sort_keys=True)
+                            activity_old_value = old_value
+                            activity_new_value = processed_value
                         else:
                             values_changed = old_value != processed_value
+                            activity_old_value = old_value
+                            activity_new_value = processed_value
 
                         if (values_changed or
                             old_data_not_available != data_not_available or
@@ -2453,8 +2539,8 @@ class FormDataService:
                                 'type': change_type,
                                 'form_item_id': field.id,
                                 'field_name': field_name_with_instance,
-                                'old_value': old_value,
-                                'new_value': processed_value,
+                                'old_value': activity_old_value,
+                                'new_value': activity_new_value,
                                 'old_data_not_available': old_data_not_available,
                                 'new_data_not_available': data_not_available or False,
                                 'old_not_applicable': old_not_applicable,

@@ -1865,6 +1865,37 @@ def api_languages_settings():
     return json_ok(languages=get_supported_languages(default=Config.LANGUAGES))
 
 
+def _github_update_check_config():
+    """Resolve GitHub update-check settings from live env (preferred) or Config."""
+    import os
+
+    repo = (os.environ.get("GITHUB_REPO") or getattr(Config, "GITHUB_REPO", "") or "").strip()
+    if not repo:
+        repo = "haythamsoufi/humdatabank"
+    token = (os.environ.get("GITHUB_TOKEN") or getattr(Config, "GITHUB_TOKEN", "") or "").strip()
+    current = getattr(Config, "APP_VERSION", "") or ""
+    return repo, token, current
+
+
+def _github_update_check_error(msg, status=502):
+    """JSON error body for update checks (includes success=false for the settings UI)."""
+    return json_error(msg, status, success=False)
+
+
+def _github_repo_not_found_message(repo, token):
+    if token:
+        return (
+            f"Cannot access GitHub repository '{repo}'. "
+            "Verify GITHUB_REPO and that GITHUB_TOKEN has read access to that repository "
+            "(fine-grained: Contents read; classic PAT: repo scope). "
+            "GitHub returns 404 when the repo is missing or the token cannot see it."
+        )
+    return (
+        f"GitHub repository '{repo}' was not found. "
+        "If the repository is private, set GITHUB_TOKEN in the environment."
+    )
+
+
 @bp.route("/api/settings/check-updates", methods=["GET"])
 @admin_permission_required('admin.settings.manage')
 def api_check_updates():
@@ -1872,19 +1903,30 @@ def api_check_updates():
     import urllib.request
     import urllib.error
 
-    repo = Config.GITHUB_REPO
-    current = Config.APP_VERSION
-    token = Config.GITHUB_TOKEN
+    repo, token, current = _github_update_check_config()
 
     def _gh_request(api_path):
         """Make an authenticated (if token available) request to the GitHub API."""
         url = f"https://api.github.com{api_path}"
-        headers = {"Accept": "application/vnd.github+json", "User-Agent": "Databank"}
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "Databank",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
         if token:
             headers["Authorization"] = f"Bearer {token}"
         req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=10) as resp:
             return json.loads(resp.read().decode())
+
+    def _http_error_message(e: urllib.error.HTTPError) -> str:
+        if e.code == 401:
+            return "Invalid GITHUB_TOKEN — check your token"
+        if e.code == 403:
+            return "GITHUB_TOKEN lacks permission or is rate-limited"
+        if e.code == 404:
+            return _github_repo_not_found_message(repo, token)
+        return f"GitHub API error ({e.code})"
 
     # Try /releases/latest first, fall back to /tags if no releases exist
     try:
@@ -1900,14 +1942,13 @@ def api_check_updates():
         )
     except urllib.error.HTTPError as e:
         if e.code != 404:
-            msg = "GitHub API error"
-            if e.code == 401:
-                msg = "Invalid GITHUB_TOKEN — check your token"
-            elif e.code == 403:
-                msg = "GITHUB_TOKEN lacks permission or rate-limited"
-            return json_error(f"{msg} ({e.code})", 502)
-    except Exception as e:
-        return json_error(GENERIC_ERROR_MESSAGE, 502)
+            return _github_update_check_error(_http_error_message(e))
+        current_app.logger.debug(
+            "GitHub releases/latest returned 404 for %s; falling back to tags", repo
+        )
+    except Exception:
+        current_app.logger.exception("GitHub update check failed for %s", repo)
+        return _github_update_check_error(GENERIC_ERROR_MESSAGE)
 
     # Releases returned 404 — try tags as fallback
     try:
@@ -1925,11 +1966,7 @@ def api_check_updates():
             )
         return json_ok(current_version=current, update_available=False, message="No releases or tags found")
     except urllib.error.HTTPError as e:
-        if e.code == 404:
-            msg = "Repository not found"
-            if not token:
-                msg += " — if the repo is private, set GITHUB_TOKEN in your .env"
-            return json_error(msg, 502)
-        return json_error(f"GitHub API error ({e.code})", 502)
-    except Exception as e:
-        return json_error(GENERIC_ERROR_MESSAGE, 502)
+        return _github_update_check_error(_http_error_message(e))
+    except Exception:
+        current_app.logger.exception("GitHub update check (tags fallback) failed for %s", repo)
+        return _github_update_check_error(GENERIC_ERROR_MESSAGE)

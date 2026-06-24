@@ -626,6 +626,40 @@ class TestEmergencyOperationsMetadata:
             assert entry.disagg_type == 'emergency_operation'
             assert entry.disagg_data == {'name': 'Afghanistan - Floods', 'code': 'MDRAF015'}
 
+    def test_emergency_operation_values_equal_dict_vs_display(self, app):
+        from app.models.forms import RepeatGroupData
+        from app.services.form_data_service import FormDataService
+
+        with app.app_context():
+            entry = RepeatGroupData()
+            entry.value = 'Cuba - Hurricane (MDRCU013)'
+            entry.disagg_data = {'name': 'Cuba - Hurricane', 'code': 'MDRCU013'}
+            entry.disagg_type = 'emergency_operation'
+
+            assert FormDataService._emergency_operation_values_equal(
+                {'name': 'Cuba - Hurricane', 'code': 'MDRCU013'},
+                'Cuba - Hurricane (MDRCU013)',
+                old_entry=entry,
+                new_metadata={'name': 'Cuba - Hurricane', 'code': 'MDRCU013'},
+            )
+
+    def test_emergency_operation_values_equal_metadata_only_old_entry(self, app):
+        from app.models.forms import RepeatGroupData
+        from app.services.form_data_service import FormDataService
+
+        with app.app_context():
+            entry = RepeatGroupData()
+            entry.value = None
+            entry.disagg_data = {'name': 'Cuba - Hurricane', 'code': 'MDRCU013'}
+            entry.disagg_type = 'emergency_operation'
+
+            assert FormDataService._emergency_operation_values_equal(
+                entry.disagg_data,
+                'Cuba - Hurricane (MDRCU013)',
+                old_entry=entry,
+                new_metadata={'name': 'Cuba - Hurricane', 'code': 'MDRCU013'},
+            )
+
     def test_store_scalar_question_value_applies_emergency_disagg(self, app):
         from app.models.forms import FormData
         from app.services.form_data_service import FormDataService

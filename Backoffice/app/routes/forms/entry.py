@@ -812,6 +812,16 @@ def handle_assignment_form(aes_id):
                                     value['_matrix_change'] = True
                                 return value
                             else:
+                                keys = set(value.keys())
+                                if keys and keys.issubset({'name', 'code'}):
+                                    name = str(value.get('name') or '').strip()
+                                    code = str(value.get('code') or '').strip()
+                                    if name == '[object Object]':
+                                        name = ''
+                                    if name and code:
+                                        return f"{name} ({code})"
+                                    if name or code:
+                                        return name or code
                                 return str(value)
                     elif isinstance(value, str):
                         return value[:100] + "..." if len(value) > 100 else value

@@ -550,16 +550,38 @@
   var badge = document.getElementById('version-badge');
   if (!btn) return;
 
+  function escAttr(s) {
+    if (window.escapeHtmlAttr) return window.escapeHtmlAttr(s);
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
   function checkForUpdates() {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin text-[10px]"></i> ' + cfg.t.checkingText + '';
 
     ((window.getFetch && window.getFetch()) || fetch)(cfg.urls.apiCheckUpdates)
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (!data.success) {
+      .then(function (r) {
+        return r.json().then(function (data) {
+          return { ok: r.ok, data: data || {} };
+        }, function () {
+          return { ok: false, data: { error: 'Invalid response from server (expected JSON).' } };
+        });
+      })
+      .then(function (result) {
+        var data = result.data;
+        if (!result.ok || data.success === false) {
+          var errMsg = data.error || data.message || 'Unknown error';
           btn.innerHTML = '<i class="fas fa-exclamation-triangle text-[10px] text-amber-500"></i> ' + cfg.t.errorText + '';
-          btn.title = data.message || 'Unknown error';
+          btn.title = errMsg;
+          if (window.__clientDebug) {
+            window.__clientDebug('[settings] GitHub update check failed', { status: result.ok, data: data });
+          }
           setTimeout(function () { resetBtn(); }, 4000);
           return;
         }
@@ -586,8 +608,13 @@
           btn.disabled = true;
         }
       })
-      .catch(function () {
+      .catch(function (err) {
+        var errMsg = (err && err.message) ? String(err.message) : (cfg.t.networkError || 'Network error');
         btn.innerHTML = '<i class="fas fa-exclamation-triangle text-[10px] text-amber-500"></i> ' + cfg.t.failedText + '';
+        btn.title = errMsg;
+        if (window.__clientWarn) {
+          window.__clientWarn('[settings] GitHub update check request failed', err);
+        }
         setTimeout(function () { resetBtn(); }, 4000);
       });
   }

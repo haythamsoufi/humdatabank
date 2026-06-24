@@ -70,7 +70,7 @@ def _resolve_app_version() -> str:
     raw = (os.environ.get("APP_VERSION") or "").strip()
     if raw:
         return raw.lstrip("vV")
-    return "1.0.1"
+    return "1.0.4"
 
 
 def _is_development_mode() -> bool:

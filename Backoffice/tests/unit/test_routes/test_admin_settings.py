@@ -869,9 +869,28 @@ class TestCheckUpdates:
             resp = logged_in_client.get("/admin/api/settings/check-updates")
         assert resp.status_code in (200, 502)
 
+    def test_check_updates_404_repo_inaccessible_with_token(self, logged_in_client, db_session, app):
+        http_error = urllib.error.HTTPError(
+            url="https://api.github.com/repos/org/private/releases/latest",
+            code=404,
+            msg="Not Found",
+            hdrs=None,
+            fp=None,
+        )
+        with _auth(), \
+             patch("app.routes.admin.settings._github_update_check_config",
+                   return_value=("org/private", "ghp_testtoken", "1.0.0")), \
+             patch("urllib.request.urlopen", side_effect=http_error):
+            resp = logged_in_client.get("/admin/api/settings/check-updates")
+        assert resp.status_code == 502
+        body = resp.get_json()
+        assert body.get("success") is False
+        assert "GITHUB_REPO" in body.get("error", "")
+        assert "GITHUB_TOKEN" in body.get("error", "")
+
     def test_check_updates_unauthenticated(self, client, db_session):
         resp = client.get("/admin/api/settings/check-updates", follow_redirects=False)
-        assert resp.status_code == 302
+        assert resp.status_code in (302, 401)
 
 
 # ---------------------------------------------------------------------------

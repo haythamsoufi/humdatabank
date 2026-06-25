@@ -22,6 +22,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/app_fade_in_up.dart';
+import '../../widgets/dashboard_focal_points_section.dart';
 import '../../widgets/entity_selector_bottom_sheet.dart';
 import '../../services/assignment_offline_bundle_service.dart';
 import '../../services/storage_service.dart';
@@ -1509,6 +1510,20 @@ class _DashboardScreenState extends State<DashboardScreen>
                           if (provider.pastAssignments.isNotEmpty) ...[
                             _buildPastAssignmentsSection(provider),
                           ],
+
+                          if (provider.selectedEntity != null ||
+                              provider.entities.isNotEmpty)
+                            Builder(
+                              builder: (context) {
+                                final entity = provider.selectedEntity ??
+                                    provider.entities.first;
+                                return DashboardFocalPointsSection(
+                                  entityLabel: entity.displayLabel,
+                                  nsFocalPoints: provider.nsFocalPoints,
+                                  orgFocalPoints: provider.orgFocalPoints,
+                                );
+                              },
+                            ),
 
                           // Empty State - only show after we've loaded at least once
                           if (provider.currentAssignments.isEmpty &&

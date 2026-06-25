@@ -3,23 +3,29 @@ setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
 echo.
-echo  Humanitarian Databank Mobile — choose Backoffice URL
-echo  (writes BACKEND_URL + FRONTEND_URL + MOBILE_APP_API_KEY into MobileApp\.env)
-echo.
-echo  API keys: add these once in MobileApp\.env — this script sets MOBILE_APP_API_KEY from them:
-echo    MOBILE_APP_API_KEY_IFRC_PROD     — choice 1 ^(IFRC production^)
-echo    MOBILE_APP_API_KEY_IFRC_STAGING  — choice 2 ^(IFRC staging^)
-echo    MOBILE_APP_API_KEY_LOCAL_DEV     — choice 5 ^(local dev^)
-echo  Mapbox ^(optional^): add MAPBOX_ACCESS_TOKEN=pk... to .env for IFRC-style map tiles;
-echo    or pass  --dart-define=MAPBOX_ACCESS_TOKEN=pk...  ^(also forwarded from extra args below^).
+echo  Humanitarian Databank Mobile
 echo.
 
-echo  Backoffice (Flask / API^):
-echo    1^) https://databank.ifrc.org              (IFRC production — default prod API host^)
-echo    2^) https://databank-stage.ifrc.org          (IFRC staging^)
-echo    3^) https://backoffice-databank.fly.dev     (Fly.io preview — not the same as 1^)
-echo    4^) http://10.0.2.2:5000   (Android emulator: host machine localhost:5000)
-echo    5^) http://localhost:5000   (USB phone: adb reverse tcp:5000 tcp:5000 first^)
+echo  Action:
+echo    1^) Run on device/emulator
+echo    2^) Build release APK
+echo.
+set "ACTION_CHOICE=1"
+set /p "ACTION_CHOICE=  Choice [1-2, Enter=run]: "
+if "!ACTION_CHOICE!"=="" set "ACTION_CHOICE=1"
+
+if not "!ACTION_CHOICE!"=="1" if not "!ACTION_CHOICE!"=="2" (
+  echo  Invalid action choice. Exiting.
+  exit /b 1
+)
+
+echo.
+echo  Backoffice URL:
+echo    1^) https://databank.ifrc.org
+echo    2^) https://databank-stage.ifrc.org
+echo    3^) https://backoffice-databank.fly.dev
+echo    4^) http://10.0.2.2:5000
+echo    5^) http://localhost:5000
 echo    6^) Custom URL
 echo.
 set /p "BO_CHOICE=  Choice [1-6]: "
@@ -43,7 +49,7 @@ set "FRONTEND_URL=https://website-databank.fly.dev"
 
 echo.
 echo  BACKEND_URL=!BACKEND_URL!
-echo  FRONTEND_URL=!FRONTEND_URL! ^(fixed^)
+echo  FRONTEND_URL=!FRONTEND_URL!
 echo.
 
 REM Merge into .env (preserve other keys; replace BACKEND_URL / FRONTEND_URL / MOBILE_APP_API_KEY)
@@ -86,16 +92,9 @@ if errorlevel 1 (
 )
 
 echo  Updated .env
-if "!BO_CHOICE!"=="1" echo   MOBILE_APP_API_KEY ^<= MOBILE_APP_API_KEY_IFRC_PROD
-if "!BO_CHOICE!"=="2" echo   MOBILE_APP_API_KEY ^<= MOBILE_APP_API_KEY_IFRC_STAGING
-if "!BO_CHOICE!"=="5" echo   MOBILE_APP_API_KEY ^<= MOBILE_APP_API_KEY_LOCAL_DEV
-if "!BO_CHOICE!"=="3" echo   MOBILE_APP_API_KEY ^(unchanged / same as last .env^)
-if "!BO_CHOICE!"=="4" echo   MOBILE_APP_API_KEY ^(unchanged / same as last .env^)
-if "!BO_CHOICE!"=="6" echo   MOBILE_APP_API_KEY ^(unchanged / same as last .env^)
 echo.
 
 if "!BO_CHOICE!"=="5" (
-  echo  USB phone: adb reverse tcp:5000 tcp:5000
   adb reverse tcp:5000 tcp:5000
   if errorlevel 1 (
     echo  Warning: adb reverse failed. Connect one device with USB debugging, or ensure adb is on PATH.
@@ -103,22 +102,20 @@ if "!BO_CHOICE!"=="5" (
   echo.
 )
 
-echo  Action:
-echo    1^) Run on device/emulator ^(flutter run — default^)
-echo    2^) Build release APK ^(flutter build apk^)
-echo.
-set "ACTION_CHOICE=1"
-set /p "ACTION_CHOICE=  Choice [1-2, Enter=run]: "
-if "!ACTION_CHOICE!"=="" set "ACTION_CHOICE=1"
+REM Stop Gradle daemons so Windows can delete mergeDebugAssets (avoids kernel_blob.bin lock errors)
+if exist "android\gradlew.bat" (
+  if exist "%ProgramFiles%\Android\Android Studio\jbr" (
+    set "JAVA_HOME=%ProgramFiles%\Android\Android Studio\jbr"
+  )
+  call android\gradlew.bat --stop >nul 2>&1
+)
 
 if /i "!ACTION_CHOICE!"=="2" (
-  echo.
-  echo  Building APK. Extra args: %*
+  echo  Building APK...
   echo.
   flutter build apk %*
 ) else (
-  echo.
-  echo  Starting Flutter run ^(default org profile: IFRC^). Extra args: %*
+  echo  Starting Flutter run...
   echo.
   flutter run %*
 )

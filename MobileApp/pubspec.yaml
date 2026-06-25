@@ -81,7 +81,7 @@ dependencies:
 
   # Error Tracking
   sentry_flutter: ^9.16.0
-  home_widget: ^0.9.0
+  home_widget: ^0.9.3
   quick_actions: ^1.1.0
   flutter_map: ^8.2.2
   latlong2: ^0.9.1

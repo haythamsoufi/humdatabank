@@ -342,6 +342,32 @@ class TestMobilePeriods:
         assert status == 200
         assert 'periods' in body.get_json()['data']
 
+    def test_defaults_to_fdrs_template_id(self, app, db_session):
+        """Without template_id, periods are scoped to FDRS (template 21 by default)."""
+        from unittest.mock import patch
+
+        from app.models import AssignedForm
+        from app.routes.api.mobile.public_data import mobile_periods
+        from tests.factories import create_test_template
+
+        with app.app_context():
+            fdrs_tmpl = create_test_template(db_session)
+            other_tmpl = create_test_template(db_session)
+            db_session.add(AssignedForm(template_id=fdrs_tmpl.id, period_name='FDRS-Only'))
+            db_session.add(AssignedForm(template_id=other_tmpl.id, period_name='Other-Only'))
+            db_session.commit()
+            fdrs_id = fdrs_tmpl.id
+
+        with patch('app.utils.data_quality_constants.FDRS_TEMPLATE_ID', fdrs_id):
+            with app.test_request_context('/api/mobile/v1/data/periods', method='GET'):
+                resp = mobile_periods()
+
+        body, status = _parse(resp)
+        assert status == 200
+        periods = body.get_json()['data']['periods']
+        assert 'FDRS-Only' in periods
+        assert 'Other-Only' not in periods
+
     def test_with_template_filter(self, app, db_session):
         from app.routes.api.mobile.public_data import mobile_periods
 

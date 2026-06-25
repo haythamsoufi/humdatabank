@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../models/shared/assignment.dart';
+import '../../models/shared/focal_point_contact.dart';
 import '../../models/shared/dashboard_data.dart';
 import '../../models/shared/entity.dart';
 import '../../repositories/dashboard_repository.dart';
@@ -13,6 +14,8 @@ class DashboardProvider with ChangeNotifier {
   List<Assignment> _currentAssignments = [];
   List<Assignment> _pastAssignments = [];
   List<Entity> _entities = [];
+  List<FocalPointContact> _nsFocalPoints = [];
+  List<FocalPointContact> _orgFocalPoints = [];
   Entity? _selectedEntity;
   bool _isLoading = false;
   String? _error;
@@ -20,6 +23,8 @@ class DashboardProvider with ChangeNotifier {
   List<Assignment> get currentAssignments => _currentAssignments;
   List<Assignment> get pastAssignments => _pastAssignments;
   List<Entity> get entities => _entities;
+  List<FocalPointContact> get nsFocalPoints => _nsFocalPoints;
+  List<FocalPointContact> get orgFocalPoints => _orgFocalPoints;
   Entity? get selectedEntity => _selectedEntity;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -127,6 +132,8 @@ class DashboardProvider with ChangeNotifier {
     _currentAssignments = data.currentAssignments;
     _pastAssignments = data.pastAssignments;
     _entities = data.entities;
+    _nsFocalPoints = data.nsFocalPoints;
+    _orgFocalPoints = data.orgFocalPoints;
     // Preserve current selection if flag is set, otherwise use API response or keep current
     if (preserveSelectedEntity) {
       // Keep the current selection - don't overwrite it
@@ -222,6 +229,8 @@ class DashboardProvider with ChangeNotifier {
     _currentAssignments = [];
     _pastAssignments = [];
     _entities = [];
+    _nsFocalPoints = [];
+    _orgFocalPoints = [];
     _selectedEntity = null;
     notifyListeners();
   }
@@ -234,6 +243,8 @@ class DashboardProvider with ChangeNotifier {
     _currentAssignments = [];
     _pastAssignments = [];
     _entities = [];
+    _nsFocalPoints = [];
+    _orgFocalPoints = [];
     // Restore the preserved entity
     _selectedEntity = preservedEntity;
     notifyListeners();

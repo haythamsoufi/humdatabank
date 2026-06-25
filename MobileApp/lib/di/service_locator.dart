@@ -16,6 +16,7 @@ import '../services/notification_service.dart';
 import '../services/ai_chat_service.dart';
 import '../services/push_notification_service.dart';
 import '../services/global_overview_data_service.dart';
+import '../services/disaggregation_data_service.dart';
 import '../services/auth_service.dart';
 import '../services/auth_error_handler.dart';
 import '../services/error_handler.dart';
@@ -65,6 +66,8 @@ void setupServiceLocator() {
       () => PushNotificationService());
   sl.registerLazySingleton<GlobalOverviewDataService>(
       () => GlobalOverviewDataService());
+  sl.registerLazySingleton<DisaggregationDataService>(
+      () => DisaggregationDataService());
 
   // ── Tier 4: Depend on Tier 3 (multiple lower-tier services) ──────────
   sl.registerLazySingleton<AuthService>(() => AuthService());

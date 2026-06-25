@@ -214,6 +214,35 @@ class AppLocalizations {
       'home_landing_shortcut_resources_subtitle': 'Publications and materials',
       'home_landing_shortcut_countries_subtitle': 'Profiles and regional views',
       'home_landing_shortcut_disaggregation_subtitle': 'Break down indicator values',
+      'disagg_hero_description':
+          'Explore sex, age, and country breakdowns for FDRS indicators with interactive native charts.',
+      'disagg_filter_button': 'Filters',
+      'disagg_filter_title': 'Analysis filters',
+      'disagg_filter_period': 'Reporting period',
+      'disagg_filter_country': 'Country',
+      'disagg_filter_indicator': 'Indicator',
+      'disagg_filter_all_periods': 'All periods',
+      'disagg_filter_all_countries': 'All countries',
+      'disagg_filter_clear': 'Clear filters',
+      'disagg_filter_apply': 'Apply filters',
+      'disagg_stat_total': 'Total',
+      'disagg_stat_disaggregation_rate': 'Disaggregated',
+      'disagg_stat_records': 'Records',
+      'disagg_tab_by_sex': 'Sex',
+      'disagg_tab_by_age': 'Age',
+      'disagg_tab_by_country': 'Countries',
+      'disagg_tab_trends': 'Trends',
+      'disagg_no_data': 'No data for the current filters',
+      'disagg_load_error': 'Could not load analysis',
+      'disagg_retry': 'Retry',
+      'disagg_coverage_title': 'Disaggregation coverage by country',
+      'disagg_tab_by_region': 'Regions',
+      'disagg_region_coverage_title': 'Disaggregation coverage by region',
+      'disagg_region_country_count': '%s countries',
+      'disagg_public_insights_title': 'Global & regional view',
+      'disagg_public_insights_body':
+          'Sign in with your organization account to explore country-level breakdowns and filters.',
+      'disagg_login_for_countries': 'Sign in for country details',
       'home_landing_explore_title': 'Global map & charts',
       'home_landing_explore_subtitle':
           'Native map and chart using the same FDRS totals as the website — without leaving the app.',
@@ -7521,6 +7550,35 @@ class AppLocalizations {
       translate('home_landing_shortcut_countries_subtitle');
   String get homeLandingShortcutDisaggregationSubtitle =>
       translate('home_landing_shortcut_disaggregation_subtitle');
+  String get disaggHeroDescription => translate('disagg_hero_description');
+  String get disaggFilterButton => translate('disagg_filter_button');
+  String get disaggFilterTitle => translate('disagg_filter_title');
+  String get disaggFilterPeriod => translate('disagg_filter_period');
+  String get disaggFilterCountry => translate('disagg_filter_country');
+  String get disaggFilterIndicator => translate('disagg_filter_indicator');
+  String get disaggFilterAllPeriods => translate('disagg_filter_all_periods');
+  String get disaggFilterAllCountries => translate('disagg_filter_all_countries');
+  String get disaggFilterClear => translate('disagg_filter_clear');
+  String get disaggFilterApply => translate('disagg_filter_apply');
+  String get disaggStatTotal => translate('disagg_stat_total');
+  String get disaggStatDisaggregationRate =>
+      translate('disagg_stat_disaggregation_rate');
+  String get disaggStatRecords => translate('disagg_stat_records');
+  String get disaggTabBySex => translate('disagg_tab_by_sex');
+  String get disaggTabByAge => translate('disagg_tab_by_age');
+  String get disaggTabByCountry => translate('disagg_tab_by_country');
+  String get disaggTabTrends => translate('disagg_tab_trends');
+  String get disaggNoData => translate('disagg_no_data');
+  String get disaggLoadError => translate('disagg_load_error');
+  String get disaggRetry => translate('disagg_retry');
+  String get disaggCoverageTitle => translate('disagg_coverage_title');
+  String get disaggTabByRegion => translate('disagg_tab_by_region');
+  String get disaggRegionCoverageTitle => translate('disagg_region_coverage_title');
+  String disaggRegionCountryCount(int count) =>
+      translate('disagg_region_country_count').replaceAll('%s', '$count');
+  String get disaggPublicInsightsTitle => translate('disagg_public_insights_title');
+  String get disaggPublicInsightsBody => translate('disagg_public_insights_body');
+  String get disaggLoginForCountries => translate('disagg_login_for_countries');
   String get homeLandingExploreTitle => translate('home_landing_explore_title');
   String get homeLandingExploreSubtitle => translate('home_landing_explore_subtitle');
   String get homeLandingGlobalIndicatorVolunteers =>

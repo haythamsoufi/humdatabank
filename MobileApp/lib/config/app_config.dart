@@ -379,6 +379,8 @@ class AppConfig {
   static const String mobileQuizSubmitScoreEndpoint = '$mobileApiPrefix/data/quiz/submit-score';
   static const String mobileFdrsPeriodsEndpoint = '$mobileApiPrefix/data/periods';
   static const String mobileFdrsOverviewEndpoint = '$mobileApiPrefix/data/fdrs-overview';
+  static const String mobileDisaggregationOverviewEndpoint =
+      '$mobileApiPrefix/data/disaggregation-overview';
   static const String mobileScreenViewEndpoint = '$mobileApiPrefix/analytics/screen-view';
 
   /// Main app dashboard (assignments / entities). Not the admin analytics stats endpoint.

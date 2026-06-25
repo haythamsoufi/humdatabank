@@ -532,9 +532,13 @@ class TestGetDashboard:
         assert "current_assignments" in data
         assert "past_assignments" in data
         assert "entities" in data
+        assert "ns_focal_points" in data
+        assert "org_focal_points" in data
         assert isinstance(data["current_assignments"], list)
         assert isinstance(data["past_assignments"], list)
         assert isinstance(data["entities"], list)
+        assert isinstance(data["ns_focal_points"], list)
+        assert isinstance(data["org_focal_points"], list)
 
     def test_selected_entity_key_present(self, client, db_session, app):
         with app.app_context():

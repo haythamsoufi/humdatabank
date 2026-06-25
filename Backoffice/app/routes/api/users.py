@@ -33,6 +33,7 @@ from app.utils.form_localization import get_localized_template_name
 from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
 from app.services.entity_service import EntityService
 from app.utils.api_helpers import json_response, api_error, PAST_ASSIGNMENT_DAYS, get_json_safe
+from app.utils.dashboard_focal_points import get_focal_points_for_country
 from app.utils.request_validation import enforce_csrf_json
 from app import db
 
@@ -478,7 +479,16 @@ def get_dashboard():
             "entity_id": int,
             "name": string,
             "display_name": string
-        } | null
+        } | null,
+        "ns_focal_points": [
+            {
+                "id": int,
+                "name": string | null,
+                "title": string | null,
+                "email": string
+            }
+        ],
+        "org_focal_points": [...] // Same structure as ns_focal_points
     }
     """
     try:
@@ -906,11 +916,25 @@ def get_dashboard():
                 else:
                     current_assignments.append(assignment_data)
 
+        ns_focal_points = []
+        org_focal_points = []
+        if selected_entity:
+            entity_country = EntityService.get_country_for_entity(
+                selected_entity['entity_type'],
+                selected_entity['entity_id'],
+            )
+            if entity_country is not None:
+                ns_focal_points, org_focal_points = get_focal_points_for_country(
+                    entity_country.id,
+                )
+
         return json_response({
             'current_assignments': current_assignments,
             'past_assignments': past_assignments,
             'entities': entities_json,
-            'selected_entity': selected_entity
+            'selected_entity': selected_entity,
+            'ns_focal_points': ns_focal_points,
+            'org_focal_points': org_focal_points,
         })
 
     except Exception as e:

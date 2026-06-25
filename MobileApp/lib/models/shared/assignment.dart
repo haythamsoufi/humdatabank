@@ -116,9 +116,23 @@ class Assignment {
     };
   }
 
+  /// Matches [dashboard.html] overdue rules: past due date and still awaiting submission.
+  /// [status] is the raw API value (`pending`, `in_progress`, `approved`, …).
   bool get isOverdue {
     if (dueDate == null) return false;
-    return DateTime.now().isAfter(dueDate!) && status != 'Approved';
+
+    if (status == 'submitted' ||
+        status == 'approved' ||
+        status == 'requires_revision' ||
+        status == 'sent_for_review') {
+      return false;
+    }
+
+    final now = DateTime.now();
+    final due = dueDate!.toLocal();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(due.year, due.month, due.day);
+    return dueDay.isBefore(today);
   }
 
   /// Submitted/approved accountability fields may remain on the record after reopen;

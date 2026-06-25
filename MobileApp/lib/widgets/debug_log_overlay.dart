@@ -296,7 +296,7 @@ class _LogPanel extends StatelessWidget {
                         top: 4,
                       ),
                       itemCount: reversed.length,
-                      separatorBuilder: (_, __) => const Divider(
+                      separatorBuilder: (_, _) => const Divider(
                         height: 1,
                         color: Color(0xFF2D3748),
                         indent: 8,

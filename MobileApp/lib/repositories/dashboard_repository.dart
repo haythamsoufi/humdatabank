@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/shared/assignment.dart';
 import '../models/shared/dashboard_data.dart';
 import '../models/shared/entity.dart';
+import '../models/shared/focal_point_contact.dart';
 import '../services/api_service.dart';
 import '../services/error_handler.dart';
 import '../services/storage_service.dart';
@@ -112,6 +113,8 @@ class DashboardRepository {
     final currentAssignments = <Assignment>[];
     final pastAssignments = <Assignment>[];
     final entities = <Entity>[];
+    final nsFocalPoints = <FocalPointContact>[];
+    final orgFocalPoints = <FocalPointContact>[];
     Entity? selectedEntity;
 
     if (root.containsKey('current_assignments')) {
@@ -129,6 +132,18 @@ class DashboardRepository {
     if (root.containsKey('entities')) {
       entities.addAll((root['entities'] as List)
           .map((item) => Entity.fromJson(item as Map<String, dynamic>))
+          .toList());
+    }
+
+    if (root.containsKey('ns_focal_points')) {
+      nsFocalPoints.addAll((root['ns_focal_points'] as List)
+          .map((item) => FocalPointContact.fromJson(item as Map<String, dynamic>))
+          .toList());
+    }
+
+    if (root.containsKey('org_focal_points')) {
+      orgFocalPoints.addAll((root['org_focal_points'] as List)
+          .map((item) => FocalPointContact.fromJson(item as Map<String, dynamic>))
           .toList());
     }
 
@@ -158,6 +173,8 @@ class DashboardRepository {
       pastAssignments: pastAssignments,
       entities: entities,
       selectedEntity: selectedEntity,
+      nsFocalPoints: nsFocalPoints,
+      orgFocalPoints: orgFocalPoints,
       timestamp: DateTime.now(),
     );
   }
@@ -194,6 +211,14 @@ class DashboardRepository {
           .map((json) => Assignment.fromJson(json))
           .toList();
 
+      final nsFocalPoints = (data['ns_focal_points'] as List? ?? const [])
+          .map((json) => FocalPointContact.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      final orgFocalPoints = (data['org_focal_points'] as List? ?? const [])
+          .map((json) => FocalPointContact.fromJson(json as Map<String, dynamic>))
+          .toList();
+
       // Try to load entities from cache
       final entities = await loadEntitiesFromCache();
 
@@ -220,6 +245,8 @@ class DashboardRepository {
         pastAssignments: pastAssignments,
         entities: entities,
         selectedEntity: selectedEntity,
+        nsFocalPoints: nsFocalPoints,
+        orgFocalPoints: orgFocalPoints,
         timestamp: cacheTime,
       );
     } catch (e) {
@@ -236,6 +263,8 @@ class DashboardRepository {
         'current_assignments':
             data.currentAssignments.map((a) => a.toJson()).toList(),
         'past_assignments': data.pastAssignments.map((a) => a.toJson()).toList(),
+        'ns_focal_points': data.nsFocalPoints.map((fp) => fp.toJson()).toList(),
+        'org_focal_points': data.orgFocalPoints.map((fp) => fp.toJson()).toList(),
       };
       await _storage.setString(
           AppConfig.cachedDashboardKey, jsonEncode(cacheData));

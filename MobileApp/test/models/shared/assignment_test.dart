@@ -135,7 +135,7 @@ void main() {
 
   group('Assignment.isOverdue', () {
     test('returns false when dueDate is null', () {
-      final a = Assignment(id: 1, name: 'x', status: 'Pending', completionRate: 0);
+      final a = Assignment(id: 1, name: 'x', status: 'pending', completionRate: 0);
       expect(a.isOverdue, false);
     });
 
@@ -143,31 +143,54 @@ void main() {
       final a = Assignment(
         id: 1,
         name: 'x',
-        status: 'Pending',
+        status: 'pending',
         completionRate: 0,
         dueDate: DateTime.now().add(const Duration(days: 30)),
       );
       expect(a.isOverdue, false);
     });
 
-    test('returns true when dueDate is in the past and status is not Approved', () {
+    test('returns true when dueDate is in the past and status is in_progress', () {
       final a = Assignment(
         id: 1,
         name: 'x',
-        status: 'In Progress',
+        status: 'in_progress',
         completionRate: 0,
         dueDate: DateTime.now().subtract(const Duration(days: 1)),
       );
       expect(a.isOverdue, true);
     });
 
-    test('returns false when dueDate is past but status is Approved', () {
+    test('returns false when dueDate is past but status is approved', () {
       final a = Assignment(
         id: 1,
         name: 'x',
-        status: 'Approved',
+        status: 'approved',
         completionRate: 1.0,
         dueDate: DateTime.now().subtract(const Duration(days: 1)),
+      );
+      expect(a.isOverdue, false);
+    });
+
+    test('returns false when dueDate is past but status is submitted', () {
+      final a = Assignment(
+        id: 1,
+        name: 'x',
+        status: 'submitted',
+        completionRate: 1.0,
+        dueDate: DateTime.now().subtract(const Duration(days: 1)),
+      );
+      expect(a.isOverdue, false);
+    });
+
+    test('returns false when dueDate is today', () {
+      final now = DateTime.now();
+      final a = Assignment(
+        id: 1,
+        name: 'x',
+        status: 'pending',
+        completionRate: 0,
+        dueDate: DateTime(now.year, now.month, now.day, 23, 59),
       );
       expect(a.isOverdue, false);
     });

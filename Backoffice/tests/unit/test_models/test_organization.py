@@ -463,6 +463,20 @@ class TestSecretariatRegionalOffice:
             ro = self._create_ro(db_session, code='  ')
             assert ro.code is None
 
+    def test_short_name_and_translations(self, db_session, app):
+        """Test short_name fields and translation helpers."""
+        with app.app_context():
+            ro = self._create_ro(
+                db_session,
+                name='Europe and Central Asia',
+                short_name='Europe & CA',
+                short_name_translations={'en': 'Europe & CA', 'fr': 'Europe & CA'},
+            )
+            assert ro.short_name == 'Europe & CA'
+            assert ro.get_short_name_translation('en') == 'Europe & CA'
+            assert ro.get_short_name_translation('fr') == 'Europe & CA'
+            assert ro.get_short_name_translation('de') == 'Europe & CA'
+
 
 @pytest.mark.unit
 class TestSecretariatClusterOffice:

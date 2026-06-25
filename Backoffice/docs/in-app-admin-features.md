@@ -125,7 +125,7 @@ Operational guide: [Notifications and communications (Admin)](user-guides/admin/
 
 - Searchable/sortable user list, country and role visibility, activation controls.
 - **User form** — Profile fields, password flows, country assignments, **RBAC roles** grouped (system, core, admin modules, assignment roles) when you have `admin.users.roles.assign` or read-only role display.
-- **Access requests** — When `admin.access_requests.view` is granted, the page header links to the access-request queue (approve/reject extra country or access asks).
+- **Access requests** — When `admin.users.edit` or `admin.access_requests.view` is granted, the page header links to the access-request queue (approve/reject extra country or access asks).
 - **RBAC administration** — **System Manager only**: header links to **`/admin/users/roles/`**, **`/admin/users/permissions`**, and **`/admin/users/grants`** (roles, permission catalogue, explicit grants). Routes are additionally decorated with `admin.users.roles.assign`; in practice only System Managers can use these screens.
 
 Guides: [Manage users](user-guides/admin/manage-users.md), [Add a user](user-guides/admin/add-user.md), [Role recipes](user-guides/admin/role-recipes.md).

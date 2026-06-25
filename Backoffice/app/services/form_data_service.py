@@ -2592,10 +2592,49 @@ class FormDataService:
                     f"Removing orphan repeat instance {existing_instance.id} "
                     f"(instance_number={existing_instance.instance_number})"
                 )
+                cls._delete_repeat_instance_dynamic_indicators(
+                    section, assignment_entity_status, existing_instance.instance_number
+                )
                 db.session.delete(existing_instance)
 
         cls._log_verbose(f"Repeat group processing completed with {len(field_changes)} field changes")
         return field_changes
+
+    @classmethod
+    def _delete_repeat_instance_dynamic_indicators(cls, repeat_section, assignment_entity_status, instance_number) -> None:
+        """Delete dynamic indicators scoped to a removed repeat entry."""
+        try:
+            subsection_ids = [
+                sub.id for sub in repeat_section.sub_sections
+                if getattr(sub, 'section_type', None) == 'dynamic_indicators'
+            ]
+        except Exception:
+            subsection_ids = []
+
+        if not subsection_ids:
+            return
+
+        if cls._is_public_submission(assignment_entity_status):
+            dynamic_rows = DynamicIndicatorData.query.filter(
+                DynamicIndicatorData.public_submission_id == assignment_entity_status.id,
+                DynamicIndicatorData.section_id.in_(subsection_ids),
+                DynamicIndicatorData.repeat_instance_number == instance_number,
+            ).all()
+        else:
+            dynamic_rows = DynamicIndicatorData.query.filter(
+                DynamicIndicatorData.assignment_entity_status_id == assignment_entity_status.id,
+                DynamicIndicatorData.section_id.in_(subsection_ids),
+                DynamicIndicatorData.repeat_instance_number == instance_number,
+            ).all()
+
+        for dynamic_row in dynamic_rows:
+            db.session.delete(dynamic_row)
+            logger.info(
+                "Deleted dynamic indicator %s for orphan repeat instance %s in repeat section %s",
+                dynamic_row.id,
+                instance_number,
+                repeat_section.id,
+            )
 
     # Helper methods for field processing optimization
     @classmethod

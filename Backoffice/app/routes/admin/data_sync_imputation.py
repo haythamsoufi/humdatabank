@@ -238,6 +238,7 @@ def _imputable_items_for_template(
 # Templates that support external data sync (FDRS pipeline).
 # Other templates get imputation only until their sync source is configured.
 _TEMPLATES_WITH_DATA_SYNC: frozenset = frozenset({21})
+_UPR_EXCEL_TEMPLATE_IDS: frozenset = frozenset({22, 23, 24, 33})
 
 
 def _accessible_templates_for_user(user) -> List[Dict[str, Any]]:
@@ -257,6 +258,25 @@ def _accessible_templates_for_user(user) -> List[Dict[str, Any]]:
     return [{"id": t.id, "name": t.name} for t in templates]
 
 
+def _sections_with_items_for_template(template: FormTemplate) -> List[Dict[str, Any]]:
+    template_sections = _published_sections_query(template).all()
+    published_items = _published_items_query(template).all()
+    items_by_section_id: Dict[int, List[FormItem]] = {}
+    for item in published_items:
+        items_by_section_id.setdefault(item.section_id, []).append(item)
+    return _build_ordered_sections_with_items(
+        template,
+        template_sections,
+        items_by_section_id,
+    )
+
+
+def _template_has_data_sync(template_id: int) -> bool:
+    scripts_dir = os.path.join(current_app.root_path, "..", "scripts")
+    sync_script_available = os.path.isfile(os.path.join(scripts_dir, "import_fdrs_form_data.py"))
+    return (template_id in _TEMPLATES_WITH_DATA_SYNC) and sync_script_available
+
+
 def render_data_sync_imputation_page(template_id: int):
     """Render data sync & imputation UI for the given template."""
     template = FormTemplate.query.get_or_404(template_id)
@@ -265,22 +285,8 @@ def render_data_sync_imputation_page(template_id: int):
         flash("Access denied. You don't have permission to access this template.", "warning")
         return redirect(url_for("form_builder.manage_templates"))
 
-    template_sections = _published_sections_query(template).all()
-    published_items = _published_items_query(template).all()
-    items_by_section_id: Dict[int, List[FormItem]] = {}
-    for item in published_items:
-        items_by_section_id.setdefault(item.section_id, []).append(item)
-
-    sections_with_items = _build_ordered_sections_with_items(
-        template,
-        template_sections,
-        items_by_section_id,
-    )
-
-    scripts_dir = os.path.join(current_app.root_path, "..", "scripts")
-    sync_script_available = os.path.isfile(os.path.join(scripts_dir, "import_fdrs_form_data.py"))
-    has_data_sync = (template_id in _TEMPLATES_WITH_DATA_SYNC) and sync_script_available
-
+    sections_with_items = _sections_with_items_for_template(template)
+    has_data_sync = _template_has_data_sync(template_id)
     accessible_templates = _accessible_templates_for_user(current_user)
 
     return render_template(
@@ -289,6 +295,7 @@ def render_data_sync_imputation_page(template_id: int):
         sections_with_items=sections_with_items,
         title=f"{template.name} — Data Sync & Imputation",
         has_data_sync=has_data_sync,
+        has_upr_excel=template_id in _UPR_EXCEL_TEMPLATE_IDS,
         accessible_templates=accessible_templates,
     )
 
@@ -297,6 +304,29 @@ def render_data_sync_imputation_page(template_id: int):
 @admin_permission_required('admin.templates.view')
 def data_sync_view(template_id: int):
     return render_data_sync_imputation_page(template_id)
+
+
+@bp.route("/<int:template_id>/context", methods=["GET"])
+@admin_permission_required('admin.templates.view')
+def get_template_context(template_id: int):
+    """JSON payload for switching templates without a full page reload."""
+    template = FormTemplate.query.get_or_404(template_id)
+    if not check_template_access(template_id, current_user.id):
+        return json_forbidden("Access denied. You don't have permission to access this template.")
+
+    sections_with_items = _sections_with_items_for_template(template)
+    methods_html = render_template(
+        "admin/templates/partials/imputation_methods_rows.html",
+        sections_with_items=sections_with_items,
+    )
+    return json_ok({
+        "template_id": template_id,
+        "template_name": template.name,
+        "page_title": f"{template.name} — Data Sync & Imputation",
+        "has_data_sync": _template_has_data_sync(template_id),
+        "has_upr_excel": template_id in _UPR_EXCEL_TEMPLATE_IDS,
+        "methods_html": methods_html,
+    })
 
 
 @bp.route("/impute/template2", methods=["POST"])

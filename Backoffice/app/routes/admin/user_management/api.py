@@ -8,7 +8,7 @@ from flask_login import current_user
 
 from app import db
 from app.models import User, Country, UserEntityPermission, CountryAccessRequest, UserSessionLog
-from app.routes.admin.shared import permission_required
+from app.routes.admin.shared import permission_required, permission_required_any
 from app.services.user_analytics_service import log_admin_action
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
@@ -453,7 +453,7 @@ def api_users_profile_summary():
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 @bp.route("/api/users/access-requests/count", methods=["GET"])
-@permission_required('admin.access_requests.view')
+@permission_required_any('admin.access_requests.view', 'admin.users.edit')
 def api_access_requests_count():
     """API endpoint to get pending access requests count"""
     try:
@@ -468,7 +468,7 @@ def api_access_requests_count():
 
 
 @bp.route("/api/users/access-requests", methods=["GET"])
-@permission_required('admin.access_requests.view')
+@permission_required_any('admin.access_requests.view', 'admin.users.edit')
 def api_access_requests_list():
     """JSON list of pending and recently processed country access requests (mobile app)."""
     try:
@@ -515,7 +515,7 @@ def api_access_requests_list():
 
 
 @bp.route("/api/users/access-requests/<int:request_id>/approve", methods=["POST"])
-@permission_required('admin.access_requests.approve')
+@permission_required_any('admin.access_requests.approve', 'admin.users.edit')
 def api_approve_access_request(request_id):
     """Approve a country access request (JSON; same behaviour as the HTML POST)."""
     req = CountryAccessRequest.query.get_or_404(request_id)
@@ -565,7 +565,7 @@ def api_approve_access_request(request_id):
 
 
 @bp.route("/api/users/access-requests/<int:request_id>/reject", methods=["POST"])
-@permission_required('admin.access_requests.reject')
+@permission_required_any('admin.access_requests.reject', 'admin.users.edit')
 def api_reject_access_request(request_id):
     """Reject a country access request (JSON)."""
     req = CountryAccessRequest.query.get_or_404(request_id)
@@ -611,7 +611,7 @@ def api_reject_access_request(request_id):
 
 
 @bp.route("/api/users/access-requests/approve-all", methods=["POST"])
-@permission_required('admin.access_requests.approve')
+@permission_required_any('admin.access_requests.approve', 'admin.users.edit')
 def api_approve_all_access_requests():
     """Approve all pending country access requests (JSON)."""
     from app.services.country_access_request_service import (

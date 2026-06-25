@@ -374,6 +374,24 @@ function initPagination() {
         changePage(idx, false);
         return true;
     };
+    window.__ifrcPagination.navigateToSection = (sectionId, pageNumber) => {
+        if (!sectionId) return false;
+
+        const targetPageNum = parsePageNumber(pageNumber, 1);
+        const idx = pages.findIndex(p => p.number === targetPageNum);
+        if (idx !== -1 && idx !== currentPageIdx) {
+            changePage(idx, false);
+        }
+
+        currentSection = sectionId;
+        saveCurrentSection(storageKey, sectionId);
+        updateURLWithPage(currentPageIdx, sectionId);
+
+        window.__ifrcSectionNavScrollSpy?.setActive?.(sectionId);
+        window.__ifrcSectionNavScrollSpy?.pause?.(900);
+        scrollToSection(sectionId);
+        return true;
+    };
     window.__ifrcPagination.getCurrentPageNumber = () => {
         return pages[currentPageIdx]?.number ?? null;
     };
@@ -811,68 +829,73 @@ function initPagination() {
     function scrollToSection(sectionId) {
         if (!sectionId) return;
 
-        const section = document.getElementById(sectionId);
-        if (section && section.style.display !== 'none') {
-            // Use setTimeout to ensure the page change has completed
-            setTimeout(() => {
-                // Find the scrollable container
-                const scrollContainer = getScrollableContainer(section);
-                const isMainContainer = scrollContainer !== window;
-                // Use CSS scroll-margin-top (Tailwind `scroll-mt-*`) as the single source of truth
-                // for header offset. This avoids scrollIntoView() side effects (window scroll changes).
-                const sectionRect = section.getBoundingClientRect();
-                const computed = window.getComputedStyle(section);
-                const scrollMarginTop = parseInt(computed.scrollMarginTop || '0', 10) || 80;
-                const paddingBottom = 16;
+        // Use setTimeout to ensure the page change has completed
+        setTimeout(() => {
+            const section = document.getElementById(sectionId);
+            if (!section || section.style.display === 'none' || section.classList.contains('relevance-hidden')) {
+                debugLog(MODULE_NAME, `Section not found or not visible: ${sectionId}`);
+                return;
+            }
+            if (section.getClientRects().length === 0) {
+                debugLog(MODULE_NAME, `Section has no layout box: ${sectionId}`);
+                return;
+            }
 
-                let targetTop;
-                if (isMainContainer) {
-                    const containerRect = scrollContainer.getBoundingClientRect();
-                    const visibleTop = containerRect.top + scrollMarginTop;
-                    const visibleBottom = containerRect.bottom - paddingBottom;
-                    const sectionTopRel = sectionRect.top - containerRect.top;
+            // Find the scrollable container
+            const scrollContainer = getScrollableContainer(section);
+            const isMainContainer = scrollContainer !== window;
+            // Use CSS scroll-margin-top (Tailwind `scroll-mt-*`) as the single source of truth
+            // for header offset. This avoids scrollIntoView() side effects (window scroll changes).
+            const sectionRect = section.getBoundingClientRect();
+            const computed = window.getComputedStyle(section);
+            const scrollMarginTop = parseInt(computed.scrollMarginTop || '0', 10) || 80;
+            const paddingBottom = 16;
 
-                    if (sectionRect.top < visibleTop) {
-                        // Scroll up just enough to bring the top into view (below header offset)
-                        targetTop = Math.max(0, scrollContainer.scrollTop + sectionTopRel - scrollMarginTop);
-                    } else if (sectionRect.bottom > visibleBottom) {
-                        // Scroll down just enough to bring the bottom into view
-                        const delta = sectionRect.bottom - visibleBottom;
-                        targetTop = Math.max(0, scrollContainer.scrollTop + delta);
-                    } else {
-                        // Already in view; avoid any scroll to prevent "over-scrolling"
-                        debugLog(MODULE_NAME, `Section already in view, no scroll: ${sectionId}`);
-                        return;
-                    }
+            let targetTop;
+            if (isMainContainer) {
+                const containerRect = scrollContainer.getBoundingClientRect();
+                const visibleTop = containerRect.top + scrollMarginTop;
+                const visibleBottom = containerRect.bottom - paddingBottom;
+                const sectionTopRel = sectionRect.top - containerRect.top;
 
-                    scrollContainer.scrollTo({ top: targetTop, behavior: 'smooth' });
+                if (sectionRect.top < visibleTop) {
+                    // Scroll up just enough to bring the top into view (below header offset)
+                    targetTop = Math.max(0, scrollContainer.scrollTop + sectionTopRel - scrollMarginTop);
+                } else if (sectionRect.bottom > visibleBottom) {
+                    // Scroll down just enough to bring the bottom into view
+                    const delta = sectionRect.bottom - visibleBottom;
+                    targetTop = Math.max(0, scrollContainer.scrollTop + delta);
                 } else {
-                    const visibleTop = scrollMarginTop;
-                    const visibleBottom = window.innerHeight - paddingBottom;
-
-                    if (sectionRect.top < visibleTop) {
-                        targetTop = Math.max(0, window.pageYOffset + sectionRect.top - scrollMarginTop);
-                    } else if (sectionRect.bottom > visibleBottom) {
-                        const delta = sectionRect.bottom - visibleBottom;
-                        targetTop = Math.max(0, window.pageYOffset + delta);
-                    } else {
-                        debugLog(MODULE_NAME, `Section already in view, no scroll: ${sectionId}`);
-                        return;
-                    }
-
-                    window.scrollTo({ top: targetTop, behavior: 'smooth' });
+                    // Already in view; avoid any scroll to prevent "over-scrolling"
+                    debugLog(MODULE_NAME, `Section already in view, no scroll: ${sectionId}`);
+                    return;
                 }
 
-                debugLog(MODULE_NAME, `Scrolled to section: ${sectionId}`, {
-                    scrollContainer: isMainContainer ? 'main' : 'window',
-                    scrollMarginTop,
-                    targetTop,
-                    paddingBottom
-                });
-            }, 100);
-        } else {
-            debugLog(MODULE_NAME, `Section not found or not visible: ${sectionId}`);
-        }
+                scrollContainer.scrollTo({ top: targetTop, behavior: 'smooth' });
+            } else {
+                const visibleTop = scrollMarginTop;
+                const visibleBottom = window.innerHeight - paddingBottom;
+
+                if (sectionRect.top < visibleTop) {
+                    targetTop = Math.max(0, window.pageYOffset + sectionRect.top - scrollMarginTop);
+                } else if (sectionRect.bottom > visibleBottom) {
+                    const delta = sectionRect.bottom - visibleBottom;
+                    targetTop = Math.max(0, window.pageYOffset + delta);
+                } else {
+                    debugLog(MODULE_NAME, `Section already in view, no scroll: ${sectionId}`);
+                    return;
+                }
+
+                window.scrollTo({ top: targetTop, behavior: 'smooth' });
+            }
+
+            debugLog(MODULE_NAME, `Scrolled to section: ${sectionId}`, {
+                scrollContainer: isMainContainer ? 'main' : 'window',
+                scrollMarginTop,
+                targetTop,
+                paddingBottom
+            });
+        }, 100);
     }
 
     // Add event listener for beforeunload to save current page and section

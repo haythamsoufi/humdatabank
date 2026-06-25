@@ -1338,20 +1338,4 @@
         });
     </script>
 
-    {# Ensure Excel export/import checkboxes are unchecked and disabled (coming soon feature) #}
-    <script nonce="{{ csp_nonce() }}">
-        document.addEventListener('DOMContentLoaded', function() {
-            const exportExcelCheckbox = document.querySelector('input[name="enable_export_excel"]:not([type="hidden"])');
-            const importExcelCheckbox = document.querySelector('input[name="enable_import_excel"]:not([type="hidden"])');
-
-            if (exportExcelCheckbox) {
-                exportExcelCheckbox.checked = false;
-                exportExcelCheckbox.disabled = true;
-            }
-            if (importExcelCheckbox) {
-                importExcelCheckbox.checked = false;
-                importExcelCheckbox.disabled = true;
-            }
-        });
-    </script>
 {% endblock %}

@@ -13,7 +13,7 @@ from app.routes.api.mobile import mobile_bp
 
 
 @mobile_bp.route('/admin/access-requests', methods=['GET'])
-@mobile_auth_required(permission='admin.access_requests.view')
+@mobile_auth_required(permissions=('admin.access_requests.view', 'admin.users.edit'))
 def list_access_requests():
     """List country access requests (admin). Returns both pending and processed."""
     from app.models import CountryAccessRequest, Country
@@ -57,7 +57,7 @@ def list_access_requests():
 
 
 @mobile_bp.route('/admin/access-requests/<int:request_id>/approve', methods=['POST'])
-@mobile_auth_required(permission='admin.access_requests.approve')
+@mobile_auth_required(permissions=('admin.access_requests.approve', 'admin.users.edit'))
 def approve_access_request(request_id):
     """Approve a country access request (admin)."""
     from app.models import CountryAccessRequest, Country
@@ -88,7 +88,7 @@ def approve_access_request(request_id):
 
 
 @mobile_bp.route('/admin/access-requests/<int:request_id>/reject', methods=['POST'])
-@mobile_auth_required(permission='admin.access_requests.reject')
+@mobile_auth_required(permissions=('admin.access_requests.reject', 'admin.users.edit'))
 def reject_access_request(request_id):
     """Reject a country access request (admin)."""
     from app.models import CountryAccessRequest
@@ -113,7 +113,7 @@ def reject_access_request(request_id):
 
 
 @mobile_bp.route('/admin/access-requests/approve-all', methods=['POST'])
-@mobile_auth_required(permission='admin.access_requests.approve')
+@mobile_auth_required(permissions=('admin.access_requests.approve', 'admin.users.edit'))
 def approve_all_access_requests():
     """Bulk-approve all pending access requests."""
     from app.models import CountryAccessRequest, Country

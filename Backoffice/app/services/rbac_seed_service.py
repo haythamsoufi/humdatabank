@@ -43,6 +43,9 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         ("admin.users.devices.view", "View user devices", "View user devices"),
         ("admin.users.devices.kickout", "Kick out user devices", "End user device sessions"),
         ("admin.users.devices.remove", "Remove user devices", "Remove user devices from registry"),
+        ("admin.access_requests.view", "View access requests", "View country access requests"),
+        ("admin.access_requests.approve", "Approve access requests", "Approve country access requests"),
+        ("admin.access_requests.reject", "Reject access requests", "Reject country access requests"),
 
         # Assignment management (admin screens)
         ("admin.assignments.view", "View assignments (admin)", "View assignments management screens"),
@@ -76,9 +79,6 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         ("admin.countries.view", "View countries", "View countries"),
         ("admin.countries.edit", "Edit countries", "Edit countries"),
         ("admin.organization.manage", "Manage organization", "Manage organization structure"),
-        ("admin.access_requests.view", "View access requests", "View access requests"),
-        ("admin.access_requests.approve", "Approve access requests", "Approve access requests"),
-        ("admin.access_requests.reject", "Reject access requests", "Reject access requests"),
 
         # Indicator bank
         ("admin.indicator_bank.view", "View indicator bank", "View indicator bank"),
@@ -174,6 +174,9 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
                 "admin.users.devices.view",
                 "admin.users.devices.kickout",
                 "admin.users.devices.remove",
+                "admin.access_requests.view",
+                "admin.access_requests.approve",
+                "admin.access_requests.reject",
             ],
         },
         {
@@ -231,9 +234,6 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
                 "admin.countries.view",
                 "admin.countries.edit",
                 "admin.organization.manage",
-                "admin.access_requests.view",
-                "admin.access_requests.approve",
-                "admin.access_requests.reject",
             ],
         },
         {

@@ -65,7 +65,7 @@ def _try_jwt_auth() -> bool:
     return True
 
 
-def mobile_auth_required(f=None, *, permission: str | None = None):
+def mobile_auth_required(f=None, *, permission: str | None = None, permissions: tuple[str, ...] | None = None):
     """
     Authentication decorator for mobile API routes.
 
@@ -77,7 +77,7 @@ def mobile_auth_required(f=None, *, permission: str | None = None):
     2. For session-based auth on unsafe HTTP methods, requires either a valid
        ``X-Mobile-Auth`` header or a valid CSRF token.  JWT-based requests
        skip CSRF entirely (tokens are not cookie-based).
-    3. Optionally checks an RBAC permission string.
+    3. Optionally checks one or more RBAC permission strings (any match).
 
     Usage::
 
@@ -90,7 +90,16 @@ def mobile_auth_required(f=None, *, permission: str | None = None):
         @mobile_auth_required(permission='admin.users.edit')
         def bar():
             ...
+
+        @mobile_bp.route('/baz', methods=['POST'])
+        @mobile_auth_required(permissions=('admin.access_requests.view', 'admin.users.edit'))
+        def baz():
+            ...
     """
+    permission_codes = tuple(permissions or ())
+    if permission:
+        permission_codes = permission_codes + (permission,) if permission not in permission_codes else permission_codes
+
     def decorator(fn):
         @wraps(fn)
         def decorated_view(*args, **kwargs):
@@ -122,12 +131,10 @@ def mobile_auth_required(f=None, *, permission: str | None = None):
             if not jwt_authenticated and request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
                 enforce_api_or_csrf_protection()
 
-            if permission:
+            if permission_codes:
                 from app.routes.admin.shared import user_has_permission
-                if not user_has_permission(permission):
-                    return mobile_forbidden(
-                        f'{permission.replace("_", " ").title()} permission required.'
-                    )
+                if not any(user_has_permission(p) for p in permission_codes):
+                    return mobile_forbidden('Permission required.')
 
             # Track session activity for JWT-authenticated mobile requests so that
             # UserSessionLog.last_activity stays current.  Without this,
@@ -151,9 +158,10 @@ def mobile_auth_required(f=None, *, permission: str | None = None):
         # ── Endpoint-registry metadata ────────────────────────────────────
         # These attributes are read by scan_flask_routes() in api_management.py
         # to detect auth policy from live Flask routes without manual registry upkeep.
-        decorated_view._ep_auth = 'rbac' if permission else 'user'
-        if permission:
-            decorated_view._ep_permission = permission
+        decorated_view._ep_auth = 'rbac' if permission_codes else 'user'
+        if permission_codes:
+            decorated_view._ep_permission = permission_codes[0]
+            decorated_view._ep_permissions = permission_codes
         return decorated_view
 
     if f is not None:

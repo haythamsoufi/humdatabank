@@ -74,8 +74,21 @@ def _country_iso_for_aes(aes) -> Optional[str]:
     return iso or None
 
 
+def _assignment_period_for_aes(aes) -> Optional[str]:
+    try:
+        period = getattr(getattr(aes, 'assigned_form', None), 'period_name', None)
+        return str(period).strip() if period else None
+    except Exception:
+        return None
+
+
 def _eo_field_config(version_id) -> Dict:
-    """Return the Emergency Operations plugin field config for a template version (filters/timeframe)."""
+    """Return Emergency Operations filter config for a template version (filters/timeframe).
+
+    Supports both native ``emergency_operations`` plugin fields (``plugin_config``) and
+    calculated-list questions that use ``lookup_list_id='emergency_operations'``
+    (``question_plugin_config``).
+    """
     if not version_id:
         return {}
     try:
@@ -86,29 +99,89 @@ def _eo_field_config(version_id) -> Dict:
                 FormItem.item_type.like('plugin_emergency_operations%'),
             ),
         ).first()
+        if not item:
+            item = FormItem.query.filter(
+                FormItem.version_id == version_id,
+                FormItem.lookup_list_id == 'emergency_operations',
+            ).first()
     except Exception as exc:  # pragma: no cover - defensive
         logger.debug("Could not load EO field config for version %s: %s", version_id, exc)
         return {}
     if not item:
         return {}
     cfg = item.config if isinstance(getattr(item, 'config', None), dict) else {}
+    if item.lookup_list_id == 'emergency_operations':
+        qpc = cfg.get('question_plugin_config') if isinstance(cfg.get('question_plugin_config'), dict) else {}
+        return qpc or {}
     plugin_cfg = cfg.get('plugin_config') if isinstance(cfg.get('plugin_config'), dict) else {}
     return plugin_cfg or {}
 
 
-def _filters_hash(country_iso: Optional[str], eo_cfg: Dict) -> str:
+def _normalize_emops_config(raw_cfg: Optional[Dict], assignment_period: Optional[str] = None) -> Dict:
+    """Map emops_* / plugin_config keys to ``get_emergency_operations_data`` config."""
+    raw = raw_cfg if isinstance(raw_cfg, dict) else {}
+
+    show_closed = raw.get('show_closed_operations')
+    if show_closed is None:
+        show_closed = raw.get('emops_show_closed_operations')
+    if isinstance(show_closed, list):
+        show_closed = len(show_closed) > 0
+    elif isinstance(show_closed, str):
+        show_closed = show_closed.lower() in ('1', 'true', 'yes', 'on')
+    elif show_closed is None:
+        show_closed = True
+    else:
+        show_closed = bool(show_closed)
+
+    operation_types = raw.get('operation_types') or raw.get('emops_operation_types') or ['All']
+    if not isinstance(operation_types, list):
+        operation_types = [operation_types] if operation_types else ['All']
+    operation_types = [t for t in operation_types if t]
+    if not operation_types:
+        operation_types = ['All']
+    if 'All' in operation_types and len(operation_types) > 1:
+        operation_types = [t for t in operation_types if t != 'All']
+
+    config: Dict = {
+        'operation_types': operation_types,
+        'show_closed_operations': show_closed,
+    }
+
+    timeframe_mode = raw.get('emops_timeframe_mode') or raw.get('timeframe_mode') or 'static'
+    start_date = raw.get('start_date') or raw.get('emops_start_date')
+    end_date_gt = raw.get('end_date_gt') or raw.get('emops_end_date_gt')
+
+    if timeframe_mode == 'assignment_period' and assignment_period:
+        year_match = re.search(r'\b(20\d{2})\b', str(assignment_period))
+        if year_match:
+            end_date_gt = f"{year_match.group(1)}-01-01"
+
+    if start_date:
+        config['start_date'] = start_date
+    if end_date_gt:
+        config['end_date_gt'] = end_date_gt
+
+    return config
+
+
+def _filters_hash(country_iso: Optional[str], eo_cfg: Dict, assignment_period: Optional[str] = None) -> str:
+    normalized = _normalize_emops_config(eo_cfg, assignment_period)
     payload = {
         'iso': country_iso or '',
-        'operation_types': eo_cfg.get('operation_types'),
-        'show_closed_operations': eo_cfg.get('show_closed_operations'),
-        'end_date_gt': eo_cfg.get('end_date_gt'),
-        'start_date': eo_cfg.get('start_date'),
+        'operation_types': normalized.get('operation_types'),
+        'show_closed_operations': normalized.get('show_closed_operations'),
+        'end_date_gt': normalized.get('end_date_gt'),
+        'start_date': normalized.get('start_date'),
     }
     raw = json.dumps(payload, sort_keys=True, default=str)
     return hashlib.sha1(raw.encode('utf-8')).hexdigest()[:32]
 
 
-def _fetch_ordered_operations(country_iso: Optional[str], eo_cfg: Dict) -> List[Dict]:
+def _fetch_ordered_operations(
+    country_iso: Optional[str],
+    eo_cfg: Dict,
+    assignment_period: Optional[str] = None,
+) -> List[Dict]:
     """Fetch operations for the country with the field's filters, de-duplicated and deterministically sorted.
 
     Sort: newest start_date first (missing dates last), tie-break appeal code ascending. This makes the
@@ -122,14 +195,7 @@ def _fetch_ordered_operations(country_iso: Optional[str], eo_cfg: Dict) -> List[
         logger.debug("Emergency Operations plugin unavailable: %s", exc)
         return []
 
-    config = {
-        'operation_types': eo_cfg.get('operation_types', ['All']),
-        'show_closed_operations': eo_cfg.get('show_closed_operations', True),
-    }
-    if eo_cfg.get('end_date_gt'):
-        config['end_date_gt'] = eo_cfg.get('end_date_gt')
-    if eo_cfg.get('start_date'):
-        config['start_date'] = eo_cfg.get('start_date')
+    config = _normalize_emops_config(eo_cfg, assignment_period)
 
     try:
         ops = get_emergency_operations_data(country_iso=country_iso, config=config) or []
@@ -175,8 +241,9 @@ def resolve_slot_map(aes, max_slots: int = MAX_SLOTS) -> List[Optional[Dict]]:
         version_id = None
 
     country_iso = _country_iso_for_aes(aes)
+    assignment_period = _assignment_period_for_aes(aes)
     eo_cfg = _eo_field_config(version_id)
-    ops = _fetch_ordered_operations(country_iso, eo_cfg)
+    ops = _fetch_ordered_operations(country_iso, eo_cfg, assignment_period)
     ops_by_code = {(op.get('code') or '').strip(): op for op in ops if (op.get('code') or '').strip()}
 
     # Load existing bindings for this assignment.
@@ -261,6 +328,7 @@ def persist_section_binding(section, aes, user_id=None) -> Optional[DynamicSecti
     except Exception:
         version_id = None
     country_iso = _country_iso_for_aes(aes)
+    assignment_period = _assignment_period_for_aes(aes)
     eo_cfg = _eo_field_config(version_id)
 
     slots = resolve_slot_map(aes)
@@ -291,6 +359,6 @@ def persist_section_binding(section, aes, user_id=None) -> Optional[DynamicSecti
         binding.context_key = s['code']
     binding.label_snapshot = s.get('label') or s.get('name') or binding.context_key
     binding.status = s.get('status', 'active')
-    binding.filters_hash = _filters_hash(country_iso, eo_cfg)
+    binding.filters_hash = _filters_hash(country_iso, eo_cfg, assignment_period)
     binding.resolved_at = now
     return binding

@@ -654,6 +654,16 @@ class Config:
     # Prefer environment variable (e.g., Fly sets /data/uploads) and fallback to instance folder
     upload_folder_env = os.environ.get('UPLOAD_FOLDER', '').strip()
     UPLOAD_FOLDER = upload_folder_env if upload_folder_env else os.path.join(basedir, 'instance', 'uploads')
+    # Per-country UPR Country Reporting Excel template (T33 export/import)
+    UPR_COUNTRY_REPORTING_TEMPLATE_PATH = os.environ.get(
+        'UPR_COUNTRY_REPORTING_TEMPLATE_PATH',
+        os.environ.get(
+            'MYR_REPORTING_TEMPLATE_PATH',
+            os.path.join(basedir, 'app', 'static', 'templates', 'upr_country_reporting_template.xlsx'),
+        ),
+    )
+    # Deprecated alias — use UPR_COUNTRY_REPORTING_TEMPLATE_PATH
+    MYR_REPORTING_TEMPLATE_PATH = UPR_COUNTRY_REPORTING_TEMPLATE_PATH
     # Ensure the upload folder exists (this will be handled in __init__.py)
 
     # Request size limits

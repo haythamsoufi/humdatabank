@@ -5,7 +5,7 @@
 {% set pending_requests_count = pending_requests_count | default(0) %}
 {% set has_pending_requests = pending_requests_count > 0 %}
 {% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
-{% set can_review_access_requests = current_is_system_manager or has_permission('admin.access_requests.view') %}
+{% set can_review_access_requests = current_is_system_manager or has_permission('admin.access_requests.view') or has_permission('admin.users.edit') %}
 {% set can_manage_roles_permissions = current_is_system_manager or has_permission('admin.users.roles.assign') %}
 {# Roles & Permissions (RBAC management) is System Manager only (also enforced server-side). #}
 {% set can_manage_rbac = current_is_system_manager %}

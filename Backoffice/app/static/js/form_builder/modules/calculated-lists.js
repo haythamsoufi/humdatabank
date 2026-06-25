@@ -182,8 +182,9 @@ export const CalculatedLists = {
                     doSetup(window[jsHandler]);
                 } else {
                     // Derive plugin name from the list ID (convention: list ID === plugin name).
-                    // Same path as matrix.js: /plugins/static/{plugin}/js/matrix_config_handler.js
-                    import(`/plugins/static/${listId}/js/matrix_config_handler.js`)
+                    // Prepend origin so the path resolves to the app server even when
+                    // this module is served from a CDN (e.g. Azure Blob Storage).
+                    import(`${window.location.origin}/plugins/static/${listId}/js/matrix_config_handler.js`)
                         .then(mod => {
                             const fn = mod[jsHandler] || mod.default;
                             if (fn) doSetup(fn);

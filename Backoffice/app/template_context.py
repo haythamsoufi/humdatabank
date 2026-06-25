@@ -288,9 +288,7 @@ def register_template_context(app, config_class):
 
             from app.services.authorization_service import AuthorizationService
 
-            can_review = AuthorizationService.is_system_manager(current_user) or AuthorizationService.has_rbac_permission(
-                current_user, "admin.access_requests.view"
-            )
+            can_review = AuthorizationService.can_view_access_requests(current_user)
             if not can_review:
                 return {"pending_access_requests_count": 0}
 

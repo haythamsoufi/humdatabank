@@ -373,6 +373,8 @@ def build_entry_form_features(all_sections, form_template=None):
 
     enable_export_excel = bool(getattr(form_template, 'enable_export_excel', False)) if form_template else False
     enable_import_excel = bool(getattr(form_template, 'enable_import_excel', False)) if form_template else False
+    template_id = int(getattr(form_template, 'id', 0) or 0)
+    upr_country_reporting_excel = template_id == 33
 
     return {
         'matrix': has_matrix_fields,
@@ -381,7 +383,7 @@ def build_entry_form_features(all_sections, form_template=None):
         'documents': has_document_fields,
         'calculatedLists': has_calculated_list_fields,
         'pdfExport': True,
-        'excelExport': enable_export_excel or enable_import_excel,
+        'excelExport': enable_export_excel or enable_import_excel or upr_country_reporting_excel,
     }
 
 

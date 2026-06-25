@@ -371,6 +371,34 @@ class AuthorizationService:
     # ========== RBAC (Granular permissions) ==========
 
     @staticmethod
+    def can_view_access_requests(user) -> bool:
+        """Country access requests are part of user management."""
+        if AuthorizationService.is_system_manager(user):
+            return True
+        return (
+            AuthorizationService.has_rbac_permission(user, "admin.access_requests.view")
+            or AuthorizationService.has_rbac_permission(user, "admin.users.edit")
+        )
+
+    @staticmethod
+    def can_approve_access_requests(user) -> bool:
+        if AuthorizationService.is_system_manager(user):
+            return True
+        return (
+            AuthorizationService.has_rbac_permission(user, "admin.access_requests.approve")
+            or AuthorizationService.has_rbac_permission(user, "admin.users.edit")
+        )
+
+    @staticmethod
+    def can_reject_access_requests(user) -> bool:
+        if AuthorizationService.is_system_manager(user):
+            return True
+        return (
+            AuthorizationService.has_rbac_permission(user, "admin.access_requests.reject")
+            or AuthorizationService.has_rbac_permission(user, "admin.users.edit")
+        )
+
+    @staticmethod
     def has_rbac_permission(
         user,
         permission_code: str,

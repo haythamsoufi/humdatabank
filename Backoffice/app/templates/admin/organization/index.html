@@ -172,7 +172,7 @@
                 <div class="flex items-center gap-2 flex-wrap min-w-0">
                     <h3 class="text-lg font-semibold text-gray-800">{{ _('Secretariat Divisions') }}</h3>
                     {% if can_manage_org %}
-                        <button type="button" id="auto-translate-all-secretariat-btn" class="btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
+                        <button type="button" class="auto-translate-secretariat-btn btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" data-entity-type="secretariat_divisions" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
                             <i class="fas fa-language text-sm" aria-hidden="true"></i>
                         </button>
                     {% endif %}
@@ -203,7 +203,7 @@
                 <div class="flex items-center gap-2 flex-wrap min-w-0">
                     <h3 class="text-lg font-semibold text-gray-800">{{ _('Secretariat Departments') }}</h3>
                     {% if can_manage_org %}
-                        <button type="button" id="auto-translate-all-secretariat-btn" class="btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
+                        <button type="button" class="auto-translate-secretariat-btn btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" data-entity-type="secretariat_departments" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
                             <i class="fas fa-language text-sm" aria-hidden="true"></i>
                         </button>
                     {% endif %}
@@ -234,7 +234,7 @@
                 <div class="flex items-center gap-2 flex-wrap min-w-0">
                     <h3 class="text-lg font-semibold text-gray-800">{{ _('Secretariat Regional Offices') }}</h3>
                     {% if can_manage_org %}
-                        <button type="button" id="auto-translate-all-secretariat-btn" class="btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
+                        <button type="button" class="auto-translate-secretariat-btn btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" data-entity-type="secretariat_regions" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
                             <i class="fas fa-language text-sm" aria-hidden="true"></i>
                         </button>
                     {% endif %}
@@ -265,7 +265,7 @@
                 <div class="flex items-center gap-2 flex-wrap min-w-0">
                     <h3 class="text-lg font-semibold text-gray-800">{{ _('Secretariat Cluster Offices') }}</h3>
                     {% if can_manage_org %}
-                        <button type="button" id="auto-translate-all-secretariat-btn" class="btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
+                        <button type="button" class="auto-translate-secretariat-btn btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" data-entity-type="secretariat_clusters" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
                             <i class="fas fa-language text-sm" aria-hidden="true"></i>
                         </button>
                     {% endif %}
@@ -1660,9 +1660,14 @@ try {
             id: {{ region.id }},
             code: {{ (region.code or '')|tojson|safe }},
             name: {{ (region.name or '')|tojson|safe }},
+            short_name: {{ (region.short_name or '')|tojson|safe }},
             {% set _rg = region.name_translations or {} %}
             {% for code in TRANSLATABLE_LANGUAGES %}
             name_{{ code }}: {{ ((_rg.get(code) if _rg else '') or '')|tojson|safe }},
+            {% endfor %}
+            {% set _rsg = region.short_name_translations or {} %}
+            {% for code in TRANSLATABLE_LANGUAGES %}
+            short_name_{{ code }}: {{ ((_rsg.get(code) if _rsg else '') or '')|tojson|safe }},
             {% endfor %}
             description: {{ (region.description or '')|tojson|safe }},
             is_active: {{ region.is_active|tojson|safe }},
@@ -1700,6 +1705,19 @@ try {
             sortable: true,
             cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
         },
+        {
+            field: 'short_name',
+            headerName: {{ _("Short Name") | tojson }},
+            width: 180,
+            minWidth: 140,
+            maxWidth: 240,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+        },
         {% for code in TRANSLATABLE_LANGUAGES %}
         {
             field: 'name_{{ code }}',
@@ -1707,6 +1725,22 @@ try {
             width: 250,
             minWidth: 200,
             maxWidth: 350,
+            hide: true,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            cellRenderer: function(params) {
+                return params.value || '<span class="text-gray-400">-</span>';
+            },
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' {% if code in ['ar','fa','he','ur'] %}, 'direction': 'rtl'{% endif %} }
+        },
+        {% endfor %}
+        {% for code in TRANSLATABLE_LANGUAGES %}
+        {
+            field: 'short_name_{{ code }}',
+            headerName: {{ (_('Short Name') ~ ' (' ~ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) ~ ')')|tojson|safe }},
+            width: 180,
+            minWidth: 140,
+            maxWidth: 240,
             hide: true,
             filter: 'agTextColumnFilter',
             sortable: true,
@@ -2084,8 +2118,10 @@ try {
         try {
             if (gridApi && typeof AgGridHelper.pinActionsColumn === 'function') {
                 const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
-                const desiredOrder = ['code', 'name']
+                const shortNameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'short_name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+                const desiredOrder = ['code', 'name', 'short_name']
                     .concat(nameColumns)
+                    .concat(shortNameColumns)
                     .concat(['description', 'is_active', 'display_order'])
                     .concat(['actions']);
                 AgGridHelper.pinActionsColumn(gridApi, desiredOrder, regionsGridHelper.columnVisibilityManager);
@@ -2446,9 +2482,19 @@ try {
 
         // Auto-translate functionality for organization entities
         let currentEntityType = null; // Track which entity type tab is active
-        let pendingCountsRequest = null; // Track pending API request to cancel if needed
 
-        // Function to get translation counts for the modal
+        const ENTITY_TYPE_LABELS = {
+            countries: {{ _('countries') | tojson }},
+            national_societies: {{ _('national societies') | tojson }},
+            ns_structure: {{ _('NS structure entities') | tojson }},
+            secretariat_divisions: {{ _('secretariat divisions') | tojson }},
+            secretariat_departments: {{ _('secretariat departments') | tojson }},
+            secretariat_regions: {{ _('regional offices') | tojson }},
+            secretariat_clusters: {{ _('cluster offices') | tojson }},
+            secretariat: {{ _('secretariat entities') | tojson }},
+        };
+
+        // Function to get translation counts for the modal (returns a Promise)
         window.getPageSpecificTranslationCounts = function() {
             const counts = {};
             {% if TRANSLATABLE_LANGUAGES %}
@@ -2458,79 +2504,54 @@ try {
             {% endif %}
 
             if (!currentEntityType) {
-                return counts;
+                return Promise.resolve(counts);
             }
 
-            // Cancel any pending request
-            if (pendingCountsRequest) {
-                // Note: fetch doesn't support cancellation directly, but we'll track the entity type
-                pendingCountsRequest = null;
+            const apiUrl = {{ url_for("organization.api_get_translation_counts") | tojson }};
+            if (!apiUrl || apiUrl === null || apiUrl === 'null') {
+                console.error('API URL not found');
+                return Promise.resolve(counts);
+            }
+            const csrfToken = document.querySelector('meta[name="csrf-token"]');
+            if (!csrfToken) {
+                console.error('CSRF token not found');
+                return Promise.resolve(counts);
             }
 
-            // Make API call asynchronously to avoid permissions policy violations
-            // Return initial counts immediately, then update when API responds
-            try {
-                const apiUrl = {{ url_for("organization.api_get_translation_counts") | tojson }};
-                if (!apiUrl || apiUrl === null || apiUrl === 'null') {
-                    console.error('API URL not found');
+            const requestEntityType = currentEntityType;
+
+            return fetch(apiUrl + '?entity_type=' + encodeURIComponent(requestEntityType), {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken.getAttribute('content')
+                }
+            })
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                window.__clientLog && window.__clientLog('Translation counts API response:', data);
+                if (requestEntityType !== currentEntityType) {
+                    window.__clientWarn && window.__clientWarn('Counts update skipped: entity type changed');
                     return counts;
                 }
-                const csrfToken = document.querySelector('meta[name="csrf-token"]');
-                if (!csrfToken) {
-                    console.error('CSRF token not found');
+                if (!data.success || !data.counts) {
+                    window.__clientWarn && window.__clientWarn('Translation counts API returned no counts:', data);
                     return counts;
                 }
-
-                // Store the entity type for this request to ensure we only update if it matches
-                const requestEntityType = currentEntityType;
-
-                // Fetch counts asynchronously and update modal when ready
-                const fetchPromise = fetch(apiUrl + '?entity_type=' + encodeURIComponent(requestEntityType), {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken.getAttribute('content')
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    window.__clientLog && window.__clientLog('Translation counts API response:', data);
-                    // Only update if this request is still for the current entity type
-                    if (requestEntityType === currentEntityType && data.success && data.counts) {
-                        const updatedCounts = {};
-                        Object.keys(data.counts).forEach(lang => {
-                            if (counts.hasOwnProperty(lang)) {
-                                updatedCounts[lang] = data.counts[lang] || 0;
-                            } else {
-                                updatedCounts[lang] = data.counts[lang] || 0;
-                            }
-                        });
-                        window.__clientLog && window.__clientLog('Updated counts for modal:', updatedCounts);
-                        // Update modal if it's already open and entity type matches
-                        if (window.autoTranslateModal && window.autoTranslateModal.updateLanguageCounts) {
-                            window.autoTranslateModal.updateLanguageCounts(updatedCounts);
-                        }
-                    } else {
-                        window.__clientWarn && window.__clientWarn('Counts update skipped:', { requestEntityType, currentEntityType, success: data.success, hasCounts: !!data.counts });
-                    }
-                    pendingCountsRequest = null;
-                })
-                .catch(error => {
-                    console.error('Error calculating translation counts:', error);
-                    pendingCountsRequest = null;
+                const merged = Object.assign({}, counts);
+                Object.keys(data.counts).forEach(function(lang) {
+                    merged[lang] = data.counts[lang] || 0;
                 });
-
-                pendingCountsRequest = fetchPromise;
-            } catch (error) {
+                window.__clientLog && window.__clientLog('Merged counts for modal:', merged);
+                return merged;
+            })
+            .catch(function(error) {
                 console.error('Error calculating translation counts:', error);
-                pendingCountsRequest = null;
-            }
-
-            return counts;
+                return counts;
+            });
         };
 
         // Store current translation request state for pause/resume
-        const bulkTranslationWebSocketEnabled = {{ 'true' if websocket_enabled else 'false' }};
         let currentTranslationReader = null;
         let currentTranslationAbortController = null;
         let currentTranslationParams = null;
@@ -2541,20 +2562,6 @@ try {
 
         // Override the generic translation function with organization-specific logic
         window.performPageSpecificTranslation = function(selectedLanguages, selectedService) {
-            if (!bulkTranslationWebSocketEnabled) {
-                const streamingDisabledMsg = {{ _("Live translation streaming is disabled in this environment. Please enable WebSocket to use this feature.") | tojson }};
-                if (window.autoTranslateModal && window.autoTranslateModal.logProgress) {
-                    window.autoTranslateModal.logProgress(streamingDisabledMsg, 'error');
-                    window.autoTranslateModal.translationState.isRunning = false;
-                    window.autoTranslateModal.translationState.isPaused = false;
-                    jQuery('#auto-translate-stop-btn').addClass('hidden');
-                    jQuery('#auto-translate-close-btn').removeClass('hidden');
-                } else {
-                    showToast(streamingDisabledMsg, 'error', 8000);
-                }
-                return;
-            }
-
             // Ensure modal is initialized
             if (!window.autoTranslateModal) {
                 console.error('Auto-translate modal not initialized');
@@ -2718,8 +2725,15 @@ try {
                                         }
 
                                         if (result.success) {
+                                            const translationFieldLabels = {
+                                                name: {{ _("name") | tojson }},
+                                                short_name: {{ _("short name") | tojson }},
+                                            };
+                                            const fieldLabel = result.field
+                                                ? (' (' + (translationFieldLabels[result.field] || result.field) + ')')
+                                                : '';
                                             window.autoTranslateModal.logProgress(
-                                                translatedLabel + ' ' + (result.entity_type || entityLabel) + ' ' + (result.entity_id || '') + ' ' + toLabel + ' ' + (result.language || ''),
+                                                translatedLabel + ' ' + (result.entity_type || entityLabel) + ' ' + (result.entity_id || '') + fieldLabel + ' ' + toLabel + ' ' + (result.language || ''),
                                                 'success'
                                             );
                                         } else {
@@ -2751,6 +2765,11 @@ try {
                                         jQuery('#auto-translate-close-btn').removeClass('hidden');
                                         if (window.autoTranslateModal.notifyCompletion) {
                                             window.autoTranslateModal.notifyCompletion();
+                                        }
+                                        if ((data.success || 0) > 0) {
+                                            jQuery('#auto-translate-close-btn').one('click', function() {
+                                                window.location.reload();
+                                            });
                                         }
                                         // Reset pause tracking
                                         itemsProcessedBeforePause = 0;
@@ -2857,7 +2876,6 @@ try {
                 }
 
                 // Cancel any pending counts request
-                pendingCountsRequest = null;
                 currentTranslationParams = null;
                 // Reset pause tracking
                 itemsProcessedBeforePause = 0;
@@ -2868,6 +2886,11 @@ try {
 
             // Set the current entity type
             currentEntityType = entityType;
+
+            // Use tab-specific label in the modal summary
+            if (window.autoTranslateModal && window.autoTranslateModal.config) {
+                window.autoTranslateModal.config.itemType = ENTITY_TYPE_LABELS[entityType] || {{ _('organization entities') | tojson }};
+            }
 
             // Reset modal UI state
             jQuery('#confirmation-section').show();
@@ -2880,12 +2903,21 @@ try {
             jQuery('#auto-translate-close-btn').addClass('hidden');
             jQuery('#translation-log').empty();
 
-            // Get translation counts for the selected entity type
+            // Fetch translation counts for the selected entity type before showing summary
+            const loadingMessage = {{ _("Calculating translation counts…") | tojson }};
+            jQuery('#translation-summary').html('<span class="text-gray-600">' + loadingMessage + '</span>');
+            jQuery('#auto-translate-start-btn').prop('disabled', true);
+
+            const modalEntityType = entityType;
             if (window.getPageSpecificTranslationCounts) {
-                const counts = window.getPageSpecificTranslationCounts();
-                if (window.autoTranslateModal && window.autoTranslateModal.updateLanguageCounts) {
-                    window.autoTranslateModal.updateLanguageCounts(counts);
-                }
+                window.getPageSpecificTranslationCounts().then(function(counts) {
+                    if (currentEntityType !== modalEntityType) {
+                        return;
+                    }
+                    if (window.autoTranslateModal && window.autoTranslateModal.updateLanguageCounts) {
+                        window.autoTranslateModal.updateLanguageCounts(counts);
+                    }
+                });
             } else {
                 // Fallback: show modal without counts
                 const fallbackMessage = {{ _("Click 'Start Translation' to begin translating blank organization entities.") | tojson }};
@@ -3018,9 +3050,12 @@ try {
                     openAutoTranslateModal('ns_structure');
                 });
 
-                // Secretariat button
-                jQuery('#auto-translate-all-secretariat-btn').on('click', function() {
-                    openAutoTranslateModal('secretariat');
+                // Secretariat sub-tab buttons (class + data-entity-type; IDs were duplicated across tabs)
+                jQuery(document).on('click', '.auto-translate-secretariat-btn', function() {
+                    const entityType = jQuery(this).data('entity-type');
+                    if (entityType) {
+                        openAutoTranslateModal(entityType);
+                    }
                 });
             }
             waitForjQuery();

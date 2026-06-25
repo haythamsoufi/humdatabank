@@ -7,7 +7,13 @@ import { debugLog } from './debug.js';
 import { initExcelImportDropzone } from '../../components/excel-import-dropzone.js';
 
 export class ExcelExportManager {
-    constructor() {
+    constructor(config = {}) {
+        this.modalId = config.modalId || 'excel-options-modal';
+        this.buttonId = config.buttonId || 'excel-options-btn';
+        this.importFormId = config.importFormId || 'modalImportExcelForm';
+        this.fileInputId = config.fileInputId || 'modal_excel_file';
+        this.dropzoneSelector = config.dropzoneSelector || '.excel-io-dropzone';
+
         this.modal = null;
         this.exportButton = null;
         this.closeButtons = [];
@@ -34,10 +40,10 @@ export class ExcelExportManager {
 
     init() {
         // Find DOM elements
-        this.modal = document.getElementById('excel-options-modal');
-        this.exportButton = document.getElementById('excel-options-btn');
-        this.importForm = document.getElementById('modalImportExcelForm');
-        this.overlay = document.querySelector('#excel-options-modal');
+        this.modal = document.getElementById(this.modalId);
+        this.exportButton = document.getElementById(this.buttonId);
+        this.importForm = document.getElementById(this.importFormId);
+        this.overlay = document.querySelector(`#${this.modalId}`);
 
         if (!this.modal || !this.exportButton) {
             debugLog('excel-export', 'Excel export elements not found - feature may not be available');
@@ -133,7 +139,7 @@ export class ExcelExportManager {
             if (this._dropzoneController?.reset) {
                 this._dropzoneController.reset();
             } else {
-                const fileInput = document.getElementById('modal_excel_file');
+                const fileInput = document.getElementById(this.fileInputId);
                 if (fileInput) fileInput.value = '';
             }
             const existingInfo = this.modal?.querySelector('.file-info');
@@ -247,7 +253,7 @@ export class ExcelExportManager {
     handleImportSubmission(event) {
         event.preventDefault();
 
-        const fileInput = document.getElementById('modal_excel_file');
+        const fileInput = document.getElementById(this.fileInputId);
         const submitButton = event.target.querySelector('button[type="submit"]');
 
         if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
@@ -557,7 +563,7 @@ export class ExcelExportManager {
     }
 
     setupFormValidation() {
-        const dropzoneEl = this.modal?.querySelector('.excel-io-dropzone');
+        const dropzoneEl = this.modal?.querySelector(this.dropzoneSelector);
         if (!dropzoneEl) return;
 
         this._dropzoneController = initExcelImportDropzone(dropzoneEl, {
@@ -609,7 +615,7 @@ export class ExcelExportManager {
         fileInfo.appendChild(fileInfoInner);
 
         // Insert after file input
-        const fileInput = document.getElementById('modal_excel_file');
+        const fileInput = document.getElementById(this.fileInputId);
         if (fileInput && fileInput.parentNode) {
             fileInput.parentNode.insertBefore(fileInfo, fileInput.nextSibling);
         }

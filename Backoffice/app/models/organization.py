@@ -297,9 +297,11 @@ class SecretariatRegionalOffice(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
+    short_name = db.Column(db.String(100), nullable=True)
     code = db.Column(db.String(50), nullable=True, unique=True)
     description = db.Column(db.Text, nullable=True)
     name_translations = db.Column(JSONB, nullable=True)
+    short_name_translations = db.Column(JSONB, nullable=True)
 
     # Status and metadata
     is_active = db.Column(db.Boolean, default=True, nullable=False)
@@ -311,9 +313,26 @@ class SecretariatRegionalOffice(db.Model):
 
     # Relationships
     cluster_offices = db.relationship('SecretariatClusterOffice', backref='regional_office', lazy='dynamic', cascade="all, delete-orphan")
+    countries = db.relationship('Country', back_populates='secretariat_regional_office')
 
     def __repr__(self):
         return f'<SecretariatRegionalOffice {self.name}>'
+
+    def get_name_translation(self, language: str) -> str:
+        if self.name_translations and language in self.name_translations:
+            value = self.name_translations[language]
+            if value and isinstance(value, str) and value.strip():
+                return value.strip()
+        return self.name
+
+    def get_short_name_translation(self, language: str) -> str:
+        if self.short_name_translations and language in self.short_name_translations:
+            value = self.short_name_translations[language]
+            if value and isinstance(value, str) and value.strip():
+                return value.strip()
+        if self.short_name and str(self.short_name).strip():
+            return str(self.short_name).strip()
+        return self.get_name_translation(language)
 
     @validates('code')
     def _normalize_code(self, key, value):

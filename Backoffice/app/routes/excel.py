@@ -8,6 +8,10 @@ import openpyxl
 import io
 import time
 from app.services.excel_service import ExcelService
+from app.services.upr_country_reporting_excel_service import (
+    UPR_COUNTRY_REPORTING_LABEL,
+    UprCountryReportingExcelService,
+)
 from app.services.authorization_service import AuthorizationService
 from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
 from app.utils.request_utils import is_json_request
@@ -182,5 +186,165 @@ def import_assignment_excel(aes_id):
         flash(error_msg, "danger")
         if is_ajax:
             return json_bad_request(error_msg, errors=result['errors'])
+
+    return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+
+
+def _assignment_template_id(aes) -> int:
+    assigned = getattr(aes, "assigned_form", None)
+    return int(getattr(assigned, "template_id", 0) or 0)
+
+
+def _validate_upr_country_reporting_assignment(aes_id, *, is_ajax: bool):
+    """Shared guard for UPR Country Reporting template routes (T33 only)."""
+    aes = get_aes_with_joins(aes_id)
+    if not aes:
+        error_msg = "Assignment not found or access denied."
+        flash(error_msg, "warning")
+        if is_ajax:
+            return None, json_not_found(error_msg)
+        return None, redirect(url_for("main.dashboard"))
+
+    if _assignment_template_id(aes) != 33:
+        error_msg = (
+            f"{UPR_COUNTRY_REPORTING_LABEL} export/import is only available for "
+            "Reporting – Country (T33)."
+        )
+        flash(error_msg, "warning")
+        if is_ajax:
+            return None, json_bad_request(error_msg)
+        return None, redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+    return aes, None
+
+
+def _validate_upr_country_reporting_import_state(aes, *, is_ajax: bool):
+    if aes.status in ["submitted", "approved"] and not AuthorizationService.is_admin(current_user):
+        error_msg = "This assignment is no longer in an editable state."
+        flash(error_msg, "warning")
+        if is_ajax:
+            return json_forbidden(error_msg)
+        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes.id))
+    return None
+
+
+def _validate_excel_upload(excel_file, *, is_ajax: bool, aes_id: int):
+    if not excel_file or excel_file.filename == "":
+        error_msg = "No Excel file selected."
+        flash(error_msg, "danger")
+        if is_ajax:
+            return json_bad_request(error_msg)
+        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+
+    if not excel_file.filename.lower().endswith(".xlsx"):
+        error_msg = "Invalid file type. Please upload a .xlsx file."
+        flash(error_msg, "danger")
+        if is_ajax:
+            return json_bad_request(error_msg)
+        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+
+    file_size = excel_file.content_length
+    if file_size is None:
+        excel_file.seek(0, 2)
+        file_size = excel_file.tell()
+        excel_file.seek(0)
+
+    if file_size > MAX_EXCEL_FILE_SIZE:
+        error_msg = (
+            f"File size ({file_size / (1024 * 1024):.2f}MB) exceeds the maximum allowed size of 10MB."
+        )
+        flash(error_msg, "danger")
+        if is_ajax:
+            return json_bad_request(error_msg)
+        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+    return None
+
+
+@excel_bp.route("/assignment/<int:aes_id>/export-upr-country-reporting", methods=["GET"])
+@excel_bp.route("/assignment/<int:aes_id>/export-myr", methods=["GET"])  # legacy URL
+@login_required
+@memory_tracker("Excel Route UPR Country Reporting Export", log_top_allocations=True)
+def export_upr_country_reporting_template(aes_id):
+    """Export a T33 assignment into the UPR Country Reporting Excel template."""
+    aes, error_response = _validate_upr_country_reporting_assignment(aes_id, is_ajax=is_json_request())
+    if error_response is not None:
+        return error_response
+
+    current_app.logger.info(
+        "UPR_COUNTRY_REPORTING_EXCEL_EXPORT: start",
+        extra={"aes_id": aes_id, "user_id": getattr(current_user, "id", None)},
+    )
+    try:
+        output, filename = UprCountryReportingExcelService.build_workbook(aes)
+    except FileNotFoundError as exc:
+        error_msg = str(exc)
+        flash(error_msg, "danger")
+        if is_json_request():
+            return json_bad_request(error_msg)
+        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+    except Exception as exc:
+        current_app.logger.error("%s export failed: %s", UPR_COUNTRY_REPORTING_LABEL, exc, exc_info=True)
+        error_msg = f"{UPR_COUNTRY_REPORTING_LABEL} export failed: {exc}"
+        flash(error_msg, "danger")
+        if is_json_request():
+            return json_bad_request(error_msg)
+        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+
+    resp = send_file(
+        output,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        download_name=filename,
+        as_attachment=True,
+    )
+    resp.headers["X-hum-databank-Export-Completed"] = "1"
+    resp.headers["X-hum-databank-Export-Filename"] = filename
+    return resp
+
+
+@excel_bp.route("/assignment/<int:aes_id>/import-upr-country-reporting", methods=["POST"])
+@excel_bp.route("/assignment/<int:aes_id>/import-myr", methods=["POST"])  # legacy URL
+@login_required
+@memory_tracker("Excel Route UPR Country Reporting Import", log_top_allocations=True)
+def import_upr_country_reporting_template(aes_id):
+    """Import a filled UPR Country Reporting Excel template into a T33 assignment."""
+    is_ajax = is_json_request()
+    aes, error_response = _validate_upr_country_reporting_assignment(aes_id, is_ajax=is_ajax)
+    if error_response is not None:
+        return error_response
+
+    state_error = _validate_upr_country_reporting_import_state(aes, is_ajax=is_ajax)
+    if state_error is not None:
+        return state_error
+
+    excel_file = request.files.get("excel_file")
+    upload_error = _validate_excel_upload(excel_file, is_ajax=is_ajax, aes_id=aes_id)
+    if upload_error is not None:
+        return upload_error
+
+    file_bytes = excel_file.read()
+    result = UprCountryReportingExcelService.import_data(aes, file_bytes)
+
+    if result.get("success"):
+        updated_count = result.get("updated_count", 0)
+        warnings = result.get("warnings") or []
+        if warnings:
+            error_msg = (
+                f"{UPR_COUNTRY_REPORTING_LABEL} import completed with {updated_count} values saved. "
+                f"Warnings: {', '.join(warnings[:5])}"
+            )
+            if len(warnings) > 5:
+                error_msg += f" (and {len(warnings) - 5} more)"
+            flash(error_msg, "warning")
+            if is_ajax:
+                return json_ok(message=error_msg, updated_count=updated_count, warnings=warnings)
+        else:
+            success_msg = f"{UPR_COUNTRY_REPORTING_LABEL} import completed: {updated_count} values saved."
+            flash(success_msg, "success")
+            if is_ajax:
+                return json_ok(message=success_msg, updated_count=updated_count)
+    else:
+        error_msg = result.get("message") or f"{UPR_COUNTRY_REPORTING_LABEL} import failed."
+        flash(error_msg, "danger")
+        if is_ajax:
+            return json_bad_request(error_msg, warnings=result.get("warnings"))
 
     return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))

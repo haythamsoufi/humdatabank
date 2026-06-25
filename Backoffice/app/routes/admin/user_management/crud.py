@@ -18,7 +18,7 @@ from app.services.country_access_request_service import (
 )
 from app.models.enums import EntityType
 from app.forms.system import UserForm
-from app.routes.admin.shared import permission_required
+from app.routes.admin.shared import permission_required, permission_required_any
 from app.utils.form_localization import get_localized_country_name
 from app.services.user_analytics_service import log_admin_action
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
@@ -130,7 +130,7 @@ def manage_users():
                            user_countries_by_id=user_countries_by_id)
 
 @bp.route("/access-requests", methods=["GET"])
-@permission_required('admin.access_requests.view')
+@permission_required_any('admin.access_requests.view', 'admin.users.edit')
 def access_requests():
     """List and manage country access requests."""
     from app.services.app_settings_service import get_auto_approve_access_requests
@@ -172,7 +172,7 @@ def access_requests():
     )
 
 @bp.route("/access-requests/<int:request_id>/approve", methods=["POST"])
-@permission_required('admin.access_requests.approve')
+@permission_required_any('admin.access_requests.approve', 'admin.users.edit')
 def approve_access_request(request_id):
     """Approve a country access request and grant the permission."""
     req = CountryAccessRequest.query.get_or_404(request_id)
@@ -225,7 +225,7 @@ def approve_access_request(request_id):
     return redirect(url_for("user_management.access_requests"))
 
 @bp.route("/access-requests/<int:request_id>/reject", methods=["POST"])
-@permission_required('admin.access_requests.reject')
+@permission_required_any('admin.access_requests.reject', 'admin.users.edit')
 def reject_access_request(request_id):
     """Reject a country access request."""
     req = CountryAccessRequest.query.get_or_404(request_id)
@@ -267,7 +267,7 @@ def reject_access_request(request_id):
     return redirect(url_for("user_management.access_requests"))
 
 @bp.route("/access-requests/approve-all", methods=["POST"])
-@permission_required('admin.access_requests.approve')
+@permission_required_any('admin.access_requests.approve', 'admin.users.edit')
 def approve_all_access_requests():
     """Approve all pending country access requests at once."""
     reconcile_fulfilled_pending_country_access_requests()
@@ -325,7 +325,7 @@ def approve_all_access_requests():
 
 
 @bp.route("/access-requests/user/<int:user_id>/approve-all", methods=["POST"])
-@permission_required('admin.access_requests.approve')
+@permission_required_any('admin.access_requests.approve', 'admin.users.edit')
 def approve_user_access_requests(user_id):
     """Approve all pending country access requests for one user."""
     user = User.query.get_or_404(user_id)
@@ -383,7 +383,7 @@ def approve_user_access_requests(user_id):
 
 
 @bp.route("/access-requests/user/<int:user_id>/reject-all", methods=["POST"])
-@permission_required('admin.access_requests.reject')
+@permission_required_any('admin.access_requests.reject', 'admin.users.edit')
 def reject_user_access_requests(user_id):
     """Reject all pending country access requests for one user."""
     user = User.query.get_or_404(user_id)

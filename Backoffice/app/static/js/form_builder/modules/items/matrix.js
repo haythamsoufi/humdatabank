@@ -1234,7 +1234,10 @@ export const MatrixItem = {
                 const pluginName = this.getPluginNameFromListId(listId);
                 if (pluginName) {
                     try {
-                        const module = await import(`/plugins/static/${pluginName}/js/matrix_config_handler.js`);
+                        // Prepend origin so the path resolves to the app server even when
+                        // this module is served from a CDN (e.g. Azure Blob Storage).
+                        const moduleUrl = `${window.location.origin}/plugins/static/${pluginName}/js/matrix_config_handler.js`;
+                        const module = await import(moduleUrl);
                         handler = module[jsHandlerName] || module.default;
                     } catch (importError) {
                         console.warn(`Failed to import plugin handler for ${listId}:`, importError);

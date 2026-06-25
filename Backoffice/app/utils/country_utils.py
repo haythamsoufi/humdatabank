@@ -1,20 +1,32 @@
 from collections import defaultdict
 from typing import Optional, Tuple, Union
 from sqlalchemy import or_
+from sqlalchemy.orm import joinedload
 from app.models import Country
 from app import db
 
 
+def get_country_region_name(country) -> str:
+    """Return the IFRC region label for a country."""
+    if getattr(country, "secretariat_regional_office", None) is not None:
+        return country.secretariat_regional_office.name
+    return country.region if country.region else "Unassigned Region"
+
+
 def get_countries_by_region():
-    """Get all countries grouped by region.
+    """Get all countries grouped by IFRC region.
 
     Returns:
         dict: A dictionary where keys are region names and values are lists of countries in that region.
     """
     countries_by_region = defaultdict(list)
-    all_countries = Country.query.order_by(Country.region, Country.name).all()
+    all_countries = (
+        Country.query.options(joinedload(Country.secretariat_regional_office))
+        .order_by(Country.region, Country.name)
+        .all()
+    )
     for country in all_countries:
-        region_name = country.region if country.region else "Unassigned Region"
+        region_name = get_country_region_name(country)
         countries_by_region[region_name].append(country)
     return countries_by_region
 

@@ -14,6 +14,10 @@ from app.models import IndicatorBank, IndicatorSuggestion, AssignedForm, PublicS
 from app.models import APIKey
 from app.models.assignments import AssignmentEntityStatus
 from app.models.core import UserEntityPermission
+from app.services.secretariat_regional_office_service import (
+    assign_country_secretariat_regional_office,
+    ensure_secretariat_regional_offices,
+)
 from app.models.enums import EntityType
 from app.models.rbac import RbacRole, RbacPermission, RbacRolePermission, RbacUserRole
 
@@ -301,15 +305,27 @@ def create_test_country(db_session, **kwargs):
             name = f"{base_name} {name_counter}"
             name_counter += 1
 
+    region_label = kwargs.get('region', 'Europe')
+    secretariat_regional_office_id = kwargs.get('secretariat_regional_office_id')
+
     defaults = {
         'name': name,
         'iso2': iso2,
         'iso3': iso3,
-        'region': kwargs.get('region', 'Europe')
+        'region': region_label,
     }
-    defaults.update({k: v for k, v in kwargs.items() if k not in ['iso2', 'iso3', 'name', 'region']})
+    if secretariat_regional_office_id is not None:
+        defaults['secretariat_regional_office_id'] = secretariat_regional_office_id
 
+    defaults.update({
+        k: v for k, v in kwargs.items()
+        if k not in ['iso2', 'iso3', 'name', 'region', 'secretariat_regional_office_id']
+    })
+
+    ensure_secretariat_regional_offices(db_session)
     country = Country(**defaults)
+    if secretariat_regional_office_id is None:
+        assign_country_secretariat_regional_office(country, region_label)
     db_session.add(country)
     db_session.commit()
     db_session.refresh(country)

@@ -937,7 +937,11 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
             typeof: typeof showClosed,
             isArray: Array.isArray(showClosed),
         });
-        if (showClosed === false || showClosed === '0' || showClosed === 0) {
+        const hideClosed = showClosed === false
+            || showClosed === '0'
+            || showClosed === 0
+            || (Array.isArray(showClosed) && showClosed.length === 0);
+        if (hideClosed) {
             extraFilters.push({ field: 'status', op: 'ne', value: 'Closed' });
             traceEmOpsFilter(fieldIdForTrace, 'status filter applied (hide closed)', extraFilters[extraFilters.length - 1]);
         } else {

@@ -150,7 +150,7 @@
                                 {% endif %}
                             </p>
                             <div class="text-sm text-gray-600 mt-2 inline-flex flex-wrap items-center gap-x-0">
-                                <span class="font-medium">{{ _('Due Date:') }}</span> {{ assignment_status.due_date|datetime_local('date') if assignment_status.due_date else _('N/A') }}
+                                <span class="font-medium mr-1">{{ _('Due Date:') }}</span>{{ assignment_status.due_date|datetime_local('date') if assignment_status.due_date else _('N/A') }}
                                 <span class="mx-2">•</span>
                                 <span class="font-medium mr-1">{{ _('Status:') }}</span>
                                 {% set aes_status = assignment_status.status.value if assignment_status.status is not none and assignment_status.status.value is defined else assignment_status.status %}
@@ -174,13 +174,18 @@
                     <div class="action-controls">
                         {% if not is_preview_mode and not is_public_submission %}
                             {% set tmpl = assignment_status.assigned_form.template if assignment_status and assignment_status.assigned_form else None %}
-                            {% if tmpl and (tmpl.enable_export_excel or tmpl.enable_import_excel) %}
+                            {% set _tpl_id = assignment_status.assigned_form.template_id if assignment_status and assignment_status.assigned_form else none %}
+                            {% set _aes_id = assignment_status.id if assignment_status and assignment_status.id is not none and assignment_status.id != 0 else none %}
+                            {% set _use_upr_country_reporting_excel = _tpl_id == 33 and _aes_id %}
+                            {% if tmpl and (tmpl.enable_export_excel or tmpl.enable_import_excel or _use_upr_country_reporting_excel) %}
                             <button type="button" id="excel-options-btn" class="professional-action-btn professional-action-btn-green">
                                 <i class="fas fa-file-excel"></i>
                                 <span>
-                                    {% if tmpl.enable_export_excel and tmpl.enable_import_excel %}
+                                    {% if _use_upr_country_reporting_excel %}
+                                        {{ _('UPR Country Reporting') }}
+                                    {% elif (tmpl.enable_export_excel or _use_upr_country_reporting_excel) and (tmpl.enable_import_excel or _use_upr_country_reporting_excel) %}
                                         {{ _('Excel Import/Export') }}
-                                    {% elif tmpl.enable_export_excel %}
+                                    {% elif tmpl.enable_export_excel or _use_upr_country_reporting_excel %}
                                         {{ _('Excel Export') }}
                                     {% else %}
                                         {{ _('Excel Import') }}
@@ -2631,27 +2636,29 @@
         {# Excel Options Modal — shared excel_io_modal #}
         {% from "macros/excel_io_modal.html" import excel_io_modal %}
         {% from "macros/modal_shell.html" import modal_shell %}
-        {% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('Excel Options') }}{% endset %}
         {% if not is_preview_mode and not is_public_submission %}
             {% set tmpl = assignment_status.assigned_form.template if assignment_status and assignment_status.assigned_form else None %}
             {% set aes_id = assignment_status.id if assignment_status and assignment_status.id is not none and assignment_status.id != 0 else none %}
-            {% set _show_export = tmpl and tmpl.enable_export_excel and aes_id %}
-            {% set _show_import = tmpl and tmpl.enable_import_excel and aes_id %}
+            {% set _tpl_id = assignment_status.assigned_form.template_id if assignment_status and assignment_status.assigned_form else none %}
+            {% set _use_upr_country_reporting_excel = _tpl_id == 33 and aes_id %}
+            {% set _show_export = aes_id and (_use_upr_country_reporting_excel or (tmpl and tmpl.enable_export_excel)) %}
+            {% set _show_import = aes_id and (_use_upr_country_reporting_excel or (tmpl and tmpl.enable_import_excel)) %}
+            {% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('UPR Country Reporting') if _use_upr_country_reporting_excel else _('Excel Options') }}{% endset %}
             {% set _csrf_field %}{{ form.csrf_token if form else '' }}{% endset %}
             {% if _show_export or _show_import %}
             {% call excel_io_modal(
                 'excel-options-modal',
                 modal_title=excel_title,
-                aria_label=_('Excel Options'),
+                aria_label=_('UPR Country Reporting') if _use_upr_country_reporting_excel else _('Excel Options'),
                 max_width='max-w-sm',
                 close_class='close-modal-btn',
                 layout='simple',
                 show_export=_show_export,
                 show_import=_show_import,
-                export_url=url_for('excel.export_assignment_excel', aes_id=aes_id) if _show_export else none,
-                export_label=_('Export Data Template (.xlsx)'),
+                export_url=url_for('excel.export_upr_country_reporting_template', aes_id=aes_id) if _use_upr_country_reporting_excel else (url_for('excel.export_assignment_excel', aes_id=aes_id) if _show_export else none),
+                export_label=_('Export UPR Country Reporting (.xlsx)') if _use_upr_country_reporting_excel else _('Export Data Template (.xlsx)'),
                 import_form_id='modalImportExcelForm',
-                import_action=url_for('excel.import_assignment_excel', aes_id=aes_id) if _show_import else none,
+                import_action=url_for('excel.import_upr_country_reporting_template', aes_id=aes_id) if _use_upr_country_reporting_excel else (url_for('excel.import_assignment_excel', aes_id=aes_id) if _show_import else none),
                 dropzone_id='entry-excel-dropzone',
                 dropzone_input_id='modal_excel_file',
                 dropzone_accept='.xlsx',
@@ -2664,6 +2671,7 @@
             ) %}{% endcall %}
             {% endif %}
         {% else %}
+        {% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('Excel Options') }}{% endset %}
         {% call modal_shell('excel-options-modal', excel_title, aria_label=_('Excel Options'), max_width='max-w-sm', title_safe=true, close_class='close-modal-btn') %}
                 <div class="text-center py-8">
                     <i class="fas fa-eye text-gray-400 text-3xl mb-3"></i>

@@ -40,7 +40,10 @@ from app.services.country_service import (
     parse_fds_member_user_id,
     resolve_fds_member_user_id_from_import,
 )
-from app.services.entity_service import EntityService
+from app.services.secretariat_regional_office_service import (
+    assign_country_secretariat_regional_office,
+    ensure_secretariat_regional_offices,
+)
 from app.routes.admin.shared import admin_required, admin_permission_required, admin_permission_required_any, permission_required, permission_required_any, rbac_guard_audit_exempt
 from app.utils.request_utils import is_json_request
 from app.utils.entity_groups import get_enabled_entity_groups
@@ -267,6 +270,221 @@ def _count_missing_name_translations(entities) -> Dict[str, int]:
     return counts
 
 
+def _normalize_translations_dict(raw) -> Dict[str, Any]:
+    """Return a dict of translations from a JSONB column value."""
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        with suppress((TypeError, ValueError, json.JSONDecodeError)):
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                return parsed
+    return {}
+
+
+def _regional_office_translation_fields(entity) -> list:
+    """Return translatable field pairs for a regional office."""
+    fields = [('name', 'name_translations')]
+    short_name = getattr(entity, 'short_name', None)
+    if short_name and str(short_name).strip():
+        fields.append(('short_name', 'short_name_translations'))
+    return fields
+
+
+def _resolve_field_translation(entity, source_attr, source_value, lang_code, auto_translator, translation_service):
+    """Translate a field, copying name translations for identical short names when possible."""
+    if source_attr == 'short_name':
+        name = getattr(entity, 'name', None)
+        if name and str(source_value).strip().casefold() == str(name).strip().casefold():
+            name_translations = _normalize_translations_dict(getattr(entity, 'name_translations', None))
+            copied = name_translations.get(lang_code) if name_translations else None
+            if copied and str(copied).strip():
+                return str(copied).strip()
+
+    return auto_translator.translate_text(
+        str(source_value).strip(),
+        lang_code,
+        'en',
+        translation_service,
+    )
+
+
+def _entity_translation_field_pairs(entity, fields, fields_for_entity=None):
+    if fields_for_entity is not None:
+        return fields_for_entity(entity)
+    return fields or []
+
+
+def _commit_translation_entity(entity) -> None:
+    """Commit a single translated entity (streaming endpoints opt out of auto-commit)."""
+    db.session.add(entity)
+    db.session.commit()
+
+
+def _count_missing_translations_for_fields(entities, fields, fields_for_entity=None) -> Dict[str, int]:
+    """Count missing translations for one or more source/translation field pairs."""
+    counts: Dict[str, int] = {}
+    if has_app_context():
+        lang_codes = current_app.config.get("TRANSLATABLE_LANGUAGES") or []
+    else:
+        lang_codes = getattr(Config, "TRANSLATABLE_LANGUAGES", []) or []
+
+    for entity in entities:
+        for source_attr, translations_attr in _entity_translation_field_pairs(entity, fields, fields_for_entity):
+            source_value = getattr(entity, source_attr, None)
+            if not source_value or not str(source_value).strip():
+                continue
+
+            translations = _normalize_translations_dict(getattr(entity, translations_attr, None))
+            for lang_code in lang_codes:
+                translated_value = translations.get(lang_code) if translations else None
+                if not translated_value or not str(translated_value).strip():
+                    counts[lang_code] = counts.get(lang_code, 0) + 1
+
+    return counts
+
+
+def _secretariat_translation_fields(entity_type: str):
+    """Return (entities, translation_fields, result_entity_type) for secretariat auto-translate."""
+    if entity_type == 'secretariat_divisions':
+        return SecretariatDivision.query.all(), [('name', 'name_translations')], 'secretariat_division'
+    if entity_type == 'secretariat_departments':
+        return SecretariatDepartment.query.all(), [('name', 'name_translations')], 'secretariat_department'
+    if entity_type == 'secretariat_regions':
+        return (
+            SecretariatRegionalOffice.query.all(),
+            None,
+            'secretariat_regional_office',
+        )
+    if entity_type == 'secretariat_clusters':
+        return SecretariatClusterOffice.query.all(), [('name', 'name_translations')], 'secretariat_cluster_office'
+    return None, None, None
+
+
+def _secretariat_translation_jobs():
+    """Return ordered translation jobs for all secretariat entity types."""
+    return [
+        (SecretariatDivision.query.all(), [('name', 'name_translations')], 'secretariat_division', None),
+        (SecretariatDepartment.query.all(), [('name', 'name_translations')], 'secretariat_department', None),
+        (
+            SecretariatRegionalOffice.query.all(),
+            None,
+            'secretariat_regional_office',
+            _regional_office_translation_fields,
+        ),
+        (SecretariatClusterOffice.query.all(), [('name', 'name_translations')], 'secretariat_cluster_office', None),
+    ]
+
+
+def _stream_entity_translation_events(
+    entities,
+    entity_type_label,
+    fields,
+    normalized_languages,
+    auto_translator,
+    translation_service,
+    *,
+    fields_for_entity=None,
+    emit_complete=True,
+):
+    """Yield SSE events while translating entity name fields."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    total_count = 0
+    for entity in entities:
+        for source_attr, translations_attr in _entity_translation_field_pairs(entity, fields, fields_for_entity):
+            source_value = getattr(entity, source_attr, None)
+            if not source_value or not str(source_value).strip():
+                continue
+            translations = _normalize_translations_dict(getattr(entity, translations_attr, None))
+            for lang_code in Config.TRANSLATABLE_LANGUAGES:
+                if lang_code not in normalized_languages:
+                    continue
+                if lang_code in translations and str(translations.get(lang_code, '')).strip():
+                    continue
+                total_count += 1
+
+    yield f"data: {json.dumps({'type': 'start', 'total': total_count})}\n\n"
+
+    processed_count = 0
+    success_count = 0
+    error_count = 0
+
+    for entity in entities:
+        for source_attr, translations_attr in _entity_translation_field_pairs(entity, fields, fields_for_entity):
+            source_value = getattr(entity, source_attr, None)
+            if not source_value or not str(source_value).strip():
+                continue
+
+            translations = _normalize_translations_dict(getattr(entity, translations_attr, None))
+            for lang_code in Config.TRANSLATABLE_LANGUAGES:
+                if lang_code not in normalized_languages:
+                    continue
+                if lang_code in translations and str(translations.get(lang_code, '')).strip():
+                    continue
+
+                translated = _resolve_field_translation(
+                    entity,
+                    source_attr,
+                    source_value,
+                    lang_code,
+                    auto_translator,
+                    translation_service,
+                )
+
+                if translated:
+                    if not getattr(entity, translations_attr, None):
+                        setattr(entity, translations_attr, {})
+                    current_translations = _normalize_translations_dict(getattr(entity, translations_attr, None))
+                    current_translations[lang_code] = translated
+                    setattr(entity, translations_attr, current_translations)
+                    flag_modified(entity, translations_attr)
+
+                    result = {
+                        'success': True,
+                        'entity_type': entity_type_label,
+                        'entity_id': entity.id,
+                        'language': lang_code,
+                        'field': source_attr,
+                    }
+                    success_count += 1
+                else:
+                    result = {
+                        'success': False,
+                        'entity_type': entity_type_label,
+                        'entity_id': entity.id,
+                        'language': lang_code,
+                        'field': source_attr,
+                        'error': 'Translation service returned no result',
+                    }
+                    error_count += 1
+
+                processed_count += 1
+
+                try:
+                    _commit_translation_entity(entity)
+                except Exception as e:
+                    request_transaction_rollback()
+                    current_app.logger.error(
+                        "Error committing translation for %s %s field %s, language %s: %s",
+                        entity_type_label,
+                        entity.id,
+                        source_attr,
+                        lang_code,
+                        e,
+                    )
+                    result['success'] = False
+                    result['error'] = GENERIC_ERROR_MESSAGE
+                    error_count += 1
+                    if success_count > 0 and translated:
+                        success_count -= 1
+
+                yield f"data: {json.dumps({'type': 'progress', 'result': result, 'processed': processed_count, 'total': total_count, 'success': success_count, 'error': error_count})}\n\n"
+
+    if emit_complete:
+        yield f"data: {json.dumps({'type': 'complete', 'processed': processed_count, 'total': total_count, 'success': success_count, 'error': error_count})}\n\n"
+
+
 # ==================== Forms ====================
 
 class CountryForm(FlaskForm):
@@ -274,9 +492,7 @@ class CountryForm(FlaskForm):
     name = StringField('Country Name', validators=[DataRequired(), Length(max=100)])
     iso3 = StringField('ISO3 Code', validators=[DataRequired(), Length(min=3, max=3)])
     iso2 = StringField('ISO2 Code', validators=[Optional(), Length(min=2, max=2)])
-    region = SelectField('Region', validators=[DataRequired()],
-                        choices=[('Africa', 'Africa'), ('Americas', 'Americas'), ('Asia Pacific', 'Asia Pacific'),
-                                ('Europe', 'Europe'), ('Middle East and North Africa', 'Middle East and North Africa')])
+    secretariat_regional_office_id = SelectField('IFRC Region', coerce=int, validators=[DataRequired()])
     status = SelectField('Status', validators=[Optional()], choices=[('Active', 'Active'), ('Inactive', 'Inactive')])
     preferred_language = StringField('Preferred Language', validators=[Optional()])
     currency_code = StringField('Currency Code', validators=[Optional(), Length(max=3)])
@@ -285,6 +501,11 @@ class CountryForm(FlaskForm):
         # Add language fields at runtime (requires app context).
         _add_translation_fields(self.__class__, 'name', 'Country Name', 100)
         super().__init__(*args, **kwargs)
+        ensure_secretariat_regional_offices()
+        offices = SecretariatRegionalOffice.query.filter_by(is_active=True).order_by(
+            SecretariatRegionalOffice.display_order, SecretariatRegionalOffice.name,
+        ).all()
+        self.secretariat_regional_office_id.choices = [(o.id, o.name) for o in offices]
 
 
 class NationalSocietyForm(FlaskForm):
@@ -396,6 +617,7 @@ class SecretariatDepartmentForm(FlaskForm):
 class SecretariatRegionalOfficeForm(FlaskForm):
     """Form for creating/editing Secretariat regional offices."""
     name = StringField('Regional Office Name', validators=[DataRequired(), Length(max=255)])
+    short_name = StringField('Short Name', validators=[Optional(), Length(max=100)])
     code = StringField('Regional Office Code', validators=[Optional(), Length(max=50)])
     description = TextAreaField('Description', validators=[Optional()])
     is_active = BooleanField('Active', default=True)
@@ -403,6 +625,7 @@ class SecretariatRegionalOfficeForm(FlaskForm):
 
     def __init__(self, *args, **kwargs):
         _add_translation_fields(self.__class__, 'name', 'Regional Office Name', 255)
+        _add_translation_fields(self.__class__, 'short_name', 'Short Name', 100)
         super().__init__(*args, **kwargs)
 
 
@@ -620,6 +843,7 @@ def index():
             response_data['regions'] = [{
                 'id': r.id,
                 'name': r.name,
+                'short_name': r.short_name,
                 'display_order': r.display_order if hasattr(r, 'display_order') else None,
             } for r in regions]
             response_data['clusters'] = [{
@@ -666,8 +890,7 @@ def index():
                          selected_division_id=selected_division_id,
                          selected_branch_id=branch_id,
                          active_only=active_only,
-                         enabled_entity_types=enabled_entity_groups,
-                         websocket_enabled=current_app.config.get('WEBSOCKET_ENABLED', True))
+                         enabled_entity_types=enabled_entity_groups)
 
 
 # ==================== Countries ====================
@@ -683,11 +906,12 @@ def new_country():
             name=form.name.data,
             iso3=form.iso3.data.upper(),
             iso2=form.iso2.data.upper() if form.iso2.data else None,
-            region=form.region.data,
+            secretariat_regional_office_id=form.secretariat_regional_office_id.data,
             status=form.status.data or 'Active',
             preferred_language=form.preferred_language.data,
             currency_code=form.currency_code.data
         )
+        assign_country_secretariat_regional_office(country, None)
         country.name_translations = _collect_translations(form, 'name')
         db.session.add(country)
         db.session.flush()
@@ -715,7 +939,7 @@ def edit_country(country_id):
         form.name.data = country.name
         form.iso3.data = country.iso3
         form.iso2.data = country.iso2
-        form.region.data = country.region
+        form.secretariat_regional_office_id.data = country.secretariat_regional_office_id
         form.status.data = country.status
         form.preferred_language.data = country.preferred_language
         form.currency_code.data = country.currency_code
@@ -729,7 +953,8 @@ def edit_country(country_id):
         country.name = form.name.data
         country.iso3 = form.iso3.data.upper()
         country.iso2 = form.iso2.data.upper() if form.iso2.data else None
-        country.region = form.region.data
+        country.secretariat_regional_office_id = form.secretariat_regional_office_id.data
+        assign_country_secretariat_regional_office(country, None)
         country.status = form.status.data
         country.preferred_language = form.preferred_language.data
         country.currency_code = form.currency_code.data
@@ -986,8 +1211,8 @@ def import_countries():
                 short_name = short_name or None
                 iso2 = str(row['ISO2']).strip().upper() if 'ISO2' in df.columns and pd.notna(row.get('ISO2')) else None
                 iso2 = iso2 or None
-                region = str(row['Region']).strip() if 'Region' in df.columns and pd.notna(row.get('Region')) else 'Other'
-                region = region or 'Other'
+                region_label = str(row['Region']).strip() if 'Region' in df.columns and pd.notna(row.get('Region')) else None
+                region_label = region_label or None
                 status = str(row['Status']).strip() if 'Status' in df.columns and pd.notna(row.get('Status')) else 'Active'
                 status = status or 'Active'
                 pref_lang = str(row['Preferred Language']).strip() if 'Preferred Language' in df.columns and pd.notna(row.get('Preferred Language')) else 'en'
@@ -1000,7 +1225,8 @@ def import_countries():
                     existing.iso3 = iso3
                     existing.short_name = short_name
                     existing.iso2 = iso2
-                    existing.region = region
+                    existing.secretariat_regional_office_id = None
+                    assign_country_secretariat_regional_office(existing, region_label)
                     existing.status = status
                     existing.preferred_language = pref_lang
                     existing.currency_code = currency
@@ -1012,7 +1238,7 @@ def import_countries():
                         short_name=short_name,
                         iso3=iso3,
                         iso2=iso2,
-                        region=region,
+                        region=region_label or 'Unassigned',
                         status=status,
                         preferred_language=pref_lang,
                         currency_code=currency,
@@ -1021,6 +1247,7 @@ def import_countries():
                     if row_id:
                         create_kwargs['id'] = row_id
                     target_country = Country(**create_kwargs)
+                    assign_country_secretariat_regional_office(target_country, region_label)
                     db.session.add(target_country)
                     imported += 1
 
@@ -1986,12 +2213,14 @@ def new_secretariat_regional_office():
     if form.validate_on_submit():
         region = SecretariatRegionalOffice(
             name=form.name.data,
+            short_name=(form.short_name.data or None),
             code=form.code.data,
             description=form.description.data,
             is_active=form.is_active.data,
             display_order=form.display_order.data or 0
         )
         region.name_translations = _collect_translations(form, 'name')
+        region.short_name_translations = _collect_translations(form, 'short_name')
         db.session.add(region)
         db.session.flush()
         flash(f'Secretariat Regional Office "{region.name}" created successfully.', 'success')
@@ -2015,15 +2244,19 @@ def edit_secretariat_regional_office(region_id):
 
     if request.method == 'GET':
         _clear_translation_fields(form, 'name')
+        _clear_translation_fields(form, 'short_name')
         _populate_translation_fields(form, region, 'name_translations', 'name')
+        _populate_translation_fields(form, region, 'short_name_translations', 'short_name')
 
     if form.validate_on_submit():
         region.name = form.name.data
+        region.short_name = form.short_name.data or None
         region.code = form.code.data
         region.description = form.description.data
         region.is_active = form.is_active.data
         region.display_order = form.display_order.data
         region.name_translations = _collect_translations(form, 'name')
+        region.short_name_translations = _collect_translations(form, 'short_name')
 
         db.session.flush()
         flash(f'Secretariat Regional Office "{region.name}" updated successfully.', 'success')
@@ -2267,13 +2500,24 @@ def api_get_translation_counts():
             _merge_counts(_count_missing_name_translations(entities))
 
         elif entity_type == 'secretariat':
-            secretariat_entities = (
-                SecretariatDivision.query.all()
-                + SecretariatDepartment.query.all()
-                + SecretariatRegionalOffice.query.all()
-                + SecretariatClusterOffice.query.all()
+            for entities, fields, _, fields_resolver in _secretariat_translation_jobs():
+                _merge_counts(_count_missing_translations_for_fields(entities, fields, fields_resolver))
+
+        elif entity_type in (
+            'secretariat_divisions',
+            'secretariat_departments',
+            'secretariat_regions',
+            'secretariat_clusters',
+        ):
+            entities, fields, entity_label = _secretariat_translation_fields(entity_type)
+            if entities is None:
+                return json_bad_request('Invalid entity type')
+            fields_resolver = (
+                _regional_office_translation_fields
+                if entity_type == 'secretariat_regions'
+                else None
             )
-            _merge_counts(_count_missing_name_translations(secretariat_entities))
+            _merge_counts(_count_missing_translations_for_fields(entities, fields, fields_resolver))
 
         else:
             return json_bad_request('Invalid entity type')
@@ -2309,16 +2553,6 @@ def api_auto_translate_organizations():
 
         if not target_languages:
             return json_bad_request('Target languages are required')
-
-        if not current_app.config.get('WEBSOCKET_ENABLED', True):
-            current_app.logger.info('WebSocket is disabled; rejecting streaming translation request')
-            return json_error(
-                'Live translation streaming is disabled on this environment.',
-                503,
-                success=False,
-                message='Live translation streaming is disabled on this environment.',
-                websocket_enabled=False
-            )
 
         # Normalize target languages to ISO codes (e.g., 'fr_FR' -> 'fr')
         normalized_languages = []
@@ -2407,10 +2641,9 @@ def api_auto_translate_organizations():
 
                             processed_count += 1
 
-                            # Persist changes to database (flush within current transaction)
+                            # Persist each translation immediately (streaming opts out of auto-commit)
                             try:
-                                db.session.add(country)  # Ensure entity is in session
-                                db.session.flush()
+                                _commit_translation_entity(country)
                             except Exception as e:
                                 request_transaction_rollback()
                                 current_app.logger.error(f"Error committing translation for country {country.id}, language {lang_code}: {e}")
@@ -2485,10 +2718,9 @@ def api_auto_translate_organizations():
 
                             processed_count += 1
 
-                            # Persist changes to database (flush within current transaction)
+                            # Persist each translation immediately (streaming opts out of auto-commit)
                             try:
-                                db.session.add(ns)  # Ensure entity is in session
-                                db.session.flush()
+                                _commit_translation_entity(ns)
                             except Exception as e:
                                 request_transaction_rollback()
                                 current_app.logger.error(f"Error committing translation for NS {ns.id}, language {lang_code}: {e}")
@@ -2505,14 +2737,71 @@ def api_auto_translate_organizations():
                     return
 
                 elif entity_type == 'secretariat':
-                    yield f"data: {json.dumps({'type': 'error', 'message': 'Secretariat entities do not currently support translations. Translation fields need to be added to the models first.'})}\n\n"
+                    total_processed = 0
+                    total_items = 0
+                    total_success = 0
+                    total_errors = 0
+                    started = False
+                    for entities, fields, entity_label, fields_resolver in _secretariat_translation_jobs():
+                        for event in _stream_entity_translation_events(
+                            entities,
+                            entity_label,
+                            fields,
+                            normalized_languages,
+                            auto_translator,
+                            translation_service,
+                            fields_for_entity=fields_resolver,
+                            emit_complete=False,
+                        ):
+                            payload = json.loads(event.replace('data: ', '').strip())
+                            if payload.get('type') == 'start':
+                                if not started:
+                                    started = True
+                                    total_items += payload.get('total', 0)
+                                    yield f"data: {json.dumps({'type': 'start', 'total': total_items})}\n\n"
+                                else:
+                                    total_items += payload.get('total', 0)
+                            elif payload.get('type') == 'progress':
+                                total_processed = payload.get('processed', total_processed)
+                                total_success = payload.get('success', total_success)
+                                total_errors = payload.get('error', total_errors)
+                                payload['total'] = total_items
+                                yield f"data: {json.dumps(payload)}\n\n"
+                    yield f"data: {json.dumps({'type': 'complete', 'processed': total_processed, 'total': total_items, 'success': total_success, 'error': total_errors})}\n\n"
+                    return
+
+                elif entity_type in (
+                    'secretariat_divisions',
+                    'secretariat_departments',
+                    'secretariat_regions',
+                    'secretariat_clusters',
+                ):
+                    entities, fields, entity_label = _secretariat_translation_fields(entity_type)
+                    if entities is None:
+                        yield f"data: {json.dumps({'type': 'error', 'message': 'Invalid entity type'})}\n\n"
+                        return
+                    fields_resolver = (
+                        _regional_office_translation_fields
+                        if entity_type == 'secretariat_regions'
+                        else None
+                    )
+                    for event in _stream_entity_translation_events(
+                        entities,
+                        entity_label,
+                        fields,
+                        normalized_languages,
+                        auto_translator,
+                        translation_service,
+                        fields_for_entity=fields_resolver,
+                    ):
+                        yield event
                     return
 
                 else:
                     yield f"data: {json.dumps({'type': 'error', 'message': 'Invalid entity type'})}\n\n"
                     return
 
-                # Send completion message (all commits already done per-translation)
+                # Send completion message (each translation is committed as it completes)
                 yield f"data: {json.dumps({'type': 'complete', 'processed': processed_count, 'total': total_count, 'success': success_count, 'error': error_count})}\n\n"
 
             except Exception as e:

@@ -583,6 +583,20 @@
 
         // Event Handlers
 
+        function applyPageSpecificTranslationCounts(overwriteExisting, selectedMsgids) {
+            if (!window.getPageSpecificTranslationCounts) {
+                return;
+            }
+            const countsOrPromise = window.getPageSpecificTranslationCounts(overwriteExisting, selectedMsgids);
+            if (countsOrPromise && typeof countsOrPromise.then === 'function') {
+                countsOrPromise.then(function(counts) {
+                    updateLanguageCounts(counts);
+                });
+            } else {
+                updateLanguageCounts(countsOrPromise);
+            }
+        }
+
         // Show modal button
         jQuery('#auto-translate-all-btn').on('click', function() {
             // Reset overwrite checkbox to unchecked by default
@@ -604,8 +618,7 @@
 
             // Let page-specific implementation calculate and set counts
             if (window.getPageSpecificTranslationCounts) {
-                const counts = window.getPageSpecificTranslationCounts(false, selectedMsgids);
-                updateLanguageCounts(counts);
+                applyPageSpecificTranslationCounts(false, selectedMsgids);
             } else {
                 // Default to showing the modal without specific counts
                 const fallbackMessage = cfg.t.click_start_translation_blank_6e8f4a2b || cfg.t.items_691d502c;
@@ -680,10 +693,7 @@
                 }
             }
             // Recalculate counts based on overwrite mode and selection
-            if (window.getPageSpecificTranslationCounts) {
-                const counts = window.getPageSpecificTranslationCounts(overwriteExisting, selectedMsgids);
-                updateLanguageCounts(counts);
-            }
+            applyPageSpecificTranslationCounts(overwriteExisting, selectedMsgids);
             updateEstimatedTime();
         });
 

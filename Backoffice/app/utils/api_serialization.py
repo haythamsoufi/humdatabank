@@ -58,6 +58,7 @@ def format_country_info(country):
         'iso2': country.iso2,  # NEW: ISO 2-letter country code
         'national_society_name': (ns.name if ns else None),
         'region': country.region,
+        'secretariat_regional_office_id': getattr(country, 'secretariat_regional_office_id', None),
         'partof': country.partof,
         'status': country.status,
         'preferred_language': country.preferred_language,
@@ -77,6 +78,7 @@ def format_country_info_minimal(country):
         'iso3': country.iso3,
         'iso2': country.iso2,
         'region': country.region,
+        'secretariat_regional_office_id': getattr(country, 'secretariat_regional_office_id', None),
     }
 
 

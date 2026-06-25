@@ -101,9 +101,9 @@ class TestGetCountriesByRegion:
 
             result = get_countries_by_region()
 
-            assert 'Europe' in result
+            assert 'Europe and Central Asia' in result
             assert 'Americas' in result
-            assert len(result['Europe']) >= 2
+            assert len(result['Europe and Central Asia']) >= 2
             assert len(result['Americas']) >= 1
 
     def test_countries_with_no_region(self, db_session, app):

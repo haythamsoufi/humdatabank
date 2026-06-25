@@ -10,25 +10,55 @@ function getScrollableContainer() {
     return window;
 }
 
+function isElementVisibleForScroll(el) {
+    if (!el) return false;
+    if (el.classList.contains('relevance-hidden')) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    return el.getClientRects().length > 0;
+}
+
 function scrollToElement(elementId) {
     const target = document.getElementById(elementId);
-    if (!target) return;
+    if (!target || !isElementVisibleForScroll(target)) return;
 
     const scrollContainer = getScrollableContainer();
     const isMainContainer = scrollContainer !== window;
     const targetRect = target.getBoundingClientRect();
     const computed = window.getComputedStyle(target);
     const scrollMarginTop = parseInt(computed.scrollMarginTop || '0', 10) || 80;
+    const paddingBottom = 16;
 
+    let targetTop;
     if (isMainContainer) {
         const containerRect = scrollContainer.getBoundingClientRect();
-        const targetTop = Math.max(
-            0,
-            scrollContainer.scrollTop + (targetRect.top - containerRect.top) - scrollMarginTop
-        );
+        const visibleTop = containerRect.top + scrollMarginTop;
+        const visibleBottom = containerRect.bottom - paddingBottom;
+        const sectionTopRel = targetRect.top - containerRect.top;
+
+        if (targetRect.top < visibleTop) {
+            targetTop = Math.max(0, scrollContainer.scrollTop + sectionTopRel - scrollMarginTop);
+        } else if (targetRect.bottom > visibleBottom) {
+            const delta = targetRect.bottom - visibleBottom;
+            targetTop = Math.max(0, scrollContainer.scrollTop + delta);
+        } else {
+            return;
+        }
+
         scrollContainer.scrollTo({ top: targetTop, behavior: 'smooth' });
     } else {
-        const targetTop = Math.max(0, window.pageYOffset + targetRect.top - scrollMarginTop);
+        const visibleTop = scrollMarginTop;
+        const visibleBottom = window.innerHeight - paddingBottom;
+
+        if (targetRect.top < visibleTop) {
+            targetTop = Math.max(0, window.pageYOffset + targetRect.top - scrollMarginTop);
+        } else if (targetRect.bottom > visibleBottom) {
+            const delta = targetRect.bottom - visibleBottom;
+            targetTop = Math.max(0, window.pageYOffset + delta);
+        } else {
+            return;
+        }
+
         window.scrollTo({ top: targetTop, behavior: 'smooth' });
     }
 }
@@ -123,13 +153,19 @@ export function initRepeatEntryNavigation() {
             || (link.getAttribute('href') || '').replace(/^#/, '');
         if (!entryId) return;
 
-        try {
-            const url = new URL(window.location.href);
-            url.hash = entryId;
-            window.history.replaceState({}, '', url);
-        } catch (_err) { /* no-op */ }
+        const isPaginated = document.getElementById('sections-container')?.dataset.isPaginated === 'true';
+        if (isPaginated && window.__ifrcPagination?.navigateToSection) {
+            window.__ifrcPagination.navigateToSection(entryId, link.dataset.pageNumber);
+        } else {
+            try {
+                const url = new URL(window.location.href);
+                url.hash = entryId;
+                window.history.replaceState({}, '', url);
+            } catch (_err) { /* no-op */ }
 
-        scrollToElement(entryId);
+            window.__ifrcSectionNavScrollSpy?.pause?.(900);
+            scrollToElement(entryId);
+        }
 
         document.querySelectorAll('a.repeat-entry-nav-link.is-active').forEach((el) => {
             el.classList.remove('is-active');

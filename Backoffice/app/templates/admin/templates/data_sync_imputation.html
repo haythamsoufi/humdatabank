@@ -2,7 +2,6 @@
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
-{% from "components/_status_label.html" import status_label %}
 
 {% block head %}
     {{ super() }}
@@ -58,165 +57,24 @@
     </style>
 {% endblock %}
 
-{% macro imputation_type_badge(item) %}
-    {% set raw_type = (item.type or item.field_type_for_js or '')|string %}
-    {% set type_key = raw_type|lower|replace(' ', '_') %}
-    {% if item.is_document_field and not raw_type %}
-        {% set type_key = 'document' %}
-    {% elif item.item_type == 'matrix' %}
-        {% set type_key = 'matrix' %}
-    {% elif item.item_type and item.item_type.startswith('plugin_') %}
-        {% set type_key = 'plugin' %}
-    {% endif %}
-    {% if item.is_indicator and item.type_display %}
-        {% set type_label = item.type_display %}
-    {% elif raw_type %}
-        {% set type_label = raw_type|replace('_', ' ')|title %}
-    {% elif item.is_document_field %}
-        {% set type_label = _('Document') %}
-    {% elif item.item_type == 'matrix' %}
-        {% set type_label = _('Matrix') %}
-    {% elif item.item_type and item.item_type.startswith('plugin_') %}
-        {% set type_label = _('Plugin') %}
-    {% elif item.is_question %}
-        {% set type_label = _('Question') %}
-        {% set type_key = 'question' %}
-    {% else %}
-        {% set type_label = _('Unknown') %}
-        {% set type_key = 'unknown' %}
-    {% endif %}
-    {% if type_key in ['number', 'count'] %}
-        {% set type_classes = 'bg-emerald-50 text-emerald-800 border-emerald-200' %}
-        {% set type_icon = 'fas fa-hashtag' %}
-    {% elif type_key == 'percentage' %}
-        {% set type_classes = 'bg-purple-50 text-purple-800 border-purple-200' %}
-        {% set type_icon = 'fas fa-percent' %}
-    {% elif type_key in ['text', 'string', 'textarea'] %}
-        {% set type_classes = 'bg-slate-50 text-slate-700 border-slate-200' %}
-        {% set type_icon = 'fas fa-font' %}
-    {% elif type_key in ['yesno', 'boolean'] %}
-        {% set type_classes = 'bg-amber-50 text-amber-800 border-amber-200' %}
-        {% set type_icon = 'fas fa-toggle-on' %}
-    {% elif type_key in ['single_choice', 'choice', 'multiple_choice'] %}
-        {% set type_classes = 'bg-indigo-50 text-indigo-800 border-indigo-200' %}
-        {% set type_icon = 'fas fa-list-ul' %}
-    {% elif type_key == 'date' %}
-        {% set type_classes = 'bg-sky-50 text-sky-800 border-sky-200' %}
-        {% set type_icon = 'fas fa-calendar-day' %}
-    {% elif type_key == 'datetime' %}
-        {% set type_classes = 'bg-sky-50 text-sky-800 border-sky-200' %}
-        {% set type_icon = 'fas fa-clock' %}
-    {% elif type_key == 'currency' %}
-        {% set type_classes = 'bg-orange-50 text-orange-800 border-orange-200' %}
-        {% set type_icon = 'fas fa-coins' %}
-    {% elif type_key in ['document', 'document_field'] %}
-        {% set type_classes = 'bg-stone-50 text-stone-700 border-stone-200' %}
-        {% set type_icon = 'fas fa-file-alt' %}
-    {% elif type_key == 'matrix' %}
-        {% set type_classes = 'bg-cyan-50 text-cyan-800 border-cyan-200' %}
-        {% set type_icon = 'fas fa-table' %}
-    {% elif type_key == 'blank' %}
-        {% set type_classes = 'bg-gray-50 text-gray-500 border-gray-200' %}
-        {% set type_icon = 'fas fa-minus' %}
-    {% elif type_key == 'plugin' %}
-        {% set type_classes = 'bg-violet-50 text-violet-800 border-violet-200' %}
-        {% set type_icon = 'fas fa-puzzle-piece' %}
-    {% elif type_key == 'question' %}
-        {% set type_classes = 'bg-blue-50 text-blue-800 border-blue-200' %}
-        {% set type_icon = 'fas fa-question-circle' %}
-    {% elif type_key == 'unknown' %}
-        <span class="imputation-meta-badge imputation-meta-badge--empty px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-400 border-gray-200" title="{{ _('Type not set on this item') }}">
-            <i class="fas fa-question text-[10px]" aria-hidden="true"></i>
-            <span class="imputation-meta-badge__label">{{ type_label }}</span>
-        </span>
-    {% else %}
-        {% set type_classes = 'bg-blue-50 text-blue-800 border-blue-200' %}
-        {% set type_icon = 'fas fa-tag' %}
-    {% endif %}
-    {% if type_key != 'unknown' %}
-        <span class="imputation-meta-badge px-2.5 py-0.5 rounded-full text-xs font-medium {{ type_classes }}" title="{{ type_label }}">
-            <i class="{{ type_icon }} text-[10px] opacity-80" aria-hidden="true"></i>
-            <span class="imputation-meta-badge__label">{{ type_label }}</span>
-        </span>
-    {% endif %}
-{% endmacro %}
-
-{% macro imputation_unit_badge(item) %}
-    {% set raw_unit = (item.unit or '')|string|trim %}
-    {% set unit_key = raw_unit|lower|replace(' ', '_')|replace('-', '_') %}
-    {% if item.unit_display %}
-        {% set unit_label = item.unit_display %}
-    {% elif raw_unit %}
-        {% set unit_label = raw_unit|replace('_', ' ')|title %}
-    {% else %}
-        {% set unit_label = _('No unit') %}
-    {% endif %}
-    {% if not raw_unit %}
-        <span class="imputation-meta-badge imputation-meta-badge--empty px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-400 border-gray-200" title="{{ _('No measurement unit') }}">
-            <i class="fas fa-ban text-[10px]" aria-hidden="true"></i>
-            <span class="imputation-meta-badge__label">{{ unit_label }}</span>
-        </span>
-    {% elif unit_key in ['people', 'person', 'persons', 'beneficiaries', 'beneficiary'] %}
-        {% set unit_classes = 'bg-emerald-50 text-emerald-800 border-emerald-200' %}
-        {% set unit_icon = 'fas fa-users' %}
-    {% elif unit_key in ['volunteers', 'volunteer'] %}
-        {% set unit_classes = 'bg-teal-50 text-teal-800 border-teal-200' %}
-        {% set unit_icon = 'fas fa-hands-helping' %}
-    {% elif unit_key in ['staff', 'employees', 'employee'] %}
-        {% set unit_classes = 'bg-blue-50 text-blue-800 border-blue-200' %}
-        {% set unit_icon = 'fas fa-id-badge' %}
-    {% elif unit_key in ['households', 'household', 'families', 'family'] %}
-        {% set unit_classes = 'bg-amber-50 text-amber-800 border-amber-200' %}
-        {% set unit_icon = 'fas fa-home' %}
-    {% elif unit_key in ['communities', 'community'] %}
-        {% set unit_classes = 'bg-lime-50 text-lime-800 border-lime-200' %}
-        {% set unit_icon = 'fas fa-building' %}
-    {% elif unit_key in ['ns', 'national_society', 'national_societies'] %}
-        {% set unit_classes = 'bg-violet-50 text-violet-800 border-violet-200' %}
-        {% set unit_icon = 'fas fa-globe' %}
-    {% elif unit_key in ['usd', 'eur', 'chf', 'gbp', 'currency', 'money'] %}
-        {% set unit_classes = 'bg-orange-50 text-orange-800 border-orange-200' %}
-        {% set unit_icon = 'fas fa-coins' %}
-    {% elif unit_key in ['percent', 'percentage', '%'] %}
-        {% set unit_classes = 'bg-purple-50 text-purple-800 border-purple-200' %}
-        {% set unit_icon = 'fas fa-percent' %}
-    {% elif unit_key in ['year', 'years', 'month', 'months', 'day', 'days'] %}
-        {% set unit_classes = 'bg-sky-50 text-sky-800 border-sky-200' %}
-        {% set unit_icon = 'fas fa-calendar-alt' %}
-    {% else %}
-        {% set unit_classes = 'bg-slate-50 text-slate-700 border-slate-200' %}
-        {% set unit_icon = 'fas fa-ruler' %}
-    {% endif %}
-    {% if raw_unit %}
-        <span class="imputation-meta-badge px-2.5 py-0.5 rounded-full text-xs font-medium {{ unit_classes }}" title="{{ unit_label }}">
-            <i class="{{ unit_icon }} text-[10px] opacity-80" aria-hidden="true"></i>
-            <span class="imputation-meta-badge__label">{{ unit_label }}</span>
-        </span>
-    {% endif %}
-{% endmacro %}
-
 {% block content %}
 <div class="sharp-ui">
 {% set header_actions = namespace(items=[]) %}
-{% if has_data_sync %}
 {% set __ = header_actions.items.append({
     'type': 'button',
     'text': _('Data Sync'),
     'icon': 'fas fa-sync-alt',
-    'classes': 'professional-action-btn professional-action-btn-purple',
+    'classes': 'professional-action-btn professional-action-btn-purple' ~ (' hidden' if not has_data_sync else ''),
     'attributes': {'id': 'data-sync-open-btn', 'title': _('Sync data from external API')}
 }) %}
-{% endif %}
-{% if template.id in [22, 23, 24, 33] %}
 {% set __ = header_actions.items.append({
     'type': 'link',
     'text': _('UPR Excel Sync'),
     'icon': 'fas fa-file-excel',
     'url': url_for('upr_excel_import.wizard'),
-    'classes': 'professional-action-btn professional-action-btn-green',
-    'attributes': {'title': _('Import from UPR Master Excel workbook')}
+    'classes': 'professional-action-btn professional-action-btn-green' ~ (' hidden' if not has_upr_excel else ''),
+    'attributes': {'id': 'upr-excel-sync-link', 'title': _('Import from UPR Master Excel workbook')}
 }) %}
-{% endif %}
 {% call page_header(
     title=_('Data Sync & Imputation'),
     icon='fas fa-sync-alt',
@@ -244,7 +102,6 @@
 
   <!-- Data Sync Settings Modal -->
   {% from "macros/modal_shell.html" import modal_shell %}
-  {% if has_data_sync %}
   {% call modal_shell('data-sync-modal', _('Data Sync Settings'), max_width='max-w-lg', close_id='data-sync-modal-close') %}
       <div id="data-sync-settings" class="space-y-4">
         <p class="text-sm text-gray-600">{{ _('Sync data from your configured external API endpoint into form data for this template.') }}</p>
@@ -375,7 +232,6 @@
         </button>
       </div>
   {% endcall %}
-  {% endif %}
 
   <div class="bg-white shadow-md border border-gray-200">
     {% call scroll_tab_bar(inner_id='data-sync-tabs', aria_label=_('Data sync & imputation sections')) %}
@@ -541,85 +397,8 @@
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Method') }}</th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          {% for section_data in sections_with_items %}
-            <tr class="bg-gray-100 border-t-2 border-gray-300">
-              <td colspan="5" class="px-6 py-4">
-                <div class="flex items-center">
-                  <div class="flex items-center">
-                    <svg class="h-4 w-4 text-gray-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                    </svg>
-                    <h3 class="text-sm font-semibold text-gray-800">{{ section_data.section.name }}</h3>
-                  </div>
-                  {{ status_label(section_data.section_items|length ~ ' item' ~ ('s' if section_data.section_items|length != 1 else ''), 'info', 'ml-3') }}
-                </div>
-              </td>
-            </tr>
-
-            {% for item in section_data.section_items %}
-            <tr class="hover:bg-gray-50">
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                <div class="flex items-center">
-                  <div class="w-4 h-px bg-gray-300 mr-2"></div>
-                  {{ item.display_order }}
-                </div>
-              </td>
-              <td class="px-6 py-4 text-sm text-gray-900">
-                <div class="font-medium">{{ item.label }}</div>
-                {% if item.description %}
-                <div class="text-gray-500 text-xs">{{ item.description }}</div>
-                {% endif %}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-[10rem]">
-                {{ imputation_type_badge(item) }}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-[10rem]">
-                {{ imputation_unit_badge(item) }}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {% set imputation_method = (item.config or {}).get('imputation_method', 'no_imputation') %}
-                <div class="relative">
-                  <button type="button"
-                          class="imputation-method-btn inline-flex items-center px-3 py-1 border rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500
-                          {% if imputation_method == 'no_imputation' %}
-                            border-gray-200 text-gray-500 bg-gray-50 hover:bg-gray-100
-                          {% else %}
-                            border-gray-300 text-gray-700 bg-white hover:bg-gray-50
-                          {% endif %}"
-                          data-item-id="{{ item.id }}"
-                          data-current-method="{{ imputation_method }}">
-                    <span class="method-text">
-                      {% if imputation_method == 'three_year_avg' %}
-                        {{ _('Three Year Average') }}
-                      {% elif imputation_method == 'last_year' %}
-                        {{ _("Last Year's Value") }}
-                      {% else %}
-                        {{ _('No Imputation') }}
-                      {% endif %}
-                    </span>
-                    <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                  </button>
-                  <div class="imputation-method-dropdown absolute z-50 mt-1 w-48 bg-white shadow-lg rounded-md border border-gray-200 hidden" style="position: fixed;">
-                    <div class="py-1">
-                      <button type="button" class="method-option block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-method="last_year">
-                        {{ _("Last Year's Value") }}
-                      </button>
-                      <button type="button" class="method-option block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-method="three_year_avg">
-                        {{ _('Three Year Average') }}
-                      </button>
-                      <button type="button" class="method-option block w-full text-left px-4 py-2 text-sm text-gray-500 hover:bg-gray-100" data-method="no_imputation">
-                        <span class="text-gray-400">{{ _('No Imputation') }}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </td>
-            </tr>
-            {% endfor %}
-          {% endfor %}
+        <tbody id="imputation-methods-tbody" class="bg-white divide-y divide-gray-200">
+          {% include "admin/templates/partials/imputation_methods_rows.html" %}
         </tbody>
         </table>
       </div>
@@ -654,18 +433,191 @@ function dismissAlert(alert) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    let currentTemplateId = {{ template.id }};
+    let templateSwitchRequestId = 0;
+
+    const TEMPLATE_API_URLS = {
+        view: '{{ url_for("data_sync_imputation.data_sync_view", template_id=0) }}',
+        context: '{{ url_for("data_sync_imputation.get_template_context", template_id=0) }}',
+        periods: '{{ url_for("data_sync_imputation.get_available_periods", template_id=0) }}',
+        filterOptions: '{{ url_for("data_sync_imputation.get_filter_options", template_id=0) }}',
+        previewDataChunked: '{{ url_for("data_sync_imputation.preview_data_chunked", template_id=0) }}',
+        previewImputationChunked: '{{ url_for("data_sync_imputation.preview_imputation_chunked", template_id=0) }}',
+        runImputationFiltered: '{{ url_for("data_sync_imputation.run_imputation_filtered", template_id=0) }}',
+        exportPreviewExcel: '{{ url_for("data_sync_imputation.export_preview_excel", template_id=0) }}',
+        runDataSync: '{{ url_for("data_sync_imputation.run_data_sync", template_id=0) }}',
+        dataSyncStatus: '{{ url_for("data_sync_imputation.data_sync_status", template_id=0, job_id="__JOB_ID__") }}',
+        dataSyncCancel: '{{ url_for("data_sync_imputation.data_sync_cancel", template_id=0, job_id="__JOB_ID__") }}'
+    };
+
+    function templateApiUrl(pathTemplate, templateId) {
+        return pathTemplate.replace(/\/0(\/|$|\?|(?=\/))/, '/' + encodeURIComponent(templateId) + '$1');
+    }
+
     const templateSelector = document.getElementById('template-selector');
-    if (templateSelector) {
-        const urlTemplate = templateSelector.getAttribute('data-url-template') || '';
-        templateSelector.addEventListener('change', function() {
-            const templateId = this.value;
-            if (!templateId || !urlTemplate) return;
-            window.location.href = urlTemplate.replace(/\/0$/, '/' + encodeURIComponent(templateId));
-        });
+    const dataSyncOpenBtn = document.getElementById('data-sync-open-btn');
+    const uprExcelSyncLink = document.getElementById('upr-excel-sync-link');
+
+    function toggleHeaderActions(hasDataSync, hasUprExcel) {
+        if (dataSyncOpenBtn) {
+            dataSyncOpenBtn.classList.toggle('hidden', !hasDataSync);
+        }
+        if (uprExcelSyncLink) {
+            uprExcelSyncLink.classList.toggle('hidden', !hasUprExcel);
+        }
     }
 
     const saveAllBtn = document.getElementById('save-all-methods-btn');
     const pendingChanges = new Map(); // Track pending changes
+
+    function updateSaveAllButton() {
+        if (!saveAllBtn) return;
+        const svgCheck = '<svg class="h-4 w-4 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+        if (pendingChanges.size > 0) {
+            saveAllBtn.disabled = false;
+            saveAllBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            saveAllBtn.innerHTML = svgCheck + `Save All Changes (${pendingChanges.size})`;
+        } else {
+            saveAllBtn.disabled = true;
+            saveAllBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            saveAllBtn.innerHTML = svgCheck + 'Save All Changes';
+        }
+    }
+
+    function initImputationMethodHandlers() {
+        document.querySelectorAll('.imputation-method-btn').forEach(button => {
+            const dropdown = button.nextElementSibling;
+            const itemId = button.dataset.itemId;
+            if (!button.dataset.savedMethod) {
+                button.dataset.savedMethod = button.dataset.currentMethod;
+            }
+
+            button.addEventListener('click', function(e) {
+                e.stopPropagation();
+                document.querySelectorAll('.imputation-method-dropdown').forEach(dd => {
+                    if (dd !== dropdown) dd.classList.add('hidden');
+                });
+
+                if (dropdown.classList.contains('hidden')) {
+                    const buttonRect = button.getBoundingClientRect();
+                    const dropdownHeight = 120;
+                    const viewportHeight = window.innerHeight;
+
+                    let top = buttonRect.bottom + 4;
+                    let left = buttonRect.left;
+
+                    if (top + dropdownHeight > viewportHeight) {
+                        top = buttonRect.top - dropdownHeight - 4;
+                    }
+
+                    const dropdownWidth = 192;
+                    if (left + dropdownWidth > window.innerWidth) {
+                        left = window.innerWidth - dropdownWidth - 10;
+                    }
+
+                    dropdown.style.left = left + 'px';
+                    dropdown.style.top = top + 'px';
+                    dropdown.classList.remove('hidden');
+                } else {
+                    dropdown.classList.add('hidden');
+                }
+            });
+
+            dropdown.querySelectorAll('.method-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    const method = this.dataset.method;
+                    const methodText = this.textContent.trim();
+
+                    button.querySelector('.method-text').textContent = methodText;
+                    button.dataset.currentMethod = method;
+                    dropdown.classList.add('hidden');
+
+                    if (method !== button.dataset.savedMethod) {
+                        pendingChanges.set(itemId, method);
+                        button.classList.add('border-yellow-400', 'bg-yellow-50');
+                    } else {
+                        pendingChanges.delete(itemId);
+                        button.classList.remove('border-yellow-400', 'bg-yellow-50');
+                    }
+
+                    updateSaveAllButton();
+                });
+            });
+        });
+    }
+
+    function applyTemplateContext(data) {
+        currentTemplateId = data.template_id;
+        if (document.title && data.page_title) {
+            document.title = data.page_title;
+        }
+
+        const tbody = document.getElementById('imputation-methods-tbody');
+        if (tbody) {
+            tbody.innerHTML = data.methods_html || '';
+        }
+        pendingChanges.clear();
+        updateSaveAllButton();
+        initImputationMethodHandlers();
+        toggleHeaderActions(!!data.has_data_sync, !!data.has_upr_excel);
+        updateDataSyncUrlTemplates(currentTemplateId);
+        resetPreviewForTemplateSwitch();
+    }
+
+    function loadTemplateContext(templateId) {
+        const requestId = ++templateSwitchRequestId;
+        if (templateSelector) {
+            templateSelector.disabled = true;
+        }
+
+        return fetch(templateApiUrl(TEMPLATE_API_URLS.context, templateId), {
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (requestId !== templateSwitchRequestId) {
+                    return { cancelled: true };
+                }
+                if (!data.success) {
+                    throw new Error(data.error || '{{ _("Failed to load template") }}');
+                }
+                applyTemplateContext(data);
+                history.replaceState(null, '', templateApiUrl(TEMPLATE_API_URLS.view, templateId));
+                return data;
+            })
+            .finally(() => {
+                if (templateSelector) {
+                    templateSelector.disabled = false;
+                }
+            });
+    }
+
+    if (templateSelector) {
+        templateSelector.addEventListener('change', function() {
+            const templateId = this.value;
+            if (!templateId || String(templateId) === String(currentTemplateId)) {
+                return;
+            }
+
+            const previousTemplateId = String(currentTemplateId);
+            const proceed = () => {
+                loadTemplateContext(templateId).catch(error => {
+                    showSaveMessage(error.message || '{{ _("Failed to load template") }}', 'error');
+                    templateSelector.value = previousTemplateId;
+                });
+            };
+
+            if (pendingChanges.size > 0) {
+                showConfirmation(
+                    '{{ _("You have unsaved imputation method changes. Switch template anyway?") }}',
+                    proceed,
+                    () => { templateSelector.value = previousTemplateId; }
+                );
+            } else {
+                proceed();
+            }
+        });
+    }
 
     // Tab navigation (same pattern as manage_settings.html)
     (function initFdrsTabs() {
@@ -695,79 +647,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     })();
 
-    // Handle imputation method dropdowns
-    const methodButtons = document.querySelectorAll('.imputation-method-btn');
-
-    methodButtons.forEach(button => {
-        const dropdown = button.nextElementSibling;
-        const itemId = button.dataset.itemId;
-        // Track saved method to avoid stale comparisons after a save
-        if (!button.dataset.savedMethod) {
-            button.dataset.savedMethod = button.dataset.currentMethod;
-        }
-
-        button.addEventListener('click', function(e) {
-            e.stopPropagation();
-            // Close other dropdowns
-            document.querySelectorAll('.imputation-method-dropdown').forEach(dd => {
-                if (dd !== dropdown) dd.classList.add('hidden');
-            });
-
-            if (dropdown.classList.contains('hidden')) {
-                // Position dropdown relative to button
-                const buttonRect = button.getBoundingClientRect();
-                const dropdownHeight = 120; // Approximate height of dropdown
-                const viewportHeight = window.innerHeight;
-
-                let top = buttonRect.bottom + 4;
-                let left = buttonRect.left;
-
-                // Check if dropdown would go off bottom of screen
-                if (top + dropdownHeight > viewportHeight) {
-                    top = buttonRect.top - dropdownHeight - 4;
-                }
-
-                // Check if dropdown would go off right side of screen
-                const dropdownWidth = 192; // w-48 = 12rem = 192px
-                if (left + dropdownWidth > window.innerWidth) {
-                    left = window.innerWidth - dropdownWidth - 10;
-                }
-
-                dropdown.style.left = left + 'px';
-                dropdown.style.top = top + 'px';
-                dropdown.classList.remove('hidden');
-            } else {
-                dropdown.classList.add('hidden');
-            }
-        });
-
-        // Handle method selection
-        dropdown.querySelectorAll('.method-option').forEach(option => {
-            option.addEventListener('click', function() {
-                const method = this.dataset.method;
-                const methodText = this.textContent.trim();
-
-                // Update button text
-                button.querySelector('.method-text').textContent = methodText;
-                button.dataset.currentMethod = method;
-
-                // Close dropdown
-                dropdown.classList.add('hidden');
-
-                // Track changes
-                if (method !== button.dataset.savedMethod) {
-                    pendingChanges.set(itemId, method);
-                    button.classList.add('border-yellow-400', 'bg-yellow-50');
-                } else {
-                    pendingChanges.delete(itemId);
-                    button.classList.remove('border-yellow-400', 'bg-yellow-50');
-                }
-
-                // Enable/disable save all button
-                updateSaveAllButton();
-            });
-        });
-    });
+    initImputationMethodHandlers();
 
     // Handle save all button
     if (saveAllBtn) saveAllBtn.addEventListener('click', function() {
@@ -799,7 +679,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success) {
                 // All successful
                 pendingChanges.clear();
-                methodButtons.forEach(button => {
+                document.querySelectorAll('.imputation-method-btn').forEach(button => {
                     button.classList.remove('border-yellow-400', 'bg-yellow-50');
                     button.classList.add('border-green-300', 'bg-green-50');
                     // Persist saved method to current selection
@@ -808,7 +688,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 });
                 setTimeout(() => {
-                    methodButtons.forEach(button => {
+                    document.querySelectorAll('.imputation-method-btn').forEach(button => {
                         button.classList.remove('border-green-300', 'bg-green-50');
                     });
                 }, 2000);
@@ -829,21 +709,6 @@ document.addEventListener('DOMContentLoaded', function() {
             saveAllBtn.innerHTML = '<svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Save All Changes';
         });
     });
-
-    function updateSaveAllButton() {
-        if (!saveAllBtn) return;
-        const svgCheck = '<svg class="h-4 w-4 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
-        if (pendingChanges.size > 0) {
-            saveAllBtn.disabled = false;
-            saveAllBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            saveAllBtn.innerHTML = svgCheck + `Save All Changes (${pendingChanges.size})`;
-        } else {
-            saveAllBtn.disabled = true;
-            saveAllBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            saveAllBtn.innerHTML = svgCheck + 'Save All Changes';
-        }
-    }
-
 
     // Handle preview functionality
     const loadPreviewBtn = document.getElementById('load-preview-btn');
@@ -902,8 +767,25 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load all available periods on page load and populate dropdowns
     loadAvailablePeriods();
 
+    function resetPreviewForTemplateSwitch() {
+        currentPreviewData = [];
+        allPreviewData = [];
+        currentLoadMode = 'data';
+        window._allPeriods = [];
+        if (window.previewGridApi) {
+            window.previewGridApi.setGridOption('rowData', []);
+        }
+        showPreviewEmpty();
+        previewCountryFilter.innerHTML = '<option value="">{{ _("All Countries") }}</option>';
+        previewItemFilter.innerHTML = '<option value="">{{ _("All Items") }}</option>';
+        previewTypeFilter.value = '';
+        previewYearInput.innerHTML = '<option value="">{{ _("Loading…") }}</option>';
+        previewSourcePeriodSelect.innerHTML = '<option value="">{{ _("Loading…") }}</option>';
+        loadAvailablePeriods();
+    }
+
     function loadAvailablePeriods() {
-        fetch(`{{ url_for('data_sync_imputation.get_available_periods', template_id=template.id) }}`)
+        fetch(templateApiUrl(TEMPLATE_API_URLS.periods, currentTemplateId))
         .then(response => response.json())
         .then(data => {
             if (data.success && data.periods && data.periods.length > 0) {
@@ -1014,7 +896,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        fetch('{{ url_for("data_sync_imputation.export_preview_excel", template_id=template.id) }}', {
+        fetch(templateApiUrl(TEMPLATE_API_URLS.exportPreviewExcel, currentTemplateId), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1040,7 +922,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function loadFilterOptions(year) {
-        fetch(`{{ url_for('data_sync_imputation.get_filter_options', template_id=template.id) }}?year=${encodeURIComponent(year)}`)
+        fetch(`${templateApiUrl(TEMPLATE_API_URLS.filterOptions, currentTemplateId)}?year=${encodeURIComponent(year)}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -1085,7 +967,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function loadPreviewDataChunked(year, offset, accumulatedData) {
         const chunkSize = 2000; // Reduced chunk size for better memory management
 
-        fetch(`{{ url_for('data_sync_imputation.preview_data_chunked', template_id=template.id) }}`, {
+        fetch(templateApiUrl(TEMPLATE_API_URLS.previewDataChunked, currentTemplateId), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1143,7 +1025,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function previewImputationChunked(year, offset, accumulatedData, sourcePeriod) {
         const chunkSize = 2000; // Reduced chunk size for better memory management
 
-        fetch(`{{ url_for('data_sync_imputation.preview_imputation_chunked', template_id=template.id) }}`, {
+        fetch(templateApiUrl(TEMPLATE_API_URLS.previewImputationChunked, currentTemplateId), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1197,7 +1079,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function runImputation(year, countryFilter = null, itemFilter = null, typeFilter = null, sourcePeriod = null) {
         showPreviewLoading('Running imputation...', 'Processing data...');
 
-        fetch(`{{ url_for('data_sync_imputation.run_imputation_filtered', template_id=template.id) }}`, {
+        fetch(templateApiUrl(TEMPLATE_API_URLS.runImputationFiltered, currentTemplateId), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1392,9 +1274,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Preview grid initialization is handled in the extra_js block
 
-    {% if has_data_sync %}
     // Data Sync modal
-    const dataSyncOpenBtn = document.getElementById('data-sync-open-btn');
     const dataSyncModal = document.getElementById('data-sync-modal');
     const dataSyncModalClose = document.getElementById('data-sync-modal-close');
     const dataSyncModalCancel = document.getElementById('data-sync-modal-cancel');
@@ -1427,12 +1307,18 @@ document.addEventListener('DOMContentLoaded', function() {
         500: '{{ _("Published") }}'
     };
 
-    const dataSyncStatusUrlTemplate = '{{ url_for("data_sync_imputation.data_sync_status", template_id=template.id, job_id="__JOB_ID__") }}';
-    const dataSyncCancelUrlTemplate = '{{ url_for("data_sync_imputation.data_sync_cancel", template_id=template.id, job_id="__JOB_ID__") }}';
+    let dataSyncStatusUrlTemplate = TEMPLATE_API_URLS.dataSyncStatus;
+    let dataSyncCancelUrlTemplate = TEMPLATE_API_URLS.dataSyncCancel;
     let dataSyncActiveJobId = null;
     let dataSyncPollTimer = null;
     let dataSyncUIMode = 'settings';
     let dataSyncStopRequested = false;
+
+    function updateDataSyncUrlTemplates(templateId) {
+        dataSyncStatusUrlTemplate = templateApiUrl(TEMPLATE_API_URLS.dataSyncStatus, templateId);
+        dataSyncCancelUrlTemplate = templateApiUrl(TEMPLATE_API_URLS.dataSyncCancel, templateId);
+    }
+    updateDataSyncUrlTemplates(currentTemplateId);
 
     function isSafeHref(url) {
         if (!url || typeof url !== 'string') return false;
@@ -1773,7 +1659,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (params.batchSize !== null) {
                 payload.batch_size = params.batchSize;
             }
-            fetch('{{ url_for("data_sync_imputation.run_data_sync", template_id=template.id) }}', {
+            fetch(templateApiUrl(TEMPLATE_API_URLS.runDataSync, currentTemplateId), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1799,7 +1685,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-    {% endif %}
 
     // Close dropdowns when clicking outside
     document.addEventListener('click', function() {

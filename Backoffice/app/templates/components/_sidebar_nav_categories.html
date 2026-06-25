@@ -64,7 +64,7 @@
 
 {# User Management Category - Only show if user has admin.users.view permission #}
 {% set can_view_users = is_system_manager or has_permission('admin.users.view') %}
-{% set can_review_access_requests = is_system_manager or has_permission('admin.access_requests.view') %}
+{% set can_review_access_requests = is_system_manager or has_permission('admin.access_requests.view') or has_permission('admin.users.edit') %}
 {% set pending_access_requests_count = pending_access_requests_count | default(0) %}
 {% if can_view_users %}
 <div class="space-y-2 mt-4" data-category="user-management">

@@ -1239,8 +1239,93 @@ class TestOrganizationAPIEndpoints:
         assert resp.status_code == 200
 
     def test_api_translation_counts_returns_json(self, logged_in_client, db_session, app):
-        resp = logged_in_client.get("/admin/organization/api/translation-counts")
+        resp = logged_in_client.get("/admin/organization/api/translation-counts?entity_type=countries")
         assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert "counts" in data
+
+    def test_api_translation_counts_secretariat_regions(self, logged_in_client, db_session, app):
+        from app.models.organization import SecretariatRegionalOffice
+
+        region = SecretariatRegionalOffice(
+            name="Untranslated Region",
+            short_name="UR",
+            is_active=True,
+        )
+        db_session.add(region)
+        db_session.commit()
+
+        resp = logged_in_client.get(
+            "/admin/organization/api/translation-counts?entity_type=secretariat_regions"
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert sum(data["counts"].values()) > 0
+
+    def test_regional_office_translation_fields_includes_short_name(self):
+        from types import SimpleNamespace
+        from app.routes.admin.organization import _regional_office_translation_fields
+
+        same = SimpleNamespace(name="Africa", short_name="Africa")
+        assert _regional_office_translation_fields(same) == [
+            ("name", "name_translations"),
+            ("short_name", "short_name_translations"),
+        ]
+
+        different = SimpleNamespace(name="Europe and Central Asia", short_name="Europe & CA")
+        assert _regional_office_translation_fields(different) == [
+            ("name", "name_translations"),
+            ("short_name", "short_name_translations"),
+        ]
+
+    def test_resolve_field_translation_copies_matching_short_name(self):
+        from types import SimpleNamespace
+        from app.routes.admin.organization import _resolve_field_translation
+
+        entity = SimpleNamespace(
+            name="Africa",
+            short_name="Africa",
+            name_translations={"fr": "Afrique"},
+        )
+        mock_translator = MagicMock()
+
+        result = _resolve_field_translation(
+            entity, "short_name", "Africa", "fr", mock_translator, "ifrc"
+        )
+
+        assert result == "Afrique"
+        mock_translator.translate_text.assert_not_called()
+
+    def test_api_auto_translate_secretariat_regions_persists(self, logged_in_client, db_session, app):
+        from app.models.organization import SecretariatRegionalOffice
+
+        region = SecretariatRegionalOffice(name="Persist Test Region", is_active=True)
+        db_session.add(region)
+        db_session.commit()
+        region_id = region.id
+
+        mock_translator = MagicMock()
+        mock_translator.translate_text.return_value = "Région test"
+
+        with patch("app.services.translation.auto_translator.get_auto_translator", return_value=mock_translator):
+            resp = logged_in_client.post(
+                "/admin/organization/api/auto-translate-organizations",
+                json={
+                    "entity_type": "secretariat_regions",
+                    "target_languages": ["fr"],
+                    "translation_service": "ifrc",
+                },
+                headers={**_json_headers(), "Accept": "text/event-stream"},
+                buffered=True,
+            )
+
+        assert resp.status_code == 200
+        db_session.expire_all()
+        refreshed = db_session.get(SecretariatRegionalOffice, region_id)
+        assert refreshed is not None
+        assert (refreshed.name_translations or {}).get("fr") == "Région test"
 
     def test_api_auto_translate_missing_key_returns_error(self, logged_in_client, db_session):
         resp = logged_in_client.post(

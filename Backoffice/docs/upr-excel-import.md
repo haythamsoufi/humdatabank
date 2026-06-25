@@ -441,7 +441,8 @@ Accessible from the "UPR Excel Sync" button in the Data Sync & Imputation header
 
 ### Warning display
 Warnings are deduplicated server-side by `summarize_warnings()`:
-- Repeated messages are shown once with a count: `National Society not found: 'X' (×12)`
+- Messages that differ only by country and/or round are **grouped** — e.g. `No reporting-country form item for area 'SP1' (×96, 92 countries, 8 indicators, AR25)`
+- Exact duplicates (e.g. repeated NS name typos) show once with a count: `National Society not found: 'X' (×12)`
 - Header shows total count and unique count: `227 (18 unique)`
 - Full list rendered in a scrollable panel (max-height 18 rem)
 

@@ -430,8 +430,19 @@ class Country(db.Model):
     short_name = Column(String(50), nullable=True)
     iso3 = Column(String(3), unique=True, nullable=False)
     iso2 = Column(String(2), unique=True, nullable=True)
-    region = Column(String(15), nullable=False)
+    secretariat_regional_office_id = Column(
+        Integer,
+        ForeignKey('secretariat_regional_offices.id'),
+        nullable=True,
+        index=True,
+    )
+    region = Column(String(100), nullable=False)
     partof = Column(String(100), nullable=True)
+
+    secretariat_regional_office = relationship(
+        'SecretariatRegionalOffice',
+        back_populates='countries',
+    )
 
     # Additional fields
     status = Column(String(50), nullable=True, default='Active')
@@ -561,6 +572,21 @@ class Country(db.Model):
         except Exception as e:
             logger.debug("Country.__repr__ failed: %s", e)
             return f'<Country id={getattr(self, "id", "Unknown")}>'
+
+
+@event.listens_for(Country, 'before_insert')
+@event.listens_for(Country, 'before_update')
+def _country_sync_secretariat_regional_office_fields(mapper, connection, target):
+    """Link legacy region strings and keep denormalized country.region in sync."""
+    from app.services.secretariat_regional_office_service import (
+        assign_country_secretariat_regional_office,
+        sync_country_region_fields,
+    )
+
+    if target.secretariat_regional_office_id is None and target.region:
+        assign_country_secretariat_regional_office(target, target.region)
+    else:
+        sync_country_region_fields(target)
 
 
 def _split_login_log_browser_field(browser):

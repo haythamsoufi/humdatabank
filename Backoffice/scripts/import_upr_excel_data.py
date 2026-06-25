@@ -58,6 +58,7 @@ from import_fdrs_form_data import (  # noqa: E402
     upsert_form_data_rows,
     write_rows_to_excel,
 )
+from upr_import_warnings import summarize_warnings  # noqa: E402
 
 UPR_DATA_SHEET = "UPR Data"
 HEADER_ROW_INDEX = 2  # 0-based row 3 in Excel
@@ -124,11 +125,14 @@ ITEM_REPORTING_COUNTRY_SP_BREAKDOWN = 1405  # Optional breakdown by SP/EF (manua
 ITEM_REPORTING_COUNTRY_SUPPORT = 1407   # Received Support (list_library national_society)
 ITEM_REPORTING_PNS_FUNDING = 952        # T23 – PNS Funding matrix (list_library national_society)
 
-# Row names in country-reporting Total Funding matrix (column = REPORTING_FUNDING_COLUMN)
+# Row names in country-reporting Total Funding matrix (item 1403).
 REPORTING_FUNDING_ROW_IFRC = "IFRC Secretariat"
 REPORTING_FUNDING_ROW_PNS = "PNSs"
 REPORTING_FUNDING_ROW_OTHER = "HNS other sources"
+# Legacy/display label — not used as the matrix cell-key suffix.
 REPORTING_FUNDING_COLUMN = "NS 2025 Total Funding"
+# Matrix column ``name`` from item 1403 config (cell keys are ``{row}_{column_name}``).
+REPORTING_FUNDING_MATRIX_COLUMN = "tot_fn"
 
 # SP/EF breakdown matrix: Excel Area → manual matrix row label
 REPORTING_SP_BREAKDOWN_AREA_TO_ROW: Dict[str, str] = {
@@ -281,26 +285,6 @@ def parse_comment_value(row: Dict[str, Any]) -> Optional[str]:
         if text:
             return text
     return None
-
-
-def summarize_warnings(warnings: List[str]) -> Dict[str, Any]:
-    """Deduplicate warnings for display, preserving first-seen order and repeat counts."""
-    counts: Dict[str, int] = {}
-    order: List[str] = []
-    for message in warnings:
-        if message not in counts:
-            order.append(message)
-            counts[message] = 0
-        counts[message] += 1
-    summarized = [
-        f"{message} (×{counts[message]})" if counts[message] > 1 else message
-        for message in order
-    ]
-    return {
-        "warnings": summarized,
-        "warning_count": len(warnings),
-        "warning_unique_count": len(order),
-    }
 
 
 def load_upr_data_sheet(path: str) -> Tuple[List[str], List[Dict[str, Any]]]:
@@ -1209,7 +1193,7 @@ def transform_to_import_rows(
     # ── Post-loop: reporting country funding staging → item 1403 matrix cells ──
     for (aes_id, row_name), total in reporting_funding_staging.items():
         if total:
-            cell_key = f"{row_name}_{REPORTING_FUNDING_COLUMN}"
+            cell_key = f"{row_name}_{REPORTING_FUNDING_MATRIX_COLUMN}"
             matrix_cells[(aes_id, ITEM_REPORTING_COUNTRY_FUNDING)][cell_key] = total
 
     # Build reverse map: aes_id → (iso3, period) across ALL templates.

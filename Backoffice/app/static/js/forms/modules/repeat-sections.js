@@ -188,6 +188,69 @@ function purgeRepeatInstanceData(sectionId, instanceNumber) {
     delete sectionData[String(instanceNumber)];
 }
 
+/**
+ * When a repeat entry is removed, its dynamic-indicator DOM goes away but saved
+ * assignments and pending hidden inputs on the form would still be processed on save.
+ * Mirror the per-indicator delete flow by scheduling DB deletions and dropping pending rows.
+ */
+function purgeRepeatInstanceDynamicIndicators(form, repeatEntry, instanceNumber) {
+    if (!form) return;
+
+    const assignmentIds = new Set();
+
+    if (repeatEntry) {
+        repeatEntry.querySelectorAll('[data-assignment-id]').forEach(el => {
+            const id = el.getAttribute('data-assignment-id');
+            if (id && !String(id).startsWith('pending_')) {
+                assignmentIds.add(String(id));
+            }
+        });
+
+        repeatEntry.querySelectorAll('[data-pending-assignment-id]').forEach(el => {
+            const pendingId = el.getAttribute('data-pending-assignment-id');
+            if (!pendingId) return;
+            form.querySelectorAll(`input[data-temp-assignment-id="${pendingId}"]`).forEach(input => input.remove());
+        });
+
+        repeatEntry.querySelectorAll('[data-section-type="dynamic_indicators"]').forEach(subSection => {
+            const subSectionId = subSection.getAttribute('data-dynamic-section-id')
+                || subSection.id.replace('section-container-', '').replace(/-ri-\d+$/, '');
+            if (!subSectionId) return;
+            const pendingName = `pending_dynamic_indicator_${subSectionId}_ri_${instanceNumber}`;
+            form.querySelectorAll(`input[name="${pendingName}"]`).forEach(input => input.remove());
+        });
+    }
+
+    const allData = window.REPEAT_DYNAMIC_INDICATOR_DATA || {};
+    Object.keys(allData).forEach(subSectionId => {
+        const sectionData = allData[subSectionId] ?? allData[String(subSectionId)];
+        if (!sectionData) return;
+
+        const items = sectionData[instanceNumber] ?? sectionData[String(instanceNumber)] ?? [];
+        items.forEach(item => {
+            if (item?.assignment_id != null) {
+                assignmentIds.add(String(item.assignment_id));
+            }
+        });
+
+        delete sectionData[instanceNumber];
+        delete sectionData[String(instanceNumber)];
+
+        const pendingName = `pending_dynamic_indicator_${subSectionId}_ri_${instanceNumber}`;
+        form.querySelectorAll(`input[name="${pendingName}"]`).forEach(input => input.remove());
+    });
+
+    assignmentIds.forEach(assignmentId => {
+        const inputName = `delete_dynamic_indicator_${assignmentId}`;
+        if (form.querySelector(`input[name="${inputName}"]`)) return;
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = inputName;
+        input.value = '1';
+        form.appendChild(input);
+    });
+}
+
 function setRepeatEntryTitleLoading(repeatEntry, loading) {
     const wrap = repeatEntry?.querySelector('.repeat-entry__title-select-wrap');
     const select = wrap?.querySelector('select.repeat-entry__title-select');
@@ -250,12 +313,15 @@ function restoreTitleSelectToFieldBlock(repeatEntry) {
     titleSelect.classList.remove('repeat-entry__title-select');
 }
 
-function finalizeRepeatEntryDeletion(sectionId, instanceNumber) {
+function finalizeRepeatEntryDeletion(sectionId, instanceNumber, repeatEntry = null) {
+    const form = document.querySelector('form#focalDataEntryForm') || document.querySelector('form');
+
+    purgeRepeatInstanceDynamicIndicators(form, repeatEntry, instanceNumber);
+
     // Emergency-metadata hidden inputs are appended directly to the <form> element (not
     // inside the repeat entry element), so they survive repeatEntry.remove().  Remove them
     // explicitly here so they don't fool the server into thinking the deleted entry was
     // still submitted, which would prevent the backend's orphan-removal from deleting it.
-    const form = document.querySelector('form');
     if (form) {
         const prefix = `repeat_${sectionId}_${instanceNumber}_field_`;
         form.querySelectorAll('input[type="hidden"]').forEach(hidden => {
@@ -869,6 +935,17 @@ async function _fetchRepeatIndicatorHtml(fetchFn, assignmentId, attempt = 1) {
  * Pre-rendered HTML avoids lazy-fetch timeouts; live DOM resolution on insert
  * prevents indicators being lost when repeat-entry layout moves nodes.
  */
+function hydrateRepeatEntryDynamicIndicators(repeatEntry, instanceNumber) {
+    if (!repeatEntry) return;
+    repeatEntry.querySelectorAll('[data-section-type="dynamic_indicators"]').forEach(subSection => {
+        const subSectionId = subSection.getAttribute('data-dynamic-section-id')
+            || subSection.id.replace('section-container-', '').replace(/-ri-\d+$/, '');
+        if (subSectionId) {
+            injectExistingRepeatIndicators(subSectionId, instanceNumber);
+        }
+    });
+}
+
 async function injectExistingRepeatIndicators(sectionId, instanceNumber) {
     const allData = window.REPEAT_DYNAMIC_INDICATOR_DATA || {};
     const sectionData = allData[sectionId] || allData[String(sectionId)] || {};
@@ -1001,9 +1078,9 @@ function createRepeatEntry(sectionId, isInitialEntry = false) {
                 window.showDangerConfirmation(
                     confirmMessage,
                     () => {
+                        finalizeRepeatEntryDeletion(sectionId, instanceNumber, repeatEntry);
                         repeatEntry.remove();
                         debugLog('repeat-sections', `Deleted repeat entry #${instanceNumber} for section ${sectionId}`);
-                        finalizeRepeatEntryDeletion(sectionId, instanceNumber);
                     },
                     null,
                     'Delete',
@@ -1014,9 +1091,9 @@ function createRepeatEntry(sectionId, isInitialEntry = false) {
                 window.showConfirmation(
                     confirmMessage,
                     () => {
+                        finalizeRepeatEntryDeletion(sectionId, instanceNumber, repeatEntry);
                         repeatEntry.remove();
                         debugLog('repeat-sections', `Deleted repeat entry #${instanceNumber} for section ${sectionId}`);
-                        finalizeRepeatEntryDeletion(sectionId, instanceNumber);
                     },
                     null,
                     'Delete',
@@ -1704,6 +1781,8 @@ function loadExistingRepeatData() {
             const fieldData = instanceData.data || instanceData;
             debugLog('repeat-sections', `🔍 Extracted field data:`, fieldData);
             debugLog('repeat-sections', `🔍 Field data keys: [${Object.keys(fieldData).join(', ')}]`);
+
+            hydrateRepeatEntryDynamicIndicators(currentEntry, instanceNumber);
 
             if (Object.keys(fieldData).length === 0) {
                 debugLog('repeat-sections', `📭 No field data to load for instance ${instanceNumber}`);

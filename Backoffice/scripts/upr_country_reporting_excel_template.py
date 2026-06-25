@@ -518,6 +518,8 @@ def _resolve_workbook_indicator_bank_id(
 def _workbook_yes_no_value(applicable_text: str) -> str:
     """Map workbook Applicable column to entry-form yes/no storage."""
     text = str(applicable_text or "").strip().lower()
+    if "data not available" in text:
+        return "no"
     if "applicable" in text:
         return "yes"
     return "no"
@@ -529,10 +531,10 @@ def _resolve_indicator_import_value(
     yes_no_bank_ids: Set[int],
 ) -> Tuple[Optional[Any], bool, Optional[Dict[str, Any]], bool]:
     """Return (value, data_not_available, disagg, should_import)."""
-    if row.get("data_not_available"):
-        return None, True, None, True
     if bank_id and bank_id in yes_no_bank_ids:
         return _workbook_yes_no_value(row.get("applicable_text", "")), False, None, True
+    if row.get("data_not_available"):
+        return None, True, None, True
     disagg = row.get("disagg")
     value = row.get("value")
     return value, False, disagg, bool(disagg or value is not None)
@@ -1559,13 +1561,9 @@ def parse_indicators(
                 resolved_bank_id and yes_no_bank_ids and resolved_bank_id in yes_no_bank_ids
             )
             if is_yes_no:
-                if is_dna:
-                    value = None
-                elif "applicable" in applicable:
-                    value = "yes"
-                else:
-                    value = "no"
+                value = "yes" if "applicable" in applicable and not is_dna else "no"
                 disagg = None
+                is_dna = False
             elif not is_dna and "applicable" in applicable and disagg is None and value is None:
                 # Numeric placeholders: Applicable with no values — skip on import.
                 continue

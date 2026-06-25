@@ -561,6 +561,7 @@ def test_apply_reporting_assignment_label_updates_start_and_headers(upr_country_
 def test_workbook_yes_no_value_mapping():
     assert _workbook_yes_no_value("Applicable") == "yes"
     assert _workbook_yes_no_value(" applicable ") == "yes"
+    assert _workbook_yes_no_value("Data not available") == "no"
     assert _workbook_yes_no_value("") == "no"
 
 
@@ -626,6 +627,17 @@ def test_resolve_indicator_import_value_yes_no():
     }
     value, is_dna, disagg, should_import = _resolve_indicator_import_value(no_row, 999, {999})
     assert value == "no"
+    assert should_import
+
+    dna_row = {
+        "data_not_available": True,
+        "applicable_text": "data not available",
+        "value": None,
+        "disagg": None,
+    }
+    value, is_dna, disagg, should_import = _resolve_indicator_import_value(dna_row, 999, {999})
+    assert value == "no"
+    assert not is_dna
     assert should_import
 
     numeric_row = {

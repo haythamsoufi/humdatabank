@@ -285,6 +285,15 @@ a.close-modal:not(.btn) {
 /* End unified button system */
 
 /* Flash Message Styles */
+/* DOM mount + aria-live region only; .flash-messages is fixed to the viewport bottom */
+#flashMessagesContainer {
+    margin: 0;
+    padding: 0;
+    height: 0;
+    min-height: 0;
+    overflow: visible;
+}
+
 .flash-messages {
     position: fixed;
     bottom: 1.5rem;

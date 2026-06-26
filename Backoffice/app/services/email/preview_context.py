@@ -88,7 +88,7 @@ def get_email_template_preview_context(
             "user_name": "Jamie",
             "dashboard_url": f"{base_url}/",
             "notifications_url": f"{base_url}/notifications",
-            "documentation_url": f"{base_url}/admin/docs/",
+            "documentation_url": f"{base_url}/help/docs/",
             "org_name": org_name,
             "copyright_year": copyright_year,
         }

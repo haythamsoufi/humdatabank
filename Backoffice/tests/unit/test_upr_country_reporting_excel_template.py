@@ -42,6 +42,7 @@ from upr_country_reporting_excel_template import (  # noqa: E402
     _entry_is_yes_no,
     _is_yes_no_indicator_type,
     _parse_workbook_row_disagg,
+    import_rows_to_client_payload,
     build_kpi_lookup,
     parse_comments,
     parse_funding,
@@ -56,6 +57,7 @@ from upr_country_reporting_excel_template import (  # noqa: E402
     read_named_cell,
     read_named_table,
     write_table_cell,
+    validate_upr_country_reporting_import_file,
     _table_data_row_capacity,
     DATA_OTHER_SHEET,
     DATA_OTHER_TABLE,
@@ -656,6 +658,60 @@ def test_reporting_funding_matrix_column_matches_form_item(app):
         assert _reporting_funding_matrix_column() == "tot_fn"
 
 
+def test_validate_upr_country_reporting_import_file_accepts_current_template(
+    upr_country_reporting_workbook,
+):
+    result = validate_upr_country_reporting_import_file(
+        upr_country_reporting_workbook,
+        expected_country="Afghanistan",
+        expected_period="Jan-Jun 2026",
+    )
+    assert result["valid"]
+    assert result["preview"]["kpi_count"] > 0
+    assert result["preview"]["core_indicator_rows"] > 0
+
+
+def test_validate_upr_country_reporting_import_file_rejects_generic_export():
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    wb.create_sheet("Template")
+    wb.create_sheet("Pages")
+    wb.create_sheet("Sections")
+    wb.create_sheet("Items")
+    if "Sheet" in wb.sheetnames:
+        del wb["Sheet"]
+    result = validate_upr_country_reporting_import_file(wb)
+    assert not result["valid"]
+    assert any("generic form Excel export" in err for err in result["errors"])
+    wb.close()
+
+
+def test_validate_upr_country_reporting_import_file_rejects_country_mismatch(
+    upr_country_reporting_workbook,
+):
+    result = validate_upr_country_reporting_import_file(
+        upr_country_reporting_workbook,
+        expected_country="Netherlands",
+        expected_period="Jan-Jun 2026",
+    )
+    assert not result["valid"]
+    assert any("country" in err.lower() for err in result["errors"])
+
+
+def test_validate_upr_country_reporting_import_file_allows_period_mismatch(
+    upr_country_reporting_workbook,
+):
+    result = validate_upr_country_reporting_import_file(
+        upr_country_reporting_workbook,
+        expected_country="Afghanistan",
+        expected_period="2025",
+    )
+    assert result["valid"]
+    assert any("period" in w.lower() for w in result["warnings"])
+    assert not any("period" in err.lower() for err in result["errors"])
+
+
 def test_quiet_openpyxl_io_suppresses_pil_debug(capsys):
     import logging
 
@@ -670,3 +726,40 @@ def test_quiet_openpyxl_io_suppresses_pil_debug(capsys):
         assert "IHDR" not in captured.err
     finally:
         pil_logger.setLevel(previous)
+
+
+def test_import_rows_to_client_payload_splits_fields_and_matrices():
+    from import_fdrs_form_data import COL_DATA_NA, COL_DISAGG, COL_ITEM, COL_VALUE
+
+    rows = [
+        {
+            COL_ITEM: "100",
+            COL_VALUE: "42",
+            COL_DISAGG: "",
+            COL_DATA_NA: "",
+        },
+        {
+            COL_ITEM: "200",
+            COL_VALUE: "",
+            COL_DISAGG: '{"mode":"total","values":{"total":99}}',
+            COL_DATA_NA: "",
+        },
+        {
+            COL_ITEM: "300",
+            COL_VALUE: "",
+            COL_DISAGG: '{"IFRC_tot_fn":1500}',
+            COL_DATA_NA: "",
+        },
+        {
+            COL_ITEM: "400",
+            COL_VALUE: "",
+            COL_DISAGG: "",
+            COL_DATA_NA: "1",
+        },
+    ]
+    fields, matrices = import_rows_to_client_payload(rows)
+    assert fields["100"]["value"] == "42"
+    assert fields["200"]["disagg_data"]["mode"] == "total"
+    assert matrices["300"]["IFRC_tot_fn"] == 1500
+    assert fields["400"]["data_not_available"] is True
+    assert "400" not in matrices

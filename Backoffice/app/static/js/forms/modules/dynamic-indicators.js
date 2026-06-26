@@ -993,6 +993,111 @@ function addDynamicIndicator(sectionId, indicatorId, rowId, repeatInstance = nul
     });
 }
 
+/**
+ * Render a pending dynamic indicator (no DB write) for Excel import staging.
+ * Returns the inserted DOM element, or null when already present.
+ */
+export function addPendingDynamicIndicatorForImport(sectionId, indicatorBankId, repeatInstance = null) {
+    if (isIndicatorAlreadyAdded(sectionId, indicatorBankId, repeatInstance)) {
+        return Promise.resolve(null);
+    }
+
+    const sectionContainer = (repeatInstance !== null
+        ? document.getElementById(`section-container-${sectionId}-ri-${repeatInstance}`)
+        : null) || document.getElementById(`section-container-${sectionId}`);
+    const aesId = sectionContainer?.getAttribute('data-aes-id')
+        || document.querySelector('[data-aes-id]')?.getAttribute('data-aes-id');
+
+    if (!aesId || String(aesId) === '0') {
+        return Promise.reject(new Error('Assignment not found'));
+    }
+
+    const indicator = (window.availableIndicatorsData?.[sectionId] || []).find(
+        (i) => String(i.id) === String(indicatorBankId)
+    );
+    if (!indicator) {
+        return Promise.reject(new Error(`Indicator ${indicatorBankId} not available in section ${sectionId}`));
+    }
+
+    const tempAssignmentId = `pending_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const formData = new FormData();
+    formData.append('section_id', sectionId);
+    formData.append('indicator_bank_id', indicatorBankId);
+    formData.append('assignment_entity_status_id', aesId);
+    formData.append('temp_assignment_id', tempAssignmentId);
+    if (repeatInstance !== null) {
+        formData.append('repeat_instance_number', repeatInstance);
+    }
+
+    const csrfToken = document.querySelector('input[name="csrf_token"]')?.value
+        || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    const _dfetch = (window.getFetch && window.getFetch()) || fetch;
+
+    return _dfetch('/api/forms/dynamic-indicators/render-pending', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    })
+        .then((response) => {
+            if (!response.ok) {
+                return response.json().then((data) => {
+                    throw new Error(data.error || 'Failed to render indicator');
+                });
+            }
+            return response.json();
+        })
+        .then((data) => {
+            if (!data.success || !data.html) {
+                throw new Error(data.error || 'Failed to render indicator');
+            }
+
+            const interfaceEl = (repeatInstance !== null
+                ? document.getElementById(`dynamic-indicator-interface-${sectionId}-ri-${repeatInstance}`)
+                : null) || document.getElementById(`dynamic-indicator-interface-${sectionId}`);
+            const insertionPoint = interfaceEl?.parentElement || sectionContainer;
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(data.html.trim(), 'text/html');
+            const indicatorElement = doc.body.firstElementChild;
+
+            if (!indicatorElement || !insertionPoint) {
+                throw new Error('Failed to insert indicator into page');
+            }
+
+            const form = document.querySelector('form#focalDataEntryForm');
+            if (form) {
+                const pendingInput = document.createElement('input');
+                pendingInput.type = 'hidden';
+                pendingInput.name = repeatInstance !== null
+                    ? `pending_dynamic_indicator_${sectionId}_ri_${repeatInstance}`
+                    : `pending_dynamic_indicator_${sectionId}`;
+                pendingInput.value = `${indicatorBankId}:${tempAssignmentId}`;
+                pendingInput.setAttribute('data-temp-assignment-id', tempAssignmentId);
+                form.appendChild(pendingInput);
+            }
+
+            indicatorElement.setAttribute('data-pending-assignment-id', tempAssignmentId);
+            if (interfaceEl) {
+                insertionPoint.insertBefore(indicatorElement, interfaceEl);
+            } else {
+                insertionPoint.appendChild(indicatorElement);
+            }
+
+            applyLayoutToSection(sectionContainer);
+            initializeFieldListeners(indicatorElement);
+            if (window.reinitializeDisaggregationCalculator) {
+                window.reinitializeDisaggregationCalculator();
+            }
+            if (window.cleanupInputValues) {
+                window.cleanupInputValues();
+            }
+            refreshDynamicIndicatorButtonStates();
+            return indicatorElement;
+        });
+}
+
 function isIndicatorAlreadyAdded(sectionId, indicatorId, repeatInstance = null) {
     // Check within the appropriate container (per-entry clone or section-level)
     const containerId = repeatInstance !== null

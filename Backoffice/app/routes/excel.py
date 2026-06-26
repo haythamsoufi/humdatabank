@@ -300,6 +300,24 @@ def export_upr_country_reporting_template(aes_id):
     return resp
 
 
+@excel_bp.route("/assignment/<int:aes_id>/validate-upr-country-reporting", methods=["POST"])
+@excel_bp.route("/assignment/<int:aes_id>/validate-myr", methods=["POST"])  # legacy URL
+@login_required
+def validate_upr_country_reporting_import(aes_id):
+    """Validate a UPR Country Reporting workbook before import (structure + assignment match)."""
+    aes, error_response = _validate_upr_country_reporting_assignment(aes_id, is_ajax=True)
+    if error_response is not None:
+        return error_response
+
+    excel_file = request.files.get("excel_file")
+    upload_error = _validate_excel_upload(excel_file, is_ajax=True, aes_id=aes_id)
+    if upload_error is not None:
+        return upload_error
+
+    result = UprCountryReportingExcelService.validate_import_file(aes, excel_file.read())
+    return json_ok(**result)
+
+
 @excel_bp.route("/assignment/<int:aes_id>/import-upr-country-reporting", methods=["POST"])
 @excel_bp.route("/assignment/<int:aes_id>/import-myr", methods=["POST"])  # legacy URL
 @login_required
@@ -321,26 +339,41 @@ def import_upr_country_reporting_template(aes_id):
         return upload_error
 
     file_bytes = excel_file.read()
-    result = UprCountryReportingExcelService.import_data(aes, file_bytes)
+    result = UprCountryReportingExcelService.import_data_for_form(aes, file_bytes)
 
     if result.get("success"):
         updated_count = result.get("updated_count", 0)
         warnings = result.get("warnings") or []
         if warnings:
-            error_msg = (
-                f"{UPR_COUNTRY_REPORTING_LABEL} import completed with {updated_count} values saved. "
+            success_msg = (
+                f"{UPR_COUNTRY_REPORTING_LABEL} loaded {updated_count} values into the form. "
+                f"Review your data and click Save to persist. "
                 f"Warnings: {', '.join(warnings[:5])}"
             )
             if len(warnings) > 5:
-                error_msg += f" (and {len(warnings) - 5} more)"
-            flash(error_msg, "warning")
+                success_msg += f" (and {len(warnings) - 5} more)"
+            flash(success_msg, "warning")
             if is_ajax:
-                return json_ok(message=error_msg, updated_count=updated_count, warnings=warnings)
+                return json_ok(
+                    message=success_msg,
+                    updated_count=updated_count,
+                    warnings=warnings,
+                    stage_only=True,
+                    payload=result.get("payload"),
+                )
         else:
-            success_msg = f"{UPR_COUNTRY_REPORTING_LABEL} import completed: {updated_count} values saved."
+            success_msg = (
+                f"{UPR_COUNTRY_REPORTING_LABEL} loaded {updated_count} values into the form. "
+                "Review your data and click Save to persist."
+            )
             flash(success_msg, "success")
             if is_ajax:
-                return json_ok(message=success_msg, updated_count=updated_count)
+                return json_ok(
+                    message=success_msg,
+                    updated_count=updated_count,
+                    stage_only=True,
+                    payload=result.get("payload"),
+                )
     else:
         error_msg = result.get("message") or f"{UPR_COUNTRY_REPORTING_LABEL} import failed."
         flash(error_msg, "danger")

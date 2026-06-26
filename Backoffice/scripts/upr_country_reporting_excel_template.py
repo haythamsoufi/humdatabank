@@ -151,6 +151,25 @@ INDICATOR_HEADER = "Indicator"
 DATA_OTHER_SHEET = "Overall action Indicators"
 DATA_OTHER_TABLE = "Data_other"
 
+# Workbooks produced by the generic assignment Excel export (not UPR Country Reporting).
+GENERIC_FORM_EXPORT_SHEETS: Tuple[str, ...] = ("Template", "Pages", "Sections", "Items")
+
+# Minimum structure required by the T33 UPR Country Reporting import script.
+UPR_COUNTRY_REPORTING_REQUIRED_NAMED_RANGES: Tuple[str, ...] = (
+    "Version",
+    "Data_Country",
+)
+UPR_COUNTRY_REPORTING_REQUIRED_TABLES: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
+    ("Indicators list", "Final", ("KPI ID", "SP/EF", "Indicator Name")),
+    (
+        "Overall action Indicators",
+        "Data_core",
+        (INDICATOR_ID_HEADER, SP_EF_HEADER, INDICATOR_HEADER, INDICATOR_DNA_HEADER),
+    ),
+    ("Funding", "Data_funding1", ()),
+)
+UPR_COUNTRY_REPORTING_COMPATIBLE_ROUND_PREFIXES: Tuple[str, ...] = ("MYR", "AR")
+
 # Fuzzy label matching thresholds (Excel truncates long indicator names).
 INDICATOR_MATCH_THRESHOLD = 0.60
 INDICATOR_CROSS_SECTION_THRESHOLD = 0.95
@@ -2125,46 +2144,38 @@ def _upsert_dynamic_indicator(
     return action
 
 
-def _import_dynamic_indicators_from_workbook(
+def _lookup_existing_dynamic_assignment_id(
+    aes_id: int,
+    section_id: int,
+    indicator_bank_id: int,
+    repeat_instance_number: Optional[int],
+) -> Optional[int]:
+    from app.models.forms import DynamicIndicatorData
+
+    row = DynamicIndicatorData.query.filter_by(
+        assignment_entity_status_id=aes_id,
+        section_id=section_id,
+        indicator_bank_id=indicator_bank_id,
+        repeat_instance_number=repeat_instance_number,
+    ).first()
+    return int(row.id) if row else None
+
+
+def _collect_workbook_dynamic_indicator_entries(
     aes_id: int,
     wb,
     ctx: UprImportContext,
     *,
     section_label_map: Dict[Tuple[str, str], int],
     kpi_lookup: Dict[Tuple[str, str], int],
-    dry_run: bool = False,
-) -> Dict[str, int]:
-    from app.extensions import db
-
+) -> List[Dict[str, Any]]:
+    """Parse dynamic indicator rows from a workbook without writing to the database."""
     section_ids = _load_upr_country_reporting_section_ids()
     ea_dynamic = section_ids.get("ea_dynamic")
-    ea_repeat = section_ids.get("ea_repeat")
     other_dynamic = section_ids.get("other_dynamic")
-    user_id = _default_user_id_for_import()
-    stats = {"inserted": 0, "updated": 0}
     yes_no_bank_ids = _load_workbook_yes_no_bank_ids(wb, kpi_lookup)
-
-    if dry_run:
-        return stats
-
-    slot_meta = parse_emergency_slot_metadata(wb)
-    choice_item_id = _load_upr_country_reporting_emergency_choice_item_id(ea_repeat)
-    for slot_num, meta in slot_meta.items():
-        if ea_repeat:
-            inst = _ensure_repeat_instance(
-                aes_id,
-                ea_repeat,
-                slot_num,
-                meta.get("appeal_name") or meta.get("mdr_code"),
-                user_id=user_id,
-            )
-            if inst and choice_item_id:
-                _upsert_emergency_repeat_choice(
-                    repeat_instance=inst,
-                    choice_item_id=choice_item_id,
-                    appeal_name=meta.get("appeal_name") or "",
-                    mdr_code=meta.get("mdr_code") or "",
-                )
+    entries: List[Dict[str, Any]] = []
+    order = 0.0
 
     emergency_tables = tuple((sheet, table) for sheet, table, *_rest in EMERGENCY_SLOTS)
     ea_rows = parse_indicators(
@@ -2173,7 +2184,6 @@ def _import_dynamic_indicators_from_workbook(
         yes_no_bank_ids=yes_no_bank_ids,
         kpi_lookup=kpi_lookup,
     )
-    order = 0.0
     for row in ea_rows:
         if not ea_dynamic:
             continue
@@ -2195,20 +2205,21 @@ def _import_dynamic_indicators_from_workbook(
         if not should_import:
             continue
         order += 1.0
-        action = _upsert_dynamic_indicator(
-            aes_id=aes_id,
-            section_id=ea_dynamic,
-            indicator_bank_id=bank_id,
-            repeat_instance_number=slot_num,
-            value=value,
-            data_not_available=is_dna,
-            user_id=user_id,
-            order=order,
-            disagg_payload=disagg,
+        entries.append(
+            {
+                "section_id": ea_dynamic,
+                "indicator_bank_id": bank_id,
+                "repeat_instance_number": slot_num,
+                "value": value,
+                "data_not_available": is_dna,
+                "disagg_data": disagg,
+                "order": order,
+                "existing_assignment_id": _lookup_existing_dynamic_assignment_id(
+                    aes_id, ea_dynamic, bank_id, slot_num
+                ),
+            }
         )
-        stats[action] += 1
 
-    # Other dynamic indicators: rows present in Data_other when populated.
     if other_dynamic and "Overall action Indicators" in wb.sheetnames:
         if "Data_other" in wb["Overall action Indicators"].tables:
             other_rows = parse_indicators(
@@ -2236,18 +2247,178 @@ def _import_dynamic_indicators_from_workbook(
                 if not should_import:
                     continue
                 order += 1.0
-                action = _upsert_dynamic_indicator(
-                    aes_id=aes_id,
-                    section_id=other_dynamic,
-                    indicator_bank_id=bank_id,
-                    repeat_instance_number=None,
-                    value=value,
-                    data_not_available=is_dna,
-                    user_id=user_id,
-                    order=order,
-                    disagg_payload=disagg,
+                entries.append(
+                    {
+                        "section_id": other_dynamic,
+                        "indicator_bank_id": bank_id,
+                        "repeat_instance_number": None,
+                        "value": value,
+                        "data_not_available": is_dna,
+                        "disagg_data": disagg,
+                        "order": order,
+                        "existing_assignment_id": _lookup_existing_dynamic_assignment_id(
+                            aes_id, other_dynamic, bank_id, None
+                        ),
+                    }
                 )
-                stats[action] += 1
+    return entries
+
+
+def _collect_workbook_repeat_slot_entries(
+    aes_id: int,
+    wb,
+    dynamic_entries: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Build repeat-slot metadata for client-side repeat entry creation."""
+    section_ids = _load_upr_country_reporting_section_ids()
+    ea_repeat = section_ids.get("ea_repeat")
+    if not ea_repeat:
+        return []
+
+    choice_item_id = _load_upr_country_reporting_emergency_choice_item_id(ea_repeat)
+    slot_meta = parse_emergency_slot_metadata(wb)
+    required_slots: Set[int] = set(slot_meta.keys())
+    for entry in dynamic_entries:
+        repeat_num = entry.get("repeat_instance_number")
+        if repeat_num is not None:
+            required_slots.add(int(repeat_num))
+
+    out: List[Dict[str, Any]] = []
+    for slot_num in sorted(required_slots):
+        meta = slot_meta.get(slot_num) or {}
+        appeal_name = meta.get("appeal_name") or ""
+        mdr_code = meta.get("mdr_code") or ""
+        out.append(
+            {
+                "repeat_section_id": ea_repeat,
+                "slot_num": slot_num,
+                "mdr_code": mdr_code,
+                "appeal_name": appeal_name,
+                "choice_item_id": choice_item_id,
+                "display_value": _format_emergency_operation_display(appeal_name, mdr_code),
+            }
+        )
+    return out
+
+
+def import_rows_to_client_payload(
+    import_rows: List[Dict[str, str]],
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Split form_data import rows into static field values and matrix cell maps."""
+    fields: Dict[str, Any] = {}
+    matrices: Dict[str, Any] = {}
+    for row in import_rows:
+        item_id = str(row.get(COL_ITEM) or "").strip()
+        if not item_id:
+            continue
+        data_na = str(row.get(COL_DATA_NA) or "").strip() == "1"
+        disagg_raw = str(row.get(COL_DISAGG) or "").strip()
+        value = row.get(COL_VALUE)
+
+        if disagg_raw:
+            try:
+                disagg = json.loads(disagg_raw)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(disagg, dict) and ("mode" in disagg or "values" in disagg):
+                fields[item_id] = {"disagg_data": disagg, "data_not_available": data_na}
+            elif isinstance(disagg, dict):
+                matrices[item_id] = disagg
+            continue
+        if data_na:
+            fields[item_id] = {"data_not_available": True}
+        elif value is not None and str(value).strip() != "":
+            fields[item_id] = {"value": str(value)}
+    return fields, matrices
+
+
+def build_upr_country_reporting_client_payload(
+    aes_id: int,
+    wb,
+    ctx: UprImportContext,
+    import_rows: List[Dict[str, str]],
+    *,
+    iso3: str,
+    period: str,
+) -> Dict[str, Any]:
+    """Build a JSON-serializable payload for staging an Excel import in the browser."""
+    fields, matrices = import_rows_to_client_payload(import_rows)
+    section_label_map = _load_items_by_section_label(REPORTING_COUNTRY_TEMPLATE_ID)
+    kpi_lookup = build_kpi_lookup(wb)
+    dynamic_entries = _collect_workbook_dynamic_indicator_entries(
+        aes_id,
+        wb,
+        ctx,
+        section_label_map=section_label_map,
+        kpi_lookup=kpi_lookup,
+    )
+    repeat_slots = _collect_workbook_repeat_slot_entries(aes_id, wb, dynamic_entries)
+    return {
+        "fields": fields,
+        "matrices": matrices,
+        "dynamic_indicators": dynamic_entries,
+        "repeat_slots": repeat_slots,
+        "meta": {"iso3": iso3, "period": period},
+    }
+
+
+def _import_dynamic_indicators_from_workbook(
+    aes_id: int,
+    wb,
+    ctx: UprImportContext,
+    *,
+    section_label_map: Dict[Tuple[str, str], int],
+    kpi_lookup: Dict[Tuple[str, str], int],
+    dry_run: bool = False,
+) -> Dict[str, int]:
+    from app.extensions import db
+
+    section_ids = _load_upr_country_reporting_section_ids()
+    ea_repeat = section_ids.get("ea_repeat")
+    user_id = _default_user_id_for_import()
+    stats = {"inserted": 0, "updated": 0}
+
+    if dry_run:
+        return stats
+
+    slot_meta = parse_emergency_slot_metadata(wb)
+    choice_item_id = _load_upr_country_reporting_emergency_choice_item_id(ea_repeat)
+    for slot_num, meta in slot_meta.items():
+        if ea_repeat:
+            inst = _ensure_repeat_instance(
+                aes_id,
+                ea_repeat,
+                slot_num,
+                meta.get("appeal_name") or meta.get("mdr_code"),
+                user_id=user_id,
+            )
+            if inst and choice_item_id:
+                _upsert_emergency_repeat_choice(
+                    repeat_instance=inst,
+                    choice_item_id=choice_item_id,
+                    appeal_name=meta.get("appeal_name") or "",
+                    mdr_code=meta.get("mdr_code") or "",
+                )
+
+    for entry in _collect_workbook_dynamic_indicator_entries(
+        aes_id,
+        wb,
+        ctx,
+        section_label_map=section_label_map,
+        kpi_lookup=kpi_lookup,
+    ):
+        action = _upsert_dynamic_indicator(
+            aes_id=aes_id,
+            section_id=entry["section_id"],
+            indicator_bank_id=entry["indicator_bank_id"],
+            repeat_instance_number=entry.get("repeat_instance_number"),
+            value=entry.get("value"),
+            data_not_available=bool(entry.get("data_not_available")),
+            user_id=user_id,
+            order=float(entry.get("order") or 0),
+            disagg_payload=entry.get("disagg_data"),
+        )
+        stats[action] += 1
 
     db.session.commit()
     return stats
@@ -2407,6 +2578,179 @@ def _scalar_value(entry) -> Any:
     if entry.is_data_not_available:
         return None
     return entry.value
+
+
+def _workbook_table_headers(wb, sheet_name: str, table_name: str) -> Optional[List[str]]:
+    """Return Excel table header row values, or None when the sheet/table is missing."""
+    if sheet_name not in wb.sheetnames:
+        return None
+    ws = wb[sheet_name]
+    if table_name not in ws.tables:
+        return None
+    from openpyxl.utils import range_boundaries
+
+    tbl = ws.tables[table_name]
+    ref = tbl.ref if hasattr(tbl, "ref") else tbl
+    min_col, min_row, max_col, _max_row = range_boundaries(ref)
+    headers: List[str] = []
+    for col in range(min_col, max_col + 1):
+        raw = ws.cell(min_row, col).value
+        headers.append(str(raw).strip() if raw is not None else "")
+    return headers
+
+
+def _header_set_includes(headers: Optional[List[str]], required: Iterable[str]) -> bool:
+    if not headers:
+        return False
+    normalized = {_normalize_workbook_header(h) for h in headers if h}
+    for header in required:
+        if _normalize_workbook_header(header) not in normalized:
+            return False
+    return True
+
+
+def validate_upr_country_reporting_import_file(
+    wb,
+    *,
+    expected_country: str = "",
+    expected_period: str = "",
+) -> Dict[str, Any]:
+    """Validate a workbook before UPR Country Reporting import (structure + assignment match).
+
+    Returns dict with keys: valid, message, errors, warnings, preview.
+    """
+    errors: List[str] = []
+    warnings: List[str] = []
+    preview: Dict[str, Any] = {
+        "country": None,
+        "period": None,
+        "round_code": None,
+        "kpi_count": 0,
+        "core_indicator_rows": 0,
+    }
+
+    generic_hits = [name for name in GENERIC_FORM_EXPORT_SHEETS if name in wb.sheetnames]
+    if generic_hits:
+        errors.append(
+            "This file looks like a generic form Excel export (sheets: "
+            f"{', '.join(generic_hits)}), not a UPR Country Reporting workbook. "
+            "Use Export UPR Country Reporting from this assignment and fill that template."
+        )
+
+    for named_range in UPR_COUNTRY_REPORTING_REQUIRED_NAMED_RANGES:
+        if named_range not in wb.defined_names:
+            errors.append(
+                f"Missing named range {named_range!r}. "
+                "Download a current UPR Country Reporting template from this assignment."
+            )
+
+    for sheet_name, table_name, required_headers in UPR_COUNTRY_REPORTING_REQUIRED_TABLES:
+        headers = _workbook_table_headers(wb, sheet_name, table_name)
+        if headers is None:
+            if sheet_name not in wb.sheetnames:
+                errors.append(f"Missing sheet {sheet_name!r}.")
+            else:
+                errors.append(
+                    f"Missing table {table_name!r} on sheet {sheet_name!r}. "
+                    "Older IFRC templates are not compatible with this import."
+                )
+            continue
+        if required_headers and not _header_set_includes(headers, required_headers):
+            normalized = {_normalize_workbook_header(h) for h in headers if h}
+            missing = [
+                header
+                for header in required_headers
+                if _normalize_workbook_header(header) not in normalized
+            ]
+            if INDICATOR_ID_HEADER in missing:
+                errors.append(
+                    "The Overall action Indicators table is missing the ID column. "
+                    "Export a fresh UPR Country Reporting template from this assignment "
+                    "(older Midyear templates without bank IDs cannot be imported)."
+                )
+            else:
+                errors.append(
+                    f"Table {table_name!r} on {sheet_name!r} is missing required columns: "
+                    f"{', '.join(missing)}."
+                )
+
+    round_code, period_name = parse_version(wb)
+    preview["round_code"] = round_code or None
+    preview["period"] = period_name or None
+    country_name = str(read_named_cell(wb, "Data_Country") or "").strip()
+    preview["country"] = country_name or None
+
+    if not round_code:
+        errors.append(
+            "Missing or unreadable Version cell. "
+            "Use a UPR Country Reporting template exported from this assignment."
+        )
+    elif not any(round_code.startswith(prefix) for prefix in UPR_COUNTRY_REPORTING_COMPATIBLE_ROUND_PREFIXES):
+        errors.append(
+            f"Unsupported workbook version {round_code!r}. "
+            f"Expected a reporting round code starting with "
+            f"{' or '.join(UPR_COUNTRY_REPORTING_COMPATIBLE_ROUND_PREFIXES)}."
+        )
+
+    if not errors:
+        try:
+            kpi_lookup = build_kpi_lookup(wb)
+        except Exception:
+            kpi_lookup = {}
+            errors.append(
+                "Could not read the Indicators list (Final) table. "
+                "Ensure the workbook is an unmodified UPR Country Reporting template."
+            )
+        else:
+            preview["kpi_count"] = len(kpi_lookup)
+            if not kpi_lookup:
+                errors.append(
+                    "Indicators list (Final) contains no KPI mappings. "
+                    "Download a current template from this assignment."
+                )
+
+    if not errors and "Overall action Indicators" in wb.sheetnames:
+        try:
+            _, core_rows = read_named_table(wb, "Overall action Indicators", "Data_core")
+            preview["core_indicator_rows"] = len(core_rows)
+            if not any(_parse_row_bank_id(row) for row in core_rows):
+                errors.append(
+                    "Overall action Indicators rows have no bank IDs. "
+                    "Export a fresh UPR Country Reporting template from this assignment."
+                )
+        except Exception:
+            errors.append("Could not read Overall action Indicators (Data_core).")
+
+    if expected_period and period_name and period_name != expected_period:
+        warnings.append(
+            f"Workbook period {period_name!r} differs from this assignment ({expected_period!r}). "
+            "Values will be loaded into the current assignment."
+        )
+    if expected_country and country_name:
+        if _normalize_text(expected_country) != _normalize_text(country_name):
+            errors.append(
+                f"Workbook country {country_name!r} does not match this assignment ({expected_country!r}). "
+                "Use the file exported for this country assignment."
+            )
+    elif expected_country and not country_name:
+        warnings.append("Workbook country is blank on the Start sheet.")
+
+    valid = len(errors) == 0
+    if valid:
+        message = (
+            f"Compatible UPR Country Reporting workbook"
+            f"{f' for {country_name}' if country_name else ''}"
+            f"{f' ({period_name})' if period_name else ''}."
+        )
+    else:
+        message = errors[0]
+    return {
+        "valid": valid,
+        "message": message,
+        "errors": errors,
+        "warnings": warnings,
+        "preview": preview,
+    }
 
 
 def validate_upr_country_reporting_workbook(
@@ -2600,9 +2944,14 @@ def run_upr_country_reporting_import(
     input_path: str,
     *,
     dry_run: bool = False,
+    persist: bool = True,
     batch_size: int = 500,
 ) -> Dict[str, Any]:
-    """Import a UPR Country Reporting workbook into a single T33 assignment."""
+    """Import a UPR Country Reporting workbook into a single T33 assignment.
+
+    When ``persist`` is False, parse the workbook and return a client payload for
+    staging in the browser without writing to the database.
+    """
     from contextlib import nullcontext
 
     from app.extensions import db
@@ -2643,10 +2992,51 @@ def run_upr_country_reporting_import(
         )
         stats["warnings"] = list(meta.warnings)
 
+        compat = validate_upr_country_reporting_import_file(
+            wb,
+            expected_country=country_name,
+            expected_period=period,
+        )
+        if not compat.get("valid"):
+            stats["success"] = False
+            stats["errors"] = 1
+            stats["message"] = compat.get("message") or "Workbook is not compatible with UPR Country Reporting import."
+            stats["warnings"].extend(compat.get("warnings") or [])
+            for err in compat.get("errors") or []:
+                if err not in stats["warnings"]:
+                    stats["warnings"].append(err)
+            wb.close()
+            return stats
+        stats["warnings"].extend(compat.get("warnings") or [])
+
         ctx = build_import_context([REPORTING_COUNTRY_TEMPLATE_ID])
         import_rows = transform_upr_country_reporting_to_import_rows(aes_id, wb, ctx, iso3=iso3, period=period)
         stats["warnings"].extend(ctx.warnings)
         stats["transformed"] = len(import_rows)
+
+        if not persist:
+            payload = build_upr_country_reporting_client_payload(
+                aes_id,
+                wb,
+                ctx,
+                import_rows,
+                iso3=iso3,
+                period=period,
+            )
+            field_count = len(payload.get("fields") or {})
+            matrix_count = len(payload.get("matrices") or {})
+            dynamic_count = len(payload.get("dynamic_indicators") or [])
+            repeat_count = len(payload.get("repeat_slots") or [])
+            updated_count = field_count + matrix_count + dynamic_count + repeat_count
+            wb.close()
+            return {
+                "success": True,
+                "stage_only": True,
+                "payload": payload,
+                "warnings": stats["warnings"],
+                "transformed": len(import_rows),
+                "updated_count": updated_count,
+            }
 
         valid_item_ids: Set[int] = set(
             fid for (fid,) in db.session.query(FormItem.id).filter(FormItem.template_id == REPORTING_COUNTRY_TEMPLATE_ID).all()

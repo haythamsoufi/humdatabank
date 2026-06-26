@@ -6,7 +6,7 @@
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {% block content %}
-<div class="py-2 sharp-ui">
+<div class="sharp-ui {% if not user_countries %}dashboard-no-access dashboard-no-access-bleed{% else %}py-2{% endif %}">
 
     {# Executive Dashboard Header - Professional Corporate Style #}
     <div class="executive-page-header executive-dashboard-header">
@@ -165,7 +165,19 @@
         }
         .dashboard-no-access {
             position: relative;
-            min-height: 28rem;
+        }
+        main:has(.dashboard-no-access-bleed) #pageContentContainer {
+            padding-top: 0;
+        }
+        .dashboard-no-access-bleed {
+            margin: 0 -1.5rem -1.5rem;
+            min-height: calc(100vh - 4rem);
+            min-height: calc(100dvh - 4rem);
+            padding: 1.5rem 1.5rem 0;
+            box-sizing: border-box;
+        }
+        .dashboard-no-access .executive-page-header {
+            z-index: 0;
         }
         .dashboard-no-access-skeleton {
             pointer-events: none;
@@ -179,55 +191,526 @@
             position: absolute;
             inset: 0;
             z-index: 1;
-            background: linear-gradient(
-                180deg,
-                rgba(241, 245, 249, 0.48) 0%,
-                rgba(226, 232, 240, 0.58) 55%,
-                rgba(248, 250, 252, 0.52) 100%
-            );
+            background: rgba(15, 23, 42, 0.4);
             backdrop-filter: blur(1.5px);
             -webkit-backdrop-filter: blur(1.5px);
         }
         .dashboard-no-access-panel {
             position: absolute;
-            inset: 0.25rem 0.75rem 1.25rem;
+            inset: 0;
             z-index: 2;
             display: flex;
             align-items: flex-start;
             justify-content: center;
             overflow-y: auto;
-            padding: 0;
+            padding: clamp(1.5rem, 10vh, 3.5rem) 1rem 1.5rem;
         }
-        @media (min-width: 640px) {
-            .dashboard-no-access-panel {
-                inset: 0.5rem 1rem 2rem;
+        .dashboard-no-access-panel-stage {
+            position: relative;
+            width: 100%;
+            max-width: 52rem;
+        }
+        @keyframes dashboard-no-access-float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-0.5rem); }
+        }
+        .dashboard-no-access-card--floating {
+            animation: dashboard-no-access-float 3.5s ease-in-out infinite;
+        }
+        .dashboard-no-access-card--settled {
+            animation: none;
+            transform: none;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .dashboard-no-access-card--floating {
+                animation: none;
             }
         }
         .dashboard-no-access-card {
             width: 100%;
-            max-width: 42rem;
-            border-radius: 0.875rem;
-            border: 1px solid rgba(226, 232, 240, 0.95);
-            background: rgba(255, 255, 255, 0.97);
+            max-width: 52rem;
+            border-radius: 0.75rem;
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
             box-shadow:
-                0 4px 6px -1px rgba(15, 23, 42, 0.06),
-                0 20px 40px -12px rgba(15, 23, 42, 0.18);
+                0 1px 3px rgba(15, 23, 42, 0.06),
+                0 16px 40px -8px rgba(15, 23, 42, 0.14);
+            overflow: hidden;
         }
         .dashboard-no-access-card-header {
-            background: linear-gradient(135deg, #1d4ed8 0%, #4338ca 100%);
-            color: #fff;
-            padding: 1.25rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.875rem;
+            padding: 1rem 1.25rem;
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            color: #0f172a;
+        }
+        @media (min-width: 640px) {
+            .dashboard-no-access-card-header {
+                padding: 1.125rem 1.5rem;
+            }
         }
         .dashboard-no-access-card-icon {
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 2.75rem;
-            height: 2.75rem;
-            border-radius: 0.75rem;
-            background: rgba(255, 255, 255, 0.14);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 0.5rem;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
             flex-shrink: 0;
+            font-size: 1rem;
+            color: #2563eb;
+        }
+        .dashboard-no-access-card-title {
+            margin: 0;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            line-height: 1.45;
+            color: #0f172a;
+        }
+        @media (min-width: 640px) {
+            .dashboard-no-access-card-title {
+                font-size: 1rem;
+            }
+        }
+        .dashboard-no-access-card-body {
+            padding: 1.25rem;
+        }
+        @media (min-width: 640px) {
+            .dashboard-no-access-card-body {
+                padding: 1.5rem;
+            }
+        }
+        .dashboard-no-access-pending {
+            margin-bottom: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #bbf7d0;
+            background: #f0fdf4;
+            padding: 0.75rem 0.875rem;
+        }
+        .dashboard-no-access-pending__title {
+            margin: 0;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: #166534;
+        }
+        .dashboard-no-access-pending__text {
+            margin: 0.25rem 0 0;
+            font-size: 0.75rem;
+            color: #15803d;
+            line-height: 1.45;
+        }
+        .dashboard-no-access-steps {
+            padding: 1rem 1.125rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            background: #f8fafc;
+            overflow: visible;
+        }
+        .dashboard-no-access-steps__label {
+            margin: 0 0 0.75rem;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .dashboard-no-access-steps__list {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.625rem;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            overflow: visible;
+        }
+        @media (min-width: 768px) {
+            .dashboard-no-access-steps__list {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 1rem;
+                position: relative;
+            }
+        }
+        @media (min-width: 768px) {
+            .dashboard-no-access-steps__list::before {
+                content: '';
+                position: absolute;
+                top: 0.6875rem;
+                left: 12%;
+                right: 12%;
+                height: 2px;
+                background: #e2e8f0;
+                z-index: 0;
+            }
+            .dashboard-no-access-steps__list--at-step-2::before {
+                background: linear-gradient(to right, #16a34a 0%, #16a34a 50%, #e2e8f0 50%, #e2e8f0 100%);
+            }
+        }
+        .dashboard-no-access-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.625rem;
+            min-width: 0;
+        }
+        .dashboard-no-access-step--current {
+            position: relative;
+            z-index: 2;
+            overflow: visible;
+        }
+        .dashboard-no-access-step-content {
+            flex: 1;
+            min-width: 0;
+        }
+        @media (min-width: 768px) {
+            .dashboard-no-access-step {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                z-index: 1;
+            }
+            .dashboard-no-access-step--current {
+                z-index: 2;
+            }
+            .dashboard-no-access-step-content {
+                width: 100%;
+            }
+        }
+        .dashboard-no-access-step-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.375rem;
+            height: 1.375rem;
+            border-radius: 9999px;
+            border: 2px solid #cbd5e1;
+            background: #fff;
+            color: #94a3b8;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        @media (min-width: 768px) {
+            .dashboard-no-access-step-num {
+                width: 1.5rem;
+                height: 1.5rem;
+            }
+        }
+        .dashboard-no-access-step--current .dashboard-no-access-step-num {
+            border-color: #2563eb;
+            background: #2563eb;
+            color: #fff;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        }
+        @media (min-width: 768px) {
+            .dashboard-no-access-step--current .dashboard-no-access-step-num {
+                background: #fff;
+                color: #2563eb;
+            }
+        }
+        .dashboard-no-access-step--completed .dashboard-no-access-step-num {
+            border-color: #16a34a;
+            background: #16a34a;
+            color: #fff;
+        }
+        .dashboard-no-access-step--completed .dashboard-no-access-step-num .fa-check {
+            font-size: 0.5625rem;
+        }
+        .dashboard-no-access-step-title {
+            display: block;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: #94a3b8;
+            line-height: 1.35;
+        }
+        .dashboard-no-access-step--current .dashboard-no-access-step-title {
+            color: #1e40af;
+        }
+        .dashboard-no-access-step--completed .dashboard-no-access-step-title {
+            color: #166534;
+        }
+        .dashboard-no-access-step-desc {
+            display: block;
+            margin-top: 0.125rem;
+            font-size: 0.6875rem;
+            color: #94a3b8;
+            line-height: 1.4;
+        }
+        .dashboard-no-access-step--current .dashboard-no-access-step-desc {
+            color: #64748b;
+        }
+        .dashboard-no-access-step--completed .dashboard-no-access-step-desc {
+            color: #64748b;
+        }
+        .dashboard-no-access-step-here {
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.0625rem;
+            margin: 0;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .dashboard-no-access-step-here[hidden] {
+            display: none;
+        }
+        .dashboard-no-access-step-here__text {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            font-style: italic;
+            color: #dc2626;
+            line-height: 1;
+            white-space: nowrap;
+            transform: rotate(5deg);
+            transform-origin: left center;
+        }
+        .dashboard-no-access-step-here__arrow {
+            width: 2rem;
+            height: 1.375rem;
+            flex-shrink: 0;
+            color: #dc2626;
+            margin: 0 0 0 0.125rem;
+        }
+        .dashboard-no-access-request-block {
+            margin-top: 1.5rem;
+            padding: 1.25rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            background: #ffffff;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+        .dashboard-no-access-requests {
+            margin-bottom: 1rem;
+        }
+        .dashboard-no-access-requests__title {
+            margin: 0 0 0.625rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: #475569;
+        }
+        .dashboard-no-access-requests__list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            max-height: 12rem;
+            overflow-y: auto;
+        }
+        .dashboard-no-access-request-item {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 0.75rem 0.875rem;
+            background: #f8fafc;
+        }
+        .dashboard-no-access-form-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+        @media (min-width: 900px) {
+            .dashboard-no-access-form-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 1.25rem;
+            }
+        }
+        .dashboard-no-access-form-section {
+            display: flex;
+            flex-direction: column;
+            gap: 0.625rem;
+        }
+        .dashboard-no-access-form-section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .dashboard-no-access-form-section-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: 0.375rem;
+            flex-shrink: 0;
+            font-size: 0.8125rem;
+        }
+        .dashboard-no-access-form-section-icon--country {
+            background: #eff6ff;
+            color: #2563eb;
+        }
+        .dashboard-no-access-form-section-icon--message {
+            background: #f5f3ff;
+            color: #7c3aed;
+        }
+        .dashboard-no-access-form-section-title {
+            margin: 0;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        .dashboard-no-access-form-section-title .required-mark {
+            color: #dc2626;
+            margin-left: 0.125rem;
+        }
+        .dashboard-no-access-form-section-hint {
+            margin: 0;
+            font-size: 0.75rem;
+            color: #64748b;
+            line-height: 1.5;
+        }
+        .dashboard-no-access-form-section-note {
+            margin: 0;
+            font-size: 0.6875rem;
+            color: #94a3b8;
+            line-height: 1.45;
+        }
+        .dashboard-no-access-card .select2-container {
+            width: 100% !important;
+        }
+        .dashboard-no-access-card .select2-container--default .select2-selection--multiple,
+        .dashboard-no-access-card .select2-container--default .select2-selection--single {
+            border: 1px solid #cbd5e1;
+            border-radius: 0.5rem;
+            min-height: 2.625rem;
+            padding: 0.1875rem 0.375rem;
+            background: #fff;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .dashboard-no-access-card .select2-container--default.select2-container--focus .select2-selection--multiple,
+        .dashboard-no-access-card .select2-container--default.select2-container--focus .select2-selection--single {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+        .dashboard-no-access-card .select2-container--default .select2-selection--multiple .select2-selection__choice {
+            border-radius: 9999px;
+            border: none;
+            background: #eff6ff;
+            color: #1e40af;
+            font-size: 0.8125rem;
+            padding: 0.125rem 0.5rem;
+        }
+        .dashboard-no-access-message-wrap {
+            position: relative;
+        }
+        .dashboard-no-access-message {
+            width: 100%;
+            min-height: 8.5rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.5rem;
+            padding: 0.625rem 0.75rem 1.625rem;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            color: #1e293b;
+            resize: vertical;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .dashboard-no-access-message:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+        .dashboard-no-access-message-count {
+            position: absolute;
+            right: 0.625rem;
+            bottom: 0.4375rem;
+            font-size: 0.6875rem;
+            color: #94a3b8;
+        }
+        .dashboard-no-access-form-footer {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            margin: 1rem -1.25rem -1.25rem;
+            padding: 0.5rem 1.25rem;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            border-radius: 0 0 0.5rem 0.5rem;
+        }
+        @media (min-width: 640px) {
+            .dashboard-no-access-form-footer {
+                margin: 1rem -1.25rem -1.25rem;
+                padding: 0.5rem 1.25rem;
+            }
+        }
+        @media (min-width: 768px) {
+            .dashboard-no-access-form-footer {
+                align-items: flex-end;
+            }
+        }
+        .dashboard-no-access-submit-wrap {
+            width: 100%;
+        }
+        @media (min-width: 768px) {
+            .dashboard-no-access-submit-wrap {
+                width: auto;
+            }
+        }
+        .dashboard-no-access-submit-row {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.5rem;
+            width: 100%;
+        }
+        @media (min-width: 640px) {
+            .dashboard-no-access-submit-row {
+                flex-direction: row;
+                align-items: center;
+                justify-content: flex-end;
+                gap: 0.75rem;
+                width: 100%;
+            }
+        }
+        .dashboard-no-access-notify {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            margin: 0;
+            font-size: 0.6875rem;
+            color: #64748b;
+            line-height: 1.35;
+        }
+        @media (min-width: 640px) {
+            .dashboard-no-access-notify {
+                flex: 1;
+                max-width: none;
+            }
+        }
+        .dashboard-no-access-notify__icon {
+            color: #94a3b8;
+            flex-shrink: 0;
+        }
+        .dashboard-no-access-submit {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.375rem;
+            min-width: 10.5rem;
+            padding: 0.4375rem 1.125rem;
+            border: none;
+            border-radius: 0.5rem;
+            background: #2563eb;
+            color: #fff;
+            font-size: 0.875rem;
+            font-weight: 600;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+            flex-shrink: 0;
+        }
+        .dashboard-no-access-submit:hover {
+            background: #1d4ed8;
+        }
+        .dashboard-no-access-limit-notice {
+            border-radius: 0.5rem;
+            border: 1px solid #fde68a;
+            background: #fffbeb;
+            padding: 0.75rem 0.875rem;
+            font-size: 0.8125rem;
+            color: #92400e;
         }
         #data-quality-period-select {
             -webkit-appearance: none;
@@ -1945,8 +2428,7 @@
         </div>
 
     {% elif not user_countries %}
-        <div class="dashboard-no-access">
-            {# Ghost dashboard preview (blurred behind the request panel) #}
+            {# Ghost dashboard preview (dimmed behind the request panel) #}
             <div class="dashboard-no-access-skeleton space-y-6" aria-hidden="true">
                 <div class="dashboard-no-access-skeleton-block bg-white p-6 rounded-lg shadow-md border border-gray-300">
                     <div class="dashboard-skeleton-bar h-6 w-64 max-w-full mb-4"></div>
@@ -2015,33 +2497,37 @@
             <div class="dashboard-no-access-backdrop" aria-hidden="true"></div>
 
             <div class="dashboard-no-access-panel">
-                <div class="dashboard-no-access-card">
+                {% set no_access_flow_step = 2 if pending_access_requests else 1 %}
+                <div class="dashboard-no-access-panel-stage">
+                    <p class="dashboard-no-access-step-here" hidden>
+                        <span class="dashboard-no-access-step-here__text">{{ _("You're here") }}</span>
+                        <svg class="dashboard-no-access-step-here__arrow" viewBox="0 0 40 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M34 2C22 6 16 14 8 26" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                            <path d="M4 22L8 26L14 22" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </p>
+                <div class="dashboard-no-access-card dashboard-no-access-card--floating">
                     <div class="dashboard-no-access-card-header">
-                        <div class="flex items-start gap-4">
-                            <div class="dashboard-no-access-card-icon">
-                                <i class="fas fa-globe-americas text-lg" aria-hidden="true"></i>
-                            </div>
-                            <div class="min-w-0">
-                                <h2 class="text-lg font-semibold leading-snug">{{ _('Request country access') }}</h2>
-                                <p class="mt-1 text-sm text-blue-100/95">
-                                    {% if pending_access_requests %}
-                                        {{ _('Your account is not linked to a country yet. You have pending request(s) under review.') }}
-                                    {% else %}
-                                        {{ _('Your account is not linked to a country yet. Submit a request to unlock your dashboard.') }}
-                                    {% endif %}
-                                </p>
-                            </div>
+                        <div class="dashboard-no-access-card-icon">
+                            <i class="fas fa-globe-americas" aria-hidden="true"></i>
                         </div>
+                        <h2 class="dashboard-no-access-card-title">
+                            {% if pending_access_requests %}
+                                {{ _('Your account is not linked to a country yet. You have pending request(s) under review.') }}
+                            {% else %}
+                                {{ _('Your account is not linked to a country yet. Submit a request to unlock your dashboard.') }}
+                            {% endif %}
+                        </h2>
                     </div>
 
-                    <div class="p-5 sm:p-6">
+                    <div class="dashboard-no-access-card-body">
                         {% if pending_access_requests %}
-                            <div class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
-                                <p class="text-sm font-medium text-emerald-800">
-                                    <i class="fas fa-clock mr-2" aria-hidden="true"></i>
+                            <div class="dashboard-no-access-pending">
+                                <p class="dashboard-no-access-pending__title">
+                                    <i class="fas fa-clock mr-1.5" aria-hidden="true"></i>
                                     {{ _('You have %(count)d pending access request(s). An admin will review them shortly.', count=pending_access_requests|length) }}
                                 </p>
-                                <p class="mt-1 text-xs text-emerald-700">
+                                <p class="dashboard-no-access-pending__text">
                                     {% if can_request_multiple_countries %}
                                         {{ _('Need access to more countries? You can select multiple countries in a single request below.') }}
                                     {% else %}
@@ -2049,32 +2535,51 @@
                                     {% endif %}
                                 </p>
                             </div>
-                        {% else %}
-                            <p class="mb-5 text-sm text-gray-600">
-                                {% if can_request_multiple_countries %}
-                                    {{ _('Select one or more countries below. An administrator will review your request and grant access when approved.') }}
-                                {% else %}
-                                    {{ _('Select one country below. You can only request one country in total.') }}
-                                {% endif %}
-                            </p>
                         {% endif %}
 
-                        {# Display list of access requests if any exist #}
+                        <div class="dashboard-no-access-steps">
+                            <p class="dashboard-no-access-steps__label">{{ _('How it works') }}</p>
+                            <ol class="dashboard-no-access-steps__list dashboard-no-access-steps__list--at-step-{{ no_access_flow_step }}">
+                                <li class="dashboard-no-access-step{% if no_access_flow_step == 1 %} dashboard-no-access-step--current{% elif no_access_flow_step > 1 %} dashboard-no-access-step--completed{% endif %}"{% if no_access_flow_step == 1 %} aria-current="step"{% endif %}>
+                                    <span class="dashboard-no-access-step-num" aria-hidden="true">
+                                        {% if no_access_flow_step > 1 %}<i class="fas fa-check"></i>{% else %}1{% endif %}
+                                    </span>
+                                    <div class="dashboard-no-access-step-content">
+                                        <span class="dashboard-no-access-step-title">{{ _('Submit your request') }}</span>
+                                        <span class="dashboard-no-access-step-desc">{{ _('Choose the countries whose data you will be responsible for managing.') }}</span>
+                                    </div>
+                                </li>
+                                <li class="dashboard-no-access-step{% if no_access_flow_step == 2 %} dashboard-no-access-step--current{% elif no_access_flow_step > 2 %} dashboard-no-access-step--completed{% endif %}"{% if no_access_flow_step == 2 %} aria-current="step"{% endif %}>
+                                    <span class="dashboard-no-access-step-num" aria-hidden="true">
+                                        {% if no_access_flow_step > 2 %}<i class="fas fa-check"></i>{% else %}2{% endif %}
+                                    </span>
+                                    <div class="dashboard-no-access-step-content">
+                                        <span class="dashboard-no-access-step-title">{{ _('Admin review') }}</span>
+                                        <span class="dashboard-no-access-step-desc">{{ _('An administrator will review your request.') }}</span>
+                                    </div>
+                                </li>
+                                <li class="dashboard-no-access-step{% if no_access_flow_step == 3 %} dashboard-no-access-step--current{% endif %}">
+                                    <span class="dashboard-no-access-step-num" aria-hidden="true">3</span>
+                                    <div class="dashboard-no-access-step-content">
+                                        <span class="dashboard-no-access-step-title">{{ _('Access granted') }}</span>
+                                        <span class="dashboard-no-access-step-desc">{{ _('You’ll get access once your request is approved.') }}</span>
+                                    </div>
+                                </li>
+                            </ol>
+                        </div>
+
+                        <div class="dashboard-no-access-request-block">
+
                         {% if all_access_requests %}
-                            <div class="mb-6">
-                                <h3 class="text-sm font-semibold text-gray-800 mb-3 flex items-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    {{ _('Your Access Requests') }}
-                                </h3>
-                                <div class="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                            <div class="dashboard-no-access-requests">
+                                <h3 class="dashboard-no-access-requests__title">{{ _('Your Access Requests') }}</h3>
+                                <div class="dashboard-no-access-requests__list">
                                     {% for request in all_access_requests %}
                                         {% set is_revoked = False %}
                                         {% if request.status == 'approved' %}
                                             {% set is_revoked = request._access_revoked|default(False) %}
                                         {% endif %}
-                                        <div class="border border-gray-200 rounded-lg p-3.5 bg-gray-50/80">
+                                        <div class="dashboard-no-access-request-item">
                                             <div class="flex items-center justify-between flex-wrap gap-2 mb-1.5">
                                                 <h4 class="text-sm font-semibold text-gray-900">
                                                     {% if request.country %}
@@ -2086,45 +2591,18 @@
                                                 <div class="flex items-center gap-2 flex-wrap">
                                                     {{ status_label_for_access_request(request.status, is_revoked, request._auto_resolved|default(false)) }}
                                                     <span class="text-xs text-gray-500">
-                                                        <i class="far fa-calendar mr-1"></i>
                                                         {{ request.created_at|datetime_local('datetime') }}
                                                     </span>
-                                                    {% if request.processed_at %}
-                                                        <span class="text-xs text-gray-500">
-                                                            <i class="far fa-calendar-check mr-1"></i>
-                                                            {{ _('Processed') }}: {{ request.processed_at|datetime_local('datetime') }}
-                                                        </span>
-                                                    {% endif %}
                                                 </div>
                                             </div>
-
                                             {% if request.request_message %}
-                                                <div class="mt-2 pt-2 border-t border-gray-200">
-                                                    <p class="text-sm text-gray-600">
-                                                        <span class="font-medium text-gray-700">
-                                                            <i class="fas fa-sticky-note mr-1"></i>{{ _('Your note') }}:
-                                                        </span>
-                                                        {{ request.request_message }}
-                                                    </p>
-                                                </div>
+                                                <p class="text-sm text-gray-600 mt-2 pt-2 border-t border-gray-200">{{ request.request_message }}</p>
                                             {% endif %}
-
                                             {% if request.admin_notes %}
-                                                <div class="mt-2 pt-2 border-t border-gray-200">
-                                                    <p class="text-xs font-medium text-gray-700 mb-1">
-                                                        <i class="fas fa-user-shield mr-1"></i>{{ _('Admin Notes') }}:
-                                                    </p>
-                                                    <p class="text-xs text-gray-600">{{ request.admin_notes }}</p>
-                                                </div>
+                                                <p class="text-xs text-gray-600 mt-2 pt-2 border-t border-gray-200"><strong>{{ _('Admin Notes') }}:</strong> {{ request.admin_notes }}</p>
                                             {% endif %}
-
                                             {% if is_revoked %}
-                                                <div class="mt-2 pt-2 border-t border-orange-200">
-                                                    <p class="text-xs text-orange-700">
-                                                        <i class="fas fa-info-circle mr-1"></i>
-                                                        {{ _('This request was approved, but your access to this country has since been removed by an administrator.') }}
-                                                    </p>
-                                                </div>
+                                                <p class="text-xs text-orange-700 mt-2 pt-2 border-t border-orange-200">{{ _('This request was approved, but your access to this country has since been removed by an administrator.') }}</p>
                                             {% endif %}
                                         </div>
                                     {% endfor %}
@@ -2137,66 +2615,86 @@
                         <form method="POST" action="{{ url_for('main.request_country_access') }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" id="request_access_csrf_token">
 
-                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                                <div class="space-y-2">
-                                    <label for="request_access_requested_country" class="block text-sm font-medium text-gray-700">
-                                        {% if can_request_multiple_countries %}{{ _('Countries you need access to') }}{% else %}{{ _('Country you need access to') }}{% endif %}
-                                        <span class="text-red-500">*</span>
-                                    </label>
+                            <div class="dashboard-no-access-form-grid">
+                                <section class="dashboard-no-access-form-section">
+                                    <div class="dashboard-no-access-form-section-header">
+                                        <span class="dashboard-no-access-form-section-icon dashboard-no-access-form-section-icon--country">
+                                            <i class="fas fa-globe-americas" aria-hidden="true"></i>
+                                        </span>
+                                        <h3 class="dashboard-no-access-form-section-title">
+                                            {% if can_request_multiple_countries %}{{ _('Countries whose data you will manage') }}{% else %}{{ _('Country whose data you will manage') }}{% endif %}
+                                            <span class="required-mark">*</span>
+                                        </h3>
+                                    </div>
+                                    <p class="dashboard-no-access-form-section-hint">
+                                        {% if can_request_multiple_countries %}
+                                            {{ _('Only request access for countries whose databank data you are responsible for managing.') }}
+                                        {% else %}
+                                            {{ _('Request access for the country whose databank data you are responsible for managing. An admin will review your request.') }}
+                                        {% endif %}
+                                    </p>
                                     <div class="select2-country-wrap">
-                                    {{ request_access_form.requested_country_id(id="request_access_requested_country", class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm select2-country") }}
+                                        {{ request_access_form.requested_country_id(id="request_access_requested_country", class="block w-full select2-country") }}
                                     </div>
                                     {% for error in request_access_form.requested_country_id.errors %}
-                                        <p class="mt-1 text-red-600 text-sm">{{ error }}</p>
+                                        <p class="text-red-600 text-sm">{{ error }}</p>
                                     {% endfor %}
-                                    <p class="text-xs text-gray-500">
-                                       {% if can_request_multiple_countries %}
-                                           {{ _('Select one or more countries. Countries you already have access to are greyed out and cannot be selected.') }}
-                                       {% else %}
-                                           {{ _('Select one country. An admin will review your request.') }}
-                                       {% endif %}
+                                    <p class="dashboard-no-access-form-section-note">
+                                        {% if can_request_multiple_countries %}
+                                            {{ _('You can select multiple countries and submit all requests at once.') }}
+                                        {% else %}
+                                            {{ _('You can only request one country in total.') }}
+                                        {% endif %}
                                     </p>
-                                </div>
+                                </section>
 
-                                <div class="space-y-2">
-                                    <label for="request_access_request_message" class="block text-sm font-medium text-gray-700">
-                                        {{ _('Message to admins') }}
-                                        <span class="text-gray-400 font-normal">({{ _('optional') }})</span>
-                                    </label>
-                                    {{ request_access_form.request_message(id="request_access_request_message", class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm resize-none", placeholder=_('Briefly describe your role and why you need access'), rows="5") }}
+                                <section class="dashboard-no-access-form-section">
+                                    <div class="dashboard-no-access-form-section-header">
+                                        <span class="dashboard-no-access-form-section-icon dashboard-no-access-form-section-icon--message">
+                                            <i class="fas fa-comment-dots" aria-hidden="true"></i>
+                                        </span>
+                                        <h3 class="dashboard-no-access-form-section-title">
+                                            {{ _('Message to admins') }}
+                                            <span class="text-gray-400 font-normal">({{ _('optional') }})</span>
+                                        </h3>
+                                    </div>
+                                    <p class="dashboard-no-access-form-section-hint">{{ _('Briefly describe your role and why you need access.') }}</p>
+                                    <div class="dashboard-no-access-message-wrap">
+                                        {{ request_access_form.request_message(id="request_access_request_message", class="dashboard-no-access-message", placeholder=_('Example: I am the Focal Point for reporting and need access to submit annual data.'), rows="5", maxlength="1000") }}
+                                        <span class="dashboard-no-access-message-count" id="request_access_message_count">0 / 1000</span>
+                                    </div>
                                     {% for error in request_access_form.request_message.errors %}
-                                        <p class="mt-1 text-red-600 text-sm">{{ error }}</p>
+                                        <p class="mt-2 text-red-600 text-sm">{{ error }}</p>
                                     {% endfor %}
-                                    <p class="text-xs text-gray-500">{{ _('Provide additional context to help admins process your request faster.') }}</p>
-                                </div>
+                                </section>
                             </div>
 
-                            <div class="mt-5 pt-5 border-t border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                <button type="submit" class="btn btn-primary w-full sm:w-auto sm:min-w-[200px]">
-                                    <i class="fas fa-paper-plane mr-2"></i>
-                                    {{ _('Request Access') }}
-                                </button>
-                                <p class="text-xs text-gray-500 text-center sm:text-right">
-                                   {% if can_request_multiple_countries %}
-                                       {{ _('You can select multiple countries and submit all requests at once.') }}
-                                   {% else %}
-                                       {{ _('You can only request one country in total.') }}
-                                   {% endif %}
-                                </p>
+                            <div class="dashboard-no-access-form-footer">
+                                <div class="dashboard-no-access-submit-wrap">
+                                    <div class="dashboard-no-access-submit-row">
+                                        <p class="dashboard-no-access-notify">
+                                            <i class="far fa-envelope dashboard-no-access-notify__icon" aria-hidden="true"></i>
+                                            <span>{{ _('You will be notified about the status of your request.') }}</span>
+                                        </p>
+                                        <button type="submit" class="dashboard-no-access-submit">
+                                            <i class="fas fa-paper-plane" aria-hidden="true"></i>
+                                            {{ _('Request Access') }}
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </form>
                         {% else %}
-                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-                            <p class="text-sm text-amber-800">
-                                <i class="fas fa-info-circle mr-2"></i>
-                                {{ _('You can only request access to one country in total. You have already submitted a request.') }}
-                            </p>
+                        <div class="dashboard-no-access-limit-notice">
+                            <i class="fas fa-info-circle mr-2" aria-hidden="true"></i>
+                            {{ _('You can only request access to one country in total. You have already submitted a request.') }}
                         </div>
                         {% endif %}
+                        </div>
                     </div>
                 </div>
+                </div>
             </div>
-        </div>
     {% endif %}
 </div>
 
@@ -2260,7 +2758,7 @@
                     <div class="space-y-4">
                         <div>
                             <label for="modal_request_access_requested_country" class="block text-sm font-medium text-gray-700 mb-2">
-                                {% if can_request_multiple_countries %}{{ _('Countries you need access to') }}{% else %}{{ _('Country you need access to') }}{% endif %}
+                                {% if can_request_multiple_countries %}{{ _('Countries whose data you will manage') }}{% else %}{{ _('Country whose data you will manage') }}{% endif %}
                                 <span class="text-red-500">*</span>
                             </label>
                             <div class="select2-country-wrap">
@@ -2271,9 +2769,9 @@
                             {% endfor %}
                             <p class="mt-2 text-xs text-gray-500">
                                 {% if can_request_multiple_countries %}
-                                    {{ _('Select one or more countries. An admin will review your request(s). Countries you already have access to are greyed out and cannot be selected.') }}
+                                    {{ _('Only request access for countries whose databank data you are responsible for managing.') }}
                                 {% else %}
-                                    {{ _('Select one country. An admin will review your request. Countries you already have access to are greyed out and cannot be selected.') }}
+                                    {{ _('Request access for the country whose databank data you are responsible for managing.') }}
                                 {% endif %}
                             </p>
                         </div>
@@ -2477,6 +2975,66 @@ function enforceSingleCountrySelection($select) {
     }
 }
 
+function initRequestAccessMessageCounter() {
+    const messageField = document.getElementById('request_access_request_message');
+    const counter = document.getElementById('request_access_message_count');
+    if (!messageField || !counter) {
+        return;
+    }
+    const maxLength = parseInt(messageField.getAttribute('maxlength') || '1000', 10);
+    const updateCount = () => {
+        counter.textContent = `${messageField.value.length} / ${maxLength}`;
+    };
+    messageField.addEventListener('input', updateCount);
+    updateCount();
+}
+
+function positionNoAccessStepHere() {
+    const stage = document.querySelector('.dashboard-no-access-panel-stage');
+    const here = document.querySelector('.dashboard-no-access-step-here');
+    const stepNum = document.querySelector('.dashboard-no-access-step--current .dashboard-no-access-step-num');
+    if (!stage || !here || !stepNum) {
+        if (here) {
+            here.hidden = true;
+        }
+        return;
+    }
+
+    here.hidden = false;
+    here.style.visibility = 'hidden';
+    here.style.top = '0';
+    here.style.left = '0';
+
+    const stepRect = stepNum.getBoundingClientRect();
+    const stageRect = stage.getBoundingClientRect();
+    const arrowTipOffsetX = 10;
+    const arrowTipOffsetY = here.offsetHeight - 2;
+    const targetX = stepRect.right - stageRect.left + 2;
+    const targetY = stepRect.top - stageRect.top + 3;
+
+    here.style.top = `${Math.round(targetY - arrowTipOffsetY)}px`;
+    here.style.left = `${Math.round(targetX - arrowTipOffsetX + 8)}px`;
+    here.style.visibility = '';
+}
+
+function initNoAccessCardFloat() {
+    const card = document.querySelector('.dashboard-no-access-card--floating');
+    requestAnimationFrame(() => {
+        requestAnimationFrame(positionNoAccessStepHere);
+    });
+    window.addEventListener('resize', positionNoAccessStepHere);
+    if (!card) {
+        return;
+    }
+    const stopFloat = () => {
+        card.classList.remove('dashboard-no-access-card--floating');
+        card.classList.add('dashboard-no-access-card--settled');
+        positionNoAccessStepHere();
+    };
+    card.addEventListener('click', stopFloat, { once: true });
+    card.addEventListener('focusin', stopFloat, { once: true });
+}
+
 function initRequestAccessCountrySelect() {
     if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
         setTimeout(initRequestAccessCountrySelect, 250);
@@ -2493,8 +3051,8 @@ function initRequestAccessCountrySelect() {
         $select.select2({
             width: '100%',
             placeholder: canRequestMultipleCountries
-                ? "{{ _('Select one or more countries') }}"
-                : "{{ _('Select one country') }}",
+                ? "{{ _('Select countries you will manage data for') }}"
+                : "{{ _('Select country you will manage data for') }}",
             minimumResultsForSearch: 0,
             allowClear: true,
             closeOnSelect: !canRequestMultipleCountries,
@@ -2543,6 +3101,7 @@ function initRequestAccessCountrySelect() {
         $select.on('change', function() {
             enforceSingleCountrySelection($select);
         });
+        positionNoAccessStepHere();
     } catch (error) {
         window.__clientWarn && window.__clientWarn('Could not initialize country selector:', error);
     }
@@ -2565,8 +3124,8 @@ function initModalRequestAccessCountrySelect() {
         $select.select2({
             width: '100%',
             placeholder: canRequestMultipleCountries
-                ? "{{ _('Select one or more countries') }}"
-                : "{{ _('Select one country') }}",
+                ? "{{ _('Select countries you will manage data for') }}"
+                : "{{ _('Select country you will manage data for') }}",
             minimumResultsForSearch: 0,
             allowClear: true,
             closeOnSelect: !canRequestMultipleCountries,
@@ -2897,6 +3456,8 @@ function initProfileIconTooltips() {
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     initRequestAccessCountrySelect();
+    initRequestAccessMessageCounter();
+    initNoAccessCardFloat();
     initActivityFilters();
     initLoadMoreActivities();
     initProfileIconTooltips();

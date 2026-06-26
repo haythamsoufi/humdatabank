@@ -73,8 +73,44 @@ class UprCountryReportingExcelService:
                 pass
 
     @classmethod
-    def import_data(cls, aes, file_bytes: bytes) -> Dict[str, Any]:
-        """Import a filled UPR Country Reporting workbook into the assignment."""
+    def validate_import_file(cls, aes, file_bytes: bytes) -> Dict[str, Any]:
+        """Validate a filled workbook before UPR Country Reporting import."""
+        _ensure_scripts_in_path()
+        from upr_country_reporting_excel_template import (
+            validate_upr_country_reporting_import_file,
+            _load_assignment_meta,
+        )
+
+        import openpyxl
+
+        _, country_name, _iso3, period = _load_assignment_meta(int(aes.id))
+        try:
+            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+        except Exception as exc:
+            current_app.logger.error("%s validate: failed to load workbook: %s", UPR_COUNTRY_REPORTING_LABEL, exc)
+            return {
+                "valid": False,
+                "message": "Invalid Excel file. Check the file format and try again.",
+                "errors": ["Failed to load Excel file."],
+                "warnings": [],
+                "preview": {},
+            }
+        try:
+            return validate_upr_country_reporting_import_file(
+                wb,
+                expected_country=country_name,
+                expected_period=period,
+            )
+        finally:
+            wb.close()
+
+    @classmethod
+    def import_data(cls, aes, file_bytes: bytes, *, persist: bool = True) -> Dict[str, Any]:
+        """Import a filled UPR Country Reporting workbook into the assignment.
+
+        When ``persist`` is False, returns a client payload for staging in the form UI
+        without writing to the database.
+        """
         _ensure_scripts_in_path()
         from upr_country_reporting_excel_template import run_upr_country_reporting_import
 
@@ -82,7 +118,10 @@ class UprCountryReportingExcelService:
         try:
             tmp.write(file_bytes)
             tmp.close()
-            result = run_upr_country_reporting_import(int(aes.id), tmp.name, dry_run=False)
+            result = run_upr_country_reporting_import(int(aes.id), tmp.name, dry_run=False, persist=persist)
+            if result.get("stage_only"):
+                result["success"] = True
+                return result
             result["success"] = int(result.get("errors", 0) or 0) == 0
             result["updated_count"] = int(result.get("inserted", 0) or 0) + int(result.get("updated", 0) or 0)
             return result
@@ -94,3 +133,8 @@ class UprCountryReportingExcelService:
                 os.unlink(tmp.name)
             except OSError:
                 pass
+
+    @classmethod
+    def import_data_for_form(cls, aes, file_bytes: bytes) -> Dict[str, Any]:
+        """Parse workbook and return a client payload (no database writes)."""
+        return cls.import_data(aes, file_bytes, persist=False)

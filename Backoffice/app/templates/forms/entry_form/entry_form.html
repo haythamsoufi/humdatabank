@@ -375,6 +375,7 @@
         </div>
 
         <div id="entry-form-ui" class="min-w-0" style="display:none;">
+        <div id="entry-form-excel-import-notice" class="hidden mb-6" role="alert" aria-live="polite"></div>
         <div id="entry-form-layout" class="flex flex-col lg:flex-row gap-4 lg:gap-6 min-w-0">
             {# Sections Pane - Static pane on large screens (≥1100px), overlay sidebar on smaller screens #}
             <div id="section-navigation-sidebar"
@@ -2661,6 +2662,7 @@
 
         {# Excel Options Modal — shared excel_io_modal #}
         {% from "macros/excel_io_modal.html" import excel_io_modal %}
+        {% from "macros/upr_country_reporting_excel_instructions.html" import upr_country_reporting_excel_workflow, upr_country_reporting_excel_export_panel_lead, upr_country_reporting_excel_import_panel_lead %}
         {% from "macros/modal_shell.html" import modal_shell %}
         {% if not is_preview_mode and not is_public_submission %}
             {% set tmpl = assignment_status.assigned_form.template if assignment_status and assignment_status.assigned_form else None %}
@@ -2672,19 +2674,56 @@
             {% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('UPR Country Reporting') if _use_upr_country_reporting_excel else _('Excel Options') }}{% endset %}
             {% set _csrf_field %}{{ form.csrf_token if form else '' }}{% endset %}
             {% if _show_export or _show_import %}
+            {% if _use_upr_country_reporting_excel %}
+            {% set _upr_workflow %}{{ upr_country_reporting_excel_workflow() }}{% endset %}
+            {% set _upr_export_lead %}{{ upr_country_reporting_excel_export_panel_lead() }}{% endset %}
+            {% set _upr_import_lead %}{{ upr_country_reporting_excel_import_panel_lead() }}{% endset %}
             {% call excel_io_modal(
                 'excel-options-modal',
                 modal_title=excel_title,
-                aria_label=_('UPR Country Reporting') if _use_upr_country_reporting_excel else _('Excel Options'),
+                aria_label=_('UPR Country Reporting'),
+                max_width='max-w-4xl',
+                content_class='excel-io-modal-shell-content',
+                close_class='close-modal-btn',
+                layout='guide-split',
+                default_tab='export',
+                export_tab_label=_('Download template'),
+                import_tab_label=_('Upload & import'),
+                intro_html=_upr_workflow,
+                export_intro_html=_upr_export_lead,
+                import_intro_html=_upr_import_lead,
+                show_export=_show_export,
+                show_import=_show_import,
+                export_url=url_for('excel.export_upr_country_reporting_template', aes_id=aes_id),
+                export_label=_('Export UPR Country Reporting (.xlsx)'),
+                import_form_id='modalImportExcelForm',
+                import_action=url_for('excel.import_upr_country_reporting_template', aes_id=aes_id),
+                validate_url=url_for('excel.validate_upr_country_reporting_import', aes_id=aes_id),
+                dropzone_id='entry-excel-dropzone',
+                dropzone_input_id='modal_excel_file',
+                dropzone_accept='.xlsx',
+                dropzone_max_size_bytes=10485760,
+                dropzone_title=_('Drop your saved workbook here'),
+                dropzone_hint=_('or click to browse — .xlsx only'),
+                import_submit_label=_('Load into form'),
+                import_submit_disabled=not can_edit,
+                import_hidden_fields=_csrf_field,
+                import_note=_('The file is checked for template version, country, and reporting period before import.')
+            ) %}{% endcall %}
+            {% else %}
+            {% call excel_io_modal(
+                'excel-options-modal',
+                modal_title=excel_title,
+                aria_label=_('Excel Options'),
                 max_width='max-w-sm',
                 close_class='close-modal-btn',
                 layout='simple',
                 show_export=_show_export,
                 show_import=_show_import,
-                export_url=url_for('excel.export_upr_country_reporting_template', aes_id=aes_id) if _use_upr_country_reporting_excel else (url_for('excel.export_assignment_excel', aes_id=aes_id) if _show_export else none),
-                export_label=_('Export UPR Country Reporting (.xlsx)') if _use_upr_country_reporting_excel else _('Export Data Template (.xlsx)'),
+                export_url=url_for('excel.export_assignment_excel', aes_id=aes_id) if _show_export else none,
+                export_label=_('Export Data Template (.xlsx)'),
                 import_form_id='modalImportExcelForm',
-                import_action=url_for('excel.import_upr_country_reporting_template', aes_id=aes_id) if _use_upr_country_reporting_excel else (url_for('excel.import_assignment_excel', aes_id=aes_id) if _show_import else none),
+                import_action=url_for('excel.import_assignment_excel', aes_id=aes_id) if _show_import else none,
                 dropzone_id='entry-excel-dropzone',
                 dropzone_input_id='modal_excel_file',
                 dropzone_accept='.xlsx',
@@ -2695,6 +2734,7 @@
                 import_hidden_fields=_csrf_field,
                 import_note=_('Supported formats: .xlsx') ~ ' • ' ~ _('Maximum file size: 10MB')
             ) %}{% endcall %}
+            {% endif %}
             {% endif %}
         {% else %}
         {% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('Excel Options') }}{% endset %}

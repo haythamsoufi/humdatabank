@@ -469,6 +469,209 @@
     display: none;
 }
 
+/* Guide + actions split (UPR Country Reporting: instructions | export/import) */
+.excel-io-modal-shell-content {
+    min-height: 0;
+    max-height: min(75vh, 42rem);
+    overflow: hidden;
+}
+
+.excel-io-modal--guide-split {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+    width: 100%;
+    min-height: 0;
+    max-height: inherit;
+    overflow: hidden;
+}
+
+@media (min-width: 768px) {
+    .excel-io-modal--guide-split {
+        grid-template-columns: minmax(15rem, 42%) minmax(0, 58%);
+    }
+}
+
+.excel-io-modal--guide-split .excel-io-modal__col--guide {
+    padding: 0 1.25rem 1rem 0;
+    min-width: 0;
+    overflow-y: auto;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+@media (min-width: 768px) {
+    .excel-io-modal--guide-split .excel-io-modal__col--guide {
+        padding: 0 1.5rem 0 0;
+        border-bottom: none;
+        border-right: 1px solid #e5e7eb;
+    }
+}
+
+.excel-io-modal--guide-split .excel-io-modal__col--actions {
+    padding: 1rem 0 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow-y: auto;
+}
+
+@media (min-width: 768px) {
+    .excel-io-modal--guide-split .excel-io-modal__col--actions {
+        padding: 0 0 0 1.5rem;
+    }
+}
+
+.excel-io-modal--guide-split .excel-io-modal__action-block + .excel-io-modal__action-block {
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.excel-io-modal--guide-split .excel-io-modal__section-title {
+    display: flex;
+    align-items: center;
+    font-size: 1rem;
+    margin: 0 0 0.75rem;
+}
+
+.excel-io-modal--guide-split .excel-io-modal__action-block .excel-io-dropzone {
+    min-height: 9.5rem;
+}
+
+.excel-io-modal--guide-split .excel-io-modal__import-submit,
+.excel-io-modal--guide-split .excel-io-modal__export-btn {
+    width: 100%;
+}
+
+.excel-io-modal--guide-split .excel-io-modal__workflow {
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+.excel-io-modal--guide-split .excel-io-modal__workflow-lead {
+    color: #374151;
+    font-size: 0.875rem;
+}
+
+.excel-io-modal--guide-split .excel-io-modal__workflow-tip {
+    border-top-color: #e5e7eb;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 0.375rem;
+    padding: 0.625rem 0.75rem;
+    margin-top: 1rem;
+}
+
+.excel-io-guide-validation {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    border-radius: 0.5rem;
+    padding: 0.875rem;
+}
+
+.excel-io-guide-validation--warning {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+}
+
+.excel-io-guide-validation--error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+}
+
+.excel-io-guide-validation__header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+}
+
+.excel-io-guide-validation__icon {
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+    font-size: 1.125rem;
+}
+
+.excel-io-guide-validation--warning .excel-io-guide-validation__icon {
+    color: #d97706;
+}
+
+.excel-io-guide-validation--error .excel-io-guide-validation__icon {
+    color: #dc2626;
+}
+
+.excel-io-guide-validation__title {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.excel-io-guide-validation__lead {
+    margin: 0.375rem 0 0;
+    font-size: 0.8125rem;
+    color: #4b5563;
+    line-height: 1.5;
+}
+
+.excel-io-guide-validation__items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.excel-io-guide-validation__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: #374151;
+    background: #fff;
+    border: 1px solid #fde68a;
+}
+
+.excel-io-guide-validation--error .excel-io-guide-validation__item {
+    border-color: #fecaca;
+    color: #7f1d1d;
+}
+
+.excel-io-guide-validation__item-icon {
+    flex-shrink: 0;
+    margin-top: 0.15rem;
+    font-size: 0.625rem;
+    color: #d97706;
+}
+
+.excel-io-guide-validation--error .excel-io-guide-validation__item-icon {
+    color: #dc2626;
+}
+
+.excel-io-guide-validation__ack {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.375rem;
+    background: #fff;
+    border: 1px solid #fcd34d;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: #78350f;
+    cursor: pointer;
+}
+
+.excel-io-guide-validation__ack input[type="checkbox"] {
+    flex-shrink: 0;
+    margin-top: 0.2rem;
+}
+
 .excel-io-modal__section-title {
     font-size: 1.125rem;
     font-weight: 500;
@@ -484,6 +687,107 @@
 
 .excel-io-modal__note i {
     margin-right: 0.25rem;
+}
+
+/* Workflow instructions (UPR Country Reporting modal) */
+.excel-io-modal__intro {
+    margin-bottom: 1rem;
+}
+
+.excel-io-modal__workflow {
+    padding: 0.875rem 1rem;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 0.5rem;
+}
+
+.excel-io-modal__workflow-lead {
+    margin: 0 0 0.75rem;
+    font-size: 0.875rem;
+    color: #166534;
+    line-height: 1.45;
+}
+
+.excel-io-modal__steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+.excel-io-modal__step {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    font-size: 0.8125rem;
+    color: #374151;
+    line-height: 1.45;
+}
+
+.excel-io-modal__step-num {
+    flex-shrink: 0;
+    width: 1.375rem;
+    height: 1.375rem;
+    border-radius: 9999px;
+    background: #16a34a;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0.1rem;
+}
+
+.excel-io-modal__step-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+}
+
+.excel-io-modal__step-body strong {
+    color: #111827;
+    font-size: 0.8125rem;
+}
+
+.excel-io-modal__workflow-tip {
+    margin: 0.75rem 0 0;
+    padding-top: 0.625rem;
+    border-top: 1px solid #bbf7d0;
+    font-size: 0.75rem;
+    color: #92400e;
+    line-height: 1.45;
+}
+
+.excel-io-modal__workflow-tip i {
+    margin-right: 0.35rem;
+    color: #d97706;
+}
+
+.excel-io-modal__panel-intro {
+    margin-bottom: 0.75rem;
+}
+
+.excel-io-modal__panel-lead {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #4b5563;
+    line-height: 1.45;
+}
+
+.excel-io-modal--tabs .excel-io-tab-panel {
+    padding-top: 0.25rem;
+}
+
+.excel-io-modal--tabs .excel-io-modal__export-btn {
+    margin-top: 0.25rem;
+}
+
+.excel-io-modal--tabs .excel-io-modal__import-submit {
+    width: 100%;
 }
 
 /* Tabs layout */

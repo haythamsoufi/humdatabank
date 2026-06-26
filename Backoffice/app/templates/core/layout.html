@@ -325,7 +325,7 @@
             </nav>
 
             <main class="admin-scroll-main flex-1 min-w-0 overflow-x-hidden bg-gray-100">
-                <div id="flashMessagesContainer" class="container mx-auto px-4 mt-4" aria-live="polite" aria-atomic="false">
+                <div id="flashMessagesContainer" aria-live="polite" aria-atomic="false">
                     {% with messages = get_flashed_messages(with_categories=true) %}
                         {% if messages %}
                             <div class="flash-messages">

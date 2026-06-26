@@ -1,5 +1,5 @@
 {#
-    Reusable Excel import/export modal with layout variants: simple | split | tabs.
+    Reusable Excel import/export modal with layout variants: simple | split | tabs | guide-split.
     See macro header in repo for full configuration contract.
 #}
 {% from "macros/modal_shell.html" import modal_shell %}
@@ -50,7 +50,10 @@
     footer=none,
     tab_export=none,
     tab_import=none,
-    import_note=none
+    import_note=none,
+    intro_html=none,
+    export_intro_html=none,
+    import_intro_html=none
 ) -%}
 {% set _title = modal_title if modal_title is not none else (_('<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> ') ~ _('Excel Options')) %}
 {% set _export_tab_label = export_tab_label if export_tab_label is not none else _('Export') %}
@@ -65,7 +68,58 @@
      data-excel-io-layout="{{ layout }}"
      data-excel-io-default-tab="{{ default_tab }}">
 
-    {% if layout == 'tabs' %}
+    {% if intro_html and layout != 'guide-split' %}
+    <div class="excel-io-modal__intro">{{ intro_html|safe }}</div>
+    {% endif %}
+
+    {% if layout == 'guide-split' %}
+    <div class="excel-io-modal__col excel-io-modal__col--guide" data-excel-io-guide-panel>
+        {% if intro_html %}{{ intro_html|safe }}{% endif %}
+    </div>
+    <div class="excel-io-modal__col excel-io-modal__col--actions">
+        {% if show_export %}
+        <section class="excel-io-modal__action-block" aria-labelledby="{{ modal_id }}-export-heading">
+            <h4 id="{{ modal_id }}-export-heading" class="excel-io-modal__section-title">
+                <i class="fas fa-download mr-2 text-green-600" aria-hidden="true"></i>{{ _export_tab_label }}
+            </h4>
+            {% if tab_export %}{{ tab_export|safe }}
+            {% elif export_body %}{{ export_body|safe }}
+            {% elif export_url %}
+                {% if export_intro_html %}<div class="excel-io-modal__panel-intro">{{ export_intro_html|safe }}</div>{% endif %}
+                {% if export_method == 'button' %}
+                <button type="button" id="{{ modal_id }}-export-btn" class="btn btn-success w-full excel-io-modal__export-btn" data-export-url="{{ export_url }}">
+                    <i class="fas fa-download mr-2"></i> {{ _export_label }}
+                </button>
+                {% else %}
+                <a href="{{ export_url }}" class="btn btn-success w-full excel-io-modal__export-btn"><i class="fas fa-download mr-2"></i> {{ _export_label }}</a>
+                {% endif %}
+            {% endif %}
+        </section>
+        {% endif %}
+        {% if show_import %}
+        <section class="excel-io-modal__action-block" aria-labelledby="{{ modal_id }}-import-heading">
+            <h4 id="{{ modal_id }}-import-heading" class="excel-io-modal__section-title">
+                <i class="fas fa-upload mr-2 text-blue-600" aria-hidden="true"></i>{{ _import_tab_label }}
+            </h4>
+            {% if tab_import %}{{ tab_import|safe }}
+            {% elif import_body %}{{ import_body|safe }}
+            {% elif import_enabled %}
+            {% if import_intro_html %}<div class="excel-io-modal__panel-intro">{{ import_intro_html|safe }}</div>{% endif %}
+            <form method="{{ import_method }}" {% if import_form_id %}id="{{ import_form_id }}"{% endif %} {% if import_action %}action="{{ import_action }}"{% endif %} enctype="multipart/form-data" class="space-y-4 excel-io-modal__import-form">
+                {% if import_alert %}{{ import_alert|safe }}{% endif %}
+                {% if import_hidden_fields %}{{ import_hidden_fields|safe }}{% endif %}
+                {% call excel_import_dropzone(_dz_id, input_id=dropzone_input_id, input_name=dropzone_input_name, variant=dropzone_variant, accept=dropzone_accept, title=dropzone_title, hint=dropzone_hint, validate_url=validate_url, file_field_name=dropzone_input_name, auto_submit=dropzone_auto_submit, max_size_bytes=dropzone_max_size_bytes, form_id=import_form_id) %}{% endcall %}
+                {% if import_note %}<p class="excel-io-modal__note"><i class="fas fa-info-circle"></i>{{ import_note }}</p>{% endif %}
+                {% if import_submit_label is not none %}
+                <button type="submit" class="btn btn-success btn-block excel-io-modal__import-submit" {% if import_submit_disabled %}disabled{% endif %}><i class="fas fa-upload mr-2"></i> {{ _import_submit_label }}</button>
+                {% endif %}
+            </form>
+            {% elif import_disabled_body %}{{ import_disabled_body|safe }}{% endif %}
+        </section>
+        {% endif %}
+    </div>
+
+    {% elif layout == 'tabs' %}
     <div class="excel-io-tabs">
         <div class="excel-io-tabs__bar" role="tablist" aria-label="{{ _('Import or export') }}">
             {% if show_export %}
@@ -92,12 +146,13 @@
             {% if tab_export %}{{ tab_export|safe }}
             {% elif export_body %}{{ export_body|safe }}
             {% elif export_url %}
+                {% if export_intro_html %}<div class="excel-io-modal__panel-intro">{{ export_intro_html|safe }}</div>{% endif %}
                 {% if export_method == 'button' %}
                 <button type="button" id="{{ modal_id }}-export-btn" class="btn btn-success w-full excel-io-modal__export-btn" data-export-url="{{ export_url }}">
                     <i class="fas fa-download mr-2"></i> {{ _export_label }}
                 </button>
                 {% else %}
-                <a href="{{ export_url }}" class="btn btn-success w-full"><i class="fas fa-download mr-2"></i> {{ _export_label }}</a>
+                <a href="{{ export_url }}" class="btn btn-success w-full excel-io-modal__export-btn"><i class="fas fa-download mr-2"></i> {{ _export_label }}</a>
                 {% endif %}
             {% endif %}
         </div>
@@ -107,13 +162,14 @@
             {% if tab_import %}{{ tab_import|safe }}
             {% elif import_body %}{{ import_body|safe }}
             {% elif import_enabled %}
+            {% if import_intro_html %}<div class="excel-io-modal__panel-intro">{{ import_intro_html|safe }}</div>{% endif %}
             <form method="{{ import_method }}" {% if import_form_id %}id="{{ import_form_id }}"{% endif %} {% if import_action %}action="{{ import_action }}"{% endif %} enctype="multipart/form-data" class="space-y-4 excel-io-modal__import-form">
                 {% if import_alert %}{{ import_alert|safe }}{% endif %}
                 {% if import_hidden_fields %}{{ import_hidden_fields|safe }}{% endif %}
-                {% call excel_import_dropzone(_dz_id, input_id=dropzone_input_id, input_name=dropzone_input_name, variant=dropzone_variant, accept=dropzone_accept, title=dropzone_title, hint=dropzone_hint, validate_url=validate_url, file_field_name=dropzone_input_name, auto_submit=dropzone_auto_submit, max_size_bytes=dropzone_max_size_bytes) %}{% endcall %}
+                {% call excel_import_dropzone(_dz_id, input_id=dropzone_input_id, input_name=dropzone_input_name, variant=dropzone_variant, accept=dropzone_accept, title=dropzone_title, hint=dropzone_hint, validate_url=validate_url, file_field_name=dropzone_input_name, auto_submit=dropzone_auto_submit, max_size_bytes=dropzone_max_size_bytes, form_id=import_form_id) %}{% endcall %}
                 {% if import_note %}<p class="excel-io-modal__note"><i class="fas fa-info-circle"></i>{{ import_note }}</p>{% endif %}
                 {% if import_submit_label is not none %}
-                <button type="submit" class="btn btn-success btn-block"><i class="fas fa-upload"></i> {{ _import_submit_label }}</button>
+                <button type="submit" class="btn btn-success btn-block excel-io-modal__import-submit" {% if import_submit_disabled %}disabled{% endif %}><i class="fas fa-upload mr-2"></i> {{ _import_submit_label }}</button>
                 {% endif %}
             </form>
             {% elif import_disabled_body %}{{ import_disabled_body|safe }}{% endif %}

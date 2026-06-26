@@ -610,6 +610,21 @@ function createInitialRepeatEntries() {
  * @param {string} sectionId
  * @returns {number|null}
  */
+function getEffectiveRepeatEntryMax(sectionId) {
+    const sectionContainer = document.getElementById(`section-container-${sectionId}`);
+    let effectiveMax = null;
+    const maxEntriesAttr = sectionContainer?.getAttribute('data-max-entries');
+    if (maxEntriesAttr) {
+        const n = parseInt(maxEntriesAttr, 10);
+        if (!isNaN(n)) effectiveMax = n;
+    }
+    const optMax = getOptionCountLimit(sectionId);
+    if (optMax !== null) {
+        effectiveMax = effectiveMax !== null ? Math.min(effectiveMax, optMax) : optMax;
+    }
+    return effectiveMax;
+}
+
 function getOptionCountLimit(sectionId) {
     const repeatContainer = document.getElementById(`repeat-entries-${sectionId}`);
     if (!repeatContainer) return null;
@@ -675,40 +690,27 @@ function updateRepeatLimitText(sectionId) {
     }
 }
 
-function addRepeatEntry(sectionId) {
+function addRepeatEntry(sectionId, options = {}) {
+    const silent = options.silent === true;
     debugLog('repeat-sections', `Adding repeat entry for section ${sectionId}`);
 
     const repeatContainer = document.getElementById(`repeat-entries-${sectionId}`);
     const currentEntries = repeatContainer ? repeatContainer.querySelectorAll('.repeat-entry').length : 0;
+    const effectiveMax = getEffectiveRepeatEntryMax(sectionId);
 
-    // Check hard max-entries limit from section config
-    const sectionContainer = document.getElementById(`section-container-${sectionId}`);
-    if (sectionContainer) {
-        const maxEntries = sectionContainer.getAttribute('data-max-entries');
-        if (maxEntries) {
-            const maxEntriesNum = parseInt(maxEntries, 10);
-            if (!isNaN(maxEntriesNum) && currentEntries >= maxEntriesNum) {
-                debugWarn('repeat-sections', `Cannot add more entries: reached maximum of ${maxEntriesNum}`);
-                const msg = `Maximum number of entries (${maxEntriesNum}) has been reached for this repeat group.`;
-                if (window.showAlert) window.showAlert(msg, 'warning');
-                else (window.__clientWarn || console.warn)(msg);
-                return;
-            }
+    if (effectiveMax !== null && currentEntries >= effectiveMax) {
+        debugWarn('repeat-sections', `Cannot add more entries: reached maximum of ${effectiveMax}`);
+        if (!silent) {
+            const msg = `All available options are already in use. The number of entries cannot exceed ${effectiveMax} (the number of options in this section).`;
+            if (window.showAlert) window.showAlert(msg, 'warning');
+            else (window.__clientWarn || console.warn)(msg);
         }
-    }
-
-    // Check option-count limit: single-choice questions with limit_entries_to_option_count
-    const optMax = getOptionCountLimit(sectionId);
-    if (optMax !== null && currentEntries >= optMax) {
-        debugWarn('repeat-sections', `Cannot add more entries: all ${optMax} options are already allocated.`);
-        const msg = `All available options are already in use. The number of entries cannot exceed ${optMax} (the number of options in this section).`;
-        if (window.showAlert) window.showAlert(msg, 'warning');
-        else (window.__clientWarn || console.warn)(msg);
-        return;
+        return false;
     }
 
     createRepeatEntry(sectionId, false); // false = not initial entry
     updateRepeatLimitText(sectionId); // Update limit display after adding
+    return true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2589,6 +2591,7 @@ export {
     setupRepeatSections,
     loadExistingRepeatData,
     addRepeatEntry,
+    getEffectiveRepeatEntryMax,
     updateRepeatLimitText,
     debugLog,
     debugWarn,

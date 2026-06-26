@@ -816,7 +816,7 @@ def send_security_alert(subject=None, event_type=None, severity=None, descriptio
 def send_welcome_email(user):
     """
     Send a welcome email to a newly registered user.
-    Explains the system and how to request access to entities.
+    Explains the system and how to get started, including requesting country access when needed.
 
     Note: Welcome emails are sent regardless of user preferences since they are
     one-time onboarding emails that users need to receive when they first register.
@@ -836,7 +836,7 @@ def send_welcome_email(user):
         base_url = current_app.config.get('BASE_URL', 'http://localhost:5000').rstrip("/")
         dashboard_url = f"{base_url}/"
         notifications_url = f"{base_url}/notifications"
-        documentation_url = f"{base_url}/admin/docs/"
+        documentation_url = f"{base_url}/help/docs/"
         org_name = get_org_name()
         copyright_year = get_org_copyright_year()
 
@@ -886,43 +886,21 @@ def send_welcome_email(user):
                             <h3>Getting Started</h3>
                             <p>Your account has been successfully created. To get started:</p>
                             <ul>
-                                <li>Log in to access your dashboard</li>
-                                <li>Explore the system and familiarize yourself with the interface</li>
-                                <li>Request access to countries, National Societies, or other entities you need to work with</li>
+                                <li>Log in and open your dashboard</li>
+                                <li>Review your assignments and reporting tasks</li>
+                                <li>Set your language in account settings</li>
+                                <li>If you don't yet see the countries you need, request access from your dashboard</li>
                             </ul>
                             <a href="{{ dashboard_url }}" class="action-button">Go to Dashboard</a>
                         </div>
                         <div class="section">
                             <h3>Documentation</h3>
                             <p>
-                                In-app documentation (the same help area as <strong>Admin &rarr; Documentation</strong>)
-                                includes getting-started guides and user guides. Use it to learn features, workflows, and
-                                best practices once you are signed in and have access.
+                                After you sign in, open <strong>Documentation</strong> from the main navigation.
+                                It includes getting-started guides and step-by-step user guides for assignments,
+                                data entry, and reporting workflows.
                             </p>
                             <a href="{{ documentation_url }}" class="action-button">Open documentation</a>
-                        </div>
-                        <div class="section">
-                            <h3>Requesting Access to Entities</h3>
-                            <p>To work with specific countries, National Societies, or other entities, you'll need to request access:</p>
-                            <ol>
-                                <li>Go to your dashboard</li>
-                                <li>Select the entity (country, National Society, etc.) you want to access</li>
-                                <li>Click &ldquo;Request Access&rdquo; if you don't have permission yet</li>
-                                <li>An administrator will review your request and notify you when it's approved</li>
-                            </ol>
-                            <div class="highlight">
-                                <strong>Note:</strong> You'll receive an email notification when your access request is approved.
-                            </div>
-                        </div>
-                        <div class="section">
-                            <h3>Notification Preferences</h3>
-                            <p>You can customize how you receive notifications:</p>
-                            <ul>
-                                <li>Choose between instant, daily, or weekly email digests</li>
-                                <li>Enable or disable specific notification types</li>
-                                <li>Configure push notifications for mobile devices</li>
-                            </ul>
-                            <a href="{{ notifications_url }}" class="action-button">Manage Notifications</a>
                         </div>
                         <div class="section">
                             <h3>Need Help?</h3>

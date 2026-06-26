@@ -293,43 +293,21 @@ DEFAULT_EMAIL_TEMPLATES = {
                     <h3>Getting Started</h3>
                     <p>Your account has been successfully created. To get started:</p>
                     <ul>
-                        <li>Log in to access your dashboard</li>
-                        <li>Explore the system and familiarize yourself with the interface</li>
-                        <li>Request access to countries, National Societies, or other entities you need to work with</li>
+                        <li>Log in and open your dashboard</li>
+                        <li>Review your assignments and reporting tasks</li>
+                        <li>Set your language in account settings</li>
+                        <li>If you don't yet see the countries you need, request access from your dashboard</li>
                     </ul>
                     <a href="{{ dashboard_url }}" class="action-button">Go to Dashboard</a>
                 </div>
                 <div class="section">
                     <h3>Documentation</h3>
                     <p>
-                        In-app documentation (the same help area as <strong>Admin &rarr; Documentation</strong>)
-                        includes getting-started guides and user guides. Use it to learn features, workflows, and
-                        best practices once you are signed in and have access.
+                        After you sign in, open <strong>Documentation</strong> from the main navigation.
+                        It includes getting-started guides and step-by-step user guides for assignments,
+                        data entry, and reporting workflows.
                     </p>
                     <a href="{{ documentation_url }}" class="action-button">Open documentation</a>
-                </div>
-                <div class="section">
-                    <h3>Requesting Access to Entities</h3>
-                    <p>To work with specific countries, National Societies, or other entities, you'll need to request access:</p>
-                    <ol>
-                        <li>Go to your dashboard</li>
-                        <li>Select the entity (country, National Society, etc.) you want to access</li>
-                        <li>Click &ldquo;Request Access&rdquo; if you don't have permission yet</li>
-                        <li>An administrator will review your request and notify you when it's approved</li>
-                    </ol>
-                    <div class="highlight">
-                        <strong>Note:</strong> You'll receive an email notification when your access request is approved.
-                    </div>
-                </div>
-                <div class="section">
-                    <h3>Notification Preferences</h3>
-                    <p>You can customize how you receive notifications:</p>
-                    <ul>
-                        <li>Choose between instant, daily, or weekly email digests</li>
-                        <li>Enable or disable specific notification types</li>
-                        <li>Configure push notifications for mobile devices</li>
-                    </ul>
-                    <a href="{{ notifications_url }}" class="action-button">Manage Notifications</a>
                 </div>
                 <div class="section">
                     <h3>Need Help?</h3>
@@ -433,10 +411,9 @@ DEFAULT_TEMPLATE_METADATA = {
         "notification_message": (
             "Welcome to {{org_name}}! We're excited to have you on board. "
             "Your account has been successfully created. To get started, "
-            "explore your dashboard and in-app documentation (Admin → Documentation) "
-            "for user guides and getting started. "
-            "If you need access to specific countries, National Societies, or "
-            "other entities, you can request access from your dashboard. "
+            "open your dashboard, review your assignments, and use Documentation "
+            "from the main navigation for getting-started and user guides. "
+            "If you need access to additional countries, you can request access from your dashboard. "
             "We look forward to working with you!"
         ),
         "priority": "normal",

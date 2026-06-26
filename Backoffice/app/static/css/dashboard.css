@@ -61,6 +61,29 @@
     border-radius: 9999px !important;
 }
 
+/* No-access request card: rounded modal-style UI (exception to sharp-ui) */
+.sharp-ui .dashboard-no-access-card,
+.sharp-ui .dashboard-no-access-card-icon,
+.sharp-ui .dashboard-no-access-pending,
+.sharp-ui .dashboard-no-access-request-item,
+.sharp-ui .dashboard-no-access-form-section-icon,
+.sharp-ui .dashboard-no-access-message,
+.sharp-ui .dashboard-no-access-submit,
+.sharp-ui .dashboard-no-access-limit-notice {
+    border-radius: 0.5rem !important;
+}
+.sharp-ui .dashboard-no-access-card {
+    border-radius: 0.75rem !important;
+}
+.sharp-ui .dashboard-no-access-step-num,
+.sharp-ui .dashboard-no-access-card .select2-container--default .select2-selection--multiple .select2-selection__choice {
+    border-radius: 9999px !important;
+}
+.sharp-ui .dashboard-no-access-card .select2-container--default .select2-selection--multiple,
+.sharp-ui .dashboard-no-access-card .select2-container--default .select2-selection--single {
+    border-radius: 0.5rem !important;
+}
+
 /* Dashboard-specific header styling (extends executive-header.css) */
 
 .control-group {

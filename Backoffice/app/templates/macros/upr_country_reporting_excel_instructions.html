@@ -1,0 +1,66 @@
+{#
+    Instruction copy for the T33 UPR Country Reporting Excel import/export modal.
+#}
+{% macro _upr_step(num, icon, title, body) -%}
+<li class="flex gap-3 items-start">
+    <span class="flex-shrink-0 w-6 h-6 rounded-full bg-green-600 text-white text-xs font-semibold flex items-center justify-center mt-0.5" aria-hidden="true">{{ num }}</span>
+    <div class="min-w-0 flex-1">
+        <p class="text-sm font-semibold text-gray-900 m-0 flex items-center gap-1.5">
+            <i class="fas fa-{{ icon }} text-green-600 text-xs w-3.5 text-center" aria-hidden="true"></i>
+            {{ title }}
+        </p>
+        <p class="text-xs text-gray-600 mt-1 mb-0 leading-relaxed">{{ body }}</p>
+    </div>
+</li>
+{%- endmacro %}
+
+{% macro _upr_warning() -%}
+<div class="flex gap-2.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 leading-relaxed">
+    <i class="fas fa-exclamation-triangle text-amber-500 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
+    <span>{{ _('Older IFRC Reporting templates or exports from other forms will not work. Always start by downloading the template on this page.') }}</span>
+</div>
+{%- endmacro %}
+
+{% macro upr_country_reporting_excel_workflow() -%}
+<div class="upr-excel-workflow" role="region" aria-label="{{ _('How to use UPR Country Reporting Excel') }}">
+    <p class="text-sm font-medium text-gray-800 m-0 mb-1">{{ _('How it works') }}</p>
+    <p class="text-xs text-gray-600 mb-3 leading-relaxed m-0">{{ _('Bulk-edit this assignment in Excel, load the file back here, then save when you are ready.') }}</p>
+    <ol class="space-y-3 list-none p-0 m-0">
+        {{ _upr_step(
+            '1',
+            'download',
+            _('Download'),
+            _('Export the pre-filled workbook for this country and reporting period.')
+        ) }}
+        {{ _upr_step(
+            '2',
+            'pen',
+            _('Edit in Excel'),
+            _('Update your figures. Do not rename sheets or remove columns (especially the indicator ID column). Save as .xlsx.')
+        ) }}
+        {{ _upr_step(
+            '3',
+            'upload',
+            _('Upload'),
+            _('Return here and upload the saved file. We verify the template, country, and period match this assignment.')
+        ) }}
+        {{ _upr_step(
+            '4',
+            'save',
+            _('Review & save'),
+            _('Click Load into form, review the data on this page, then click Save on the assignment to persist.')
+        ) }}
+    </ol>
+    <div class="mt-4">
+        {{ _upr_warning() }}
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro upr_country_reporting_excel_export_panel_lead() -%}
+<p class="excel-io-modal__panel-lead">{{ _('Pre-filled with your country, reporting period, and saved data.') }}</p>
+{%- endmacro %}
+
+{% macro upr_country_reporting_excel_import_panel_lead() -%}
+<p class="excel-io-modal__panel-lead">{{ _('Upload your saved .xlsx. Load into form is enabled after validation passes.') }}</p>
+{%- endmacro %}

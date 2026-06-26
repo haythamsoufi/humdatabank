@@ -200,7 +200,7 @@
 
                             <div class="mb-4">
                                 <label for="account_request_access_requested_country" class="block text-sm font-medium text-gray-700 mb-2">
-                                    {% if can_request_multiple_countries %}{{ _('Countries you need access to') }}{% else %}{{ _('Country you need access to') }}{% endif %}
+                                    {% if can_request_multiple_countries %}{{ _('Countries whose data you will manage') }}{% else %}{{ _('Country whose data you will manage') }}{% endif %}
                                     <span class="text-red-500">*</span>
                                 </label>
                                 <div class="select2-country-wrap">
@@ -211,9 +211,9 @@
                                 {% endfor %}
                                 <p class="mt-2 text-xs text-gray-500">
                                     {% if can_request_multiple_countries %}
-                                        Select one or more countries. Countries you already have access to are disabled.
+                                        {{ _('Only request access for countries whose databank data you are responsible for managing.') }}
                                     {% else %}
-                                        Select one country. Countries you already have access to are disabled.
+                                        {{ _('Request access for the country whose databank data you are responsible for managing.') }}
                                     {% endif %}
                                 </p>
                             </div>

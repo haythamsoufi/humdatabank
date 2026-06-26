@@ -155,6 +155,80 @@
                 animation: none;
             }
         }
+        /* No-access dashboard: skeleton preview behind request form */
+        .dashboard-skeleton-bar {
+            background: #cbd5e1;
+            border-radius: 0.375rem;
+        }
+        .dashboard-skeleton-bar--violet {
+            background: #c4b5fd;
+        }
+        .dashboard-no-access {
+            position: relative;
+            min-height: 28rem;
+        }
+        .dashboard-no-access-skeleton {
+            pointer-events: none;
+            user-select: none;
+        }
+        .dashboard-no-access-skeleton-block {
+            border-color: #d1d5db !important;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+        }
+        .dashboard-no-access-backdrop {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            background: linear-gradient(
+                180deg,
+                rgba(241, 245, 249, 0.48) 0%,
+                rgba(226, 232, 240, 0.58) 55%,
+                rgba(248, 250, 252, 0.52) 100%
+            );
+            backdrop-filter: blur(1.5px);
+            -webkit-backdrop-filter: blur(1.5px);
+        }
+        .dashboard-no-access-panel {
+            position: absolute;
+            inset: 0.25rem 0.75rem 1.25rem;
+            z-index: 2;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            overflow-y: auto;
+            padding: 0;
+        }
+        @media (min-width: 640px) {
+            .dashboard-no-access-panel {
+                inset: 0.5rem 1rem 2rem;
+            }
+        }
+        .dashboard-no-access-card {
+            width: 100%;
+            max-width: 42rem;
+            border-radius: 0.875rem;
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            background: rgba(255, 255, 255, 0.97);
+            box-shadow:
+                0 4px 6px -1px rgba(15, 23, 42, 0.06),
+                0 20px 40px -12px rgba(15, 23, 42, 0.18);
+        }
+        .dashboard-no-access-card-header {
+            background: linear-gradient(135deg, #1d4ed8 0%, #4338ca 100%);
+            color: #fff;
+            padding: 1.25rem 1.5rem;
+        }
+        .dashboard-no-access-card-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.75rem;
+            height: 2.75rem;
+            border-radius: 0.75rem;
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            flex-shrink: 0;
+        }
         #data-quality-period-select {
             -webkit-appearance: none;
             -moz-appearance: none;
@@ -1871,183 +1945,258 @@
         </div>
 
     {% elif not user_countries %}
-         <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 py-8">
-             <div class="text-center mb-8">
-                 <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                   <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                 </svg>
-                 {% if pending_access_requests %}
-                     <h2 class="mt-4 text-lg font-semibold text-gray-900">{{ _('Your user account is not associated with any countries.') }}</h2>
-                     <p class="mt-2 text-sm text-green-600 font-medium">
-                         {{ _('You have %(count)d pending access request(s). An admin will review them shortly.', count=pending_access_requests|length) }}
-                     </p>
-                     <p class="mt-2 text-sm text-gray-600">
-                        {% if can_request_multiple_countries %}
-                            {{ _('Need access to more countries? You can select multiple countries in a single request below.') }}
+        <div class="dashboard-no-access">
+            {# Ghost dashboard preview (blurred behind the request panel) #}
+            <div class="dashboard-no-access-skeleton space-y-6" aria-hidden="true">
+                <div class="dashboard-no-access-skeleton-block bg-white p-6 rounded-lg shadow-md border border-gray-300">
+                    <div class="dashboard-skeleton-bar h-6 w-64 max-w-full mb-4"></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {% for _ in range(3) %}
+                        <div class="p-4 rounded-lg border border-gray-300 bg-gray-100/80">
+                            <div class="dashboard-skeleton-bar h-5 w-3/4 max-w-full mb-3"></div>
+                            <div class="dashboard-skeleton-bar h-3 w-1/2 max-w-full mb-2"></div>
+                            <div class="dashboard-skeleton-bar h-3 w-2/3 max-w-full mb-2"></div>
+                            <div class="dashboard-skeleton-bar h-3 w-1/3 max-w-full"></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="flex flex-col lg:flex-row gap-6">
+                    <div class="lg:w-2/3">
+                        <div class="dashboard-no-access-skeleton-block bg-white p-6 rounded-lg shadow-md border border-gray-300">
+                            <div class="dashboard-skeleton-bar h-6 w-72 max-w-full mb-4"></div>
+                            <div class="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-100/80 via-white to-white p-5">
+                                <div class="flex flex-col sm:flex-row gap-4 mb-5 pb-5 border-b border-gray-200">
+                                    <div class="dashboard-skeleton-bar dashboard-skeleton-bar--violet w-24 h-24 rounded-full shrink-0"></div>
+                                    <div class="flex-1 space-y-2 pt-1">
+                                        <div class="dashboard-skeleton-bar h-3 w-32 max-w-full"></div>
+                                        <div class="dashboard-skeleton-bar h-5 w-48 max-w-full"></div>
+                                        <div class="dashboard-skeleton-bar h-4 w-36 max-w-full"></div>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    {% for _ in range(6) %}
+                                    <div class="dashboard-skeleton-bar h-20 rounded-lg"></div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="lg:w-1/3 flex flex-col gap-6">
+                        <div class="dashboard-no-access-skeleton-block bg-white p-6 rounded-lg shadow-md border border-gray-300">
+                            <div class="dashboard-skeleton-bar h-6 w-40 max-w-full mb-4"></div>
+                            {% for _ in range(4) %}
+                            <div class="flex gap-3 mb-4 last:mb-0">
+                                <div class="dashboard-skeleton-bar w-8 h-8 rounded-full shrink-0"></div>
+                                <div class="flex-1 space-y-2">
+                                    <div class="dashboard-skeleton-bar h-3 w-full"></div>
+                                    <div class="dashboard-skeleton-bar h-3 w-2/3 max-w-full"></div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="dashboard-no-access-skeleton-block bg-white p-6 rounded-lg shadow-md border border-gray-300">
+                            <div class="dashboard-skeleton-bar h-6 w-36 max-w-full mb-4"></div>
+                            {% for _ in range(2) %}
+                            <div class="flex gap-3 mb-3 last:mb-0 py-1">
+                                <div class="dashboard-skeleton-bar w-10 h-10 rounded-full shrink-0"></div>
+                                <div class="flex-1 space-y-2">
+                                    <div class="dashboard-skeleton-bar h-4 w-3/4 max-w-full"></div>
+                                    <div class="dashboard-skeleton-bar h-3 w-1/2 max-w-full"></div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-no-access-backdrop" aria-hidden="true"></div>
+
+            <div class="dashboard-no-access-panel">
+                <div class="dashboard-no-access-card">
+                    <div class="dashboard-no-access-card-header">
+                        <div class="flex items-start gap-4">
+                            <div class="dashboard-no-access-card-icon">
+                                <i class="fas fa-globe-americas text-lg" aria-hidden="true"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <h2 class="text-lg font-semibold leading-snug">{{ _('Request country access') }}</h2>
+                                <p class="mt-1 text-sm text-blue-100/95">
+                                    {% if pending_access_requests %}
+                                        {{ _('Your account is not linked to a country yet. You have pending request(s) under review.') }}
+                                    {% else %}
+                                        {{ _('Your account is not linked to a country yet. Submit a request to unlock your dashboard.') }}
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-5 sm:p-6">
+                        {% if pending_access_requests %}
+                            <div class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+                                <p class="text-sm font-medium text-emerald-800">
+                                    <i class="fas fa-clock mr-2" aria-hidden="true"></i>
+                                    {{ _('You have %(count)d pending access request(s). An admin will review them shortly.', count=pending_access_requests|length) }}
+                                </p>
+                                <p class="mt-1 text-xs text-emerald-700">
+                                    {% if can_request_multiple_countries %}
+                                        {{ _('Need access to more countries? You can select multiple countries in a single request below.') }}
+                                    {% else %}
+                                        {{ _('You can only request access to one country in total. You have already submitted a request.') }}
+                                    {% endif %}
+                                </p>
+                            </div>
                         {% else %}
-                            {{ _('You can only request access to one country in total. You have already submitted a request.') }}
-                        {% endif %}
-                     </p>
-                 {% else %}
-                     <h2 class="mt-4 text-lg font-semibold text-gray-900">{{ _('Your user account is not associated with any countries.') }}</h2>
-                     <p class="mt-2 text-sm text-gray-600">
-                        {% if can_request_multiple_countries %}
-                            {{ _('Request access to one or more countries below. You can select multiple countries in a single request.') }}
-                        {% else %}
-                            {{ _('Request access to one country below. You can only request one country in total.') }}
-                        {% endif %}
-                     </p>
-                 {% endif %}
-             </div>
-
-             {# Display list of access requests if any exist #}
-             {% if all_access_requests %}
-                 <div class="mb-8 max-w-4xl mx-auto">
-                     <h3 class="text-md font-semibold text-gray-800 mb-4 flex items-center">
-                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                         </svg>
-                         {{ _('Your Access Requests') }}
-                     </h3>
-                     <div class="space-y-3">
-                         {% for request in all_access_requests %}
-                             {% set is_revoked = False %}
-                             {% if request.status == 'approved' %}
-                                 {% set is_revoked = request._access_revoked|default(False) %}
-                             {% endif %}
-                             <div class="border border-gray-200 rounded-lg p-4 bg-white">
-                                 <div class="flex-1">
-                                     {# First line: Country name on left, status and date on right #}
-                                     <div class="flex items-center justify-between flex-wrap gap-3 mb-2">
-                                         <h4 class="text-sm font-semibold text-gray-900">
-                                             {% if request.country %}
-                                                 {{ get_localized_country_name(request.country) }}
-                                             {% else %}
-                                                 {{ _('Unknown Country') }} (ID: {{ request.country_id }})
-                                             {% endif %}
-                                         </h4>
-                                         <div class="flex items-center gap-3 flex-wrap">
-                                             {{ status_label_for_access_request(request.status, is_revoked, request._auto_resolved|default(false)) }}
-                                             <span class="text-xs text-gray-500">
-                                                 <i class="far fa-calendar mr-1"></i>
-                                                 {{ request.created_at|datetime_local('datetime') }}
-                                             </span>
-                                             {% if request.processed_at %}
-                                                 <span class="text-xs text-gray-500">
-                                                     <i class="far fa-calendar-check mr-1"></i>
-                                                     {{ _('Processed') }}: {{ request.processed_at|datetime_local('datetime') }}
-                                                 </span>
-                                             {% endif %}
-                                         </div>
-                                     </div>
-
-                                     {# Second line: User's note/description #}
-                                     {% if request.request_message %}
-                                         <div class="mt-2 pt-2 border-t border-gray-200">
-                                             <p class="text-sm text-gray-600">
-                                                 <span class="font-medium text-gray-700">
-                                                     <i class="fas fa-sticky-note mr-1"></i>{{ _('Your note') }}:
-                                                 </span>
-                                                 {{ request.request_message }}
-                                             </p>
-                                         </div>
-                                     {% endif %}
-
-                                     {# Admin notes if available #}
-                                     {% if request.admin_notes %}
-                                         <div class="mt-2 pt-2 border-t border-gray-200">
-                                             <p class="text-xs font-medium text-gray-700 mb-1">
-                                                 <i class="fas fa-user-shield mr-1"></i>{{ _('Admin Notes') }}:
-                                             </p>
-                                             <p class="text-xs text-gray-600">{{ request.admin_notes }}</p>
-                                         </div>
-                                     {% endif %}
-
-                                     {# Show message if access was revoked #}
-                                     {% if is_revoked %}
-                                         <div class="mt-2 pt-2 border-t border-orange-200">
-                                             <p class="text-xs text-orange-700">
-                                                 <i class="fas fa-info-circle mr-1"></i>
-                                                 {{ _('This request was approved, but your access to this country has since been removed by an administrator.') }}
-                                             </p>
-                                         </div>
-                                     {% endif %}
-                                 </div>
-                             </div>
-                         {% endfor %}
-                     </div>
-                 </div>
-             {% endif %}
-
-             {% set non_org_can_still_request = can_request_multiple_countries or not (non_org_has_counting_request|default(false)) %}
-             {% if non_org_can_still_request %}
-             <form method="POST" action="{{ url_for('main.request_country_access') }}" class="max-w-4xl mx-auto">
-                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" id="request_access_csrf_token">
-
-                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                     {# Left column: Country selection #}
-                     <div class="space-y-4">
-                         <div>
-                             <label for="request_access_requested_country" class="block text-sm font-medium text-gray-700 mb-2">
-                                 {% if can_request_multiple_countries %}{{ _('Countries you need access to') }}{% else %}{{ _('Country you need access to') }}{% endif %}
-                                 <span class="text-red-500">*</span>
-                             </label>
-                             <div class="select2-country-wrap">
-                             {{ request_access_form.requested_country_id(id="request_access_requested_country", class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm select2-country") }}
-                             </div>
-                             {% for error in request_access_form.requested_country_id.errors %}
-                                 <p class="mt-1 text-red-600 text-sm">{{ error }}</p>
-                             {% endfor %}
-                             <p class="mt-2 text-xs text-gray-500">
+                            <p class="mb-5 text-sm text-gray-600">
                                 {% if can_request_multiple_countries %}
-                                    {{ _('Select one or more countries. An admin will review your request(s). Countries you already have access to are greyed out and cannot be selected.') }}
+                                    {{ _('Select one or more countries below. An administrator will review your request and grant access when approved.') }}
                                 {% else %}
-                                    {{ _('Select one country. An admin will review your request. You can only request one country in total.') }}
+                                    {{ _('Select one country below. You can only request one country in total.') }}
                                 {% endif %}
-                             </p>
-                         </div>
-                     </div>
-
-                     {# Right column: Message field #}
-                     <div class="space-y-4">
-                         <div>
-                             <label for="request_access_request_message" class="block text-sm font-medium text-gray-700 mb-2">
-                                 {{ _('Message to admins') }}
-                                 <span class="text-gray-400 font-normal">({{ _('optional') }})</span>
-                             </label>
-                             {{ request_access_form.request_message(id="request_access_request_message", class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm resize-none", placeholder=_('Briefly describe your role and why you need access'), rows="6") }}
-                             {% for error in request_access_form.request_message.errors %}
-                                 <p class="mt-1 text-red-600 text-sm">{{ error }}</p>
-                             {% endfor %}
-                             <p class="mt-2 text-xs text-gray-500">{{ _('Provide additional context to help admins process your request faster.') }}</p>
-                         </div>
-                     </div>
-                 </div>
-
-                 {# Submit button - full width below the form fields #}
-                 <div class="mt-6 pt-6 border-t border-gray-200">
-                     <button type="submit" class="btn btn-primary w-full sm:w-auto sm:min-w-[200px]">
-                         <i class="fas fa-paper-plane mr-2"></i>
-                         {{ _('Request Access') }}
-                     </button>
-                     <p class="mt-2 text-xs text-gray-500 text-center sm:text-left">
-                        {% if can_request_multiple_countries %}
-                            {{ _('You can select multiple countries and submit all requests at once.') }}
-                        {% else %}
-                            {{ _('You can only request one country in total.') }}
+                            </p>
                         {% endif %}
-                     </p>
-                 </div>
-             </form>
-             {% else %}
-             <div class="max-w-4xl mx-auto mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                 <p class="text-sm text-amber-800">
-                     <i class="fas fa-info-circle mr-2"></i>
-                     {{ _('You can only request access to one country in total. You have already submitted a request.') }}
-                 </p>
-             </div>
-             {% endif %}
-         </div>
+
+                        {# Display list of access requests if any exist #}
+                        {% if all_access_requests %}
+                            <div class="mb-6">
+                                <h3 class="text-sm font-semibold text-gray-800 mb-3 flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    {{ _('Your Access Requests') }}
+                                </h3>
+                                <div class="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                                    {% for request in all_access_requests %}
+                                        {% set is_revoked = False %}
+                                        {% if request.status == 'approved' %}
+                                            {% set is_revoked = request._access_revoked|default(False) %}
+                                        {% endif %}
+                                        <div class="border border-gray-200 rounded-lg p-3.5 bg-gray-50/80">
+                                            <div class="flex items-center justify-between flex-wrap gap-2 mb-1.5">
+                                                <h4 class="text-sm font-semibold text-gray-900">
+                                                    {% if request.country %}
+                                                        {{ get_localized_country_name(request.country) }}
+                                                    {% else %}
+                                                        {{ _('Unknown Country') }} (ID: {{ request.country_id }})
+                                                    {% endif %}
+                                                </h4>
+                                                <div class="flex items-center gap-2 flex-wrap">
+                                                    {{ status_label_for_access_request(request.status, is_revoked, request._auto_resolved|default(false)) }}
+                                                    <span class="text-xs text-gray-500">
+                                                        <i class="far fa-calendar mr-1"></i>
+                                                        {{ request.created_at|datetime_local('datetime') }}
+                                                    </span>
+                                                    {% if request.processed_at %}
+                                                        <span class="text-xs text-gray-500">
+                                                            <i class="far fa-calendar-check mr-1"></i>
+                                                            {{ _('Processed') }}: {{ request.processed_at|datetime_local('datetime') }}
+                                                        </span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+
+                                            {% if request.request_message %}
+                                                <div class="mt-2 pt-2 border-t border-gray-200">
+                                                    <p class="text-sm text-gray-600">
+                                                        <span class="font-medium text-gray-700">
+                                                            <i class="fas fa-sticky-note mr-1"></i>{{ _('Your note') }}:
+                                                        </span>
+                                                        {{ request.request_message }}
+                                                    </p>
+                                                </div>
+                                            {% endif %}
+
+                                            {% if request.admin_notes %}
+                                                <div class="mt-2 pt-2 border-t border-gray-200">
+                                                    <p class="text-xs font-medium text-gray-700 mb-1">
+                                                        <i class="fas fa-user-shield mr-1"></i>{{ _('Admin Notes') }}:
+                                                    </p>
+                                                    <p class="text-xs text-gray-600">{{ request.admin_notes }}</p>
+                                                </div>
+                                            {% endif %}
+
+                                            {% if is_revoked %}
+                                                <div class="mt-2 pt-2 border-t border-orange-200">
+                                                    <p class="text-xs text-orange-700">
+                                                        <i class="fas fa-info-circle mr-1"></i>
+                                                        {{ _('This request was approved, but your access to this country has since been removed by an administrator.') }}
+                                                    </p>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        {% set non_org_can_still_request = can_request_multiple_countries or not (non_org_has_counting_request|default(false)) %}
+                        {% if non_org_can_still_request %}
+                        <form method="POST" action="{{ url_for('main.request_country_access') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" id="request_access_csrf_token">
+
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                                <div class="space-y-2">
+                                    <label for="request_access_requested_country" class="block text-sm font-medium text-gray-700">
+                                        {% if can_request_multiple_countries %}{{ _('Countries you need access to') }}{% else %}{{ _('Country you need access to') }}{% endif %}
+                                        <span class="text-red-500">*</span>
+                                    </label>
+                                    <div class="select2-country-wrap">
+                                    {{ request_access_form.requested_country_id(id="request_access_requested_country", class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm select2-country") }}
+                                    </div>
+                                    {% for error in request_access_form.requested_country_id.errors %}
+                                        <p class="mt-1 text-red-600 text-sm">{{ error }}</p>
+                                    {% endfor %}
+                                    <p class="text-xs text-gray-500">
+                                       {% if can_request_multiple_countries %}
+                                           {{ _('Select one or more countries. Countries you already have access to are greyed out and cannot be selected.') }}
+                                       {% else %}
+                                           {{ _('Select one country. An admin will review your request.') }}
+                                       {% endif %}
+                                    </p>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="request_access_request_message" class="block text-sm font-medium text-gray-700">
+                                        {{ _('Message to admins') }}
+                                        <span class="text-gray-400 font-normal">({{ _('optional') }})</span>
+                                    </label>
+                                    {{ request_access_form.request_message(id="request_access_request_message", class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm resize-none", placeholder=_('Briefly describe your role and why you need access'), rows="5") }}
+                                    {% for error in request_access_form.request_message.errors %}
+                                        <p class="mt-1 text-red-600 text-sm">{{ error }}</p>
+                                    {% endfor %}
+                                    <p class="text-xs text-gray-500">{{ _('Provide additional context to help admins process your request faster.') }}</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-5 pt-5 border-t border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <button type="submit" class="btn btn-primary w-full sm:w-auto sm:min-w-[200px]">
+                                    <i class="fas fa-paper-plane mr-2"></i>
+                                    {{ _('Request Access') }}
+                                </button>
+                                <p class="text-xs text-gray-500 text-center sm:text-right">
+                                   {% if can_request_multiple_countries %}
+                                       {{ _('You can select multiple countries and submit all requests at once.') }}
+                                   {% else %}
+                                       {{ _('You can only request one country in total.') }}
+                                   {% endif %}
+                                </p>
+                            </div>
+                        </form>
+                        {% else %}
+                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                            <p class="text-sm text-amber-800">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                {{ _('You can only request access to one country in total. You have already submitted a request.') }}
+                            </p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
     {% endif %}
 </div>
 

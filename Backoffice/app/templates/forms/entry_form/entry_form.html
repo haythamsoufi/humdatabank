@@ -241,15 +241,41 @@
         {# Preview context controls merged into the Template Preview Mode banner above #}
 
         {% if not can_edit and not is_preview_mode %}
-            <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6" role="alert">
-                <p class="font-bold">{{ _('Read Only') }}</p>
-                {% if assignment_status is defined and assignment_status.is_round_closed_for_entity %}
-                <p>{{ _('This assignment\'s data collection round is closed. You can view the form, but only an administrator can make changes or reopen it for this entity.') }}</p>
-                {% elif assignment_status is defined and assignment_status.status == 'sent_for_review' %}
-                <p>{{ _('This assignment has been sent to %(org)s for review. You cannot make changes until the delegation returns it for revision.', org=ORG_NAME) }}</p>
-                {% else %}
-                <p>{{ _('You cannot make changes to this form because it has been submitted. To request reopening this form, please write to') }} data@{{ get_organization_email_domain() or get_organization_domain() }} {{ _('including your reason for the request.') }}</p>
-                {% endif %}
+            {% set _org_data_email = 'data@' ~ (get_organization_email_domain() or get_organization_domain()) %}
+            {% set _assignment_scope = {
+                'entity_type': assignment_status.entity_type,
+                'entity_id': assignment_status.entity_id,
+                'assigned_form_id': assignment_status.assigned_form_id,
+            } if (assignment_status is defined and assignment_status and not is_public_submission) else none %}
+            {% set _can_enter_assignment = has_permission('assignment.enter', _assignment_scope) if _assignment_scope else false %}
+            {% set _raw_assignment_status = assignment_status.status if (assignment_status is defined and assignment_status) else none %}
+            {% set _assignment_status_value = _raw_assignment_status.value if (_raw_assignment_status is not none and _raw_assignment_status.value is defined) else (_raw_assignment_status|string if _raw_assignment_status is not none else '') %}
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 mb-6" role="alert">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-lock text-yellow-600 mt-1"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="font-medium">{{ _('Read-only') }}</p>
+                        <p class="text-sm mt-1">
+                        {% if is_public_submission %}
+                            {{ _('This public submission is read-only. You can review the responses but cannot change them.') }}
+                        {% elif assignment_status is defined and assignment_status.is_round_closed_for_entity %}
+                            {{ _('This assignment\'s data collection round is closed. You can view the form, but only an administrator can make changes or reopen it for this entity.') }}
+                        {% elif _assignment_status_value == 'sent_for_review' %}
+                            {{ _('This assignment has been sent to %(org)s for review. You cannot make changes until it is returned for revision.', org=ORG_NAME) }}
+                        {% elif _assignment_status_value == 'approved' %}
+                            {{ _('This form has been validated and is read-only. To request changes, please write to %(email)s and include your reason for the request.', email=_org_data_email) }}
+                        {% elif _assignment_status_value == 'submitted' %}
+                            {{ _('This form has been submitted and is read-only. To request reopening, please write to %(email)s and include your reason for the request.', email=_org_data_email) }}
+                        {% elif _assignment_scope and not _can_enter_assignment %}
+                            {{ _('You have view-only access to this assignment. You can review the data but cannot enter or change values.') }}
+                        {% else %}
+                            {{ _('This form is read-only. You can review the data but cannot make changes.') }}
+                        {% endif %}
+                        </p>
+                    </div>
+                </div>
             </div>
         {% endif %}
 

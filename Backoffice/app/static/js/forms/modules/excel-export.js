@@ -217,7 +217,7 @@ export class ExcelExportManager {
                 if (contentType.includes('application/json')) {
                     try {
                         const data = await response.json();
-                        msg = data?.message || msg;
+                        msg = data?.message || data?.error || msg;
                     } catch (_e) {
                         // ignore JSON parse errors
                     }

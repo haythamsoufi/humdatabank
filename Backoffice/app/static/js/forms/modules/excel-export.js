@@ -432,14 +432,15 @@ export class ExcelExportManager {
                 try {
                     const { applyUprExcelImportPayload } = await import('./upr-excel-import-apply.js');
                     const applyResult = await applyUprExcelImportPayload(data.payload);
-                    const allWarnings = [...new Set(
-                        [...(data.warnings || []), ...(applyResult.warnings || [])].filter(Boolean)
-                    )];
+                    const allWarnings = this._dedupeImportWarnings([
+                        ...(data.warnings || []),
+                        ...(applyResult.warnings || []),
+                    ]);
                     this.hideModal();
-                    const baseMessage = data.message || 'Import loaded into the form. Click Save to persist your changes.';
                     this.showPageImportNotice({
-                        message: baseMessage,
+                        message: data.message,
                         warnings: allWarnings,
+                        updatedCount: data.updated_count ?? applyResult.applied,
                         type: allWarnings.length ? 'warning' : 'success',
                     });
                 } catch (applyError) {
@@ -481,6 +482,33 @@ export class ExcelExportManager {
             .replace(/"/g, '&quot;');
     }
 
+    _stripEmbeddedWarningsFromMessage(message) {
+        const text = String(message || '').trim();
+        const idx = text.search(/\bWarnings:\s/i);
+        if (idx >= 0) {
+            return text.slice(0, idx).trim();
+        }
+        return text;
+    }
+
+    _dedupeImportWarnings(warnings) {
+        const seen = new Set();
+        const out = [];
+        let periodNoted = false;
+        for (const raw of warnings || []) {
+            const text = String(raw || '').trim();
+            if (!text || seen.has(text)) continue;
+            const lower = text.toLowerCase();
+            if (lower.includes('period') && (lower.includes('does not match') || lower.includes('differs from'))) {
+                if (periodNoted) continue;
+                periodNoted = true;
+            }
+            seen.add(text);
+            out.push(text);
+        }
+        return out;
+    }
+
     clearPageImportNotice() {
         const anchor = document.getElementById('entry-form-excel-import-notice');
         if (!anchor) return;
@@ -492,11 +520,12 @@ export class ExcelExportManager {
     /**
      * Show import result as an inline notice at the top of the entry form (not a flash toast).
      */
-    showPageImportNotice({ message, warnings = [], type = 'success' }) {
+    showPageImportNotice({ message, warnings = [], type = 'success', updatedCount = null }) {
         const anchor = document.getElementById('entry-form-excel-import-notice');
         if (!anchor) return;
 
-        const hasWarnings = Array.isArray(warnings) && warnings.length > 0;
+        const dedupedWarnings = this._dedupeImportWarnings(warnings);
+        const hasWarnings = dedupedWarnings.length > 0;
         const isWarning = type === 'warning' || hasWarnings;
         anchor.className = isWarning
             ? 'bg-amber-50 border-l-4 border-amber-500 text-amber-900 p-4 mb-6 rounded-r-lg'
@@ -506,11 +535,21 @@ export class ExcelExportManager {
 
         const iconClass = isWarning ? 'fas fa-exclamation-triangle text-amber-600' : 'fas fa-check-circle text-green-600';
         const title = isWarning ? 'Excel import loaded with warnings' : 'Excel import loaded';
+        const summary = this._stripEmbeddedWarningsFromMessage(message)
+            || (updatedCount != null
+                ? `Loaded ${updatedCount} values into the form. Review your data and click Save to persist.`
+                : 'Import loaded into the form. Review your data and click Save to persist.');
 
         let warningsHtml = '';
         if (hasWarnings) {
-            const items = warnings.map((w) => `<li class="mt-1">${this._escapeNoticeHtml(w)}</li>`).join('');
-            warningsHtml = `<ul class="text-sm mt-2 mb-0 list-disc pl-5 space-y-1">${items}</ul>`;
+            const items = dedupedWarnings
+                .map((w) => (
+                    `<li class="excel-io-page-notice__warning-item">${this._escapeNoticeHtml(w)}</li>`
+                ))
+                .join('');
+            warningsHtml = `
+                <p class="text-sm font-medium mt-3 mb-1 m-0">Warnings (${dedupedWarnings.length})</p>
+                <ul class="excel-io-page-notice__warnings text-sm mt-1 mb-0">${items}</ul>`;
         }
 
         anchor.innerHTML = `
@@ -521,7 +560,7 @@ export class ExcelExportManager {
                     </div>
                     <div class="ml-3 min-w-0">
                         <p class="font-medium m-0">${this._escapeNoticeHtml(title)}</p>
-                        <p class="text-sm mt-1 mb-0">${this._escapeNoticeHtml(message)}</p>
+                        <p class="text-sm mt-1 mb-0">${this._escapeNoticeHtml(summary)}</p>
                         ${warningsHtml}
                     </div>
                 </div>

@@ -885,6 +885,71 @@ class TestImportTemplate:
 
             assert result['success'] is True
 
+    def test_parse_import_version_mode(self, db_session, app):
+        with app.app_context():
+            template = create_test_template(db_session, name="Parse Mode Template")
+            published = template.published_version
+            draft = create_test_draft_version(db_session, template, name="Parse Draft")
+
+            assert TemplateExcelService._parse_import_version_mode('create_draft', published) is True
+            assert TemplateExcelService._parse_import_version_mode('current_version', published) is False
+            assert TemplateExcelService._parse_import_version_mode(None, published) is True
+            assert TemplateExcelService._parse_import_version_mode(None, draft) is False
+
+    def test_get_or_create_draft_for_import_reuses_existing(self, db_session, app):
+        with app.app_context():
+            admin = create_test_admin(db_session)
+            template = create_test_template(db_session, name="Reuse Draft Import Template")
+            published = template.published_version
+            existing = create_test_draft_version(db_session, template, name="Existing Draft")
+
+            with app.test_request_context():
+                login_user(admin)
+                draft = TemplateExcelService._get_or_create_draft_for_import(template, published)
+
+            assert draft.id == existing.id
+            assert FormTemplateVersion.query.filter_by(
+                template_id=template.id, status='draft'
+            ).count() == 1
+
+    def test_get_or_create_draft_for_import_creates_new(self, db_session, app):
+        with app.app_context():
+            admin = create_test_admin(db_session)
+            template = create_test_template(db_session, name="Create Draft Import Template")
+            published = template.published_version
+
+            with app.test_request_context():
+                login_user(admin)
+                draft = TemplateExcelService._get_or_create_draft_for_import(template, published)
+
+            assert draft.status == 'draft'
+            assert draft.based_on_version_id == published.id
+
+    def test_resolve_import_target_version_id_uses_existing_draft(self, db_session, app):
+        with app.app_context():
+            template = create_test_template(db_session, name="Resolve Draft Target Template")
+            published = template.published_version
+            draft = create_test_draft_version(db_session, template, name="Existing Draft")
+
+            resolved = TemplateExcelService.resolve_import_target_version_id(
+                template.id,
+                published.id,
+                import_version_mode='create_draft',
+            )
+            assert resolved == draft.id
+
+    def test_resolve_import_target_version_id_keeps_published_for_current_mode(self, db_session, app):
+        with app.app_context():
+            template = create_test_template(db_session, name="Resolve Published Target Template")
+            published = template.published_version
+
+            resolved = TemplateExcelService.resolve_import_target_version_id(
+                template.id,
+                published.id,
+                import_version_mode='current_version',
+            )
+            assert resolved == published.id
+
     def test_import_with_pages(self, db_session, app):
         with app.app_context():
             admin = create_test_admin(db_session)

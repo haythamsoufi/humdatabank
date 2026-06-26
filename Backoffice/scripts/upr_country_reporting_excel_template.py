@@ -2332,6 +2332,25 @@ def import_rows_to_client_payload(
     return fields, matrices
 
 
+def dedupe_upr_import_warnings(warnings: Iterable[str]) -> List[str]:
+    """Return unique import warnings, collapsing redundant period-mismatch messages."""
+    seen: Set[str] = set()
+    out: List[str] = []
+    period_noted = False
+    for raw in warnings:
+        text = str(raw or "").strip()
+        if not text or text in seen:
+            continue
+        lower = text.lower()
+        if "period" in lower and ("does not match" in lower or "differs from" in lower):
+            if period_noted:
+                continue
+            period_noted = True
+        seen.add(text)
+        out.append(text)
+    return out
+
+
 def build_upr_country_reporting_client_payload(
     aes_id: int,
     wb,
@@ -2766,9 +2785,7 @@ def validate_upr_country_reporting_workbook(
     ctx.country_name = str(read_named_cell(wb, "Data_Country") or "").strip()
 
     if expected_period and ctx.period_name and ctx.period_name != expected_period:
-        ctx.warnings.append(
-            f"Workbook Version period {ctx.period_name!r} does not match assignment period {expected_period!r}"
-        )
+        pass  # Period mismatch is reported once via validate_upr_country_reporting_import_file.
     if expected_country and ctx.country_name:
         if _normalize_text(expected_country) != _normalize_text(ctx.country_name):
             ctx.warnings.append(
@@ -3012,6 +3029,7 @@ def run_upr_country_reporting_import(
         ctx = build_import_context([REPORTING_COUNTRY_TEMPLATE_ID])
         import_rows = transform_upr_country_reporting_to_import_rows(aes_id, wb, ctx, iso3=iso3, period=period)
         stats["warnings"].extend(ctx.warnings)
+        stats["warnings"] = dedupe_upr_import_warnings(stats["warnings"])
         stats["transformed"] = len(import_rows)
 
         if not persist:

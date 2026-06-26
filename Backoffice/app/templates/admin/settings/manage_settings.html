@@ -360,6 +360,17 @@
                  placeholder="{{ _('e.g., humdatabank.org') }}" />
           <p class="text-xs text-gray-400 mt-1">{{ _('Falls back to organization domain if empty.') }}</p>
         </div>
+        <div class="md:col-span-2">
+          <label class="block text-xs text-gray-500 mb-1">{{ _('Team contact email') }}</label>
+          <input type="email"
+                 name="organization_team_email"
+                 value="{{ current_branding.get('organization_team_email', '') }}"
+                 maxlength="200"
+                 autocomplete="email"
+                 class="w-full max-w-xl rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                 placeholder="{{ _('e.g., support@humdatabank.org') }}" />
+          <p class="text-xs text-gray-400 mt-1">{{ _('Optional. Shown in the Indicator Suggestion Confirmation email as the team_email template variable (contact link and footer). Also used as BCC on that message.') }}</p>
+        </div>
       </div>
     </div>
 
@@ -891,7 +902,7 @@
         {
           'key': 'email_template_suggestion_confirmation',
           'label': _('Indicator Suggestion Confirmation'),
-          'description': _('Email sent to users when they submit an indicator suggestion. Variables: submitter_name, suggestion_type_display, indicator_name, submitted_date, suggestion_details, org_name, copyright_year')
+          'description': _('Email sent to users when they submit an indicator suggestion. Variables: submitter_name, suggestion_type_display, indicator_name, submitted_date, suggestion_details, team_email (from Branding → Team contact email), org_name, copyright_year')
         },
         {
           'key': 'email_template_admin_notification',
@@ -901,7 +912,7 @@
         {
           'key': 'email_template_security_alert',
           'label': _('Security Alert'),
-          'description': _('Email sent to admins for security events. Variables: event_type, severity, description, ip_address, user_email, user_id, timestamp, admin_url, org_name, copyright_year')
+          'description': _('Email sent to admins for security events. Variables: event_type_display, severity_display, formatted_timestamp, header_bg_color, alert_bg_color, alert_border_color, description, ip_address, user_email, user_id, admin_url, org_name, copyright_year')
         },
         {
           'key': 'email_template_welcome',

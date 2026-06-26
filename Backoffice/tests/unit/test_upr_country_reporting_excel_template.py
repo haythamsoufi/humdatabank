@@ -43,6 +43,7 @@ from upr_country_reporting_excel_template import (  # noqa: E402
     _is_yes_no_indicator_type,
     _parse_workbook_row_disagg,
     import_rows_to_client_payload,
+    dedupe_upr_import_warnings,
     build_kpi_lookup,
     parse_comments,
     parse_funding,
@@ -763,3 +764,15 @@ def test_import_rows_to_client_payload_splits_fields_and_matrices():
     assert matrices["300"]["IFRC_tot_fn"] == 1500
     assert fields["400"]["data_not_available"] is True
     assert "400" not in matrices
+
+
+def test_dedupe_upr_import_warnings_collapses_period_mismatch():
+    warnings = dedupe_upr_import_warnings([
+        "Workbook Version period '2025' does not match assignment period 'Jan-Jun 2026'",
+        "Workbook period '2025' differs from this assignment ('Jan-Jun 2026'). Values will be loaded into the current assignment.",
+        "No T33 form item for indicator 'Example' in 'Section' (AFG)",
+        "No T33 form item for indicator 'Example' in 'Section' (AFG)",
+    ])
+    assert len(warnings) == 2
+    assert sum("period" in w.lower() for w in warnings) == 1
+    assert any("Example" in w for w in warnings)

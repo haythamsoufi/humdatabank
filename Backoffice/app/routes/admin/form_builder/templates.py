@@ -1265,7 +1265,8 @@ def edit_template(template_id):
             'updated_by_name': updated_by_user.name if updated_by_user and updated_by_user.name else (updated_by_user.email if updated_by_user else None),
             'is_published': (template.published_version_id == v.id)
         })
-    has_draft = FormTemplateVersion.query.filter_by(template_id=template.id, status='draft').first() is not None
+    draft_version = FormTemplateVersion.query.filter_by(template_id=template.id, status='draft').first()
+    has_draft = draft_version is not None
 
     # Get active version number for display
     active_version_number = None
@@ -1309,6 +1310,7 @@ def edit_template(template_id):
                            add_question_modal_form=add_question_modal_form,
                            active_version_id=selected_version.id,
                            has_draft=has_draft,
+                           draft_version=draft_version,
                            published_version_id=template.published_version_id,
                            draft_pages=draft_pages,
                            versions_for_ui=versions_for_ui,
@@ -1713,7 +1715,11 @@ def preflight_import_excel(template_id):
         return jsonify({'error': 'Access denied'}), 403
 
     version_id = request.args.get('version_id', type=int)
-    impact = TemplateExcelService._count_deletion_impact(template_id, version_id)
+    import_version_mode = request.args.get('import_version_mode')
+    effective_version_id = TemplateExcelService.resolve_import_target_version_id(
+        template_id, version_id, import_version_mode
+    )
+    impact = TemplateExcelService._count_deletion_impact(template_id, effective_version_id)
     return jsonify(impact)
 
 
@@ -1731,6 +1737,7 @@ def import_template_excel(template_id):
     # Get version_id from query parameter or form (defaults to active version)
     # Get this early so we can use it in error redirects too
     version_id = request.args.get('version_id', type=int) or request.form.get('version_id', type=int)
+    import_version_mode = request.form.get('import_version_mode')
 
     # Validate CSRF token
     csrf_form = FlaskForm()
@@ -1761,7 +1768,9 @@ def import_template_excel(template_id):
 
     try:
         # Import template from Excel
-        result = TemplateExcelService.import_template(template_id, excel_file, version_id)
+        result = TemplateExcelService.import_template(
+            template_id, excel_file, version_id, import_version_mode=import_version_mode
+        )
 
         # Use the version_id from result (may be new draft if published was selected)
         final_version_id = result.get('version_id', version_id)

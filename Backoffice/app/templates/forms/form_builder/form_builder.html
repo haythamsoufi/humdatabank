@@ -401,6 +401,16 @@
     </script>
     {% endif %}
 
+    <div id="excel-import-version-config" class="hidden" aria-hidden="true"
+         data-is-draft="{{ '1' if selected_version_is_draft else '0' }}"
+         data-has-draft="{{ '1' if has_draft else '0' }}"
+         data-version-id="{{ active_version_id }}"
+         data-version-number="{{ active_version_number or '' }}"
+         data-draft-version-id="{{ draft_version.id if draft_version else '' }}"
+         data-draft-version-number="{{ draft_version.version_number if draft_version else '' }}"
+         data-version-status="{{ selected_version_status }}">
+    </div>
+
     </div>{# /form-builder-status-banners #}
 
 {# Template Details Section #}
@@ -839,7 +849,32 @@
         window.formBuilderMessages = {
             deployVersion: {{ _("Deploy this version? This will publish it as the live version.") | tojson }},
             deleteVersion: {{ _("Delete this version? This cannot be undone.") | tojson }},
-            discardDraft: {{ _("Discard this draft? All changes will be lost and cannot be undone.") | tojson }}
+            discardDraft: {{ _("Discard this draft? All changes will be lost and cannot be undone.") | tojson }},
+            excelImport: {
+                validatingLabel: {{ _('Validating file…') | tojson }},
+                validationFailedLabel: {{ _('Validation failed. Please fix the file and try again.') | tojson }},
+                networkErrorLabel: {{ _('Could not validate the file. Please try again.') | tojson }},
+                extractedDetailsLabel: {{ _('Extracted details') | tojson }},
+                validExportLabel: {{ _('Valid export') | tojson }},
+                pagesLabel: {{ _('Pages') | tojson }},
+                sectionsLabel: {{ _('Sections') | tojson }},
+                itemsLabel: {{ _('Items') | tojson }},
+                templateNameLabel: {{ _('Template name') | tojson }},
+                invalidFileTypeLabel: {{ _('Please upload a valid Excel file (.xlsx or .xls).') | tojson }},
+                maxSizeLabel: {{ _('File size must be less than 10MB.') | tojson }},
+                importingLabel: {{ _('Importing template…') | tojson }},
+                checkingLabel: {{ _('Checking…') | tojson }},
+                preflightErrorLabel: {{ _('Could not check for existing data. Please try again.') | tojson }},
+                deleteDataTitle: {{ _('This import will permanently delete existing submission data:') | tojson }},
+                deleteDataUndo: {{ _('This action cannot be undone.') | tojson }},
+                deleteDataConfirm: {{ _('Delete data & import') | tojson }},
+                cancelLabel: {{ _('Cancel') | tojson }},
+                labelCreateDraft: {{ _('Create a new draft version') | tojson }},
+                labelImportExistingDraft: {{ _('Import into existing draft (Version %(num)s)') | tojson }},
+                labelCurrentVersion: {{ _('Import into current version (Version %(num)s)') | tojson }},
+                labelPublishedWarning: {{ _('This will modify the published version.') | tojson }},
+                labelDraftNote: {{ _('You are already editing a draft version.') | tojson }}
+            }
         };
     </script>
     <script src="{{ static_url('js/core/floating-progress-banner.js') }}"></script>

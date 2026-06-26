@@ -198,6 +198,91 @@ export function initPageSectionsToggle() {
 }
 
 /**
+ * Keep Excel import target radios in sync with the active template version.
+ */
+export function syncExcelImportVersionOptions() {
+    const config = document.getElementById('excel-import-version-config');
+    const importForm = document.getElementById('import-excel-form');
+    if (!config || !importForm) return;
+
+    const labels = window.formBuilderMessages?.excelImport || {};
+    const isDraft = config.dataset.isDraft === '1';
+    const hasDraft = config.dataset.hasDraft === '1';
+    const versionNumber = config.dataset.versionNumber || '';
+    const draftVersionNumber = config.dataset.draftVersionNumber || '';
+    const versionStatus = config.dataset.versionStatus || '';
+    const versionId = config.dataset.versionId || '';
+
+    const versionInput = importForm.querySelector('input[name="version_id"]');
+    if (versionInput && versionId) {
+        versionInput.value = versionId;
+    }
+
+    const createDraftRadio = importForm.querySelector('#excel-import-mode-create-draft');
+    const currentVersionRadio = importForm.querySelector('#excel-import-mode-current-version');
+    const createDraftLabel = importForm.querySelector('#excel-import-create-draft-label');
+    const currentVersionLabel = importForm.querySelector('#excel-import-current-version-label');
+    const draftNote = importForm.querySelector('#excel-import-draft-exists-note');
+
+    const formatLabel = (template, num) => String(template || '').replace('%(num)s', num);
+
+    if (createDraftLabel) {
+        const template = hasDraft && !isDraft
+            ? (labels.labelImportExistingDraft || '')
+            : (labels.labelCreateDraft || '');
+        createDraftLabel.textContent = formatLabel(template, draftVersionNumber || versionNumber);
+    }
+
+    if (createDraftRadio) {
+        createDraftRadio.disabled = isDraft;
+    }
+
+    if (draftNote) {
+        draftNote.hidden = !isDraft;
+        if (isDraft && labels.labelDraftNote) {
+            draftNote.textContent = labels.labelDraftNote;
+        }
+    }
+
+    if (currentVersionLabel) {
+        const template = labels.labelCurrentVersion || '';
+        let html = formatLabel(template, versionNumber);
+        if (!isDraft && versionStatus === 'published' && labels.labelPublishedWarning) {
+            html += `<span class="excel-io-modal__import-target-warning">${labels.labelPublishedWarning}</span>`;
+        }
+        currentVersionLabel.innerHTML = html;
+    }
+
+    if (createDraftRadio && currentVersionRadio) {
+        if (isDraft) {
+            currentVersionRadio.checked = true;
+            createDraftRadio.checked = false;
+        } else {
+            createDraftRadio.checked = true;
+            currentVersionRadio.checked = false;
+        }
+    }
+}
+
+function getExcelImportLabels() {
+    const labels = window.formBuilderMessages?.excelImport || {};
+    return {
+        validatingLabel: labels.validatingLabel || 'Validating file…',
+        validationFailedLabel: labels.validationFailedLabel || 'Validation failed. Please fix the file and try again.',
+        networkErrorLabel: labels.networkErrorLabel || 'Could not validate the file. Please try again.',
+        extractedDetailsLabel: labels.extractedDetailsLabel || 'Extracted details',
+        validExportLabel: labels.validExportLabel || 'Valid export',
+        pagesLabel: labels.pagesLabel || 'Pages',
+        sectionsLabel: labels.sectionsLabel || 'Sections',
+        itemsLabel: labels.itemsLabel || 'Items',
+        templateNameLabel: labels.templateNameLabel || 'Template name',
+        invalidFileTypeLabel: labels.invalidFileTypeLabel || 'Please upload a valid Excel file (.xlsx or .xls).',
+        maxSizeLabel: labels.maxSizeLabel || 'File size must be less than 10MB.',
+        importingLabel: labels.importingLabel || 'Importing template…',
+    };
+}
+
+/**
  * Initialize Excel modal functionality
  */
 export function initExcelModal() {
@@ -206,34 +291,49 @@ export function initExcelModal() {
         const excelModal = document.getElementById('excel-options-modal');
         const importForm = document.getElementById('import-excel-form');
 
+        syncExcelImportVersionOptions();
+        document.addEventListener('formBuilder:domUpdated', syncExcelImportVersionOptions);
+
         if (excelBtn && excelModal) {
             initExcelIoModal(excelModal, {
                 openTrigger: excelBtn,
+                onOpen: syncExcelImportVersionOptions,
                 onClose: function() {
                     if (importForm?.dataset?.excelImportSubmitting === '1') {
                         return;
                     }
-                    if (importForm) importForm.reset();
+                    if (importForm) {
+                        importForm.reset();
+                        delete importForm.dataset.excelPreflightDone;
+                        delete importForm.dataset.excelImportSubmitting;
+                        syncExcelImportVersionOptions();
+                    }
                 },
             });
 
             initExcelImportDropzone('#excel-import-dropzone', {
                 validateUrl: document.getElementById('excel-import-dropzone')?.dataset?.validateUrl,
                 fileFieldName: 'excel_file',
-                submitBtn: importForm?.querySelector('button[type="submit"]'),
+                submitBtn: importForm?.querySelector('.excel-io-modal__import-submit, button[type="submit"]'),
                 requireValidation: true,
                 resetOnModalClose: excelModal,
-                importingLabel: 'Importing template…',
+                maxSizeBytes: 10 * 1024 * 1024,
+                acceptExtensions: ['.xlsx', '.xls'],
+                ...getExcelImportLabels(),
             });
 
             if (importForm) {
                 const preflightUrl = document.getElementById('excel-import-preflight-url')?.value || null;
+                const uiLabels = window.formBuilderMessages?.excelImport || {};
 
                 importForm.addEventListener('submit', async (e) => {
                     const submitBtn = importForm.querySelector('button[type="submit"]');
 
-                    // User already confirmed deletion in this session — let the form submit.
-                    if (importForm.querySelector('input[name="confirm_deletion"]')) {
+                    // Preflight already passed, or user confirmed deletion — allow real submit.
+                    if (
+                        importForm.dataset.excelPreflightDone === '1'
+                        || importForm.querySelector('input[name="confirm_deletion"]')
+                    ) {
                         importForm.dataset.excelImportSubmitting = '1';
                         if (submitBtn) {
                             submitBtn.disabled = true;
@@ -257,12 +357,16 @@ export function initExcelModal() {
                     const originalBtnHtml = submitBtn?.innerHTML || '';
                     if (submitBtn) {
                         submitBtn.disabled = true;
-                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Checking\u2026';
+                        submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i> ${uiLabels.checkingLabel || 'Checking\u2026'}`;
                     }
 
                     try {
                         const versionId = importForm.querySelector('input[name="version_id"]')?.value;
-                        const url = versionId ? `${preflightUrl}?version_id=${encodeURIComponent(versionId)}` : preflightUrl;
+                        const importMode = importForm.querySelector('input[name="import_version_mode"]:checked')?.value;
+                        const params = new URLSearchParams();
+                        if (versionId) params.set('version_id', versionId);
+                        if (importMode) params.set('import_version_mode', importMode);
+                        const url = params.toString() ? `${preflightUrl}?${params.toString()}` : preflightUrl;
                         const resp = await fetch(url, { credentials: 'same-origin' });
                         const data = await resp.json();
 
@@ -280,22 +384,22 @@ export function initExcelModal() {
                             // Inject a warning banner with confirm / cancel actions above the submit button.
                             importForm.querySelector('.excel-import-deletion-warning')?.remove();
                             const warning = document.createElement('div');
-                            warning.className = 'excel-import-deletion-warning bg-red-50 border border-red-300 rounded-md p-3 text-sm mt-2';
+                            warning.className = 'excel-import-deletion-warning excel-io-modal__preflight-warning';
                             warning.innerHTML = `
-                                <div class="flex items-start gap-2">
-                                    <i class="fas fa-exclamation-triangle text-red-600 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
-                                    <div class="text-red-800">
-                                        <p class="font-semibold mb-1">This import will permanently delete existing submission data:</p>
-                                        <p class="mb-1">${summary}</p>
-                                        <p class="text-xs text-red-600">This action cannot be undone.</p>
+                                <div class="excel-io-modal__preflight-warning-body">
+                                    <i class="fas fa-exclamation-triangle excel-io-modal__preflight-warning-icon" aria-hidden="true"></i>
+                                    <div class="excel-io-modal__preflight-warning-text">
+                                        <p class="excel-io-modal__preflight-warning-title">${uiLabels.deleteDataTitle || 'This import will permanently delete existing submission data:'}</p>
+                                        <p class="excel-io-modal__preflight-warning-summary">${summary}</p>
+                                        <p class="excel-io-modal__preflight-warning-detail">${uiLabels.deleteDataUndo || 'This action cannot be undone.'}</p>
                                     </div>
                                 </div>
-                                <div class="flex gap-2 mt-3">
+                                <div class="excel-io-modal__preflight-warning-actions">
                                     <button type="button" class="btn btn-danger btn-sm excel-import-confirm-btn flex-1">
-                                        <i class="fas fa-trash mr-1"></i> Delete data &amp; import
+                                        <i class="fas fa-trash mr-1"></i> ${uiLabels.deleteDataConfirm || 'Delete data & import'}
                                     </button>
                                     <button type="button" class="btn btn-secondary btn-sm excel-import-cancel-btn flex-1">
-                                        Cancel
+                                        ${uiLabels.cancelLabel || 'Cancel'}
                                     </button>
                                 </div>`;
 
@@ -325,7 +429,8 @@ export function initExcelModal() {
                                 }
                             });
                         } else {
-                            // No data at risk — submit immediately.
+                            // No data at risk — submit immediately (skip preflight on re-entry).
+                            importForm.dataset.excelPreflightDone = '1';
                             importForm.dataset.excelImportSubmitting = '1';
                             if (submitBtn) {
                                 submitBtn.disabled = true;
@@ -341,12 +446,12 @@ export function initExcelModal() {
                         }
                         importForm.querySelector('.excel-import-deletion-warning')?.remove();
                         const errBanner = document.createElement('div');
-                        errBanner.className = 'excel-import-deletion-warning bg-red-50 border border-red-300 rounded-md p-3 text-sm mt-2';
+                        errBanner.className = 'excel-import-deletion-warning excel-io-modal__preflight-warning excel-io-modal__preflight-warning--error';
                         errBanner.innerHTML = `
-                            <div class="flex items-start gap-2">
-                                <i class="fas fa-exclamation-triangle text-red-600 mt-0.5 flex-shrink-0" aria-hidden="true"></i>
-                                <div class="text-red-800">
-                                    <p class="font-semibold">Could not check for existing data. Please try again.</p>
+                            <div class="excel-io-modal__preflight-warning-body">
+                                <i class="fas fa-exclamation-triangle excel-io-modal__preflight-warning-icon" aria-hidden="true"></i>
+                                <div class="excel-io-modal__preflight-warning-text">
+                                    <p class="excel-io-modal__preflight-warning-title">${uiLabels.preflightErrorLabel || 'Could not check for existing data. Please try again.'}</p>
                                 </div>
                             </div>`;
                         submitBtn.insertAdjacentElement('beforebegin', errBanner);

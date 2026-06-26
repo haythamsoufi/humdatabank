@@ -181,9 +181,7 @@
                             <button type="button" id="excel-options-btn" class="professional-action-btn professional-action-btn-green">
                                 <i class="fas fa-file-excel"></i>
                                 <span>
-                                    {% if _use_upr_country_reporting_excel %}
-                                        {{ _('UPR Country Reporting') }}
-                                    {% elif (tmpl.enable_export_excel or _use_upr_country_reporting_excel) and (tmpl.enable_import_excel or _use_upr_country_reporting_excel) %}
+                                    {% if (tmpl.enable_export_excel or _use_upr_country_reporting_excel) and (tmpl.enable_import_excel or _use_upr_country_reporting_excel) %}
                                         {{ _('Excel Import/Export') }}
                                     {% elif tmpl.enable_export_excel or _use_upr_country_reporting_excel %}
                                         {{ _('Excel Export') }}

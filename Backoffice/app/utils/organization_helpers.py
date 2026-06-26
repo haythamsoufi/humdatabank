@@ -14,6 +14,7 @@ from app.services.app_settings_service import (
     get_organization_email_domain,
     get_organization_name,
     get_organization_short_name,
+    get_organization_team_email,
     is_organization_email,
     get_organization_logo_path,
     get_organization_copyright_year,
@@ -38,6 +39,11 @@ def get_org_domain(default: str = "humdatabank.org") -> str:
 def get_org_email_domain(default: str = "humdatabank.org") -> str:
     """Get organization email domain. Alias for get_organization_email_domain."""
     return get_organization_email_domain(default=default)
+
+
+def get_org_team_email(default: Optional[str] = None) -> Optional[str]:
+    """Get team/support contact email for public-facing messages."""
+    return get_organization_team_email(default=default)
 
 
 def is_org_email(email: str) -> bool:

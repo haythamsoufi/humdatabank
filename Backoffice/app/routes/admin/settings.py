@@ -503,6 +503,7 @@ def _manage_settings_form_baseline(
         "organization_short_name_translations": json.dumps(org_short_name_translations or {}, ensure_ascii=False),
         "organization_domain": (current_branding or {}).get("organization_domain") or "",
         "organization_email_domain": (current_branding or {}).get("organization_email_domain") or "",
+        "organization_team_email": (current_branding or {}).get("organization_team_email") or "",
         "organization_logo_path": (current_branding or {}).get("organization_logo_path") or "",
         "organization_favicon_path": (current_branding or {}).get("organization_favicon_path") or "",
         "organization_copyright_year": str((current_branding or {}).get("organization_copyright_year") or ""),
@@ -562,6 +563,7 @@ _MANAGE_SETTINGS_AUDIT_LABELS = {
     "chatbot_name": "Chatbot display name",
     "organization_domain": "Organization domain",
     "organization_email_domain": "Organization email domain",
+    "organization_team_email": "Team contact email",
     "organization_logo_path": "Organization logo",
     "organization_favicon_path": "Favicon",
     "organization_copyright_year": "Copyright year",
@@ -1001,6 +1003,7 @@ def manage_settings():
                     "organization_short_name": org_short_name_localized if org_short_name_localized else data.get("organization_short_name", "").strip(),
                     "organization_domain": data.get("organization_domain", "").strip(),
                     "organization_email_domain": data.get("organization_email_domain", "").strip(),
+                    "organization_team_email": data.get("organization_team_email", "").strip(),
                     "organization_logo_path": data.get("organization_logo_path", "").strip(),
                     "organization_favicon_path": data.get("organization_favicon_path", "").strip(),
                     "organization_copyright_year": data.get("organization_copyright_year", "").strip(),
@@ -1023,6 +1026,8 @@ def manage_settings():
                     branding_data.pop("indicator_details_url_template", None)
                 if not branding_data.get("propose_new_indicator_url"):
                     branding_data.pop("propose_new_indicator_url", None)
+                if not branding_data.get("organization_team_email"):
+                    branding_data.pop("organization_team_email", None)
 
                 try:
                     branding_ok = set_organization_branding(branding_data, user_id=user_id)

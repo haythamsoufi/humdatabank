@@ -704,6 +704,7 @@ def get_organization_branding(default: Optional[Dict] = None) -> Dict:
     - organization_copyright_year: Copyright year (e.g., 2024) - not localized
     - indicator_details_url_template: Optional URL template for "View Full Details" links. Use "{id}" placeholder.
     - propose_new_indicator_url: Optional URL for "Propose a new indicator" links.
+    - organization_team_email: Optional contact address for public-facing emails (e.g. indicator suggestion confirmations).
 
     Falls back to environment variables or provided default.
     """
@@ -760,6 +761,7 @@ def set_organization_branding(branding: Dict, user_id: Optional[int] = None) -> 
     - organization_copyright_year (optional, defaults to current year) - string only
     - indicator_details_url_template (optional) - string; URL template with "{id}" placeholder
     - propose_new_indicator_url (optional) - string; URL to propose a new indicator
+    - organization_team_email (optional) - string; contact address for public-facing emails
 
     For localized fields (organization_name, organization_short_name), the dict format is:
     {'en': 'English Name', 'fr': 'French Name', ...}
@@ -812,6 +814,7 @@ def set_organization_branding(branding: Dict, user_id: Optional[int] = None) -> 
         "organization_copyright_year": str(branding.get("organization_copyright_year", str(datetime.now().year))).strip(),
         "indicator_details_url_template": str(branding.get("indicator_details_url_template", "")).strip(),
         "propose_new_indicator_url": str(branding.get("propose_new_indicator_url", "")).strip(),
+        "organization_team_email": str(branding.get("organization_team_email", "")).strip(),
     }
 
     # Remove empty optional fields
@@ -823,6 +826,8 @@ def set_organization_branding(branding: Dict, user_id: Optional[int] = None) -> 
         normalized.pop("indicator_details_url_template", None)
     if not normalized.get("propose_new_indicator_url"):
         normalized.pop("propose_new_indicator_url", None)
+    if not normalized.get("organization_team_email"):
+        normalized.pop("organization_team_email", None)
 
     data = read_settings()
     data["organization_branding"] = normalized
@@ -855,6 +860,32 @@ def get_organization_email_domain(default: str = "humdatabank.org") -> str:
     """Get organization email domain from settings."""
     branding = get_organization_branding()
     return branding.get("organization_email_domain", branding.get("organization_domain", default))
+
+
+def get_organization_team_email(default: Optional[str] = None) -> Optional[str]:
+    """Contact address for public-facing emails (branding DB, then TEAM_EMAIL config/env)."""
+    import os
+
+    branding = get_organization_branding()
+    value = str(branding.get("organization_team_email") or "").strip()
+    if value:
+        return value
+    config_value = ""
+    try:
+        from flask import current_app
+
+        config_value = str(current_app.config.get("TEAM_EMAIL") or "").strip()
+    except RuntimeError:
+        config_value = ""
+    if config_value:
+        return config_value
+    env_value = str(os.environ.get("TEAM_EMAIL") or "").strip()
+    if env_value:
+        return env_value
+    if default is not None:
+        stripped = str(default).strip()
+        return stripped or None
+    return None
 
 
 def is_organization_email(email: str) -> bool:

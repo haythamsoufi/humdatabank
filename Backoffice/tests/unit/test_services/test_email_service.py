@@ -438,7 +438,7 @@ class TestSecurityAlertFallbackHtmlBody:
     def test_timestamp_ensure_utc_exception(self):
         ts = datetime(2024, 1, 1)
         context = {"event_type": "x", "severity": "low", "description": "D", "timestamp": ts}
-        with patch("app.services.email.service.ensure_utc", side_effect=Exception("tz fail")):
+        with patch("app.utils.datetime_helpers.ensure_utc", side_effect=Exception("tz fail")):
             result = _security_alert_fallback_html_body(context)
         # falls back to str(ts)
         assert isinstance(result, str)
@@ -793,7 +793,9 @@ class TestSendAdminNotificationEmail:
                 send_admin_notification_email(sug)
 
         call_kwargs = mock_render.call_args.kwargs
-        assert "https://app.example.com" in call_kwargs.get("admin_url", "")
+        admin_url = call_kwargs.get("admin_url", "")
+        assert "https://app.example.com" in admin_url
+        assert admin_url.endswith("/admin/indicator_suggestions/view/42")
 
 
 # ---------------------------------------------------------------------------

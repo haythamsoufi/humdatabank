@@ -19,6 +19,7 @@ from app.services.notification_service import NotificationService
 from app.services.email.client import send_email as send_email_message
 from app.services.authorization_service import AuthorizationService
 from app.services.app_settings_service import get_notification_templates, get_email_template
+from app.utils.organization_helpers import get_org_name
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.error_handling import handle_json_view_exception
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
@@ -537,7 +538,7 @@ def api_send_notifications():
                 email_template,
                 title=title,
                 message=message,
-                org_name=current_app.config.get('ORG_NAME', 'System'),
+                org_name=get_org_name(),
             )
 
             # Send email to each user

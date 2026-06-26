@@ -2111,8 +2111,120 @@ class TemplateExcelService:
         }
 
     @classmethod
+    def _parse_import_version_mode(cls, import_version_mode: Optional[str], target_version) -> bool:
+        """Return True when the import should land in a draft (new or existing)."""
+        if import_version_mode == 'create_draft':
+            return True
+        if import_version_mode == 'current_version':
+            return False
+        return target_version.status == 'published'
+
+    @classmethod
+    def _resolve_target_version(cls, template, version_id: Optional[int]):
+        """Resolve the base version row for an import request."""
+        target_version = None
+        if version_id:
+            target_version = FormTemplateVersion.query.filter_by(
+                id=version_id, template_id=template.id
+            ).first()
+
+        if not target_version:
+            if template.published_version_id:
+                target_version = FormTemplateVersion.query.get(template.published_version_id)
+            else:
+                target_version = FormTemplateVersion.query.filter_by(
+                    template_id=template.id
+                ).order_by(FormTemplateVersion.created_at.desc()).first()
+
+        return target_version
+
+    @classmethod
+    def resolve_import_target_version_id(
+        cls,
+        template_id: int,
+        version_id: Optional[int],
+        import_version_mode: Optional[str] = None,
+    ) -> Optional[int]:
+        """Return the version_id that will receive the import (without creating rows)."""
+        template = FormTemplate.query.get(template_id)
+        if not template:
+            return version_id
+
+        target_version = cls._resolve_target_version(template, version_id)
+        if not target_version:
+            return version_id
+
+        if cls._parse_import_version_mode(import_version_mode, target_version):
+            if target_version.status == 'published':
+                existing_draft = FormTemplateVersion.query.filter_by(
+                    template_id=template.id, status='draft'
+                ).first()
+                return existing_draft.id if existing_draft else None
+            return target_version.id
+
+        return target_version.id
+
+    @classmethod
+    def _get_or_create_draft_for_import(cls, template, source_version) -> FormTemplateVersion:
+        """Return an existing draft or create one cloned from source_version."""
+        existing_draft = FormTemplateVersion.query.filter_by(
+            template_id=template.id, status='draft'
+        ).first()
+        if existing_draft:
+            current_app.logger.info(
+                f"Draft version already exists (ID={existing_draft.id}); using it for Excel import"
+            )
+            return existing_draft
+
+        from sqlalchemy import func
+        max_version = db.session.query(func.max(FormTemplateVersion.version_number)).filter_by(
+            template_id=template.id
+        ).scalar()
+        next_version_number = (max_version + 1) if max_version else 1
+
+        new_draft = FormTemplateVersion(
+            template_id=template.id,
+            version_number=next_version_number,
+            status='draft',
+            created_by=current_user.id,
+            updated_by=current_user.id,
+            based_on_version_id=source_version.id,
+            comment='Created automatically for Excel import',
+            name=source_version.name,
+            name_translations=source_version.name_translations.copy() if source_version.name_translations else None,
+            description=source_version.description,
+            add_to_self_report=source_version.add_to_self_report,
+            display_order_visible=source_version.display_order_visible,
+            is_paginated=source_version.is_paginated,
+            enable_export_pdf=source_version.enable_export_pdf,
+            enable_export_excel=source_version.enable_export_excel,
+            enable_import_excel=source_version.enable_import_excel,
+            enable_ai_validation=getattr(source_version, 'enable_ai_validation', False),
+            enable_data_quality=getattr(source_version, 'enable_data_quality', False),
+            data_quality_methodology=getattr(source_version, 'data_quality_methodology', None),
+            validation_rule_pack=getattr(source_version, 'validation_rule_pack', None),
+            variables=source_version.variables.copy() if source_version.variables else None
+        )
+        db.session.add(new_draft)
+        db.session.flush()
+        current_app.logger.info(
+            f"Created new draft version: ID={new_draft.id}, Version #={new_draft.version_number}"
+        )
+        cls._matrix_import_log(
+            f"Published import: created draft {new_draft.id} from version {source_version.id} "
+            f"(structure will be rebuilt from Excel)"
+        )
+        return new_draft
+
+    @classmethod
     @memory_tracker("Template Excel Import", log_top_allocations=True)
-    def import_template(cls, template_id: int, excel_file, version_id: Optional[int] = None) -> Dict[str, Any]:
+    def import_template(
+        cls,
+        template_id: int,
+        excel_file,
+        version_id: Optional[int] = None,
+        import_version_mode: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Import template structure from Excel.
 
@@ -2120,6 +2232,7 @@ class TemplateExcelService:
             template_id: Template ID to import into
             excel_file: File-like object containing Excel file
             version_id: Optional version ID to import into (defaults to active version or creates draft)
+            import_version_mode: 'create_draft' | 'current_version' — UI choice for import target
 
         Returns:
             Dict with 'success', 'message', 'errors', 'created_count' keys
@@ -2164,25 +2277,17 @@ class TemplateExcelService:
 
             # Determine target version
             current_app.logger.info("Determining target version...")
-            target_version = None
-            if version_id:
-                target_version = FormTemplateVersion.query.filter_by(
-                    id=version_id, template_id=template.id
-                ).first()
-                if target_version:
-                    current_app.logger.info(f"Using specified version ID {version_id} (Status: {target_version.status}, Version #: {target_version.version_number})")
-
-            if not target_version:
-                # Use published version or latest as fallback
-                if template.published_version_id:
-                    target_version = FormTemplateVersion.query.get(template.published_version_id)
-                    current_app.logger.info(f"Using published version ID {template.published_version_id}")
-                else:
-                    target_version = FormTemplateVersion.query.filter_by(
-                        template_id=template.id
-                    ).order_by(FormTemplateVersion.created_at.desc()).first()
-                    if target_version:
-                        current_app.logger.info(f"Using latest version ID {target_version.id} (Status: {target_version.status})")
+            target_version = cls._resolve_target_version(template, version_id)
+            if target_version and version_id:
+                current_app.logger.info(
+                    f"Using specified version ID {version_id} "
+                    f"(Status: {target_version.status}, Version #: {target_version.version_number})"
+                )
+            elif target_version:
+                current_app.logger.info(
+                    f"Using fallback version ID {target_version.id} "
+                    f"(Status: {target_version.status})"
+                )
 
             if not target_version:
                 current_app.logger.error("No version found for template")
@@ -2193,58 +2298,18 @@ class TemplateExcelService:
                     'created_count': created_counts
                 }
 
-            # If target version is published, create a new draft version
-            if target_version.status == 'published':
-                current_app.logger.info(f"Target version is published. Creating new draft version...")
+            create_new_draft = cls._parse_import_version_mode(import_version_mode, target_version)
 
-                # Get the next version number
-                from sqlalchemy import func
-                max_version = db.session.query(func.max(FormTemplateVersion.version_number)).filter_by(
-                    template_id=template.id
-                ).scalar()
-                next_version_number = (max_version + 1) if max_version else 1
+            # When importing into a draft, create/use a draft version from published.
+            if create_new_draft and target_version.status == 'published':
+                current_app.logger.info("Import target is a draft; preparing draft version...")
+                target_version = cls._get_or_create_draft_for_import(template, target_version)
+                version_id = target_version.id
 
-                # Create new draft version
-                new_draft = FormTemplateVersion(
-                    template_id=template.id,
-                    version_number=next_version_number,
-                    status='draft',
-                    created_by=current_user.id,
-                    updated_by=current_user.id,
-                    based_on_version_id=target_version.id,
-                    comment='Created automatically for Excel import',
-                    name=target_version.name,
-                    name_translations=target_version.name_translations.copy() if target_version.name_translations else None,
-                    description=target_version.description,
-                    add_to_self_report=target_version.add_to_self_report,
-                    display_order_visible=target_version.display_order_visible,
-                    is_paginated=target_version.is_paginated,
-                    enable_export_pdf=target_version.enable_export_pdf,
-                    enable_export_excel=target_version.enable_export_excel,
-                    enable_import_excel=target_version.enable_import_excel,
-                    enable_ai_validation=getattr(target_version, 'enable_ai_validation', False),
-                    enable_data_quality=getattr(target_version, 'enable_data_quality', False),
-                    data_quality_methodology=getattr(target_version, 'data_quality_methodology', None),
-                    validation_rule_pack=getattr(target_version, 'validation_rule_pack', None),
-                    variables=target_version.variables.copy() if target_version.variables else None
-                )
-                db.session.add(new_draft)
-                db.session.flush()
-
-                current_app.logger.info(f"Created new draft version: ID={new_draft.id}, Version #={new_draft.version_number}")
-                cls._matrix_import_log(
-                    f"Published import: created draft {new_draft.id} from version {target_version.id} "
-                    f"(structure will be rebuilt from Excel)"
-                )
-
-                # Use the new draft as target
-                target_version = new_draft
-                current_app.logger.info(f"Using new draft version: ID={target_version.id}, Version #={target_version.version_number}")
-
-                # Update version_id to return the new draft version ID
-                version_id = new_draft.id
-
-            current_app.logger.info(f"Target version: ID={target_version.id}, Status={target_version.status}, Version #={target_version.version_number}")
+            current_app.logger.info(
+                f"Target version: ID={target_version.id}, Status={target_version.status}, "
+                f"Version #={target_version.version_number}"
+            )
 
             # Import Template metadata first (including version-specific name)
             current_app.logger.info("=== IMPORTING TEMPLATE METADATA ===")
@@ -3086,37 +3151,44 @@ class TemplateExcelService:
                 template_id=template_id, version_id=version_id
             ).all()
         ]
-        if not section_ids:
-            return {'has_data': False, 'counts': {}}
 
-        item_ids_sq = db.session.query(FormItem.id).filter_by(
-            template_id=template_id, version_id=version_id
-        ).subquery()
-
+        # Join form_item so we count only data for this version without a large IN subquery.
         form_data: int = db.session.query(
             db.func.count(FormData.id)
-        ).filter(FormData.form_item_id.in_(item_ids_sq)).scalar() or 0
+        ).join(
+            FormItem, FormData.form_item_id == FormItem.id
+        ).filter(
+            FormItem.template_id == template_id,
+            FormItem.version_id == version_id,
+        ).scalar() or 0
 
-        repeat_instances: int = db.session.query(
-            db.func.count(RepeatGroupInstance.id)
-        ).filter(RepeatGroupInstance.section_id.in_(section_ids)).scalar() or 0
-
+        repeat_instances: int = 0
         repeat_data: int = 0
-        if repeat_instances:
-            instance_ids_sq = db.session.query(RepeatGroupInstance.id).filter(
-                RepeatGroupInstance.section_id.in_(section_ids)
-            ).subquery()
-            repeat_data = db.session.query(
-                db.func.count(RepeatGroupData.id)
-            ).filter(RepeatGroupData.repeat_instance_id.in_(instance_ids_sq)).scalar() or 0
+        dynamic_indicators: int = 0
+        dynamic_contexts: int = 0
 
-        dynamic_indicators: int = db.session.query(
-            db.func.count(DynamicIndicatorData.id)
-        ).filter(DynamicIndicatorData.section_id.in_(section_ids)).scalar() or 0
+        if section_ids:
+            repeat_instances = db.session.query(
+                db.func.count(RepeatGroupInstance.id)
+            ).filter(RepeatGroupInstance.section_id.in_(section_ids)).scalar() or 0
 
-        dynamic_contexts: int = db.session.query(
-            db.func.count(DynamicSectionContext.id)
-        ).filter(DynamicSectionContext.section_id.in_(section_ids)).scalar() or 0
+            if repeat_instances:
+                repeat_data = db.session.query(
+                    db.func.count(RepeatGroupData.id)
+                ).join(
+                    RepeatGroupInstance,
+                    RepeatGroupData.repeat_instance_id == RepeatGroupInstance.id,
+                ).filter(
+                    RepeatGroupInstance.section_id.in_(section_ids)
+                ).scalar() or 0
+
+            dynamic_indicators = db.session.query(
+                db.func.count(DynamicIndicatorData.id)
+            ).filter(DynamicIndicatorData.section_id.in_(section_ids)).scalar() or 0
+
+            dynamic_contexts = db.session.query(
+                db.func.count(DynamicSectionContext.id)
+            ).filter(DynamicSectionContext.section_id.in_(section_ids)).scalar() or 0
 
         total = form_data + repeat_instances + repeat_data + dynamic_indicators + dynamic_contexts
         return {

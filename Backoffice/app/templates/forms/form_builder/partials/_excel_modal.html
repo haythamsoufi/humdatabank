@@ -1,19 +1,47 @@
-{# Excel Import/Export Modal — form builder #}
+{# Excel Import/Export Modal — form builder (tabs layout + validated dropzone) #}
 {% from "macros/excel_io_modal.html" import excel_io_modal %}
 
 {% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('Excel Options') }}{% endset %}
-{% set _published_alert %}
-{% if selected_version_status == 'published' %}
-<div class="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-2" role="alert" aria-live="polite">
-    <div class="flex items-start">
-        <i class="fas fa-info-circle text-yellow-600 mt-0.5 mr-2" aria-hidden="true"></i>
-        <div class="text-sm text-yellow-800">
-            <p class="font-semibold mb-1">{{ _('Note:') }}</p>
-            <p>{{ _('A new draft version will be created automatically for this import.') }}</p>
-        </div>
-    </div>
-</div>
-{% endif %}
+{% set _default_import_mode = 'current_version' if selected_version_is_draft else 'create_draft' %}
+{% set _import_version_alert %}
+<fieldset class="excel-io-modal__import-target" id="excel-import-version-mode-fieldset">
+    <legend class="excel-io-modal__import-target-title">{{ _('Import target') }}</legend>
+
+    <label class="excel-io-modal__import-target-option">
+        <input type="radio"
+               name="import_version_mode"
+               value="create_draft"
+               class="form-radio"
+               {% if _default_import_mode == 'create_draft' %}checked{% endif %}
+               {% if selected_version_is_draft %}disabled{% endif %}
+               id="excel-import-mode-create-draft">
+        <span id="excel-import-create-draft-label">
+            {% if has_draft and not selected_version_is_draft and draft_version %}
+            {{ _('Import into existing draft (Version %(num)s)', num=draft_version.version_number) }}
+            {% else %}
+            {{ _('Create a new draft version') }}
+            {% endif %}
+        </span>
+    </label>
+    {% if selected_version_is_draft %}
+    <p class="excel-io-modal__import-target-note" id="excel-import-draft-exists-note">{{ _('You are already editing a draft version.') }}</p>
+    {% endif %}
+
+    <label class="excel-io-modal__import-target-option">
+        <input type="radio"
+               name="import_version_mode"
+               value="current_version"
+               class="form-radio"
+               {% if _default_import_mode == 'current_version' %}checked{% endif %}
+               id="excel-import-mode-current-version">
+        <span id="excel-import-current-version-label">
+            {{ _('Import into current version (Version %(num)s)', num=active_version_number) }}
+            {% if not selected_version_is_draft and selected_version_status == 'published' %}
+            <span class="excel-io-modal__import-target-warning" id="excel-import-published-warning">{{ _('This will modify the published version.') }}</span>
+            {% endif %}
+        </span>
+    </label>
+</fieldset>
 {% endset %}
 
 {% set _hidden_fields %}
@@ -27,7 +55,12 @@
     modal_title=excel_title,
     aria_label=_('Excel Options'),
     max_width='max-w-lg',
-    layout='simple',
+    content_class='excel-io-modal-shell-content',
+    close_class='close-modal-btn',
+    layout='tabs',
+    default_tab='export',
+    export_tab_label=_('Export'),
+    import_tab_label=_('Import'),
     export_url=url_for('form_builder.export_template_excel', template_id=template.id) ~ ('?version_id=' ~ active_version_id|string if active_version_id else ''),
     export_label=_('Export Template Structure (.xlsx)'),
     import_form_id='import-excel-form',
@@ -36,11 +69,13 @@
     dropzone_input_id='excel_file',
     dropzone_input_name='excel_file',
     dropzone_title=_('Click or drag Excel file here to import'),
+    dropzone_hint=_('.xlsx or .xls'),
     dropzone_auto_submit=false,
+    dropzone_max_size_bytes=10485760,
     validate_url=url_for('form_builder.validate_excel_import'),
     import_submit_label=_('Import Template'),
     import_submit_disabled=true,
-    import_alert=_published_alert,
+    import_alert=_import_version_alert,
     import_hidden_fields=_hidden_fields,
-    import_note=_('Supported formats: .xlsx')
+    import_note=_('Supported formats: .xlsx') ~ ' • ' ~ _('Maximum file size: 10MB')
 ) %}{% endcall %}

@@ -2501,9 +2501,13 @@
                 <div class="dashboard-no-access-panel-stage">
                     <p class="dashboard-no-access-step-here" hidden>
                         <span class="dashboard-no-access-step-here__text">{{ _("You're here") }}</span>
-                        <svg class="dashboard-no-access-step-here__arrow" viewBox="0 0 40 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                            <path d="M34 2C22 6 16 14 8 26" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-                            <path d="M4 22L8 26L14 22" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <svg class="dashboard-no-access-step-here__arrow" viewBox="0 0 44 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <defs>
+                                <marker id="no-access-here-arrowhead" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                                    <path d="M0 1.75 L9 5 L0 8.25 Z" fill="currentColor"/>
+                                </marker>
+                            </defs>
+                            <path d="M36 4 C24 8 17 17 11 28" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none" marker-end="url(#no-access-here-arrowhead)"/>
                         </svg>
                     </p>
                 <div class="dashboard-no-access-card dashboard-no-access-card--floating">

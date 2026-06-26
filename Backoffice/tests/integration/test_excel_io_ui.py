@@ -37,5 +37,8 @@ class TestExcelIoUiMarkup:
                 assert 'id="excel-options-modal"' in html
                 assert 'class="excel-io-dropzone' in html
                 assert 'excel-import-dropzone' in html
+                assert 'data-excel-io-layout="tabs"' in html
+                assert 'validate_excel_import' in html
+                assert 'excel-import-version-mode-fieldset' in html
             finally:
                 app.config["WTF_CSRF_ENABLED"] = previous_csrf

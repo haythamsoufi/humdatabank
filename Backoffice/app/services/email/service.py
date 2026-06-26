@@ -4,7 +4,7 @@ from app.services.email.client import send_email
 from app.services.email.delivery import log_email_attempt, mark_email_sent, mark_email_failed
 from app.utils.datetime_helpers import utcnow
 from app.utils.organization_helpers import (
-    get_org_name, get_org_short_name, get_org_copyright_year
+    get_org_name, get_org_short_name, get_org_copyright_year, get_org_team_email
 )
 from app.services.app_settings_service import get_email_template
 import logging
@@ -59,7 +59,8 @@ def normalize_sector_data(sector_data, is_sector=True):
     else:
         # Old string format - handle both string and integer values
         if isinstance(sector_data, str):
-            result = sector_data.strip() if sector_data else None
+            stripped = sector_data.strip()
+            result = stripped if stripped else None
         else:
             result = str(sector_data) if sector_data else None
 
@@ -349,17 +350,24 @@ def send_suggestion_confirmation_email(suggestion):
                         <div class="details">
                             <h3>What happens next?</h3>
                             <ul>
-                                <li>Our team will review your suggestion within 5-7 business days</li>
-                                <li>If approved, the indicator will be added to our database</li>
+                                <li>Our team will review your suggestion as soon as possible</li>
+                                <li>If approved, the indicator will be added to our indicator bank</li>
                                 <li>If we need additional information, we'll contact you at this email address</li>
-                                <li>You'll receive a final notification once the review is complete</li>
                             </ul>
                         </div>
-                        <p>If you have any questions about your submission, please don't hesitate to contact us.</p>
+                        {% if team_email %}
+                        <p>If you have any questions about your submission, contact us at <a href="mailto:{{ team_email }}">{{ team_email }}</a>, or reply to this email.</p>
+                        {% else %}
+                        <p>If you have any questions about your submission, reply to this email.</p>
+                        {% endif %}
                         <p>Best regards,<br>The {{ org_name }} Team</p>
                     </div>
                     <div class="email-footer">
-                        <p>This is an automated message. Please do not reply to this email.</p>
+                        {% if team_email %}
+                        <p>This message was sent by {{ org_name }}. You can reply to this email or write to {{ team_email }}.</p>
+                        {% else %}
+                        <p>This message was sent by {{ org_name }}. You can reply to this email if you have questions.</p>
+                        {% endif %}
                         <p>&copy; {{ copyright_year }} {{ org_name }}. All rights reserved.</p>
                     </div>
                 </div>
@@ -395,6 +403,7 @@ def send_suggestion_confirmation_email(suggestion):
         # Get organization branding
         org_name = get_org_name()
         copyright_year = get_org_copyright_year()
+        team_email = get_org_team_email()
 
         # Render the HTML template
         html_content = render_admin_email_template(
@@ -406,16 +415,17 @@ def send_suggestion_confirmation_email(suggestion):
             suggestion_details=suggestion_details,
             org_name=org_name,
             copyright_year=copyright_year,
+            team_email=team_email,
         )
 
         # Send the email (replyable address)
-        team_email = current_app.config.get('TEAM_EMAIL') or current_app.config['MAIL_DEFAULT_SENDER']
+        bcc_email = team_email or current_app.config.get('MAIL_DEFAULT_SENDER')
         send_email(
             subject=subject,
             recipients=[suggestion.submitter_email],
             html=html_content,
             sender=current_app.config['MAIL_DEFAULT_SENDER'],
-            bcc=[team_email] if team_email else None,
+            bcc=[bcc_email] if bcc_email else None,
         )
 
         current_app.logger.info(f"Confirmation email sent to {suggestion.submitter_email} for suggestion ID {suggestion.id}")
@@ -523,8 +533,9 @@ def send_admin_notification_email(suggestion):
         # Format the submission date
         submitted_date = suggestion.submitted_at.strftime("%B %d, %Y at %I:%M %p")
 
-        # Admin URL (you'll need to adjust this based on your admin URL structure)
-        admin_url = f"{current_app.config.get('BASE_URL', 'http://localhost:5000')}/admin/indicator-suggestions/{suggestion.id}"
+        # Admin URL for the suggestion review page in Backoffice
+        base_url = current_app.config.get('BASE_URL', 'http://localhost:5000').rstrip("/")
+        admin_url = f"{base_url}{url_for('utilities.view_indicator_suggestion', suggestion_id=suggestion.id)}"
 
         # Get organization branding
         org_name = get_org_name()
@@ -560,7 +571,7 @@ def send_admin_notification_email(suggestion):
         )
 
         # Send the email to admins (replyable address)
-        team_email = current_app.config.get('TEAM_EMAIL') or current_app.config['MAIL_DEFAULT_SENDER']
+        team_email = get_org_team_email() or current_app.config['MAIL_DEFAULT_SENDER']
         send_email(
             subject=subject,
             recipients=admin_emails,
@@ -592,7 +603,7 @@ def _security_alert_fallback_html_body(context):
     else:
         ts_display = "N/A"
 
-    event_type = escape(str(context.get("event_type") or "unknown"))
+    event_type = escape(str(context.get("event_type_display") or context.get("event_type") or "unknown"))
     severity = escape(str(context.get("severity") or "medium"))
     desc = escape(str(context.get("description") or "No description provided"))
     admin_url = escape(str(context.get("admin_url") or ""))
@@ -678,20 +689,8 @@ def send_security_alert(subject=None, event_type=None, severity=None, descriptio
                   line-height: 1.65; -webkit-font-smoothing: antialiased; }
                 .email-outer { max-width: 960px; width: 100%; margin: 0 auto; padding: 28px 20px; box-sizing: border-box; }
                 .email-card { background: #ffffff; border: 1px solid #e2e8f0; }
-                .header { color: #ffffff; padding: 32px 40px; text-align: center; }
-                .header.low { background: #d97706; }
-                .header.medium { background: #ea580c; }
-                .header.high { background: #dc2626; }
-                .header.critical { background: #7f1d1d; }
-                .header h1 { margin: 0 0 8px; font-size: 26px; font-weight: 600; }
-                .header h2 { margin: 0; font-size: 18px; font-weight: 500; opacity: 0.95; }
                 .content { padding: 36px 40px 32px; background: #ffffff; }
                 .content p { margin: 0 0 12px; }
-                .alert-box { padding: 20px 22px; margin: 0 0 22px; border: 1px solid #e2e8f0; }
-                .alert-box.low { background: #fffbeb; border-left: 4px solid #f59e0b; }
-                .alert-box.medium { background: #fff7ed; border-left: 4px solid #f97316; }
-                .alert-box.high { background: #fef2f2; border-left: 4px solid #dc2626; }
-                .alert-box.critical { background: #fef2f2; border-left: 4px solid #7f1d1d; }
                 .details { background: #f8fafc; border: 1px solid #e2e8f0; padding: 22px 24px; margin: 0 0 22px; }
                 .details h3 { margin: 0 0 14px; font-size: 17px; color: #0f172a; font-weight: 600; }
                 .details-table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -707,24 +706,23 @@ def send_security_alert(subject=None, event_type=None, severity=None, descriptio
         <body>
             <div class="email-outer">
                 <div class="email-card">
-                    <div class="header {{ severity|lower }}">
-                        <h1>&#9888;&#65039; Security Alert</h1>
-                        <h2>{{ event_type|replace('_', ' ')|title }}</h2>
+                    <div style="color:#ffffff;padding:32px 40px;text-align:center;background:{{ header_bg_color }};">
+                        <h1 style="margin:0 0 8px;font-size:26px;font-weight:600;line-height:1.3;">Security Alert</h1>
+                        <p style="margin:0;font-size:18px;font-weight:500;line-height:1.4;opacity:0.95;">{{ event_type_display }}</p>
                     </div>
                     <div class="content">
-                        <div class="alert-box {{ severity|lower }}">
-                            <strong>Severity:</strong> {{ severity|upper }}<br>
-                            <strong>Time:</strong> {{ timestamp|datetimeformat if timestamp else 'N/A' }}
+                        <div style="padding:20px 22px;margin:0 0 22px;border:1px solid #e2e8f0;background:{{ alert_bg_color }};border-left:4px solid {{ alert_border_color }};">
+                            <strong>Severity:</strong> {{ severity_display }}<br>
+                            <strong>Time:</strong> {{ formatted_timestamp }}
                         </div>
                         <div class="details">
                             <h3>Event Details</h3>
                             <table class="details-table">
-                                <tr><td>Event Type:</td><td>{{ event_type|replace('_', ' ')|title if event_type else 'N/A' }}</td></tr>
+                                <tr><td>Event Type:</td><td>{{ event_type_display }}</td></tr>
                                 <tr><td>Description:</td><td>{{ description or 'No description provided' }}</td></tr>
                                 {% if ip_address %}<tr><td>IP Address:</td><td>{{ ip_address }}</td></tr>{% endif %}
                                 {% if user_email %}<tr><td>User:</td><td>{{ user_email }} (ID: {{ user_id }})</td></tr>
                                 {% elif user_id %}<tr><td>User ID:</td><td>{{ user_id }}</td></tr>{% endif %}
-                                {% if timestamp %}<tr><td>Timestamp:</td><td>{{ timestamp }}</td></tr>{% endif %}
                             </table>
                         </div>
                         <p><a href="{{ admin_url }}" class="action-button">View Security Dashboard</a></p>
@@ -743,43 +741,23 @@ def send_security_alert(subject=None, event_type=None, severity=None, descriptio
         html_template = get_email_template('email_template_security_alert', default_template)
 
         # Prepare template context
-        base_url = current_app.config.get('BASE_URL', 'http://localhost:5000')
+        base_url = current_app.config.get('BASE_URL', 'http://localhost:5000').rstrip("/")
         admin_url = f"{base_url}/admin/security/dashboard"
 
-        # Get organization branding
-        org_name = get_org_name()
-        copyright_year = get_org_copyright_year()
+        from app.services.email.preview_context import build_security_alert_email_context
 
-        # Convert timestamp to datetime object if it's a string
-        # The template expects a datetime object for datetimeformat filter
-        timestamp_dt = None
-        if timestamp:
-            if isinstance(timestamp, str):
-                try:
-                    from datetime import datetime
-                    # Try parsing ISO format timestamp
-                    timestamp_dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                except (ValueError, AttributeError):
-                    # If parsing fails, use current time
-                    timestamp_dt = utcnow()
-            else:
-                # Already a datetime object
-                timestamp_dt = timestamp
-        else:
-            timestamp_dt = utcnow()
-
-        context = {
-            'event_type': event_type or 'Unknown Event',
-            'severity': severity or 'medium',
-            'description': description or 'No description provided',
-            'ip_address': ip_address,
-            'user_id': user_id,
-            'org_name': org_name,
-            'copyright_year': copyright_year,
-            'user_email': user_email,
-            'timestamp': timestamp_dt,
-            'admin_url': admin_url,
-        }
+        context = build_security_alert_email_context(
+            event_type=event_type,
+            severity=severity,
+            description=description,
+            ip_address=ip_address,
+            user_id=user_id,
+            user_email=user_email,
+            timestamp=timestamp,
+            admin_url=admin_url,
+            org_name=get_org_name(),
+            copyright_year=get_org_copyright_year(),
+        )
 
         # Render email content
         html_content = render_admin_email_template(html_template, **context)
@@ -791,7 +769,7 @@ def send_security_alert(subject=None, event_type=None, severity=None, descriptio
             html_content = _security_alert_fallback_html_body(context)
 
         # Send email
-        team_email = current_app.config.get('TEAM_EMAIL') or current_app.config.get('MAIL_DEFAULT_SENDER')
+        team_email = get_org_team_email() or current_app.config.get('MAIL_DEFAULT_SENDER')
         success = send_email(
             subject=subject,
             recipients=admin_emails,
@@ -888,7 +866,6 @@ def send_welcome_email(user):
                             <ul>
                                 <li>Log in and open your dashboard</li>
                                 <li>Review your assignments and reporting tasks</li>
-                                <li>Set your language in account settings</li>
                                 <li>If you don't yet see the countries you need, request access from your dashboard</li>
                             </ul>
                             <a href="{{ dashboard_url }}" class="action-button">Go to Dashboard</a>

@@ -446,6 +446,19 @@ Warnings are deduplicated server-side by `summarize_warnings()`:
 - Header shows total count and unique count: `227 (18 unique)`
 - Full list rendered in a scrollable panel (max-height 18 rem)
 
+### Template version routing (T33)
+
+When a template has a **deployed v2** (previous version archived), the import resolves form items per row:
+
+| Round / period | Template version |
+|----------------|------------------|
+| `AR25`, `MYR25`, … (calendar year &lt; 2026) | Legacy (archived) version |
+| `MYR26`, `AR26`, … (calendar year ≥ 2026) | Current published version |
+
+Special matrix items (NS Total Funding, Expenditure, SP/EF breakdown, Received Support) are resolved by **label** within the chosen version, not hardcoded item ids. Indicator bank-id lookups use the same version index.
+
+Other templates (24, 22, 23) load legacy + current indexes when both exist; only T33 applies the 2026 cutoff today. Planning templates typically have a single published version.
+
 ---
 
 ## 10. Shared DB upsert

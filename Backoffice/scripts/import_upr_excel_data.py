@@ -58,6 +58,11 @@ from import_fdrs_form_data import (  # noqa: E402
     upsert_form_data_rows,
     write_rows_to_excel,
 )
+from upr_import_versioning import (  # noqa: E402
+    REPORTING_COUNTRY_VERSION_2_MIN_YEAR,
+    find_item_by_label,
+    resolve_version_bracket,
+)
 from upr_import_warnings import summarize_warnings  # noqa: E402
 
 UPR_DATA_SHEET = "UPR Data"
@@ -118,14 +123,24 @@ EMERGENCY_APPEALS_COLUMN = "Total People to be reached"
 # ── Reporting country template (T33) ───────────────────────────────────────────
 REPORTING_COUNTRY_TEMPLATE_ID = 33
 
-# Matrix / special items on the published T33 version (resolve by label if these change).
-ITEM_REPORTING_COUNTRY_FUNDING = 1403   # NS Total Funding (manual rows)
-ITEM_REPORTING_COUNTRY_EXPENDITURE = 1404  # NS Total Expenditure (scalar, bank=734, Attribute=Total)
-ITEM_REPORTING_COUNTRY_SP_BREAKDOWN = 1405  # Optional breakdown by SP/EF (manual matrix)
-ITEM_REPORTING_COUNTRY_SUPPORT = 1407   # Received Support (list_library national_society)
-ITEM_REPORTING_PNS_FUNDING = 952        # T23 – PNS Funding matrix (list_library national_society)
+# Label needles for version-aware item resolution (substring match, case-insensitive).
+REPORTING_SPECIAL_ITEM_LABELS: Dict[str, Tuple[str, ...]] = {
+    "funding": ("ns total funding",),
+    "expenditure": ("ns total expenditure",),
+    "sp_breakdown": ("optional breakdown by sp/ef",),
+    "support": ("received support",),
+}
+T22_STAFF_MATRIX_LABELS: Tuple[str, ...] = ("pns staff contributions",)
+T23_PNS_FUNDING_LABELS: Tuple[str, ...] = ("pns funding", "funding matrix")
 
-# Row names in country-reporting Total Funding matrix (item 1403).
+# Fallback item ids when label lookup fails (T33 v1).
+ITEM_REPORTING_COUNTRY_FUNDING = 1403
+ITEM_REPORTING_COUNTRY_EXPENDITURE = 1404
+ITEM_REPORTING_COUNTRY_SP_BREAKDOWN = 1405
+ITEM_REPORTING_COUNTRY_SUPPORT = 1407
+ITEM_REPORTING_PNS_FUNDING = 952
+
+# Row names in country-reporting Total Funding matrix.
 REPORTING_FUNDING_ROW_IFRC = "IFRC Secretariat"
 REPORTING_FUNDING_ROW_PNS = "PNSs"
 REPORTING_FUNDING_ROW_OTHER = "HNS other sources"
@@ -201,7 +216,19 @@ class UprImportContext:
     # template_id -> bank_id -> section_name -> item_id (for section-scoped duplicate bank ids)
     items_by_bank_section: Dict[int, Dict[int, Dict[str, int]]] = field(default_factory=dict)
     item_ids_by_label: Dict[int, Dict[str, int]] = field(default_factory=dict)
-    staff_matrix_item_id: int = 1367  # Template 22 – PNS staff contributions matrix (fixed)
+    # Per-version indexes: template_id -> version_id -> ...
+    items_by_bank_by_version: Dict[int, Dict[int, Dict[int, int]]] = field(default_factory=dict)
+    items_by_bank_section_by_version: Dict[int, Dict[int, Dict[int, Dict[str, int]]]] = field(
+        default_factory=dict
+    )
+    item_ids_by_label_by_version: Dict[int, Dict[int, Dict[str, int]]] = field(default_factory=dict)
+    # template_id -> {legacy, current} version ids (legacy omitted when only one version exists)
+    template_version_brackets: Dict[int, Dict[str, int]] = field(default_factory=dict)
+    # template_id -> version_id -> {funding, expenditure, sp_breakdown, support, funding_col}
+    reporting_special_items: Dict[int, Dict[int, Dict[str, Any]]] = field(default_factory=dict)
+    staff_matrix_item_id: int = 1367  # fallback when label lookup fails
+    staff_matrix_by_version: Dict[int, int] = field(default_factory=dict)
+    pns_funding_item_by_version: Dict[int, int] = field(default_factory=dict)
     ns_name_to_id: Dict[str, int] = field(default_factory=dict)
     # NS name (lower) → home country ISO3 (for PNS funding → template 22 lookup)
     ns_home_country_iso3: Dict[str, str] = field(default_factory=dict)
@@ -550,54 +577,180 @@ def _load_assignment_map(template_ids: List[int]) -> Dict[int, Dict[Tuple[str, s
     return by_template
 
 
-def _load_items_by_bank(template_ids: List[int]) -> Tuple[Dict[int, Dict[int, int]], Dict[int, Dict[int, Dict[str, int]]]]:
+def _matrix_column_name_from_item_id(item_id: int) -> str:
     from app.models.form_items import FormItem
-    from app.models.forms import FormSection, FormTemplateVersion
 
-    by_bank: Dict[int, Dict[int, int]] = {tid: {} for tid in template_ids}
-    by_bank_section: Dict[int, Dict[int, Dict[str, int]]] = {tid: {} for tid in template_ids}
+    item = FormItem.query.get(item_id)
+    if item and isinstance(item.config, dict):
+        matrix_cfg = item.config.get("matrix_config") or item.config
+        if isinstance(matrix_cfg, dict):
+            columns = matrix_cfg.get("columns") or []
+            if columns:
+                first = columns[0]
+                name = first.get("name") if isinstance(first, dict) else first
+                if name:
+                    return str(name)
+    return REPORTING_FUNDING_MATRIX_COLUMN
+
+
+def _load_template_version_brackets(template_ids: List[int]) -> Tuple[Dict[int, Dict[str, int]], Set[int]]:
+    from app.models.forms import FormTemplate, FormTemplateVersion
+
+    brackets: Dict[int, Dict[str, int]] = {}
+    version_ids: Set[int] = set()
+    for tid in template_ids:
+        template = FormTemplate.query.get(int(tid))
+        if not template or not template.published_version_id:
+            continue
+        current = int(template.published_version_id)
+        version_ids.add(current)
+        legacy = (
+            FormTemplateVersion.query.filter_by(template_id=int(tid), status="archived")
+            .order_by(FormTemplateVersion.version_number.desc())
+            .first()
+        )
+        if legacy and int(legacy.id) != current:
+            brackets[int(tid)] = {"legacy": int(legacy.id), "current": current}
+            version_ids.add(int(legacy.id))
+        else:
+            brackets[int(tid)] = {"current": current}
+    return brackets, version_ids
+
+
+def _load_items_for_versions(
+    template_ids: List[int],
+    version_ids: Set[int],
+) -> Tuple[
+    Dict[int, Dict[int, Dict[int, int]]],
+    Dict[int, Dict[int, Dict[int, Dict[str, int]]]],
+    Dict[int, Dict[int, Dict[str, int]]],
+]:
+    from app.models.form_items import FormItem
+    from app.models.forms import FormSection
+
+    by_bank: Dict[int, Dict[int, Dict[int, int]]] = {tid: {} for tid in template_ids}
+    by_bank_section: Dict[int, Dict[int, Dict[int, Dict[str, int]]]] = {tid: {} for tid in template_ids}
+    by_label: Dict[int, Dict[int, Dict[str, int]]] = {tid: {} for tid in template_ids}
+    if not version_ids:
+        return by_bank, by_bank_section, by_label
+
     items = (
-        FormItem.query.join(FormTemplateVersion, FormItem.version_id == FormTemplateVersion.id)
-        .outerjoin(FormSection, FormItem.section_id == FormSection.id)
+        FormItem.query.outerjoin(FormSection, FormItem.section_id == FormSection.id)
         .filter(
             FormItem.template_id.in_(template_ids),
+            FormItem.version_id.in_(version_ids),
             FormItem.archived == False,
-            FormTemplateVersion.status == "published",
-            FormItem.indicator_bank_id.isnot(None),
         )
         .all()
     )
     for item in items:
-        if not item.template_id or not item.indicator_bank_id:
+        if not item.template_id or not item.version_id:
             continue
         tid = int(item.template_id)
-        bank_id = int(item.indicator_bank_id)
+        vid = int(item.version_id)
         item_id = int(item.id)
-        by_bank.setdefault(tid, {})[bank_id] = item_id
-        section_name = (item.form_section.name if item.form_section else "").strip()
-        if section_name:
-            by_bank_section.setdefault(tid, {}).setdefault(bank_id, {})[section_name] = item_id
+        label = (item.label or "").strip().lower()
+        if label:
+            by_label.setdefault(tid, {}).setdefault(vid, {})[label] = item_id
+        if item.indicator_bank_id:
+            bank_id = int(item.indicator_bank_id)
+            by_bank.setdefault(tid, {}).setdefault(vid, {})[bank_id] = item_id
+            section_name = (item.form_section.name if item.form_section else "").strip()
+            if section_name:
+                by_bank_section.setdefault(tid, {}).setdefault(vid, {}).setdefault(bank_id, {})[
+                    section_name
+                ] = item_id
+    return by_bank, by_bank_section, by_label
+
+
+def _build_reporting_special_items(
+    template_id: int,
+    labels_by_version: Dict[int, Dict[str, int]],
+) -> Dict[int, Dict[str, Any]]:
+    out: Dict[int, Dict[str, Any]] = {}
+    fallbacks = {
+        "funding": ITEM_REPORTING_COUNTRY_FUNDING,
+        "expenditure": ITEM_REPORTING_COUNTRY_EXPENDITURE,
+        "sp_breakdown": ITEM_REPORTING_COUNTRY_SP_BREAKDOWN,
+        "support": ITEM_REPORTING_COUNTRY_SUPPORT,
+    }
+    for vid, labels in labels_by_version.items():
+        special: Dict[str, Any] = {}
+        for key, needles in REPORTING_SPECIAL_ITEM_LABELS.items():
+            item_id = find_item_by_label(labels, *needles) or fallbacks.get(key)
+            if item_id:
+                special[key] = int(item_id)
+        funding_id = special.get("funding")
+        if funding_id:
+            special["funding_col"] = _matrix_column_name_from_item_id(int(funding_id))
+        else:
+            special["funding_col"] = REPORTING_FUNDING_MATRIX_COLUMN
+        out[int(vid)] = special
+    return out
+
+
+def resolve_template_version_id(
+    ctx: UprImportContext,
+    template_id: int,
+    period: str,
+    round_code: Optional[str] = None,
+) -> int:
+    """Resolve form template version for an import row (period + optional round code)."""
+    brackets = ctx.template_version_brackets.get(int(template_id), {})
+    if not brackets:
+        bracket_current = ctx.template_version_brackets.get(int(template_id), {}).get("current")
+        if bracket_current:
+            return int(bracket_current)
+        versions = ctx.items_by_bank_by_version.get(int(template_id), {})
+        if versions:
+            return int(next(iter(versions)))
+        return 0
+    min_year = REPORTING_COUNTRY_VERSION_2_MIN_YEAR if template_id == REPORTING_COUNTRY_TEMPLATE_ID else 9999
+    return resolve_version_bracket(
+        brackets,
+        period=period,
+        round_code=round_code,
+        min_year_v2=min_year,
+    )
+
+
+def reporting_special_item(
+    ctx: UprImportContext,
+    version_id: int,
+    key: str,
+) -> Optional[int]:
+    special = ctx.reporting_special_items.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(int(version_id), {})
+    item_id = special.get(key)
+    return int(item_id) if item_id else None
+
+
+def reporting_funding_matrix_column(ctx: UprImportContext, version_id: int) -> str:
+    special = ctx.reporting_special_items.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(int(version_id), {})
+    return str(special.get("funding_col") or REPORTING_FUNDING_MATRIX_COLUMN)
+
+
+def _load_items_by_bank(template_ids: List[int]) -> Tuple[Dict[int, Dict[int, int]], Dict[int, Dict[int, Dict[str, int]]]]:
+    """Load bank-id indexes for the current published version only (backward compat)."""
+    brackets, version_ids = _load_template_version_brackets(template_ids)
+    by_bank_v, by_bank_section_v, _ = _load_items_for_versions(template_ids, version_ids)
+    by_bank: Dict[int, Dict[int, int]] = {tid: {} for tid in template_ids}
+    by_bank_section: Dict[int, Dict[int, Dict[str, int]]] = {tid: {} for tid in template_ids}
+    for tid in template_ids:
+        current_vid = (brackets.get(tid) or {}).get("current")
+        if current_vid:
+            by_bank[tid] = dict(by_bank_v.get(tid, {}).get(current_vid, {}))
+            by_bank_section[tid] = dict(by_bank_section_v.get(tid, {}).get(current_vid, {}))
     return by_bank, by_bank_section
 
 
 def _load_items_by_label(template_ids: List[int]) -> Dict[int, Dict[str, int]]:
-    from app.models.form_items import FormItem
-    from app.models.forms import FormTemplateVersion
-
+    brackets, version_ids = _load_template_version_brackets(template_ids)
+    _, _, by_label_v = _load_items_for_versions(template_ids, version_ids)
     out: Dict[int, Dict[str, int]] = {tid: {} for tid in template_ids}
-    items = (
-        FormItem.query.join(FormTemplateVersion, FormItem.version_id == FormTemplateVersion.id)
-        .filter(
-            FormItem.template_id.in_(template_ids),
-            FormItem.archived == False,
-            FormTemplateVersion.status == "published",
-        )
-        .all()
-    )
-    for item in items:
-        label = (item.label or "").strip().lower()
-        if label and item.template_id:
-            out.setdefault(int(item.template_id), {})[label] = int(item.id)
+    for tid in template_ids:
+        current_vid = (brackets.get(tid) or {}).get("current")
+        if current_vid:
+            out[tid] = dict(by_label_v.get(tid, {}).get(current_vid, {}))
     return out
 
 
@@ -606,8 +759,21 @@ def _resolve_item_by_bank_and_area(
     template_id: int,
     bank_id: int,
     area: str,
+    version_id: Optional[int] = None,
 ) -> Optional[int]:
     """Resolve a form item when indicator bank ids repeat across reporting-country sections."""
+    vid = version_id or resolve_template_version_id(ctx, template_id, "", None)
+    if vid and ctx.items_by_bank_section_by_version.get(template_id, {}).get(vid):
+        section_map = ctx.items_by_bank_section_by_version[template_id][vid].get(bank_id)
+        if section_map:
+            section_name = REPORTING_EXCEL_AREA_TO_SECTION.get(area)
+            if section_name and section_name in section_map:
+                return section_map[section_name]
+            if len(section_map) == 1:
+                return next(iter(section_map.values()))
+        bank_map = ctx.items_by_bank_by_version.get(template_id, {}).get(vid, {})
+        if bank_id in bank_map:
+            return bank_map[bank_id]
     section_map = ctx.items_by_bank_section.get(template_id, {}).get(bank_id)
     if section_map:
         section_name = REPORTING_EXCEL_AREA_TO_SECTION.get(area)
@@ -622,10 +788,29 @@ def build_import_context(template_ids: List[int]) -> UprImportContext:
     ids = [int(t) for t in template_ids]
     ctx = UprImportContext(template_ids=ids)
     ctx.assignment_by_template = _load_assignment_map(ids)
-    # Template-24 map kept on ctx for backward-compat with _resolve_aes (Reach, Support, NS Data, Comments)
     ctx.assignment_by_period_iso = ctx.assignment_by_template.get(24, {})
+    ctx.template_version_brackets, all_version_ids = _load_template_version_brackets(ids)
+    (
+        ctx.items_by_bank_by_version,
+        ctx.items_by_bank_section_by_version,
+        ctx.item_ids_by_label_by_version,
+    ) = _load_items_for_versions(ids, all_version_ids)
     ctx.items_by_bank_id, ctx.items_by_bank_section = _load_items_by_bank(ids)
     ctx.item_ids_by_label = _load_items_by_label(ids)
+    if REPORTING_COUNTRY_TEMPLATE_ID in ids:
+        ctx.reporting_special_items[REPORTING_COUNTRY_TEMPLATE_ID] = _build_reporting_special_items(
+            REPORTING_COUNTRY_TEMPLATE_ID,
+            ctx.item_ids_by_label_by_version.get(REPORTING_COUNTRY_TEMPLATE_ID, {}),
+        )
+    if 22 in ids:
+        for vid, labels in ctx.item_ids_by_label_by_version.get(22, {}).items():
+            staff_id = find_item_by_label(labels, *T22_STAFF_MATRIX_LABELS)
+            if staff_id:
+                ctx.staff_matrix_by_version[int(vid)] = int(staff_id)
+    if 23 in ids:
+        for vid, labels in ctx.item_ids_by_label_by_version.get(23, {}).items():
+            pns_id = find_item_by_label(labels, *T23_PNS_FUNDING_LABELS) or ITEM_REPORTING_PNS_FUNDING
+            ctx.pns_funding_item_by_version[int(vid)] = int(pns_id)
     ctx.ns_name_to_id = _build_ns_name_index()
     ctx.ns_home_country_iso3, ctx.country_id_by_iso3, ctx.iso3_to_hns_id = _build_ns_home_country_index()
     if 24 in ids:
@@ -804,7 +989,7 @@ def transform_to_import_rows(
     # ── Reporting country funding staging ─────────────────────────────────────
     # Entity=IFRC/PNS/Other rows (Attribute=Funding Source only, Indicator=Funding) accumulated
     # per aes_id into item 1403 rows.  Keyed by (aes_id, row_name) → accumulated total.
-    reporting_funding_staging: Dict[Tuple[int, str], float] = defaultdict(float)
+    reporting_funding_staging: Dict[Tuple[int, int, str], float] = defaultdict(float)
 
     for row in filtered:
         iso3 = str(row.get("ISO3") or "").strip().upper()
@@ -1001,7 +1186,10 @@ def transform_to_import_rows(
             if not host_ns_id:
                 ctx.warnings.append(f"No active NS found for host country: {iso3!r}")
                 continue
-            matrix_cells[(pns_aes, ctx.staff_matrix_item_id)][f"{host_ns_id}_{col_name}"] = value_num
+            matrix_cells[(pns_aes, ctx.staff_matrix_by_version.get(
+                resolve_template_version_id(ctx, 22, period, rnd),
+                ctx.staff_matrix_item_id,
+            ))][f"{host_ns_id}_{col_name}"] = value_num
             continue
 
         # ════════════════════════════════════════════════════════════════════════
@@ -1014,7 +1202,10 @@ def transform_to_import_rows(
             if not indicator_id or value_num is None:
                 continue
             aes_id = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get((period, iso3))
-            item_id = ctx.items_by_bank_id.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(indicator_id)
+            version_id = resolve_template_version_id(ctx, REPORTING_COUNTRY_TEMPLATE_ID, period, rnd)
+            item_id = ctx.items_by_bank_by_version.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(version_id, {}).get(
+                indicator_id
+            )
             if not aes_id or not item_id:
                 continue
             built = _scalar_row(
@@ -1038,7 +1229,10 @@ def transform_to_import_rows(
             if not area or area in AGGREGATE_AREA:
                 continue
             aes_id = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get((period, iso3))
-            item_id = _resolve_item_by_bank_and_area(ctx, REPORTING_COUNTRY_TEMPLATE_ID, indicator_id, area)
+            version_id = resolve_template_version_id(ctx, REPORTING_COUNTRY_TEMPLATE_ID, period, rnd)
+            item_id = _resolve_item_by_bank_and_area(
+                ctx, REPORTING_COUNTRY_TEMPLATE_ID, indicator_id, area, version_id=version_id
+            )
             if not aes_id or not item_id:
                 if aes_id and indicator_id:
                     ctx.warnings.append(
@@ -1098,9 +1292,11 @@ def transform_to_import_rows(
                     )
                 elif col_name and value_num:
                     aes_id = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get((period, iso3))
-                    if aes_id:
+                    version_id = resolve_template_version_id(ctx, REPORTING_COUNTRY_TEMPLATE_ID, period, rnd)
+                    sp_item = reporting_special_item(ctx, version_id, "sp_breakdown")
+                    if aes_id and sp_item:
                         cell_key = f"{row_name}_{col_name}"
-                        matrix_cells[(aes_id, ITEM_REPORTING_COUNTRY_SP_BREAKDOWN)][cell_key] = value_num
+                        matrix_cells[(aes_id, sp_item)][cell_key] = value_num
                 continue
 
             # ── T33: HNS Expenditure total (Attribute=Total, bank=734) → scalar item 1404 ──
@@ -1111,7 +1307,10 @@ def transform_to_import_rows(
                 and indicator_id == 734
             ):
                 aes_id = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get((period, iso3))
-                item_id = ctx.items_by_bank_id.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(734)
+                version_id = resolve_template_version_id(ctx, REPORTING_COUNTRY_TEMPLATE_ID, period, rnd)
+                item_id = ctx.items_by_bank_by_version.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(version_id, {}).get(
+                    734
+                ) or reporting_special_item(ctx, version_id, "expenditure")
                 if aes_id and item_id:
                     built = _scalar_row(
                         aes_id=aes_id,
@@ -1134,12 +1333,15 @@ def transform_to_import_rows(
             if REPORTING_COUNTRY_TEMPLATE_ID in tids and is_funding_source_row:
                 aes_id = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get((period, iso3))
                 if aes_id:
-                    if ent_upper == "IFRC SECRETARIAT":
-                        reporting_funding_staging[(aes_id, REPORTING_FUNDING_ROW_IFRC)] += value_num
-                    elif ent_upper == "PNS" and ns_name and ns_name.lower() not in ("country", ""):
-                        reporting_funding_staging[(aes_id, REPORTING_FUNDING_ROW_PNS)] += value_num
-                    elif ent_upper == "OTHER SOURCES":
-                        reporting_funding_staging[(aes_id, REPORTING_FUNDING_ROW_OTHER)] += value_num
+                    version_id = resolve_template_version_id(ctx, REPORTING_COUNTRY_TEMPLATE_ID, period, rnd)
+                    funding_item = reporting_special_item(ctx, version_id, "funding")
+                    if funding_item:
+                        if ent_upper == "IFRC SECRETARIAT":
+                            reporting_funding_staging[(aes_id, funding_item, REPORTING_FUNDING_ROW_IFRC)] += value_num
+                        elif ent_upper == "PNS" and ns_name and ns_name.lower() not in ("country", ""):
+                            reporting_funding_staging[(aes_id, funding_item, REPORTING_FUNDING_ROW_PNS)] += value_num
+                        elif ent_upper == "OTHER SOURCES":
+                            reporting_funding_staging[(aes_id, funding_item, REPORTING_FUNDING_ROW_OTHER)] += value_num
 
             # ── T23: PNS-reported Funding / Expenditure / Transferred → item 952 ──
             # AES is keyed by PNS home country ISO3; row is the host country's NS id.
@@ -1154,8 +1356,10 @@ def transform_to_import_rows(
                         if pns_aes:
                             host_ns_id = ctx.iso3_to_hns_id.get(iso3)
                             if host_ns_id:
+                                t23_version = resolve_template_version_id(ctx, 23, period, rnd)
+                                pns_item = ctx.pns_funding_item_by_version.get(t23_version, ITEM_REPORTING_PNS_FUNDING)
                                 cell_key = f"{host_ns_id}_{col_name}"
-                                matrix_cells[(pns_aes, ITEM_REPORTING_PNS_FUNDING)][cell_key] = value_num
+                                matrix_cells[(pns_aes, pns_item)][cell_key] = value_num
                             else:
                                 ctx.warnings.append(f"No active NS found for host country: {iso3!r}")
             continue
@@ -1172,8 +1376,12 @@ def transform_to_import_rows(
             ns_id = _resolve_ns_row_id(ctx, ns_name)
             if not aes_id or ns_id is None:
                 continue
+            version_id = resolve_template_version_id(ctx, REPORTING_COUNTRY_TEMPLATE_ID, period, rnd)
+            support_item = reporting_special_item(ctx, version_id, "support")
+            if not support_item:
+                continue
             cell_key = f"{ns_id}_{area} Supported"
-            matrix_cells[(aes_id, ITEM_REPORTING_COUNTRY_SUPPORT)][cell_key] = 1
+            matrix_cells[(aes_id, support_item)][cell_key] = 1
             continue
 
     # ── Post-loop: T22 PNS funding → {original, modified, isModified} cells ──
@@ -1190,11 +1398,12 @@ def transform_to_import_rows(
             "isModified": is_modified,
         }
 
-    # ── Post-loop: reporting country funding staging → item 1403 matrix cells ──
-    for (aes_id, row_name), total in reporting_funding_staging.items():
+    # ── Post-loop: reporting country funding staging → NS Total Funding matrix cells ──
+    for (aes_id, funding_item_id, row_name), total in reporting_funding_staging.items():
         if total:
-            cell_key = f"{row_name}_{REPORTING_FUNDING_MATRIX_COLUMN}"
-            matrix_cells[(aes_id, ITEM_REPORTING_COUNTRY_FUNDING)][cell_key] = total
+            col_name = _matrix_column_name_from_item_id(funding_item_id)
+            cell_key = f"{row_name}_{col_name}"
+            matrix_cells[(aes_id, funding_item_id)][cell_key] = total
 
     # Build reverse map: aes_id → (iso3, period) across ALL templates.
     aes_meta: Dict[int, Tuple[str, str]] = {}

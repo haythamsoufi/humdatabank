@@ -64,6 +64,9 @@ from import_upr_excel_data import (  # noqa: E402
     _resolve_ns_row_id,
     _scalar_row,
     build_import_context,
+    reporting_funding_matrix_column,
+    reporting_special_item,
+    resolve_template_version_id,
     round_to_period,
 )
 
@@ -919,22 +922,25 @@ def _build_kpi_display_map(wb) -> Dict[int, Tuple[str, str]]:
     return out
 
 
-def _load_items_by_section_label(template_id: int) -> Dict[Tuple[str, str], int]:
+def _load_items_by_section_label(template_id: int, version_id: Optional[int] = None) -> Dict[Tuple[str, str], int]:
     """Map (normalized section name, normalized item label) -> form_item_id."""
     from app.models.form_items import FormItem
     from app.models.forms import FormSection, FormTemplateVersion
 
     out: Dict[Tuple[str, str], int] = {}
-    items = (
+    query = (
         FormItem.query.join(FormTemplateVersion, FormItem.version_id == FormTemplateVersion.id)
         .outerjoin(FormSection, FormItem.section_id == FormSection.id)
         .filter(
             FormItem.template_id == template_id,
             FormItem.archived == False,
-            FormTemplateVersion.status == "published",
         )
-        .all()
     )
+    if version_id:
+        query = query.filter(FormItem.version_id == int(version_id))
+    else:
+        query = query.filter(FormTemplateVersion.status == "published")
+    items = query.all()
     for item in items:
         section_name = (item.form_section.name if item.form_section else "") or ""
         label = (item.label or "").strip()
@@ -978,8 +984,11 @@ def _indicator_names_match(excel_indicator: str, form_label: str) -> bool:
     return _indicator_similarity(excel_indicator, form_label) >= INDICATOR_MATCH_THRESHOLD
 
 
-def _resolve_comments_item_id(ctx: UprImportContext) -> Optional[int]:
-    labels = ctx.item_ids_by_label.get(REPORTING_COUNTRY_TEMPLATE_ID, {})
+def _resolve_comments_item_id(ctx: UprImportContext, version_id: Optional[int] = None) -> Optional[int]:
+    if version_id:
+        labels = ctx.item_ids_by_label_by_version.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(int(version_id), {})
+    else:
+        labels = ctx.item_ids_by_label.get(REPORTING_COUNTRY_TEMPLATE_ID, {})
     for key, item_id in labels.items():
         if "comment" in key:
             return item_id
@@ -1489,9 +1498,15 @@ def _resolve_item_for_workbook_indicator(
     ctx: UprImportContext,
     bank_id: int,
     sp_ef: str,
+    version_id: Optional[int] = None,
 ) -> Optional[int]:
     """Resolve T33 form item for an indicator bank id and SP/EF section name."""
-    section_map = ctx.items_by_bank_section.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(bank_id)
+    if version_id:
+        section_map = ctx.items_by_bank_section_by_version.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(
+            int(version_id), {}
+        ).get(bank_id)
+    else:
+        section_map = ctx.items_by_bank_section.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(bank_id)
     if section_map:
         sp_norm = _normalize_text(sp_ef)
         for section_name, item_id in section_map.items():
@@ -1505,7 +1520,13 @@ def _resolve_item_for_workbook_indicator(
 
     for area_code, section in REPORTING_EXCEL_AREA_TO_SECTION.items():
         if _normalize_text(section) == _normalize_text(sp_ef):
-            return _resolve_item_by_bank_and_area(ctx, REPORTING_COUNTRY_TEMPLATE_ID, bank_id, area_code)
+            return _resolve_item_by_bank_and_area(
+                ctx, REPORTING_COUNTRY_TEMPLATE_ID, bank_id, area_code, version_id=version_id
+            )
+    if version_id:
+        return ctx.items_by_bank_by_version.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(int(version_id), {}).get(
+            bank_id
+        )
     return ctx.items_by_bank_id.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(bank_id)
 
 
@@ -2805,9 +2826,14 @@ def transform_upr_country_reporting_to_import_rows(
     """Transform UPR Country Reporting workbook content into form_data import rows for one assignment."""
     import_rows: List[Dict[str, str]] = []
     matrix_cells: Dict[Tuple[int, int], Dict[str, Any]] = {}
+    version_id = resolve_template_version_id(ctx, REPORTING_COUNTRY_TEMPLATE_ID, period, None)
+    items_by_bank = ctx.items_by_bank_by_version.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(version_id, {})
+    funding_item = reporting_special_item(ctx, version_id, "funding") or ITEM_REPORTING_COUNTRY_FUNDING
+    sp_breakdown_item = reporting_special_item(ctx, version_id, "sp_breakdown") or ITEM_REPORTING_COUNTRY_SP_BREAKDOWN
+    support_item = reporting_special_item(ctx, version_id, "support") or ITEM_REPORTING_COUNTRY_SUPPORT
     kpi_lookup = build_kpi_lookup(wb)
     yes_no_bank_ids = _load_workbook_yes_no_bank_ids(wb, kpi_lookup)
-    section_label_map = _load_items_by_section_label(REPORTING_COUNTRY_TEMPLATE_ID)
+    section_label_map = _load_items_by_section_label(REPORTING_COUNTRY_TEMPLATE_ID, version_id=version_id)
 
     # NS Data scalars
     ns_data = parse_ns_key_data(wb)
@@ -2819,7 +2845,7 @@ def transform_upr_country_reporting_to_import_rows(
     }
     for key, bank_id in bank_key_map.items():
         value = ns_data.get(key)
-        item_id = ctx.items_by_bank_id.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(bank_id)
+        item_id = items_by_bank.get(bank_id)
         if item_id and value is not None:
             built = _scalar_row(
                 aes_id=aes_id,
@@ -2836,7 +2862,7 @@ def transform_upr_country_reporting_to_import_rows(
     for row in parse_indicators(wb, yes_no_bank_ids=yes_no_bank_ids, kpi_lookup=kpi_lookup):
         bank_id = _resolve_workbook_indicator_bank_id(row, kpi_lookup)
         if bank_id:
-            item_id = _resolve_item_for_workbook_indicator(ctx, bank_id, row["sp_ef"])
+            item_id = _resolve_item_for_workbook_indicator(ctx, bank_id, row["sp_ef"], version_id=version_id)
         else:
             item_id = _resolve_item_by_section_and_indicator(
                 ctx,
@@ -2890,15 +2916,15 @@ def transform_upr_country_reporting_to_import_rows(
 
     # Funding (IFRC / PNS / HNS rows → item 1403 matrix column tot_fn)
     funding = parse_funding(wb)
-    funding_matrix_col = _reporting_funding_matrix_column()
+    funding_matrix_col = reporting_funding_matrix_column(ctx, version_id)
     for row_name, amount in funding.get("sources", {}).items():
         if amount:
             cell_key = f"{row_name}_{funding_matrix_col}"
-            matrix_cells.setdefault((aes_id, ITEM_REPORTING_COUNTRY_FUNDING), {})[cell_key] = amount
+            matrix_cells.setdefault((aes_id, funding_item), {})[cell_key] = amount
 
     total_exp = funding.get("total_expenditure")
     if total_exp is not None:
-        exp_item = ctx.items_by_bank_id.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(734)
+        exp_item = items_by_bank.get(734) or reporting_special_item(ctx, version_id, "expenditure")
         item_id = exp_item or ITEM_REPORTING_COUNTRY_EXPENDITURE
         built = _scalar_row(
             aes_id=aes_id,
@@ -2915,7 +2941,7 @@ def transform_upr_country_reporting_to_import_rows(
         for col_name, amount in cols.items():
             if amount is not None:
                 cell_key = f"{row_name}_{col_name}"
-                matrix_cells.setdefault((aes_id, ITEM_REPORTING_COUNTRY_SP_BREAKDOWN), {})[cell_key] = amount
+                matrix_cells.setdefault((aes_id, sp_breakdown_item), {})[cell_key] = amount
 
     # Bilateral support
     for row in parse_bilateral_support(wb):
@@ -2924,10 +2950,10 @@ def transform_upr_country_reporting_to_import_rows(
             continue
         for area in row["areas"]:
             cell_key = f"{ns_id}_{area} Supported"
-            matrix_cells.setdefault((aes_id, ITEM_REPORTING_COUNTRY_SUPPORT), {})[cell_key] = 1
+            matrix_cells.setdefault((aes_id, support_item), {})[cell_key] = 1
 
     # Comments (T33 item — single textarea ↔ Commetns_overall)
-    comments_item_id = _resolve_comments_item_id(ctx)
+    comments_item_id = _resolve_comments_item_id(ctx, version_id=version_id)
     comments = parse_comments(wb)
     if comments and comments_item_id:
         import_rows.append(

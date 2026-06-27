@@ -4,7 +4,7 @@
 > **Last updated:** June 2026  
 > **Primary files:** `Backoffice/scripts/import_upr_excel_data.py` · `Backoffice/app/services/upr_excel_import_service.py` · `Backoffice/app/routes/admin/upr_excel_import.py` · `Backoffice/app/templates/admin/templates/upr_excel_import.html`
 
-> **Scope (June 2026):** Planning templates 24 + 22 and Reporting templates 33 + 23 are all implemented. Emergency 1/2/3 sections are intentionally skipped for the first reporting release.
+> **Scope (June 2026):** Planning templates 24 + 22 and Reporting templates 33 + 23 are implemented, including Emergency 1/2/3 on T33 (repeat group + dynamic indicators).
 
 ---
 
@@ -21,7 +21,7 @@ Sync planning and reporting data from **UPR Master.xlsx** (sheet `UPR Data`) int
 | **33** | Reporting – Country | `AR*`, `MYR*` | NS Data, Core indicators, Other indicators, Funding, Support |
 | **23** | Reporting – PNS | `AR*` | Funding (PNS-reported totals) |
 
-**Emergency 1/2/3 sections** (MDR-scoped indicators) are intentionally skipped for now — see §13.
+**Emergency 1/2/3 sections** on T33 map to the repeat-group **Emergency Appeals Indicators** block and its dynamic child section — see §6.11.
 
 ---
 
@@ -341,7 +341,7 @@ Unknown `Comments_*` slugs are title-cased automatically.
 > **Example:** bank id **619** exists on two section-scoped items (Cross Cutting and Response - Disasters and crises). The Cross-cutting Excel row must land on the Cross Cutting item; the SP2 row on the SP2 section item. Resolved via `items_by_bank_section` + Excel `Area`.
 
 - If `Applicable/Data not available` contains "data not available" → writes `is_data_not_available = True` (no value)
-- **Yes/No indicators** (indicator bank `type = yesno`): UPR Master `ValueNum = 1` → stored as `yes`; any other value (including `0` or blank) → `no`. Yes/No rows are always imported unless marked data-not-available.
+- **Yes/No indicators** (indicator bank `type = yesno`): UPR Master `ValueNum = 1` → stored as `yes`; any other value (including `0` or blank) → `no`. Yes/No rows are always imported unless marked data-not-available. **Missing Excel row** for a core Yes/No item → defaults to `no` for every T33 assignment in the imported reporting round(s).
 - Otherwise uses `ValueNum` as a scalar
 
 ---
@@ -390,6 +390,30 @@ Unknown `Comments_*` slugs are title-cased automatically.
 - Row key: `NationalSociety.id` of the PNS (from `NS` column)
 - Column key: `{area} Supported` — e.g. `SP1 Supported`, `EFs Supported`
 - Paired `{area} Planned` columns are pre-filled from planning (variable/readonly) — not written by import
+
+---
+
+### 6.11 Emergency 1/2/3 → Template 33 (repeat group + dynamic indicators)
+
+T33 stores per-emergency indicators in a **repeat section** (`Emergency Appeals Indicators`) with a child **dynamic indicators** section (`Emergency Appeal Indicators`). Each Excel emergency slot maps to repeat instance number 1/2/3.
+
+**NS Data — emergency identity (per country, per round):**
+
+| Excel indicator | Slot | Maps to |
+|-----------------|------|---------|
+| `Data_EO1` … `Data_EO3` | 1–3 | Appeal **name** (text from `Value`) |
+| `Data_MDR1` … `Data_MDR3` | 1–3 | Appeal **MDR code** (text from `Value`) |
+
+These populate the repeat-group **Select Emergency appeal** choice (`emergency_operations` lookup) via `RepeatGroupData.disagg_data = {name, code}`. When an MDR code is present, the import **looks up the operation in the GO API** (using the T33 choice field filters) and stores the API canonical name/display (`Nigeria - Floods (MDRNG041)`). If the code is missing from the API, it falls back to the Excel `Data_EO*` name formatted as `{name} ({code})`.
+
+**Emergency 1 / Emergency 2 / Emergency 3 sections:**
+
+- Excel section name → repeat slot: `Emergency 1` → slot 1, etc.
+- `SectionB` column carries the MDR code (validates against NS Data when both present).
+- Indicator values → `dynamic_indicator_data` on the emergency dynamic section with `repeat_instance_number = slot`.
+- Yes/No rules match core indicators (`ValueNum = 1` → `yes`, else `no`).
+
+Import order: form_data upsert → repeat instances + emergency choice → dynamic indicators (other + emergency).
 
 ---
 
@@ -549,7 +573,8 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 - [x] Template 22: Staff — AES via PNS home country ISO3; row key = host `NationalSociety.id` → item 1367
 
 ### Reporting (rounds AR*, MYR*)
-- [x] Template 33: NS Data scalars (bank IDs 723/724/727/1117); `Data_EO*`/`Data_MDR*` skipped
+- [x] Template 33: NS Data scalars (bank IDs 723/724/727/1117); `Data_EO1–3` / `Data_MDR1–3` → emergency repeat slot metadata
+- [x] Template 33: Emergency 1/2/3 → dynamic indicators under each repeat slot (`SectionB` = MDR code)
 - [x] Template 33: Core indicators + Other indicators → scalar by `indicator_bank_id`; `is_data_not_available` flag written when Excel marks row as unavailable
 - [x] Template 33: Funding — HNS Expenditure total → item 1404 (scalar, `Attribute = Total`); SP/EF breakdown → item 1405 (matrix, `Attribute = SP Breakdown`); IFRC/PNS/Other by Funding Source rows → item 1403 (manual matrix)
 - [x] Template 33: Support — bilateral ticks → item 1407 `{area} Supported` columns
@@ -562,12 +587,10 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 
 | # | Item | Notes |
 |---|------|-------|
-| 1 | **Emergency 1/2/3 sections (reporting)** | Skipped. These sections carry indicators scoped to specific MDR appeal codes (`SectionB`). Implementing them requires understanding the storage format of `plugin_emergency_operations` item 1302 and mapping MDR codes to matrix row keys. |
-| 2 | **Multi-year PNS Funding in template 22** | T22 form (item 1303) has only one Funding Requirements matrix with SP1–SP5/EFs columns — no year+1/+2 equivalents exist. Adding year+1/+2 support requires new form items before the import can write them. |
-| 3 | **Template 22-only import skips PNS funding** | `UPR_TEMPLATE_PROFILES[22]` lists only `Staff` for row filtering. PNS Funding is written from the `Funding` section when template 22 is also included — run with **both 24 and 22** (default in the wizard). |
-| 4 | **NS name exact matching** | Match is case-insensitive but exact. Names differing by punctuation or abbreviation (e.g. "The Netherlands Red Cross" vs "Netherlands Red Cross") produce a warning and are skipped. Fuzzy matching is intentionally not implemented. |
-| 5 | **File locking** | UPR Master.xlsx is locked when open in Excel. Users must copy the file first or close Excel. |
-| 6 | **Unit tests** | No automated tests for the transform logic. Key test cases: AFG P26 dry run vs DB, NS name resolution, EA Code vs slot fallback, Netherlands×Uganda T22 `{original, modified, isModified}`, AR25/MYR26 period resolution. |
+| 1 | **Multi-year PNS Funding in template 22** | T22 form (item 1303) has only one Funding Requirements matrix with SP1–SP5/EFs columns — no year+1/+2 equivalents exist. Adding year+1/+2 support requires new form items before the import can write them. |
+| 2 | **Template 22-only import skips PNS funding** | `UPR_TEMPLATE_PROFILES[22]` lists only `Staff` for row filtering. PNS Funding is written from the `Funding` section when template 22 is also included — run with **both 24 and 22** (default in the wizard). |
+| 3 | **NS name exact matching** | Match is case-insensitive but exact. Names differing by punctuation or abbreviation (e.g. "The Netherlands Red Cross" vs "Netherlands Red Cross") produce a warning and are skipped. Fuzzy matching is intentionally not implemented. |
+| 4 | **File locking** | UPR Master.xlsx is locked when open in Excel. Users must copy the file first or close Excel. |
 
 ---
 

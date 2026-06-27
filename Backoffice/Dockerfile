@@ -78,7 +78,12 @@ RUN mkdir -p /data/uploads && \
 # Entrypoint script (runs migrations at container startup, not at build time)
 COPY entrypoint.sh /app/entrypoint.sh
 COPY sshd_config /etc/ssh/sshd_config
-RUN chmod +x /app/entrypoint.sh
+COPY docker/azure-ssh-profile.sh /etc/profile.d/azure-ssh.sh
+RUN chmod +x /app/entrypoint.sh /etc/profile.d/azure-ssh.sh \
+    && printf '%s\n' \
+       '# Azure App Service SSH defaults (fallback when shell is not a login shell)' \
+       '[ -f /etc/profile.d/azure-ssh.sh ] && . /etc/profile.d/azure-ssh.sh' \
+       >> /root/.bashrc
 
 EXPOSE 5000 2222
 

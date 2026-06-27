@@ -26,6 +26,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -84,8 +85,16 @@ UPR_TEMPLATE_PROFILES: Dict[int, Dict[str, Any]] = {
     33: {
         "name": "Reporting - Country",
         "round_prefixes": ("AR", "MYR"),
-        # Emergency 1/2/3 sections are skipped (complex MDR-scoped indicators).
-        "sections": frozenset({"NS Data", "Funding", "Core indicators", "Other indicators", "Support"}),
+        "sections": frozenset({
+            "NS Data",
+            "Funding",
+            "Core indicators",
+            "Other indicators",
+            "Support",
+            "Emergency 1",
+            "Emergency 2",
+            "Emergency 3",
+        }),
     },
     23: {
         "name": "Reporting - PNS",
@@ -163,6 +172,14 @@ REPORTING_SP_BREAKDOWN_COLUMNS: Dict[int, str] = {
     734: "Expenditure (CHF)",
 }
 
+REPORTING_EMERGENCY_EXCEL_SECTION_TO_SLOT: Dict[str, int] = {
+    "Emergency 1": 1,
+    "Emergency 2": 2,
+    "Emergency 3": 3,
+}
+NS_EMERGENCY_NAME_PREFIX = "data_eo"
+NS_EMERGENCY_CODE_PREFIX = "data_mdr"
+
 # Core/Other indicators: Excel Area → form section name (when the same bank id
 # appears on multiple section-scoped items, e.g. 619 on Cross Cutting + SP2).
 REPORTING_EXCEL_AREA_TO_SECTION: Dict[str, str] = {
@@ -218,6 +235,10 @@ class UprImportContext:
     # template_id -> {funding, expenditure, sp_breakdown, support, funding_col}
     reporting_special_items: Dict[int, Dict[str, Any]] = field(default_factory=dict)
     other_indicators_section_id: Optional[int] = None
+    ea_repeat_section_id: Optional[int] = None
+    ea_dynamic_section_id: Optional[int] = None
+    emergency_choice_item_id: Optional[int] = None
+    emergency_slot_meta: Dict[Tuple[int, int], Dict[str, str]] = field(default_factory=dict)
     dynamic_indicator_entries: List[Dict[str, Any]] = field(default_factory=list)
     staff_matrix_item_id: int = 1314  # fallback when label lookup fails (prod T22)
     pns_funding_item_id: int = ITEM_REPORTING_PNS_FUNDING
@@ -232,7 +253,9 @@ class UprImportContext:
     emergency_ops_by_iso: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     emergency_ops_ordered_by_iso: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
     emergency_matrix_plugin_config: Dict[str, Any] = field(default_factory=dict)
+    emergency_go_plugin_config: Dict[str, Any] = field(default_factory=dict)
     yes_no_bank_ids: Set[int] = field(default_factory=set)
+    core_yes_no_item_ids: List[int] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
 
 
@@ -313,6 +336,82 @@ def _reporting_indicator_import_value(
     if indicator_bank_id in ctx.yes_no_bank_ids:
         return _master_yes_no_value(value_num)
     return value_num
+
+
+def _load_core_yes_no_item_ids(
+    template_id: int,
+    version_id: int,
+    *,
+    other_section_id: Optional[int],
+    yes_no_bank_ids: Set[int],
+) -> List[int]:
+    """Published-version static form items for Yes/No core indicators (excludes Other dynamic)."""
+    from app.models.form_items import FormItem
+
+    skip_sections = {int(other_section_id)} if other_section_id else set()
+    out: List[int] = []
+    for item in FormItem.query.filter_by(
+        template_id=int(template_id),
+        version_id=int(version_id),
+        archived=False,
+    ):
+        if item.section_id in skip_sections:
+            continue
+        bank_id = item.indicator_bank_id
+        is_yes_no = bool(
+            (bank_id and int(bank_id) in yes_no_bank_ids)
+            or _is_yes_no_indicator_type(getattr(item, "type", None))
+        )
+        if is_yes_no:
+            out.append(int(item.id))
+    return out
+
+
+def _reporting_aes_ids_for_import(ctx: UprImportContext, rounds: Optional[Set[str]]) -> Set[int]:
+    """Assignment ids on T33 for the reporting periods included in this import."""
+    tpl_map = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {})
+    if not tpl_map:
+        return set()
+    if not rounds:
+        return {int(aes_id) for aes_id in tpl_map.values()}
+    periods = {p for p in (round_to_period(r) for r in rounds) if p}
+    if not periods:
+        return set()
+    return {
+        int(aes_id)
+        for (period, _iso), aes_id in tpl_map.items()
+        if period in periods
+    }
+
+
+def _fill_missing_core_yes_no_defaults(
+    *,
+    ctx: UprImportContext,
+    import_rows: List[Dict[str, str]],
+    filled_core_yes_no: Set[Tuple[int, int]],
+    target_aes_ids: Set[int],
+    aes_meta: Dict[int, Tuple[str, str]],
+) -> None:
+    """Default missing Yes/No core indicators to ``no`` when UPR Master has no row."""
+    if not ctx.core_yes_no_item_ids or not target_aes_ids:
+        return
+    core_ids = set(ctx.core_yes_no_item_ids)
+    for aes_id in target_aes_ids:
+        iso3, period = aes_meta.get(aes_id, ("", ""))
+        for item_id in core_ids:
+            if (aes_id, item_id) in filled_core_yes_no:
+                continue
+            built = _scalar_row(
+                aes_id=aes_id,
+                item_id=item_id,
+                value="no",
+                iso3=iso3,
+                period=period,
+                debug_kpi=f"core_yesno_default_{item_id}",
+            )
+            if built:
+                import_rows.append(built)
+                filled_core_yes_no.add((aes_id, item_id))
 
 
 def is_aggregate_row(row: Dict[str, Any]) -> bool:
@@ -487,6 +586,26 @@ def _build_ns_home_country_index() -> Tuple[Dict[str, str], Dict[str, int], Dict
     return ns_home, cid, iso3_ns
 
 
+def _load_emergency_choice_plugin_config(choice_item_id: int) -> Dict[str, Any]:
+    """GO filter config from the T33 emergency_operations single-choice field."""
+    from app.models.form_items import FormItem
+
+    item = FormItem.query.get(int(choice_item_id))
+    if not item or not isinstance(item.config, dict):
+        return {}
+    cfg = item.config
+    if item.lookup_list_id == "emergency_operations":
+        qpc = cfg.get("question_plugin_config")
+        if isinstance(qpc, dict):
+            return qpc
+    plugin_cfg = cfg.get("plugin_config")
+    return plugin_cfg if isinstance(plugin_cfg, dict) else {}
+
+
+def _active_emergency_go_config(ctx: UprImportContext) -> Dict[str, Any]:
+    return ctx.emergency_go_plugin_config or ctx.emergency_matrix_plugin_config
+
+
 def _load_emergency_matrix_plugin_config(template_id: int = 24) -> Dict[str, Any]:
     """Plugin filter config from the Emergency Appeals matrix (item 960)."""
     from app.models.form_items import FormItem
@@ -538,10 +657,51 @@ def _fetch_emergency_ops_for_country(iso3: str, plugin_cfg: Dict[str, Any]) -> T
 def _ensure_emergency_ops(ctx: UprImportContext, iso3: str) -> Tuple[List[Dict[str, Any]], Dict[str, Dict[str, Any]]]:
     key = iso3.upper()
     if key not in ctx.emergency_ops_ordered_by_iso:
-        ordered, by_code = _fetch_emergency_ops_for_country(key, ctx.emergency_matrix_plugin_config)
+        plugin_cfg = _active_emergency_go_config(ctx)
+        ordered, by_code = _fetch_emergency_ops_for_country(key, plugin_cfg)
         ctx.emergency_ops_ordered_by_iso[key] = ordered
         ctx.emergency_ops_by_iso[key] = by_code
     return ctx.emergency_ops_ordered_by_iso[key], ctx.emergency_ops_by_iso[key]
+
+
+def _aes_id_to_iso3(ctx: UprImportContext, aes_id: int) -> str:
+    tpl_map = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {})
+    for (_period, iso), aid in tpl_map.items():
+        if int(aid) == int(aes_id):
+            return str(iso).upper()
+    return ""
+
+
+def _format_emergency_operation_display(name: str, code: str) -> str:
+    name = (name or "").strip()
+    code = (code or "").strip()
+    if name and code:
+        return f"{name} ({code})"
+    return name or code
+
+
+def _resolve_emergency_operation_labels(
+    ctx: UprImportContext,
+    *,
+    iso3: str,
+    excel_name: str,
+    excel_code: str,
+) -> Tuple[str, str, str]:
+    """Return (name, code, display_value). Prefer GO API labels when MDR code matches."""
+    name = (excel_name or "").strip()
+    code = (excel_code or "").strip()
+    code_upper = code.upper()
+    if code_upper and iso3:
+        _, by_code = _ensure_emergency_ops(ctx, iso3.upper())
+        op = by_code.get(code_upper)
+        if op:
+            api_name = (op.get("name") or "").strip()
+            api_code = (op.get("code") or "").strip()
+            return api_name or name, api_code or code, _emergency_op_row_id(op)
+        ctx.warnings.append(
+            f"Emergency code {code!r} not found in GO API for {iso3} — using Excel name/code"
+        )
+    return name, code, _format_emergency_operation_display(name, code)
 
 
 def _parse_ea_slot(area: str) -> Optional[int]:
@@ -725,6 +885,213 @@ def _load_other_indicators_section_id() -> Optional[int]:
     return None
 
 
+def _load_reporting_emergency_structure(template_id: int, version_id: int) -> Tuple[Optional[int], Optional[int], Optional[int]]:
+    """Return (ea_repeat_section_id, ea_dynamic_section_id, emergency_choice_item_id)."""
+    from app.models.form_items import FormItem
+    from app.models.forms import FormSection, FormTemplateVersion
+
+    ea_repeat_id: Optional[int] = None
+    ea_dynamic_id: Optional[int] = None
+    sections = (
+        FormSection.query.join(FormTemplateVersion, FormSection.version_id == FormTemplateVersion.id)
+        .filter(
+            FormSection.template_id == int(template_id),
+            FormTemplateVersion.id == int(version_id),
+        )
+        .all()
+    )
+    for section in sections:
+        name = (section.name or "").strip().lower()
+        stype = (section.section_type or "").strip().lower()
+        if name == "emergency appeals indicators" and stype == "repeat":
+            ea_repeat_id = int(section.id)
+        elif name == "emergency appeal indicators" and stype == "dynamic_indicators":
+            ea_dynamic_id = int(section.id)
+    if ea_repeat_id:
+        for section in sections:
+            if (
+                section.parent_section_id == ea_repeat_id
+                and (section.section_type or "").strip().lower() == "dynamic_indicators"
+            ):
+                ea_dynamic_id = int(section.id)
+                break
+    choice_item_id: Optional[int] = None
+    if ea_repeat_id:
+        item = (
+            FormItem.query.filter_by(
+                template_id=int(template_id),
+                version_id=int(version_id),
+                section_id=ea_repeat_id,
+                archived=False,
+            )
+            .filter(FormItem.lookup_list_id == "emergency_operations")
+            .first()
+        )
+        if item:
+            choice_item_id = int(item.id)
+    return ea_repeat_id, ea_dynamic_id, choice_item_id
+
+
+def _parse_row_text_value(row: Dict[str, Any]) -> Optional[str]:
+    for key in ("Value", "UPR Value"):
+        raw = row.get(key)
+        if raw is None:
+            continue
+        text = str(raw).strip()
+        if text:
+            return text
+    return None
+
+
+def _parse_ns_emergency_slot_field(indicator_name: str) -> Optional[Tuple[int, str]]:
+    """Return (slot 1–3, 'name'|'code') for Data_EO* / Data_MDR* NS Data indicators."""
+    key = (indicator_name or "").strip().lower().replace(" ", "")
+    for prefix, field in ((NS_EMERGENCY_NAME_PREFIX, "name"), (NS_EMERGENCY_CODE_PREFIX, "code")):
+        m = re.fullmatch(rf"{prefix}(\d)", key)
+        if m:
+            return int(m.group(1)), field
+    return None
+
+
+def _stage_emergency_slot_meta(
+    ctx: UprImportContext,
+    *,
+    aes_id: int,
+    slot: int,
+    field: str,
+    value: str,
+) -> None:
+    if slot not in (1, 2, 3) or field not in ("name", "code"):
+        return
+    meta = ctx.emergency_slot_meta.setdefault((int(aes_id), int(slot)), {"name": "", "code": ""})
+    meta[field] = value.strip()
+
+
+def _ensure_repeat_instance(
+    aes_id: int,
+    repeat_section_id: int,
+    instance_number: int,
+    label: Optional[str] = None,
+    *,
+    user_id: Optional[int] = None,
+):
+    from app.extensions import db
+    from app.models.forms import RepeatGroupInstance
+
+    inst = RepeatGroupInstance.query.filter_by(
+        assignment_entity_status_id=aes_id,
+        section_id=repeat_section_id,
+        instance_number=instance_number,
+    ).first()
+    if not inst:
+        effective_user_id = int(user_id) if user_id is not None else _default_user_id_for_import()
+        inst = RepeatGroupInstance(
+            assignment_entity_status_id=aes_id,
+            section_id=repeat_section_id,
+            instance_number=instance_number,
+            instance_label=label or f"Emergency Appeal {instance_number}",
+            created_by_user_id=effective_user_id,
+        )
+        db.session.add(inst)
+    elif label:
+        inst.instance_label = label
+    return inst
+
+
+def _upsert_emergency_repeat_choice(
+    *,
+    repeat_instance,
+    choice_item_id: int,
+    appeal_name: str,
+    mdr_code: str,
+    display_value: Optional[str] = None,
+) -> None:
+    from app.extensions import db
+    from app.models.forms import RepeatGroupData
+
+    name = (appeal_name or "").strip()
+    code = (mdr_code or "").strip()
+    if not name and not code:
+        return
+
+    display = (display_value or "").strip() or _format_emergency_operation_display(name, code)
+    entry = RepeatGroupData.query.filter_by(
+        repeat_instance_id=repeat_instance.id,
+        form_item_id=choice_item_id,
+    ).first()
+    if not entry:
+        entry = RepeatGroupData(
+            repeat_instance_id=repeat_instance.id,
+            form_item_id=choice_item_id,
+        )
+        db.session.add(entry)
+
+    entry.value = display
+    entry.disagg_data = {"name": name, "code": code}
+    entry.disagg_type = "emergency_operation"
+    entry.data_not_available = False
+    entry.not_applicable = False
+
+
+def upsert_emergency_repeat_slots(
+    ctx: UprImportContext,
+    *,
+    dry_run: bool = False,
+) -> Dict[str, int]:
+    """Create repeat-group instances and emergency operation choices from staged NS Data."""
+    from app.extensions import db
+
+    stats = {"emergency_slots_upserted": 0}
+    repeat_section_id = ctx.ea_repeat_section_id
+    choice_item_id = ctx.emergency_choice_item_id
+    if dry_run or not repeat_section_id or not choice_item_id:
+        return stats
+
+    slots_needed: Set[Tuple[int, int]] = set(ctx.emergency_slot_meta.keys())
+    ea_dynamic = ctx.ea_dynamic_section_id
+    if ea_dynamic:
+        for entry in ctx.dynamic_indicator_entries:
+            repeat_num = entry.get("repeat_instance_number")
+            if repeat_num is not None and int(entry.get("section_id") or 0) == int(ea_dynamic):
+                slots_needed.add((int(entry["aes_id"]), int(repeat_num)))
+
+    user_id = _default_user_id_for_import()
+    for aes_id, slot_num in sorted(slots_needed):
+        meta = ctx.emergency_slot_meta.get((aes_id, slot_num), {"name": "", "code": ""})
+        excel_name = (meta.get("name") or "").strip()
+        excel_code = (meta.get("code") or "").strip()
+        if not excel_name and not excel_code:
+            continue
+        iso3 = _aes_id_to_iso3(ctx, aes_id)
+        name, code, display = _resolve_emergency_operation_labels(
+            ctx,
+            iso3=iso3,
+            excel_name=excel_name,
+            excel_code=excel_code,
+        )
+        label = name or code or display
+        inst = _ensure_repeat_instance(
+            aes_id,
+            int(repeat_section_id),
+            int(slot_num),
+            label,
+            user_id=user_id,
+        )
+        if inst:
+            _upsert_emergency_repeat_choice(
+                repeat_instance=inst,
+                choice_item_id=int(choice_item_id),
+                appeal_name=name,
+                mdr_code=code,
+                display_value=display,
+            )
+            stats["emergency_slots_upserted"] += 1
+
+    if stats["emergency_slots_upserted"]:
+        db.session.commit()
+    return stats
+
+
 def reporting_special_item(
     ctx: UprImportContext,
     key: str,
@@ -762,6 +1129,47 @@ def _resolve_item_by_bank_and_area(
     return ctx.items_by_bank_id.get(template_id, {}).get(bank_id)
 
 
+def _queue_dynamic_indicator_entry(
+    ctx: UprImportContext,
+    *,
+    section_id: Optional[int],
+    aes_id: int,
+    indicator_bank_id: int,
+    value: Optional[Any],
+    data_not_available: bool,
+    order_counters: Dict[Tuple[Any, ...], float],
+    order_key: Tuple[Any, ...],
+    repeat_instance_number: Optional[int] = None,
+    disagg_data: Optional[Dict[str, Any]] = None,
+    missing_section_warning: str = "",
+) -> None:
+    if not section_id:
+        if missing_section_warning:
+            ctx.warnings.append(missing_section_warning)
+        return
+    order_counters[order_key] = order_counters.get(order_key, 0.0) + 1.0
+    entry = {
+        "aes_id": aes_id,
+        "section_id": section_id,
+        "indicator_bank_id": indicator_bank_id,
+        "repeat_instance_number": repeat_instance_number,
+        "value": value,
+        "data_not_available": data_not_available,
+        "order": order_counters[order_key],
+        "disagg_data": disagg_data,
+    }
+    for idx, existing in enumerate(ctx.dynamic_indicator_entries):
+        if (
+            existing.get("aes_id") == aes_id
+            and existing.get("indicator_bank_id") == indicator_bank_id
+            and existing.get("section_id") == section_id
+            and existing.get("repeat_instance_number") == repeat_instance_number
+        ):
+            ctx.dynamic_indicator_entries[idx] = entry
+            return
+    ctx.dynamic_indicator_entries.append(entry)
+
+
 def _queue_other_dynamic_indicator(
     ctx: UprImportContext,
     *,
@@ -772,32 +1180,50 @@ def _queue_other_dynamic_indicator(
     order_counters: Dict[int, float],
     disagg_data: Optional[Dict[str, Any]] = None,
 ) -> None:
-    section_id = ctx.other_indicators_section_id
-    if not section_id:
-        ctx.warnings.append(
+    _queue_dynamic_indicator_entry(
+        ctx,
+        section_id=ctx.other_indicators_section_id,
+        aes_id=aes_id,
+        indicator_bank_id=indicator_bank_id,
+        value=value,
+        data_not_available=data_not_available,
+        order_counters=order_counters,
+        order_key=(aes_id, "other"),
+        repeat_instance_number=None,
+        disagg_data=disagg_data,
+        missing_section_warning=(
             f"Other indicators dynamic section missing; cannot import bank {indicator_bank_id} (aes {aes_id})"
-        )
-        return
-    order_counters[aes_id] = order_counters.get(aes_id, 0.0) + 1.0
-    entry = {
-        "aes_id": aes_id,
-        "section_id": section_id,
-        "indicator_bank_id": indicator_bank_id,
-        "repeat_instance_number": None,
-        "value": value,
-        "data_not_available": data_not_available,
-        "order": order_counters[aes_id],
-        "disagg_data": disagg_data,
-    }
-    for idx, existing in enumerate(ctx.dynamic_indicator_entries):
-        if (
-            existing.get("aes_id") == aes_id
-            and existing.get("indicator_bank_id") == indicator_bank_id
-            and existing.get("repeat_instance_number") is None
-        ):
-            ctx.dynamic_indicator_entries[idx] = entry
-            return
-    ctx.dynamic_indicator_entries.append(entry)
+        ),
+    )
+
+
+def _queue_emergency_dynamic_indicator(
+    ctx: UprImportContext,
+    *,
+    aes_id: int,
+    slot: int,
+    indicator_bank_id: int,
+    value: Optional[Any],
+    data_not_available: bool,
+    order_counters: Dict[Tuple[int, int], float],
+    disagg_data: Optional[Dict[str, Any]] = None,
+) -> None:
+    _queue_dynamic_indicator_entry(
+        ctx,
+        section_id=ctx.ea_dynamic_section_id,
+        aes_id=aes_id,
+        indicator_bank_id=indicator_bank_id,
+        value=value,
+        data_not_available=data_not_available,
+        order_counters=order_counters,
+        order_key=(aes_id, slot),
+        repeat_instance_number=int(slot),
+        disagg_data=disagg_data,
+        missing_section_warning=(
+            f"Emergency appeal dynamic section missing; cannot import bank {indicator_bank_id} "
+            f"(aes {aes_id}, slot {slot})"
+        ),
+    )
 
 
 def _default_user_id_for_import() -> int:
@@ -887,6 +1313,23 @@ def build_import_context(template_ids: List[int]) -> UprImportContext:
         )
         ctx.other_indicators_section_id = _load_other_indicators_section_id()
         ctx.yes_no_bank_ids = _load_yes_no_bank_ids()
+        pub_vid = ctx.published_version_ids.get(REPORTING_COUNTRY_TEMPLATE_ID)
+        if pub_vid:
+            ctx.core_yes_no_item_ids = _load_core_yes_no_item_ids(
+                REPORTING_COUNTRY_TEMPLATE_ID,
+                pub_vid,
+                other_section_id=ctx.other_indicators_section_id,
+                yes_no_bank_ids=ctx.yes_no_bank_ids,
+            )
+            (
+                ctx.ea_repeat_section_id,
+                ctx.ea_dynamic_section_id,
+                ctx.emergency_choice_item_id,
+            ) = _load_reporting_emergency_structure(REPORTING_COUNTRY_TEMPLATE_ID, pub_vid)
+            if ctx.emergency_choice_item_id:
+                ctx.emergency_go_plugin_config = _load_emergency_choice_plugin_config(
+                    ctx.emergency_choice_item_id
+                )
     if 22 in ids:
         staff_id = find_item_by_label(ctx.item_ids_by_label.get(22, {}), *T22_STAFF_MATRIX_LABELS)
         if staff_id:
@@ -1064,6 +1507,9 @@ def transform_to_import_rows(
     comment_parts: Dict[int, List[str]] = defaultdict(list)
     import_rows: List[Dict[str, str]] = []
     dynamic_order: Dict[int, float] = {}
+    emergency_dynamic_order: Dict[Tuple[int, int], float] = {}
+    filled_core_yes_no: Set[Tuple[int, int]] = set()
+    core_yes_no_ids = set(ctx.core_yes_no_item_ids)
 
     # ── Planning T22 PNS funding staging ──────────────────────────────────────
     # Collected across all rows then converted to {original, modified, isModified} matrix cells.
@@ -1279,13 +1725,22 @@ def transform_to_import_rows(
         # ════════════════════════════════════════════════════════════════════════
 
         # --- Template 33: NS Data ---
-        # Same 4 KPI indicators as planning (723/724/727/1117); Data_EO/MDR text fields skipped.
+        # KPI scalars (723/724/727/1117) plus emergency slot metadata (Data_EO*/Data_MDR*).
         if REPORTING_COUNTRY_TEMPLATE_ID in tids and sec == "NS Data" and rnd_is_reporting:
+            aes_id = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get((period, iso3))
+            if not aes_id:
+                continue
+            slot_field = _parse_ns_emergency_slot_field(indicator)
+            if slot_field:
+                slot, field = slot_field
+                text = _parse_row_text_value(row)
+                if text:
+                    _stage_emergency_slot_meta(ctx, aes_id=aes_id, slot=slot, field=field, value=text)
+                continue
             if not indicator_id or value_num is None:
                 continue
-            aes_id = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get((period, iso3))
             item_id = ctx.items_by_bank_id.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(indicator_id)
-            if not aes_id or not item_id:
+            if not item_id:
                 continue
             built = _scalar_row(
                 aes_id=aes_id,
@@ -1297,6 +1752,47 @@ def transform_to_import_rows(
             )
             if built:
                 import_rows.append(built)
+            continue
+
+        # --- Template 33: Emergency 1/2/3 (repeat-group dynamic indicators) ---
+        if (
+            REPORTING_COUNTRY_TEMPLATE_ID in tids
+            and sec in REPORTING_EMERGENCY_EXCEL_SECTION_TO_SLOT
+            and rnd_is_reporting
+        ):
+            if not indicator_id:
+                continue
+            if not area or area in AGGREGATE_AREA:
+                continue
+            slot = REPORTING_EMERGENCY_EXCEL_SECTION_TO_SLOT[sec]
+            aes_id = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get((period, iso3))
+            if not aes_id:
+                continue
+            section_b = str(row.get("SectionB") or "").strip()
+            if section_b:
+                code = section_b.upper()
+                meta = ctx.emergency_slot_meta.setdefault((aes_id, slot), {"name": "", "code": ""})
+                if not meta.get("code"):
+                    meta["code"] = code
+                elif meta["code"].upper() != code:
+                    ctx.warnings.append(
+                        f"Emergency slot {slot} SectionB {code!r} differs from NS Data MDR {meta['code']!r} ({iso3} {rnd})"
+                    )
+            applicable_raw = str(row.get("Applicable/Data not available") or "").strip().lower()
+            is_dna = "data not available" in applicable_raw
+            has_value = _reporting_indicator_has_import_value(
+                ctx, indicator_id, value_num, is_dna=is_dna
+            )
+            if has_value:
+                _queue_emergency_dynamic_indicator(
+                    ctx,
+                    aes_id=aes_id,
+                    slot=slot,
+                    indicator_bank_id=indicator_id,
+                    value=None if is_dna else _reporting_indicator_import_value(ctx, indicator_id, value_num),
+                    data_not_available=is_dna,
+                    order_counters=emergency_dynamic_order,
+                )
             continue
 
         # --- Template 33: Core indicators + Other indicators ---
@@ -1341,6 +1837,8 @@ def transform_to_import_rows(
                             debug_kpi=f"bank_{indicator_id}",
                         )
                     )
+                    if item_id in core_yes_no_ids:
+                        filled_core_yes_no.add((aes_id, item_id))
                 elif has_value:
                     built = _scalar_row(
                         aes_id=aes_id,
@@ -1352,6 +1850,8 @@ def transform_to_import_rows(
                     )
                     if built:
                         import_rows.append(built)
+                        if item_id in core_yes_no_ids:
+                            filled_core_yes_no.add((aes_id, item_id))
             elif has_value:
                 _queue_other_dynamic_indicator(
                     ctx,
@@ -1535,6 +2035,15 @@ def transform_to_import_rows(
             )
         )
 
+    if REPORTING_COUNTRY_TEMPLATE_ID in tids:
+        _fill_missing_core_yes_no_defaults(
+            ctx=ctx,
+            import_rows=import_rows,
+            filled_core_yes_no=filled_core_yes_no,
+            target_aes_ids=_reporting_aes_ids_for_import(ctx, rounds),
+            aes_meta=aes_meta,
+        )
+
     return import_rows
 
 
@@ -1590,6 +2099,7 @@ def run_upr_import(
         stats.update(summarize_warnings(ctx.warnings))
         stats["transformed"] = len(import_rows)
         stats["dynamic_transformed"] = len(ctx.dynamic_indicator_entries)
+        stats["emergency_slots_staged"] = len(ctx.emergency_slot_meta)
 
         if preview_excel_path and import_rows:
             write_rows_to_excel(import_rows, preview_excel_path)
@@ -1615,9 +2125,11 @@ def run_upr_import(
             progress_cb=_emit,
             cancel_check=cancel_check,
             progress_start_pct=25.0,
-            progress_end_pct=90.0,
+            progress_end_pct=85.0,
             stats=stats,
         )
+        emergency_stats = upsert_emergency_repeat_slots(ctx, dry_run=dry_run)
+        upsert_stats.update(emergency_stats)
         dyn_stats = upsert_dynamic_indicator_entries(
             ctx.dynamic_indicator_entries,
             dry_run=dry_run,

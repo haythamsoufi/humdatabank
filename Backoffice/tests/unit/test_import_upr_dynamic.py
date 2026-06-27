@@ -10,8 +10,10 @@ if str(scripts_dir) not in sys.path:
 
 from import_upr_excel_data import (  # noqa: E402
     UprImportContext,
+    _fill_missing_core_yes_no_defaults,
     _master_yes_no_value,
     _queue_other_dynamic_indicator,
+    _reporting_aes_ids_for_import,
     _reporting_indicator_has_import_value,
     _reporting_indicator_import_value,
     _resolve_item_by_bank_and_area,
@@ -122,3 +124,37 @@ class TestMasterYesNoValue:
         assert _reporting_indicator_import_value(ctx, 631, 0) == "no"
         assert _reporting_indicator_has_import_value(ctx, 631, None, is_dna=False) is True
         assert _reporting_indicator_import_value(ctx, 724, 42) == 42
+
+
+class TestMissingCoreYesNoDefaults:
+    def test_fills_no_for_unseen_core_item(self):
+        from import_fdrs_form_data import COL_ITEM, COL_VALUE
+
+        ctx = _ctx(core_yes_no_item_ids=[5001, 5002])
+        import_rows: list = []
+        filled: set = {(10, 5001)}
+        _fill_missing_core_yes_no_defaults(
+            ctx=ctx,
+            import_rows=import_rows,
+            filled_core_yes_no=filled,
+            target_aes_ids={10},
+            aes_meta={10: ("AFG", "Jan-Jun 2025")},
+        )
+        assert len(import_rows) == 1
+        assert import_rows[0][COL_ITEM] == "5002"
+        assert import_rows[0][COL_VALUE] == "no"
+        assert (10, 5002) in filled
+
+    def test_reporting_aes_filtered_by_round(self):
+        ctx = UprImportContext(template_ids=[33])
+        ctx.assignment_by_template = {
+            33: {
+                ("Jan-Jun 2025", "AFG"): 1,
+                ("Jan-Jun 2026", "AFG"): 2,
+                ("2025", "AFG"): 3,
+            }
+        }
+        aes = _reporting_aes_ids_for_import(ctx, {"MYR25"})
+        assert aes == {1}
+        aes_all = _reporting_aes_ids_for_import(ctx, None)
+        assert aes_all == {1, 2, 3}

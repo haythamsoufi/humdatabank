@@ -191,6 +191,9 @@ DEFAULT_EMAIL_TEMPLATES = {
           line-height: 1.65; -webkit-font-smoothing: antialiased; }
         .email-outer { max-width: 960px; width: 100%; margin: 0 auto; padding: 28px 20px; box-sizing: border-box; }
         .email-card { background: #ffffff; border: 1px solid #e2e8f0; }
+        .email-header { background-color: #dc2626; color: #ffffff; padding: 32px 40px; text-align: center; }
+        .email-header h1 { margin: 0 0 8px; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; color: #ffffff; }
+        .email-header p { margin: 0; font-size: 18px; font-weight: 500; opacity: 0.95; color: #ffffff; }
         .content { padding: 36px 40px 32px; background: #ffffff; }
         .content p { margin: 0 0 12px; }
         .details { background: #f8fafc; border: 1px solid #e2e8f0; padding: 22px 24px; margin: 0 0 22px; }
@@ -208,12 +211,12 @@ DEFAULT_EMAIL_TEMPLATES = {
 <body>
     <div class="email-outer">
         <div class="email-card">
-            <div style="color:#ffffff;padding:32px 40px;text-align:center;background:{{ header_bg_color }};">
-                <h1 style="margin:0 0 8px;font-size:26px;font-weight:600;line-height:1.3;">Security Alert</h1>
-                <p style="margin:0;font-size:18px;font-weight:500;line-height:1.4;opacity:0.95;">{{ event_type_display }}</p>
+            <div class="email-header" style="{{ header_style }}">
+                <h1 style="margin:0 0 8px;font-size:26px;font-weight:600;line-height:1.3;color:#ffffff;">Security Alert</h1>
+                <p style="margin:0;font-size:18px;font-weight:500;line-height:1.4;opacity:0.95;color:#ffffff;">{{ event_type_display }}</p>
             </div>
             <div class="content">
-                <div style="padding:20px 22px;margin:0 0 22px;border:1px solid #e2e8f0;background:{{ alert_bg_color }};border-left:4px solid {{ alert_border_color }};">
+                <div style="{{ alert_panel_style }}">
                     <strong>Severity:</strong> {{ severity_display }}<br>
                     <strong>Time:</strong> {{ formatted_timestamp }}
                 </div>

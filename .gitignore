@@ -59,6 +59,7 @@ venv/
 Backoffice/.env
 .env.*
 .flaskenv
+azure_webapp.local.env
 
 # Firebase service account JSON (contains sensitive credentials)
 **/firebase-adminsdk-*.json

@@ -181,6 +181,18 @@ NOTIFICATION_TYPE_REGISTRY_SPECS: List[Dict[str, Any]] = [
         ),
     },
     {
+        "group": "Templates",
+        "type_key": "template_updated",
+        "emitter_active": False,
+        "audiences": [],
+        "description": (
+            "Deprecated. Formerly sent when a form template version was deployed."
+        ),
+        "recipients": (
+            "No longer emitted. Retained for historical in-app notifications only."
+        ),
+    },
+    {
         "group": "System & admin",
         "type_key": "admin_message",
         "emitter_active": True,

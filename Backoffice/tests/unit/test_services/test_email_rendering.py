@@ -237,6 +237,25 @@ class TestRenderAdminEmailTemplate:
         assert "background-color:#0d9488" in result.replace(" ", "")
         assert "color:#ffffff" in result.replace(" ", "")
 
+    def test_security_alert_header_style_preserved(self):
+        from app.services.email.preview_context import build_security_alert_email_context
+        from scripts.seed_email_templates import DEFAULT_EMAIL_TEMPLATES
+
+        ctx = build_security_alert_email_context(
+            event_type="failed_login",
+            severity="high",
+            description="Test",
+            org_name="Org",
+            copyright_year="2026",
+        )
+        result = render_admin_email_template(
+            DEFAULT_EMAIL_TEMPLATES["email_template_security_alert"]["en"],
+            **ctx,
+        )
+        assert 'class="email-header"' in result
+        assert "background-color:#dc2626" in result.replace(" ", "")
+        assert "color:#ffffff" in result.replace(" ", "")
+
 
 # ---------------------------------------------------------------------------
 # render_admin_email_template_for_preview

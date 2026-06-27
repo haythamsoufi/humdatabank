@@ -63,14 +63,24 @@ def build_security_alert_email_context(
     timestamp_dt = _coerce_security_alert_timestamp(timestamp)
     formatted_timestamp = _datetimeformat_filter(timestamp_dt) or "N/A"
 
+    header_style = (
+        f"background-color:{header_bg};color:#ffffff;padding:32px 40px;text-align:center;"
+    )
+    alert_panel_style = (
+        f"padding:20px 22px;margin:0 0 22px;border:1px solid #e2e8f0;"
+        f"background-color:{alert_bg};border-left:4px solid {alert_border};"
+    )
+
     return {
         "event_type": event_raw,
         "event_type_display": event_raw.replace("_", " ").title(),
         "severity": severity or "medium",
         "severity_display": (severity or "medium").upper(),
         "header_bg_color": header_bg,
+        "header_style": header_style,
         "alert_bg_color": alert_bg,
         "alert_border_color": alert_border,
+        "alert_panel_style": alert_panel_style,
         "description": description or "No description provided",
         "ip_address": ip_address,
         "user_id": user_id,

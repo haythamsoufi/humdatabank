@@ -25,6 +25,68 @@ function submitBuilderForm(form) {
     try { return form.submit(); } catch (_e) {}
 }
 
+async function buildDeployConfirmMessage(baseMessage, form) {
+    const templateId = window.templateId;
+    if (!templateId || !form) return { message: baseMessage, fieldMappingUrl: null };
+    const versionInput = form.querySelector('input[name="version_id"]');
+    const versionId = versionInput ? versionInput.value : null;
+    if (!versionId) return { message: baseMessage, fieldMappingUrl: null };
+    try {
+        const url = `/admin/templates/${templateId}/deploy/preflight?version_id=${encodeURIComponent(versionId)}`;
+        const resp = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+        if (!resp.ok) return { message: baseMessage, fieldMappingUrl: null };
+        const data = await resp.json();
+        if (!data.success) return { message: baseMessage, fieldMappingUrl: null };
+        const rows = data.estimate?.remappable_rows ?? 0;
+        let message = baseMessage;
+        if (rows > 0) {
+            message += `\n\n~${Number(rows).toLocaleString()} submission row(s) will be remapped to the new version.`;
+        }
+        if (data.show_latency_warning) {
+            message += '\n\nThis is a large migration and may take up to a minute to complete.';
+        }
+        const summary = data.mapping_summary || {};
+        const suggested = summary.suggested_items ?? 0;
+        const orphanedWithData = summary.orphaned_items_with_data ?? 0;
+        if (suggested > 0 || orphanedWithData > 0) {
+            message += `\n\n${suggested} field(s) have suggested matches`;
+            if (orphanedWithData > 0) {
+                message += `; ${orphanedWithData} published field(s) with data have no draft match`;
+            }
+            message += '.\nReview field mapping before deploying if unsure.';
+        }
+        return {
+            message,
+            fieldMappingUrl: data.field_mapping_url || null,
+        };
+    } catch (_e) {
+        return { message: baseMessage, fieldMappingUrl: null };
+    }
+}
+
+function confirmDeploy(form, baseMessage) {
+    const doDeploy = () => { if (form) submitBuilderForm(form); };
+    buildDeployConfirmMessage(baseMessage, form).then(({ message, fieldMappingUrl }) => {
+        const onConfirm = () => {
+            if (fieldMappingUrl && (message.includes('Review field mapping') || message.includes('suggested matches'))) {
+                const reviewFirst = window.confirm(
+                    message + '\n\nOpen the field mapping review page now? (Cancel to deploy anyway.)'
+                );
+                if (reviewFirst) {
+                    window.location.href = fieldMappingUrl;
+                    return;
+                }
+            }
+            doDeploy();
+        };
+        if (window.showConfirmation) {
+            window.showConfirmation(message, onConfirm, null, 'Deploy', 'Cancel', 'Deploy Version?');
+        } else if (window.confirm(message)) {
+            onConfirm();
+        }
+    });
+}
+
 /**
  * Wire version modal actions (idempotent — safe after AJAX DOM swaps).
  */
@@ -62,11 +124,8 @@ export function wireVersionsModal() {
             const form = this.closest('form');
             const deployMessage = window.formBuilderMessages?.deployVersion ||
                 'Deploy this version? This will publish it as the live version.';
-            const doDeploy = () => { if (form) submitBuilderForm(form); };
             if (form) {
-                if (window.showConfirmation) {
-                    window.showConfirmation(deployMessage, doDeploy, null, 'Deploy', 'Cancel', 'Deploy Version?');
-                }
+                confirmDeploy(form, deployMessage);
             }
         });
     });
@@ -778,11 +837,13 @@ function enhance() {
                     form.submit();
                 }
             };
-            if (window.showConfirmation) {
-                window.showConfirmation(message, doSubmit, null, 'Deploy', 'Cancel', 'Deploy Version?');
-            } else {
-                if (window.confirm(message)) doSubmit();
-            }
+            buildDeployConfirmMessage(message, form).then((fullMessage) => {
+                if (window.showConfirmation) {
+                    window.showConfirmation(fullMessage, doSubmit, null, 'Deploy', 'Cancel', 'Deploy Version?');
+                } else if (window.confirm(fullMessage)) {
+                    doSubmit();
+                }
+            });
         });
     }
 
@@ -1020,4 +1081,18 @@ export function initFormBuilder() {
     initBulkCollapseExpandControls();
     initExcelModal();
     initArchivedItemsToggle();
+    initStableKeyCopyButton();
+}
+
+function initStableKeyCopyButton() {
+    document.addEventListener('click', (event) => {
+        const btn = event.target.closest('#item-modal-stable-key-copy');
+        if (!btn) return;
+        const input = document.getElementById('item-modal-stable-key');
+        if (!input || !input.value) return;
+        navigator.clipboard.writeText(input.value).catch(() => {
+            input.select();
+            document.execCommand('copy');
+        });
+    });
 }

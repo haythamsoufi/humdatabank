@@ -683,3 +683,52 @@ class TestCloneTemplateStructureBetweenTemplates:
         assert len(cloned) == 2
         child_clone = next((s for s in cloned if s.name == "Child"), None)
         assert child_clone.parent_section_id is not None
+
+
+class TestCloneStableKeyPreservation:
+    def test_clone_preserves_item_and_section_stable_keys(self, app, db_session):
+        from app.utils.stable_key import generate_stable_key
+        from app.models import FormSection, FormItem, FormTemplateVersion
+
+        template = create_test_template(db_session)
+        pub_version = db_session.query(FormTemplateVersion).filter_by(
+            id=template.published_version_id
+        ).first()
+        section_key = generate_stable_key()
+        item_key = generate_stable_key()
+
+        section = FormSection(
+            template_id=template.id,
+            version_id=pub_version.id,
+            name='Stable Section',
+            order=1,
+            stable_key=section_key,
+        )
+        db_session.add(section)
+        db_session.flush()
+        item = FormItem(
+            section_id=section.id,
+            template_id=template.id,
+            version_id=pub_version.id,
+            item_type='question',
+            label='Stable Item',
+            order=1,
+            stable_key=item_key,
+        )
+        db_session.add(item)
+        db_session.commit()
+
+        draft = create_test_draft_version(db_session, template)
+        _clone_template_structure(template.id, pub_version.id, draft.id)
+        db_session.commit()
+
+        cloned_section = FormSection.query.filter_by(
+            template_id=template.id, version_id=draft.id, name='Stable Section'
+        ).first()
+        cloned_item = FormItem.query.filter_by(
+            template_id=template.id, version_id=draft.id, label='Stable Item'
+        ).first()
+        assert cloned_section is not None
+        assert cloned_item is not None
+        assert cloned_section.stable_key == section_key
+        assert cloned_item.stable_key == item_key

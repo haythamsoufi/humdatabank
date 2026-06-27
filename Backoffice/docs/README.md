@@ -85,6 +85,7 @@ Step-by-step workflows used by the in-app chatbot to power interactive tours:
 
 - [Diagrams](diagrams/) – Technical diagrams
   - [AI chat: fast path vs long path](diagrams/ai-chat-fast-path-vs-long-path.md)
+- [Template versioning & submission identity](template-version-submission-identity.md) – Proposed design for cross-version field identity and deploy-time data remapping
 
 ## Engineering runbooks
 

@@ -668,7 +668,6 @@ class AppLocalizations {
       'form_updated': 'Form Updated',
       'document_uploaded': 'Document Uploaded',
       'user_added_to_country': 'User Added To Country',
-      'template_updated': 'Template Updated',
       'self_report_created': 'Self Report Created',
       'deadline_reminder': 'Deadline Reminder',
       'search_audit_logs': 'Search audit logs...',
@@ -1865,7 +1864,6 @@ class AppLocalizations {
       'form_updated': 'Formulario Actualizado',
       'document_uploaded': 'Documento Subido',
       'user_added_to_country': 'Usuario Agregado al País',
-      'template_updated': 'Plantilla Actualizada',
       'self_report_created': 'Informe Propio Creado',
       'deadline_reminder': 'Recordatorio de Fecha Límite',
       'search_audit_logs': 'Buscar registros de auditoría...',
@@ -2894,7 +2892,6 @@ class AppLocalizations {
       'form_updated': 'Formulaire Mis à Jour',
       'document_uploaded': 'Document Téléchargé',
       'user_added_to_country': 'Utilisateur Ajouté au Pays',
-      'template_updated': 'Modèle Mis à Jour',
       'self_report_created': 'Rapport Personnel Créé',
       'deadline_reminder': 'Rappel d\'Échéance',
       'search_audit_logs': 'Rechercher les journaux d\'audit...',
@@ -3906,7 +3903,6 @@ class AppLocalizations {
       'form_updated': 'تم تحديث النموذج',
       'document_uploaded': 'تم تحميل المستند',
       'user_added_to_country': 'تمت إضافة المستخدم إلى البلد',
-      'template_updated': 'تم تحديث القالب',
       'self_report_created': 'تم إنشاء التقرير الذاتي',
       'deadline_reminder': 'تذكير بالموعد النهائي',
       'search_audit_logs': 'البحث في سجلات التدقيق...',
@@ -4901,7 +4897,6 @@ class AppLocalizations {
       'form_updated': 'फॉर्म अपडेट किया गया',
       'document_uploaded': 'दस्तावेज़ अपलोड किया गया',
       'user_added_to_country': 'उपयोगकर्ता देश में जोड़ा गया',
-      'template_updated': 'टेम्प्लेट अपडेट किया गया',
       'self_report_created': 'स्व-रिपोर्ट बनाई गई',
       'deadline_reminder': 'अंतिम तिथि अनुस्मारक',
       'search_audit_logs': 'ऑडिट लॉग खोजें...',
@@ -5921,7 +5916,6 @@ class AppLocalizations {
       'form_updated': 'Форма Обновлена',
       'document_uploaded': 'Документ Загружен',
       'user_added_to_country': 'Пользователь Добавлен в Страну',
-      'template_updated': 'Шаблон Обновлен',
       'self_report_created': 'Собственный Отчет Создан',
       'deadline_reminder': 'Напоминание о Сроке',
       'search_audit_logs': 'Поиск журналов аудита...',
@@ -6903,7 +6897,6 @@ class AppLocalizations {
       'form_updated': '表单已更新',
       'document_uploaded': '文档已上传',
       'user_added_to_country': '用户已添加到国家',
-      'template_updated': '模板已更新',
       'self_report_created': '自报告已创建',
       'deadline_reminder': '截止日期提醒',
       'search_audit_logs': '搜索审计日志...',
@@ -8199,7 +8192,6 @@ class AppLocalizations {
   String get formUpdated => translate('form_updated');
   String get documentUploaded => translate('document_uploaded');
   String get userAddedToCountry => translate('user_added_to_country');
-  String get templateUpdated => translate('template_updated');
   String get selfReportCreated => translate('self_report_created');
   String get deadlineReminder => translate('deadline_reminder');
   String get searchAuditLogs => translate('search_audit_logs');

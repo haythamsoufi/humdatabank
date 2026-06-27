@@ -751,6 +751,8 @@
 <script type="application/json" id="indicator-bank-choices-data">{{ indicator_bank_choices_with_units_for_js | tojson | safe }}</script>
 <script type="application/json" id="disaggregation-choices-data">{{ add_indicator_modal_form.allowed_disaggregation_options.choices | tojson | safe }}</script>
 <script type="application/json" id="all-template-items-data">{{ all_template_items_for_js | tojson | safe }}</script>
+<script type="application/json" id="published-items-data">{{ published_items_for_js | default([]) | tojson | safe }}</script>
+<script type="application/json" id="suggested-draft-item-ids-data">{{ suggested_draft_item_ids | default([]) | tojson | safe }}</script>
 <script type="application/json" id="sections-with-items-data">{{ sections_with_items_for_js | tojson | safe }}</script>
 <script type="application/json" id="question-type-choices-data">{{ question_type_choices_for_js | tojson | safe }}</script>
 <script type="application/json" id="all-template-sections-data">{{ all_template_sections_for_js | tojson | safe }}</script>
@@ -769,6 +771,26 @@
 
     // Expose template ID to JavaScript (used by item-modal.js for API URLs)
     window.templateId = "{{ template.id }}";
+
+    (function initPublishedFieldIdentity() {
+        try {
+            const pubEl = document.getElementById('published-items-data');
+            const suggestedEl = document.getElementById('suggested-draft-item-ids-data');
+            const publishedItems = pubEl ? JSON.parse(pubEl.textContent || '[]') : [];
+            window.publishedItemsByStableKey = {};
+            publishedItems.forEach((item) => {
+                if (item && item.stable_key) {
+                    window.publishedItemsByStableKey[item.stable_key] = item;
+                }
+            });
+            window.suggestedDraftItemIds = suggestedEl
+                ? JSON.parse(suggestedEl.textContent || '[]')
+                : [];
+        } catch (_e) {
+            window.publishedItemsByStableKey = {};
+            window.suggestedDraftItemIds = [];
+        }
+    })();
 
     // Plugin-provided variables for section/item labels (e.g. [EO1], [EO2] from Emergency Operations plugin)
     window.pluginLabelVariables = {{ plugin_label_variables|default([])|tojson|safe }};

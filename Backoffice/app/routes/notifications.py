@@ -69,7 +69,6 @@ def get_notification_type_labels():
         'form_updated': _('Form Updated'),
         'document_uploaded': _('Document Uploaded'),
         'user_added_to_country': _('User Added to Country'),
-        'template_updated': _('Template Updated'),
         'self_report_created': _('Self Report Created'),
         'deadline_reminder': _('Deadline Reminder'),
         'admin_message': _('Admin Message'),

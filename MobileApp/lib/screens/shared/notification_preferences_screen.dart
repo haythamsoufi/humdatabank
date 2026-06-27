@@ -31,7 +31,6 @@ class _NotificationPreferencesScreenState
     'form_updated',
     'document_uploaded',
     'user_added_to_country',
-    'template_updated',
     'self_report_created',
     'deadline_reminder',
   ];
@@ -113,8 +112,6 @@ class _NotificationPreferencesScreenState
         return localizations.documentUploaded;
       case 'user_added_to_country':
         return localizations.userAddedToCountry;
-      case 'template_updated':
-        return localizations.templateUpdated;
       case 'self_report_created':
         return localizations.selfReportCreated;
       case 'deadline_reminder':

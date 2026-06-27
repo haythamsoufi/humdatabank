@@ -240,6 +240,7 @@ def get_template_details(template_id):
             for item in section.form_items.order_by(FormItem.order).all():
                 item_data = {
                     'id': item.id,
+                    'stable_key': item.stable_key,
                     'type': item.item_type,
                     'label': item.label,
                     'order': item.order,
@@ -287,6 +288,7 @@ def get_template_details(template_id):
 
             section_data = {
                 'id': section.id,
+                'stable_key': section.stable_key,
                 'name': section.name,
                 'order': section.order,
                 'section_type': section.section_type,
@@ -319,6 +321,7 @@ def get_template_details(template_id):
                         # Same item processing as above
                         item_data = {
                             'id': item.id,
+                            'stable_key': item.stable_key,
                             'type': item.item_type,
                             'label': item.label,
                             'order': item.order,
@@ -365,6 +368,7 @@ def get_template_details(template_id):
 
                     section_data['sub_sections'].append({
                         'id': sub_section.id,
+                        'stable_key': sub_section.stable_key,
                         'name': sub_section.name,
                         'order': sub_section.order,
                         'section_type': sub_section.section_type,
@@ -558,6 +562,7 @@ def get_form_items():
 
             item_data = {
                 'id': item.id,
+                'stable_key': item.stable_key,
                 'template_id': item.template_id,
                 'template_version': _template_version_summary(versions_by_id.get(item.version_id)) if item.version_id else None,
                 'section': section_info,
@@ -691,6 +696,7 @@ def get_form_item_details(item_id):
 
         item_data = {
             'id': item.id,
+            'stable_key': item.stable_key,
             'template_id': item.template_id,
             'template_version': template_version_summary,
             'section': section_info,

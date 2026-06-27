@@ -1913,6 +1913,18 @@ class TestResolveSheetHeaders:
             assert 'unrecognized column' in err.lower()
             assert 'unexpected_column' in err
 
+    def test_accepts_v2_export_without_stable_key_column(self, app):
+        with app.app_context():
+            section_headers = [c for c in TemplateExcelService.get_section_columns() if c != 'stable_key']
+            _, legacy, err = TemplateExcelService._resolve_sheet_headers('Sections', section_headers)
+            assert err is None
+            assert legacy is False
+
+            item_headers = [c for c in TemplateExcelService.get_item_columns() if c != 'stable_key']
+            _, legacy, err = TemplateExcelService._resolve_sheet_headers('Items', item_headers)
+            assert err is None
+            assert legacy is False
+
 
 class TestNormalizeMatrixItemConfig:
     def test_wraps_flat_matrix_config(self):
@@ -2174,3 +2186,155 @@ class TestClassConstants:
 
     def test_excel_export_version(self):
         assert TemplateExcelService.EXCEL_EXPORT_VERSION == 'V2'
+
+    def test_item_columns_exclude_stable_key(self):
+        cols = TemplateExcelService.get_item_columns()
+        assert 'stable_key' not in cols
+
+    def test_section_columns_exclude_stable_key(self):
+        cols = TemplateExcelService.get_section_columns()
+        assert 'stable_key' not in cols
+
+
+class TestStableKeyExcelRoundTrip:
+    def test_export_omits_stable_key(self, app, db_session, admin_user):
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        version = template.published_version
+        section = create_test_section(db_session, template, version=version)
+        item = create_test_item(db_session, section, template, version=version, item_type='question')
+        item.stable_key = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+        db_session.commit()
+
+        with app.test_request_context():
+            login_user(admin_user)
+            buf = TemplateExcelService.export_template(template.id, version.id)
+        wb = openpyxl.load_workbook(buf)
+        assert 'stable_key' not in [cell.value for cell in wb['Sections'][1]]
+        assert 'stable_key' not in [cell.value for cell in wb['Items'][1]]
+
+    def test_import_inherits_published_stable_keys_without_excel_column(
+        self, app, db_session, admin_user
+    ):
+        section_key = 'cccccccc-dddd-eeee-ffff-000000000001'
+        item_key = 'dddddddd-eeee-ffff-0000-111111111111'
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        version = template.published_version
+        section = create_test_section(db_session, template, version=version)
+        section.stable_key = section_key
+        item = create_test_item(db_session, section, template, version=version, item_type='question')
+        item.stable_key = item_key
+        db_session.commit()
+
+        with app.test_request_context():
+            login_user(admin_user)
+            export_buf = TemplateExcelService.export_template(template.id, version.id)
+
+        draft = create_test_draft_version(db_session, template, name='Stable Key RT Draft')
+        export_buf.seek(0)
+        with app.test_request_context():
+            login_user(admin_user)
+            result = TemplateExcelService.import_template(
+                template.id, export_buf, version_id=draft.id
+            )
+        assert result['success'] is True
+
+        imported_section = db_session.query(FormSection).filter_by(
+            template_id=template.id, version_id=draft.id
+        ).one()
+        imported_item = db_session.query(FormItem).filter_by(
+            template_id=template.id, version_id=draft.id
+        ).one()
+        assert imported_section.stable_key == section_key
+        assert imported_item.stable_key == item_key
+
+    def test_duplicate_stable_key_in_file_rejected(self, app, db_session, admin_user):
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        draft = create_test_draft_version(db_session, template)
+        dup_key = '11111111-2222-3333-4444-555555555555'
+        cols = _excel_columns(app)
+
+        section_row = _blank_row(cols['sections'])
+        section_row[cols['sections'].index('id')] = 1
+        section_row[cols['sections'].index('order')] = 1.0
+        section_row[cols['sections'].index('name')] = 'Section A'
+        section_row[cols['sections'].index('section_type')] = 'standard'
+
+        def _item_row(export_id, label):
+            row = _blank_row(cols['items']) + [dup_key]
+            row[cols['items'].index('id')] = export_id
+            row[cols['items'].index('section_id')] = 1
+            row[cols['items'].index('item_type')] = 'question'
+            row[cols['items'].index('order')] = export_id
+            row[cols['items'].index('label')] = label
+            return row
+
+        buf = io.BytesIO()
+        wb = openpyxl.Workbook()
+        wb.remove(wb.active)
+        ws_t = wb.create_sheet('Template')
+        _append_template_sheet_row_layout(ws_t)
+        for name, headers, rows in (
+            ('Pages', cols['pages'], []),
+            ('Sections', cols['sections'], [section_row]),
+            ('Items', cols['items'] + ['stable_key'], [_item_row(1, 'Q1'), _item_row(2, 'Q2')]),
+        ):
+            ws = wb.create_sheet(name)
+            ws.append(headers)
+            for row in rows:
+                ws.append(row)
+        wb.save(buf)
+        buf.seek(0)
+
+        with app.test_request_context():
+            login_user(admin_user)
+            result = TemplateExcelService.import_template(template.id, buf, version_id=draft.id)
+
+        assert result['success'] is False
+        assert any('Duplicate stable_key' in err for err in result.get('errors', []))
+
+    def test_published_import_blocked_when_submission_data_exists(self, app, db_session, admin_user):
+        from app.models import FormData
+        from tests.factories import create_test_assignment_entity_status
+
+        template = create_test_template(db_session, owner_id=admin_user.id)
+        published = template.published_version
+        section = create_test_section(db_session, template, version=published)
+        item = create_test_item(db_session, section, template, version=published, item_type='question')
+        aes = create_test_assignment_entity_status(db_session, template=template)
+        db_session.add(FormData(assignment_entity_status_id=aes.id, form_item_id=item.id, value='1'))
+        db_session.commit()
+
+        cols = _excel_columns(app)
+        section_row = _blank_row(cols['sections'])
+        section_row[cols['sections'].index('id')] = 1
+        section_row[cols['sections'].index('order')] = 1.0
+        section_row[cols['sections'].index('name')] = 'Section A'
+        section_row[cols['sections'].index('section_type')] = 'standard'
+        item_row = _blank_row(cols['items'])
+        item_row[cols['items'].index('id')] = 1
+        item_row[cols['items'].index('section_id')] = 1
+        item_row[cols['items'].index('item_type')] = 'question'
+        item_row[cols['items'].index('order')] = 1.0
+        item_row[cols['items'].index('label')] = 'Q1'
+        buf = _make_export_workbook_bytes(sections=[section_row], items=[item_row], app=app)
+
+        with app.test_request_context():
+            login_user(admin_user)
+            result = TemplateExcelService.import_template(
+                template.id,
+                buf,
+                version_id=published.id,
+                import_version_mode='current_version',
+            )
+
+        assert result['success'] is False
+        assert any('submission data' in err.lower() for err in result.get('errors', []))
+
+    def test_new_item_auto_generates_stable_key(self, db_session, app):
+        template = create_test_template(db_session)
+        version = template.published_version
+        section = create_test_section(db_session, template, version=version)
+        item = create_test_item(db_session, section, template, version=version, item_type='question')
+        assert item.stable_key is not None
+        from app.utils.stable_key import is_valid_stable_key
+        assert is_valid_stable_key(item.stable_key)

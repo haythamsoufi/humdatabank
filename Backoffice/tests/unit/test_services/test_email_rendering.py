@@ -228,6 +228,15 @@ class TestRenderAdminEmailTemplate:
         assert "visible" in render_admin_email_template(template, show=True)
         assert "hidden" in render_admin_email_template(template, show=False)
 
+    def test_inline_style_background_preserved(self):
+        template = (
+            '<div style="background-color:#0d9488;color:#ffffff;padding:28px 40px;">'
+            '<h1 style="color:#ffffff;">Notification</h1></div>'
+        )
+        result = render_admin_email_template(template)
+        assert "background-color:#0d9488" in result.replace(" ", "")
+        assert "color:#ffffff" in result.replace(" ", "")
+
 
 # ---------------------------------------------------------------------------
 # render_admin_email_template_for_preview

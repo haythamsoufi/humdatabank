@@ -647,6 +647,32 @@ class TestCreateNotification:
         assert isinstance(result, list)
         assert len(result) >= 1
 
+    def test_document_uploaded_is_in_app_only(self, app, db_session):
+        from app.models import User
+        from app import db
+
+        with app.app_context():
+            user = User(email='doc_in_app@test.com', name='Doc', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+            db.session.commit()
+
+            with patch('app.services.notification.emails.send_instant_notification_email') as mock_email:
+                result = create_notification(
+                    user_ids=user.id,
+                    notification_type=NotificationType.document_uploaded,
+                    title_key='notification.document_uploaded.title',
+                    message_key='notification.document_uploaded.message',
+                    message_params={'document': 'report.pdf', 'document_type': 'PDF'},
+                    priority='high',
+                    override_email_preferences=True,
+                    send_email_notifications=True,
+                )
+
+        assert len(result) >= 1
+        mock_email.assert_not_called()
+
     def test_creates_notification_for_multiple_users(self, app, db_session):
         from app.models import User
         from app import db

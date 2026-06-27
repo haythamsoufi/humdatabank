@@ -797,6 +797,13 @@
                                 </span>
                             </div>
 
+                            <div id="item-modal-stable-key-row" class="hidden col-span-2 flex items-center gap-2 min-w-0 flex-wrap">
+                                <label for="item-modal-stable-key" class="shrink-0 w-20 text-sm font-semibold text-gray-700">{{ _('Field ID') }}</label>
+                                <input type="text" id="item-modal-stable-key" readonly class="flex-1 min-w-0 shadow-sm bg-gray-50 text-gray-600 py-1.5 sm:text-sm border-gray-300 rounded-md font-mono text-xs" aria-readonly="true">
+                                <span id="item-modal-identity-status" class="hidden shrink-0 text-xs font-medium px-2 py-0.5 rounded-full" aria-live="polite"></span>
+                                <button type="button" id="item-modal-stable-key-copy" class="btn btn-secondary btn-sm shrink-0" title="{{ _('Copy field identity') }}">{{ _('Copy') }}</button>
+                            </div>
+
                             {# Privacy — right column; populated by JS #}
                             <div id="item-privacy-field" class="flex items-center gap-2 min-w-0"></div>
 

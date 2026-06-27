@@ -17,6 +17,7 @@ from app.models import (
     FormData,
     RepeatGroupInstance, RepeatGroupData, DynamicIndicatorData, DynamicSectionContext,
 )
+from app.models.documents import SubmittedDocument
 from app.models.indicator_bank import IndicatorBank
 from contextlib import suppress
 from app.services.monitoring.memory import memory_tracker
@@ -34,6 +35,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
+from app.utils.stable_key import generate_stable_key, is_valid_stable_key, normalize_stable_key
 
 
 class TemplateExcelService:
@@ -58,6 +60,12 @@ class TemplateExcelService:
         'Pages': ['id', 'name', 'order'],
         'Sections': ['id', 'name', 'order'],
         'Items': ['id', 'section_id', 'item_type', 'label', 'order']
+    }
+
+    # Import-only columns omitted from export (e.g. stable_key). May be absent or present on import.
+    OPTIONAL_HEADER_COLUMNS = {
+        'Sections': {'stable_key'},
+        'Items': {'stable_key'},
     }
 
     # Excel export version (V2: per-language translation columns)
@@ -394,6 +402,7 @@ class TemplateExcelService:
         current, legacy = layouts[sheet_name]
         current_set = set(current)
         legacy_set = set(legacy)
+        optional_import = cls.OPTIONAL_HEADER_COLUMNS.get(sheet_name, set())
         required = set(cls.REQUIRED_COLUMNS.get(sheet_name, []))
 
         missing_required = sorted(required - header_set)
@@ -405,7 +414,7 @@ class TemplateExcelService:
                 got=normalized,
             )
 
-        known_set = current_set | legacy_set
+        known_set = current_set | legacy_set | optional_import
         unrecognized = sorted(header_set - known_set)
         if unrecognized:
             return current, False, cls._format_sheet_header_error(
@@ -430,11 +439,14 @@ class TemplateExcelService:
         if header_set <= current_set:
             return current, False, None
 
-        missing_optional = sorted(current_set - header_set)
+        missing_from_current = current_set - header_set
+        if missing_from_current <= optional_import:
+            return current, False, None
+
         return current, False, cls._format_sheet_header_error(
             sheet_name,
             summary='missing expected column(s) for the current export format',
-            missing=missing_optional,
+            missing=sorted(missing_from_current - optional_import),
             got=normalized,
         )
 
@@ -2247,6 +2259,7 @@ class TemplateExcelService:
         current_app.logger.info(f"Template found: '{template.name}'")
 
         errors = []
+        warnings: List[str] = []
         created_counts = {'pages': 0, 'sections': 0, 'items': 0}
 
         try:
@@ -2311,6 +2324,21 @@ class TemplateExcelService:
                 f"Version #={target_version.version_number}"
             )
 
+            if not create_new_draft and target_version.status == 'published':
+                deletion_impact = cls._count_deletion_impact(template.id, target_version.id)
+                if deletion_impact.get('has_data'):
+                    return {
+                        'success': False,
+                        'message': (
+                            'This template has submitted data. Import into a draft version '
+                            'and deploy it instead.'
+                        ),
+                        'errors': [
+                            'Excel import into the published version is blocked when submission data exists.'
+                        ],
+                        'created_count': created_counts,
+                    }
+
             # Import Template metadata first (including version-specific name)
             current_app.logger.info("=== IMPORTING TEMPLATE METADATA ===")
             template_sheet = workbook['Template']
@@ -2323,6 +2351,7 @@ class TemplateExcelService:
 
             # Excel import is a full structure replace: drop existing pages/sections/items first
             # so renamed sections, changed types, and removed subsections don't linger.
+            published_stable_key_context = cls._build_published_stable_key_context(template)
             cls._clear_version_structure(template.id, target_version.id)
 
             # ID mapping dictionaries (export ID -> new database ID)
@@ -2345,7 +2374,12 @@ class TemplateExcelService:
             current_app.logger.info("=== IMPORTING SECTIONS ===")
             sections_sheet = workbook['Sections']
             section_errors = cls._import_sections(
-                sections_sheet, template, target_version, page_id_map, section_id_map
+                sections_sheet,
+                template,
+                target_version,
+                page_id_map,
+                section_id_map,
+                published_stable_key_context=published_stable_key_context,
             )
             errors.extend(section_errors)
             created_counts['sections'] = len(section_id_map)
@@ -2358,7 +2392,12 @@ class TemplateExcelService:
             current_app.logger.info("=== IMPORTING ITEMS ===")
             items_sheet = workbook['Items']
             item_errors = cls._import_items(
-                items_sheet, template, target_version, section_id_map
+                items_sheet,
+                template,
+                target_version,
+                section_id_map,
+                warnings=warnings,
+                published_stable_key_context=published_stable_key_context,
             )
             errors.extend(item_errors)
             created_counts['items'] = db.session.query(FormItem).filter_by(
@@ -2395,6 +2434,7 @@ class TemplateExcelService:
                           f"{created_counts['sections']} sections, "
                           f"{created_counts['items']} items",
                 'errors': [],
+                'warnings': warnings,
                 'created_count': created_counts,
                 'version_id': version_id  # Return the version ID (may be new draft if published was selected)
             }
@@ -2602,9 +2642,179 @@ class TemplateExcelService:
         return errors
 
     @classmethod
+    def _build_published_stable_key_context(cls, template: FormTemplate) -> Dict[str, Any]:
+        """Map published structure to stable_key values for silent reuse on Excel import."""
+        empty: Dict[str, Any] = {
+            'sections': {},
+            'items_by_indicator': {},
+            'items_by_position': {},
+        }
+        if not template.published_version_id:
+            return empty
+
+        sections = FormSection.query.filter_by(
+            template_id=template.id,
+            version_id=template.published_version_id,
+        ).all()
+        if not sections:
+            return empty
+
+        sections_by_id = {section.id: section for section in sections}
+        section_keys: Dict[Tuple[float, str], str] = {}
+        for section in sections:
+            if section.stable_key:
+                section_keys[(float(section.order), section.name or '')] = section.stable_key
+
+        items_by_indicator: Dict[Tuple[float, str, int, float], str] = {}
+        items_by_position: Dict[Tuple[float, str, float, str, str], str] = {}
+        items = FormItem.query.filter_by(
+            template_id=template.id,
+            version_id=template.published_version_id,
+        ).all()
+        for item in items:
+            if not item.stable_key:
+                continue
+            section = sections_by_id.get(item.section_id)
+            if not section:
+                continue
+            section_key = (float(section.order), section.name or '')
+            item_order = float(item.order) if item.order is not None else 0.0
+            item_type = (item.item_type or '').strip().lower()
+            if item.indicator_bank_id:
+                indicator_key = (
+                    section_key[0],
+                    section_key[1],
+                    int(item.indicator_bank_id),
+                    item_order,
+                )
+                items_by_indicator[indicator_key] = item.stable_key
+            else:
+                position_key = (
+                    section_key[0],
+                    section_key[1],
+                    item_order,
+                    item_type,
+                    str(item.label or '').strip(),
+                )
+                items_by_position[position_key] = item.stable_key
+
+        return {
+            'sections': section_keys,
+            'items_by_indicator': items_by_indicator,
+            'items_by_position': items_by_position,
+        }
+
+    @classmethod
+    def _published_item_stable_key_fallback(
+        cls,
+        *,
+        published_stable_key_context: Dict[str, Any],
+        section_order: float,
+        section_name: str,
+        item_type: str,
+        item_label: str,
+        item_order: float,
+        indicator_bank_id: Optional[int],
+    ) -> Optional[str]:
+        section_key = (section_order, section_name or '')
+        if indicator_bank_id is not None:
+            indicator_key = (section_key[0], section_key[1], int(indicator_bank_id), item_order)
+            return published_stable_key_context.get('items_by_indicator', {}).get(indicator_key)
+        position_key = (
+            section_key[0],
+            section_key[1],
+            item_order,
+            (item_type or '').strip().lower(),
+            str(item_label or '').strip(),
+        )
+        return published_stable_key_context.get('items_by_position', {}).get(position_key)
+
+    @classmethod
+    def _resolve_import_stable_key(
+        cls,
+        row_data: Dict[str, Any],
+        row_idx: int,
+        sheet_name: str,
+        errors: List[str],
+        published_fallback: Optional[str] = None,
+    ) -> Optional[str]:
+        raw = row_data.get('stable_key')
+        if raw is not None and str(raw).strip() != '':
+            key = normalize_stable_key(raw)
+            if not key:
+                errors.append(f"{sheet_name} row {row_idx}: Invalid stable_key '{raw}'")
+                return None
+            return key
+        if published_fallback:
+            return published_fallback
+        return generate_stable_key()
+
+    @classmethod
+    def _validate_stable_key_duplicates_in_sheet(
+        cls,
+        rows: List[Tuple[int, Dict[str, Any]]],
+        sheet_name: str,
+        errors: List[str],
+    ) -> None:
+        seen: Dict[str, int] = {}
+        for row_idx, row_data in rows:
+            raw = row_data.get('stable_key')
+            if raw is None or str(raw).strip() == '':
+                continue
+            key = normalize_stable_key(raw)
+            if not key:
+                continue
+            if key in seen:
+                errors.append(
+                    f"{sheet_name} row {row_idx}: Duplicate stable_key '{key}' "
+                    f"(also on row {seen[key]})"
+                )
+            else:
+                seen[key] = row_idx
+
+    @classmethod
+    def _published_items_by_stable_key(cls, template: FormTemplate) -> Dict[str, FormItem]:
+        if not template.published_version_id:
+            return {}
+        items = FormItem.query.filter_by(
+            template_id=template.id,
+            version_id=template.published_version_id,
+        ).filter(FormItem.stable_key.isnot(None)).all()
+        return {item.stable_key: item for item in items if item.stable_key}
+
+    @classmethod
+    def _check_stable_key_identity_mismatch(
+        cls,
+        *,
+        template: FormTemplate,
+        stable_key: str,
+        item_type: str,
+        indicator_bank_id: Optional[int],
+        row_idx: int,
+        warnings: List[str],
+    ) -> None:
+        published_by_key = cls._published_items_by_stable_key(template)
+        published_item = published_by_key.get(stable_key)
+        if not published_item:
+            return
+        pub_type = (published_item.item_type or '').strip().lower()
+        cur_type = (item_type or '').strip().lower()
+        pub_bank = published_item.indicator_bank_id
+        if pub_type != cur_type or pub_bank != indicator_bank_id:
+            warnings.append(
+                f"Items row {row_idx}: stable_key {stable_key} matches published field "
+                f"'{published_item.label}' (type={pub_type}, indicator_bank_id={pub_bank}) "
+                f"but this row is type={cur_type}, indicator_bank_id={indicator_bank_id}. "
+                f"Identity mismatch — verify this is intentional."
+            )
+
+    @classmethod
     def _import_sections(cls, sheet, template: FormTemplate, version: FormTemplateVersion,
-                        page_id_map: Dict[int, int], section_id_map: Dict[int, int]) -> List[str]:
+                        page_id_map: Dict[int, int], section_id_map: Dict[int, int],
+                        published_stable_key_context: Optional[Dict[str, Any]] = None) -> List[str]:
         """Import sections from sheet."""
+        if published_stable_key_context is None:
+            published_stable_key_context = cls._build_published_stable_key_context(template)
         current_app.logger.info("Starting sections import...")
         current_app.logger.info(f"Page ID mapping available: {len(page_id_map)} pages")
         errors = []
@@ -2634,6 +2844,10 @@ class TemplateExcelService:
                 errors.append(f"Sections row {row_idx}: Validation error.")
 
         current_app.logger.info(f"Collected {len(sections_data)} section rows to process")
+
+        cls._validate_stable_key_duplicates_in_sheet(sections_data, 'Sections', errors)
+        if errors:
+            return errors
 
         # Get existing sections for this version (for matching)
         existing_sections = FormSection.query.filter_by(
@@ -2672,6 +2886,17 @@ class TemplateExcelService:
                 section_name = row_data['name'] or ''
                 section_order = float(row_data['order']) if row_data['order'] is not None else 0.0
                 section_type = row_data.get('section_type') or 'standard'
+                section_stable_key = cls._resolve_import_stable_key(
+                    row_data,
+                    row_idx,
+                    'Sections',
+                    errors,
+                    published_fallback=published_stable_key_context.get('sections', {}).get(
+                        (section_order, section_name)
+                    ),
+                )
+                if section_stable_key is None:
+                    continue
                 current_app.logger.info(f"Processing section row {row_idx}: export_id={export_id}, name='{section_name}', order={section_order}, type={section_type}, page_export_id={page_export_id}")
 
                 # Check if section already exists (match by order + name)
@@ -2696,6 +2921,7 @@ class TemplateExcelService:
                     )
                     existing_section.relevance_condition = row_data.get('relevance_condition')
                     existing_section.archived = bool(row_data.get('archived', False))
+                    existing_section.stable_key = section_stable_key
                     # Note: parent_section_id will be updated in third pass
                     sections_updated += 1
                     section_id_map[export_id] = existing_section.id
@@ -2722,7 +2948,8 @@ class TemplateExcelService:
                             row_data, 'name', legacy=legacy_format
                         ),
                         relevance_condition=row_data.get('relevance_condition'),
-                        archived=bool(row_data.get('archived', False))
+                        archived=bool(row_data.get('archived', False)),
+                        stable_key=section_stable_key,
                     )
 
                     db.session.add(new_section)
@@ -2773,8 +3000,13 @@ class TemplateExcelService:
 
     @classmethod
     def _import_items(cls, sheet, template: FormTemplate, version: FormTemplateVersion,
-                     section_id_map: Dict[int, int]) -> List[str]:
+                     section_id_map: Dict[int, int], warnings: Optional[List[str]] = None,
+                     published_stable_key_context: Optional[Dict[str, Any]] = None) -> List[str]:
         """Import items from sheet."""
+        if warnings is None:
+            warnings = []
+        if published_stable_key_context is None:
+            published_stable_key_context = cls._build_published_stable_key_context(template)
         current_app.logger.info("Starting items import...")
         current_app.logger.info(f"Section ID mapping available: {len(section_id_map)} sections")
         errors = []
@@ -2860,8 +3092,6 @@ class TemplateExcelService:
         cls._log_matrix_items_in_version(template.id, version.id, stage='before-import')
 
         # Pre-scan rows for indicator_bank_id values so we can validate in one DB query.
-        # If an indicator references a missing IndicatorBank ID, we will import the item with
-        # indicator_bank_id=NULL and flag it in config so the builder can show an issue and publishing can be blocked.
         candidate_indicator_bank_ids: set[int] = set()
         rows_buffer: List[Tuple[int, Dict[str, Any]]] = []
         for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
@@ -2875,6 +3105,10 @@ class TemplateExcelService:
                 parsed_ib = _parse_int_like(raw_ib)
                 if parsed_ib is not None:
                     candidate_indicator_bank_ids.add(parsed_ib)
+
+        cls._validate_stable_key_duplicates_in_sheet(rows_buffer, 'Items', errors)
+        if errors:
+            return errors
 
         existing_indicator_bank_ids: set[int] = set()
         if candidate_indicator_bank_ids:
@@ -2918,6 +3152,35 @@ class TemplateExcelService:
                 item_type = str(row_data.get('item_type') or 'indicator').strip().lower()
                 item_label = str(row_data.get('label') or '').strip()
                 item_order = float(row_data['order']) if row_data['order'] is not None else 0.0
+                parsed_ib_for_mismatch = _parse_int_like(row_data.get('indicator_bank_id'))
+                section = FormSection.query.get(section_id)
+                section_order = float(section.order) if section and section.order is not None else 0.0
+                section_name = (section.name or '') if section else ''
+                item_stable_key = cls._resolve_import_stable_key(
+                    row_data,
+                    row_idx,
+                    'Items',
+                    errors,
+                    published_fallback=cls._published_item_stable_key_fallback(
+                        published_stable_key_context=published_stable_key_context,
+                        section_order=section_order,
+                        section_name=section_name,
+                        item_type=item_type,
+                        item_label=item_label,
+                        item_order=item_order,
+                        indicator_bank_id=parsed_ib_for_mismatch,
+                    ),
+                )
+                if item_stable_key is None:
+                    continue
+                cls._check_stable_key_identity_mismatch(
+                    template=template,
+                    stable_key=item_stable_key,
+                    item_type=item_type,
+                    indicator_bank_id=parsed_ib_for_mismatch,
+                    row_idx=row_idx,
+                    warnings=warnings,
+                )
                 current_app.logger.info(f"Processing item row {row_idx}: export_id={export_id}, type={item_type}, label='{item_label[:50]}...', order={item_order}, section_export_id={section_export_id}")
 
                 existing_item, match_method = cls._find_existing_item_for_import(
@@ -2999,6 +3262,7 @@ class TemplateExcelService:
                     cls._apply_item_translations_from_row(existing_item, row_data, legacy=legacy_format)
                     existing_item.options_translations = cls._parse_json(row_data.get('options_translations'))
                     existing_item.description = row_data.get('description')
+                    existing_item.stable_key = item_stable_key
                     if item_type == 'matrix':
                         cls._sync_matrix_item_fields_from_config(existing_item)
                         from sqlalchemy.orm.attributes import flag_modified
@@ -3058,6 +3322,7 @@ class TemplateExcelService:
                         template_id=template.id,
                         version_id=version.id,
                         item_type=item_type,
+                        stable_key=item_stable_key,
                         label=item_label,
                         order=item_order,
                         relevance_condition=row_data.get('relevance_condition'),
@@ -3190,7 +3455,16 @@ class TemplateExcelService:
                 db.func.count(DynamicSectionContext.id)
             ).filter(DynamicSectionContext.section_id.in_(section_ids)).scalar() or 0
 
-        total = form_data + repeat_instances + repeat_data + dynamic_indicators + dynamic_contexts
+        submitted_documents: int = db.session.query(
+            db.func.count(SubmittedDocument.id)
+        ).join(
+            FormItem, SubmittedDocument.form_item_id == FormItem.id
+        ).filter(
+            FormItem.template_id == template_id,
+            FormItem.version_id == version_id,
+        ).scalar() or 0
+
+        total = form_data + repeat_instances + repeat_data + dynamic_indicators + dynamic_contexts + submitted_documents
         return {
             'has_data': total > 0,
             'counts': {
@@ -3199,6 +3473,7 @@ class TemplateExcelService:
                 'repeat_data': repeat_data,
                 'dynamic_indicators': dynamic_indicators,
                 'dynamic_contexts': dynamic_contexts,
+                'submitted_documents': submitted_documents,
             },
         }
 
@@ -3210,6 +3485,15 @@ class TemplateExcelService:
         child records that have FK constraints pointing to form_section / form_item must be
         removed explicitly before the structural rows are deleted.
         """
+        version = FormTemplateVersion.query.filter_by(id=version_id, template_id=template_id).first()
+        if version and version.status == 'published':
+            impact = cls._count_deletion_impact(template_id, version_id)
+            if impact.get('has_data'):
+                raise ValueError(
+                    'Cannot clear structure on a published version that has submission data. '
+                    'Import into a draft version and deploy it instead.'
+                )
+
         current_app.logger.info(
             f"Clearing existing structure for template_id={template_id}, version_id={version_id} before Excel import"
         )

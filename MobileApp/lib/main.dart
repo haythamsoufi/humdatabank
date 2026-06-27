@@ -308,6 +308,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       } else {
         DebugLogger.logWarn(
             'AUTH', 'Session refresh definitively rejected on app resume');
+        await authService.invalidateLocalAuth(
+          reason: 'Session refresh rejected on app resume',
+        );
       }
     } catch (e) {
       // Transient failure — leave tokens in place; the next API call will
@@ -335,6 +338,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         // These providers manage essential app state and are lightweight
         ChangeNotifierProvider(create: (_) {
           final authProvider = AuthProvider();
+          authProvider.attachAuthListeners();
           sl<AuthErrorHandler>().authProvider = authProvider;
           return authProvider;
         }),

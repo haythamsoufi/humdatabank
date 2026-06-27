@@ -341,6 +341,7 @@ Unknown `Comments_*` slugs are title-cased automatically.
 > **Example:** bank id **619** exists on two section-scoped items (Cross Cutting and Response - Disasters and crises). The Cross-cutting Excel row must land on the Cross Cutting item; the SP2 row on the SP2 section item. Resolved via `items_by_bank_section` + Excel `Area`.
 
 - If `Applicable/Data not available` contains "data not available" → writes `is_data_not_available = True` (no value)
+- **Yes/No indicators** (indicator bank `type = yesno`): UPR Master `ValueNum = 1` → stored as `yes`; any other value (including `0` or blank) → `no`. Yes/No rows are always imported unless marked data-not-available.
 - Otherwise uses `ValueNum` as a scalar
 
 ---
@@ -446,18 +447,18 @@ Warnings are deduplicated server-side by `summarize_warnings()`:
 - Header shows total count and unique count: `227 (18 unique)`
 - Full list rendered in a scrollable panel (max-height 18 rem)
 
-### Template version routing (T33)
+### Published template only (T33)
 
-When a template has a **deployed v2** (previous version archived), the import resolves form items per row:
+All UPR import writes target the **published** template version only. There is no legacy/v1 routing.
 
-| Round / period | Template version |
-|----------------|------------------|
-| `AR25`, `MYR25`, … (calendar year &lt; 2026) | Legacy (archived) version |
-| `MYR26`, `AR26`, … (calendar year ≥ 2026) | Current published version |
+**Core indicators** (Excel `Section = Core indicators`):
 
-Special matrix items (NS Total Funding, Expenditure, SP/EF breakdown, Received Support) are resolved by **label** within the chosen version, not hardcoded item ids. Indicator bank-id lookups use the same version index.
+1. Resolve a static `form_item` on the published template (by indicator bank id + SP/EF area).
+2. If no matching core item exists (indicator removed or moved in the latest template), sync the value to the **Other indicators** dynamic section via `dynamic_indicator_data`.
 
-Other templates (24, 22, 23) load legacy + current indexes when both exist; only T33 applies the 2026 cutoff today. Planning templates typically have a single published version.
+**Other indicators** (Excel `Section = Other indicators`): always written to the dynamic section.
+
+Special matrix items (NS Total Funding, Expenditure, SP/EF breakdown, Received Support) are resolved by **label** on the published version. The per-country reporting workbook import uses the same fallback for core rows that no longer map to a static item.
 
 ---
 

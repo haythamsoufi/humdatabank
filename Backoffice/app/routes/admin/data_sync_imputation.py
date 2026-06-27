@@ -129,7 +129,11 @@ def _published_sections_query(template: FormTemplate):
 
 
 def _published_items_query(template: FormTemplate):
-    """Form items for the published template version only."""
+    """Form items for the published template version only.
+
+    Aligns with stable_key deploy migration: form_data FKs and sync/imputation
+    must target the live published structure, not draft or archived versions.
+    """
     query = FormItem.query.filter(
         FormItem.template_id == template.id,
         FormItem.archived == False,

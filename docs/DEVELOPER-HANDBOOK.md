@@ -683,6 +683,60 @@ All client-side code that inserts dynamic HTML (via `innerHTML`, `outerHTML`, or
 3. When `innerHTML` with template literals is unavoidable, **escape every interpolated value** with `escapeHtml()` for text context or `escapeHtmlAttr()` for attribute context.
 4. Do not create new per-file sanitizer functions — use `SafeDom.sanitizeHtml` or `window.sanitizeHtml`.
 
+## Template version field identity (`stable_key`)
+
+Cross-version submission continuity uses a template-scoped logical id on structure rows:
+
+- `form_item.stable_key` / `form_section.stable_key` (UUID, system-managed)
+- Preserved on clone and Excel round-trip; auto-generated on new rows
+- On **deploy**, `VersionDeployMigrationService.migrate_submission_fks()` bulk-remaps submission FKs from the archived published version to the new version where keys match
+
+Query all version rows for one logical field:
+
+```python
+FormItem.by_stable_key(template_id, stable_key).all()
+```
+
+Operational scripts (run from `Backoffice/`):
+
+- `python scripts/template_version_scale_inventory.py` — per-template row counts before large deploys
+- `python scripts/backfill_stable_keys.py --dry-run` — one-time backfill for existing rows (run before first deploy migration in each environment)
+
+See also [`Backoffice/docs/template-version-submission-identity.md`](../Backoffice/docs/template-version-submission-identity.md).
+
+### Data API (`/api/v1/data`, `/api/v1/data/tables`)
+
+Submission facts stay keyed by **`form_item_id`** (the stored FK). Logical field identity lives on the **`form_items`** / **`dim_form_item`** dimension — not duplicated on every fact row.
+
+**Join facts to labels**
+
+| Layout | Fact column | Dimension column |
+|--------|-------------|------------------|
+| Flat (`/data/tables`) | `data[].form_item_id` | `form_items[].id` → read `label`, `stable_key` |
+| Star (`layout=star`) | `tables.fact_form_values[].form_item_id` | `tables.dim_form_item[].id` |
+
+Use **`(template_id, stable_key)`** as the durable external identifier. Cache **`form_item_id` only within a single API response** — it changes when a new template version is deployed (submission FKs are remapped on deploy).
+
+**Query parameters** (both endpoints when `template_id` is set):
+
+| Param | Default | Purpose |
+|-------|---------|---------|
+| `version_scope` | `published` | `published` = facts from the published version only; `all` = include archived-version rows (e.g. removed fields) |
+| `stable_key` | — | Filter by logical field UUID; requires `template_id`. With `published`, resolves to the current published `form_item_id`; with `all`, matches any version row with that key |
+
+**Response `scope`** (when `template_id` is in the request): `{ template_id, published_version_id, version_scope, stable_key? }` — documents which version filter was applied. Star layout exposes the same object under `meta.scope`.
+
+**Dimension fields** on each form item row: `id`, `stable_key`, `version_id`, `archived`, `label`, … Star `dim_template` also includes `published_version_id`.
+
+**Examples**
+
+```http
+GET /api/v1/data/tables?template_id=12&related=all
+GET /api/v1/data/tables?template_id=12&stable_key=<uuid>
+GET /api/v1/data/tables?template_id=12&version_scope=all&layout=star
+GET /api/v1/data?template_id=12&stable_key=<uuid>
+```
+
 ## Troubleshooting (Common)
 
 - **iOS `pod` / CocoaPods on Windows**: `pod` is not available on Windows; you cannot refresh `MobileApp/ios/Podfile.lock` locally. Use the **Regenerate iOS Podfile.lock** GitHub Action (see **Mobile App (Flutter)** above).

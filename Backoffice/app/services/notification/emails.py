@@ -25,6 +25,16 @@ except ImportError:
     PYTZ_AVAILABLE = False
 
 
+def _notifications_eligible_for_email(notifications):
+    """Exclude in-app-only notification types from digest/instant email delivery."""
+    from app.services.notification.core import IN_APP_ONLY_NOTIFICATION_TYPES
+
+    return [
+        n for n in notifications
+        if n.notification_type not in IN_APP_ONLY_NOTIFICATION_TYPES
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Compiled Jinja2 template cache
 #
@@ -281,6 +291,10 @@ def send_daily_digest(user, preferences, retry_count=0, max_retries=3, existing_
     if not notifications:
         return False  # No notifications to send
 
+    notifications = _notifications_eligible_for_email(notifications)
+    if not notifications:
+        return False
+
     # Filter by enabled notification types if specified
     if preferences.notification_types_enabled:
         notifications = [
@@ -381,6 +395,10 @@ def send_weekly_digest(user, preferences, retry_count=0, max_retries=3, existing
 
     if not notifications:
         return False  # No notifications to send
+
+    notifications = _notifications_eligible_for_email(notifications)
+    if not notifications:
+        return False
 
     # Filter by enabled notification types if specified
     if preferences.notification_types_enabled:
@@ -555,6 +573,11 @@ def send_instant_notification_email(user, notification, override_preferences=Fal
         notification: Notification instance
         override_preferences: If True, bypass user preferences and send email anyway (admin override)
     """
+    from app.services.notification.core import IN_APP_ONLY_NOTIFICATION_TYPES
+
+    if notification.notification_type in IN_APP_ONLY_NOTIFICATION_TYPES:
+        return False
+
     # If override is enabled, skip preference checks
     if not override_preferences:
         # Check if user has email notifications enabled
@@ -692,9 +715,9 @@ _DIGEST_TEMPLATE_SRC = """
     <body>
         <div class="email-outer">
             <div class="email-card">
-                <div class="email-header">
-                    <h1>{{ frequency }} notification digest</h1>
-                    <p>{{ notifications|length }} new notification(s) for {{ user.name }}</p>
+                <div style="background-color:#0d9488;color:#ffffff;padding:28px 36px;text-align:center;">
+                    <h1 style="margin:0 0 8px;font-size:24px;font-weight:600;line-height:1.3;color:#ffffff;">{{ frequency }} notification digest</h1>
+                    <p style="margin:0;font-size:15px;line-height:1.4;opacity:0.95;color:#ffffff;">{{ notifications|length }} new notification(s) for {{ user.name }}</p>
                 </div>
                 <div class="email-body">
                     <p>Hello {{ user.name }},</p>
@@ -800,9 +823,9 @@ _INSTANT_TEMPLATE_SRC = """
     <body>
         <div class="email-outer">
             <div class="email-card">
-                <div class="email-header {% if is_action_required %}action-required{% else %}informational{% endif %}">
-                    <h1>{{ header_label }}</h1>
-                    {% if header_subtitle %}<p class="subtitle">{{ header_subtitle }}</p>{% endif %}
+                <div style="color:#ffffff;padding:28px 36px;text-align:center;background-color:{% if is_action_required %}#b91c1c{% else %}#0d9488{% endif %};">
+                    <h1 style="margin:0;font-size:24px;font-weight:600;line-height:1.3;color:#ffffff;">{{ header_label }}</h1>
+                    {% if header_subtitle %}<p style="margin:8px 0 0;font-size:15px;font-weight:500;line-height:1.4;opacity:0.95;color:#ffffff;">{{ header_subtitle }}</p>{% endif %}
                 </div>
                 <div class="email-body">
                     <p>Hello {{ user.name }},</p>

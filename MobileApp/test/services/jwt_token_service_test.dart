@@ -80,13 +80,26 @@ void main() {
       expect(await svc.getRefreshToken(), 'refresh-1');
       expect(await svc.hasTokens(), isTrue);
       expect(await svc.hasRefreshToken(), isTrue);
-      // Just-saved 30-min token: not expired (30s buffer at most).
+      // Just-saved 30-min token: not expired (60s buffer at most).
       expect(await svc.isAccessTokenExpired(), isFalse);
 
       // Expiry must live in secure storage now (not SharedPreferences).
       expect(_secureValues.containsKey('jwt_access_expires_at_v2'), isTrue);
+      expect(_secureValues.containsKey('jwt_token_bundle_v1'), isTrue);
       final storage = StorageService();
       expect(await storage.getInt('jwt_access_expires_at_v1'), isNull);
+    });
+
+    test('timeUntilAccessExpiry reflects saved token lifetime', () async {
+      final svc = JwtTokenService();
+      await svc.saveTokens(
+        accessToken: 'access-1',
+        refreshToken: 'refresh-1',
+        expiresIn: 1800,
+      );
+      final remaining = await svc.timeUntilAccessExpiry();
+      expect(remaining, isNotNull);
+      expect(remaining!, greaterThan(const Duration(minutes: 25)));
     });
 
     test('isAccessTokenExpired is true when expiry timestamp is missing',
@@ -126,6 +139,7 @@ void main() {
       expect(await svc.hasRefreshToken(), isFalse);
       expect(await svc.isAccessTokenExpired(), isTrue);
       expect(_secureValues.containsKey('jwt_access_expires_at_v2'), isFalse);
+      expect(_secureValues.containsKey('jwt_token_bundle_v1'), isFalse);
     });
 
     test(

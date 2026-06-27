@@ -23,6 +23,7 @@ from datetime import date, datetime
 from typing import Any, Optional
 
 import bleach
+from bleach.css_sanitizer import CSSSanitizer
 from jinja2.sandbox import SandboxedEnvironment
 
 logger = logging.getLogger(__name__)
@@ -122,6 +123,35 @@ def _allow_attr(tag: str, name: str, value: str) -> bool:
     return True
 
 
+# Bleach 6+ strips inline style values unless a CSS sanitizer is configured.
+_EMAIL_CSS_SANITIZER = CSSSanitizer(
+    allowed_css_properties=[
+        "color", "background", "background-color",
+        "font-size", "font-weight", "font-family", "font-style",
+        "text-align", "text-decoration", "text-transform",
+        "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
+        "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
+        "width", "height", "max-width", "min-width",
+        "border", "border-width", "border-style", "border-color",
+        "border-top", "border-right", "border-bottom", "border-left",
+        "display", "line-height", "letter-spacing",
+        "vertical-align", "white-space", "opacity", "box-sizing",
+    ]
+)
+
+
+def _sanitize_email_html(html: str) -> str:
+    return bleach.clean(
+        html,
+        tags=_ALLOWED_TAGS,
+        attributes=_allow_attr,
+        protocols=_SAFE_PROTOCOLS,
+        strip=True,
+        strip_comments=False,
+        css_sanitizer=_EMAIL_CSS_SANITIZER,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -149,14 +179,7 @@ def render_admin_email_template_for_preview(
         return None, "Template rendered to empty output."
 
     try:
-        cleaned = bleach.clean(
-            rendered,
-            tags=_ALLOWED_TAGS,
-            attributes=_allow_attr,
-            protocols=_SAFE_PROTOCOLS,
-            strip=True,
-            strip_comments=False,
-        )
+        cleaned = _sanitize_email_html(rendered)
     except Exception as e:
         logger.info("Admin email template preview: sanitization failed: %s", e)
         return None, f"HTML sanitization failed: {e}"
@@ -177,14 +200,7 @@ def sanitize_admin_email_html_for_api(html: str) -> str:
     if not html or not str(html).strip():
         return ""
     try:
-        return bleach.clean(
-            str(html),
-            tags=_ALLOWED_TAGS,
-            attributes=_allow_attr,
-            protocols=_SAFE_PROTOCOLS,
-            strip=True,
-            strip_comments=False,
-        )
+        return _sanitize_email_html(str(html))
     except Exception:
         logger.warning(
             "API email HTML re-sanitization failed; returning empty body.",
@@ -227,14 +243,7 @@ def render_admin_email_template(template_str: str, **context: Any) -> str:
 
     # Step 2 – HTML sanitisation of the rendered output
     try:
-        return bleach.clean(
-            rendered,
-            tags=_ALLOWED_TAGS,
-            attributes=_allow_attr,
-            protocols=_SAFE_PROTOCOLS,
-            strip=True,
-            strip_comments=False,
-        )
+        return _sanitize_email_html(rendered)
     except Exception:
         logger.warning(
             'Post-render HTML sanitisation failed; returning empty body.',

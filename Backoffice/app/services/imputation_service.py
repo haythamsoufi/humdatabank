@@ -154,10 +154,14 @@ class ImputationService:
                 "error": f"Template {template_id} not found",
             }
 
-        # Fetch all items under this template once
-        form_items: List[FormItem] = (
-            FormItem.query.filter_by(template_id=template_id).all()
-        )
+        # Fetch imputable items on the published version only (matches data sync UI helpers).
+        form_items_query = FormItem.query.filter_by(template_id=template_id)
+        if template.published_version_id:
+            form_items_query = form_items_query.filter(
+                FormItem.version_id == template.published_version_id,
+                FormItem.archived == False,
+            )
+        form_items: List[FormItem] = form_items_query.all()
         logger.debug(
             "Imputation: template_id=%s items=%s target_period=%s source_period=%s",
             template_id,
@@ -459,8 +463,13 @@ class ImputationService:
                 "error": f"Template {template_id} not found",
             }
 
-        # Fetch all items under this template
+        # Fetch items on the published version only (matches data sync UI helpers).
         form_items_query = FormItem.query.filter_by(template_id=template_id)
+        if template.published_version_id:
+            form_items_query = form_items_query.filter(
+                FormItem.version_id == template.published_version_id,
+                FormItem.archived == False,
+            )
 
         # Apply item filter if specified
         if item_filter:

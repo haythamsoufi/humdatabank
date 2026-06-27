@@ -407,6 +407,15 @@ class AppConfig {
   static String get persistentDeviceInstallIdKey =>
       '${_storagePrefix}persistent_device_install_id';
 
+  /// Session activity timestamps (SharedPreferences) — env-prefixed so prod and
+  /// staging installs on the same device do not share stale validation windows.
+  static String get sessionCreatedAtKey =>
+      '${_storagePrefix}session_created_at';
+  static String get sessionLastValidatedKey =>
+      '${_storagePrefix}session_last_validated';
+  static String get sessionLastValidatedOnlineKey =>
+      '${_storagePrefix}session_last_validated_online';
+
   // Cache Keys
   static String get cachedDashboardKey   => '${_storagePrefix}cached_dashboard';
   static String get cachedUserProfileKey => '${_storagePrefix}cached_user_profile';

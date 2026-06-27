@@ -66,8 +66,9 @@ from import_upr_excel_data import (  # noqa: E402
     build_import_context,
     reporting_funding_matrix_column,
     reporting_special_item,
-    resolve_template_version_id,
     round_to_period,
+    upsert_dynamic_indicator_entries,
+    _queue_other_dynamic_indicator,
 )
 
 # NS Data indicator bank IDs (same as UPR T33 / T24 NS Data)
@@ -984,11 +985,8 @@ def _indicator_names_match(excel_indicator: str, form_label: str) -> bool:
     return _indicator_similarity(excel_indicator, form_label) >= INDICATOR_MATCH_THRESHOLD
 
 
-def _resolve_comments_item_id(ctx: UprImportContext, version_id: Optional[int] = None) -> Optional[int]:
-    if version_id:
-        labels = ctx.item_ids_by_label_by_version.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(int(version_id), {})
-    else:
-        labels = ctx.item_ids_by_label.get(REPORTING_COUNTRY_TEMPLATE_ID, {})
+def _resolve_comments_item_id(ctx: UprImportContext) -> Optional[int]:
+    labels = ctx.item_ids_by_label.get(REPORTING_COUNTRY_TEMPLATE_ID, {})
     for key, item_id in labels.items():
         if "comment" in key:
             return item_id
@@ -1498,15 +1496,9 @@ def _resolve_item_for_workbook_indicator(
     ctx: UprImportContext,
     bank_id: int,
     sp_ef: str,
-    version_id: Optional[int] = None,
 ) -> Optional[int]:
-    """Resolve T33 form item for an indicator bank id and SP/EF section name."""
-    if version_id:
-        section_map = ctx.items_by_bank_section_by_version.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(
-            int(version_id), {}
-        ).get(bank_id)
-    else:
-        section_map = ctx.items_by_bank_section.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(bank_id)
+    """Resolve T33 published-version form item for an indicator bank id and SP/EF section name."""
+    section_map = ctx.items_by_bank_section.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(bank_id)
     if section_map:
         sp_norm = _normalize_text(sp_ef)
         for section_name, item_id in section_map.items():
@@ -1520,13 +1512,7 @@ def _resolve_item_for_workbook_indicator(
 
     for area_code, section in REPORTING_EXCEL_AREA_TO_SECTION.items():
         if _normalize_text(section) == _normalize_text(sp_ef):
-            return _resolve_item_by_bank_and_area(
-                ctx, REPORTING_COUNTRY_TEMPLATE_ID, bank_id, area_code, version_id=version_id
-            )
-    if version_id:
-        return ctx.items_by_bank_by_version.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(int(version_id), {}).get(
-            bank_id
-        )
+            return _resolve_item_by_bank_and_area(ctx, REPORTING_COUNTRY_TEMPLATE_ID, bank_id, area_code)
     return ctx.items_by_bank_id.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(bank_id)
 
 
@@ -2826,14 +2812,14 @@ def transform_upr_country_reporting_to_import_rows(
     """Transform UPR Country Reporting workbook content into form_data import rows for one assignment."""
     import_rows: List[Dict[str, str]] = []
     matrix_cells: Dict[Tuple[int, int], Dict[str, Any]] = {}
-    version_id = resolve_template_version_id(ctx, REPORTING_COUNTRY_TEMPLATE_ID, period, None)
-    items_by_bank = ctx.items_by_bank_by_version.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(version_id, {})
-    funding_item = reporting_special_item(ctx, version_id, "funding") or ITEM_REPORTING_COUNTRY_FUNDING
-    sp_breakdown_item = reporting_special_item(ctx, version_id, "sp_breakdown") or ITEM_REPORTING_COUNTRY_SP_BREAKDOWN
-    support_item = reporting_special_item(ctx, version_id, "support") or ITEM_REPORTING_COUNTRY_SUPPORT
+    dynamic_order: Dict[int, float] = {}
+    items_by_bank = ctx.items_by_bank_id.get(REPORTING_COUNTRY_TEMPLATE_ID, {})
+    funding_item = reporting_special_item(ctx, "funding") or ITEM_REPORTING_COUNTRY_FUNDING
+    sp_breakdown_item = reporting_special_item(ctx, "sp_breakdown") or ITEM_REPORTING_COUNTRY_SP_BREAKDOWN
+    support_item = reporting_special_item(ctx, "support") or ITEM_REPORTING_COUNTRY_SUPPORT
     kpi_lookup = build_kpi_lookup(wb)
     yes_no_bank_ids = _load_workbook_yes_no_bank_ids(wb, kpi_lookup)
-    section_label_map = _load_items_by_section_label(REPORTING_COUNTRY_TEMPLATE_ID, version_id=version_id)
+    section_label_map = _load_items_by_section_label(REPORTING_COUNTRY_TEMPLATE_ID)
 
     # NS Data scalars
     ns_data = parse_ns_key_data(wb)
@@ -2862,7 +2848,7 @@ def transform_upr_country_reporting_to_import_rows(
     for row in parse_indicators(wb, yes_no_bank_ids=yes_no_bank_ids, kpi_lookup=kpi_lookup):
         bank_id = _resolve_workbook_indicator_bank_id(row, kpi_lookup)
         if bank_id:
-            item_id = _resolve_item_for_workbook_indicator(ctx, bank_id, row["sp_ef"], version_id=version_id)
+            item_id = _resolve_item_for_workbook_indicator(ctx, bank_id, row["sp_ef"])
         else:
             item_id = _resolve_item_by_section_and_indicator(
                 ctx,
@@ -2871,15 +2857,26 @@ def transform_upr_country_reporting_to_import_rows(
                 row["indicator"],
                 kpi_lookup,
             )
-        if not item_id:
-            ctx.warnings.append(
-                f"No T33 form item for indicator {row['indicator']!r} in {row['sp_ef']!r} ({iso3})"
-            )
-            continue
         value, is_dna, disagg, should_import = _resolve_indicator_import_value(
             row, bank_id, yes_no_bank_ids
         )
         if not should_import:
+            continue
+        if not item_id:
+            if bank_id and (is_dna or value is not None or disagg):
+                _queue_other_dynamic_indicator(
+                    ctx,
+                    aes_id=aes_id,
+                    indicator_bank_id=bank_id,
+                    value=value,
+                    data_not_available=is_dna,
+                    order_counters=dynamic_order,
+                    disagg_data=disagg,
+                )
+            elif not bank_id:
+                ctx.warnings.append(
+                    f"No T33 form item for indicator {row['indicator']!r} in {row['sp_ef']!r} ({iso3})"
+                )
             continue
         if is_dna:
             import_rows.append(
@@ -2916,7 +2913,7 @@ def transform_upr_country_reporting_to_import_rows(
 
     # Funding (IFRC / PNS / HNS rows → item 1403 matrix column tot_fn)
     funding = parse_funding(wb)
-    funding_matrix_col = reporting_funding_matrix_column(ctx, version_id)
+    funding_matrix_col = reporting_funding_matrix_column(ctx)
     for row_name, amount in funding.get("sources", {}).items():
         if amount:
             cell_key = f"{row_name}_{funding_matrix_col}"
@@ -2924,7 +2921,7 @@ def transform_upr_country_reporting_to_import_rows(
 
     total_exp = funding.get("total_expenditure")
     if total_exp is not None:
-        exp_item = items_by_bank.get(734) or reporting_special_item(ctx, version_id, "expenditure")
+        exp_item = items_by_bank.get(734) or reporting_special_item(ctx, "expenditure")
         item_id = exp_item or ITEM_REPORTING_COUNTRY_EXPENDITURE
         built = _scalar_row(
             aes_id=aes_id,
@@ -2953,7 +2950,7 @@ def transform_upr_country_reporting_to_import_rows(
             matrix_cells.setdefault((aes_id, support_item), {})[cell_key] = 1
 
     # Comments (T33 item — single textarea ↔ Commetns_overall)
-    comments_item_id = _resolve_comments_item_id(ctx, version_id=version_id)
+    comments_item_id = _resolve_comments_item_id(ctx)
     comments = parse_comments(wb)
     if comments and comments_item_id:
         import_rows.append(
@@ -3101,8 +3098,16 @@ def run_upr_country_reporting_import(
                 kpi_lookup=build_kpi_lookup(wb),
                 dry_run=False,
             )
-            upsert_stats["dynamic_inserted"] = dyn_stats.get("inserted", 0)
-            upsert_stats["dynamic_updated"] = dyn_stats.get("updated", 0)
+            displaced_stats = upsert_dynamic_indicator_entries(
+                ctx.dynamic_indicator_entries,
+                dry_run=False,
+            )
+            upsert_stats["dynamic_inserted"] = dyn_stats.get("inserted", 0) + displaced_stats.get(
+                "dynamic_inserted", 0
+            )
+            upsert_stats["dynamic_updated"] = dyn_stats.get("updated", 0) + displaced_stats.get(
+                "dynamic_updated", 0
+            )
         upsert_stats["success"] = upsert_stats.get("errors", 0) == 0
         upsert_stats["updated_count"] = upsert_stats.get("inserted", 0) + upsert_stats.get("updated", 0)
         upsert_stats["warnings"] = stats["warnings"]

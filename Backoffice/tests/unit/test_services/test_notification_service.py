@@ -59,7 +59,7 @@ class TestGetTranslatedNotificationTypeLabel:
             known_types = [
                 'assignment_created', 'assignment_submitted', 'assignment_approved',
                 'assignment_reopened', 'form_updated', 'document_uploaded',
-                'user_added_to_country', 'template_updated', 'self_report_created',
+                'user_added_to_country', 'self_report_created',
                 'deadline_reminder', 'admin_message', 'access_request_received',
                 'validation_questions', 'public_submission_received',
             ]

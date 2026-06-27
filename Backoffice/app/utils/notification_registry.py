@@ -151,7 +151,7 @@ NOTIFICATION_TYPE_REGISTRY_SPECS: List[Dict[str, Any]] = [
         "recipients": (
             "Pending standalone uploads: org admins covering the country and/or system managers "
             "(separate toggles). Approved / assignment-linked: focal points on the entity "
-            "(uploader excluded where applicable)."
+            "(uploader excluded where applicable). In-app only — no email."
         ),
     },
     {
@@ -178,18 +178,6 @@ NOTIFICATION_TYPE_REGISTRY_SPECS: List[Dict[str, Any]] = [
         "recipients": (
             "Org admins covering the requested country and/or system managers (requester excluded); "
             "not sent when auto-approved."
-        ),
-    },
-    {
-        "group": "Templates",
-        "type_key": "template_updated",
-        "emitter_active": True,
-        "audiences": ["focal_points"],
-        "description": (
-            "Published when template definition changes relevant to downstream users."
-        ),
-        "recipients": (
-            "Focal points on countries that have active assignments using the updated template."
         ),
     },
     {

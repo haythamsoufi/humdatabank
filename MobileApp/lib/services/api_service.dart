@@ -72,6 +72,28 @@ class ApiService {
     _tokenRefreshCallback = callback;
   }
 
+  /// Clears local credentials and notifies [AuthService] via
+  /// [invalidateLocalAuth]. Registered by [AuthService.ensureApiCallbacksRegistered].
+  static Future<void> Function(String reason)? _localAuthInvalidationCallback;
+
+  static Future<void> Function(String reason)?
+      get localAuthInvalidationCallback => _localAuthInvalidationCallback;
+
+  static set localAuthInvalidationCallback(
+      Future<void> Function(String reason) callback) {
+    _localAuthInvalidationCallback = callback;
+  }
+
+  Future<void> _clearLocalAuthState(String reason) async {
+    final callback = _localAuthInvalidationCallback;
+    if (callback != null) {
+      await callback(reason);
+      return;
+    }
+    await _jwtService.clearTokens();
+    await _session.clearSession();
+  }
+
   final StorageService _storage = StorageService();
   final SessionService _session = SessionService();
   final JwtTokenService _jwtService = JwtTokenService();
@@ -179,11 +201,7 @@ class ApiService {
       }
       // Refresh failed (refresh token itself is expired or server rejected it).
       DebugLogger.logApi('Proactive refresh failed — clearing auth state');
-      await _jwtService.clearTokens();
-      await _session.clearSession();
-    } else {
-      DebugLogger.logApi(
-          'Session expired and no valid JWT or refresh token — throwing AuthenticationException');
+      await _clearLocalAuthState('Proactive refresh failed');
     }
     throw AuthenticationException('Session expired. Please log in again.');
   }
@@ -467,7 +485,7 @@ class ApiService {
               'Redirect to /login detected - throwing AuthenticationException');
           // Clear expired session
           if (includeAuth) {
-            await _session.clearSession();
+            await _clearLocalAuthState('Redirect to login');
           }
           throw AuthenticationException(
               'Session expired. Please log in again.');
@@ -504,19 +522,17 @@ class ApiService {
               response = retryResponse;
               // Fall through to normal response handling with the retry response.
             } else {
-              await _jwtService.clearTokens();
-              await _session.clearSession();
+              await _clearLocalAuthState('401 after refresh retry failed');
               throw AuthenticationException('Authentication required. Please log in.');
             }
           } else {
             DebugLogger.logApi('JWT refresh failed — clearing auth state');
-            await _jwtService.clearTokens();
-            await _session.clearSession();
+            await _clearLocalAuthState('JWT refresh failed');
             throw AuthenticationException('Session expired. Please log in again.');
           }
         } else {
           DebugLogger.logApi('No refresh token or callback — clearing session');
-          await _session.clearSession();
+          await _clearLocalAuthState('No refresh token for 401 recovery');
           throw AuthenticationException('Authentication required. Please log in.');
         }
       }
@@ -869,20 +885,18 @@ class ApiService {
               response = retryResponse;
               // Fall through to normal response handling below.
             } else {
-              await _jwtService.clearTokens();
-              await _session.clearSession();
+              await _clearLocalAuthState('401 after refresh retry failed');
               throw AuthenticationException(
                   'Authentication required. Please log in.');
             }
           } else {
             DebugLogger.logApi('JWT refresh failed — clearing auth state');
-            await _jwtService.clearTokens();
-            await _session.clearSession();
+            await _clearLocalAuthState('JWT refresh failed');
             throw AuthenticationException('Session expired. Please log in again.');
           }
         } else {
           DebugLogger.logApi('No refresh token or callback — clearing session');
-          await _session.clearSession();
+          await _clearLocalAuthState('No refresh token for 401 recovery');
           throw AuthenticationException('Authentication required. Please log in.');
         }
       }
@@ -1030,19 +1044,17 @@ class ApiService {
             if (retryResponse != null && retryResponse.statusCode != 401) {
               response = retryResponse;
             } else {
-              await _jwtService.clearTokens();
-              await _session.clearSession();
+              await _clearLocalAuthState('401 after refresh retry failed');
               throw AuthenticationException('Authentication required. Please log in.');
             }
           } else {
             DebugLogger.logApi('JWT refresh failed — clearing auth state');
-            await _jwtService.clearTokens();
-            await _session.clearSession();
+            await _clearLocalAuthState('JWT refresh failed');
             throw AuthenticationException('Session expired. Please log in again.');
           }
         } else {
           DebugLogger.logApi('No refresh token or callback — clearing session');
-          await _session.clearSession();
+          await _clearLocalAuthState('No refresh token for 401 recovery');
           throw AuthenticationException('Authentication required. Please log in.');
         }
       }
@@ -1164,19 +1176,17 @@ class ApiService {
             if (retryResponse != null && retryResponse.statusCode != 401) {
               response = retryResponse;
             } else {
-              await _jwtService.clearTokens();
-              await _session.clearSession();
+              await _clearLocalAuthState('401 after refresh retry failed');
               throw AuthenticationException('Authentication required. Please log in.');
             }
           } else {
             DebugLogger.logApi('JWT refresh failed — clearing auth state');
-            await _jwtService.clearTokens();
-            await _session.clearSession();
+            await _clearLocalAuthState('JWT refresh failed');
             throw AuthenticationException('Session expired. Please log in again.');
           }
         } else {
           DebugLogger.logApi('No refresh token or callback — clearing session');
-          await _session.clearSession();
+          await _clearLocalAuthState('No refresh token for 401 recovery');
           throw AuthenticationException('Authentication required. Please log in.');
         }
       }

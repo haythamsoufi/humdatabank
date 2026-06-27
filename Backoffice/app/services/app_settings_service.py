@@ -1193,7 +1193,6 @@ DEFAULT_NOTIFICATION_AUDIENCE_RULES: Dict[str, Dict[str, bool]] = {
     "form_updated": {"focal_points": True, "admin_users": False, "system_managers": False},
     "document_uploaded": {"focal_points": True, "admin_users": True, "system_managers": True},
     "user_added_to_country": {"focal_points": True, "admin_users": False, "system_managers": False},
-    "template_updated": {"focal_points": True, "admin_users": False, "system_managers": False},
     "self_report_created": {"focal_points": True, "admin_users": False, "system_managers": False},
     "deadline_reminder": {"focal_points": True, "admin_users": False, "system_managers": False},
     "admin_message": {"focal_points": True, "admin_users": True, "system_managers": True},

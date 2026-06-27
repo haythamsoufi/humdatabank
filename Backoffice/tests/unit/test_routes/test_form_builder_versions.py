@@ -55,7 +55,7 @@ class TestDeployTemplateVersion:
         template = _make_owned_template(db_session, admin_user)
         draft = _make_draft(db_session, template)
         with patch('app.routes.admin.form_builder.versions.log_admin_action'), \
-             patch('app.routes.admin.form_builder.versions.notify_template_updated',
+             patch('app.routes.admin.form_builder.versions.register_post_commit',
                    side_effect=None, create=True):
             resp = logged_in_client.post(
                 f'/admin/templates/{template.id}/deploy',
@@ -122,7 +122,7 @@ class TestDeployTemplateVersion:
         template = _make_owned_template(db_session, admin_user)
         draft = _make_draft(db_session, template)
         with patch('app.routes.admin.form_builder.versions.log_admin_action'), \
-             patch('app.routes.admin.form_builder.versions.notify_template_updated',
+             patch('app.routes.admin.form_builder.versions.register_post_commit',
                    side_effect=None, create=True):
             resp = logged_in_client.post(
                 f'/admin/templates/{template.id}/deploy',
@@ -187,7 +187,7 @@ class TestDeployTemplateVersion:
         template = _make_owned_template(db_session, admin_user)
         draft = _make_draft(db_session, template)
         with patch('app.routes.admin.form_builder.versions.log_admin_action'), \
-             patch('app.routes.admin.form_builder.versions.notify_template_updated',
+             patch('app.routes.admin.form_builder.versions.register_post_commit',
                    side_effect=None, create=True):
             resp = logged_in_client.post(
                 f'/admin/templates/{template.id}/deploy',
@@ -196,6 +196,74 @@ class TestDeployTemplateVersion:
             )
         assert resp.status_code == 302
         assert f'version_id={draft.id}' in resp.headers.get('Location', '')
+
+    def test_deploy_preflight_returns_estimate(self, logged_in_client, db_session, admin_user, app):
+        _grant_template_permissions(db_session)
+        template = _make_owned_template(db_session, admin_user)
+        draft = _make_draft(db_session, template)
+        resp = logged_in_client.get(
+            f'/admin/templates/{template.id}/deploy/preflight?version_id={draft.id}'
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['success'] is True
+        assert 'estimate' in data
+
+    def test_deploy_remaps_form_data_on_publish(
+        self, logged_in_client, db_session, admin_user, app
+    ):
+        from app.models import FormData
+        from app.utils.stable_key import generate_stable_key
+        from tests.factories import create_test_assignment_entity_status, create_test_item, create_test_section
+
+        _grant_template_permissions(db_session)
+        template = _make_owned_template(db_session, admin_user)
+        published = template.published_version
+        pub_section = create_test_section(db_session, template, version=published)
+        draft = _make_draft(db_session, template)
+        draft_section = create_test_section(db_session, template, version=draft)
+        shared_key = generate_stable_key()
+
+        pub_item = create_test_item(
+            db_session, pub_section, template, version=published, item_type='question', label='Q1'
+        )
+        pub_item.stable_key = shared_key
+        draft_item = create_test_item(
+            db_session, draft_section, template, version=draft, item_type='question', label='Q1'
+        )
+        draft_item.stable_key = shared_key
+        aes = create_test_assignment_entity_status(db_session, template=template)
+        row = FormData(assignment_entity_status_id=aes.id, form_item_id=pub_item.id, value='7')
+        db_session.add(row)
+        db_session.commit()
+
+        with patch('app.routes.admin.form_builder.versions.log_admin_action'), \
+             patch('app.routes.admin.form_builder.versions.register_post_commit'):
+            resp = logged_in_client.post(
+                f'/admin/templates/{template.id}/deploy',
+                data={'version_id': str(draft.id)},
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+        db_session.refresh(row)
+        assert row.form_item_id == draft_item.id
+
+    def test_deploy_schedules_notification_after_commit(
+        self, logged_in_client, db_session, admin_user, app
+    ):
+        _grant_template_permissions(db_session)
+        template = _make_owned_template(db_session, admin_user)
+        draft = _make_draft(db_session, template)
+        with patch('app.routes.admin.form_builder.versions.log_admin_action'), \
+             patch('app.routes.admin.form_builder.versions.register_post_commit') as mock_post_commit:
+            resp = logged_in_client.post(
+                f'/admin/templates/{template.id}/deploy',
+                data={'version_id': str(draft.id)},
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+        mock_post_commit.assert_called_once()
+        assert mock_post_commit.call_args[0][1] == template.id
 
 
 # ---------------------------------------------------------------------------

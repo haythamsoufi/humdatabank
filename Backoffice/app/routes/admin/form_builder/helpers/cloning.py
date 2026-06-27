@@ -5,6 +5,7 @@ from flask import current_app
 from app import db
 from app.models import FormPage, FormSection, FormItem
 from app.utils.json_helpers import deep_copy_json as _deep_copy_json_value
+from app.utils.stable_key import defer_stable_key_autogen
 import json
 import re
 
@@ -151,6 +152,7 @@ def _clone_template_structure(template_id: int, source_version_id: int, target_v
             parent_section_id=None,  # set later
             page_id=page_id_map.get(s.page_id) if s.page_id else None,
             section_type=s.section_type,
+            stable_key=s.stable_key,
             max_dynamic_indicators=s.max_dynamic_indicators,
             allowed_sectors=s.allowed_sectors,
             indicator_filters=s.indicator_filters,
@@ -164,6 +166,8 @@ def _clone_template_structure(template_id: int, source_version_id: int, target_v
             config=_new_config,
             archived=getattr(s, 'archived', False)
         )
+        if not s.stable_key:
+            defer_stable_key_autogen(new_s)
         db.session.add(new_s)
         db.session.flush()
         section_id_map[s.id] = new_s.id
@@ -196,6 +200,7 @@ def _clone_template_structure(template_id: int, source_version_id: int, target_v
             version_id=target_version_id,
             section_id=section_id_map.get(it.section_id),
             item_type=it.item_type,
+            stable_key=it.stable_key,
             label=it.label,
             order=it.order,
             relevance_condition=None,  # Will be set after remapping
@@ -222,6 +227,8 @@ def _clone_template_structure(template_id: int, source_version_id: int, target_v
             new_it.description = getattr(it, 'description', None)
             new_it.archived = getattr(it, 'archived', False)
             # Matrix/plugin configs are within config already
+        if not it.stable_key:
+            defer_stable_key_autogen(new_it)
         db.session.add(new_it)
         item_pairs.append((it, new_it))
         items_cloned += 1
@@ -335,6 +342,7 @@ def _clone_template_structure_between_templates(*, source_template_id: int, sour
             parent_section_id=None,
             page_id=page_id_map.get(s.page_id) if s.page_id else None,
             section_type=s.section_type,
+            stable_key=s.stable_key,
             max_dynamic_indicators=s.max_dynamic_indicators,
             allowed_sectors=s.allowed_sectors,
             indicator_filters=s.indicator_filters,
@@ -348,6 +356,8 @@ def _clone_template_structure_between_templates(*, source_template_id: int, sour
             config=_new_config,
             archived=getattr(s, 'archived', False)
         )
+        if not s.stable_key:
+            defer_stable_key_autogen(new_s)
         db.session.add(new_s)
         db.session.flush()
         section_id_map[s.id] = new_s.id
@@ -387,6 +397,7 @@ def _clone_template_structure_between_templates(*, source_template_id: int, sour
             version_id=target_version_id,
             section_id=section_id_map.get(it.section_id),
             item_type=it.item_type,
+            stable_key=it.stable_key,
             label=it.label,
             order=it.order,
             relevance_condition=None,  # Will be set after remapping
@@ -411,6 +422,8 @@ def _clone_template_structure_between_templates(*, source_template_id: int, sour
             new_it.description_translations = _deep_copy_json_value(getattr(it, 'description_translations', None))
             new_it.description = getattr(it, 'description', None)
             new_it.archived = getattr(it, 'archived', False)
+        if not it.stable_key:
+            defer_stable_key_autogen(new_it)
         db.session.add(new_it)
         item_pairs.append((it, new_it))
         items_cloned += 1

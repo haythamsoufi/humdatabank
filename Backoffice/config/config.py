@@ -965,6 +965,11 @@ class Config:
 
     # Verbose app/form debug: DEBUG log level, debug_utils helpers, guarded admin debug logs.
     # Env: true/false only (see _parse_bool). Default false; avoid true in production unless troubleshooting.
+    # Warn in deploy preflight when estimated FK remapping rows exceed this count.
+    DEPLOY_MIGRATION_PREFLIGHT_ROW_THRESHOLD = int(
+        os.environ.get("DEPLOY_MIGRATION_PREFLIGHT_ROW_THRESHOLD", "500000")
+    )
+
     VERBOSE_FORM_DEBUG = _parse_bool(os.environ.get("VERBOSE_FORM_DEBUG"), default=False)
 
     # Log full filtered form POST bodies at DEBUG (very noisy for large templates).
@@ -1087,7 +1092,6 @@ class Config:
         'form_updated': 60,
         'document_uploaded': 60,
         'user_added_to_country': 90,
-        'template_updated': 90,
         'self_report_created': 90,
     }
 

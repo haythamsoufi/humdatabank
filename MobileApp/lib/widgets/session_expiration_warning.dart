@@ -2,12 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../di/service_locator.dart';
 import '../services/auth_service.dart';
-import '../services/session_service.dart';
-import '../config/app_config.dart';
+import '../services/jwt_token_service.dart';
 import '../l10n/app_localizations.dart';
 import '../utils/debug_logger.dart';
 
-/// Widget that shows a warning dialog when session is about to expire.
+/// Warns when the JWT access token is close to expiry and offers a one-tap
+/// refresh via the mobile refresh endpoint.
 class SessionExpirationWarning extends StatefulWidget {
   final Widget child;
 
@@ -17,27 +17,25 @@ class SessionExpirationWarning extends StatefulWidget {
   });
 
   @override
-  State<SessionExpirationWarning> createState() => _SessionExpirationWarningState();
+  State<SessionExpirationWarning> createState() =>
+      _SessionExpirationWarningState();
 }
 
 class _SessionExpirationWarningState extends State<SessionExpirationWarning> {
   late final AuthService _authService = sl<AuthService>();
-  late final SessionService _sessionService = sl<SessionService>();
+  late final JwtTokenService _jwtService = sl<JwtTokenService>();
   Timer? _checkTimer;
   bool _isDialogShowing = false;
+
+  static const Duration _warningThreshold = Duration(minutes: 15);
 
   @override
   void initState() {
     super.initState();
-    // Check session expiration every minute for better responsiveness
-    // This ensures we catch expiration warnings quickly
     _checkTimer = Timer.periodic(const Duration(minutes: 1), (_) {
-      _checkSessionExpiration();
+      _checkAccessTokenExpiration();
     });
-    // Also check immediately after a short delay
-    Future.delayed(const Duration(seconds: 10), () {
-      _checkSessionExpiration();
-    });
+    Future.delayed(const Duration(seconds: 10), _checkAccessTokenExpiration);
   }
 
   @override
@@ -46,38 +44,36 @@ class _SessionExpirationWarningState extends State<SessionExpirationWarning> {
     super.dispose();
   }
 
-  Future<void> _checkSessionExpiration() async {
-    if (_isDialogShowing) return; // Don't show multiple dialogs
+  Future<void> _checkAccessTokenExpiration() async {
+    if (_isDialogShowing) return;
 
     try {
-      final lastValidated = await _sessionService.getSessionLastValidated();
-      if (lastValidated == null) return;
+      final hasRefresh = await _jwtService.hasRefreshToken();
+      if (!hasRefresh) return;
 
-      final now = DateTime.now();
-      final timeSinceLastActivity = now.difference(lastValidated);
-      final timeUntilExpiration = AppConfig.sessionTimeout - timeSinceLastActivity;
+      final timeUntilExpiry = await _jwtService.timeUntilAccessExpiry();
+      if (timeUntilExpiry == null) return;
 
-      // Show warning if within 15 minutes of expiration
-      // Use shorter check interval when close to expiration (within 5 minutes)
-      if (timeUntilExpiration <= const Duration(minutes: 15) &&
-          timeUntilExpiration > Duration.zero) {
+      if (timeUntilExpiry <= _warningThreshold) {
         if (mounted && !_isDialogShowing) {
           _isDialogShowing = true;
-          _showExpirationWarning(timeUntilExpiration);
+          _showExpirationWarning(
+            timeUntilExpiry <= Duration.zero
+                ? _warningThreshold
+                : timeUntilExpiry,
+          );
         }
       }
 
-      // If very close to expiration (within 5 minutes), check more frequently
-      if (timeUntilExpiration <= const Duration(minutes: 5) &&
-          timeUntilExpiration > Duration.zero) {
-        // Cancel current timer and restart with shorter interval
+      if (timeUntilExpiry <= const Duration(minutes: 5) &&
+          timeUntilExpiry > Duration.zero) {
         _checkTimer?.cancel();
         _checkTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-          _checkSessionExpiration();
+          _checkAccessTokenExpiration();
         });
       }
     } catch (e) {
-      DebugLogger.logWarn('AUTH', 'Error checking session expiration: $e');
+      DebugLogger.logWarn('AUTH', 'Error checking JWT expiry: $e');
     }
   }
 
@@ -88,16 +84,17 @@ class _SessionExpirationWarningState extends State<SessionExpirationWarning> {
     final minutes = timeUntilExpiration.inMinutes;
     final seconds = timeUntilExpiration.inSeconds % 60;
 
-    // Show countdown timer in message
     String message;
     if (minutes > 0) {
-      message = 'Your session will expire in $minutes minute${minutes != 1 ? 's' : ''}';
+      message =
+          'Your sign-in will expire in $minutes minute${minutes != 1 ? 's' : ''}';
       if (seconds > 0 && minutes < 5) {
         message += ' and $seconds second${seconds != 1 ? 's' : ''}';
       }
-      message += '. Would you like to extend it?';
+      message += '. Would you like to refresh it now?';
     } else {
-      message = 'Your session will expire in $seconds second${seconds != 1 ? 's' : ''}. Would you like to extend it?';
+      message =
+          'Your sign-in has expired or is about to expire. Refresh now to stay signed in?';
     }
 
     showDialog(
@@ -110,7 +107,7 @@ class _SessionExpirationWarningState extends State<SessionExpirationWarning> {
             children: [
               Icon(Icons.warning_amber_rounded, color: cs.tertiary),
               const SizedBox(width: 8),
-              const Text('Session Expiring Soon'),
+              const Text('Sign-in Expiring Soon'),
             ],
           ),
           content: Column(
@@ -119,13 +116,14 @@ class _SessionExpirationWarningState extends State<SessionExpirationWarning> {
             children: [
               Text(message),
               const SizedBox(height: 16),
-              // Show visual countdown indicator
               if (timeUntilExpiration.inMinutes < 5)
                 LinearProgressIndicator(
                   value: timeUntilExpiration.inSeconds / (5 * 60),
                   backgroundColor: cs.surfaceContainerHighest,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    timeUntilExpiration.inMinutes < 2 ? cs.error : cs.tertiary,
+                    timeUntilExpiration.inMinutes < 2
+                        ? cs.error
+                        : cs.tertiary,
                   ),
                 ),
             ],
@@ -144,7 +142,7 @@ class _SessionExpirationWarningState extends State<SessionExpirationWarning> {
                 _isDialogShowing = false;
                 await _extendSession();
               },
-              child: const Text('Extend Session'),
+              child: const Text('Refresh Sign-in'),
             ),
           ],
         );
@@ -157,30 +155,32 @@ class _SessionExpirationWarningState extends State<SessionExpirationWarning> {
   void _resetToNormalCheckInterval() {
     _checkTimer?.cancel();
     _checkTimer = Timer.periodic(const Duration(minutes: 1), (_) {
-      _checkSessionExpiration();
+      _checkAccessTokenExpiration();
     });
   }
 
   Future<void> _extendSession() async {
     try {
-      DebugLogger.logAuth('User requested to extend session');
+      DebugLogger.logAuth('User requested JWT refresh from expiry warning');
       final success = await _authService.refreshSession(forceRefresh: true);
       if (success) {
-        // Session was refreshed: reset timer back to normal 1-minute interval.
         _resetToNormalCheckInterval();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Session extended successfully'),
+              content: Text('Sign-in refreshed successfully'),
               duration: Duration(seconds: 2),
             ),
           );
         }
       } else {
+        await _authService.invalidateLocalAuth(
+          reason: 'Refresh rejected from expiry warning',
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Failed to extend session. Please log in again.'),
+              content: Text('Failed to refresh sign-in. Please log in again.'),
               backgroundColor: Colors.red,
               duration: Duration(seconds: 3),
             ),
@@ -188,7 +188,7 @@ class _SessionExpirationWarningState extends State<SessionExpirationWarning> {
         }
       }
     } catch (e) {
-      DebugLogger.logError('Error extending session: $e');
+      DebugLogger.logError('Error refreshing JWT from expiry warning: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

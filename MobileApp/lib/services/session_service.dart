@@ -1,6 +1,7 @@
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../config/app_config.dart';
 import 'storage_service.dart';
+import 'jwt_token_service.dart';
 import '../utils/debug_logger.dart';
 
 class SessionService {
@@ -11,10 +12,11 @@ class SessionService {
   final StorageService _storage = StorageService();
   final CookieManager _cookieManager = CookieManager.instance();
 
-  // Storage keys for session metadata
-  static const String _sessionCreatedAtKey = 'session_created_at';
-  static const String _sessionLastValidatedKey = 'session_last_validated';
-  static const String _sessionLastValidatedOnlineKey = 'session_last_validated_online';
+  // Unprefixed legacy keys — migrated once into [AppConfig] prefixed keys.
+  static const String _legacySessionCreatedAtKey = 'session_created_at';
+  static const String _legacySessionLastValidatedKey = 'session_last_validated';
+  static const String _legacySessionLastValidatedOnlineKey =
+      'session_last_validated_online';
 
   // Refresh session if it expires within this duration
   static const Duration _sessionRefreshThreshold = Duration(hours: 1);
@@ -22,13 +24,34 @@ class SessionService {
   // Offline validity duration - allow operations if offline and session was validated within this time
   static const Duration _offlineValidityDuration = Duration(minutes: 30);
 
+  Future<int?> _readTimestamp(String prefixedKey, String legacyKey) async {
+    final current = await _storage.getInt(prefixedKey);
+    if (current != null) return current;
+
+    final legacy = await _storage.getInt(legacyKey);
+    if (legacy == null) return null;
+
+    await _storage.setInt(prefixedKey, legacy);
+    await _storage.remove(legacyKey);
+    return legacy;
+  }
+
+  Future<void> _writeTimestamp(String prefixedKey, int value) async {
+    await _storage.setInt(prefixedKey, value);
+  }
+
+  Future<void> _removeTimestamp(String prefixedKey, String legacyKey) async {
+    await _storage.remove(prefixedKey);
+    await _storage.remove(legacyKey);
+  }
+
   // Save session cookie after login
   Future<void> saveSessionCookie(String cookie) async {
     await _storage.setSecure(AppConfig.sessionCookieKey, cookie);
     // Track when session was created
     final now = DateTime.now().millisecondsSinceEpoch;
-    await _storage.setInt(_sessionCreatedAtKey, now);
-    await _storage.setInt(_sessionLastValidatedKey, now);
+    await _writeTimestamp(AppConfig.sessionCreatedAtKey, now);
+    await _writeTimestamp(AppConfig.sessionLastValidatedKey, now);
   }
 
   // Get session cookie
@@ -38,14 +61,20 @@ class SessionService {
 
   // Get session creation time
   Future<DateTime?> getSessionCreatedAt() async {
-    final timestamp = await _storage.getInt(_sessionCreatedAtKey);
+    final timestamp = await _readTimestamp(
+      AppConfig.sessionCreatedAtKey,
+      _legacySessionCreatedAtKey,
+    );
     if (timestamp == null) return null;
     return DateTime.fromMillisecondsSinceEpoch(timestamp);
   }
 
   // Get last validation time
   Future<DateTime?> getSessionLastValidated() async {
-    final timestamp = await _storage.getInt(_sessionLastValidatedKey);
+    final timestamp = await _readTimestamp(
+      AppConfig.sessionLastValidatedKey,
+      _legacySessionLastValidatedKey,
+    );
     if (timestamp == null) return null;
     return DateTime.fromMillisecondsSinceEpoch(timestamp);
   }
@@ -53,16 +82,18 @@ class SessionService {
   // Update last validation time
   Future<void> updateLastValidation({bool isOnline = true}) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    await _storage.setInt(_sessionLastValidatedKey, now);
+    await _writeTimestamp(AppConfig.sessionLastValidatedKey, now);
     if (isOnline) {
-      // Track when we last validated while online
-      await _storage.setInt(_sessionLastValidatedOnlineKey, now);
+      await _writeTimestamp(AppConfig.sessionLastValidatedOnlineKey, now);
     }
   }
 
   // Get last online validation time
   Future<DateTime?> getSessionLastValidatedOnline() async {
-    final timestamp = await _storage.getInt(_sessionLastValidatedOnlineKey);
+    final timestamp = await _readTimestamp(
+      AppConfig.sessionLastValidatedOnlineKey,
+      _legacySessionLastValidatedOnlineKey,
+    );
     if (timestamp == null) return null;
     return DateTime.fromMillisecondsSinceEpoch(timestamp);
   }
@@ -74,6 +105,13 @@ class SessionService {
     // dashboard snapshot, and offline form bundles without requiring a network
     // round-trip on every cold start.
     if (!(await isSessionExpired())) {
+      return true;
+    }
+
+    // Mobile JWT path: a refresh token on disk means the user can recover
+    // online without re-entering credentials — keep the logged-in shell while
+    // offline even when client-side activity timestamps are stale.
+    if (await JwtTokenService().hasRefreshToken()) {
       return true;
     }
 
@@ -126,7 +164,8 @@ class SessionService {
     // Check refresh need based on last activity
     final now = DateTime.now();
     final timeSinceLastActivity = now.difference(lastValidated);
-    final timeUntilExpiration = AppConfig.sessionTimeout - timeSinceLastActivity;
+    final timeUntilExpiration =
+        AppConfig.sessionTimeout - timeSinceLastActivity;
 
     // Refresh if within threshold of expiration based on last activity
     return timeUntilExpiration <= _sessionRefreshThreshold;
@@ -163,8 +202,9 @@ class SessionService {
         value: cookieValue,
         domain: domain,
         path: '/',
-        expiresDate:
-            DateTime.now().add(AppConfig.sessionTimeout).millisecondsSinceEpoch,
+        expiresDate: DateTime.now()
+            .add(AppConfig.sessionTimeout)
+            .millisecondsSinceEpoch,
         isSecure: backendUri.scheme == 'https',
         isHttpOnly: true,
       );
@@ -176,9 +216,18 @@ class SessionService {
   // Clear session
   Future<void> clearSession() async {
     await _storage.deleteSecure(AppConfig.sessionCookieKey);
-    await _storage.remove(_sessionCreatedAtKey);
-    await _storage.remove(_sessionLastValidatedKey);
-    await _storage.remove(_sessionLastValidatedOnlineKey);
+    await _removeTimestamp(
+      AppConfig.sessionCreatedAtKey,
+      _legacySessionCreatedAtKey,
+    );
+    await _removeTimestamp(
+      AppConfig.sessionLastValidatedKey,
+      _legacySessionLastValidatedKey,
+    );
+    await _removeTimestamp(
+      AppConfig.sessionLastValidatedOnlineKey,
+      _legacySessionLastValidatedOnlineKey,
+    );
 
     try {
       await _cookieManager.deleteCookies(
@@ -205,19 +254,23 @@ class SessionService {
     // Update last validation time (this extends the session based on activity)
     // Don't reset creation time - we want to track total session age
     final now = DateTime.now().millisecondsSinceEpoch;
-    await _storage.setInt(_sessionLastValidatedKey, now);
+    await _writeTimestamp(AppConfig.sessionLastValidatedKey, now);
 
     // Track online validation if this is an online request
     if (isOnline) {
-      await _storage.setInt(_sessionLastValidatedOnlineKey, now);
+      await _writeTimestamp(AppConfig.sessionLastValidatedOnlineKey, now);
     }
 
     // Only update creation time if it doesn't exist (for backward compatibility)
-    final createdAt = await _storage.getInt(_sessionCreatedAtKey);
+    final createdAt = await _readTimestamp(
+      AppConfig.sessionCreatedAtKey,
+      _legacySessionCreatedAtKey,
+    );
     if (createdAt == null) {
-      await _storage.setInt(_sessionCreatedAtKey, now);
+      await _writeTimestamp(AppConfig.sessionCreatedAtKey, now);
     }
 
-    DebugLogger.logAuth('Session rotated - cookie updated, last validation reset');
+    DebugLogger.logAuth(
+        'Session rotated - cookie updated, last validation reset');
   }
 }

@@ -2763,9 +2763,9 @@ def run_import(
 
         valid_form_item_ids = None
         if template_id is not None:
-            valid_form_item_ids = set(
-                fid for (fid,) in db.session.query(FormItem.id).filter(FormItem.template_id == template_id).all()
-            )
+            from app.utils.stable_key import published_form_item_id_set
+
+            valid_form_item_ids = published_form_item_id_set(int(template_id))
 
         stats = upsert_form_data_rows(
             rows,

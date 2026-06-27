@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'dart:convert';
 import '../../models/shared/user.dart';
 import '../../services/auth_service.dart';
@@ -13,6 +14,8 @@ import '../../services/api_service.dart' show AuthenticationException;
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
   final StorageService _storage = StorageService();
+
+  StreamSubscription<AuthInvalidationEvent>? _invalidationSub;
 
   User? _user;
   bool _isLoading = false;
@@ -36,6 +39,30 @@ class AuthProvider with ChangeNotifier {
   void clearSessionInvalidationReason() {
     _sessionInvalidationReason = null;
     notifyListeners();
+  }
+
+  /// Wire auth invalidation listeners and API callbacks. Call once at app start.
+  void attachAuthListeners() {
+    _authService.ensureApiCallbacksRegistered();
+    _invalidationSub ??=
+        _authService.authInvalidationStream.listen(_onAuthInvalidated);
+  }
+
+  void _onAuthInvalidated(AuthInvalidationEvent event) {
+    final hadUser = _user != null;
+    _user = null;
+    _authCheckedThisSession = false;
+    _sessionInvalidationReason = event.reason;
+    unawaited(_storage.remove(AppConfig.cachedUserProfileKey));
+    if (hadUser || event.reason != null) {
+      notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _invalidationSub?.cancel();
+    super.dispose();
   }
 
   Future<bool> checkAuthStatus({bool forceRevalidate = false}) async {
@@ -336,10 +363,10 @@ class AuthProvider with ChangeNotifier {
   Future<void> handleAuthenticationError() async {
     DebugLogger.logWarn(
         'AUTH', 'Handling authentication error - clearing session');
-    _user = null;
     _error = null;
-    await _storage.remove(AppConfig.cachedUserProfileKey);
-    await _authService.logout();
+    await _authService.invalidateLocalAuth(
+      reason: 'Authentication required',
+    );
     notifyListeners();
   }
 

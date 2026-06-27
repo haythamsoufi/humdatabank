@@ -37,7 +37,6 @@ MESSAGE_PRIMARY_NOTIFICATION_TYPES = frozenset({
     'user_added_to_country',
     'public_submission_received',
     'form_updated',
-    'template_updated',
     'self_report_created',
     'deadline_reminder',
 })
@@ -55,7 +54,6 @@ ACTOR_BADGE_ICON_BY_TYPE = {
     'user_added_to_country': 'fa-user-check',
     'public_submission_received': 'fa-inbox',
     'form_updated': 'fa-pen',
-    'template_updated': 'fa-file-alt',
     'self_report_created': 'fa-clipboard-list',
     'deadline_reminder': 'fa-clock',
     'validation_questions': 'fa-clipboard-question',
@@ -90,7 +88,6 @@ class NotificationService:
             'form_updated': 'Form Updated',
             'document_uploaded': 'Document Uploaded',
             'user_added_to_country': 'User Added to Country',
-            'template_updated': 'Template Updated',
             'self_report_created': 'Self Report Created',
             'deadline_reminder': 'Deadline Reminder',
             'admin_message': 'Admin Message',
@@ -549,7 +546,6 @@ class NotificationService:
                                     template = public_submission.assigned_form.template
 
                             elif notification.related_object_type == 'template' and notification.related_object_id:
-                                # Direct template reference (e.g., template_updated notifications)
                                 template = FormTemplate.query.get(notification.related_object_id)
 
                             # Always use fresh template lookup - never trust stored template name

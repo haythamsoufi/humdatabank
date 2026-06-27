@@ -202,6 +202,9 @@ def format_form_item_info(form_item, section=None, template=None, assignment=Non
     # Base form item information
     form_item_info = {
         'id': form_item.id,
+        'stable_key': form_item.stable_key,
+        'version_id': getattr(form_item, 'version_id', None),
+        'archived': bool(getattr(form_item, 'archived', False)),
         'type': form_item.item_type,
         'label': form_item.label,
         'order': form_item.order,
@@ -725,6 +728,7 @@ def format_dim_template(template):
         'id': template.id,
         'name': template.name,
         'description': description,
+        'published_version_id': getattr(template, 'published_version_id', None),
     }
 
 

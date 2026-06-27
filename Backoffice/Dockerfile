@@ -46,6 +46,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     shared-mime-info \
     fonts-dejavu-core \
     fonts-liberation \
+    openssh-server \
+    && echo "root:Docker!" | chpasswd \
+    && mkdir -p /var/run/sshd \
+    && ssh-keygen -A \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -73,9 +77,10 @@ RUN mkdir -p /data/uploads && \
 
 # Entrypoint script (runs migrations at container startup, not at build time)
 COPY entrypoint.sh /app/entrypoint.sh
+COPY sshd_config /etc/ssh/sshd_config
 RUN chmod +x /app/entrypoint.sh
 
-EXPOSE 5000
+EXPOSE 5000 2222
 
 # Set version identifiers last so they don't invalidate cached layers above.
 # APP_VERSION = semver from GitHub releases/latest (CI). RELEASE_VERSION = image tag stream (e.g. v1.7).

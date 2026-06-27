@@ -681,6 +681,17 @@ class TestSendInstantNotificationEmail:
         notif.related_url = None
         return notif
 
+    def test_skips_document_uploaded_in_app_only(self, app, db_session):
+        from app.models.enums import NotificationType
+
+        notif = self._make_notification(priority='urgent')
+        notif.notification_type = NotificationType.document_uploaded
+
+        with app.app_context():
+            with patch('app.services.notification.emails.send_email') as mock_send:
+                send_instant_notification_email(self._make_user(), notif)
+                mock_send.assert_not_called()
+
     def test_skips_if_no_preferences(self, app, db_session):
         with app.app_context():
             with patch('app.services.notification.emails.NotificationPreferences') as MockNP:

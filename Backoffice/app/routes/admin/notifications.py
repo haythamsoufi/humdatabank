@@ -515,8 +515,8 @@ def api_send_notifications():
             <body>
                 <div class="email-outer">
                     <div class="email-card">
-                        <div class="email-header">
-                            <h1>{{ title }}</h1>
+                        <div style="background-color:#0d9488;color:#ffffff;padding:28px 40px;text-align:center;">
+                            <h1 style="margin:0;font-size:24px;font-weight:600;line-height:1.3;color:#ffffff;">{{ title }}</h1>
                         </div>
                         <div class="email-body">
                             <div class="message">{{ message }}</div>

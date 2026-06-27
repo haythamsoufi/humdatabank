@@ -9,7 +9,6 @@ const List<String> kNotificationFilterTypeValues = [
   'form_updated',
   'document_uploaded',
   'user_added_to_country',
-  'template_updated',
   'self_report_created',
   'deadline_reminder',
   'admin_message',

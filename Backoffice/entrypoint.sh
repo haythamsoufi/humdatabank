@@ -13,6 +13,15 @@ echo "SEED_UPLOADS_ON_DEPLOY: ${SEED_UPLOADS_ON_DEPLOY:-<not set>}"
 echo "DATABASE_URL: ${DATABASE_URL:+<set>}"
 echo "=========================================="
 
+# Azure App Service SSH (Kudu WebSocket tunnel -> container port 2222).
+start_app_service_ssh() {
+  if command -v sshd >/dev/null 2>&1; then
+    echo "Starting OpenSSH daemon on port 2222 (Azure App Service SSH)..."
+    /usr/sbin/sshd
+  fi
+}
+start_app_service_ssh
+
 # Seed persistent uploads from an archive on first boot when enabled.
 # This checks SEED_UPLOADS_ON_DEPLOY and extracts /app/uploads.tgz into /data/uploads
 # only if /data/uploads is empty.

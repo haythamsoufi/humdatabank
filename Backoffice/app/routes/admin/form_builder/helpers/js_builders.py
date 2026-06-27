@@ -330,6 +330,7 @@ def _build_section_items_for_template(section_obj, all_sections, all_template_it
         item_data = {
             'id': item_id,
             'label': form_item_obj.label,  # Use actual label, not formatted label
+            'stable_key': form_item_obj.stable_key,
             'description': form_item_obj.definition or form_item_obj.description or '',
             'type': form_item_obj.type,
             'item_model': item_model,

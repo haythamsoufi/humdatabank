@@ -32,6 +32,11 @@ from app.services.notification.audience import (
     get_assignment_editor_submitter_user_ids_for_entity,
 )
 
+# In-app only: never send instant or digest email for these types.
+IN_APP_ONLY_NOTIFICATION_TYPES = frozenset({
+    NotificationType.document_uploaded,
+})
+
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -332,10 +337,6 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
         'notification.user_added_to_country.message': _notification_msgid(
             'You are now a focal point for %(country)s.'
         ),
-
-        # Template notifications
-        'notification.template_updated.title': _notification_msgid('Template updated'),
-        'notification.template_updated.message': _notification_msgid("'%(template)s' has been updated."),
 
         # Form notifications
         'notification.form_updated.title': _notification_msgid('Form updated'),
@@ -886,6 +887,10 @@ def create_notification(
         if not notification_type:
             current_app.logger.error("create_notification called without notification_type")
             raise ValueError("notification_type is required")
+
+        if notification_type in IN_APP_ONLY_NOTIFICATION_TYPES:
+            send_email_notifications = False
+            override_email_preferences = False
 
         # Validate priority
         valid_priorities = ['low', 'normal', 'high', 'urgent']
@@ -2318,7 +2323,6 @@ def get_default_icon_for_notification_type(notification_type):
         NotificationType.form_updated: 'fas fa-pen',
         NotificationType.document_uploaded: 'fas fa-file-upload',
         NotificationType.user_added_to_country: 'fas fa-user-plus',
-        NotificationType.template_updated: 'fas fa-file-alt',
         NotificationType.self_report_created: 'fas fa-clipboard-list',
         NotificationType.deadline_reminder: 'fas fa-clock',
         NotificationType.access_request_received: 'fas fa-user-plus',
@@ -2879,68 +2883,6 @@ def notify_user_added_to_country(user_id, country_id):
         )
     except Exception as e:
         current_app.logger.error(f"Error notifying user {user_id} about being added to country {country_id}: {str(e)}", exc_info=True)
-        return []
-
-
-def notify_template_updated(template):
-    """Notify users when a template they have assignments for is updated."""
-    try:
-        from app.models.rbac import RbacUserRole, RbacRole
-        # Find all active assignments using this template
-        active_assignments = AssignmentEntityStatus.query.join(
-            AssignmentEntityStatus.assigned_form
-        ).filter(
-            AssignmentEntityStatus.assigned_form.has(template_id=template.id),
-            AssignmentEntityStatus.status.in_(['pending', 'in_progress', 'submitted'])
-        ).all()
-
-        # Get unique user IDs from focal points of countries with active assignments
-        from app.models.core import UserEntityPermission
-        user_ids_to_notify = set()
-        for aes in active_assignments:
-            if aes.entity_type == 'country':
-                # Get focal points via UserEntityPermission
-                permissions = UserEntityPermission.query.filter_by(
-                    entity_type='country',
-                    entity_id=aes.entity_id
-                ).join(User, UserEntityPermission.user_id == User.id).join(
-                    RbacUserRole, RbacUserRole.user_id == User.id
-                ).join(
-                    RbacRole, RbacUserRole.role_id == RbacRole.id
-                ).filter(
-                    RbacRole.code == "assignment_editor_submitter"
-                ).all()
-
-                for perm in permissions:
-                    user_ids_to_notify.add(perm.user_id)
-
-        if not user_ids_to_notify:
-            current_app.logger.debug(f"No users to notify about template {template.id} update")
-            return []
-
-        # Get localized template name (will be translated when notification is displayed)
-        template_name = template.name
-
-        # Create notifications for all affected focal points
-        return create_notification(
-            user_ids=list(user_ids_to_notify),
-            notification_type=NotificationType.template_updated,
-            title_key='notification.template_updated.title',
-            title_params=None,
-            message_key='notification.template_updated.message',
-            message_params={
-                'template': template_name
-            },
-        entity_type=None,  # Template-level (global)
-        entity_id=None,
-            related_object_type='template',
-            related_object_id=template.id,
-            related_url=url_for('form_builder.edit_template', template_id=template.id),
-            priority='normal',
-            icon='fas fa-file-alt'
-        )
-    except Exception as e:
-        current_app.logger.error(f"Error notifying users about template {template.id} update: {str(e)}", exc_info=True)
         return []
 
 

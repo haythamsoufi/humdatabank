@@ -49,11 +49,25 @@ from app.utils.api_formatting import format_answer_value, format_form_data_respo
 from app.utils.api_serialization import _wrap_disagg_dict as _normalize_disagg_payload_util
 from app.utils.sql_utils import safe_ilike_pattern
 from app.services import query_form_data, get_form_data_queries, TemplateService, query_dynamic_indicator_data, query_repeat_group_data
+from app.utils.api_data_filters import (
+    VERSION_SCOPE_PUBLISHED,
+    apply_form_data_version_scoping,
+    build_data_api_scope_meta,
+    parse_data_item_filters,
+    resolve_template_published_version_id,
+)
 from app.services.data_retrieval_shared import (
     get_effective_request_user,
     can_view_non_public_form_items,
     form_item_privacy_is_public_expr,
 )
+
+
+def _merge_scope_into_response(response_data, scope_meta):
+    """Attach ``scope`` metadata when template-scoped filters were used."""
+    if scope_meta:
+        response_data['scope'] = scope_meta
+    return response_data
 
 
 def _normalize_disagg_payload(disagg_data):
@@ -472,7 +486,9 @@ def get_all_data():
     Query Parameters:
         - template_id: Filter by template ID
         - submission_id: Filter by submission ID
-        - item_id: Filter by form item ID
+        - item_id: Filter by form item ID (published-version row when version_scope=published)
+        - stable_key: Filter by logical field UUID (requires template_id; resolves to published item when version_scope=published)
+        - version_scope: ``published`` (default) or ``all`` — limits facts to published version rows when template_id is set
         - item_type: Filter by item type ('indicator', 'question', 'document_field')
         - country_id: Filter by country ID
         - submission_type: Filter by submission type ('assigned' or 'public')
@@ -522,6 +538,22 @@ def get_all_data():
                 item_id = None
         except (ValueError, TypeError):
             item_id = None
+
+        item_id, stable_key_filter, version_scope, filter_error = parse_data_item_filters(
+            request.args,
+            template_id=template_id,
+            item_id=item_id,
+        )
+        if filter_error:
+            return api_error(filter_error['message'], filter_error['status'])
+
+        published_version_id = resolve_template_published_version_id(template_id)
+        scope_meta = build_data_api_scope_meta(
+            template_id=template_id,
+            published_version_id=published_version_id,
+            version_scope=version_scope,
+            stable_key=stable_key_filter,
+        )
 
         # Validate item_type against whitelist
         item_type = request.args.get('item_type', type=str)
@@ -670,13 +702,13 @@ def get_all_data():
                 with suppress(Exception):
                     test_count = assigned_form_data_query.limit(1).count()
                     if test_count == 0 and (public_form_data_query is None or public_form_data_query.limit(1).count() == 0):
-                        return json_response({
+                        return json_response(_merge_scope_into_response({
                             'data': [],
                             'total_items': 0,
                             'total_pages': 0 if should_paginate else None,
                             'current_page': page if should_paginate else None,
                             'per_page': per_page if should_paginate else None
-                        })
+                        }, scope_meta))
 
         api_key_scope = getattr(g, 'api_key_data_scope', None)
         if not elevated_access and api_key_record is not None and api_key_scope:
@@ -684,6 +716,15 @@ def get_all_data():
                 queries, api_key_scope, template_id, country_id, period_name
             )
             assigned_form_data_query, public_form_data_query = get_form_data_queries(scoped_queries)
+
+        assigned_form_data_query, public_form_data_query = apply_form_data_version_scoping(
+            assigned_form_data_query,
+            public_form_data_query,
+            template_id=template_id,
+            published_version_id=published_version_id,
+            version_scope=version_scope,
+            stable_key=stable_key_filter,
+        )
 
         # (Filters already applied by the service and optional RBAC scoping)
 
@@ -801,7 +842,7 @@ def get_all_data():
         if include_repeat:
             response_body['repeat_data'] = extended['repeat_data']
 
-        return json_response(response_body)
+        return json_response(_merge_scope_into_response(response_body, scope_meta))
 
     except Exception as e:
         error_id = str(uuid.uuid4())
@@ -833,6 +874,7 @@ def _build_flat_tables_response(
     per_page,
     expansion_failed=False,
     extra=None,
+    scope_meta=None,
 ):
     """Legacy multi-table bundle (backward compatible)."""
     if should_paginate:
@@ -863,7 +905,7 @@ def _build_flat_tables_response(
         response_data['partial'] = True
     if extra:
         response_data.update(extra)
-    return json_response(response_data)
+    return json_response(_merge_scope_into_response(response_data, scope_meta))
 
 
 def _build_star_tables_response(
@@ -877,6 +919,7 @@ def _build_star_tables_response(
     per_page,
     expansion_failed=False,
     extra=None,
+    scope_meta=None,
 ):
     """Star-schema dimensional tables for BI / integrator consumers."""
     tables = build_star_schema_tables(
@@ -902,6 +945,8 @@ def _build_star_tables_response(
     if expansion_failed:
         meta['warning'] = 'Related tables expansion failed, showing page-scoped results only'
         meta['partial'] = True
+    if scope_meta:
+        meta['scope'] = scope_meta
     body = {
         'schema_version': STAR_SCHEMA_VERSION,
         'grain': STAR_SCHEMA_GRAIN,
@@ -920,7 +965,9 @@ def get_data_tables():
       - Authorization: Bearer YOUR_API_KEY (full access, paginated response)
       - HTTP Basic auth or session (user-scoped access, no pagination)
     Query Parameters:
-        - template_id, submission_id, item_id, item_type, country_id, submission_type, period_name, indicator_bank_id: filters
+        - template_id, submission_id, item_id, stable_key, version_scope, item_type, country_id, submission_type, period_name, indicator_bank_id: filters
+        - stable_key: logical field UUID (requires template_id)
+        - version_scope: ``published`` (default) or ``all`` when template_id is set
         - date_from: Filter by submission date from (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
         - date_to: Filter by submission date to (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
         - sort: Sort field (default: 'submitted_at', options: 'submitted_at', 'template_id', 'country_id', 'period_name')
@@ -960,6 +1007,22 @@ def get_data_tables():
         template_id = request.args.get('template_id', type=int)
         submission_id = request.args.get('submission_id', type=int)
         item_id = request.args.get('item_id', type=int)
+        item_id, stable_key_filter, version_scope, filter_error = parse_data_item_filters(
+            request.args,
+            template_id=template_id,
+            item_id=item_id,
+        )
+        if filter_error:
+            return api_error(filter_error['message'], filter_error['status'])
+
+        published_version_id = resolve_template_published_version_id(template_id)
+        scope_meta = build_data_api_scope_meta(
+            template_id=template_id,
+            published_version_id=published_version_id,
+            version_scope=version_scope,
+            stable_key=stable_key_filter,
+        )
+
         item_type = request.args.get('item_type', type=str)
         country_id = request.args.get('country_id', type=int)
         submission_type = request.args.get('submission_type')
@@ -1078,22 +1141,6 @@ def get_data_tables():
         if related_scope not in ('page', 'all'):
             related_scope = 'page'
 
-        # ---------- Scope to published template version (avoid multi-version duplicates) ----------
-        # Templates can have multiple versions; FormItem.template_id is denormalized and can include items
-        # from multiple versions. If we filter FormData by template_id only, we can inadvertently include
-        # rows for items from draft/older versions, which appear as "duplicates" in the UI.
-        published_version_id = None
-        if template_id is not None:
-            try:
-                tmpl = db.session.get(FormTemplate, int(template_id))
-                if tmpl and getattr(tmpl, "published_version_id", None):
-                    published_version_id = int(tmpl.published_version_id)
-                elif tmpl:
-                    pass
-            except Exception as e:
-                current_app.logger.debug("published_version_id resolution failed: %s", e)
-                published_version_id = None
-
         # Build queries via service layer for consistency.
         # form_item_info is never included in the star-schema response, so skip the
         # deep form_item joinedloads to avoid unnecessary joins on large datasets.
@@ -1111,19 +1158,6 @@ def get_data_tables():
             full_preload=False,
         )
         assigned_form_data_query, public_form_data_query = get_form_data_queries(queries)
-
-        # Apply version scoping to both assigned/public queries.
-        # Use .has() to avoid adding extra joins (keeps query shapes stable).
-        if template_id is not None and published_version_id:
-            try:
-                assigned_form_data_query = assigned_form_data_query.filter(
-                    FormData.form_item.has(FormItem.version_id == int(published_version_id))
-                )
-                public_form_data_query = public_form_data_query.filter(
-                    FormData.form_item.has(FormItem.version_id == int(published_version_id))
-                )
-            except Exception as e:
-                current_app.logger.warning("published_version scoping failed in /data/tables: %s", e, exc_info=True)
 
         # Apply date range filtering
         if date_from:
@@ -1195,8 +1229,9 @@ def get_data_tables():
                                     total_items=0,
                                     page=page,
                                     per_page=per_page,
+                                    scope_meta=scope_meta,
                                 )
-                            return json_response(empty_flat)
+                            return json_response(_merge_scope_into_response(empty_flat, scope_meta))
 
         # ---------- Scoped API key: restrict to template_ids / country_ids on the key ----------
         api_key_scope = getattr(g, 'api_key_data_scope', None)
@@ -1228,8 +1263,9 @@ def get_data_tables():
                                     total_items=0,
                                     page=page,
                                     per_page=per_page,
+                                    scope_meta=scope_meta,
                                 )
-                            return json_response({
+                            return json_response(_merge_scope_into_response({
                                 'data': [],
                                 'form_items': [],
                                 'countries': [],
@@ -1237,7 +1273,16 @@ def get_data_tables():
                                 'total_pages': None,
                                 'current_page': None,
                                 'per_page': None,
-                            })
+                            }, scope_meta))
+
+        assigned_form_data_query, public_form_data_query = apply_form_data_version_scoping(
+            assigned_form_data_query,
+            public_form_data_query,
+            template_id=template_id,
+            published_version_id=published_version_id,
+            version_scope=version_scope,
+            stable_key=stable_key_filter,
+        )
 
         if submission_type == 'assigned' and public_form_data_query is not None:
             public_form_data_query = public_form_data_query.filter(literal(False))
@@ -1436,6 +1481,7 @@ def get_data_tables():
         # Template + Period + Country are provided to keep the expansion bounded.
         if (
             include_non_reported
+            and version_scope == VERSION_SCOPE_PUBLISHED
             and not should_paginate
             and template_id is not None
             and country_id is not None
@@ -1450,7 +1496,7 @@ def get_data_tables():
                 )
 
                 # Scope expected items to the published template version (consistent with main query)
-                if published_version_id:
+                if version_scope == VERSION_SCOPE_PUBLISHED and published_version_id:
                     expected_items_q = expected_items_q.filter(FormItem.version_id == int(published_version_id))
 
                 # Apply privacy gating consistent with query_form_data
@@ -1458,7 +1504,9 @@ def get_data_tables():
                 if not can_view_non_public_form_items(viewer):
                     expected_items_q = expected_items_q.filter(form_item_privacy_is_public_expr())
 
-                if item_id is not None:
+                if stable_key_filter:
+                    expected_items_q = expected_items_q.filter(FormItem.stable_key == stable_key_filter)
+                elif item_id is not None and int(item_id) > 0:
                     expected_items_q = expected_items_q.filter(FormItem.id == int(item_id))
 
                 expected_item_ids = [int(fid) for (fid,) in expected_items_q.with_entities(FormItem.id).all() if fid is not None]
@@ -1750,6 +1798,7 @@ def get_data_tables():
                 per_page=per_page,
                 expansion_failed=expansion_failed,
                 extra=extra_keys or None,
+                scope_meta=scope_meta,
             )
 
         return _build_flat_tables_response(
@@ -1763,6 +1812,7 @@ def get_data_tables():
             per_page=per_page,
             expansion_failed=expansion_failed,
             extra=extra_keys or None,
+            scope_meta=scope_meta,
         )
     except Exception as e:
         error_id = str(uuid.uuid4())

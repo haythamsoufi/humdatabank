@@ -10,7 +10,9 @@ from .enums import SectionType, FormItemType, FormTemplateVersionStatusValue
 from app.models.enum_columns import pg_str_enum_column
 from config import Config
 import json
+from sqlalchemy import event
 from app.utils.datetime_helpers import utcnow
+from app.utils.stable_key import generate_stable_key
 
 
 class FormTemplate(db.Model):
@@ -387,6 +389,9 @@ class FormSection(db.Model):
     name = Column(String(100), nullable=False)
     order = Column(Float, nullable=False, default=0)  # Changed to Float for hierarchical ordering
 
+    # Immutable after first publish — never regenerate for existing sections.
+    stable_key = Column(String(36), nullable=True)
+
     # Support for sub-sections
     parent_section_id = Column(Integer, ForeignKey('form_section.id'), nullable=True)
 
@@ -442,12 +447,18 @@ class FormSection(db.Model):
     # Consolidated configuration field (similar to FormItem)
     config = Column(JSON, nullable=True, default=lambda: {})
 
+    @classmethod
+    def by_stable_key(cls, template_id: int, stable_key: str):
+        """Return all version rows for a logical section (cross-version analytics)."""
+        return cls.query.filter_by(template_id=template_id, stable_key=stable_key).order_by(cls.version_id)
+
     __table_args__ = (
         db.Index('ix_form_section_version_order', 'version_id', 'order'),
         db.Index('ix_form_section_page', 'page_id'),
         db.Index('ix_form_section_parent', 'parent_section_id'),
         db.Index('ix_form_section_type', 'section_type'),
         db.Index('ix_form_section_template', 'template_id'),
+        db.Index('ix_form_section_stable_key', 'template_id', 'stable_key'),
     )
 
     @property
@@ -1169,3 +1180,11 @@ class RepeatGroupData(DataEntryMixin, db.Model):
             display_value = f"Disaggregated ({self.disaggregation_mode})"
 
         return f'<RepeatGroupData Instance:{self.repeat_instance_id} {item_label} Value:{display_value}>'
+
+
+@event.listens_for(FormSection, 'before_insert', propagate=True)
+def _form_section_assign_stable_key(mapper, connection, target):
+    if getattr(target, '_defer_stable_key_autogen', False):
+        return
+    if not target.stable_key:
+        target.stable_key = generate_stable_key()

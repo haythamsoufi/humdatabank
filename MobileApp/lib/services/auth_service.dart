@@ -42,6 +42,13 @@ class SessionStateEvent {
   }) : timestamp = timestamp ?? DateTime.now();
 }
 
+/// Emitted when local auth credentials are cleared without a full [logout]
+/// (server revoke, refresh rejected, background session check 401, etc.).
+class AuthInvalidationEvent {
+  final String? reason;
+  const AuthInvalidationEvent({this.reason});
+}
+
 class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
@@ -75,6 +82,11 @@ class AuthService {
   final _sessionStateController = StreamController<SessionStateEvent>.broadcast();
   Stream<SessionStateEvent> get sessionStateStream => _sessionStateController.stream;
   Timer? _sessionStateCheckTimer;
+
+  final _authInvalidationController =
+      StreamController<AuthInvalidationEvent>.broadcast();
+  Stream<AuthInvalidationEvent> get authInvalidationStream =>
+      _authInvalidationController.stream;
 
   // Flag raised while the Chrome Custom Tab OAuth flow is in progress.
   // Prevents refreshSession() from clearing auth state in the window between
@@ -156,7 +168,7 @@ class AuthService {
           data: {'email': normalizedEmail, 'remember_me': rememberMe.toString()},
         );
 
-        _registerRefreshCallback();
+        ensureApiCallbacksRegistered();
         _startPeriodicRefresh();
         _startSessionStateMonitoring();
 
@@ -408,6 +420,41 @@ class AuthService {
     );
   }
 
+  /// Clear local auth credentials and notify listeners without calling the
+  /// server logout endpoint. Used when the server has already rejected the
+  /// session (401/403 on refresh or session check) or auth is otherwise dead.
+  Future<void> invalidateLocalAuth({String? reason}) async {
+    final hadJwt = await _jwtService.hasTokens();
+    final hadSession = await _session.hasSession();
+    final hadUser = _currentUser != null;
+
+    await _jwtService.clearTokens();
+    await _session.clearSession();
+    _currentUser = null;
+
+    _stopPeriodicRefresh();
+    _stopSessionStateMonitoring();
+    _emitSessionState(SessionState.expired);
+
+    if (hadJwt || hadSession || hadUser) {
+      DebugLogger.logWarn(
+          'AUTH',
+          'Local auth invalidated${reason != null ? ": $reason" : ""}');
+      if (!_authInvalidationController.isClosed) {
+        _authInvalidationController
+            .add(AuthInvalidationEvent(reason: reason));
+      }
+    }
+  }
+
+  /// Register JWT refresh + local invalidation callbacks on [ApiService].
+  void ensureApiCallbacksRegistered() {
+    ApiService.tokenRefreshCallback =
+        () => refreshSession(forceRefresh: true);
+    ApiService.localAuthInvalidationCallback =
+        (reason) => invalidateLocalAuth(reason: reason);
+  }
+
   // Logout
   Future<void> logout() async {
     // Unregister device BEFORE the logout API call because logout blacklists
@@ -497,14 +544,6 @@ class AuthService {
     }
   }
 
-  /// Register this service's refresh method as the callback for ApiService's
-  /// 401 auto-retry handler.  This breaks the circular import — ApiService
-  /// never imports AuthService directly.
-  void _registerRefreshCallback() {
-    ApiService.tokenRefreshCallback =
-        () => refreshSession(forceRefresh: true);
-  }
-
   // Start periodic background refresh timer
   // This ensures sessions stay alive during active use
   void _startPeriodicRefresh() {
@@ -589,14 +628,9 @@ class AuthService {
   // Check session state and emit event if changed
   Future<void> _checkAndEmitSessionState() async {
     try {
+      final hasJwt = await _jwtService.hasTokens();
       final hasSession = await _session.hasSession();
-      if (!hasSession) {
-        _emitSessionState(SessionState.expired);
-        return;
-      }
-
-      final isExpired = await _session.isSessionExpired();
-      if (isExpired) {
+      if (!hasJwt && !hasSession) {
         _emitSessionState(SessionState.expired);
         return;
       }
@@ -606,13 +640,49 @@ class AuthService {
         return;
       }
 
-      final timeUntilExpiration = await _getTimeUntilExpiration();
-      if (timeUntilExpiration != null && timeUntilExpiration <= const Duration(minutes: 15)) {
-        _emitSessionState(SessionState.expiringSoon, timeUntilExpiration: timeUntilExpiration);
+      // JWT-first: mobile API auth is driven by access/refresh tokens.
+      if (hasJwt) {
+        final accessExpired = await _jwtService.isAccessTokenExpired();
+        final timeUntilAccess = await _jwtService.timeUntilAccessExpiry();
+        if (!accessExpired) {
+          _emitSessionState(
+            SessionState.valid,
+            timeUntilExpiration: timeUntilAccess,
+          );
+          return;
+        }
+        if (await _jwtService.hasRefreshToken()) {
+          _emitSessionState(
+            SessionState.expiringSoon,
+            timeUntilExpiration: timeUntilAccess ?? Duration.zero,
+          );
+          return;
+        }
+        _emitSessionState(SessionState.expired);
         return;
       }
 
-      _emitSessionState(SessionState.valid, timeUntilExpiration: timeUntilExpiration);
+      // Legacy WebView / cookie-only session path.
+      final isExpired = await _session.isSessionExpired();
+      if (isExpired) {
+        _emitSessionState(SessionState.expired);
+        return;
+      }
+
+      final timeUntilExpiration = await _getTimeUntilExpiration();
+      if (timeUntilExpiration != null &&
+          timeUntilExpiration <= const Duration(minutes: 15)) {
+        _emitSessionState(
+          SessionState.expiringSoon,
+          timeUntilExpiration: timeUntilExpiration,
+        );
+        return;
+      }
+
+      _emitSessionState(
+        SessionState.valid,
+        timeUntilExpiration: timeUntilExpiration,
+      );
     } catch (e) {
       DebugLogger.logWarn('AUTH', 'Error checking session state: $e');
     }
@@ -837,9 +907,7 @@ class AuthService {
         return false;
       }
       DebugLogger.logWarn('AUTH', 'No refresh token available — clearing auth state');
-      await _jwtService.clearTokens();
-      await _session.clearSession();
-      _currentUser = null;
+      await invalidateLocalAuth(reason: 'No refresh token available');
       return false;
     }
 
@@ -905,9 +973,10 @@ class AuthService {
       DebugLogger.logWarn('AUTH',
           'Refresh token definitively rejected (status: ${response.statusCode}) — clearing auth state');
       _recordRefreshFailure('refresh_failure_rejected');
-      await _jwtService.clearTokens();
-      await _session.clearSession();
-      _currentUser = null;
+      await invalidateLocalAuth(
+        reason:
+            'Refresh token rejected (HTTP ${response.statusCode})',
+      );
       return false;
     }
 
@@ -1005,7 +1074,6 @@ class AuthService {
             // token itself, or no refresh token was available).
             DebugLogger.logWarn('AUTH',
                 'Silent JWT refresh definitively rejected — user must re-login');
-            _currentUser = null;
             return false;
           }
         }
@@ -1107,7 +1175,7 @@ class AuthService {
         if (_currentUser != null) {
           DebugLogger.logAuth(
               'Backend defer active — skipping live session check (cached user)');
-          _registerRefreshCallback();
+          ensureApiCallbacksRegistered();
           if (_periodicRefreshTimer == null) {
             _startPeriodicRefresh();
           }
@@ -1119,7 +1187,7 @@ class AuthService {
         DebugLogger.logAuth(
             'Backend defer active — loading profile without live session probe');
         await _loadUserProfile();
-        _registerRefreshCallback();
+        ensureApiCallbacksRegistered();
         if (_periodicRefreshTimer == null) {
           _startPeriodicRefresh();
         }
@@ -1151,7 +1219,7 @@ class AuthService {
         DebugLogger.logAuth('Session is valid');
         // Restart background timers and refresh callback if they stopped
         // (e.g. after the app was killed and relaunched).
-        _registerRefreshCallback();
+        ensureApiCallbacksRegistered();
         if (_periodicRefreshTimer == null) {
           _startPeriodicRefresh();
         }
@@ -1163,8 +1231,10 @@ class AuthService {
         // Session expired or invalid
         DebugLogger.logWarn('AUTH',
             'Session expired or invalid (status: ${response.statusCode})');
-        await _session.clearSession();
-        _currentUser = null;
+        await invalidateLocalAuth(
+          reason:
+              'Session validation failed (HTTP ${response.statusCode})',
+        );
         return false;
       } else {
         // Other error - assume session is still valid but log it
@@ -1176,10 +1246,9 @@ class AuthService {
         }
         return true;
       }
-    } on AuthenticationException {
+    } on AuthenticationException catch (e) {
       DebugLogger.logWarn('AUTH', 'Authentication exception during validation');
-      await _session.clearSession();
-      _currentUser = null;
+      await invalidateLocalAuth(reason: e.toString());
       return false;
     } on TimeoutException {
       DebugLogger.logWarn(
@@ -1277,21 +1346,17 @@ class AuthService {
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         DebugLogger.logWarn('AUTH',
             'Background validation: server returned ${response.statusCode} — clearing auth state');
-        _jwtService.clearTokens();
-        _session.clearSession();
-        _currentUser = null;
-        _emitSessionState(SessionState.expired);
+        unawaited(invalidateLocalAuth(
+          reason:
+              'Background session check failed (HTTP ${response.statusCode})',
+        ));
       }
       // 5xx / other non-401 responses: do nothing.  The server probably
       // hiccupped; we'll re-check on the next periodic tick or interaction.
     }).catchError((e) {
       if (e is AuthenticationException) {
-        // ApiService already cleared tokens in its own 401 handler before
-        // throwing this; we just sync our in-memory state.
         DebugLogger.logWarn('AUTH',
-            'Background validation: AuthenticationException — auth state already cleared by ApiService');
-        _currentUser = null;
-        _emitSessionState(SessionState.expired);
+            'Background validation: AuthenticationException — auth state already cleared');
       } else {
         // TimeoutException, http.ClientException, SocketException,
         // refresh-threw, etc. — keep the cached user logged in.
@@ -1422,8 +1487,7 @@ class AuthService {
 
       if (response.statusCode == 200) {
         DebugLogger.logAuth('Password changed successfully - invalidating session for security');
-        await _session.clearSession();
-        _currentUser = null;
+        await invalidateLocalAuth(reason: 'Password changed');
         return AuthResult.success(requiresReauth: true);
       } else {
         DebugLogger.logError(

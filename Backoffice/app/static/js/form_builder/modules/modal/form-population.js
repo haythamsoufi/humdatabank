@@ -341,6 +341,55 @@ export const FormPopulationMixin = {
             itemIdInput.value = itemData.id;
         }
 
+        const stableKeyRow = this.modalElement.querySelector('#item-modal-stable-key-row');
+        const stableKeyInput = this.modalElement.querySelector('#item-modal-stable-key');
+        const rawId = itemData.item_id_raw || itemData.id;
+        let stableKey = itemData.stable_key || null;
+        if (!stableKey && rawId && window.DataManager && typeof window.DataManager.getItemById === 'function') {
+            const typeHint = itemData.item_model || itemData.type;
+            const mapped = window.DataManager.getItemById(rawId, typeHint === 'document_field' ? 'document' : typeHint);
+            if (mapped && mapped.stable_key) stableKey = mapped.stable_key;
+        }
+        if (stableKeyRow && stableKeyInput) {
+            const identityStatus = this.modalElement.querySelector('#item-modal-identity-status');
+            if (this.currentMode === 'edit' && stableKey) {
+                stableKeyInput.value = stableKey;
+                stableKeyRow.classList.remove('hidden');
+                if (identityStatus) {
+                    const publishedByKey = window.publishedItemsByStableKey || {};
+                    const rawItemId = parseInt(String(rawId).replace(/\D/g, ''), 10);
+                    const suggestedIds = window.suggestedDraftItemIds || [];
+                    let label = '';
+                    let badgeClass = 'hidden shrink-0 text-xs font-medium px-2 py-0.5 rounded-full';
+                    if (publishedByKey[stableKey]) {
+                        label = 'Linked';
+                        badgeClass += ' bg-green-100 text-green-800';
+                    } else if (suggestedIds.includes(rawItemId)) {
+                        label = 'Suggested';
+                        badgeClass += ' bg-yellow-100 text-yellow-800';
+                    } else if (Object.keys(publishedByKey).length > 0) {
+                        label = 'New field';
+                        badgeClass += ' bg-blue-100 text-blue-800';
+                    }
+                    if (label) {
+                        identityStatus.textContent = label;
+                        identityStatus.className = badgeClass;
+                    } else {
+                        identityStatus.textContent = '';
+                        identityStatus.className = 'hidden shrink-0 text-xs font-medium px-2 py-0.5 rounded-full';
+                    }
+                }
+            } else {
+                stableKeyInput.value = '';
+                stableKeyRow.classList.add('hidden');
+                const identityStatus = this.modalElement.querySelector('#item-modal-identity-status');
+                if (identityStatus) {
+                    identityStatus.textContent = '';
+                    identityStatus.className = 'hidden shrink-0 text-xs font-medium px-2 py-0.5 rounded-full';
+                }
+            }
+        }
+
         if (this.currentMode === 'edit') {
             let itemTypeInput = this.modalElement.querySelector('#item-modal-type');
             if (!itemTypeInput) {

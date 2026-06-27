@@ -11,6 +11,8 @@ from .lookups import LookupList, LookupListRow
 from config import Config
 import json
 from contextlib import suppress
+from sqlalchemy import event
+from app.utils.stable_key import generate_stable_key
 
 
 class FormItem(db.Model):
@@ -22,6 +24,9 @@ class FormItem(db.Model):
     # Template reference (denormalized for performance, can be derived from version)
     template_id = db.Column(db.Integer, db.ForeignKey('form_template.id', ondelete='CASCADE'), nullable=True)
     item_type = Column(String(100), nullable=False)  # Changed from Enum to String to support dynamic plugin field types
+
+    # Immutable after first publish — never regenerate for existing items.
+    stable_key = Column(String(36), nullable=True)
 
     # Common fields for all item types
     label = Column(Text, nullable=False)
@@ -95,9 +100,15 @@ class FormItem(db.Model):
     measurement_type = relationship('IndicatorBankType', foreign_keys=[indicator_type_id], lazy='select')
     measurement_unit = relationship('IndicatorBankUnit', foreign_keys=[indicator_unit_id], lazy='select')
 
+    @classmethod
+    def by_stable_key(cls, template_id: int, stable_key: str):
+        """Return all version rows for a logical field (cross-version analytics)."""
+        return cls.query.filter_by(template_id=template_id, stable_key=stable_key).order_by(cls.version_id)
+
     __table_args__ = (
         db.Index('ix_form_item_version_order', 'version_id', 'order'),
         db.Index('ix_form_item_section_order', 'section_id', 'order'),
+        db.Index('ix_form_item_stable_key', 'template_id', 'stable_key'),
         db.Index('ix_form_item_item_type', 'item_type'),
         db.Index('ix_form_item_indicator_bank', 'indicator_bank_id'),
         db.Index('ix_form_item_lookup_list', 'lookup_list_id'),
@@ -987,3 +998,11 @@ class FormItem(db.Model):
             return f'<FormItem({item_type_display}) {self.display_order}. {self.label}{hierarchy_info} (Section: {section_name})>'
 
         return f'<FormItem({item_type_display}) {self.display_order}. {self.label}{hierarchy_info}>'
+
+
+@event.listens_for(FormItem, 'before_insert', propagate=True)
+def _form_item_assign_stable_key(mapper, connection, target):
+    if getattr(target, '_defer_stable_key_autogen', False):
+        return
+    if not target.stable_key:
+        target.stable_key = generate_stable_key()

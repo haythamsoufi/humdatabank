@@ -105,6 +105,7 @@ class UprExcelImportService:
             return {
                 "success": True,
                 "transformed_rows": len(import_rows),
+                "dynamic_rows": len(ctx.dynamic_indicator_entries),
                 "by_item": by_item,
                 "countries": len(by_iso3),
                 **warning_summary,

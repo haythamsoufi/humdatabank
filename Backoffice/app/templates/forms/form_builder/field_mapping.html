@@ -1,0 +1,380 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+
+{% block title %}{{ title }} — {{ template_obj.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ static_url('css/field-mapping-page.css') }}">
+{% endblock %}
+
+{% macro mapping_confidence_badge(confidence) %}
+    {% if confidence == 'exact' %}
+    <span class="field-mapping-badge field-mapping-badge--exact"><i class="fas fa-check-circle" aria-hidden="true"></i>{{ _('Linked') }}</span>
+    {% elif confidence == 'suggested' %}
+    <span class="field-mapping-badge field-mapping-badge--suggested"><i class="fas fa-exclamation-circle" aria-hidden="true"></i>{{ _('Suggested') }}</span>
+    {% elif confidence == 'new' %}
+    <span class="field-mapping-badge field-mapping-badge--new"><i class="fas fa-plus-circle" aria-hidden="true"></i>{{ _('New field') }}</span>
+    {% elif confidence == 'orphaned' %}
+    <span class="field-mapping-badge field-mapping-badge--orphaned"><i class="fas fa-archive" aria-hidden="true"></i>{{ _('Orphaned') }}</span>
+    {% endif %}
+{% endmacro %}
+
+{% macro mapping_item_rows(rows, published_picker) %}
+    {% for row in rows %}
+    {% set draft = row.draft_item %}
+    {% set pub = row.published_item %}
+    {% set confidence = row.confidence %}
+    <tr
+        class="field-mapping-row field-mapping-row--{{ confidence }}"
+        data-field-mapping-row
+        data-confidence="{{ confidence }}"
+        data-draft-label="{{ (draft.label if draft else '') | e }}"
+        {% if draft %}
+        data-link-url="{{ url_for('form_builder.link_draft_item_route', template_id=template_obj.id, version_id=draft_version.id, item_id=draft.id) }}"
+        data-unlink-url="{{ url_for('form_builder.unlink_draft_item_route', template_id=template_obj.id, version_id=draft_version.id, item_id=draft.id) }}"
+        {% endif %}
+    >
+        <td class="px-4 py-3 align-top">
+            {% if draft %}
+            <div class="font-medium text-gray-900">{{ draft.label }}</div>
+            <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                <span class="inline-flex items-center rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{{ draft.item_type }}</span>
+                <span>{{ draft.section_name }}</span>
+                <span>· {{ _('order') }} {{ draft.order }}</span>
+            </div>
+            {% else %}
+            <span class="text-gray-400 italic">{{ _('Removed from draft') }}</span>
+            {% endif %}
+        </td>
+        <td class="px-4 py-3 align-top">
+            {% if pub %}
+            <div class="font-medium text-gray-900">{{ pub.label }}</div>
+            <div class="mt-1 text-xs text-gray-500">{{ pub.section_name }} · {{ pub.item_type }}</div>
+            {% else %}
+            <span class="text-gray-400">—</span>
+            {% endif %}
+        </td>
+        <td class="px-4 py-3 align-top">{{ mapping_confidence_badge(confidence) }}</td>
+        <td class="px-4 py-3 align-top text-gray-800 tabular-nums">
+            {% if row.data_rows %}
+            <span class="font-medium">{{ row.data_rows }}</span>
+            <span class="text-xs text-gray-500 block">{{ _('submitted values') }}</span>
+            {% else %}
+            <span class="text-gray-400">0</span>
+            {% endif %}
+        </td>
+        <td class="px-4 py-3 align-top">
+            {% if draft and confidence == 'suggested' and pub and pub.stable_key %}
+            <button type="button" class="btn btn-primary btn-sm w-full sm:w-auto" data-action="confirm-link" data-published-stable-key="{{ pub.stable_key }}">
+                <i class="fas fa-link mr-1" aria-hidden="true"></i>{{ _('Confirm suggested link') }}
+            </button>
+            {% elif confidence == 'exact' and draft %}
+            <span class="text-xs text-green-700"><i class="fas fa-check mr-1" aria-hidden="true"></i>{{ _('Ready for deploy') }}</span>
+            {% elif confidence == 'new' and draft %}
+            <span class="text-xs text-blue-700">{{ _('No data will carry forward') }}</span>
+            {% elif confidence == 'orphaned' %}
+            <span class="text-xs text-gray-500">{{ _('Data stays on archived version') }}</span>
+            {% endif %}
+            {% if draft and confidence != 'orphaned' %}
+            <div class="field-mapping-actions mt-2">
+                <label class="text-xs font-medium text-gray-600">{{ _('Change link') }}</label>
+                <select class="shadow-sm border-gray-300 rounded-md py-1.5" data-published-key-select aria-label="{{ _('Link to published field') }}">
+                    <option value="">{{ _('Choose published field…') }}</option>
+                    {% for pi in published_picker %}
+                    <option value="{{ pi.stable_key }}" {% if pub and pi.stable_key == pub.stable_key %}selected{% endif %}>
+                        {{ pi.label }} ({{ pi.section_name }})
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-action="apply-link">{{ _('Apply link') }}</button>
+                    {% if confidence != 'new' %}
+                    <button type="button" class="btn btn-secondary btn-sm" data-action="unlink">{{ _('Mark as new') }}</button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    {% if not rows %}
+    <tr>
+        <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">{{ _('No form fields in this draft.') }}</td>
+    </tr>
+    {% else %}
+    <tr class="field-mapping-empty-filter-row" data-empty-filter-row hidden>
+        <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">{{ _('No rows match this filter.') }}</td>
+    </tr>
+    {% endif %}
+{% endmacro %}
+
+{% macro mapping_section_rows(rows, published_picker) %}
+    {% for row in rows %}
+    {% set draft = row.draft_item %}
+    {% set pub = row.published_item %}
+    {% set confidence = row.confidence %}
+    <tr
+        class="field-mapping-row field-mapping-row--{{ confidence }}"
+        data-field-mapping-row
+        data-confidence="{{ confidence }}"
+        data-draft-label="{{ (draft.name if draft else '') | e }}"
+        {% if draft %}
+        data-link-url="{{ url_for('form_builder.link_draft_section_route', template_id=template_obj.id, version_id=draft_version.id, section_id=draft.id) }}"
+        data-unlink-url="{{ url_for('form_builder.unlink_draft_section_route', template_id=template_obj.id, version_id=draft_version.id, section_id=draft.id) }}"
+        {% endif %}
+    >
+        <td class="px-4 py-3 align-top">
+            {% if draft %}
+            <div class="font-medium text-gray-900">{{ draft.name }}</div>
+            <div class="mt-1 text-xs text-gray-500">{{ draft.section_type }} · {{ _('order') }} {{ draft.order }}</div>
+            {% else %}
+            <span class="text-gray-400 italic">{{ _('Removed from draft') }}</span>
+            {% endif %}
+        </td>
+        <td class="px-4 py-3 align-top">
+            {% if pub %}
+            <div class="font-medium text-gray-900">{{ pub.name }}</div>
+            <div class="mt-1 text-xs text-gray-500">{{ pub.section_type }}</div>
+            {% else %}
+            <span class="text-gray-400">—</span>
+            {% endif %}
+        </td>
+        <td class="px-4 py-3 align-top">{{ mapping_confidence_badge(confidence) }}</td>
+        <td class="px-4 py-3 align-top text-gray-400">—</td>
+        <td class="px-4 py-3 align-top">
+            {% if draft and confidence == 'suggested' and pub and pub.stable_key %}
+            <button type="button" class="btn btn-primary btn-sm" data-action="confirm-link" data-published-stable-key="{{ pub.stable_key }}">
+                {{ _('Confirm suggested link') }}
+            </button>
+            {% elif confidence == 'exact' and draft %}
+            <span class="text-xs text-green-700">{{ _('Ready for deploy') }}</span>
+            {% endif %}
+            {% if draft and confidence != 'orphaned' %}
+            <div class="field-mapping-actions mt-2">
+                <select class="shadow-sm border-gray-300 rounded-md py-1.5 w-full" data-published-key-select aria-label="{{ _('Link to published section') }}">
+                    <option value="">{{ _('Choose published section…') }}</option>
+                    {% for ps in published_picker %}
+                    <option value="{{ ps.stable_key }}">{{ ps.name }}</option>
+                    {% endfor %}
+                </select>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-action="apply-link">{{ _('Apply link') }}</button>
+                    {% if confidence != 'new' %}
+                    <button type="button" class="btn btn-secondary btn-sm" data-action="unlink">{{ _('Mark as new') }}</button>
+                    {% endif %}
+                </div>
+            </div>
+            {% elif confidence == 'orphaned' %}
+            <span class="text-xs text-gray-500">{{ _('Repeat/dynamic data stays archived') }}</span>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    {% if not rows %}
+    <tr>
+        <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">{{ _('No sections in this draft.') }}</td>
+    </tr>
+    {% else %}
+    <tr class="field-mapping-empty-filter-row" data-empty-filter-row hidden>
+        <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">{{ _('No rows match this filter.') }}</td>
+    </tr>
+    {% endif %}
+{% endmacro %}
+
+{% block content %}
+<div class="sharp-ui">
+    {% set deploy_form_html %}
+    <form method="POST" action="{{ deploy_form_action }}" class="inline-block">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="version_id" value="{{ draft_version.id }}">
+        <button type="submit" class="professional-action-btn professional-action-btn-green" title="{{ _('Publish this draft and remap submission data') }}">
+            <i class="fas fa-rocket" aria-hidden="true"></i>
+            <span>{{ _('Deploy draft') }}</span>
+        </button>
+    </form>
+    {% endset %}
+
+    {{ page_header(
+        title=_('Field mapping review'),
+        subtitle=_('Confirm which draft fields correspond to the live published form before you deploy.'),
+        icon='fas fa-link',
+        breadcrumbs=[
+            {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+            {'name': _('Template Management'), 'url': url_for('form_builder.manage_templates')},
+            {'name': template_obj.name, 'url': builder_url},
+            {'name': _('Field mapping')}
+        ],
+        actions=[
+            {
+                'type': 'link',
+                'text': _('Back to builder'),
+                'icon': 'fas fa-arrow-left',
+                'url': builder_url,
+                'classes': 'professional-action-btn'
+            },
+            {
+                'type': 'custom',
+                'content': deploy_form_html
+            }
+        ]
+    ) }}
+
+    <div class="max-w-7xl mx-auto pb-24">
+        <input type="hidden" id="field-mapping-csrf" value="{{ csrf_token() }}">
+
+        {# Version context #}
+        <div class="mb-6 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+            <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                <div>
+                    <span class="text-gray-500">{{ _('Template') }}:</span>
+                    <span class="font-medium text-gray-900 ml-1">{{ template_obj.name }}</span>
+                </div>
+                <div>
+                    <span class="text-gray-500">{{ _('Draft') }}:</span>
+                    <span class="font-medium text-gray-900 ml-1">V{{ draft_version.version_number or draft_version.id }}</span>
+                </div>
+                {% if published_version %}
+                <div>
+                    <span class="text-gray-500">{{ _('Compared to published') }}:</span>
+                    <span class="font-medium text-gray-900 ml-1">V{{ published_version.version_number or published_version.id }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if not comparison_rows %}
+        <div class="rounded-lg border border-blue-200 bg-blue-50 p-6 text-sm text-blue-900">
+            <p class="font-medium">{{ _('Nothing to compare yet') }}</p>
+            <p class="mt-1">{{ _('There is no published version to compare against, or this is the first publish for this template.') }}</p>
+            <a href="{{ builder_url }}" class="btn btn-secondary btn-sm mt-4">{{ _('Return to form builder') }}</a>
+        </div>
+        {% else %}
+
+        {# Summary stats #}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="field-mapping-stat-card field-mapping-stat-card--linked">
+                <div class="text-sm text-gray-500">{{ _('Linked') }}</div>
+                <div class="field-mapping-stat-card__value">{{ stat_counts.linked }}</div>
+                <div class="text-xs text-gray-500 mt-1">{{ _('Identity confirmed') }}</div>
+            </div>
+            <div class="field-mapping-stat-card field-mapping-stat-card--suggested">
+                <div class="text-sm text-gray-500">{{ _('Suggested') }}</div>
+                <div class="field-mapping-stat-card__value">{{ stat_counts.suggested }}</div>
+                <div class="text-xs text-gray-500 mt-1">{{ _('Review recommended') }}</div>
+            </div>
+            <div class="field-mapping-stat-card field-mapping-stat-card--new">
+                <div class="text-sm text-gray-500">{{ _('New fields') }}</div>
+                <div class="field-mapping-stat-card__value">{{ stat_counts.new }}</div>
+                <div class="text-xs text-gray-500 mt-1">{{ _('No published match') }}</div>
+            </div>
+            <div class="field-mapping-stat-card field-mapping-stat-card--orphaned">
+                <div class="text-sm text-gray-500">{{ _('Orphaned') }}</div>
+                <div class="field-mapping-stat-card__value">{{ stat_counts.orphaned }}</div>
+                <div class="text-xs text-gray-500 mt-1">{{ _('Removed from draft') }}</div>
+            </div>
+        </div>
+
+        {# Legend #}
+        <div class="field-mapping-legend mb-6 text-sm text-blue-900">
+            <p class="font-medium mb-2">{{ _('How field identity works') }}</p>
+            <ul class="grid md:grid-cols-2 gap-x-6 gap-y-1 text-blue-800">
+                <li><strong>{{ _('Linked') }}:</strong> {{ _('Draft field uses the same identity as the published field — submission data will follow on deploy.') }}</li>
+                <li><strong>{{ _('Suggested') }}:</strong> {{ _('System matched by position (e.g. label changed) — confirm or pick another link.') }}</li>
+                <li><strong>{{ _('New field') }}:</strong> {{ _('No published counterpart — starts fresh with no inherited data.') }}</li>
+                <li><strong>{{ _('Orphaned') }}:</strong> {{ _('Published field removed from draft — historical data stays on the archived version.') }}</li>
+            </ul>
+        </div>
+
+        {# Entity tabs: Fields / Sections #}
+        {% call scroll_tab_bar(inner_id='field-mapping-entity-tabs', aria_label=_('Structure type')) %}
+            <button type="button" role="tab" id="field-mapping-tab-items" class="{{ admin_underline_tab_btn_classes(true) }}" data-entity-tab="items" aria-selected="true">
+                {{ _('Form fields') }}
+                <span class="ml-1 text-xs opacity-75">({{ item_comparison_rows|length }})</span>
+            </button>
+            <button type="button" role="tab" id="field-mapping-tab-sections" class="{{ admin_underline_tab_btn_classes(false) }}" data-entity-tab="sections" aria-selected="false">
+                {{ _('Sections') }}
+                <span class="ml-1 text-xs opacity-75">({{ section_comparison_rows|length }})</span>
+            </button>
+        {% endcall %}
+
+        {# Status filters #}
+        <div class="flex flex-wrap gap-2 my-4" id="field-mapping-filters" role="group" aria-label="{{ _('Filter by status') }}">
+            <button type="button" class="btn btn-secondary btn-sm field-mapping-filter-btn is-active" data-filter="all">{{ _('All') }}</button>
+            <button type="button" class="btn btn-secondary btn-sm field-mapping-filter-btn" data-filter="needs_review">{{ _('Needs review') }}</button>
+            <button type="button" class="btn btn-secondary btn-sm field-mapping-filter-btn" data-filter="exact">{{ _('Linked') }}</button>
+            <button type="button" class="btn btn-secondary btn-sm field-mapping-filter-btn" data-filter="new">{{ _('New') }}</button>
+            <button type="button" class="btn btn-secondary btn-sm field-mapping-filter-btn" data-filter="orphaned">{{ _('Orphaned') }}</button>
+        </div>
+
+        <div id="field-mapping-panel-items" class="field-mapping-entity-panel" data-entity-panel="items">
+            <div class="field-mapping-table-card">
+                <div class="overflow-x-auto">
+                    <table class="field-mapping-table min-w-full divide-y divide-gray-200 text-sm">
+                        <thead>
+                            <tr>
+                                <th class="px-4 py-3 text-left">{{ _('Draft field') }}</th>
+                                <th class="px-4 py-3 text-left">{{ _('Published match') }}</th>
+                                <th class="px-4 py-3 text-left">{{ _('Status') }}</th>
+                                <th class="px-4 py-3 text-left">{{ _('Data') }}</th>
+                                <th class="px-4 py-3 text-left">{{ _('Actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200" id="field-mapping-items-body">
+                            {{ mapping_item_rows(item_comparison_rows, published_items) }}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="field-mapping-panel-sections" class="field-mapping-entity-panel" data-entity-panel="sections" hidden>
+            <div class="field-mapping-table-card">
+                <div class="overflow-x-auto">
+                    <table class="field-mapping-table min-w-full divide-y divide-gray-200 text-sm">
+                        <thead>
+                            <tr>
+                                <th class="px-4 py-3 text-left">{{ _('Draft section') }}</th>
+                                <th class="px-4 py-3 text-left">{{ _('Published match') }}</th>
+                                <th class="px-4 py-3 text-left">{{ _('Status') }}</th>
+                                <th class="px-4 py-3 text-left">{{ _('Data') }}</th>
+                                <th class="px-4 py-3 text-left">{{ _('Actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200" id="field-mapping-sections-body">
+                            {{ mapping_section_rows(section_comparison_rows, published_sections) }}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="field-mapping-footer flex flex-wrap items-center justify-between gap-3">
+            <p class="text-sm text-gray-600 m-0">
+                {% if stat_counts.suggested %}
+                <i class="fas fa-info-circle text-amber-500 mr-1" aria-hidden="true"></i>
+                {{ _('%(count)s suggested field(s) may need confirmation before deploy.', count=stat_counts.suggested) }}
+                {% else %}
+                <i class="fas fa-check-circle text-green-600 mr-1" aria-hidden="true"></i>
+                {{ _('All draft fields are linked or marked as new.') }}
+                {% endif %}
+            </p>
+            <div class="flex flex-wrap gap-2">
+                <a href="{{ builder_url }}" class="btn btn-secondary">{{ _('Back to builder') }}</a>
+                <form method="POST" action="{{ deploy_form_action }}" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="version_id" value="{{ draft_version.id }}">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-rocket mr-1" aria-hidden="true"></i>{{ _('Deploy this version') }}
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="module" src="{{ static_url('js/form_builder/modules/field-mapping.js') }}"></script>
+{% endblock %}

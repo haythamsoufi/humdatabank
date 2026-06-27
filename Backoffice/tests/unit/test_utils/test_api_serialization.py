@@ -56,6 +56,9 @@ def _make_country(name='Test Country', iso3='TST', iso2='TS', region='Europe',
 def _make_form_item(is_indicator=False, is_question=False, is_document_field=False):
     fi = MagicMock()
     fi.id = 10
+    fi.stable_key = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+    fi.version_id = 4
+    fi.archived = False
     fi.item_type = 'indicator' if is_indicator else ('question' if is_question else 'document')
     fi.label = 'Test Item'
     fi.order = 1
@@ -207,6 +210,9 @@ class TestFormatFormItemInfo:
         fi = _make_form_item()
         result = format_form_item_info(fi)
         assert result['id'] == 10
+        assert result['stable_key'] == fi.stable_key
+        assert result['version_id'] == 4
+        assert result['archived'] is False
         assert result['label'] == 'Test Item'
         assert result['section'] is None
         assert result['template'] is None
@@ -635,12 +641,14 @@ class TestFormatDimTemplate:
     def test_with_published_version(self):
         template = MagicMock()
         template.id = 1; template.name = 'T1'
+        template.published_version_id = 12
         template.published_version = MagicMock()
         template.published_version.description = 'Published desc'
         result = format_dim_template(template)
         assert result['id'] == 1
         assert result['name'] == 'T1'
         assert result['description'] == 'Published desc'
+        assert result['published_version_id'] == 12
 
     def test_without_published_version_uses_first_version(self):
         template = MagicMock()

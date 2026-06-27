@@ -345,6 +345,46 @@ class TestGetDataTables:
         assert resp.status_code == 200
 
 
+class TestGetDataTablesStableKey:
+    """Tests for stable_key / version_scope query params on /data/tables."""
+
+    URL = "/api/v1/data/tables"
+
+    def test_stable_key_without_template_id_returns_400(self, client, app):
+        with patch("app.routes.api.data.authenticate_api_request", return_value=_auth_api_key()):
+            resp = client.get(
+                f"{self.URL}?stable_key=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                headers=_API_HEADERS,
+            )
+        assert resp.status_code == 400
+        assert 'template_id' in (resp.get_json() or {}).get('error', '')
+
+    def test_invalid_stable_key_returns_400(self, client, app):
+        with patch("app.routes.api.data.authenticate_api_request", return_value=_auth_api_key()):
+            resp = client.get(
+                f"{self.URL}?template_id=1&stable_key=not-a-uuid",
+                headers=_API_HEADERS,
+            )
+        assert resp.status_code == 400
+        assert 'stable_key' in (resp.get_json() or {}).get('error', '').lower()
+
+
+class TestGetAllDataStableKey:
+    """Tests for stable_key / scope on /api/v1/data."""
+
+    URL = "/api/v1/data"
+
+    def test_stable_key_without_template_id_returns_400(self, client, app):
+        with patch("app.routes.api.data.authenticate_api_request", return_value=_auth_api_key()), \
+             patch("app.routes.api.data.validate_data_endpoint_params",
+                   return_value={'page': 1, 'per_page': 20, 'include_full_info': False}):
+            resp = client.get(
+                f"{self.URL}?stable_key=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                headers=_API_HEADERS,
+            )
+        assert resp.status_code == 400
+
+
 class TestDataHelpers:
     """Unit tests for data module helper functions."""
 

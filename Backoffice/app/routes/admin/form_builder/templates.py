@@ -12,6 +12,7 @@ from . import bp
 from app import db
 from app.models import (FormTemplate, FormSection, FormItem, FormPage, IndicatorBank,
     QuestionType, TemplateShare, User, FormTemplateVersion, AssignedForm)
+from app.models.system import AdminActionLog
 from app.models.core import Country
 from app.forms.form_builder import (FormTemplateForm, FormSectionForm, IndicatorForm, QuestionForm, DocumentFieldForm)
 from app.forms.base import int_or_none
@@ -1247,6 +1248,23 @@ def edit_template(template_id):
         users = User.query.filter(User.id.in_(user_ids)).all()
         users_by_id = {user.id: user for user in users}
 
+    deploy_summaries_by_prev_version = {}
+    deploy_logs = (
+        AdminActionLog.query.filter_by(
+            action_type='template_version_deploy',
+            target_type='form_template',
+            target_id=template.id,
+        )
+        .order_by(AdminActionLog.timestamp.desc())
+        .all()
+    )
+    for log in deploy_logs:
+        payload = log.new_values or {}
+        prev_id = payload.get('previous_version_id')
+        summary = payload.get('stable_key_migration_summary')
+        if prev_id and summary and prev_id not in deploy_summaries_by_prev_version:
+            deploy_summaries_by_prev_version[prev_id] = summary
+
     versions_for_ui = []
     for v in versions:
         # Get updated_by user info from pre-fetched dict
@@ -1263,7 +1281,8 @@ def edit_template(template_id):
             'updated_at': v.updated_at if hasattr(v, 'updated_at') else v.created_at,
             'updated_by': updated_by_user,
             'updated_by_name': updated_by_user.name if updated_by_user and updated_by_user.name else (updated_by_user.email if updated_by_user else None),
-            'is_published': (template.published_version_id == v.id)
+            'is_published': (template.published_version_id == v.id),
+            'migration_summary': deploy_summaries_by_prev_version.get(v.id),
         })
     draft_version = FormTemplateVersion.query.filter_by(template_id=template.id, status='draft').first()
     has_draft = draft_version is not None
@@ -1297,6 +1316,26 @@ def edit_template(template_id):
         .order_by(func.lower(func.coalesce(User.name, User.email, literal(""))).asc())
         .all()
     )
+
+    published_items_for_js = []
+    suggested_draft_item_ids = []
+    if (
+        template.published_version_id
+        and selected_version.id != template.published_version_id
+        and selected_version.status == 'draft'
+    ):
+        from app.routes.admin.form_builder.helpers.field_mapping import published_picker_items
+        from app.services.version_deploy_migration_service import VersionDeployMigrationService
+
+        published_items_for_js = published_picker_items(template)
+        comparison_rows = VersionDeployMigrationService.build_field_comparison(
+            template.published_version_id, selected_version.id, template.id
+        )
+        suggested_draft_item_ids = [
+            row['draft_item']['id']
+            for row in comparison_rows
+            if row.get('confidence') == 'suggested' and row.get('draft_item')
+        ]
 
     return render_template("forms/form_builder/form_builder.html",
                            **template_data,
@@ -1332,7 +1371,9 @@ def edit_template(template_id):
                            has_archived_items=has_archived_items,
                            invalid_indicator_items_count=invalid_indicator_items_count,
                            merged_language_display_names=merged_language_display_names,
-                           template_shared_with_users=template_shared_with_users)
+                           template_shared_with_users=template_shared_with_users,
+                           published_items_for_js=published_items_for_js,
+                           suggested_draft_item_ids=suggested_draft_item_ids)
 
 @bp.route("/templates/<int:template_id>/delete-info", methods=["GET"])
 @admin_permission_required('admin.templates.delete')

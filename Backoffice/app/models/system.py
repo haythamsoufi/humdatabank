@@ -302,7 +302,11 @@ class EmailDeliveryLog(db.Model):
     __tablename__ = 'email_delivery_log'
 
     id = db.Column(db.Integer, primary_key=True)
-    notification_id = db.Column(db.Integer, db.ForeignKey('notification.id'), nullable=True)
+    notification_id = db.Column(
+        db.Integer,
+        db.ForeignKey('notification.id', ondelete='CASCADE'),
+        nullable=True,
+    )
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     email_address = db.Column(db.String(255), nullable=False)
     subject = db.Column(db.String(500), nullable=True)
@@ -324,6 +328,7 @@ class EmailDeliveryLog(db.Model):
     user = db.relationship('User', backref='email_delivery_logs')
 
     __table_args__ = (
+        db.Index('ix_email_delivery_notification', 'notification_id'),
         db.Index('ix_email_delivery_status', 'status'),
         db.Index('ix_email_delivery_user', 'user_id'),
         db.Index('ix_email_delivery_retry', 'next_retry_at'),

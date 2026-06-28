@@ -200,6 +200,22 @@ class TestMobileAuthRequiredDecorator:
             mock_track.assert_not_called()
         assert result == {'ok': True}
 
+    def test_track_session_activity_false_skips_activity_update(self, app, db_session):
+        @mobile_auth_required(track_session_activity=False)
+        def view():
+            return {'ok': True}
+
+        from tests.factories import create_test_user
+        from tests.api.mobile.conftest import _make_jwt_headers
+        with app.app_context():
+            user = create_test_user(db_session, email='no-track@test.com', password='Pass123!')
+        headers = _make_jwt_headers(app, user)
+        with app.test_request_context(method='GET', headers=headers):
+            with patch('app.services.user_analytics_service._update_session_activity_explicit') as mock_track:
+                result = view()
+            mock_track.assert_not_called()
+        assert result == {'ok': True}
+
     def test_decorator_factory_without_immediate_wrap(self, app):
         decorator = mobile_auth_required(permission='admin.users.view')
         assert callable(decorator)

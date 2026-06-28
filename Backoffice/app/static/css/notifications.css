@@ -768,9 +768,9 @@
     border-style: solid !important;
 }
 
-/* AG Grid (Notifications Center): clip cell content so User column cannot paint over Email/Type */
-.admin-notifications-center-container #notificationsGrid .ag-cell,
-.admin-notifications-center-container #campaignsGrid .ag-cell {
+/* AG Grid (Communication Center): clip cell content so User column cannot paint over adjacent columns */
+.admin-communication-center-container #notificationsGrid .ag-cell,
+.admin-communication-center-container #campaignsGrid .ag-cell {
     overflow: hidden;
 }
 
@@ -778,14 +778,14 @@
  * One outer frame only: the tab panel no longer uses a second card, so the grid needs its own edge.
  * Border on the .ag-theme-alpine host; inner .ag-root-wrapper stays borderless so we don’t get a double rim.
  */
-.admin-notifications-center-container #notificationsGrid.ag-theme-alpine,
-.admin-notifications-center-container #campaignsGrid.ag-theme-alpine {
+.admin-communication-center-container #notificationsGrid.ag-theme-alpine,
+.admin-communication-center-container #campaignsGrid.ag-theme-alpine {
     border: 1px solid #e5e7eb !important;
     border-radius: 0 !important;
     box-shadow: none !important;
 }
-.admin-notifications-center-container #notificationsGrid.ag-theme-alpine .ag-root-wrapper,
-.admin-notifications-center-container #campaignsGrid.ag-theme-alpine .ag-root-wrapper {
+.admin-communication-center-container #notificationsGrid.ag-theme-alpine .ag-root-wrapper,
+.admin-communication-center-container #campaignsGrid.ag-theme-alpine .ag-root-wrapper {
     border: none !important;
     border-radius: 0 !important;
 }

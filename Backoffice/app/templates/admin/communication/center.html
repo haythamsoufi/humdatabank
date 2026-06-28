@@ -1,7 +1,7 @@
-{# Admin notification center (system managers). User inbox: templates/notifications/center.html #}
+{# Admin Communication Center (system managers). User inbox: templates/notifications/center.html #}
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
-{% block title %}{{ _('Notifications Center') }}{% endblock %}
+{% block title %}{{ _('Communication Center') }}{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -14,34 +14,34 @@
 {% from "components/ag_grid_includes.html" import ag_grid_loading %}
 
 {{ page_header(
-    title=_('Notifications Center'),
-    icon='fas fa-bell',
+    title=_('Communication Center'),
+    icon='fas fa-comments',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('Notifications Center')}
+        {'name': _('Communication Center')}
     ],
     actions=[
         {
             'type': 'link',
-            'url': url_for('admin_notifications.notifications_registry'),
+            'url': url_for('admin_communication.communication_registry'),
             'text': _('Notification type registry'),
             'icon': 'fas fa-book',
             'classes': 'professional-action-btn professional-action-btn-blue',
         }
     ],
-    info_tooltip=_('View every notification in the system, send email and mobile push messages to selected users or entities, and manage scheduled or draft notification campaigns.')
+    info_tooltip=_('View every notification and linked email delivery in the system, send email and mobile push messages to selected users or entities, and manage scheduled or draft communication campaigns.')
 ) }}
 
 {# Tab strip + panels: same pattern as admin/settings/manage_settings.html — data-tab ↔ panel-{id}, JS uses AdminUnderlineTabs.activateStripTab #}
-<div class="admin-notifications-center-container bg-white shadow-md border border-gray-200">
-    {% call scroll_tab_bar(inner_id='notifications-center-tabs', aria_label=_('Notifications center sections')) %}
+<div class="admin-communication-center-container bg-white shadow-md border border-gray-200">
+    {% call scroll_tab_bar(inner_id='communication-center-tabs', aria_label=_('Communication center sections')) %}
         <button type="button" role="tab" id="tab-view-all" data-tab="view-all" aria-selected="true"
                 class="{{ admin_underline_tab_btn_classes(true) }}">
-            <i class="fas fa-list-ul mr-1.5"></i>{{ _('View All Notifications') }}
+            <i class="fas fa-list-ul mr-1.5"></i>{{ _('View All Communications') }}
         </button>
         <button type="button" role="tab" id="tab-send" data-tab="send" aria-selected="false"
                 class="{{ admin_underline_tab_btn_classes(false) }}">
-            <i class="fas fa-paper-plane mr-1.5"></i><span id="tab-send-label">{{ _('Create Notification') }}</span>
+            <i class="fas fa-paper-plane mr-1.5"></i><span id="tab-send-label">{{ _('Create Communication') }}</span>
         </button>
         <button type="button" role="tab" id="tab-campaigns" data-tab="campaigns" aria-selected="false"
                 class="{{ admin_underline_tab_btn_classes(false) }}">
@@ -50,14 +50,46 @@
     {% endcall %}
 
     <div class="p-6">
-        <!-- Tab Content: View All — no inner card; shell is .admin-notifications-center-container -->
-        <div id="panel-view-all" class="notifications-center-panel relative">
+        <!-- Tab Content: View All — shell is .admin-communication-center-container -->
+        <div id="panel-view-all" class="communication-center-panel relative">
             {% if notifications %}
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('All notifications') }}</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('All communications') }}</label>
                     <p class="text-xs text-gray-500">
-                        {{ _('View all notifications sent to users across the system. Use column filters to search and narrow the list.') }}
+                        {{ _('View all in-app notifications and linked email delivery status. Email columns reflect notification-triggered delivery, not every system email. Failed emails are not retried automatically — retry or dismiss them from the grid.') }}
                     </p>
+                </div>
+                {% if failed_email_delivery_count and failed_email_delivery_count > 0 %}
+                <div id="failed-email-notice" class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div class="text-sm text-red-900">
+                        <i class="fas fa-exclamation-circle mr-2"></i>
+                        {{ _('%(count)s email delivery failure(s) need attention.', count=failed_email_delivery_count) }}
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" id="retry-all-failed-emails" class="btn btn-secondary btn-sm whitespace-nowrap">
+                            <i class="fas fa-redo mr-2"></i>{{ _('Retry all failed emails') }}
+                        </button>
+                        <button type="button" id="dismiss-all-failed-emails" class="btn btn-secondary btn-sm whitespace-nowrap">
+                            <i class="fas fa-times mr-2"></i>{{ _('Dismiss all failed emails') }}
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
+                <div id="grid-email-selection-toolbar" class="hidden mb-3 p-3 bg-gray-50 border border-gray-200 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div class="text-sm text-gray-700">
+                        <span id="grid-email-selection-count">0</span> {{ _('row(s) selected') }}
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" id="retry-selected-failed-emails" class="btn btn-secondary btn-sm whitespace-nowrap">
+                            <i class="fas fa-redo mr-2"></i>{{ _('Retry selected') }}
+                        </button>
+                        <button type="button" id="dismiss-selected-failed-emails" class="btn btn-secondary btn-sm whitespace-nowrap">
+                            <i class="fas fa-times mr-2"></i>{{ _('Dismiss selected') }}
+                        </button>
+                        <button type="button" id="clear-grid-email-selection" class="btn btn-secondary btn-sm whitespace-nowrap">
+                            {{ _('Clear selection') }}
+                        </button>
+                    </div>
                 </div>
                 <div class="flex justify-end items-center mb-4">
                     <div id="column-visibility-button-placeholder" class="flex-shrink-0"></div>
@@ -66,19 +98,19 @@
                 <div id="notificationsGrid" class="ag-theme-alpine" style="width: 100%; height: 600px;"></div>
             {% else %}
                 <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('All notifications') }}</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('All communications') }}</label>
                     <p class="text-xs text-gray-500 mb-4">
-                        {{ _('View all notifications sent to users across the system. Use column filters to search and narrow the list.') }}
+                        {{ _('View all in-app notifications and linked email delivery status. Use column filters to search and narrow the list.') }}
                     </p>
                 </div>
-                <p class="text-sm text-gray-700">{{ _('No notifications found.') }}</p>
+                <p class="text-sm text-gray-700">{{ _('No communications found.') }}</p>
             {% endif %}
         </div>
 
         <!-- Tab Content: Send Notifications -->
-        <div id="panel-send" class="notifications-center-panel hidden">
+        <div id="panel-send" class="communication-center-panel hidden">
             <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Send custom notification') }}</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Send custom communication') }}</label>
                 <p class="text-xs text-gray-500">
                     {{ _('Send a message to one or more users by email and/or mobile push. Configure recipients, content, delivery, and optional attachments below.') }}
                 </p>
@@ -706,9 +738,9 @@
         </div>
 
         <!-- Tab Content: Campaigns -->
-        <div id="panel-campaigns" class="notifications-center-panel relative hidden">
+        <div id="panel-campaigns" class="communication-center-panel relative hidden">
             <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Notification campaigns') }}</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Communication campaigns') }}</label>
                 <p class="text-xs text-gray-500 mb-4">
                     {{ _('Create and manage campaigns. Schedule delivery for later or save drafts and send when ready.') }}
                 </p>
@@ -1187,13 +1219,12 @@
     {{ ag_grid_js() }}
 
     <!-- Grid Module (NEW) -->
-    <script src="{{ static_url('js/admin/notifications-grids.js') }}"></script>
+    <script src="{{ static_url('js/admin/communication-grids.js') }}"></script>
 
     <script nonce="{{ csp_nonce() }}">
     // Provide translations to JavaScript
-    window.NOTIFICATION_TRANSLATIONS = {
+    window.COMMUNICATION_TRANSLATIONS = {
         'user': {{ _('User')|tojson }},
-        'email': {{ _('Email')|tojson }},
         'type': {{ _('Type')|tojson }},
         'title': {{ _('Title')|tojson }},
         'message': {{ _('Message')|tojson }},
@@ -1218,9 +1249,31 @@
         'Archive': {{ _('Archive')|tojson }},
         'View': {{ _('View')|tojson }},
         'Delete': {{ _('Delete')|tojson }},
-        'No Notifications': {{ _('No Notifications')|tojson }},
-        "You're all caught up!": {{ _("You're all caught up!")|tojson }}
+        'No Communications': {{ _('No communications found')|tojson }},
+        "You're all caught up!": {{ _("You're all caught up!")|tojson }},
+        'notificationGroup': {{ _('Notification')|tojson }},
+        'emailGroup': {{ _('Email')|tojson }},
+        'emailStatus': {{ _('Email Status')|tojson }},
+        'emailSubject': {{ _('Email Subject')|tojson }},
+        'emailSentAt': {{ _('Email Sent At')|tojson }},
+        'emailError': {{ _('Email Error')|tojson }},
+        'notApplicable': {{ _('N/A')|tojson }},
+        'retryEmail': {{ _('Retry email')|tojson }},
+        'cancelEmail': {{ _('Dismiss email failure')|tojson }},
+        'retryAllFailed': {{ _('Retry all failed emails')|tojson }},
+        'dismissAllFailed': {{ _('Dismiss all failed emails')|tojson }},
+        'retrySelected': {{ _('Retry selected')|tojson }},
+        'dismissSelected': {{ _('Dismiss selected')|tojson }},
+        'clearSelection': {{ _('Clear selection')|tojson }},
+        'rowsSelected': {{ _('row(s) selected')|tojson }},
+        'dismissedEmail': {{ _('Email failure dismissed')|tojson }},
+        'confirmDismissSelected': {{ _('Dismiss selected email failure(s) without retrying?')|tojson }},
+        'confirmDismissAll': {{ _('Dismiss all failed emails without retrying?')|tojson }},
+        'retryingEmail': {{ _('Retrying email...')|tojson }},
+        'dismissingEmail': {{ _('Dismissing...')|tojson }},
+        'cancelled': {{ _('Dismissed')|tojson }},
     };
+    window.NOTIFICATION_TRANSLATIONS = window.COMMUNICATION_TRANSLATIONS;
 
     // Pass data to JavaScript - backend already formatted it
     window.notificationsData = {{ notifications|tojson|safe }};
@@ -1229,10 +1282,10 @@
     // Initialize grids after data is ready
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize Notifications Grid Manager
-        if (typeof NotificationsGridManager !== 'undefined') {
-            const notificationsManager = new NotificationsGridManager({
+        if (typeof CommunicationsGridManager !== 'undefined') {
+            const notificationsManager = new CommunicationsGridManager({
                 data: window.notificationsData,
-                translations: window.NOTIFICATION_TRANSLATIONS,
+                translations: window.COMMUNICATION_TRANSLATIONS,
                 containerId: 'notificationsGrid',
                 templateId: 'notifications',
                 loadingId: 'notifications-loading',
@@ -1252,7 +1305,7 @@
         if (typeof CampaignsGridManager !== 'undefined') {
             const campaignsManager = new CampaignsGridManager({
                 data: window.campaignsData,
-                translations: window.NOTIFICATION_TRANSLATIONS,
+                translations: window.COMMUNICATION_TRANSLATIONS,
                 containerId: 'campaignsGrid',
                 templateId: 'campaigns',
                 loadingId: 'campaigns-loading',
@@ -1279,5 +1332,5 @@
         // Notification quick-templates loaded from the database
         window.NOTIFICATION_TEMPLATES = {{ notification_templates | tojson | safe }};
     </script>
-    <script src="{{ static_url('js/admin/notifications.js') }}"></script>
+    <script src="{{ static_url('js/admin/communication.js') }}"></script>
 {% endblock %}

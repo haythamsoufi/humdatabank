@@ -96,7 +96,7 @@ class TestDescribeGetRequestWithoutCatalog:
         assert describe_get_request_without_catalog("") == "Session ·"
 
     def test_api_prefix_endpoint(self):
-        result = describe_get_request_without_catalog("admin_notifications.api_get_all_notifications")
+        result = describe_get_request_without_catalog("admin_communication.api_get_all_notifications")
         assert result.startswith("Session ·")
         assert "All Notifications" in result
 
@@ -425,7 +425,7 @@ class TestDefaultGeneratedDescription:
         assert "submitted" in default_generated_description("POST", "bp.submit_form").lower()
 
     def test_post_send(self):
-        assert "Sent" in default_generated_description("POST", "admin_notifications.api_send_notifications")
+        assert "Sent" in default_generated_description("POST", "admin_communication.api_send_notifications")
 
     def test_post_deploy(self):
         assert "Deployed" in default_generated_description("POST", "bp.deploy_release")

@@ -14,9 +14,9 @@ from app.utils.activity_endpoint_catalog.spec import lookup_activity_endpoint_sp
 
 
 def test_get_handlers_excluded_from_catalog_coverage():
-    assert should_exclude_from_activity_catalog("GET", "admin_notifications.api_get_all_notifications")
-    assert should_exclude_from_activity_catalog("GET", "admin_notifications.notifications_center")
-    assert not should_exclude_from_activity_catalog("POST", "admin_notifications.api_send_notifications")
+    assert should_exclude_from_activity_catalog("GET", "admin_communication.api_get_all_notifications")
+    assert should_exclude_from_activity_catalog("GET", "admin_communication.communication_center")
+    assert not should_exclude_from_activity_catalog("POST", "admin_communication.api_send_notifications")
 
 
 def test_activity_catalog_has_no_gaps_vs_url_map():

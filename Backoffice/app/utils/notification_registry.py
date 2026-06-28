@@ -206,6 +206,32 @@ NOTIFICATION_TYPE_REGISTRY_SPECS: List[Dict[str, Any]] = [
         ),
     },
     {
+        "group": "System & admin",
+        "type_key": "account_welcome",
+        "emitter_active": True,
+        "audiences": [],
+        "description": (
+            "One-time welcome when a new user account is created (admin or self-registration)."
+        ),
+        "recipients": (
+            "The new user only. Delivers an in-app notification and welcome email; "
+            "not controlled by audience toggles."
+        ),
+    },
+    {
+        "group": "System & admin",
+        "type_key": "email_digest",
+        "emitter_active": True,
+        "audiences": [],
+        "description": (
+            "Delivery receipt when a daily or weekly notification digest email is sent. "
+            "Links the email log to a notification row in Communication Center; hidden from the user inbox."
+        ),
+        "recipients": (
+            "The user who received the digest email. Not shown in the user notification list."
+        ),
+    },
+    {
         "group": "Forms & submissions",
         "type_key": "validation_questions",
         "emitter_active": True,

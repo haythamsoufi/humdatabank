@@ -38,7 +38,7 @@ from app.routes.admin.data_exploration import bp as data_exploration_bp
 from app.routes.admin.api_management import bp as api_management_bp
 from app.routes.admin.api_key_management import bp as api_key_management_bp
 from app.routes.admin.security_dashboard import bp as security_dashboard_bp
-from app.routes.admin.notifications import bp as admin_notifications_bp
+from app.routes.admin.communication import bp as admin_communication_bp
 
 # Admin documentation / onboarding (file-based markdown under Backoffice/docs)
 from app.routes.admin.documentation import bp as admin_docs_bp
@@ -86,7 +86,7 @@ def register_admin_blueprints(app):
     app.register_blueprint(api_management_bp)
     app.register_blueprint(api_key_management_bp)
     app.register_blueprint(security_dashboard_bp)
-    app.register_blueprint(admin_notifications_bp)
+    app.register_blueprint(admin_communication_bp)
     app.register_blueprint(admin_docs_bp)
 
     # Register plugin management blueprints

@@ -59,7 +59,7 @@ def test_default_generated_description_verbs():
         "POST", "ai_documents.import_ifrc_bulk_cancel"
     ) == "Cancelled Import Ifrc Bulk"
     assert default_generated_description(
-        "POST", "admin_notifications.api_send_notifications"
+        "POST", "admin_communication.api_send_notifications"
     ) == "Sent Notifications"
     assert default_generated_description("POST", "ai_documents.answer_documents") == "Answered Documents"
 
@@ -70,7 +70,7 @@ def test_catalog_display_description_respects_manual_overrides():
 
 
 def test_describe_get_api_vs_page():
-    assert describe_get_request_without_catalog("admin_notifications.api_get_all_notifications").startswith(
+    assert describe_get_request_without_catalog("admin_communication.api_get_all_notifications").startswith(
         "Session ·"
     )
     assert describe_get_request_without_catalog("analytics.audit_trail").startswith("Session ·")

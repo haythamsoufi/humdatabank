@@ -49,7 +49,7 @@ def list_notifications():
 
 @mobile_bp.route('/notifications/count', methods=['GET'])
 @mobile_rate_limit(requests_per_minute=120)
-@mobile_auth_required
+@mobile_auth_required(track_session_activity=False)
 def notification_count():
     """Return unread notification count."""
     from app.services.notification.service import NotificationService

@@ -11,7 +11,7 @@ from flask import current_app
 from markupsafe import escape
 from app import db
 from app.services.email.client import send_email
-from app.services.email.delivery import log_email_attempt, mark_email_sent, mark_email_failed
+from app.services.email.delivery import log_email_attempt, mark_email_sent, mark_email_failed, classify_orphan_email_log
 from app.models import Notification, NotificationPreferences, User, EmailDeliveryLog
 from sqlalchemy import and_
 from app.utils.datetime_helpers import utcnow
@@ -33,6 +33,139 @@ def _notifications_eligible_for_email(notifications):
         n for n in notifications
         if n.notification_type not in IN_APP_ONLY_NOTIFICATION_TYPES
     ]
+
+
+def _create_digest_delivery_notification(
+    user,
+    bundled_notifications,
+    frequency: str,
+    subject: str,
+) -> Optional[int]:
+    """Create a delivery-receipt notification linked to a digest email log."""
+    from app.models.enums import NotificationType
+    from app.services.notification.core import create_notification
+
+    count = len(bundled_notifications)
+    freq_lower = frequency.lower()
+    message = (
+        f"{frequency} email digest delivered with {count} notification(s). "
+        "Open your notification center for details."
+    )
+
+    created = create_notification(
+        user_ids=user.id,
+        notification_type=NotificationType.email_digest,
+        title_key='notification.email_digest.title',
+        title_params={'custom_title': subject, 'frequency': freq_lower, 'count': count},
+        message_key='notification.email_digest.message',
+        message_params={'message': message, 'frequency': freq_lower, 'count': count},
+        related_url='/notifications',
+        priority='low',
+        icon='fa-envelope-open-text',
+        category='system',
+        tags=['email-digest', freq_lower],
+        respect_preferences=False,
+        send_email_notifications=False,
+        send_push_notifications=False,
+    )
+    return created[0].id if created else None
+
+
+def _resolve_digest_email_log(
+    user,
+    bundled_notifications,
+    frequency: str,
+    subject: str,
+    retry_count: int,
+    existing_log: Optional[EmailDeliveryLog],
+) -> EmailDeliveryLog:
+    """Create or reuse EmailDeliveryLog with notification_id for digest sends."""
+    notification_id = None
+    if existing_log and existing_log.notification_id:
+        notification_id = existing_log.notification_id
+    elif retry_count == 0:
+        notification_id = _create_digest_delivery_notification(
+            user, bundled_notifications, frequency, subject
+        )
+
+    log = existing_log
+    if not log:
+        if retry_count == 0:
+            log = log_email_attempt(notification_id, user.id, user.email, subject)
+        else:
+            log = EmailDeliveryLog.query.filter_by(
+                user_id=user.id,
+                email_address=user.email,
+                subject=subject,
+                status='retrying',
+            ).order_by(EmailDeliveryLog.created_at.desc()).first()
+
+    if not log:
+        log = log_email_attempt(notification_id, user.id, user.email, subject)
+    elif notification_id and not log.notification_id:
+        log.notification_id = notification_id
+        db.session.commit()
+
+    return log
+
+
+def _get_or_create_digest_preferences(user):
+    preferences = NotificationPreferences.query.filter_by(user_id=user.id).first()
+    if not preferences:
+        preferences = NotificationPreferences(
+            user_id=user.id,
+            email_notifications=True,
+            notification_types_enabled=[],
+            notification_frequency='instant',
+            sound_enabled=False,
+        )
+        db.session.add(preferences)
+        db.session.commit()
+    return preferences
+
+
+def _retry_digest_email_log(user, log) -> bool:
+    orphan_kind = classify_orphan_email_log(log.subject)
+    if orphan_kind not in ('daily_digest', 'weekly_digest'):
+        mark_email_failed(
+            log.id,
+            f"Retry not supported for digest email (subject: {log.subject or '(empty)'})",
+            retry=False,
+        )
+        return False
+
+    preferences = _get_or_create_digest_preferences(user)
+    if orphan_kind == 'weekly_digest':
+        result = send_weekly_digest(user, preferences, retry_count=log.retry_count, existing_log=log)
+    else:
+        result = send_daily_digest(user, preferences, retry_count=log.retry_count, existing_log=log)
+
+    db.session.refresh(log)
+    return result or log.status == 'sent'
+
+
+def _retry_instant_notification_email_log(user, log, notification) -> bool:
+    subject = f"New Notification: {notification.title}"
+    body = render_instant_email(user, notification)
+
+    try:
+        success = send_email(
+            subject=subject,
+            recipients=[user.email],
+            html=body,
+            sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config['MAIL_DEFAULT_SENDER']),
+        )
+
+        if success:
+            mark_email_sent(log.id)
+            return True
+
+        mark_email_failed(log.id, "Retry failed: Email send returned False", retry=False)
+        return False
+    except Exception as e:
+        mark_email_failed(log.id, f"Retry failed: {str(e)}", retry=False)
+        current_app.logger.error(f"Error retrying notification email log {log.id}: {e}", exc_info=True)
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -323,22 +456,9 @@ def send_daily_digest(user, preferences, retry_count=0, max_retries=3, existing_
     subject = f"Daily Notification Digest - {len(notifications)} new notification(s)"
     body = render_digest_email(user, notifications, 'Daily', locale=user_locale)
 
-    # Log email attempt (only on first attempt, not retries)
-    log = existing_log
-    if not log:
-        if retry_count == 0:
-            log = log_email_attempt(None, user.id, user.email, subject)
-        else:
-            # For retries, find existing log entry
-            log = EmailDeliveryLog.query.filter_by(
-                user_id=user.id,
-                email_address=user.email,
-                subject=subject,
-                status='retrying'
-            ).order_by(EmailDeliveryLog.created_at.desc()).first()
-
-    if not log:
-        log = log_email_attempt(None, user.id, user.email, subject)
+    log = _resolve_digest_email_log(
+        user, notifications, 'Daily', subject, retry_count, existing_log
+    )
 
     try:
         success = send_email(
@@ -353,21 +473,13 @@ def send_daily_digest(user, preferences, retry_count=0, max_retries=3, existing_
             current_app.logger.info(f"Daily digest sent to {user.email} (retry {retry_count})")
             return True
         else:
-            if retry_count < max_retries:
-                mark_email_failed(log.id, "Email send returned False", retry=True, max_retries=max_retries)
-                current_app.logger.warning(f"Failed to send daily digest to {user.email}, will retry (attempt {retry_count + 1}/{max_retries})")
-            else:
-                mark_email_failed(log.id, "Email send returned False", retry=False, max_retries=max_retries)
-                current_app.logger.error(f"Failed to send daily digest to {user.email} after {max_retries} retries")
+            mark_email_failed(log.id, "Email send returned False", retry=False)
+            current_app.logger.error(f"Failed to send daily digest to {user.email}")
             return False
 
     except Exception as e:
-        if retry_count < max_retries:
-            mark_email_failed(log.id, str(e), retry=True, max_retries=max_retries)
-            current_app.logger.warning(f"Error sending daily digest to {user.email}, will retry: {str(e)}")
-        else:
-            mark_email_failed(log.id, str(e), retry=False, max_retries=max_retries)
-            current_app.logger.error(f"Error sending daily digest to {user.email} after {max_retries} retries: {str(e)}")
+        mark_email_failed(log.id, str(e), retry=False)
+        current_app.logger.error(f"Error sending daily digest to {user.email}: {str(e)}")
         return False
 
 
@@ -426,22 +538,9 @@ def send_weekly_digest(user, preferences, retry_count=0, max_retries=3, existing
     subject = f"Weekly Notification Digest - {len(notifications)} new notification(s)"
     body = render_digest_email(user, notifications, 'Weekly', locale=user_locale)
 
-    # Log email attempt (only on first attempt, not retries)
-    log = existing_log
-    if not log:
-        if retry_count == 0:
-            log = log_email_attempt(None, user.id, user.email, subject)
-        else:
-            # For retries, find existing log entry
-            log = EmailDeliveryLog.query.filter_by(
-                user_id=user.id,
-                email_address=user.email,
-                subject=subject,
-                status='retrying'
-            ).order_by(EmailDeliveryLog.created_at.desc()).first()
-
-    if not log:
-        log = log_email_attempt(None, user.id, user.email, subject)
+    log = _resolve_digest_email_log(
+        user, notifications, 'Weekly', subject, retry_count, existing_log
+    )
 
     try:
         success = send_email(
@@ -456,21 +555,13 @@ def send_weekly_digest(user, preferences, retry_count=0, max_retries=3, existing
             current_app.logger.info(f"Weekly digest sent to {user.email} (retry {retry_count})")
             return True
         else:
-            if retry_count < max_retries:
-                mark_email_failed(log.id, "Email send returned False", retry=True, max_retries=max_retries)
-                current_app.logger.warning(f"Failed to send weekly digest to {user.email}, will retry (attempt {retry_count + 1}/{max_retries})")
-            else:
-                mark_email_failed(log.id, "Email send returned False", retry=False, max_retries=max_retries)
-                current_app.logger.error(f"Failed to send weekly digest to {user.email} after {max_retries} retries")
+            mark_email_failed(log.id, "Email send returned False", retry=False)
+            current_app.logger.error(f"Failed to send weekly digest to {user.email}")
             return False
 
     except Exception as e:
-        if retry_count < max_retries:
-            mark_email_failed(log.id, str(e), retry=True, max_retries=max_retries)
-            current_app.logger.warning(f"Error sending weekly digest to {user.email}, will retry: {str(e)}")
-        else:
-            mark_email_failed(log.id, str(e), retry=False, max_retries=max_retries)
-            current_app.logger.error(f"Error sending weekly digest to {user.email} after {max_retries} retries: {str(e)}")
+        mark_email_failed(log.id, str(e), retry=False)
+        current_app.logger.error(f"Error sending weekly digest to {user.email}: {str(e)}")
         return False
 
 
@@ -499,67 +590,41 @@ def retry_email_delivery_log(log):
                 mark_email_failed(log.id, "Notification missing for retry", retry=False)
                 return False
 
-            subject = f"New Notification: {notification.title}"
-            body = render_instant_email(user, notification)
+            from app.models.enums import NotificationType
 
-            try:
-                success = send_email(
-                    subject=subject,
-                    recipients=[user.email],
-                    html=body,
-                    sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config['MAIL_DEFAULT_SENDER'])
-                )
+            if notification.notification_type == NotificationType.email_digest:
+                return _retry_digest_email_log(user, log)
 
-                if success:
-                    mark_email_sent(log.id)
-                    return True
+            if notification.notification_type == NotificationType.account_welcome:
+                from app.services.email.service import send_welcome_email
+                result = send_welcome_email(user, existing_log=log)
+                db.session.refresh(log)
+                return result or log.status == 'sent'
 
-                mark_email_failed(log.id, "Retry failed: Email send returned False", retry=True)
-                return False
-            except Exception as e:
-                mark_email_failed(log.id, f"Retry failed: {str(e)}", retry=True)
-                current_app.logger.error(f"Error retrying notification email log {log.id}: {e}", exc_info=True)
-                return False
+            return _retry_instant_notification_email_log(user, log, notification)
 
-        # Digest retries (no notification_id)
-        preferences = NotificationPreferences.query.filter_by(user_id=user.id).first()
-        if not preferences:
-            preferences = NotificationPreferences(
-                user_id=user.id,
-                email_notifications=True,
-                notification_types_enabled=[],
-                notification_frequency='instant',
-                sound_enabled=False
+        # Legacy orphan logs (no notification_id): digests, welcome emails, etc.
+        orphan_kind = classify_orphan_email_log(log.subject)
+
+        if orphan_kind == 'unsupported':
+            mark_email_failed(
+                log.id,
+                f"Retry not supported for this email type (subject: {log.subject or '(empty)'})",
+                retry=False,
             )
-            db.session.add(preferences)
-            db.session.commit()
-
-        subject_text = (log.subject or '').lower()
-        initial_retry_count = log.retry_count
-
-        if 'weekly notification digest' in subject_text:
-            result = send_weekly_digest(user, preferences, retry_count=log.retry_count, existing_log=log)
-        elif 'daily notification digest' in subject_text:
-            result = send_daily_digest(user, preferences, retry_count=log.retry_count, existing_log=log)
-        else:
-            mark_email_failed(log.id, "Unknown digest email subject", retry=False)
             return False
 
-        # Refresh log to get the latest status updates
-        db.session.refresh(log)
+        if orphan_kind == 'welcome':
+            from app.services.email.service import send_welcome_email
+            result = send_welcome_email(user, existing_log=log)
+            db.session.refresh(log)
+            return result or log.status == 'sent'
 
-        if result or log.status == 'sent':
-            return True
-
-        # If no change occurred, mark as failed without further retries
-        if log.retry_count == initial_retry_count and log.status == 'retrying':
-            mark_email_failed(log.id, "Digest retry skipped - no pending notifications", retry=False)
-
-        return False
+        return _retry_digest_email_log(user, log)
 
     except Exception as e:
         current_app.logger.error(f"Error retrying email delivery log {log.id}: {e}", exc_info=True)
-        mark_email_failed(log.id, f"Retry processing failed: {e}", retry=True)
+        mark_email_failed(log.id, f"Retry processing failed: {e}", retry=False)
         return False
 
 
@@ -630,11 +695,11 @@ def send_instant_notification_email(user, notification, override_preferences=Fal
         elif filtered_out:
             pass  # Recipient filtered (e.g. ALLOWED_EMAIL_RECIPIENTS_DEV) - not a failure
         else:
-            mark_email_failed(log.id, "Email send returned False", retry=True, max_retries=3)
+            mark_email_failed(log.id, "Email send returned False", retry=False)
             current_app.logger.error(f"Failed to send instant notification to {user.email}")
 
     except Exception as e:
-        mark_email_failed(log.id, str(e), retry=True, max_retries=3)
+        mark_email_failed(log.id, str(e), retry=False)
         current_app.logger.error(f"Error sending instant notification to {user.email}: {str(e)}")
 
 

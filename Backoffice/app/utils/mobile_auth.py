@@ -65,7 +65,13 @@ def _try_jwt_auth() -> bool:
     return True
 
 
-def mobile_auth_required(f=None, *, permission: str | None = None, permissions: tuple[str, ...] | None = None):
+def mobile_auth_required(
+    f=None,
+    *,
+    permission: str | None = None,
+    permissions: tuple[str, ...] | None = None,
+    track_session_activity: bool = True,
+):
     """
     Authentication decorator for mobile API routes.
 
@@ -78,6 +84,8 @@ def mobile_auth_required(f=None, *, permission: str | None = None, permissions: 
        ``X-Mobile-Auth`` header or a valid CSRF token.  JWT-based requests
        skip CSRF entirely (tokens are not cookie-based).
     3. Optionally checks one or more RBAC permission strings (any match).
+    4. Optionally updates ``UserSessionLog.last_activity`` for JWT clients
+       (disable with ``track_session_activity=False`` on read-heavy poll endpoints).
 
     Usage::
 
@@ -140,7 +148,7 @@ def mobile_auth_required(f=None, *, permission: str | None = None, permissions: 
             # UserSessionLog.last_activity stays current.  Without this,
             # cookie-based update_session_activity() is a no-op for JWT clients and
             # the sessions page shows stale activity for mobile sessions.
-            if jwt_authenticated:
+            if track_session_activity and jwt_authenticated:
                 sid = getattr(g, '_mobile_jwt_sid', None)
                 if sid:
                     try:

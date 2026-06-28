@@ -275,8 +275,8 @@
             // The defaultColDef.cellStyle does NOT apply to the selection column, so we
             // must configure it separately via selectionColumnDef (ag-grid v32+).
             selectionColumnDef: {
-                pinned: 'left',
-                lockPinned: true,
+                pinned: AgGridHelper.shouldDisableColumnPinning() ? null : 'left',
+                lockPinned: !AgGridHelper.shouldDisableColumnPinning(),
                 suppressMovable: true,
                 width: this.config.checkboxColumnWidth,
                 minWidth: this.config.checkboxColumnWidth,
@@ -409,6 +409,18 @@
             merged.getLocaleText = defaults.getLocaleText;
         } else if (custom.getLocaleText) {
             merged.getLocaleText = custom.getLocaleText;
+        }
+
+        if (AgGridHelper.shouldDisableColumnPinning()) {
+            if (merged.columnDefs) {
+                merged.columnDefs = AgGridHelper.stripColumnPinsFromColDefs(merged.columnDefs);
+            }
+            if (merged.selectionColumnDef) {
+                merged.selectionColumnDef = Object.assign({}, merged.selectionColumnDef, {
+                    pinned: null,
+                    lockPinned: false
+                });
+            }
         }
 
         // When the grid body reaches its scroll limit, continue scrolling the page (or nearest scroll parent).
@@ -655,6 +667,10 @@
             setTimeout(function() {
                 AgGridHelper.enablePageScrollChaining(self.gridDiv);
             }, 200);
+
+            // Mobile: unpin columns so wide cells are not trapped in narrow pinned panes.
+            self._mobileColumnPinningDisabled = AgGridHelper.shouldDisableColumnPinning();
+            AgGridHelper.syncColumnPinningForViewport(self.gridApi, self.columnVisibilityManager);
 
             // Set dynamic height after a short delay to ensure:
             // 1. Grid is fully rendered and positioned in the DOM
@@ -1670,6 +1686,12 @@
                 // Clear cached viewport height so it recalculates on resize
                 self._cachedViewportMinHeight = null;
                 self.setDynamicHeight();
+
+                var mobilePinningDisabled = AgGridHelper.shouldDisableColumnPinning();
+                if (mobilePinningDisabled !== self._mobileColumnPinningDisabled) {
+                    self._mobileColumnPinningDisabled = mobilePinningDisabled;
+                    AgGridHelper.syncColumnPinningForViewport(self.gridApi, self.columnVisibilityManager);
+                }
             }, 120);
         });
     };
@@ -3428,7 +3450,7 @@
         selectionCols.forEach(function(column) {
             state.push({
                 colId: column.getColId(),
-                pinned: 'left'
+                pinned: AgGridHelper.shouldDisableColumnPinning() ? null : 'left'
             });
         });
 
@@ -3803,6 +3825,7 @@
                     typeof helper.columnVisibilityManager.finishInitialColumnState === 'function') {
                     helper.columnVisibilityManager.finishInitialColumnState();
                 }
+                AgGridHelper.syncColumnPinningForViewport(api, helper.columnVisibilityManager);
                 AgGridHelper.enforceColumnMinWidths(api);
             }, 100);
         }
@@ -3948,6 +3971,94 @@
         var usesViewportSizing = (minRaw === 'viewport' || minRaw === undefined || minRaw === null) &&
             (maxRaw === 'viewport' || maxRaw === undefined || maxRaw === null);
         return usesViewportSizing;
+    };
+
+    /**
+     * Pinned columns consume scarce horizontal space on phones; disable pinning there.
+     * @returns {boolean}
+     */
+    AgGridHelper.shouldDisableColumnPinning = function() {
+        return AgGridHelper.isCoarsePointerDevice();
+    };
+
+    /**
+     * Remove pinned flags from column definitions before grid init on mobile.
+     * @param {Array} columnDefs
+     * @returns {Array}
+     */
+    AgGridHelper.stripColumnPinsFromColDefs = function(columnDefs) {
+        if (!columnDefs || !columnDefs.length) {
+            return columnDefs;
+        }
+        return columnDefs.map(function(def) {
+            var copy = Object.assign({}, def);
+            if (copy.pinned) {
+                copy.pinned = null;
+            }
+            if (copy.children && copy.children.length) {
+                copy.children = AgGridHelper.stripColumnPinsFromColDefs(copy.children);
+            }
+            return copy;
+        });
+    };
+
+    /**
+     * Unpin every column (including selection/actions with lockPinned defaults).
+     * @param {Object} gridApi
+     */
+    AgGridHelper.clearAllColumnPins = function(gridApi) {
+        if (!gridApi || typeof gridApi.getColumns !== 'function') {
+            return;
+        }
+        try {
+            var columns = gridApi.getColumns() || [];
+            var state = columns.map(function(col) {
+                return { colId: col.getColId(), pinned: null };
+            });
+            if (state.length && typeof gridApi.applyColumnState === 'function') {
+                gridApi.applyColumnState({ state: state, applyOrder: false });
+            }
+            if (typeof gridApi.getGridOption === 'function' && typeof gridApi.setGridOption === 'function') {
+                var selectionDef = gridApi.getGridOption('selectionColumnDef');
+                if (selectionDef && selectionDef.pinned) {
+                    gridApi.setGridOption('selectionColumnDef', Object.assign({}, selectionDef, {
+                        pinned: null,
+                        lockPinned: false
+                    }));
+                }
+            }
+        } catch (e) {
+            console.warn('AgGridHelper: clearAllColumnPins failed:', e);
+        }
+    };
+
+    /**
+     * Apply or restore column pinning based on current viewport (mobile vs desktop).
+     * @param {Object} gridApi
+     * @param {Object} [visibilityManager]
+     */
+    AgGridHelper.syncColumnPinningForViewport = function(gridApi, visibilityManager) {
+        if (!gridApi) {
+            return;
+        }
+
+        var gridDiv = null;
+        if (typeof gridApi.getGridElement === 'function') {
+            gridDiv = gridApi.getGridElement();
+        } else if (gridApi.eGridDiv) {
+            gridDiv = gridApi.eGridDiv;
+        }
+
+        if (AgGridHelper.shouldDisableColumnPinning()) {
+            AgGridHelper.clearAllColumnPins(gridApi);
+            AgGridHelper.ensureSelectionColumnFirst(gridApi, gridDiv);
+            return;
+        }
+
+        if (visibilityManager && typeof visibilityManager.applyColumnState === 'function') {
+            visibilityManager.applyColumnState();
+        }
+        AgGridHelper.ensureSelectionColumnFirst(gridApi, gridDiv);
     };
 
     /**
@@ -4116,6 +4227,18 @@
             return;
         }
 
+        var gridDiv = null;
+        if (gridApi.getGridElement && typeof gridApi.getGridElement === 'function') {
+            gridDiv = gridApi.getGridElement();
+        } else if (gridApi.eGridDiv) {
+            gridDiv = gridApi.eGridDiv;
+        }
+
+        if (AgGridHelper.shouldDisableColumnPinning()) {
+            AgGridHelper.syncColumnPinningForViewport(gridApi, visibilityManager);
+            return;
+        }
+
         var mgr = visibilityManager ||
             (window.gridHelper && window.gridHelper.columnVisibilityManager) ||
             window.columnVisibilityManager;
@@ -4128,13 +4251,6 @@
         }
 
         try {
-            var gridDiv = null;
-            if (gridApi.getGridElement && typeof gridApi.getGridElement === 'function') {
-                gridDiv = gridApi.getGridElement();
-            } else if (gridApi.eGridDiv) {
-                gridDiv = gridApi.eGridDiv;
-            }
-
             var selectionIds = AgGridHelper.getSelectionColumnIds(gridApi, gridDiv);
             var mergedOrder = columnOrder && Array.isArray(columnOrder)
                 ? AgGridHelper.prependSelectionColumnOrder(gridApi, gridDiv, columnOrder)

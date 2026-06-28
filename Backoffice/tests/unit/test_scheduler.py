@@ -553,25 +553,9 @@ class TestScheduledJobInnerFunctions:
         ):
             fn()  # should be caught
 
-    def test_retry_failed_emails_success(self, app):
+    def test_retry_failed_emails_job_not_registered(self, app):
         jobs = self._run_init_and_capture_jobs(app)
-        fn = jobs.get("retry_failed_emails")
-        assert fn is not None
-
-        mock_log = MagicMock()
-        with patch("app.services.email.delivery.get_pending_retries", return_value=[mock_log]):
-            with patch("app.services.notification.emails.retry_email_delivery_log"):
-                fn()
-
-    def test_retry_failed_emails_exception(self, app):
-        jobs = self._run_init_and_capture_jobs(app)
-        fn = jobs.get("retry_failed_emails")
-
-        with patch(
-            "app.services.email.delivery.get_pending_retries",
-            side_effect=Exception("conn reset"),
-        ):
-            fn()  # should be caught
+        assert "retry_failed_emails" not in jobs
 
     def test_send_digest_emails_success(self, app):
         jobs = self._run_init_and_capture_jobs(app)

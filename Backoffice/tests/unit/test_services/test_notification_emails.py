@@ -400,6 +400,47 @@ class TestSendDailyDigest:
 
         assert result is True
 
+    def test_daily_digest_links_notification_and_email_log(self, app, db_session):
+        from app.models import User, Notification, EmailDeliveryLog
+        from app import db
+
+        with app.app_context():
+            user = User(email='daily_linked@test.com', name='Linked', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+
+            notif = Notification(
+                user_id=user.id,
+                notification_type=NotificationType.admin_message,
+                title='Assignment update',
+                message='Body',
+                is_read=False,
+                is_archived=False,
+            )
+            db.session.add(notif)
+            db.session.commit()
+
+            pref = self._make_pref()
+
+            with patch('app.services.notification.emails.send_email', return_value=True), \
+                 patch('app.services.notification.emails.render_digest_email', return_value='<html>'):
+                result = send_daily_digest(user, pref)
+
+            assert result is True
+
+            digest_notification = Notification.query.filter_by(
+                user_id=user.id,
+                notification_type=NotificationType.email_digest,
+            ).first()
+            assert digest_notification is not None
+
+            email_log = EmailDeliveryLog.query.filter_by(
+                notification_id=digest_notification.id,
+            ).first()
+            assert email_log is not None
+            assert email_log.status == 'sent'
+
     def test_returns_false_on_send_failure(self, app, db_session):
         from app.models import User, Notification
         from app import db
@@ -953,15 +994,39 @@ class TestRetryEmailDeliveryLog:
             mock_user.id = 1
             mock_user.email = 'unknown@test.com'
 
-            mock_pref = MagicMock()
+            with patch('app.services.notification.emails.User') as MockUser:
+                MockUser.query.get.return_value = mock_user
+                with patch('app.services.notification.emails.mark_email_failed') as mock_failed:
+                    result = retry_email_delivery_log(mock_log)
+        assert result is False
+        mock_failed.assert_called_once()
+        assert 'Retry not supported' in mock_failed.call_args[0][1]
+
+    def test_retries_welcome_email(self, app, db_session):
+        with app.app_context():
+            mock_log = MagicMock()
+            mock_log.id = 1
+            mock_log.user_id = 1
+            mock_log.notification_id = None
+            mock_log.subject = 'Welcome to IFRC'
+            mock_log.retry_count = 0
+            mock_log.status = 'failed'
+
+            mock_user = MagicMock()
+            mock_user.id = 1
+            mock_user.email = 'welcome@test.com'
 
             with patch('app.services.notification.emails.User') as MockUser:
                 MockUser.query.get.return_value = mock_user
                 with patch('app.services.notification.emails.NotificationPreferences') as MockNP:
-                    MockNP.query.filter_by.return_value.first.return_value = mock_pref
-                    with patch('app.services.notification.emails.mark_email_failed') as mock_failed:
-                        result = retry_email_delivery_log(mock_log)
-        assert result is False
+                    MockNP.query.filter_by.return_value.first.return_value = MagicMock()
+                    with patch('app.services.email.service.send_welcome_email', return_value=True) as mock_welcome:
+                        with patch('app.services.notification.emails.db') as mock_db:
+                            mock_db.session.refresh = MagicMock()
+                            mock_log.status = 'sent'
+                            result = retry_email_delivery_log(mock_log)
+        assert result is True
+        mock_welcome.assert_called_once_with(mock_user, existing_log=mock_log)
 
     def test_handles_exception_in_retry(self, app, db_session):
         with app.app_context():

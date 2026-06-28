@@ -255,6 +255,9 @@
      * Pinned state to apply for a column (saved preference + lockPinned defaults)
      */
     ColumnVisibilityManager.prototype.resolvePinnedForApply = function(colDef, saved) {
+        if (typeof AgGridHelper !== 'undefined' && AgGridHelper.shouldDisableColumnPinning()) {
+            return null;
+        }
         if (colDef.lockPinned && colDef.pinned) {
             return this.normalizePinnedValue(colDef.pinned);
         }
@@ -594,6 +597,9 @@
      * @param {string|null} pinned - 'left', 'right', or null to unpin
      */
     ColumnVisibilityManager.prototype.setColumnPinned = function(field, pinned) {
+        if (typeof AgGridHelper !== 'undefined' && AgGridHelper.shouldDisableColumnPinning()) {
+            return;
+        }
         const apiToUse = this.getApiToUse();
         const column = apiToUse.getColumn ? apiToUse.getColumn(field) : null;
         if (column && this.isSelectionCheckboxColumn(column)) {
@@ -643,6 +649,9 @@
      * Toggle column pinned state
      */
     ColumnVisibilityManager.prototype.toggleColumnPinned = function(field) {
+        if (typeof AgGridHelper !== 'undefined' && AgGridHelper.shouldDisableColumnPinning()) {
+            return;
+        }
         const apiToUse = this.getApiToUse();
         const column = apiToUse.getColumn ? apiToUse.getColumn(field) : null;
         if (!column) {
@@ -1257,7 +1266,8 @@
             item.appendChild(checkbox);
             item.appendChild(label);
 
-            if (this.options.enablePin && !isSelectionCol) {
+            if (this.options.enablePin && !isSelectionCol &&
+                !(typeof AgGridHelper !== 'undefined' && AgGridHelper.shouldDisableColumnPinning())) {
                 const pinBtn = document.createElement('button');
                 pinBtn.type = 'button';
                 pinBtn.className = 'ag-column-visibility-pin-btn' +

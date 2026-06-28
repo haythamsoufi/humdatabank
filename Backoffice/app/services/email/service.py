@@ -6,7 +6,7 @@ from app.utils.datetime_helpers import utcnow
 from app.utils.organization_helpers import (
     get_org_name, get_org_short_name, get_org_copyright_year, get_org_team_email
 )
-from app.services.app_settings_service import get_email_template
+from app.services.app_settings_service import get_email_template, get_notification_templates
 import logging
 from contextlib import suppress
 from markupsafe import escape
@@ -794,7 +794,57 @@ def send_security_alert(subject=None, event_type=None, severity=None, descriptio
         return False
 
 
-def send_welcome_email(user):
+def _render_email_template_metadata(text: str, **context) -> str:
+    """Replace ``{{key}}`` placeholders in email template metadata strings."""
+    if not text:
+        return ''
+    result = str(text)
+    for key, value in context.items():
+        for pattern in (f'{{{{{key}}}}}', f'{{{{ {key} }}}}'):
+            result = result.replace(pattern, str(value))
+    return result.strip()
+
+
+def _create_welcome_notification(user, org_name: str):
+    """Create the in-app welcome notification linked to the welcome email."""
+    from app.models.enums import NotificationType
+    from app.services.notification.core import create_notification
+
+    welcome_meta = get_notification_templates().get('email_template_welcome', {})
+    render_ctx = {'org_name': org_name}
+
+    custom_title = _render_email_template_metadata(welcome_meta.get('title', ''), **render_ctx)
+    custom_message = _render_email_template_metadata(welcome_meta.get('message', ''), **render_ctx)
+
+    title_params = {'org_name': org_name}
+    message_params = {'org_name': org_name}
+    if custom_title:
+        title_params['custom_title'] = custom_title
+    if custom_message:
+        message_params['message'] = custom_message
+
+    notifications = create_notification(
+        user_ids=user.id,
+        notification_type=NotificationType.account_welcome,
+        title_key='notification.account_welcome.title',
+        title_params=title_params,
+        message_key='notification.account_welcome.message',
+        message_params=message_params,
+        related_url='/',
+        priority=(welcome_meta.get('priority') or 'normal').strip() or 'normal',
+        icon='fa-user-check',
+        category='system',
+        tags=['welcome', 'onboarding'],
+        respect_preferences=False,
+        send_email_notifications=False,
+        send_push_notifications=False,
+    )
+    if notifications:
+        return notifications[0].id
+    return None
+
+
+def send_welcome_email(user, existing_log=None):
     """
     Send a welcome email to a newly registered user.
     Explains the system and how to get started, including requesting country access when needed.
@@ -915,8 +965,17 @@ def send_welcome_email(user):
         # Render email content
         html_content = render_admin_email_template(html_template, **context)
 
-        # Log email attempt
-        log = log_email_attempt(None, user.id, user.email, f"Welcome to {org_name}")
+        if existing_log and existing_log.notification_id:
+            notification_id = existing_log.notification_id
+        else:
+            notification_id = _create_welcome_notification(user, org_name)
+
+        log = existing_log
+        if not log:
+            log = log_email_attempt(notification_id, user.id, user.email, f"Welcome to {org_name}")
+        elif notification_id and not log.notification_id:
+            log.notification_id = notification_id
+            db.session.commit()
 
         # Send email
         try:
@@ -931,13 +990,13 @@ def send_welcome_email(user):
                 mark_email_sent(log.id)
                 current_app.logger.info(f"Welcome email sent to {user.email}")
             else:
-                mark_email_failed(log.id, "Email send returned False", retry=True)
+                mark_email_failed(log.id, "Email send returned False")
                 current_app.logger.error(f"Failed to send welcome email to {user.email}")
 
             return success
 
         except Exception as e:
-            mark_email_failed(log.id, str(e), retry=True)
+            mark_email_failed(log.id, str(e))
             current_app.logger.error(f"Error sending welcome email to {user.email}: {str(e)}")
             return False
 

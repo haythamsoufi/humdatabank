@@ -419,6 +419,16 @@ class TestCalculateNotificationExpiration:
         assert result is not None
         assert result > utcnow()
 
+    def test_uses_notification_expiration_days_when_type_not_in_ttl_map(self, app, db_session):
+        from app.utils.datetime_helpers import utcnow
+        with app.app_context():
+            app.config['NOTIFICATION_EXPIRATION_DAYS'] = 45
+            app.config['NOTIFICATION_TTL_DAYS'] = {}
+            result = calculate_notification_expiration(NotificationType.admin_message)
+        assert result is not None
+        assert result <= utcnow() + timedelta(days=46)
+        assert result > utcnow() + timedelta(days=44)
+
     def test_error_returns_none(self, app, db_session):
         with app.app_context():
             with patch('app.services.notification.core.current_app') as mock_app:

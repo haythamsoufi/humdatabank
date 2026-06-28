@@ -826,6 +826,7 @@ class TestSendWelcomeEmail:
             app.config.setdefault("MAIL_NOREPLY_SENDER", "noreply@example.com")
 
             with patch("app.services.email.service.send_email", return_value=True) as mock_send, \
+                 patch("app.services.email.service._create_welcome_notification", return_value=99) as mock_create_notif, \
                  patch("app.services.email.service.log_email_attempt") as mock_log, \
                  patch("app.services.email.service.mark_email_sent") as mock_sent, \
                  patch("app.services.email.service.get_email_template", side_effect=lambda k, d: d), \
@@ -835,8 +836,49 @@ class TestSendWelcomeEmail:
                 result = send_welcome_email(user)
 
         assert result is True
+        mock_create_notif.assert_called_once()
+        mock_log.assert_called_once()
+        assert mock_log.call_args[0][0] == 99
         mock_send.assert_called_once()
         mock_sent.assert_called_once_with(1)
+
+    def test_creates_notification_and_links_email_log(self, app):
+        from app.models import Notification, EmailDeliveryLog
+        from app.models.enums import NotificationType
+
+        with app.app_context():
+            user = _make_user()
+            db.session.add(user)
+            db.session.commit()
+
+            app.config["MAIL_DEFAULT_SENDER"] = "noreply@example.com"
+            app.config.setdefault("MAIL_NOREPLY_SENDER", "noreply@example.com")
+
+            with patch("app.services.email.service.send_email", return_value=True), \
+                 patch("app.services.email.service.get_email_template", side_effect=lambda k, d: d), \
+                 patch("app.services.email.service.get_notification_templates", return_value={
+                     "email_template_welcome": {
+                         "title": "Welcome to {{org_name}}!",
+                         "message": "Hello from {{org_name}}",
+                         "priority": "normal",
+                     }
+                 }), \
+                 patch("app.services.email.service.get_org_name", return_value="IFRC"), \
+                 patch("app.services.email.service.get_org_copyright_year", return_value="2024"):
+                result = send_welcome_email(user)
+
+            assert result is True
+            notification = Notification.query.filter_by(
+                user_id=user.id,
+                notification_type=NotificationType.account_welcome,
+            ).first()
+            assert notification is not None
+            assert "IFRC" in notification.title
+
+            email_log = EmailDeliveryLog.query.filter_by(notification_id=notification.id).first()
+            assert email_log is not None
+            assert email_log.user_id == user.id
+            assert email_log.status == "sent"
 
     def test_send_failure_marks_email_failed(self, app):
         with app.app_context():
@@ -847,6 +889,7 @@ class TestSendWelcomeEmail:
             app.config["MAIL_DEFAULT_SENDER"] = "noreply@example.com"
 
             with patch("app.services.email.service.send_email", return_value=False), \
+                 patch("app.services.email.service._create_welcome_notification", return_value=99), \
                  patch("app.services.email.service.log_email_attempt") as mock_log, \
                  patch("app.services.email.service.mark_email_failed") as mock_failed, \
                  patch("app.services.email.service.get_email_template", side_effect=lambda k, d: d), \
@@ -867,6 +910,7 @@ class TestSendWelcomeEmail:
             app.config["MAIL_DEFAULT_SENDER"] = "noreply@example.com"
 
             with patch("app.services.email.service.send_email", side_effect=Exception("SMTP error")), \
+                 patch("app.services.email.service._create_welcome_notification", return_value=99), \
                  patch("app.services.email.service.log_email_attempt") as mock_log, \
                  patch("app.services.email.service.mark_email_failed") as mock_failed, \
                  patch("app.services.email.service.get_email_template", side_effect=lambda k, d: d), \
@@ -889,6 +933,7 @@ class TestSendWelcomeEmail:
             app.config["MAIL_DEFAULT_SENDER"] = "noreply@example.com"
 
             with patch("app.services.email.service.send_email", return_value=True), \
+                 patch("app.services.email.service._create_welcome_notification", return_value=1), \
                  patch("app.services.email.service.log_email_attempt", return_value=MagicMock(id=1)), \
                  patch("app.services.email.service.mark_email_sent"), \
                  patch("app.services.email.service.get_email_template", side_effect=lambda k, d: d), \
@@ -911,6 +956,7 @@ class TestSendWelcomeEmail:
             app.config["MAIL_DEFAULT_SENDER"] = "noreply@example.com"
 
             with patch("app.services.email.service.send_email", return_value=True), \
+                 patch("app.services.email.service._create_welcome_notification", return_value=1), \
                  patch("app.services.email.service.log_email_attempt", return_value=MagicMock(id=1)), \
                  patch("app.services.email.service.mark_email_sent"), \
                  patch("app.services.email.service.get_email_template", side_effect=lambda k, d: d), \
@@ -942,6 +988,7 @@ class TestSendWelcomeEmail:
             app.config["MAIL_DEFAULT_SENDER"] = "noreply@example.com"
 
             with patch("app.services.email.service.send_email", return_value=True) as mock_send, \
+                 patch("app.services.email.service._create_welcome_notification", return_value=1), \
                  patch("app.services.email.service.log_email_attempt", return_value=MagicMock(id=1)), \
                  patch("app.services.email.service.mark_email_sent"), \
                  patch("app.services.email.service.get_email_template", side_effect=lambda k, d: d), \

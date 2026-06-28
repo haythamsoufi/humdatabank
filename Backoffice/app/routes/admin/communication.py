@@ -1,15 +1,15 @@
-# File: Backoffice/app/routes/admin/notifications.py
+# File: Backoffice/app/routes/admin/communication.py
 """
-Admin Notifications Module - Notifications Center for admins (send notifications and view all notifications)
+Admin Communication Module - Communication Center for admins (view notifications and email delivery, send campaigns).
 """
 
 import csv
 import io
 
-from flask import Blueprint, Response, render_template, request, flash, current_app, redirect, url_for
+from flask import Blueprint, Response, render_template, request, flash, current_app
 from flask_login import current_user
 from app.extensions import csrf, db
-from app.models import User, NotificationType, Notification, NotificationCampaign
+from app.models import User, NotificationType, Notification, NotificationCampaign, EmailDeliveryLog
 from app.routes.admin.shared import permission_required
 from app.utils.sql_utils import safe_ilike_pattern
 from app.services.notification.core import create_notification, get_default_icon_for_notification_type
@@ -17,6 +17,7 @@ from app.utils.request_validation import enforce_api_or_csrf_protection
 from app.services.notification.push import PushNotificationService
 from app.services.notification_service import NotificationService
 from app.services.email.client import send_email as send_email_message
+from app.services.email.delivery import log_email_attempt, mark_email_sent, mark_email_failed
 from app.services.authorization_service import AuthorizationService
 from app.services.app_settings_service import get_notification_templates, get_email_template
 from app.utils.organization_helpers import get_org_name
@@ -24,19 +25,39 @@ from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.error_handling import handle_json_view_exception
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from flask_babel import gettext as _
-from datetime import datetime
-from sqlalchemy import and_, or_, func
+from datetime import datetime, timedelta
+from sqlalchemy import and_, or_, func, cast, String
 from contextlib import suppress
+from app.utils.datetime_helpers import utcnow
 
-bp = Blueprint("admin_notifications", __name__, url_prefix="/admin")
+bp = Blueprint("admin_communication", __name__, url_prefix="/admin")
 
 
-@bp.route("/notifications/center", methods=["GET"])
+def _latest_admin_notifications_by_user(user_ids, within_seconds=30):
+    """Map user_id -> most recent admin_message notification created within the window."""
+    if not user_ids:
+        return {}
+    recent_cutoff = utcnow() - timedelta(seconds=within_seconds)
+    rows = (
+        Notification.query.filter(
+            Notification.user_id.in_(user_ids),
+            cast(Notification.notification_type, String) == NotificationType.admin_message.value,
+            Notification.created_at >= recent_cutoff,
+        )
+        .order_by(Notification.user_id, Notification.created_at.desc())
+        .all()
+    )
+    by_user = {}
+    for notification in rows:
+        if notification.user_id not in by_user:
+            by_user[notification.user_id] = notification
+    return by_user
+
+
+@bp.route("/communication/center", methods=["GET"])
 @permission_required("admin.notifications.manage")
-def notifications_center():
-    """Render the admin notifications center page"""
-    from sqlalchemy import cast, String
-
+def communication_center():
+    """Render the admin Communication Center page"""
     # Get all notification types for the filter dropdown
     notification_types = [nt.value for nt in NotificationType]
 
@@ -90,6 +111,9 @@ def notifications_center():
     assignment_status_cache, _ = NotificationService._build_assignment_caches_for_notifications(notifications)
     actor_fields_by_id = NotificationService.build_actor_display_fields_map(
         notifications, assignment_status_cache
+    )
+    email_fields_by_id = NotificationService.build_email_delivery_fields_map(
+        [n.id for n in notifications]
     )
 
     # Format notifications for template
@@ -155,7 +179,8 @@ def notifications_center():
             'created_at': notification.created_at.strftime('%Y-%m-%d %H:%M:%S') if notification.created_at else '',
             'read_at': notification.read_at.strftime('%Y-%m-%d %H:%M:%S') if notification.read_at else '',
             'related_url': notification.related_url,
-            'icon': get_default_icon_for_notification_type(notification.notification_type)
+            'icon': get_default_icon_for_notification_type(notification.notification_type),
+            **email_fields_by_id.get(notification.id, NotificationService._serialize_email_delivery_log(None)),
         })
 
     # Fetch campaigns for the campaigns tab
@@ -214,8 +239,12 @@ def notifications_center():
     # Load notification quick-templates from the database
     notification_templates = get_notification_templates()
 
+    failed_email_delivery_count = EmailDeliveryLog.query.filter(
+        cast(EmailDeliveryLog.status, String).in_(('failed', 'retrying'))
+    ).count()
+
     return render_template(
-        "admin/notifications/center.html",
+        "admin/communication/center.html",
         notification_types=notification_types,
         notifications=notifications_data,
         total_count=total_count,
@@ -224,12 +253,13 @@ def notifications_center():
         total_pages=1 if total_count else 0,
         campaigns=campaigns_data,
         notification_templates=notification_templates,
+        failed_email_delivery_count=failed_email_delivery_count,
     )
 
 
-@bp.route("/notifications/registry")
+@bp.route("/communication/registry")
 @permission_required("admin.notifications.manage")
-def notifications_registry():
+def communication_registry():
     """
     Read-only catalog of NotificationType keys: labels, priorities, TTL, and descriptions.
 
@@ -327,20 +357,12 @@ def notifications_registry():
         )
 
     return render_template(
-        "admin/notifications/registry.html",
+        "admin/communication/registry.html",
         rows=rows_out,
         total_catalog=total_specs,
         filtered_count=len(rows_out),
         q=request.args.get("q") or "",
     )
-
-
-# Keep the old route for backward compatibility
-@bp.route("/notifications/send", methods=["GET"])
-@permission_required("admin.notifications.manage")
-def send_notifications_page():
-    """Redirect to notifications center"""
-    return redirect(url_for('admin_notifications.notifications_center'))
 
 
 @bp.route("/api/notifications/send", methods=["POST"])
@@ -444,10 +466,8 @@ def api_send_notifications():
         if not valid_user_ids:
             return json_bad_request('No valid users found')
 
-        # Create notification records in the database
-        notifications = []
-        if send_push:
-            # Create notification records for push notifications
+        # Create notification records when email and/or push is requested
+        if send_email or send_push:
             notifications = create_notification(
                 user_ids=valid_user_ids,
                 notification_type=NotificationType.admin_message,
@@ -457,16 +477,15 @@ def api_send_notifications():
                 message_params={'message': message},
                 related_url=redirect_url if redirect_url else None,
                 priority=priority,
-                respect_preferences=False,  # Admin explicitly chose these users
-                # This route sends push/email itself; avoid duplicate delivery attempts.
+                respect_preferences=False,
                 send_email_notifications=False,
-                send_push_notifications=False
+                send_push_notifications=False,
             )
 
             if not notifications:
                 error_message = 'No notifications created. All notifications were duplicates - the same notification was already sent to the selected user(s) within the last few minutes. Please wait a moment before sending again, or modify the title/message to create a unique notification.'
                 current_app.logger.warning(
-                    f"Failed to create notification records for admin push notification from {current_user.id} ({current_user.email}). "
+                    f"Failed to create notification records for admin communication from {current_user.id} ({current_user.email}). "
                     f"All notifications were likely duplicates"
                 )
                 flash(error_message, 'danger')
@@ -476,6 +495,8 @@ def api_send_notifications():
                     flash_message=error_message,
                     flash_category='danger'
                 )
+
+        notification_by_user = _latest_admin_notifications_by_user(valid_user_ids) if (send_email or send_push) else {}
 
         # Track results
         email_results = {'success': False, 'sent': 0, 'failed': 0}
@@ -541,32 +562,46 @@ def api_send_notifications():
                 org_name=get_org_name(),
             )
 
-            # Send email to each user
-            recipients = [user_emails[uid] for uid in valid_user_ids if user_emails.get(uid)]
-
-            if recipients:
+            for uid in valid_user_ids:
+                recipient = user_emails.get(uid)
+                if not recipient:
+                    continue
+                notification = notification_by_user.get(uid)
+                notification_id = notification.id if notification else None
+                log = log_email_attempt(notification_id, uid, recipient, title)
                 try:
                     email_success = send_email_message(
                         subject=title,
-                        recipients=recipients,
-                        html=email_html
+                        recipients=[recipient],
+                        html=email_html,
+                    )
+                    if email_success:
+                        mark_email_sent(log.id)
+                        email_sent_count += 1
+                    else:
+                        mark_email_failed(log.id, "Email send returned False")
+                        email_failed_count += 1
+                except Exception as e:
+                    mark_email_failed(log.id, str(e))
+                    email_failed_count += 1
+                    current_app.logger.error(
+                        f"Error sending email notification to {recipient}: {str(e)}"
                     )
 
-                    if email_success:
-                        email_sent_count = len(recipients)
-                        email_results = {'success': True, 'sent': email_sent_count, 'failed': 0}
-                        current_app.logger.info(
-                            f"Admin {current_user.id} ({current_user.email}) sent email notification to {email_sent_count} users"
-                        )
-                    else:
-                        email_failed_count = len(recipients)
-                        email_results = {'success': False, 'sent': 0, 'failed': email_failed_count}
-                        current_app.logger.error(
-                            f"Admin {current_user.id} ({current_user.email}) failed to send email notification to {len(recipients)} users"
-                        )
-                except Exception as e:
-                    current_app.logger.error(f"Error sending email notifications: {str(e)}")
-                    email_results = {'success': False, 'sent': 0, 'failed': len(recipients)}
+            if email_sent_count or email_failed_count:
+                email_results = {
+                    'success': email_sent_count > 0 and email_failed_count == 0,
+                    'sent': email_sent_count,
+                    'failed': email_failed_count,
+                }
+                if email_sent_count:
+                    current_app.logger.info(
+                        f"Admin {current_user.id} ({current_user.email}) sent email notification to {email_sent_count} users"
+                    )
+                if email_failed_count:
+                    current_app.logger.error(
+                        f"Admin {current_user.id} ({current_user.email}) failed to send email notification to {email_failed_count} users"
+                    )
 
         # Send push notifications if requested
         if send_push:
@@ -744,6 +779,9 @@ def api_get_all_notifications():
         actor_fields_by_id = NotificationService.build_actor_display_fields_map(
             notifications, assignment_status_cache
         )
+        email_fields_by_id = NotificationService.build_email_delivery_fields_map(
+            [n.id for n in notifications]
+        )
 
         # Format notifications
         notifications_data = []
@@ -787,7 +825,8 @@ def api_get_all_notifications():
                 'created_at': notification.created_at.isoformat() if notification.created_at else None,
                 'read_at': notification.read_at.isoformat() if notification.read_at else None,
                 'related_url': notification.related_url,
-                'icon': get_default_icon_for_notification_type(notification.notification_type)
+                'icon': get_default_icon_for_notification_type(notification.notification_type),
+                **email_fields_by_id.get(notification.id, NotificationService._serialize_email_delivery_log(None)),
             })
 
         return json_ok(
@@ -853,5 +892,87 @@ def api_get_campaign_recipients(campaign_id):
 
         return json_ok(success=True, recipients=recipients, total=len(recipients))
 
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/api/communications/email-delivery/<int:log_id>/retry", methods=["POST"])
+@permission_required("admin.notifications.manage")
+def api_retry_email_delivery(log_id):
+    """Manually retry a failed email delivery log."""
+    enforce_api_or_csrf_protection()
+    try:
+        from app.services.email.delivery import admin_retry_email_delivery_log
+
+        success, message = admin_retry_email_delivery_log(log_id)
+        if success:
+            return json_ok(success=True, message=message)
+        return json_bad_request(message, success=False)
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/api/communications/email-delivery/retry-failed", methods=["POST"])
+@permission_required("admin.notifications.manage")
+def api_retry_failed_email_deliveries():
+    """Manually retry all failed email delivery logs (or a subset by log id)."""
+    enforce_api_or_csrf_protection()
+    try:
+        from app.services.email.delivery import admin_retry_failed_email_delivery_logs
+
+        data = get_json_safe() or {}
+        log_ids = data.get('log_ids')
+        if log_ids is not None and not isinstance(log_ids, list):
+            return json_bad_request('log_ids must be a list when provided')
+
+        result = admin_retry_failed_email_delivery_logs(log_ids=log_ids)
+        overall_success = result['failure_count'] == 0 and result['attempted'] > 0
+        message = (
+            f"Retried {result['attempted']} email(s): "
+            f"{result['success_count']} sent, {result['failure_count']} failed."
+        )
+        return json_ok(success=overall_success, message=message, **result)
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/api/communications/email-delivery/<int:log_id>/cancel", methods=["POST"])
+@permission_required("admin.notifications.manage")
+def api_cancel_email_delivery(log_id):
+    """Dismiss a failed email delivery log without retrying."""
+    enforce_api_or_csrf_protection()
+    try:
+        from app.services.email.delivery import cancel_email_delivery_log
+
+        success, message = cancel_email_delivery_log(log_id)
+        if success:
+            return json_ok(success=True, message=message)
+        return json_bad_request(message, success=False)
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/api/communications/email-delivery/cancel-failed", methods=["POST"])
+@permission_required("admin.notifications.manage")
+def api_cancel_failed_email_deliveries():
+    """Dismiss failed email delivery logs (all or selected log ids)."""
+    enforce_api_or_csrf_protection()
+    try:
+        from app.services.email.delivery import admin_cancel_email_delivery_logs
+
+        data = get_json_safe() or {}
+        log_ids = data.get('log_ids')
+        if log_ids is not None and not isinstance(log_ids, list):
+            return json_bad_request('log_ids must be a list when provided')
+
+        result = admin_cancel_email_delivery_logs(log_ids=log_ids)
+        message = (
+            f"Dismissed {result['success_count']} email failure(s)."
+            if result['success_count']
+            else 'No email failures were dismissed.'
+        )
+        if result['failure_count']:
+            message += f" {result['failure_count']} could not be dismissed."
+        return json_ok(success=result['failure_count'] == 0, message=message, **result)
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)

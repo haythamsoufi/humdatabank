@@ -112,10 +112,19 @@ class TestCountMethods:
 
     def test_get_unread_count_error_returns_zero(self, app, db_session):
         with app.app_context():
-            with patch('app.services.notification.service.Notification') as MockN:
-                MockN.query.with_entities.side_effect = Exception('db fail')
+            with patch.object(NotificationService, '_safe_notification_count', return_value=0):
                 count = NotificationService.get_unread_count(1)
         assert count == 0
+
+    def test_get_unread_count_error_rolls_back_session(self, app, db_session):
+        from app import db
+        mock_query = MagicMock()
+        mock_query.count.side_effect = Exception('timeout')
+        with app.app_context():
+            with patch.object(db.session, 'rollback') as mock_rb:
+                result = NotificationService._safe_notification_count(mock_query, 'test count')
+        assert result == 0
+        mock_rb.assert_called_once()
 
     def test_get_archived_count_with_archived(self, app, db_session):
         from app import db
@@ -127,8 +136,7 @@ class TestCountMethods:
 
     def test_get_archived_count_error_returns_zero(self, app, db_session):
         with app.app_context():
-            with patch('app.services.notification.service.Notification') as MockN:
-                MockN.query.with_entities.side_effect = Exception('fail')
+            with patch.object(NotificationService, '_safe_notification_count', return_value=0):
                 count = NotificationService.get_archived_count(1)
         assert count == 0
 
@@ -142,8 +150,7 @@ class TestCountMethods:
 
     def test_get_all_count_error_returns_zero(self, app, db_session):
         with app.app_context():
-            with patch('app.services.notification.service.Notification') as MockN:
-                MockN.query.with_entities.side_effect = Exception('fail')
+            with patch.object(NotificationService, '_safe_notification_count', return_value=0):
                 count = NotificationService.get_all_count(1)
         assert count == 0
 
@@ -937,8 +944,122 @@ class TestSerializeActorUser:
 
 
 # ---------------------------------------------------------------------------
-# Constants / module-level attributes
+# build_email_delivery_fields_map
 # ---------------------------------------------------------------------------
+
+class TestBuildEmailDeliveryFieldsMap:
+    def test_empty_ids_returns_empty_map(self, app):
+        with app.app_context():
+            assert NotificationService.build_email_delivery_fields_map([]) == {}
+
+    def test_latest_log_wins_on_retries(self, app, db_session):
+        from app.models import User, Notification, NotificationType, EmailDeliveryLog
+        from app import db
+        from app.utils.datetime_helpers import utcnow
+        from datetime import timedelta
+
+        with app.app_context():
+            user = User(email='email_map@test.com', name='Email Map', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+
+            notification = Notification(
+                user_id=user.id,
+                notification_type=NotificationType.admin_message,
+                title='Test',
+                message='Body',
+            )
+            db.session.add(notification)
+            db.session.flush()
+
+            older = EmailDeliveryLog(
+                notification_id=notification.id,
+                user_id=user.id,
+                email_address=user.email,
+                subject='Old subject',
+                status='failed',
+                created_at=utcnow() - timedelta(minutes=5),
+            )
+            newer = EmailDeliveryLog(
+                notification_id=notification.id,
+                user_id=user.id,
+                email_address=user.email,
+                subject='New subject',
+                status='sent',
+                sent_at=utcnow(),
+                created_at=utcnow(),
+            )
+            db.session.add_all([older, newer])
+            db.session.commit()
+
+            result = NotificationService.build_email_delivery_fields_map([notification.id])
+
+        row = result[notification.id]
+        assert row['has_email'] is True
+        assert row['email_status'] == 'sent'
+        assert row['email_subject'] == 'New subject'
+
+    def test_missing_log_returns_empty_email_fields(self, app, db_session):
+        from app.models import User, Notification, NotificationType
+        from app import db
+
+        with app.app_context():
+            user = User(email='no_log@test.com', name='No Log', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+
+            notification = Notification(
+                user_id=user.id,
+                notification_type=NotificationType.assignment_created,
+                title='In-app only',
+                message='No email',
+            )
+            db.session.add(notification)
+            db.session.commit()
+
+            result = NotificationService.build_email_delivery_fields_map([notification.id])
+
+        row = result[notification.id]
+        assert row['has_email'] is False
+        assert row['email_status'] is None
+        assert row['email_can_retry'] is False
+
+    def test_retrying_status_displayed_as_failed(self, app, db_session):
+        from app.models import User, Notification, NotificationType, EmailDeliveryLog
+        from app import db
+
+        with app.app_context():
+            user = User(email='retrying_display@test.com', name='Retry Display', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+
+            notification = Notification(
+                user_id=user.id,
+                notification_type=NotificationType.admin_message,
+                title='Test',
+                message='Body',
+            )
+            db.session.add(notification)
+            db.session.flush()
+
+            log = EmailDeliveryLog(
+                notification_id=notification.id,
+                user_id=user.id,
+                email_address=user.email,
+                subject='Subject',
+                status='retrying',
+            )
+            db.session.add(log)
+            db.session.commit()
+
+            row = NotificationService.build_email_delivery_fields_map([notification.id])[notification.id]
+
+        assert row['email_status'] == 'failed'
+        assert row['email_can_retry'] is True
+
 
 class TestModuleConstants:
     def test_message_primary_notification_types_is_frozenset(self):

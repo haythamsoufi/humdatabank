@@ -19,7 +19,11 @@ from flask import current_app
 from flask_babel import gettext as _
 from app.models import db, Notification, NotificationPreferences, User, CountryAccessRequest, NotificationType, EmailDeliveryLog
 from sqlalchemy import and_, or_ as sa_or_, func, cast, String
-from app.services.notification.core import get_default_icon_for_notification_type, validate_and_sanitize_action_buttons
+from app.services.notification.core import (
+    get_default_icon_for_notification_type,
+    validate_and_sanitize_action_buttons,
+    USER_HIDDEN_NOTIFICATION_TYPES,
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -57,6 +61,8 @@ ACTOR_BADGE_ICON_BY_TYPE = {
     'self_report_created': 'fa-clipboard-list',
     'deadline_reminder': 'fa-clock',
     'validation_questions': 'fa-clipboard-question',
+    'account_welcome': 'fa-user-check',
+    'email_digest': 'fa-envelope-open-text',
 }
 
 
@@ -91,6 +97,8 @@ class NotificationService:
             'self_report_created': 'Self Report Created',
             'deadline_reminder': 'Deadline Reminder',
             'admin_message': 'Admin Message',
+            'account_welcome': 'Welcome',
+            'email_digest': 'Email Digest',
             'access_request_received': 'Country Access Request Received',  # Matches translation file
             'validation_questions': 'Data Validation Questions',
         }
@@ -748,6 +756,11 @@ class NotificationService:
                 Notification.user_id == user_id
             )
 
+            if USER_HIDDEN_NOTIFICATION_TYPES:
+                query = query.filter(
+                    Notification.notification_type.notin_(tuple(USER_HIDDEN_NOTIFICATION_TYPES))
+                )
+
             # Filter out expired notifications
             query = query.filter(
                 sa_or_(
@@ -1119,6 +1132,20 @@ class NotificationService:
             return [], 0
 
     @classmethod
+    def _safe_notification_count(cls, query, error_context: str) -> int:
+        """
+        Run a lightweight COUNT without autoflush side effects.
+        Rolls back the session on failure so callers can still commit cleanly.
+        """
+        try:
+            with db.session.no_autoflush:
+                return query.count()
+        except Exception as e:
+            logger.error("Error getting %s: %s", error_context, e, exc_info=True)
+            db.session.rollback()
+            return 0
+
+    @classmethod
     def get_unread_count(cls, user_id: int) -> int:
         """
         Get count of unread, non-archived, non-expired notifications for a user.
@@ -1130,24 +1157,19 @@ class NotificationService:
         Returns:
             Count of unread notifications
         """
-        try:
-            now = utcnow()
-            # Use with_entities to only select id to avoid issues with missing columns
-            return Notification.query.with_entities(Notification.id).filter(
-                and_(
-                    Notification.user_id == user_id,
-                    Notification.is_read == False,
-                    Notification.is_archived == False,
-                    # Filter out expired notifications
-                    sa_or_(
-                        Notification.expires_at.is_(None),
-                        Notification.expires_at > now
-                    ),
-                )
-            ).count()
-        except Exception as e:
-            logger.error(f"Error getting unread notification count: {e}", exc_info=True)
-            return 0
+        now = utcnow()
+        query = Notification.query.with_entities(Notification.id).filter(
+            and_(
+                Notification.user_id == user_id,
+                Notification.is_read == False,
+                Notification.is_archived == False,
+                sa_or_(
+                    Notification.expires_at.is_(None),
+                    Notification.expires_at > now
+                ),
+            )
+        )
+        return cls._safe_notification_count(query, 'unread notification count')
 
     @classmethod
     def get_archived_count(cls, user_id: int) -> int:
@@ -1161,22 +1183,18 @@ class NotificationService:
         Returns:
             Count of archived notifications
         """
-        try:
-            now = utcnow()
-            return Notification.query.with_entities(Notification.id).filter(
-                and_(
-                    Notification.user_id == user_id,
-                    Notification.is_archived == True,
-                    # Filter out expired notifications
-                    sa_or_(
-                        Notification.expires_at.is_(None),
-                        Notification.expires_at > now
-                    ),
-                )
-            ).count()
-        except Exception as e:
-            logger.error(f"Error getting archived notification count: {e}", exc_info=True)
-            return 0
+        now = utcnow()
+        query = Notification.query.with_entities(Notification.id).filter(
+            and_(
+                Notification.user_id == user_id,
+                Notification.is_archived == True,
+                sa_or_(
+                    Notification.expires_at.is_(None),
+                    Notification.expires_at > now
+                ),
+            )
+        )
+        return cls._safe_notification_count(query, 'archived notification count')
 
     @classmethod
     def get_all_count(cls, user_id: int) -> int:
@@ -1190,22 +1208,18 @@ class NotificationService:
         Returns:
             Count of all notifications (excluding archived)
         """
-        try:
-            now = utcnow()
-            return Notification.query.with_entities(Notification.id).filter(
-                and_(
-                    Notification.user_id == user_id,
-                    Notification.is_archived == False,
-                    # Filter out expired notifications
-                    sa_or_(
-                        Notification.expires_at.is_(None),
-                        Notification.expires_at > now
-                    ),
-                )
-            ).count()
-        except Exception as e:
-            logger.error(f"Error getting all notification count: {e}", exc_info=True)
-            return 0
+        now = utcnow()
+        query = Notification.query.with_entities(Notification.id).filter(
+            and_(
+                Notification.user_id == user_id,
+                Notification.is_archived == False,
+                sa_or_(
+                    Notification.expires_at.is_(None),
+                    Notification.expires_at > now
+                ),
+            )
+        )
+        return cls._safe_notification_count(query, 'all notification count')
 
     @classmethod
     def mark_all_as_read(cls, user_id: int) -> bool:
@@ -1522,3 +1536,95 @@ class NotificationService:
             logger.error(f"Error updating notification preferences: {e}", exc_info=True)
             db.session.rollback()
             return None
+
+    @staticmethod
+    def _serialize_email_delivery_log(log: Optional[Any]) -> Dict[str, Any]:
+        """Grid/API payload for the latest email delivery attempt linked to a notification."""
+        if log is None:
+            return {
+                'has_email': False,
+                'email_log_id': None,
+                'email_status': None,
+                'email_status_display': '',
+                'email_subject': '',
+                'email_sent_at': '',
+                'email_failed_at': '',
+                'email_error': '',
+                'email_retry_count': 0,
+                'email_can_retry': False,
+                'email_can_cancel': False,
+            }
+
+        status_raw = log.status.value if hasattr(log.status, 'value') else str(log.status or '')
+        if status_raw == 'retrying':
+            # Legacy rows from automatic retry — treat as failed in admin UI.
+            status_raw = 'failed'
+        status_display = status_raw.replace('_', ' ').title() if status_raw else ''
+
+        return {
+            'has_email': True,
+            'email_log_id': log.id,
+            'email_status': status_raw,
+            'email_status_display': status_display,
+            'email_subject': log.subject or '',
+            'email_sent_at': log.sent_at.strftime('%Y-%m-%d %H:%M:%S') if log.sent_at else '',
+            'email_failed_at': log.failed_at.strftime('%Y-%m-%d %H:%M:%S') if log.failed_at else '',
+            'email_error': log.error_message or '',
+            'email_retry_count': int(log.retry_count or 0),
+            'email_can_retry': NotificationService._email_delivery_log_can_retry(log),
+            'email_can_cancel': NotificationService._email_delivery_log_can_cancel(log),
+        }
+
+    @staticmethod
+    def _email_delivery_log_can_cancel(log) -> bool:
+        from app.services.email.delivery import email_delivery_log_can_cancel
+
+        status_raw = log.status.value if hasattr(log.status, 'value') else str(log.status or '')
+        if status_raw == 'retrying':
+            status_raw = 'failed'
+        if status_raw != 'failed':
+            return False
+        return email_delivery_log_can_cancel(log)
+
+    @staticmethod
+    def _email_delivery_log_can_retry(log) -> bool:
+        from app.services.email.delivery import email_delivery_log_can_retry
+
+        status_raw = log.status.value if hasattr(log.status, 'value') else str(log.status or '')
+        if status_raw == 'retrying':
+            status_raw = 'failed'
+        if status_raw != 'failed':
+            return False
+        return email_delivery_log_can_retry(log)
+
+    @classmethod
+    def build_email_delivery_fields_map(
+        cls,
+        notification_ids: List[int],
+    ) -> Dict[int, Dict[str, Any]]:
+        """
+        Return the latest EmailDeliveryLog fields per notification_id.
+
+        When multiple logs exist (retries), the most recently created row wins.
+        """
+        if not notification_ids:
+            return {}
+
+        logs = (
+            EmailDeliveryLog.query.filter(
+                EmailDeliveryLog.notification_id.in_(notification_ids)
+            )
+            .order_by(EmailDeliveryLog.notification_id, EmailDeliveryLog.created_at.desc())
+            .all()
+        )
+
+        latest_by_notification: Dict[int, EmailDeliveryLog] = {}
+        for log in logs:
+            nid = log.notification_id
+            if nid is not None and nid not in latest_by_notification:
+                latest_by_notification[nid] = log
+
+        return {
+            nid: cls._serialize_email_delivery_log(latest_by_notification.get(nid))
+            for nid in notification_ids
+        }

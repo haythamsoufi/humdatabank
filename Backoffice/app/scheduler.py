@@ -162,12 +162,7 @@ def init_scheduler(app, is_reloader):
                         from app.services.user_analytics_service import cleanup_inactive_sessions
                         cleanup_inactive_sessions()
 
-                    def _retry_failed_emails():
-                        from app.services.email.delivery import get_pending_retries
-                        from app.services.notification.emails import retry_email_delivery_log
-                        pending = get_pending_retries()
-                        for log in pending:
-                            retry_email_delivery_log(log)
+                    # Automatic email retries removed — admins retry from Communication Center.
 
                     def _send_digest_emails():
                         from app.services.notification.emails import send_notification_emails
@@ -208,16 +203,6 @@ def init_scheduler(app, is_reloader):
                         replace_existing=True
                     )
 
-                    scheduler.add_job(
-                        func=lambda: _run_scheduled_job(app, 'retry_failed_emails', _retry_failed_emails),
-                        trigger="interval", minutes=15,
-                        id='retry_failed_emails', name='Retry failed notification emails',
-                        replace_existing=True
-                    )
-
-                    # The digest trigger window is typically 60 minutes, so checking every
-                    # 5 minutes is sufficient and reduces unnecessary DB load 12× vs 1-minute
-                    # polling.  Override via SCHEDULER_DIGEST_EMAIL_INTERVAL_MINUTES.
                     try:
                         digest_interval = max(1, int(
                             app.config.get('SCHEDULER_DIGEST_EMAIL_INTERVAL_MINUTES', 5)

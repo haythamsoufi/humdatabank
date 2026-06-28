@@ -13,7 +13,7 @@ from app.models import (
 )
 from app.utils.datetime_helpers import utcnow
 from app.services.notification.emails import retry_email_delivery_log, send_instant_notification_email
-from app.services.notification.core import create_notification, cleanup_old_notifications
+from app.services.notification.core import create_notification, cleanup_old_notifications, cleanup_old_email_delivery_logs
 
 
 @pytest.mark.usefixtures("db_session")
@@ -204,4 +204,49 @@ def test_cleanup_old_notifications_deletes_email_delivery_logs_first(app):
 
         assert stats["expired_deleted"] >= 1
         assert db.session.get(Notification, nid) is None
+        assert db.session.get(EmailDeliveryLog, lid) is None
+
+
+@pytest.mark.usefixtures("db_session")
+def test_cleanup_old_notifications_uses_config_retention_days(app):
+    with app.app_context():
+        app.config['NOTIFICATION_CLEANUP_RETENTION_DAYS'] = 120
+        with patch('app.services.notification.core.Notification.query') as mock_notif:
+            mock_notif.filter.return_value.delete.return_value = 0
+            with patch('app.services.notification.core.EmailDeliveryLog.query') as mock_log:
+                mock_log.filter.return_value.delete.return_value = 0
+                with patch('app.services.notification.core.cleanup_old_email_delivery_logs', return_value=0):
+                    stats = cleanup_old_notifications()
+        assert stats['total_deleted'] == 0
+
+
+@pytest.mark.usefixtures("db_session")
+def test_cleanup_old_email_delivery_logs_removes_stale_rows(app):
+    with app.app_context():
+        email = f"cleanup_log-{uuid.uuid4().hex}@example.com"
+        user = User(email=email, name="Log Cleanup User", active=True)
+        user.set_password("test123")
+        db.session.add(user)
+        db.session.flush()
+
+        old = utcnow() - timedelta(days=200)
+        log = EmailDeliveryLog(
+            notification_id=None,
+            user_id=user.id,
+            email_address=email,
+            subject="Digest",
+            status="sent",
+            created_at=old,
+        )
+        db.session.add(log)
+        db.session.commit()
+        lid = log.id
+        log.created_at = old
+        db.session.commit()
+
+        deleted = cleanup_old_email_delivery_logs(days=90)
+        db.session.commit()
+        db.session.expire_all()
+
+        assert deleted >= 1
         assert db.session.get(EmailDeliveryLog, lid) is None

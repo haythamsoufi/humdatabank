@@ -192,7 +192,7 @@ def activity_category_for_endpoint(endpoint: str) -> str:
         return "admin_plugin"
     if bp.endswith("_plugin"):
         return "admin_plugin"
-    if bp in ("notifications", "notification"):
+    if bp in ("notifications", "notification", "admin_communication"):
         return "admin_notifications"
     if bp in ("monitoring",):
         return "admin_monitoring"

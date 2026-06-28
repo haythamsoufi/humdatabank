@@ -19,6 +19,10 @@ from app.services.email.delivery import (
     mark_email_sent,
     mark_email_failed,
     get_pending_retries,
+    classify_orphan_email_log,
+    email_delivery_log_can_retry,
+    cancel_email_delivery_log,
+    email_delivery_log_can_cancel,
 )
 from app.utils.datetime_helpers import utcnow
 
@@ -144,7 +148,7 @@ class TestMarkEmailFailed:
             result = mark_email_failed(99999999, "error", retry=False)
             assert result is None
 
-    def test_first_failure_schedules_retry(self, app):
+    def test_default_marks_failed_without_auto_retry(self, app):
         with app.app_context():
             user = _make_user()
             db.session.add(user)
@@ -153,32 +157,13 @@ class TestMarkEmailFailed:
             log = log_email_attempt(None, user.id, user.email, "Subject")
             result = mark_email_failed(log.id, "SMTP error", retry=True, max_retries=3)
 
-            assert result.status == "retrying"
+            assert result.status == "failed"
             assert result.retry_count == 1
-            assert result.next_retry_at is not None
+            assert result.next_retry_at is None
             assert result.error_message == "SMTP error"
             assert result.failed_at is not None
 
-    def test_second_failure_uses_longer_delay(self, app):
-        with app.app_context():
-            user = _make_user()
-            db.session.add(user)
-            db.session.commit()
-
-            log = log_email_attempt(None, user.id, user.email, "Subject")
-            # Simulate already having retried once
-            log.retry_count = 1
-            db.session.commit()
-
-            result = mark_email_failed(log.id, "error", retry=True, max_retries=3)
-            assert result.retry_count == 2
-            assert result.status == "retrying"
-            # Second retry should be at least 60 minutes (3600 sec) from now
-            from datetime import timedelta
-            min_expected = utcnow() + timedelta(minutes=59)
-            assert result.next_retry_at >= min_expected
-
-    def test_third_failure_uses_longest_delay(self, app):
+    def test_retry_flag_is_ignored(self, app):
         with app.app_context():
             user = _make_user()
             db.session.add(user)
@@ -189,11 +174,9 @@ class TestMarkEmailFailed:
             db.session.commit()
 
             result = mark_email_failed(log.id, "error", retry=True, max_retries=3)
+            assert result.status == "failed"
             assert result.retry_count == 3
-            assert result.status == "retrying"
-            # Third delay index is 2 → 240 minutes
-            min_expected = utcnow() + timedelta(minutes=239)
-            assert result.next_retry_at >= min_expected
+            assert result.next_retry_at is None
 
     def test_retry_false_marks_failed(self, app):
         with app.app_context():
@@ -207,20 +190,6 @@ class TestMarkEmailFailed:
             assert result.status == "failed"
             assert result.retry_count == 1
 
-    def test_max_retries_exceeded_marks_failed(self, app):
-        with app.app_context():
-            user = _make_user()
-            db.session.add(user)
-            db.session.commit()
-
-            log = log_email_attempt(None, user.id, user.email, "Subject")
-            log.retry_count = 3  # Already at max
-            db.session.commit()
-
-            result = mark_email_failed(log.id, "too many retries", retry=True, max_retries=3)
-            assert result.status == "failed"
-            assert result.retry_count == 4
-
     def test_error_message_stored(self, app):
         with app.app_context():
             user = _make_user()
@@ -233,49 +202,19 @@ class TestMarkEmailFailed:
             fetched = EmailDeliveryLog.query.get(log.id)
             assert fetched.error_message == "Connection refused"
 
-    def test_custom_max_retries(self, app):
-        with app.app_context():
-            user = _make_user()
-            db.session.add(user)
-            db.session.commit()
-
-            log = log_email_attempt(None, user.id, user.email, "Subject")
-            log.retry_count = 0
-            db.session.commit()
-
-            # With max_retries=1, first failure should still schedule retry
-            result = mark_email_failed(log.id, "err", retry=True, max_retries=1)
-            assert result.status == "retrying"
-            assert result.retry_count == 1
-
-    def test_already_at_custom_max_retries_marks_failed(self, app):
-        with app.app_context():
-            user = _make_user()
-            db.session.add(user)
-            db.session.commit()
-
-            log = log_email_attempt(None, user.id, user.email, "Subject")
-            log.retry_count = 1
-            db.session.commit()
-
-            # With max_retries=1, retry_count(1) == max_retries(1), should fail
-            result = mark_email_failed(log.id, "err", retry=True, max_retries=1)
-            assert result.status == "failed"
-
 
 # ---------------------------------------------------------------------------
-# get_pending_retries
+# get_pending_retries (automatic retries disabled)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.usefixtures("db_session")
 class TestGetPendingRetries:
-    def test_returns_ready_retries(self, app):
+    def test_returns_empty_list(self, app):
         with app.app_context():
             user = _make_user()
             db.session.add(user)
             db.session.commit()
 
-            # Create a retrying log with next_retry_at in the past
             log = EmailDeliveryLog(
                 notification_id=None,
                 user_id=user.id,
@@ -288,104 +227,53 @@ class TestGetPendingRetries:
             db.session.add(log)
             db.session.commit()
 
-            results = get_pending_retries(max_retries=3)
-            ids = [r.id for r in results]
-            assert log.id in ids
+            assert get_pending_retries(max_retries=3) == []
 
-    def test_skips_future_retries(self, app):
+
+@pytest.mark.usefixtures("db_session")
+class TestCancelEmailDeliveryLog:
+    def test_cancels_failed_log(self, app):
         with app.app_context():
             user = _make_user()
             db.session.add(user)
             db.session.commit()
 
-            log = EmailDeliveryLog(
-                notification_id=None,
-                user_id=user.id,
-                email_address=user.email,
-                subject="Future retry",
-                status="retrying",
-                retry_count=1,
-                next_retry_at=utcnow() + timedelta(hours=1),
-            )
-            db.session.add(log)
-            db.session.commit()
+            log = log_email_attempt(None, user.id, user.email, "Subject")
+            mark_email_failed(log.id, "SMTP error", retry=False)
 
-            results = get_pending_retries(max_retries=3)
-            ids = [r.id for r in results]
-            assert log.id not in ids
+            ok, message = cancel_email_delivery_log(log.id)
+            fetched = EmailDeliveryLog.query.get(log.id)
 
-    def test_skips_sent_logs(self, app):
+        assert ok is True
+        status = fetched.status.value if hasattr(fetched.status, 'value') else fetched.status
+        assert status == 'cancelled'
+        assert email_delivery_log_can_retry(fetched) is False
+        assert email_delivery_log_can_cancel(fetched) is False
+
+    def test_cannot_cancel_sent_log(self, app):
         with app.app_context():
             user = _make_user()
             db.session.add(user)
             db.session.commit()
 
-            log = EmailDeliveryLog(
-                notification_id=None,
-                user_id=user.id,
-                email_address=user.email,
-                subject="Sent",
-                status="sent",
-                retry_count=0,
-                next_retry_at=utcnow() - timedelta(minutes=1),
-            )
-            db.session.add(log)
-            db.session.commit()
+            log = log_email_attempt(None, user.id, user.email, "Subject")
+            mark_email_sent(log.id)
 
-            results = get_pending_retries(max_retries=3)
-            ids = [r.id for r in results]
-            assert log.id not in ids
+            ok, message = cancel_email_delivery_log(log.id)
 
-    def test_skips_exceeded_max_retries(self, app):
-        with app.app_context():
-            user = _make_user()
-            db.session.add(user)
-            db.session.commit()
+        assert ok is False
 
-            log = EmailDeliveryLog(
-                notification_id=None,
-                user_id=user.id,
-                email_address=user.email,
-                subject="Too many retries",
-                status="retrying",
-                retry_count=5,
-                next_retry_at=utcnow() - timedelta(minutes=1),
-            )
-            db.session.add(log)
-            db.session.commit()
 
-            results = get_pending_retries(max_retries=3)
-            ids = [r.id for r in results]
-            assert log.id not in ids
+@pytest.mark.usefixtures("db_session")
+class TestClassifyOrphanEmailLog:
+    def test_daily_digest(self):
+        assert classify_orphan_email_log('Daily Notification Digest - 3 new notification(s)') == 'daily_digest'
 
-    def test_returns_empty_when_no_pending(self, app):
-        with app.app_context():
-            results = get_pending_retries(max_retries=3)
-            # No assertion on exact empty list since other tests may have data
-            assert isinstance(results, list)
+    def test_weekly_digest(self):
+        assert classify_orphan_email_log('Weekly Notification Digest - 1 new notification(s)') == 'weekly_digest'
 
-    def test_custom_max_retries_filter(self, app):
-        with app.app_context():
-            user = _make_user()
-            db.session.add(user)
-            db.session.commit()
+    def test_welcome(self):
+        assert classify_orphan_email_log('Welcome to Humanitarian Databank') == 'welcome'
 
-            log = EmailDeliveryLog(
-                notification_id=None,
-                user_id=user.id,
-                email_address=user.email,
-                subject="Custom max",
-                status="retrying",
-                retry_count=2,
-                next_retry_at=utcnow() - timedelta(minutes=1),
-            )
-            db.session.add(log)
-            db.session.commit()
-
-            # With max_retries=3: retry_count=2 <= 3 → included
-            results_included = get_pending_retries(max_retries=3)
-            assert log.id in [r.id for r in results_included]
-
-            # With max_retries=1: retry_count=2 > 1 → excluded
-            results_excluded = get_pending_retries(max_retries=1)
-            assert log.id not in [r.id for r in results_excluded]
+    def test_unsupported(self):
+        assert classify_orphan_email_log('Random subject') == 'unsupported'

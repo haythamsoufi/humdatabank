@@ -35,6 +35,12 @@ from app.services.notification.audience import (
 # In-app only: never send instant or digest email for these types.
 IN_APP_ONLY_NOTIFICATION_TYPES = frozenset({
     NotificationType.document_uploaded,
+    NotificationType.email_digest,
+})
+
+# Hidden from end-user notification lists (admin Communication Center still shows them).
+USER_HIDDEN_NOTIFICATION_TYPES = frozenset({
+    NotificationType.email_digest,
 })
 
 
@@ -362,6 +368,18 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
         'notification.admin_message.title': _notification_msgid('Admin Message'),
         'notification.admin_message.message': _notification_msgid('You have received an admin message'),
 
+        # Account welcome (title/message from email template metadata when provided)
+        'notification.account_welcome.title': _notification_msgid('Welcome to %(org_name)s!'),
+        'notification.account_welcome.message': _notification_msgid(
+            "Welcome to %(org_name)s! Your account has been created. Open your dashboard to get started, "
+            "review assignments, and use Documentation from the main navigation for guides."
+        ),
+
+        'notification.email_digest.title': _notification_msgid('%(frequency)s Notification Digest'),
+        'notification.email_digest.message': _notification_msgid(
+            '%(frequency)s email digest delivered with %(count)s notification(s).'
+        ),
+
         # Validation questions (data quality checks)
         'notification.validation_questions.title': _notification_msgid(
             'Validation questions for %(template)s (%(period)s)'
@@ -384,6 +402,14 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
                     return str(params['custom_title'])[:255]
                 # For admin message body, use custom message if provided
                 if translation_key == 'notification.admin_message.message' and 'message' in params:
+                    return str(params['message'])[:MAX_NOTIFICATION_MESSAGE_LENGTH]
+                if translation_key == 'notification.account_welcome.title' and 'custom_title' in params:
+                    return str(params['custom_title'])[:255]
+                if translation_key == 'notification.account_welcome.message' and 'message' in params:
+                    return str(params['message'])[:MAX_NOTIFICATION_MESSAGE_LENGTH]
+                if translation_key == 'notification.email_digest.title' and 'custom_title' in params:
+                    return str(params['custom_title'])[:255]
+                if translation_key == 'notification.email_digest.message' and 'message' in params:
                     return str(params['message'])[:MAX_NOTIFICATION_MESSAGE_LENGTH]
 
             # Translate at runtime using the current locale
@@ -716,10 +742,14 @@ def calculate_notification_expiration(notification_type):
         else:
             notif_type_str = str(notification_type)
 
-        # Get TTL configuration
+        # Get TTL configuration (per-type override, else NOTIFICATION_EXPIRATION_DAYS)
+        try:
+            default_ttl = int(current_app.config.get('NOTIFICATION_EXPIRATION_DAYS', 90))
+        except (TypeError, ValueError):
+            default_ttl = 90
         ttl_days = current_app.config.get('NOTIFICATION_TTL_DAYS', {}).get(
             notif_type_str,
-            90  # Default 90 days
+            default_ttl,
         )
 
         if ttl_days > 0:
@@ -1898,7 +1928,48 @@ def log_entity_activity(
 
 
 
-def cleanup_old_notifications(days: int = 90) -> Dict[str, int]:
+def _notification_retention_days(days: Optional[int] = None) -> int:
+    """Resolve archived-notification retention from explicit arg or app config."""
+    if days is not None:
+        try:
+            return max(1, int(days))
+        except (TypeError, ValueError):
+            pass
+    try:
+        return max(1, int(current_app.config.get('NOTIFICATION_CLEANUP_RETENTION_DAYS', 90)))
+    except (TypeError, ValueError):
+        return 90
+
+
+def _email_delivery_log_retention_days() -> int:
+    """Retention for email_delivery_log rows (defaults to notification cleanup retention)."""
+    raw = current_app.config.get(
+        'NOTIFICATION_EMAIL_LOG_RETENTION_DAYS',
+        current_app.config.get('NOTIFICATION_CLEANUP_RETENTION_DAYS', 90),
+    )
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 90
+
+
+def cleanup_old_email_delivery_logs(days: Optional[int] = None) -> int:
+    """
+    Delete email delivery log rows older than the retention window.
+    Includes digest rows with notification_id=NULL.
+    """
+    try:
+        retention_days = days if days is not None else _email_delivery_log_retention_days()
+        cutoff = utcnow() - timedelta(days=retention_days)
+        return EmailDeliveryLog.query.filter(
+            EmailDeliveryLog.created_at < cutoff,
+        ).delete(synchronize_session=False)
+    except Exception as e:
+        current_app.logger.error(f"Error cleaning up email delivery logs: {e}", exc_info=True)
+        return 0
+
+
+def cleanup_old_notifications(days: Optional[int] = None) -> Dict[str, int]:
     """
     Delete archived notifications older than specified days.
     Also deletes expired notifications (regardless of archived status).
@@ -1907,11 +1978,13 @@ def cleanup_old_notifications(days: int = 90) -> Dict[str, int]:
         days (int): Number of days to keep archived notifications
 
     Returns:
-        dict: Statistics about cleanup (archived_deleted, expired_deleted, total_deleted)
+        dict: Statistics about cleanup (archived_deleted, expired_deleted,
+              email_logs_deleted, total_deleted)
     """
     try:
         now = utcnow()
-        cutoff = now - timedelta(days=days)
+        retention_days = _notification_retention_days(days)
+        cutoff = now - timedelta(days=retention_days)
 
         # Delete dependent email_delivery_log rows first (FK: notification.id)
         expired_notif_ids = db.session.query(Notification.id).filter(
@@ -1942,6 +2015,8 @@ def cleanup_old_notifications(days: int = 90) -> Dict[str, int]:
             Notification.archived_at < cutoff
         ).delete(synchronize_session=False)
 
+        email_logs_deleted = cleanup_old_email_delivery_logs()
+
         try:
             db.session.commit()
         except Exception as commit_error:
@@ -1950,20 +2025,23 @@ def cleanup_old_notifications(days: int = 90) -> Dict[str, int]:
             return {
                 'archived_deleted': 0,
                 'expired_deleted': 0,
+                'email_logs_deleted': 0,
                 'total_deleted': 0
             }
 
         total_deleted = expired_deleted + archived_deleted
 
-        if total_deleted > 0:
+        if total_deleted > 0 or email_logs_deleted > 0:
             current_app.logger.info(
                 f"Cleaned up {total_deleted} old notifications "
-                f"({expired_deleted} expired, {archived_deleted} archived)"
+                f"({expired_deleted} expired, {archived_deleted} archived), "
+                f"{email_logs_deleted} email delivery log(s)"
             )
 
         return {
             'archived_deleted': archived_deleted,
             'expired_deleted': expired_deleted,
+            'email_logs_deleted': email_logs_deleted,
             'total_deleted': total_deleted
         }
     except Exception as e:
@@ -1972,6 +2050,7 @@ def cleanup_old_notifications(days: int = 90) -> Dict[str, int]:
         return {
             'archived_deleted': 0,
             'expired_deleted': 0,
+            'email_logs_deleted': 0,
             'total_deleted': 0
         }
 
@@ -2327,6 +2406,8 @@ def get_default_icon_for_notification_type(notification_type):
         NotificationType.deadline_reminder: 'fas fa-clock',
         NotificationType.access_request_received: 'fas fa-user-plus',
         NotificationType.validation_questions: 'fas fa-clipboard-question',
+        NotificationType.account_welcome: 'fas fa-user-check',
+        NotificationType.email_digest: 'fas fa-envelope-open-text',
     }
     return icon_map.get(notification_type, 'fas fa-bell')
 

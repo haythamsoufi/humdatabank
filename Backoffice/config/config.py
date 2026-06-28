@@ -1107,6 +1107,13 @@ class Config:
     # Notification expiration and cleanup configuration
     NOTIFICATION_EXPIRATION_DAYS = int(os.environ.get('NOTIFICATION_EXPIRATION_DAYS', '90'))
     NOTIFICATION_CLEANUP_RETENTION_DAYS = int(os.environ.get('NOTIFICATION_CLEANUP_RETENTION_DAYS', '90'))
+    # Email delivery log retention (digest + instant sends); defaults to cleanup retention.
+    NOTIFICATION_EMAIL_LOG_RETENTION_DAYS = int(
+        os.environ.get(
+            'NOTIFICATION_EMAIL_LOG_RETENTION_DAYS',
+            os.environ.get('NOTIFICATION_CLEANUP_RETENTION_DAYS', '90'),
+        )
+    )
 
     # Notification rate limiting
     MAX_NOTIFICATIONS_PER_USER_PER_HOUR = int(os.environ.get('MAX_NOTIFICATIONS_PER_USER_PER_HOUR', '100'))

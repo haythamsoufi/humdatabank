@@ -894,7 +894,7 @@
       <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Email & Notification Templates') }}</label>
       {# Placeholder names stay literal (not gettext): they match Jinja variables and should not be auto-translated. #}
       <p class="text-xs text-gray-500 mb-3">
-        {{ _('Templates are used for both system emails and the Notifications Center. Each template has an HTML body (per language) and optional pre-fill fields (title, message, priority) used when composing a notification. Use Jinja2 syntax. Typical placeholder names include:') }}
+        {{ _('Templates are used for both system emails and the Communication Center. Each template has an HTML body (per language) and optional pre-fill fields (title, message, priority) used when composing a notification. Use Jinja2 syntax. Typical placeholder names include:') }}
         <span class="font-mono text-xs bg-gray-100 px-1 rounded ml-0.5">org_name, org_short_name, copyright_year, user_name, submitter_name, etc.</span>
       </p>
 
@@ -922,7 +922,7 @@
         {
           'key': 'email_template_notification',
           'label': _('Notification Email Wrapper'),
-          'description': _('HTML wrapper used when sending notifications from the Notifications Center via email. Variables: title, message, org_name')
+          'description': _('HTML wrapper used when sending notifications from the Communication Center via email. Variables: title, message, org_name')
         }
       ] %}
 
@@ -1046,7 +1046,7 @@
         {# Notification Center pre-fill (same template, used when composing a notification) #}
         {% set meta = current_template_metadata.get(template.key, {}) %}
         <div class="mt-4 pt-4 border-t border-gray-200">
-          <p class="text-xs font-medium text-gray-600 mb-2">{{ _('Notifications Center pre-fill') }}</p>
+          <p class="text-xs font-medium text-gray-600 mb-2">{{ _('Communication Center pre-fill') }}</p>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
             <div>
               <label class="block text-xs text-gray-500 mb-0.5">{{ _('Display label') }}</label>
@@ -1062,11 +1062,11 @@
           </div>
           <div class="mb-2">
             <label class="block text-xs text-gray-500 mb-0.5">{{ _('Pre-fill title') }}</label>
-            <input type="text" class="template-metadata-title w-full text-sm rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}" value="{{ meta.title or '' }}" placeholder="{{ _('Title when used in Notifications Center') }}">
+            <input type="text" class="template-metadata-title w-full text-sm rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}" value="{{ meta.title or '' }}" placeholder="{{ _('Title when used in Communication Center') }}">
           </div>
           <div>
             <label class="block text-xs text-gray-500 mb-0.5">{{ _('Pre-fill message') }}</label>
-            <textarea class="template-metadata-message w-full text-xs rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}" rows="2" placeholder="{{ _('Message body when used in Notifications Center') }}">{{ meta.message or '' }}</textarea>
+            <textarea class="template-metadata-message w-full text-xs rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}" rows="2" placeholder="{{ _('Message body when used in Communication Center') }}">{{ meta.message or '' }}</textarea>
           </div>
         </div>
 
@@ -1076,7 +1076,7 @@
       </div>
       {% endfor %}
 
-      {# Bundled defaults: below per-template editors (each includes Notifications Center pre-fill) #}
+      {# Bundled defaults: below per-template editors (each includes Communication Center pre-fill) #}
       <div class="mt-6 pt-6 border-t border-gray-200">
         <div class="relative inline-block text-left"
              id="email-templates-seed-dropdown"
@@ -1178,7 +1178,7 @@
         <div>
           <h3 class="text-sm font-semibold text-gray-900">{{ _('Notifications') }}</h3>
           <p class="text-xs text-gray-600 mt-1.5 max-w-3xl">
-            {{ _('Each row describes who receives the in-app notification when it is created, how long it is kept (TTL), and the default priority for new notifications of that type. Where applicable, enable or disable delivery to focal points (assignment editor/submitter on the entity) and to admin-capable users (system_manager, admin_core, admin_*). Stored items appear in the Notifications Center; WebSockets, push, and email depend on feature flags and each user’s own preferences. High and urgent priorities can trigger immediate email and stronger styling even when the user prefers digests.') }}
+            {{ _('Each row describes who receives the in-app notification when it is created, how long it is kept (TTL), and the default priority for new notifications of that type. Where applicable, enable or disable delivery to focal points (assignment editor/submitter on the entity) and to admin-capable users (system_manager, admin_core, admin_*). Stored items appear in the Communication Center; WebSockets, push, and email depend on feature flags and each user’s own preferences. High and urgent priorities can trigger immediate email and stronger styling even when the user prefers digests.') }}
           </p>
           <p class="text-xs text-gray-600 mt-2 max-w-3xl">
             {{ _('Hypothetical types are listed at the bottom; the word Hypothetical appears in the Type column when no in-app notification is emitted for that row yet.') }}

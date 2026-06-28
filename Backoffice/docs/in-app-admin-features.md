@@ -80,24 +80,24 @@ This page maps **administrator-facing screens** in the Backoffice to what they d
 | **Data** | Lookup-backed options used across forms (document types, age groups, sex categories, etc.). |
 | **Branding** | Organization name, logos, public-facing identity. |
 | **Emails** | SMTP / mail templates and behaviour tied to outbound mail. |
-| **Notifications** | System defaults that pair with the Notifications Center. |
+| **Notifications** | System defaults that pair with the Communication Center. |
 | **AI** | Feature flags and limits for AI/RAG (complements server `env` secrets; see [AI configuration](setup/ai-configuration.md)). |
 
 Header includes **app version** and an **Updates** check when implemented. Deep links from other admin pages may use hash fragments (for example `#emails`).
 
 ---
 
-### Notifications Center
+### Communication Center
 
-**Where:** Admin → **Notifications Center** → `/admin/notifications/center`.
+**Where:** Admin → **Communication Center** → `/admin/communication/center`.
 
 **Who:** `admin.notifications.manage`.
 
 **What you get:**
 
-- **View All Notifications** — AG Grid of every notification in the system; column filters and column visibility.
-- **Create Notification** — Compose sends to selected users or entities by **email** and/or **mobile push**, with delivery options and attachments.
-- **Campaigns** — Scheduled or draft notification campaigns.
+- **View All Communications** — AG Grid of every in-app notification with linked email delivery status; column filters and column visibility.
+- **Create Communication** — Compose sends to selected users or entities by **email** and/or **mobile push**, with delivery options and attachments.
+- **Campaigns** — Scheduled or draft communication campaigns.
 
 Operational guide: [Notifications and communications (Admin)](user-guides/admin/notifications-and-communications.md). Email infrastructure cross-reference: System Configuration → **Emails**.
 
@@ -330,7 +330,7 @@ These are used heavily alongside admin work:
 | Area | Entry | Notes |
 |------|--------|--------|
 | **Account settings** | Profile menu | Language, password, profile fields ([Account settings](user-guides/common/account-settings.md)). |
-| **Notifications (user)** | Bell icon | Personal inbox; distinct from admin **Notifications Center**. |
+| **Notifications (user)** | Bell icon | Personal inbox; distinct from admin **Communication Center**. |
 | **Help Documentation** | Nav / profile | Public help docs blueprint (`help_docs`), separate from admin in-app **Documentation**. |
 | **Forms / data entry** | Assignments | Focal-point data collection ([Fill and submit a form](user-guides/focal-point/submit-data.md)). |
 
@@ -345,7 +345,7 @@ These are used heavily alongside admin work:
 | Translation Management | `admin.translations.manage` |
 | Plugin Management | `admin.plugins.manage` |
 | System Configuration | `admin.settings.manage` |
-| Notifications Center | `admin.notifications.manage` |
+| Communication Center | `admin.notifications.manage` |
 | Documentation (in-app) | `admin.docs.view` |
 | Manage Users | `admin.users.view` |
 | Manage Templates | `admin.templates.view` |

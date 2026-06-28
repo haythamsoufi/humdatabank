@@ -33,21 +33,20 @@ def mark_email_sent(log_id: int) -> Optional[EmailDeliveryLog]:
     return log
 
 
-def mark_email_failed(log_id: int, error_message: str, retry: bool = True, max_retries: int = 3) -> Optional[EmailDeliveryLog]:
+def mark_email_failed(
+    log_id: int,
+    error_message: str,
+    retry: bool = False,
+    max_retries: int = 3,
+) -> Optional[EmailDeliveryLog]:
     """
-    Mark an email as failed and schedule retry if needed.
+    Mark an email delivery attempt as failed.
 
-    Uses exponential backoff: 15 min, 1 hour, 4 hours (default max 3 retries)
-
-    Args:
-        log_id: Email delivery log ID
-        error_message: Error message describing the failure
-        retry: Whether to schedule a retry
-        max_retries: Maximum number of retry attempts (default: 3)
-
-    Returns:
-        EmailDeliveryLog instance or None
+    Automatic retries are disabled; admins retry manually from Communication Center.
+    The ``retry`` parameter is kept for call-site compatibility but is ignored.
     """
+    _ = retry, max_retries  # legacy parameters — no automatic re-queue
+
     log = EmailDeliveryLog.query.get(log_id)
     if not log:
         return None
@@ -55,47 +54,180 @@ def mark_email_failed(log_id: int, error_message: str, retry: bool = True, max_r
     log.status = 'failed'
     log.error_message = error_message
     log.failed_at = utcnow()
-
-    # Schedule retry with exponential backoff if enabled
-    if retry and log.retry_count < max_retries:
-        log.retry_count += 1
-        # Exponential backoff: 15^1=15min, 15^2=225min (3.75h), 15^3=3375min (56.25h)
-        # Using more reasonable delays: 15 min, 1 hour, 4 hours
-        retry_delays_minutes = [15, 60, 240]  # Exponential backoff: 15min, 1h, 4h
-        delay_index = min(log.retry_count - 1, len(retry_delays_minutes) - 1)
-        delay_minutes = retry_delays_minutes[delay_index]
-        log.next_retry_at = utcnow() + timedelta(minutes=delay_minutes)
-        log.status = 'retrying'
-        current_app.logger.info(
-            f"Scheduled retry #{log.retry_count} for email log {log_id} "
-            f"in {delay_minutes} minutes"
-        )
-    else:
-        # Max retries exceeded or retry disabled
-        log.retry_count += 1
-        log.status = 'failed'
-        if log.retry_count >= max_retries:
-            current_app.logger.warning(
-                f"Email log {log_id} exceeded max retries ({max_retries}), marking as permanently failed"
-            )
-
+    log.next_retry_at = None
+    log.retry_count = int(log.retry_count or 0) + 1
     db.session.commit()
     return log
 
 
 def get_pending_retries(max_retries: int = 3) -> List[EmailDeliveryLog]:
-    """
-    Get emails that are ready to retry.
+    """Legacy hook — automatic email retries are disabled."""
+    _ = max_retries
+    return []
 
-    Args:
-        max_retries: Maximum number of retries allowed (default: 3)
+
+def classify_orphan_email_log(subject: Optional[str]) -> str:
+    """
+    Classify delivery logs with no notification_id for retry routing.
+
+    Orphan logs are typically digests (by design) or legacy welcome emails.
+    """
+    text = (subject or '').strip().lower()
+    if 'weekly notification digest' in text:
+        return 'weekly_digest'
+    if 'daily notification digest' in text:
+        return 'daily_digest'
+    if text.startswith('welcome to'):
+        return 'welcome'
+    return 'unsupported'
+
+
+def email_delivery_log_can_retry(log: Optional[EmailDeliveryLog]) -> bool:
+    """Whether an admin/manual retry can resend this delivery log."""
+    if log is None:
+        return False
+
+    status = log.status.value if hasattr(log.status, 'value') else str(log.status or '')
+    if status not in ('failed', 'retrying'):
+        return False
+
+    if log.notification_id:
+        return True
+
+    return classify_orphan_email_log(log.subject) != 'unsupported'
+
+
+def email_delivery_log_can_cancel(log: Optional[EmailDeliveryLog]) -> bool:
+    """Whether an admin can dismiss a failed delivery log without retrying."""
+    if log is None:
+        return False
+
+    status = log.status.value if hasattr(log.status, 'value') else str(log.status or '')
+    return status in ('failed', 'retrying')
+
+
+def cancel_email_delivery_log(log_id: int) -> tuple[bool, str]:
+    """Dismiss a failed email delivery log (no resend)."""
+    log = EmailDeliveryLog.query.get(log_id)
+    if not log:
+        return False, 'Email delivery log not found'
+
+    status = log.status.value if hasattr(log.status, 'value') else str(log.status or '')
+    if status == 'cancelled':
+        return True, 'Email failure already dismissed'
+
+    if status not in ('failed', 'retrying'):
+        return False, f'Cannot dismiss email in status: {status}'
+
+    log.status = 'cancelled'
+    log.next_retry_at = None
+    db.session.commit()
+    return True, 'Email failure dismissed'
+
+
+def admin_cancel_email_delivery_logs(log_ids: Optional[List[int]] = None) -> dict:
+    """Dismiss multiple failed delivery logs without retrying."""
+    query = EmailDeliveryLog.query.filter(
+        EmailDeliveryLog.status.in_(('failed', 'retrying'))
+    )
+    if log_ids:
+        query = query.filter(EmailDeliveryLog.id.in_(log_ids))
+
+    logs = query.order_by(EmailDeliveryLog.created_at.asc()).all()
+    success_count = 0
+    failure_count = 0
+    skipped_count = 0
+    errors: List[str] = []
+
+    for log in logs:
+        if not email_delivery_log_can_cancel(log):
+            skipped_count += 1
+            continue
+        ok, message = cancel_email_delivery_log(log.id)
+        if ok:
+            success_count += 1
+        else:
+            failure_count += 1
+            if message and len(errors) < 5:
+                errors.append(message)
+
+    return {
+        'attempted': len(logs) - skipped_count,
+        'skipped_count': skipped_count,
+        'success_count': success_count,
+        'failure_count': failure_count,
+        'errors': errors,
+    }
+
+
+def admin_retry_email_delivery_log(log_id: int) -> tuple[bool, str]:
+    """
+    Manually retry a failed email delivery log (admin Communication Center).
 
     Returns:
-        List of EmailDeliveryLog instances ready for retry
+        (success, message)
     """
-    now = utcnow()
-    return EmailDeliveryLog.query.filter(
-        EmailDeliveryLog.status == 'retrying',
-        EmailDeliveryLog.next_retry_at <= now,
-        EmailDeliveryLog.retry_count <= max_retries
-    ).all()
+    from app.services.notification.emails import retry_email_delivery_log
+
+    log = EmailDeliveryLog.query.get(log_id)
+    if not log:
+        return False, 'Email delivery log not found'
+
+    status = log.status.value if hasattr(log.status, 'value') else str(log.status or '')
+    if status == 'sent':
+        return True, 'Email already sent'
+
+    if status not in ('failed', 'retrying'):
+        return False, f'Cannot retry email in status: {status}'
+
+    if not email_delivery_log_can_retry(log):
+        return False, f'Retry is not supported for this email type (subject: {log.subject or "(empty)"})'
+
+    log.next_retry_at = None
+    db.session.commit()
+
+    if retry_email_delivery_log(log):
+        return True, 'Email sent successfully'
+
+    db.session.refresh(log)
+    refreshed = log.status.value if hasattr(log.status, 'value') else str(log.status or '')
+    if refreshed == 'sent':
+        return True, 'Email sent successfully'
+
+    error = log.error_message or 'Email send failed'
+    return False, error
+
+
+def admin_retry_failed_email_delivery_logs(log_ids: Optional[List[int]] = None) -> dict:
+    """Retry multiple failed delivery logs. Returns counts for admin UI."""
+    query = EmailDeliveryLog.query.filter(
+        EmailDeliveryLog.status.in_(('failed', 'retrying'))
+    )
+    if log_ids:
+        query = query.filter(EmailDeliveryLog.id.in_(log_ids))
+
+    logs = query.order_by(EmailDeliveryLog.created_at.asc()).all()
+    success_count = 0
+    failure_count = 0
+    skipped_count = 0
+    errors: List[str] = []
+
+    for log in logs:
+        if not email_delivery_log_can_retry(log):
+            skipped_count += 1
+            continue
+        ok, message = admin_retry_email_delivery_log(log.id)
+        if ok:
+            success_count += 1
+        else:
+            failure_count += 1
+            if message and len(errors) < 5:
+                errors.append(message)
+
+    return {
+        'attempted': len(logs) - skipped_count,
+        'skipped_count': skipped_count,
+        'success_count': success_count,
+        'failure_count': failure_count,
+        'errors': errors,
+    }

@@ -253,6 +253,7 @@ class EmailDeliveryStatusValue(str, enum.Enum):
     sent = 'sent'
     failed = 'failed'
     retrying = 'retrying'
+    cancelled = 'cancelled'
 
     @classmethod
     def values(cls) -> tuple[str, ...]:
@@ -450,3 +451,5 @@ class NotificationType(enum.Enum):
     admin_message = 'admin_message'  # Custom admin push notifications
     access_request_received = 'access_request_received'  # Country access request received
     validation_questions = 'validation_questions'  # Data validation questions for focal points
+    account_welcome = 'account_welcome'  # One-time welcome when a user account is created
+    email_digest = 'email_digest'  # Delivery receipt linking digest emails in Communication Center

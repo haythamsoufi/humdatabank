@@ -45,11 +45,11 @@
             <span class="sidebar-text">{{ _('System Configuration') }}</span>
         </a>
         {% endif %}
-        {# Notifications Center - requires admin.notifications.manage #}
+        {# Communication Center - requires admin.notifications.manage #}
         {% if is_system_manager or has_permission('admin.notifications.manage') %}
-        <a href="{{ url_for('admin_notifications.notifications_center') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Notifications Center') }}">
-            {{ svg_icon('bell', 'sidebar-icon w-6 h-6 mr-3') }}
-            <span class="sidebar-text">{{ _('Notifications Center') }}</span>
+        <a href="{{ url_for('admin_communication.communication_center') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Communication Center') }}">
+            {{ svg_icon('paper-plane', 'sidebar-icon w-6 h-6 mr-3') }}
+            <span class="sidebar-text">{{ _('Communication Center') }}</span>
         </a>
         {% endif %}
         {# Documentation / Onboarding (file-based docs under Backoffice/docs/workflows) #}

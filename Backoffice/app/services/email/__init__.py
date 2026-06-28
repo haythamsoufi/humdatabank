@@ -13,7 +13,14 @@ from .service import (
     send_admin_notification_email,
 )
 from .rendering import render_admin_email_template
-from .delivery import log_email_attempt, mark_email_sent, mark_email_failed, get_pending_retries
+from .delivery import (
+    log_email_attempt,
+    mark_email_sent,
+    mark_email_failed,
+    get_pending_retries,
+    admin_retry_email_delivery_log,
+    admin_retry_failed_email_delivery_logs,
+)
 from .campaigns import send_multiple_entity_email_campaigns
 from .protection import check_email_recipients_allowed
 
@@ -28,6 +35,8 @@ __all__ = [
     'mark_email_sent',
     'mark_email_failed',
     'get_pending_retries',
+    'admin_retry_email_delivery_log',
+    'admin_retry_failed_email_delivery_logs',
     'send_multiple_entity_email_campaigns',
     'check_email_recipients_allowed',
 ]

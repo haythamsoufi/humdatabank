@@ -255,6 +255,7 @@ class UprImportContext:
     emergency_matrix_plugin_config: Dict[str, Any] = field(default_factory=dict)
     emergency_go_plugin_config: Dict[str, Any] = field(default_factory=dict)
     yes_no_bank_ids: Set[int] = field(default_factory=set)
+    indicator_bank_ids: Set[int] = field(default_factory=set)
     core_yes_no_item_ids: List[int] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
 
@@ -305,6 +306,13 @@ def _load_yes_no_bank_ids() -> Set[int]:
         if _is_yes_no_indicator_type(row.type):
             out.add(int(row.id))
     return out
+
+
+def _load_indicator_bank_ids() -> Set[int]:
+    """All indicator bank primary keys (used to validate dynamic import FK targets)."""
+    from app.models.indicator_bank import IndicatorBank
+
+    return {int(row.id) for row in IndicatorBank.query.with_entities(IndicatorBank.id).all()}
 
 
 def _master_yes_no_value(value_num: Optional[float]) -> str:
@@ -1147,6 +1155,11 @@ def _queue_dynamic_indicator_entry(
         if missing_section_warning:
             ctx.warnings.append(missing_section_warning)
         return
+    if ctx.indicator_bank_ids and indicator_bank_id not in ctx.indicator_bank_ids:
+        ctx.warnings.append(
+            f"Indicator bank id {indicator_bank_id} not found; skipping dynamic import"
+        )
+        return
     order_counters[order_key] = order_counters.get(order_key, 0.0) + 1.0
     entry = {
         "aes_id": aes_id,
@@ -1248,22 +1261,29 @@ def upsert_dynamic_indicator_entries(
     from app.extensions import db
     from app.models.forms import DynamicIndicatorData
 
-    stats = {"dynamic_inserted": 0, "dynamic_updated": 0}
+    stats = {"dynamic_inserted": 0, "dynamic_updated": 0, "dynamic_skipped": 0}
     if dry_run or not entries:
         return stats
 
+    from app.models.indicator_bank import IndicatorBank
+
+    valid_bank_ids = {int(row.id) for row in IndicatorBank.query.with_entities(IndicatorBank.id).all()}
     user_id = _default_user_id_for_import()
     for entry in entries:
         aes_id = int(entry["aes_id"])
         section_id = int(entry["section_id"])
         bank_id = int(entry["indicator_bank_id"])
+        if bank_id not in valid_bank_ids:
+            stats["dynamic_skipped"] += 1
+            continue
         repeat_num = entry.get("repeat_instance_number")
-        row = DynamicIndicatorData.query.filter_by(
-            assignment_entity_status_id=aes_id,
-            section_id=section_id,
-            indicator_bank_id=bank_id,
-            repeat_instance_number=repeat_num,
-        ).first()
+        with db.session.no_autoflush:
+            row = DynamicIndicatorData.query.filter_by(
+                assignment_entity_status_id=aes_id,
+                section_id=section_id,
+                indicator_bank_id=bank_id,
+                repeat_instance_number=repeat_num,
+            ).first()
         action = "dynamic_updated"
         if not row:
             row = DynamicIndicatorData(
@@ -1294,13 +1314,18 @@ def upsert_dynamic_indicator_entries(
 
         stats[action] += 1
 
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
     return stats
 
 
 def build_import_context(template_ids: List[int]) -> UprImportContext:
     ids = [int(t) for t in template_ids]
     ctx = UprImportContext(template_ids=ids)
+    ctx.indicator_bank_ids = _load_indicator_bank_ids()
     ctx.assignment_by_template = _load_assignment_map(ids)
     ctx.assignment_by_period_iso = ctx.assignment_by_template.get(24, {})
     ctx.published_version_ids = _load_published_version_ids(ids)

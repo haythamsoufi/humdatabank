@@ -225,6 +225,8 @@ def run_import():
                 )
             except Exception as exc:
                 app.logger.error("UPR async import failed: %s", exc, exc_info=True)
+                from app.extensions import db
+                db.session.rollback()
                 update_import_job(
                     job_id,
                     force=True,

@@ -12,6 +12,7 @@ from import_upr_excel_data import (  # noqa: E402
     UprImportContext,
     _fill_missing_core_yes_no_defaults,
     _master_yes_no_value,
+    _queue_dynamic_indicator_entry,
     _queue_other_dynamic_indicator,
     _reporting_aes_ids_for_import,
     _reporting_indicator_has_import_value,
@@ -32,6 +33,7 @@ def _ctx(**kwargs: Any) -> UprImportContext:
             }
         },
         "other_indicators_section_id": 555,
+        "indicator_bank_ids": {123, 619},
         "dynamic_indicator_entries": [],
     }
     defaults.update(kwargs)
@@ -106,6 +108,36 @@ class TestQueueOtherDynamicIndicator:
         )
         assert ctx.dynamic_indicator_entries == []
         assert any("Other indicators dynamic section missing" in w for w in ctx.warnings)
+
+    def test_skips_unknown_indicator_bank(self):
+        ctx = _ctx(indicator_bank_ids={619})
+        _queue_other_dynamic_indicator(
+            ctx,
+            aes_id=42,
+            indicator_bank_id=1050,
+            value=1.0,
+            data_not_available=False,
+            order_counters={},
+        )
+        assert ctx.dynamic_indicator_entries == []
+        assert any("Indicator bank id 1050 not found" in w for w in ctx.warnings)
+
+
+class TestQueueDynamicIndicatorEntry:
+    def test_skips_missing_bank_before_section_check(self):
+        ctx = _ctx(other_indicators_section_id=None, indicator_bank_ids={619})
+        _queue_dynamic_indicator_entry(
+            ctx,
+            section_id=555,
+            aes_id=42,
+            indicator_bank_id=1050,
+            value=1.0,
+            data_not_available=False,
+            order_counters={},
+            order_key=(42,),
+        )
+        assert ctx.dynamic_indicator_entries == []
+        assert any("Indicator bank id 1050 not found" in w for w in ctx.warnings)
 
 
 class TestMasterYesNoValue:

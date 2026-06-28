@@ -112,6 +112,14 @@ def _classify_warning_for_grouping(message: str) -> _WarningClassification:
                 iso3=m.group(1),
             ),
         ),
+        (
+            re.compile(r"^Indicator bank id (\d+) not found; skipping dynamic import$"),
+            lambda m: _WarningClassification(
+                group_key=f"missing_indicator_bank|{m.group(1)}",
+                display_base=f"Indicator bank id {m.group(1)} not found; skipping dynamic import",
+                bank_id=m.group(1),
+            ),
+        ),
     )
 
     for pattern, builder in patterns:

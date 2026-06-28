@@ -5,6 +5,7 @@ from app.models import db, FormTemplate, FormItem, FormSection, FormPage, Assign
 from app.models.assignments import AssignmentEntityStatus
 from app.routes.admin.shared import admin_permission_required, check_template_access
 from app.services.imputation_service import ImputationService
+from app.services.reporting_period_service import sort_period_names
 import io
 import os
 import sys
@@ -1074,12 +1075,7 @@ def get_filter_options(template_id: int):
 @bp.route("/<int:template_id>/available-periods", methods=["GET"])
 @admin_permission_required('admin.templates.view')
 def get_available_periods(template_id: int):
-    """Return all distinct period_name values for this template, sorted most-recent-first.
-
-    Periods are sorted by the 4-digit year embedded in the name (descending), then
-    alphabetically within the same year, so both ``"2026"`` and ``"Jan-Jun 2026"``
-    sort correctly.
-    """
+    """Return all distinct period_name values for this template, sorted most-recent-first."""
     try:
         FormTemplate.query.get_or_404(template_id)
 
@@ -1090,14 +1086,7 @@ def get_available_periods(template_id: int):
             .distinct()
             .all()
         )
-        period_names = [row.period_name for row in rows if row.period_name]
-
-        def _period_sort_key(p: str):
-            m = re.search(r'(\d{4})', p)
-            year = int(m.group(1)) if m else 0
-            return (-year, p)
-
-        period_names.sort(key=_period_sort_key)
+        period_names = sort_period_names([row.period_name for row in rows if row.period_name])
 
         return json_ok(
             success=True,

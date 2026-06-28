@@ -11,6 +11,7 @@ from app.models import Country, FormData, FormItem, IndicatorBank, AssignmentEnt
 from app.models.enums import DocumentStatus
 from app.models.forms import FormSection
 from app.models.validation import ValidationQuestion
+from app.services.reporting_period_service import sort_period_names
 
 
 def parse_period_year(period_name: str) -> int | None:
@@ -175,12 +176,7 @@ def list_assignment_periods(
         .all()
     )
     periods = [r[0] for r in rows if r[0]]
-
-    def _sort_key(period_name: str) -> tuple[int, str]:
-        year = parse_period_year(period_name)
-        return (year or 0, period_name)
-
-    return sorted(periods, key=_sort_key, reverse=True)
+    return sort_period_names(periods)
 
 
 def list_exploration_period_names(template_id: int | None = None) -> list[str]:
@@ -213,7 +209,7 @@ def list_exploration_period_names(template_id: int | None = None) -> list[str]:
     combined = union(af_q, fd_q).subquery()
     rows = db.session.query(combined.c.period_name).distinct().all()
     periods = [r[0] for r in rows if r[0]]
-    return sorted(periods, key=lambda p: (parse_period_year(p) or 0, p), reverse=True)
+    return sort_period_names(periods)
 
 
 def resolve_assignment_aes(

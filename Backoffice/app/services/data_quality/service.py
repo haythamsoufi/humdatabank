@@ -7,6 +7,7 @@ from app.models import FormData, FormTemplate
 from app.models.assignments import AssignmentEntityStatus, AssignedForm
 from app.models.forms import FormTemplateVersion
 from app.services.data_quality.helpers import get_assignment_aes
+from app.services.reporting_period_service import period_chronology_sort_key
 from app.services.data_quality.methodologies import get_methodology
 from app.services.data_quality.types import DataQualityResult
 from app.utils.data_quality_constants import METHODOLOGY_TO_DEFAULT_RULE_PACK
@@ -93,12 +94,21 @@ def list_data_quality_templates_for_entity(
             continue
         period_names = {r[1] for r in rows if r[0] == tmpl.id and r[1]}
 
-        def _period_rank(period_name: str) -> tuple[int, str]:
+        def _period_rank(period_name: str) -> tuple[int, tuple]:
             aes = get_assignment_aes(tmpl.id, entity_type, entity_id, period_name)
             if aes is None:
-                return (0, period_name)
-            data_count = FormData.query.filter_by(assignment_entity_status_id=aes.id).count()
-            return (1 if data_count > 0 else 0, period_name)
+                data_rank = 0
+                chrono = period_chronology_sort_key(period_name)
+            else:
+                data_count = FormData.query.filter_by(assignment_entity_status_id=aes.id).count()
+                data_rank = 1 if data_count > 0 else 0
+                assigned_form = aes.assigned_form
+                chrono = period_chronology_sort_key(
+                    assigned_form.period_name if assigned_form else period_name,
+                    period_start=getattr(assigned_form, "period_start", None),
+                    period_end=getattr(assigned_form, "period_end", None),
+                )
+            return (data_rank, chrono)
 
         periods = sorted(period_names, key=_period_rank, reverse=True)
         result.append(

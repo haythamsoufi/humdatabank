@@ -5,7 +5,10 @@ Extracted from routes/api.py for better organization and reusability.
 """
 
 import logging
+from datetime import date
 from typing import Any
+
+from app.services.reporting_period_service import period_chronology_sort_key
 
 from app.utils.form_localization import get_localized_indicator_name
 from app.utils.api_formatting import format_answer_value
@@ -16,6 +19,15 @@ from app.models import FormTemplate, AssignedForm
 from app.models.assignments import AssignmentEntityStatus, PublicSubmission
 
 logger = logging.getLogger(__name__)
+
+
+def _iso_to_date(value: Any) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except (TypeError, ValueError):
+        return None
 
 
 def format_country_info(country):
@@ -918,7 +930,16 @@ def build_star_schema_tables(
             if key in period_keys and key not in seen_periods:
                 dim_period.append(format_dim_period(af))
                 seen_periods.add(key)
-        dim_period.sort(key=lambda x: (x.get('template_id') or 0, x.get('period_name') or ''))
+        dim_period.sort(
+            key=lambda row: (
+                row.get("template_id") or 0,
+                period_chronology_sort_key(
+                    row.get("period_name"),
+                    period_start=_iso_to_date(row.get("period_start")),
+                    period_end=_iso_to_date(row.get("period_end")),
+                ),
+            )
+        )
 
     assigned_submission_ids = {
         int(r['submission_id'])

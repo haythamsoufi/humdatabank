@@ -27,6 +27,7 @@ from sqlalchemy.orm import joinedload
 
 # Import utility functions
 from app.utils.api_helpers import json_response, api_error
+from app.services.reporting_period_service import sort_period_names
 
 # ---------------------------------------------------------------------------
 # Module-level caches (survive across requests, reset on worker restart)
@@ -319,15 +320,7 @@ def get_periods():
             if period_name:
                 periods_set.add(period_name)
 
-        # Sort periods by extracted year desc, then lexically
-        def _extract_year(p):
-            try:
-                m = re.search(r"\b(20\d{2})\b", p or '')
-                return int(m.group(1)) if m else 0
-            except Exception as e:
-                current_app.logger.debug("_extract_year failed for %r: %s", p, e)
-                return 0
-        sorted_periods = sorted(periods_set, key=lambda p: (_extract_year(p), str(p)), reverse=True)
+        sorted_periods = sort_period_names(list(periods_set))
         return json_response(sorted_periods)
     except Exception as e:
         current_app.logger.error(f"Error fetching periods: {e}", exc_info=True)

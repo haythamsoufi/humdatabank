@@ -35,6 +35,7 @@ from app.utils.constants import DEFAULT_LIMIT_PERIODS, MAX_LIMIT_PERIODS
 from app.utils.datetime_helpers import utcnow
 from app.utils.form_localization import get_localized_country_name, get_localized_indicator_name
 from app.services.app_settings_service import get_organization_name
+from app.services.reporting_period_service import period_chronology_sort_key
 from app.utils.sql_utils import safe_ilike_pattern
 from flask_babel import gettext as _
 
@@ -155,6 +156,7 @@ def get_indicator_timeseries(
                 AssignmentEntityStatus.status_timestamp.label("status_timestamp"),
                 AssignedForm.period_name.label("period_name"),
                 AssignedForm.period_start.label("period_start"),
+                AssignedForm.period_end.label("period_end"),
                 FormData.value.label("value"),
                 FormData.disagg_data.label("disagg_data"),
             )
@@ -355,6 +357,7 @@ def get_indicator_timeseries(
                     "submission_id": sid,
                     "period_name": getattr(r, "period_name", None),
                     "period_start": getattr(r, "period_start", None),
+                    "period_end": getattr(r, "period_end", None),
                     "timestamp": getattr(r, "status_timestamp", None),
                     "status": getattr(r, "status", None),
                     "total": 0.0,
@@ -380,6 +383,10 @@ def get_indicator_timeseries(
             return 0
 
         def _period_year(entry: Dict[str, Any]) -> tuple[Optional[int], str, Optional[int]]:
+            period_end = entry.get("period_end")
+            if period_end is not None:
+                with suppress(Exception):
+                    return int(period_end.year), "period_end", None
             period_start = entry.get("period_start")
             if period_start is not None:
                 with suppress(Exception):
@@ -1259,15 +1266,12 @@ def get_value_breakdown(
                 logger.debug("_ts failed: %s", exc)
                 return _dt.min
 
-        def _year_for_sort(e: dict) -> int:
-            """Year for ordering: period_name first, then timestamp year, else -1 so unknown sorts last."""
-            y = _parse_year(e.get("period_name"))
-            if y is not None:
-                return y
-            ts = e.get("timestamp")
-            if ts and hasattr(ts, "year"):
-                return ts.year
-            return -1
+        def _year_for_sort(e: dict) -> tuple:
+            return period_chronology_sort_key(
+                e.get("period_name"),
+                period_start=e.get("period_start"),
+                period_end=e.get("period_end"),
+            )
 
         # Point indicators: use latest submission value instead of summing submissions.
         assignment_name: Optional[str] = None
@@ -1843,6 +1847,8 @@ def get_indicator_values_for_all_countries(
                 AssignmentEntityStatus.status.label("status"),
                 AssignmentEntityStatus.status_timestamp.label("status_timestamp"),
                 AssignedForm.period_name.label("period_name"),
+                AssignedForm.period_start.label("period_start"),
+                AssignedForm.period_end.label("period_end"),
                 AssignedForm.assigned_at.label("assigned_at"),
                 AssignedForm.template_id.label("template_id"),
                 FormData.id.label("formdata_id"),
@@ -1915,17 +1921,12 @@ def get_indicator_values_for_all_countries(
                 logger.debug("_recency_ts failed: %s", exc)
                 return _dt.min
 
-        def _year_for_sort(e: dict) -> int:
-            y = _parse_year(e.get("period_name"))
-            if y is not None:
-                return y
-            ts = e.get("timestamp")
-            if ts and hasattr(ts, "year"):
-                return ts.year
-            at = e.get("assigned_at")
-            if at and hasattr(at, "year"):
-                return at.year
-            return -1
+        def _year_for_sort(e: dict) -> tuple:
+            return period_chronology_sort_key(
+                e.get("period_name"),
+                period_start=e.get("period_start"),
+                period_end=e.get("period_end"),
+            )
 
         def _numeric_from_row(value: Any, disagg_data: Any) -> float | None:
             try:
@@ -1975,6 +1976,8 @@ def get_indicator_values_for_all_countries(
                     "has_numeric": False,
                     "formdata_ids": [],
                     "period_name": r.period_name,
+                    "period_start": getattr(r, "period_start", None),
+                    "period_end": getattr(r, "period_end", None),
                     "template_id": int(r.template_id) if r.template_id is not None else None,
                     "status": r.status,
                     "timestamp": r.status_timestamp,

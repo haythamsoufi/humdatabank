@@ -485,6 +485,26 @@ def create_test_api_key(db_session, **kwargs):
     return api_key, full_key
 
 
+def _ensure_reporting_period_catalog(db_session, period_name: str) -> None:
+    """Ensure a catalog row exists for common test period labels."""
+    from datetime import date
+
+    from app.services.reporting_period_service import get_reporting_period, upsert_reporting_period
+
+    label = (period_name or "").strip()
+    if not label or get_reporting_period(label):
+        return
+    if label.isdigit() and len(label) == 4:
+        year = int(label)
+        upsert_reporting_period(
+            label,
+            period_type="annual",
+            period_start=date(year, 1, 1),
+            period_end=date(year, 12, 31),
+        )
+        db_session.flush()
+
+
 def create_test_assignment_entity_status(
     db_session,
     *,
@@ -506,6 +526,7 @@ def create_test_assignment_entity_status(
         period_name=period_name,
         **{k: v for k, v in kwargs.items() if k in ("is_active", "unique_token", "is_public_active")},
     )
+    _ensure_reporting_period_catalog(db_session, period_name)
     from app.services.reporting_period_service import sync_assigned_form_reporting_period
     sync_assigned_form_reporting_period(assigned_form)
     db_session.add(assigned_form)
@@ -625,6 +646,7 @@ def create_test_public_submission(
         is_public_active=True,
         is_active=True,
     )
+    _ensure_reporting_period_catalog(db_session, period_name)
     from app.services.reporting_period_service import sync_assigned_form_reporting_period
     sync_assigned_form_reporting_period(assigned_form)
     db_session.add(assigned_form)

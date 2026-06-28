@@ -390,11 +390,9 @@ def mobile_periods():
             if period_name:
                 periods_set.add(period_name)
 
-        def _extract_year(p):
-            m = re.search(r'\b(20\d{2})\b', p or '')
-            return int(m.group(1)) if m else 0
+        from app.services.reporting_period_service import sort_period_names
 
-        sorted_periods = sorted(periods_set, key=lambda p: (_extract_year(p), str(p)), reverse=True)
+        sorted_periods = sort_period_names(list(periods_set))
         return mobile_ok(data={'periods': sorted_periods})
     except Exception as e:
         current_app.logger.error('mobile_periods: %s', e, exc_info=True)

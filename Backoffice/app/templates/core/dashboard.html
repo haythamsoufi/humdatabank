@@ -1558,8 +1558,7 @@
                             <select id="period-slicer" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                                 <option value="">{{ _('All Years') }}</option>
                                 {# Populate with unique periods from approved_assignments #}
-                                {% set periods = approved_assignments | map(attribute='item_object.assigned_form.period_name') | unique | list %}
-                                {% for period in periods %}
+                                {% for period in past_assignment_periods %}
                                     <option value="{{ period }}">{{ period }}</option>
                                 {% endfor %}
                             </select>

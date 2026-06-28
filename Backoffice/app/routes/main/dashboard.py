@@ -15,7 +15,10 @@ from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY, SELF_REPORT_PER
 from app.utils.form_localization import get_localized_country_name, get_localized_national_society_name as _get_localized_national_society_name
 from datetime import datetime
 from app.services.notification.core import get_country_recent_activities, notify_self_report_created
-from app.services.reporting_period_service import sync_assigned_form_reporting_period
+from app.services.reporting_period_service import (
+    sort_period_names,
+    sync_assigned_form_reporting_period,
+)
 from app.services.notification.service import NotificationService
 from app.utils.transactions import request_transaction_rollback
 from app.forms.shared import DeleteForm
@@ -140,6 +143,7 @@ def dashboard():
     # NEW: Separate lists for current and past assignments
     current_assignments = []
     past_assignments = []
+    past_assignment_periods = []
 
     # NEW: Dictionary to hold public submissions grouped by assigned_form_id
     public_submissions_by_assignment = {}
@@ -748,6 +752,27 @@ def dashboard():
                     # Public submissions always go to current for now
                     current_assignments.append(item)
 
+            past_assignments.sort(
+                key=lambda item: (
+                    item["item_object"].assigned_form.assigned_at
+                    if item.get("type") == "assigned"
+                    and item.get("item_object")
+                    and item["item_object"].assigned_form
+                    and item["item_object"].assigned_form.assigned_at
+                    else datetime.min
+                ),
+                reverse=True,
+            )
+            past_assignment_periods = sort_period_names(
+                [
+                    item["item_object"].assigned_form.period_name
+                    for item in past_assignments
+                    if item.get("type") == "assigned"
+                    and item.get("item_object")
+                    and item["item_object"].assigned_form
+                    and item["item_object"].assigned_form.period_name
+                ]
+            )
 
             # NEW: Fetch and categorize focal points for the selected context (only if country is known)
             if selected_country is not None:
@@ -911,6 +936,7 @@ def dashboard():
                        all_forms_for_display=all_forms_for_display,
                        current_assignments=current_assignments,
                        past_assignments=past_assignments,
+                       past_assignment_periods=past_assignment_periods,
                        show_country_select=show_country_select,
                        show_entity_select=show_entity_select,
                        title=_("Dashboard"),

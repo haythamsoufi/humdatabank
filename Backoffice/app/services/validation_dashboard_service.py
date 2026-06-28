@@ -11,6 +11,7 @@ from app.models import Country, FormTemplate
 from app.models.assignments import AssignmentEntityStatus, AssignedForm
 from app.models.validation import ValidationQuestion
 from app.services.data_quality.helpers import numeric_value, parse_period_year, resolve_assignment_aes
+from app.services.reporting_period_service import sort_period_names
 from app.services.validation.rule_labels import format_rule_labels
 from app.services.validation.types import CheckResult, ValidationEvaluationResult
 from app.services.validation_check_service import evaluate_validation_checks
@@ -90,7 +91,7 @@ def global_periods_for_template(template_id: int) -> list[str]:
         .all()
     )
     periods = [r[0] for r in rows if r[0]]
-    return sorted(periods, key=lambda p: (parse_period_year(p) or 0, p), reverse=True)
+    return sort_period_names(periods)
 
 
 def list_countries_for_period(template_id: int, period_name: str) -> list[dict[str, Any]]:

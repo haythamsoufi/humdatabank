@@ -506,6 +506,8 @@ def create_test_assignment_entity_status(
         period_name=period_name,
         **{k: v for k, v in kwargs.items() if k in ("is_active", "unique_token", "is_public_active")},
     )
+    from app.services.reporting_period_service import sync_assigned_form_reporting_period
+    sync_assigned_form_reporting_period(assigned_form)
     db_session.add(assigned_form)
     db_session.flush()
 
@@ -623,6 +625,8 @@ def create_test_public_submission(
         is_public_active=True,
         is_active=True,
     )
+    from app.services.reporting_period_service import sync_assigned_form_reporting_period
+    sync_assigned_form_reporting_period(assigned_form)
     db_session.add(assigned_form)
     db_session.flush()
     assigned_form.public_countries.append(country)

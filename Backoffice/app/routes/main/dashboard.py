@@ -15,6 +15,7 @@ from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY, SELF_REPORT_PER
 from app.utils.form_localization import get_localized_country_name, get_localized_national_society_name as _get_localized_national_society_name
 from datetime import datetime
 from app.services.notification.core import get_country_recent_activities, notify_self_report_created
+from app.services.reporting_period_service import sync_assigned_form_reporting_period
 from app.services.notification.service import NotificationService
 from app.utils.transactions import request_transaction_rollback
 from app.forms.shared import DeleteForm
@@ -328,6 +329,7 @@ def dashboard():
                                  period_name=SELF_REPORT_PERIOD_NAME,
                                  assigned_at=utcnow() # Use current time for uniqueness
                              )
+                             sync_assigned_form_reporting_period(assigned_form)
                              db.session.add(assigned_form)
                              db.session.flush() # Flush to get the assigned_form.id
                              current_app.logger.debug(f"Created new AssignedForm ID {assigned_form.id} for self-report period for template {template_to_assign.id}.")

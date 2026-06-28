@@ -1721,6 +1721,8 @@ class KoboDataImportService:
                 period_name=period_name,
                 is_active=True,
             )
+            from app.services.reporting_period_service import sync_assigned_form_reporting_period
+            sync_assigned_form_reporting_period(assigned_form)
             db.session.add(assigned_form)
             db.session.flush()
 

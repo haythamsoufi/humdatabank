@@ -33,6 +33,7 @@ from app.models.forms import FormData, DynamicIndicatorData, DynamicSectionConte
 from app.utils.form_localization import get_localized_country_name, build_template_select_choices
 from app.utils.country_utils import get_countries_by_region
 from app.services.entity_service import EntityService
+from app.services.reporting_period_service import sync_assigned_form_reporting_period
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, SubmitField, DateField, BooleanField
 from wtforms.validators import Optional, DataRequired
@@ -300,6 +301,7 @@ def new_assignment():
                 requires_delegation_review=bool(form.requires_delegation_review.data),
                 activated_by_user_id=current_user.id,
             )
+            sync_assigned_form_reporting_period(new_assignment)
 
             # Warn if active and no data owner (soft enforcement)
             if not new_assignment.data_owner_id:
@@ -481,7 +483,8 @@ def edit_assignment(assignment_id):
     if form.validate_on_submit():
         try:
             assignment.template_id = form.template_id.data
-            assignment.period_name = form.period_name.data
+            assignment.period_name = (form.period_name.data or '').strip()
+            sync_assigned_form_reporting_period(assignment)
             assignment.custom_name = (form.custom_name.data or '').strip() or None
             # Persist per-language translations for custom_name
             _trans_langs = current_app.config.get('TRANSLATABLE_LANGUAGES', []) or []

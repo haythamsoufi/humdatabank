@@ -736,9 +736,14 @@ def format_dim_period(assigned_form):
     """Dimension row for reporting periods (natural key: period_name + template_id)."""
     if not assigned_form:
         return None
+    period_type = None
+    reporting_period = getattr(assigned_form, 'reporting_period', None)
+    if reporting_period is not None:
+        period_type = getattr(reporting_period, 'period_type', None)
     return {
         'period_name': assigned_form.period_name,
         'period_id': assigned_form.period_id,
+        'period_type': period_type,
         'period_start': (
             assigned_form.period_start.isoformat()
             if getattr(assigned_form, 'period_start', None) else None

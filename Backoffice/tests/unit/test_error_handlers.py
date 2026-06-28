@@ -4,7 +4,7 @@ Comprehensive tests for app/error_handlers.py — targets 100% coverage.
 Strategy:
 - Add a session-scoped blueprint with trigger routes for each HTTP error code.
 - Test both JSON (Accept: application/json) and HTML response paths.
-- Test the 403/500 security-monitor and email-alert paths (DEBUG=False).
+- Test the 403/500 security-monitor paths (DEBUG=False).
 - Test exception suppression paths inside handlers.
 """
 
@@ -233,137 +233,36 @@ class TestInternalErrorHandler:
         original = app.config.get("DEBUG")
         try:
             app.config["DEBUG"] = False
-            mock_monitor = MagicMock()
             with patch(
                 "app.services.security.monitoring.SecurityMonitor.log_security_event",
-                mock_monitor,
-            ):
-                with patch(
-                    "app.services.email.service.send_security_alert",
-                    return_value=True,
-                ):
-                    with patch("app.models.User") as mock_user:
-                        from app.models.rbac import RbacUserRole, RbacRole
-
-                        # Simulate manager query returning no managers
-                        mock_user.query.join.return_value.join.return_value.filter.return_value.filter.return_value.all.return_value = (
-                            []
-                        )
-                        resp = _html(client, 500)
+            ) as mock_log_event:
+                resp = _html(client, 500)
 
             assert resp.status_code == 500
+            mock_log_event.assert_called_once()
+            call_kw = mock_log_event.call_args.kwargs
+            assert call_kw["event_type"] == "internal_server_error"
+            assert call_kw["severity"] == "critical"
+            assert "Internal Server Error" in call_kw["description"]
+            assert "traceback" in call_kw["context_data"]
         finally:
             app.config["DEBUG"] = original
 
-    def test_production_mode_sends_alert_email_to_managers(self, client, app):
+    def test_production_mode_does_not_send_alert_directly(self, client, app):
+        """500 handler delegates email to SecurityMonitor only (no duplicate send)."""
         original = app.config.get("DEBUG")
         try:
             app.config["DEBUG"] = False
-            mock_manager = MagicMock()
-            mock_manager.email = "manager@example.com"
-
             with patch(
-                "app.services.security.monitoring.SecurityMonitor.log_security_event"
+                "app.services.security.monitoring.SecurityMonitor.log_security_event",
             ):
                 with patch(
                     "app.services.email.service.send_security_alert",
-                    return_value=True,
-                ) as mock_alert:
-                    with patch("app.models.User") as mock_user_cls:
-                        mock_user_cls.query.join.return_value.join.return_value.filter.return_value.filter.return_value.all.return_value = [
-                            mock_manager
-                        ]
-                        resp = _html(client, 500)
-
-            assert resp.status_code == 500
-        finally:
-            app.config["DEBUG"] = original
-
-    def test_production_mode_alert_email_fails(self, client, app):
-        """When send_security_alert returns False, no exception should propagate."""
-        original = app.config.get("DEBUG")
-        try:
-            app.config["DEBUG"] = False
-            mock_manager = MagicMock()
-            mock_manager.email = "manager@example.com"
-
-            with patch(
-                "app.services.security.monitoring.SecurityMonitor.log_security_event"
-            ):
-                with patch(
-                    "app.services.email.service.send_security_alert",
-                    return_value=False,
-                ):
-                    with patch("app.models.User") as mock_user_cls:
-                        mock_user_cls.query.join.return_value.join.return_value.filter.return_value.filter.return_value.all.return_value = [
-                            mock_manager
-                        ]
-                        resp = _html(client, 500)
-
-            assert resp.status_code == 500
-        finally:
-            app.config["DEBUG"] = original
-
-    def test_production_mode_managers_without_email(self, client, app):
-        """Managers found but none have email — warning is logged, no crash."""
-        original = app.config.get("DEBUG")
-        try:
-            app.config["DEBUG"] = False
-            mock_manager = MagicMock()
-            mock_manager.email = None
-
-            with patch(
-                "app.services.security.monitoring.SecurityMonitor.log_security_event"
-            ):
-                with patch("app.models.User") as mock_user_cls:
-                    mock_user_cls.query.join.return_value.join.return_value.filter.return_value.filter.return_value.all.return_value = [
-                        mock_manager
-                    ]
+                ) as mock_send_alert:
                     resp = _html(client, 500)
 
             assert resp.status_code == 500
-        finally:
-            app.config["DEBUG"] = original
-
-    def test_production_mode_rbac_join_failure_falls_back(self, client, app):
-        """When the RBAC join fails, fallback to empty managers list."""
-        original = app.config.get("DEBUG")
-        try:
-            app.config["DEBUG"] = False
-            with patch(
-                "app.services.security.monitoring.SecurityMonitor.log_security_event"
-            ):
-                with patch(
-                    "app.models.rbac.RbacUserRole",
-                    side_effect=Exception("rbac table missing"),
-                ):
-                    resp = _html(client, 500)
-
-            assert resp.status_code == 500
-        finally:
-            app.config["DEBUG"] = original
-
-    def test_production_mode_email_exception_suppressed(self, client, app):
-        """Exception during email sending is suppressed — response still returns 500."""
-        original = app.config.get("DEBUG")
-        try:
-            app.config["DEBUG"] = False
-            with patch(
-                "app.services.security.monitoring.SecurityMonitor.log_security_event"
-            ):
-                with patch(
-                    "app.services.email.service.send_security_alert",
-                    side_effect=Exception("smtp down"),
-                ):
-                    with patch("app.models.User") as mock_user_cls:
-                        mock_manager = MagicMock()
-                        mock_manager.email = "m@x.com"
-                        mock_user_cls.query.join.return_value.join.return_value.filter.return_value.filter.return_value.all.return_value = [
-                            mock_manager
-                        ]
-                        resp = _html(client, 500)
-
-            assert resp.status_code == 500
+            mock_send_alert.assert_not_called()
         finally:
             app.config["DEBUG"] = original
 

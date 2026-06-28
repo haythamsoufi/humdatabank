@@ -317,6 +317,30 @@ class TestIfrcEnvelopeToCcBcc:
         assert "a@x.com" in bcc
         assert "b@x.com" in bcc
 
+    def test_expose_recipients_in_to_multiple(self):
+        to, cc, bcc = _ifrc_envelope_to_cc_bcc(
+            "noreply@x.com",
+            ["a@x.com", "b@x.com"],
+            [],
+            [],
+            expose_recipients_in_to=True,
+        )
+        assert to == "a@x.com,b@x.com"
+        assert cc == ""
+        assert bcc == ""
+
+    def test_expose_recipients_in_to_with_cc_and_bcc(self):
+        to, cc, bcc = _ifrc_envelope_to_cc_bcc(
+            "noreply@x.com",
+            ["a@x.com", "b@x.com"],
+            ["team@x.com"],
+            ["archive@x.com"],
+            expose_recipients_in_to=True,
+        )
+        assert to == "a@x.com,b@x.com"
+        assert cc == "team@x.com"
+        assert bcc == "archive@x.com"
+
 
 # ---------------------------------------------------------------------------
 # _ifrc_http_error_diag

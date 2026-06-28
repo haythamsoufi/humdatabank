@@ -216,6 +216,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
   Future<void> _checkAuthStatus() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.authValidatedThisSession) {
+      return;
+    }
     await authProvider.checkAuthStatus();
   }
 

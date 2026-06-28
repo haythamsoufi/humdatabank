@@ -793,58 +793,47 @@ class AuthService {
       }
     }
 
-    // Context-aware rate limiting: allow more frequent refreshes when session is close to expiration
-    final now = DateTime.now();
-    if (!forceRefresh && _lastRefreshAttempt != null) {
-      // Check if session is close to expiration (within 1 hour)
-      final needsRefresh = await _session.needsRefresh();
-      final timeUntilExpiration = await _getTimeUntilExpiration();
-
-      // Use shorter interval if session is expiring soon (within 1 hour)
-      final minInterval = (needsRefresh && timeUntilExpiration != null &&
-                          timeUntilExpiration <= const Duration(hours: 1))
-          ? _minRefreshIntervalWhenExpiring
-          : _minRefreshInterval;
-
-      if (now.difference(_lastRefreshAttempt!) < minInterval) {
-        // Don't blindly return `true` — that previously caused the next API
-        // call to 401 (and trigger another refresh) when the access token
-        // had aged out *during* the rate-limit window.  Report the actual
-        // JWT validity instead so the caller can plan accordingly.
-        final accessExpired = await _jwtService.isAccessTokenExpired();
-        DebugLogger.logAuth(
-            'Refresh rate limited (last attempt ${now.difference(_lastRefreshAttempt!).inMinutes}m ago, '
-            'min interval ${minInterval.inMinutes}m) — '
-            'reporting current JWT validity: accessExpired=$accessExpired');
-        return !accessExpired;
-      }
-    }
-
-    // Set refresh lock
+    // Claim the refresh lock immediately so parallel 401 handlers cannot each
+    // start a rotation before _isRefreshing is set (refresh-token reuse storm).
     _isRefreshing = true;
     _refreshCompleter = Completer<bool>();
-    _lastRefreshAttempt = now;
-
-    // Emit refreshing state
-    _emitSessionState(SessionState.refreshing);
+    final now = DateTime.now();
 
     try {
+      // Context-aware rate limiting: allow more frequent refreshes when session is close to expiration
+      if (!forceRefresh && _lastRefreshAttempt != null) {
+        final needsRefresh = await _session.needsRefresh();
+        final timeUntilExpiration = await _getTimeUntilExpiration();
+
+        final minInterval = (needsRefresh && timeUntilExpiration != null &&
+                timeUntilExpiration <= const Duration(hours: 1))
+            ? _minRefreshIntervalWhenExpiring
+            : _minRefreshInterval;
+
+        if (now.difference(_lastRefreshAttempt!) < minInterval) {
+          final accessExpired = await _jwtService.isAccessTokenExpired();
+          DebugLogger.logAuth(
+              'Refresh rate limited (last attempt ${now.difference(_lastRefreshAttempt!).inMinutes}m ago, '
+              'min interval ${minInterval.inMinutes}m) — '
+              'reporting current JWT validity: accessExpired=$accessExpired');
+          final result = !accessExpired;
+          _refreshCompleter!.complete(result);
+          _processRefreshQueue(result);
+          return result;
+        }
+      }
+
+      _lastRefreshAttempt = now;
+      _emitSessionState(SessionState.refreshing);
+
       final result = await _doRefreshSession();
       _refreshCompleter!.complete(result);
-
-      // Process any queued refresh requests
       _processRefreshQueue(result);
-
-      // Update session state after refresh
       await _checkAndEmitSessionState();
-
       return result;
     } catch (e) {
       _refreshCompleter!.completeError(e);
-
-      // Process queue with failure
       _processRefreshQueue(false);
-
       rethrow;
     } finally {
       _isRefreshing = false;
@@ -1133,10 +1122,23 @@ class AuthService {
     // still validate but use cached user as fallback
     // This prevents unnecessary network calls on every check while still validating
     if (_currentUser != null && !forceRevalidate) {
+      // Do not fire authenticated API calls (device register, etc.) with a
+      // locally-expired access token while returning "logged in" from cache.
+      if (!_connectivity.isOffline && !shouldDeferRemoteFetch) {
+        final accessExpired = await _jwtService.isAccessTokenExpired();
+        if (accessExpired && await _jwtService.hasRefreshToken()) {
+          try {
+            final ok = await refreshSession(forceRefresh: true);
+            if (!ok) return false;
+          } catch (e) {
+            DebugLogger.logWarn('AUTH',
+                'JWT refresh before background validation threw ($e) — '
+                'keeping cached user; background check will retry');
+          }
+        }
+      }
       DebugLogger.logAuth(
           'User already loaded, validating session in background...');
-      // Still validate in background, but return cached state immediately
-      // This allows UI to render while validation happens
       _validateSessionInBackground();
       return true;
     }

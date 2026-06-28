@@ -199,7 +199,12 @@ def _filter_recipients_for_environment(recipients: List[str], cc: List[str], bcc
 
 
 def _ifrc_envelope_to_cc_bcc(
-    noreply: str, recipients: List[str], cc: List[str], bcc: List[str]
+    noreply: str,
+    recipients: List[str],
+    cc: List[str],
+    bcc: List[str],
+    *,
+    expose_recipients_in_to: bool = False,
 ) -> Tuple[str, str, str]:
     """
     Return plain-text ``(to_address, cc_csv, bcc_csv)`` for IFRC ``*AsBase64`` fields.
@@ -209,7 +214,14 @@ def _ifrc_envelope_to_cc_bcc(
     - **Multiple** To, no Cc/Bcc: **To** = noreply, **Bcc** = all To (comma-separated).
     - **To + Cc and/or Bcc:** **To** = noreply, **Cc** / **Bcc** combined as before.
     - **No To** but Cc and/or Bcc: **To** = noreply, pass Cc / Bcc.
+    - **expose_recipients_in_to:** keep all To recipients visible in **To** (comma-separated);
+      Cc/Bcc are passed through without moving To into Bcc (used for security alerts).
     """
+    if expose_recipients_in_to and recipients:
+        to_csv = ",".join(recipients)
+        cc_csv = ",".join(cc) if cc else ""
+        bcc_csv = ",".join(bcc) if bcc else ""
+        return to_csv, cc_csv, bcc_csv
     if recipients and not cc and not bcc:
         if len(recipients) == 1:
             return recipients[0], "", ""
@@ -265,6 +277,7 @@ def send_email(
     bcc: Optional[Iterable[str]] = None,
     importance: Optional[str] = None,
     attachments: Optional[List[Tuple[str, bytes, str]]] = None,
+    expose_recipients_in_to: bool = False,
     _filtered_out: Optional[list] = None,
     _failure_info: Optional[List[dict]] = None,
     _suppress_email_failure_security_event: bool = False,
@@ -287,6 +300,8 @@ def send_email(
         bcc: List of BCC email addresses (optional)
         importance: Email importance level ('high', 'normal', 'low'). If 'high', adds [HIGH PRIORITY] prefix to subject.
         attachments: Optional list of (filename, content_bytes, content_type) to attach.
+        expose_recipients_in_to: When True, list all To recipients visibly in the To field
+            instead of hiding them in Bcc (for small admin distribution lists).
         _failure_info: If provided, a single failure dict is appended on False returns
         (``code`` one of: no_recipients, no_default_sender, recipient_allowlist, no_email_api_key,
         no_email_api_url, email_api_http_error, email_api_request_error; ``http_status`` and optional
@@ -355,6 +370,7 @@ def send_email(
         cc=cc_list,
         bcc=bcc_list,
         attachments=attachments,
+        expose_recipients_in_to=expose_recipients_in_to,
         _failure_info=_failure_info,
     )
     if not ok and _failure_info and _failure_info[-1]:
@@ -377,6 +393,7 @@ def _send_via_ifrc(
     cc: List[str],
     bcc: List[str],
     attachments: Optional[List[Tuple[str, bytes, str]]] = None,
+    expose_recipients_in_to: bool = False,
     _failure_info: Optional[List[dict]] = None,
 ) -> bool:
     """
@@ -436,10 +453,15 @@ def _send_via_ifrc(
             _failure_info.append({"code": "empty_email_body"})
         return False
 
-    to_addr, out_cc, out_bcc = _ifrc_envelope_to_cc_bcc(fixed_to_address, recipients, cc, bcc)
+    to_addr, out_cc, out_bcc = _ifrc_envelope_to_cc_bcc(
+        fixed_to_address, recipients, cc, bcc, expose_recipients_in_to=expose_recipients_in_to
+    )
     is_single_in_to = bool(recipients and not cc and not bcc and len(recipients) == 1)
     has_cc_bcc = bool((out_cc or "").strip() or (out_bcc or "").strip())
-    if not is_single_in_to and not has_cc_bcc:
+    has_exposed_to = bool(
+        expose_recipients_in_to and recipients and (to_addr or "").strip()
+    )
+    if not is_single_in_to and not has_cc_bcc and not has_exposed_to:
         current_app.logger.error(
             "IFRC email: no delivery addresses after envelope mapping. "
             "This should be unreachable if send_email validated recipients."

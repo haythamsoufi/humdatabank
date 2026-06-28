@@ -9,6 +9,7 @@ from app.logging_config import (
     StaticFileFilter,
     SQLAlchemyRelationshipFilter,
     configure_access_log_filters,
+    is_noisy_access_log_message,
     validate_email_configuration,
 )
 
@@ -56,6 +57,53 @@ class TestStaticFileFilter:
         """Records that somehow lack getMessage should pass through."""
         record = MagicMock(spec=[])  # no getMessage attribute
         assert self.filter.filter(record) is True
+
+    def test_health_check_filtered_out(self):
+        record = self._make_record(
+            '169.254.129.1 - - [28/Jun/2026:20:44:27 +0000] '
+            '"GET /health HTTP/1.1" 200 123 "-" "HealthCheck/1.0" 63585'
+        )
+        assert self.filter.filter(record) is False
+
+    def test_azure_load_balancer_probe_filtered_out(self):
+        record = self._make_record(
+            '4.175.128.233:1028 - - [28/Jun/2026:20:43:50 +0000] '
+            '"GET / HTTP/1.1" 200 126 "-" "-" 1479'
+        )
+        assert self.filter.filter(record) is False
+
+    def test_app_insights_probe_filtered_out(self):
+        record = self._make_record(
+            '4.175.128.233:2048 - - [28/Jun/2026:20:45:47 +0000] '
+            '"GET /login?next=/ HTTP/1.1" 200 14039 "https://databank.ifrc.org/" '
+            '"Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0; AppInsights)" 76980'
+        )
+        assert self.filter.filter(record) is False
+
+    def test_always_on_probe_filtered_out(self):
+        record = self._make_record(
+            '127.0.0.1:12126 - - [28/Jun/2026:21:05:52 +0000] '
+            '"GET / HTTP/1.1" 302 213 "-" "AlwaysOn" 8929'
+        )
+        assert self.filter.filter(record) is False
+
+
+class TestIsNoisyAccessLogMessage:
+    def test_ai_health_endpoint_filtered(self):
+        msg = (
+            '127.0.0.1 - - [28/Jun/2026:21:00:00 +0000] '
+            '"GET /api/ai/v2/health HTTP/1.1" 200 42 "-" "curl/8.0" 12'
+        )
+        assert is_noisy_access_log_message(msg) is True
+
+    def test_real_user_request_not_filtered(self):
+        msg = (
+            '4.175.128.233:1039 - - [28/Jun/2026:21:13:14 +0000] '
+            '"GET /admin/settings HTTP/1.1" 302 241 '
+            '"https://databank.ifrc.org/admin/users/edit_user/38?tab=details" '
+            '"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" 86423'
+        )
+        assert is_noisy_access_log_message(msg) is False
 
 
 # ---------------------------------------------------------------------------

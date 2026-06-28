@@ -84,6 +84,30 @@ class ApiService {
     _localAuthInvalidationCallback = callback;
   }
 
+  /// Coalesces concurrent 401-driven refresh attempts into a single in-flight
+  /// rotation. Without this, parallel authenticated requests (e.g. device
+  /// register + session check on cold start) can each trigger refresh and
+  /// cause refresh-token reuse detection server-side.
+  Future<bool>? _inFlightTokenRefresh;
+
+  Future<bool> _coalescedTokenRefresh() async {
+    final inFlight = _inFlightTokenRefresh;
+    if (inFlight != null) {
+      return inFlight;
+    }
+    final callback = _tokenRefreshCallback;
+    if (callback == null) return false;
+    final future = callback();
+    _inFlightTokenRefresh = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_inFlightTokenRefresh, future)) {
+        _inFlightTokenRefresh = null;
+      }
+    }
+  }
+
   Future<void> _clearLocalAuthState(String reason) async {
     final callback = _localAuthInvalidationCallback;
     if (callback != null) {
@@ -194,7 +218,7 @@ class ApiService {
     if (hasRefresh && _tokenRefreshCallback != null) {
       DebugLogger.logApi(
           'Session/JWT expired — attempting proactive silent token refresh');
-      final refreshed = await _tokenRefreshCallback!();
+      final refreshed = await _coalescedTokenRefresh();
       if (refreshed) {
         DebugLogger.logApi('Proactive refresh succeeded — proceeding with request');
         return;
@@ -498,7 +522,7 @@ class ApiService {
         DebugLogger.logApi('401 Unauthorized — attempting JWT refresh');
         final hasRefresh = await _jwtService.hasRefreshToken();
         if (hasRefresh && _tokenRefreshCallback != null) {
-          final refreshed = await _tokenRefreshCallback!();
+          final refreshed = await _coalescedTokenRefresh();
           if (refreshed) {
             DebugLogger.logApi('JWT refresh succeeded — retrying original request');
             final retryHeaders = await _getHeaders(
@@ -861,7 +885,7 @@ class ApiService {
         DebugLogger.logApi('401 Unauthorized — attempting JWT refresh');
         final hasRefresh = await _jwtService.hasRefreshToken();
         if (hasRefresh && _tokenRefreshCallback != null) {
-          final refreshed = await _tokenRefreshCallback!();
+          final refreshed = await _coalescedTokenRefresh();
           if (refreshed) {
             DebugLogger.logApi('JWT refresh succeeded — retrying POST');
             final retryHeaders = await _getHeaders(
@@ -1022,7 +1046,7 @@ class ApiService {
         DebugLogger.logApi('401 Unauthorized — attempting JWT refresh');
         final hasRefresh = await _jwtService.hasRefreshToken();
         if (hasRefresh && _tokenRefreshCallback != null) {
-          final refreshed = await _tokenRefreshCallback!();
+          final refreshed = await _coalescedTokenRefresh();
           if (refreshed) {
             DebugLogger.logApi('JWT refresh succeeded — retrying PUT');
             final retryHeaders = await _getHeaders(
@@ -1153,7 +1177,7 @@ class ApiService {
         DebugLogger.logApi('401 Unauthorized — attempting JWT refresh');
         final hasRefresh = await _jwtService.hasRefreshToken();
         if (hasRefresh && _tokenRefreshCallback != null) {
-          final refreshed = await _tokenRefreshCallback!();
+          final refreshed = await _coalescedTokenRefresh();
           if (refreshed) {
             DebugLogger.logApi('JWT refresh succeeded — retrying DELETE');
             final retryHeaders = await _getHeaders(

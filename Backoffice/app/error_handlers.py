@@ -7,7 +7,6 @@ from flask_wtf.csrf import CSRFError
 
 from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_not_found, json_server_error
 from app.utils.csp_nonce import get_style_nonce
-from app.utils.datetime_helpers import utcnow
 from app.utils.request_utils import is_json_request
 
 
@@ -161,7 +160,6 @@ def register_error_handlers(app):
         if not app.config.get('DEBUG'):
             try:
                 from app.services.security.monitoring import SecurityMonitor
-                from app.services.email.service import send_security_alert
 
                 error_message = str(error)
                 error_url = request.url if request else 'Unknown URL'
@@ -176,7 +174,6 @@ def register_error_handlers(app):
                     if user_id is None:
                         with suppress(Exception):
                             user_id = getattr(current_user, 'id', None)
-                ip_address = request.remote_addr if request else 'Unknown'
 
                 SecurityMonitor.log_security_event(
                     event_type='internal_server_error',
@@ -190,44 +187,6 @@ def register_error_handlers(app):
                     },
                     user_id=user_id
                 )
-
-                try:
-                    from app.models import User
-                    try:
-                        from app.models.rbac import RbacUserRole, RbacRole
-                        managers = (
-                            User.query.join(RbacUserRole, User.id == RbacUserRole.user_id)
-                            .join(RbacRole, RbacUserRole.role_id == RbacRole.id)
-                            .filter(RbacRole.code == "system_manager")
-                            .filter(User.active.is_(True))
-                            .all()
-                        )
-                    except Exception as e:
-                        app.logger.debug("RBAC join for system managers failed, using empty list: %s", e)
-                        managers = User.query.filter(User.active.is_(True)).limit(0).all()
-
-                    if managers:
-                        manager_emails = [m.email for m in managers if m.email]
-                        if manager_emails:
-                            success = send_security_alert(
-                                event_type='internal_server_error',
-                                severity='critical',
-                                description=f'Internal Server Error occurred: {error_message[:200]}',
-                                ip_address=ip_address,
-                                user_id=user_id,
-                                timestamp=utcnow().isoformat(),
-                                recipients=manager_emails
-                            )
-                            if success:
-                                app.logger.info(f"Security alert sent to {len(manager_emails)} system managers: {', '.join(manager_emails)}")
-                            else:
-                                app.logger.error(f"Failed to send security alert to system managers: {manager_emails}")
-                        else:
-                            app.logger.warning("System managers found but none have email addresses configured")
-                    else:
-                        app.logger.warning("No active system managers found in database for error notification")
-                except Exception as email_error:
-                    app.logger.error(f"Failed to send error notification email: {email_error}")
 
             except Exception as notify_error:
                 app.logger.error(f"Failed to notify system managers of error: {notify_error}")

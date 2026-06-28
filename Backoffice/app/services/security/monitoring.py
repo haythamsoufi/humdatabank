@@ -207,8 +207,9 @@ class SecurityMonitor:
             )
             if success:
                 current_app.logger.info(
-                    "Security alert sent to %s system managers",
+                    "Security alert sent to %s system managers: %s",
                     len(manager_emails),
+                    ", ".join(manager_emails),
                 )
             else:
                 current_app.logger.error(

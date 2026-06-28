@@ -477,6 +477,31 @@ class TestSendSecurityAlert:
                 )
         kwargs = mock_send.call_args.kwargs
         assert "override@example.com" in kwargs["recipients"]
+        assert kwargs.get("expose_recipients_in_to") is True
+        assert kwargs.get("bcc") is None
+
+    def test_exposes_all_recipients_in_to_for_system_managers(self, app):
+        with app.app_context():
+            app.config["ADMIN_EMAILS"] = ["mgr1@example.com", "mgr2@example.com"]
+            app.config["MAIL_DEFAULT_SENDER"] = "noreply@example.com"
+            with patch("app.services.email.service.get_org_team_email", return_value="team@example.com"), \
+                 patch("app.services.email.service.send_email", return_value=True) as mock_send:
+                send_security_alert(event_type="internal_server_error", severity="critical")
+        kwargs = mock_send.call_args.kwargs
+        assert kwargs["recipients"] == ["mgr1@example.com", "mgr2@example.com"]
+        assert kwargs.get("expose_recipients_in_to") is True
+        assert kwargs.get("cc") == ["team@example.com"]
+        assert kwargs.get("bcc") is None
+
+    def test_skips_team_cc_when_already_in_to(self, app):
+        with app.app_context():
+            app.config["ADMIN_EMAILS"] = ["mgr1@example.com"]
+            app.config["MAIL_DEFAULT_SENDER"] = "noreply@example.com"
+            with patch("app.services.email.service.get_org_team_email", return_value="mgr1@example.com"), \
+                 patch("app.services.email.service.send_email", return_value=True) as mock_send:
+                send_security_alert(event_type="test", severity="high")
+        kwargs = mock_send.call_args.kwargs
+        assert kwargs.get("cc") is None
 
     def test_subject_auto_generated(self, app):
         with app.app_context():

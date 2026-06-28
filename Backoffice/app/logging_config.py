@@ -3,14 +3,59 @@
 import logging
 from logging import Filter
 
+# Gunicorn access log request-line fragments for probe/health endpoints.
+_NOISY_ACCESS_REQUEST_FRAGMENTS = (
+    '"GET /health ',
+    '"HEAD /health ',
+    '"GET /api/ai/v2/health ',
+    '"HEAD /api/ai/v2/health ',
+    '"GET /api/v1/health ',
+    '"HEAD /api/v1/health ',
+)
+
+# Platform probe user agents (Azure health check, Always On, App Insights availability).
+_NOISY_ACCESS_USER_AGENTS = (
+    'HealthCheck/1.0',
+    'AlwaysOn',
+    'AppInsights',
+)
+
+# Static and manifest paths (high volume, low diagnostic value).
+_NOISY_ACCESS_PATH_SUBSTRINGS = (
+    '/static/',
+    '/favicon.ico',
+    '/manifest.webmanifest',
+    '/manifest',
+)
+
+
+def is_noisy_access_log_message(msg: str) -> bool:
+    """Return True for probe/static access log lines that should be suppressed."""
+    if not msg:
+        return False
+
+    if any(path in msg for path in _NOISY_ACCESS_PATH_SUBSTRINGS):
+        return True
+
+    if any(fragment in msg for fragment in _NOISY_ACCESS_REQUEST_FRAGMENTS):
+        return True
+
+    if any(ua in msg for ua in _NOISY_ACCESS_USER_AGENTS):
+        return True
+
+    # Azure front-end / load balancer liveness probes: GET / with no referer or UA.
+    if '"-" "-"' in msg and ('"GET / HTTP/1.1"' in msg or '"HEAD / HTTP/1.1"' in msg):
+        return True
+
+    return False
+
 
 class StaticFileFilter(Filter):
-    """Filter out static file requests from access logs."""
+    """Filter high-volume static and platform probe requests from access logs."""
 
     def filter(self, record):
         if hasattr(record, 'getMessage'):
-            msg = record.getMessage()
-            if any(path in msg for path in ['/static/', '/favicon.ico', '/manifest.webmanifest', '/manifest']):
+            if is_noisy_access_log_message(record.getMessage()):
                 return False
         return True
 
@@ -26,15 +71,23 @@ class SQLAlchemyRelationshipFilter(Filter):
 
 def configure_access_log_filters(app):
     """Apply access-log and SQLAlchemy log filters."""
+    _apply_access_log_filters()
+
+
+def _apply_access_log_filters():
+    """Idempotently attach noise filters to access loggers."""
     sqlalchemy_logger = logging.getLogger('sqlalchemy.orm')
     sqlalchemy_logger.setLevel(logging.WARNING)
-    sqlalchemy_logger.addFilter(SQLAlchemyRelationshipFilter())
+    if not any(isinstance(f, SQLAlchemyRelationshipFilter) for f in sqlalchemy_logger.filters):
+        sqlalchemy_logger.addFilter(SQLAlchemyRelationshipFilter())
 
     access_logger = logging.getLogger('gunicorn.access')
-    access_logger.addFilter(StaticFileFilter())
+    if not any(isinstance(f, StaticFileFilter) for f in access_logger.filters):
+        access_logger.addFilter(StaticFileFilter())
 
     werkzeug_logger = logging.getLogger('werkzeug')
-    werkzeug_logger.addFilter(StaticFileFilter())
+    if not any(isinstance(f, StaticFileFilter) for f in werkzeug_logger.filters):
+        werkzeug_logger.addFilter(StaticFileFilter())
 
 
 def validate_email_configuration(app):

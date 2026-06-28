@@ -771,19 +771,31 @@ def send_security_alert(subject=None, event_type=None, severity=None, descriptio
             )
             html_content = _security_alert_fallback_html_body(context)
 
-        # Send email
+        # Send email — all system managers visible in To so they see who was notified
         team_email = get_org_team_email() or current_app.config.get('MAIL_DEFAULT_SENDER')
+        cc_recipients = None
+        if team_email:
+            team_lower = team_email.strip().lower()
+            if team_lower and team_lower not in {e.strip().lower() for e in admin_emails}:
+                cc_recipients = [team_email]
+
         success = send_email(
             subject=subject,
             recipients=admin_emails,
             html=html_content,
             sender=current_app.config.get('MAIL_DEFAULT_SENDER'),
-            bcc=[team_email] if team_email else None,
+            cc=cc_recipients,
+            expose_recipients_in_to=True,
             _suppress_email_failure_security_event=True,
         )
 
         if success:
-            current_app.logger.info(f"Security alert email sent to {len(admin_emails)} administrator(s) for event: {event_type}")
+            current_app.logger.info(
+                "Security alert email sent to %s administrator(s) for event: %s (%s)",
+                len(admin_emails),
+                event_type,
+                ", ".join(admin_emails),
+            )
         else:
             current_app.logger.error(f"Failed to send security alert email for event: {event_type} to recipients: {admin_emails}")
 

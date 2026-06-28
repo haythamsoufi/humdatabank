@@ -36,6 +36,9 @@ class AuthProvider with ChangeNotifier {
   /// server.  Consume this on the login screen to display the debug reason.
   String? get sessionInvalidationReason => _sessionInvalidationReason;
 
+  /// True after a successful forced session validation this app session.
+  bool get authValidatedThisSession => _authCheckedThisSession;
+
   void clearSessionInvalidationReason() {
     _sessionInvalidationReason = null;
     notifyListeners();
@@ -65,12 +68,34 @@ class AuthProvider with ChangeNotifier {
     super.dispose();
   }
 
+  Future<bool>? _authCheckInFlight;
+
   Future<bool> checkAuthStatus({bool forceRevalidate = false}) async {
     // Skip redundant non-forced checks within the same session to avoid
     // duplicate device registration calls from multiple screens.
     if (_authCheckedThisSession && !forceRevalidate && _user != null) {
       return true;
     }
+
+    if (_authCheckInFlight != null) {
+      final pending = await _authCheckInFlight!;
+      if (!forceRevalidate || _authCheckedThisSession) {
+        return pending;
+      }
+    }
+
+    final check = _checkAuthStatusImpl(forceRevalidate: forceRevalidate);
+    _authCheckInFlight = check;
+    try {
+      return await check;
+    } finally {
+      if (identical(_authCheckInFlight, check)) {
+        _authCheckInFlight = null;
+      }
+    }
+  }
+
+  Future<bool> _checkAuthStatusImpl({bool forceRevalidate = false}) async {
 
     // Load user from cache first (synchronous, fast)
     await _loadUserFromCache();
@@ -99,14 +124,16 @@ class AuthProvider with ChangeNotifier {
           DebugLogger.logAuth(
               'User loaded from backend: ${_user!.email}, profile_color: ${_user!.profileColor ?? "null"}');
 
-          // Register device for push notifications if user is already logged in
-          try {
-            // Use ensureDeviceRegistered to force registration even if already initialized
-            await PushNotificationService().ensureDeviceRegistered();
-          } catch (e) {
-            // Don't fail auth check if push notification registration fails
-            DebugLogger.logWarn(
-                'AUTH', 'Failed to register device during auth check: $e');
+          // Register device only after a forced server validation — never from
+          // a cached-user fast path that can race ahead of JWT refresh.
+          if (forceRevalidate) {
+            try {
+              await PushNotificationService().ensureDeviceRegistered();
+            } catch (e) {
+              DebugLogger.logWarn(
+                  'AUTH', 'Failed to register device during auth check: $e');
+            }
+            _authCheckedThisSession = true;
           }
         } else {
           // No user after login - session might be invalid
@@ -119,7 +146,6 @@ class AuthProvider with ChangeNotifier {
         _user = null;
         await _storage.remove(AppConfig.cachedUserProfileKey);
       }
-      if (isLoggedIn) _authCheckedThisSession = true;
       return isLoggedIn;
     } on AuthenticationException catch (e) {
       // Definitive auth failure — server explicitly told us we're no longer
@@ -242,6 +268,7 @@ class AuthProvider with ChangeNotifier {
 
       if (result.success) {
         _sessionInvalidationReason = null;
+        _authCheckedThisSession = true;
         _user = _authService.currentUser;
         if (_user != null) {
           await _saveUserToCache(_user!);
@@ -293,6 +320,7 @@ class AuthProvider with ChangeNotifier {
       final result = await _authService.quickLogin(email, password);
       if (result.success) {
         _sessionInvalidationReason = null;
+        _authCheckedThisSession = true;
         _user = _authService.currentUser;
         if (_user != null) {
           await _saveUserToCache(_user!);

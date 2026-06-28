@@ -107,7 +107,7 @@
                             adminGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]')
                           );
                           for (const input of adminInputs) {
-                            if (input.disabled) continue;
+                            setLocked(input, false);
                             input.checked = false;
                             input.dataset.userWanted = '0';
                             input.dataset.userTouched = '1';
@@ -610,53 +610,39 @@
 
                       // Ensure disabled/locked checked roles are submitted (disabled inputs don't submit)
                       form.addEventListener('submit', function () {
-                        window.__clientLog && window.__clientLog('[role-downgrade] submit handler fired');
-                        window.__clientLog && window.__clientLog('[role-downgrade] roleTypeSelect exists:', !!roleTypeSelect);
-                        window.__clientLog && window.__clientLog('[role-downgrade] roleTypeSelect.value:', roleTypeSelect?.value);
-                        window.__clientLog && window.__clientLog('[role-downgrade] adminGroup exists:', !!adminGroup);
-                        window.__clientLog && window.__clientLog('[role-downgrade] assignmentGroup exists:', !!assignmentGroup);
-
                         if (roleTypeSelect && roleTypeSelect.value === 'admin') {
                           const adminCheckboxes = adminGroup
                             ? Array.from(adminGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]'))
                             : [];
                           const checkedAdminBoxes = adminCheckboxes.filter(function (inp) { return inp.checked; });
                           const hasAdminRole = checkedAdminBoxes.length > 0;
-                          window.__clientLog && window.__clientLog('[role-downgrade] admin checkboxes total:', adminCheckboxes.length, 'checked:', checkedAdminBoxes.length);
-                          checkedAdminBoxes.forEach(function (inp) {
-                            window.__clientLog && window.__clientLog('[role-downgrade]   checked admin:', inp.value, getLabelSpanText(inp));
-                          });
 
                           let hasApprover = false;
                           if (assignmentGroup) {
                             const aInputs = Array.from(
                               assignmentGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]')
                             );
-                            window.__clientLog && window.__clientLog('[role-downgrade] assignment checkboxes total:', aInputs.length);
                             for (const inp of aInputs) {
                               const txt = String(getLabelSpanText(inp) || '').trim().toLowerCase();
-                              window.__clientLog && window.__clientLog('[role-downgrade]   assignment role:', txt, 'checked:', inp.checked, 'value:', inp.value);
                               if (txt === 'approver' && inp.checked) { hasApprover = true; }
                             }
                           }
 
-                          window.__clientLog && window.__clientLog('[role-downgrade] hasAdminRole:', hasAdminRole, 'hasApprover:', hasApprover);
-
                           if (!hasAdminRole && !hasApprover) {
-                            window.__clientLog && window.__clientLog('[role-downgrade] => DOWNGRADING role_type to focal_point');
                             roleTypeSelect.value = 'focal_point';
-                          } else {
-                            window.__clientLog && window.__clientLog('[role-downgrade] => keeping role_type as admin');
                           }
-                        } else {
-                          window.__clientLog && window.__clientLog('[role-downgrade] skipped (not admin or no select)');
                         }
+
+                        const isFocalPointSubmit = roleTypeSelect && roleTypeSelect.value === 'focal_point';
 
                         // Clean previous hidden mirrors
                         for (const el of Array.from(form.querySelectorAll('input[type="hidden"][data-implied-rbac="1"]'))) {
                           el.remove();
                         }
                         for (const input of roleInputs) {
+                          if (isFocalPointSubmit && adminGroup && adminGroup.contains(input)) {
+                            continue;
+                          }
                           if (input.disabled && input.checked) {
                             const hidden = document.createElement('input');
                             hidden.type = 'hidden';

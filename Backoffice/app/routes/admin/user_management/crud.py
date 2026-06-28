@@ -826,20 +826,12 @@ def edit_user(user_id):
             user.profile_color = _pc_raw.strip() if _pc_raw else "#3B82F6"
 
             # Update RBAC roles (best-effort; no-op if RBAC not migrated)
-            import logging as _logging
-            _log = _logging.getLogger(__name__)
-            _log.warning("[role-downgrade-backend] can_assign_rbac_roles=%s, form.rbac_roles=%s, choices=%s",
-                         can_assign_rbac_roles,
-                         getattr(form, "rbac_roles", "MISSING"),
-                         bool(getattr(getattr(form, "rbac_roles", None), "choices", None)))
             if can_assign_rbac_roles and getattr(form, "rbac_roles", None) is not None and getattr(form.rbac_roles, "choices", None):
                 requested_role_ids = list(form.rbac_roles.data or [])
-                _log.warning("[role-downgrade-backend] requested_role_ids from form: %s", requested_role_ids)
                 if (not current_is_sys_mgr) and restricted_role_ids:
                     requested_role_ids = [rid for rid in requested_role_ids if int(rid) not in restricted_role_ids]
                 # Backend enforcement: role_type defaults + drop deprecated upload-only role.
                 role_type = request.form.get("role_type")
-                _log.warning("[role-downgrade-backend] role_type from form: %s", role_type)
                 requested_role_ids = _apply_role_type_and_implications(
                     requested_role_ids,
                     role_type=role_type,
@@ -849,10 +841,7 @@ def edit_user(user_id):
                     requested_role_ids, dropped = _filter_requested_admin_roles_for_actor(requested_role_ids, current_user)
                     if dropped:
                         flash("Some admin roles were not applied because you can only assign admin roles you already have.", "warning")
-                _log.warning("[role-downgrade-backend] FINAL requested_role_ids to save: %s", requested_role_ids)
                 _set_user_rbac_roles(user, requested_role_ids)
-            else:
-                _log.warning("[role-downgrade-backend] SKIPPED role update (condition failed)")
 
             # Update password if provided (local auth only)
             if (not azure_sso_enabled) and form.password.data:

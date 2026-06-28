@@ -986,11 +986,12 @@ def _ensure_repeat_instance(
     from app.extensions import db
     from app.models.forms import RepeatGroupInstance
 
-    inst = RepeatGroupInstance.query.filter_by(
-        assignment_entity_status_id=aes_id,
-        section_id=repeat_section_id,
-        instance_number=instance_number,
-    ).first()
+    with db.session.no_autoflush:
+        inst = RepeatGroupInstance.query.filter_by(
+            assignment_entity_status_id=aes_id,
+            section_id=repeat_section_id,
+            instance_number=instance_number,
+        ).first()
     if not inst:
         effective_user_id = int(user_id) if user_id is not None else _default_user_id_for_import()
         inst = RepeatGroupInstance(
@@ -1001,6 +1002,7 @@ def _ensure_repeat_instance(
             created_by_user_id=effective_user_id,
         )
         db.session.add(inst)
+        db.session.flush()
     elif label:
         inst.instance_label = label
     return inst
@@ -1023,10 +1025,11 @@ def _upsert_emergency_repeat_choice(
         return
 
     display = (display_value or "").strip() or _format_emergency_operation_display(name, code)
-    entry = RepeatGroupData.query.filter_by(
-        repeat_instance_id=repeat_instance.id,
-        form_item_id=choice_item_id,
-    ).first()
+    with db.session.no_autoflush:
+        entry = RepeatGroupData.query.filter_by(
+            repeat_instance_id=repeat_instance.id,
+            form_item_id=choice_item_id,
+        ).first()
     if not entry:
         entry = RepeatGroupData(
             repeat_instance_id=repeat_instance.id,

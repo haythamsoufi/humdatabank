@@ -1,6 +1,6 @@
 """Tests for reporting_period_service."""
 
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 
@@ -164,17 +164,83 @@ class TestPeriodChronologySortKey:
         key = period_chronology_sort_key("Self-Reported")
         assert key[0] == date.min
 
-    def test_dashboard_item_prefers_typed_dates(self):
+    def test_dashboard_item_sorts_by_reporting_year_and_assigned_at(self):
         assigned_form = AssignedForm(period_name="2024")
         assigned_form.period_start = date(2024, 1, 1)
         assigned_form.period_end = date(2024, 6, 30)
+        assigned_form.assigned_at = datetime(2024, 3, 1)
         aes = type("AES", (), {"assigned_form": assigned_form})()
         item = {"type": "assigned", "item_object": aes}
         assert dashboard_assignment_period_sort_key(item) == (
-            date(2024, 6, 30),
-            date(2024, 1, 1),
+            2024,
+            datetime(2024, 3, 1).timestamp(),
             "2024",
         )
+
+    def test_dashboard_item_tiebreaks_same_period_by_assigned_at(self):
+        newer = AssignedForm(period_name="2025")
+        newer.period_start = date(2025, 1, 1)
+        newer.period_end = date(2025, 12, 31)
+        newer.assigned_at = datetime(2025, 6, 1)
+        older = AssignedForm(period_name="2025")
+        older.period_start = date(2025, 1, 1)
+        older.period_end = date(2025, 12, 31)
+        older.assigned_at = datetime(2025, 1, 1)
+
+        items = [
+            {"type": "assigned", "item_object": type("AES", (), {"assigned_form": older})()},
+            {"type": "assigned", "item_object": type("AES", (), {"assigned_form": newer})()},
+        ]
+        ordered = sorted(items, key=dashboard_assignment_period_sort_key, reverse=True)
+        assert ordered[0]["item_object"].assigned_form is newer
+        assert ordered[1]["item_object"].assigned_form is older
+
+    def test_dashboard_item_same_period_name_uses_catalog_when_dates_missing(self, db_session, app):
+        with app.app_context():
+            upsert_reporting_period(
+                "2024",
+                period_type="annual",
+                period_start=date(2024, 1, 1),
+                period_end=date(2024, 12, 31),
+            )
+            db_session.commit()
+
+            with_dates = AssignedForm(period_name="2024")
+            with_dates.period_start = date(2024, 1, 1)
+            with_dates.period_end = date(2024, 12, 31)
+            with_dates.assigned_at = datetime(2024, 6, 15)
+            without_dates = AssignedForm(period_name="2024")
+            without_dates.assigned_at = datetime(2023, 7, 1)
+
+            items = [
+                {"type": "assigned", "item_object": type("AES", (), {"assigned_form": with_dates})()},
+                {"type": "assigned", "item_object": type("AES", (), {"assigned_form": without_dates})()},
+            ]
+            ordered = sorted(items, key=dashboard_assignment_period_sort_key, reverse=True)
+            assert ordered[0]["item_object"].assigned_form is with_dates
+            assert ordered[1]["item_object"].assigned_form is without_dates
+
+    def test_dashboard_latest_assigned_first_within_same_reporting_year(self):
+        plan = AssignedForm(period_name="2024")
+        plan.period_start = date(2024, 1, 1)
+        plan.period_end = date(2024, 12, 31)
+        plan.assigned_at = datetime(2023, 7, 1)
+        midyear = AssignedForm(period_name="Jan-Jun 2024")
+        midyear.period_start = date(2024, 1, 1)
+        midyear.period_end = date(2024, 6, 30)
+        midyear.assigned_at = datetime(2024, 6, 15)
+        annual = AssignedForm(period_name="2024")
+        annual.period_start = date(2024, 1, 1)
+        annual.period_end = date(2024, 12, 31)
+        annual.assigned_at = datetime(2025, 1, 15)
+
+        items = [
+            {"type": "assigned", "item_object": type("AES", (), {"assigned_form": midyear})()},
+            {"type": "assigned", "item_object": type("AES", (), {"assigned_form": annual})()},
+            {"type": "assigned", "item_object": type("AES", (), {"assigned_form": plan})()},
+        ]
+        ordered = sorted(items, key=dashboard_assignment_period_sort_key, reverse=True)
+        assert [i["item_object"].assigned_form for i in ordered] == [annual, midyear, plan]
 
 
 class TestResyncAllReportingPeriods:

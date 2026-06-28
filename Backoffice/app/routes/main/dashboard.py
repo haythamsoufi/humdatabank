@@ -16,6 +16,7 @@ from app.utils.form_localization import get_localized_country_name, get_localize
 from datetime import datetime
 from app.services.notification.core import get_country_recent_activities, notify_self_report_created
 from app.services.reporting_period_service import (
+    dashboard_assignment_period_sort_key,
     sort_period_names,
     sync_assigned_form_reporting_period,
 )
@@ -752,15 +753,9 @@ def dashboard():
                     # Public submissions always go to current for now
                     current_assignments.append(item)
 
+            # Latest reporting years first; within each year, latest assigned_at first.
             past_assignments.sort(
-                key=lambda item: (
-                    item["item_object"].assigned_form.assigned_at
-                    if item.get("type") == "assigned"
-                    and item.get("item_object")
-                    and item["item_object"].assigned_form
-                    and item["item_object"].assigned_form.assigned_at
-                    else datetime.min
-                ),
+                key=dashboard_assignment_period_sort_key,
                 reverse=True,
             )
             past_assignment_periods = sort_period_names(

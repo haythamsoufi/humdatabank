@@ -1919,6 +1919,15 @@
                     calculatedHeight += paginationHeight;
                 }
 
+                // Touch / phone: expand grid to fit visible rows so the page scrolls naturally
+                // instead of trapping users in a nested scroll area inside the grid body.
+                if (AgGridHelper.shouldUseTouchPageScroll(opts)) {
+                    const absoluteMin = opts.absoluteMinHeight || 300;
+                    const touchHeight = Math.max(absoluteMin, calculatedHeight);
+                    self.applyGridHeight(touchHeight, touchHeight, touchHeight);
+                    return;
+                }
+
                 // Calculate minHeight (can be 'viewport', 'auto', or a fixed number)
                 const resolvedMinHeight = self.resolveMinHeightPx(opts, paginationEnabled);
 
@@ -3901,6 +3910,47 @@
     AgGridHelper.SCROLL_CHAIN_EDGE_TOLERANCE = 8;
 
     /**
+     * True on phones/tablets where nested scroll areas feel awkward.
+     * @returns {boolean}
+     */
+    AgGridHelper.isCoarsePointerDevice = function() {
+        try {
+            if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
+                return true;
+            }
+            if (window.matchMedia('(max-width: 768px)').matches) {
+                return true;
+            }
+        } catch (e) {
+            // matchMedia unavailable — fall through to width check
+        }
+        return (window.innerWidth || 0) <= 768;
+    };
+
+    /**
+     * On touch devices, prefer page scroll over a viewport-capped grid body scroller.
+     * @param {Object} heightOptions
+     * @returns {boolean}
+     */
+    AgGridHelper.shouldUseTouchPageScroll = function(heightOptions) {
+        var opts = heightOptions || {};
+        if (opts.useParentContainerHeight) {
+            return false;
+        }
+        if (opts.mobilePageScroll === false) {
+            return false;
+        }
+        if (!AgGridHelper.isCoarsePointerDevice()) {
+            return false;
+        }
+        var minRaw = opts.minHeight;
+        var maxRaw = opts.maxHeight;
+        var usesViewportSizing = (minRaw === 'viewport' || minRaw === undefined || minRaw === null) &&
+            (maxRaw === 'viewport' || maxRaw === undefined || maxRaw === null);
+        return usesViewportSizing;
+    };
+
+    /**
      * Viewport edge state for scroll chaining (handles sub-pixel gaps at scroll end).
      * @param {HTMLElement} viewport
      * @returns {{ atTop: boolean, atBottom: boolean, maxScroll: number }}
@@ -3940,6 +3990,7 @@
 
             viewport.setAttribute('data-ag-scroll-chain', '1');
             var pageScroller = AgGridHelper._findScrollableAncestor(gridRoot);
+            var touchChain = { lastY: 0, active: false };
 
             // Capture on the grid root so chaining works over pinned columns, cells, headers, etc.
             gridRoot.addEventListener('wheel', function(e) {
@@ -3959,6 +4010,43 @@
                     pageScroller.scrollBy({ top: deltaY, left: 0, behavior: 'auto' });
                 }
             }, { capture: true, passive: false });
+
+            gridRoot.addEventListener('touchstart', function(e) {
+                if (e.touches.length !== 1) {
+                    touchChain.active = false;
+                    return;
+                }
+                touchChain.active = true;
+                touchChain.lastY = e.touches[0].clientY;
+            }, { capture: true, passive: true });
+
+            gridRoot.addEventListener('touchmove', function(e) {
+                if (!touchChain.active || e.touches.length !== 1) {
+                    return;
+                }
+                var currentY = e.touches[0].clientY;
+                var deltaY = touchChain.lastY - currentY;
+                touchChain.lastY = currentY;
+                if (!deltaY) {
+                    return;
+                }
+
+                var edges = AgGridHelper._scrollChainViewportEdges(viewport);
+                if (edges.maxScroll <= 0) {
+                    return;
+                }
+
+                if ((deltaY < 0 && edges.atTop) || (deltaY > 0 && edges.atBottom)) {
+                    pageScroller.scrollBy({ top: deltaY, left: 0, behavior: 'auto' });
+                }
+            }, { capture: true, passive: true });
+
+            gridRoot.addEventListener('touchend', function() {
+                touchChain.active = false;
+            }, { capture: true, passive: true });
+            gridRoot.addEventListener('touchcancel', function() {
+                touchChain.active = false;
+            }, { capture: true, passive: true });
 
             return true;
         }

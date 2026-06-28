@@ -11,10 +11,11 @@ import logging
 import os
 import threading
 import time
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterator, Optional
 
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.extensions import db
@@ -43,6 +44,25 @@ def _status_str(value: Any) -> str:
     if hasattr(value, "value"):
         return str(value.value)
     return str(value or "")
+
+
+@contextmanager
+def _isolated_job_session() -> Iterator[Session]:
+    """Session scoped to AIJob persistence, isolated from the request/import session.
+
+    Long-running imports keep uncommitted FormData rows on ``db.session``. Progress
+    polling and cancel checks must not query or commit through that session or
+    SQLAlchemy autoflush will flush partial import batches prematurely.
+    """
+    session = sessionmaker(bind=db.engine)()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 def job_record_to_dict(job: AIJob) -> Dict[str, Any]:
@@ -86,24 +106,26 @@ def create_import_job(
     payload.setdefault("started_ts", now_ts)
     payload.setdefault("updated_ts", now_ts)
 
-    job = AIJob(
-        id=str(job_id),
-        job_type=str(job_type),
-        user_id=int(user_id or 0),
-        status="queued",
-        total_items=0,
-        meta=payload,
-    )
-    db.session.add(job)
-    db.session.commit()
+    with _isolated_job_session() as session:
+        session.add(
+            AIJob(
+                id=str(job_id),
+                job_type=str(job_type),
+                user_id=int(user_id or 0),
+                status="queued",
+                total_items=0,
+                meta=payload,
+            )
+        )
     _logging_state[job_id] = {}
 
 
 def get_import_job(job_id: str) -> Optional[Dict[str, Any]]:
-    job = AIJob.query.get(str(job_id))
-    if not job or job.job_type not in IMPORT_JOB_TYPES:
-        return None
-    return job_record_to_dict(job)
+    with _isolated_job_session() as session:
+        job = session.get(AIJob, str(job_id))
+        if not job or job.job_type not in IMPORT_JOB_TYPES:
+            return None
+        return job_record_to_dict(job)
 
 
 def get_import_job_logging_state(job_id: str) -> Dict[str, Any]:
@@ -141,55 +163,54 @@ def update_import_job(
         log_state.update({k: v for k, v in fields.items() if k == "last_logged_pct"})
         return True
 
-    job = AIJob.query.get(str(job_id))
-    if not job:
-        return False
-
-    meta = dict(job.meta or {})
-    meta_keys = (
-        "kind",
-        "template_id",
-        "stage",
-        "message",
-        "current",
-        "total",
-        "percent",
-        "stats",
-        "preview_path",
-        "download_ready",
-        "last_logged_pct",
-        "download_url",
-        "started_at",
-        "started_ts",
-    )
-    for key in meta_keys:
-        if key not in fields:
-            continue
-        value = fields[key]
-        if value is None and key not in ("preview_path", "download_url", "stats", "error"):
-            continue
-        meta[key] = value
-
-    now_ts = time.time()
-    meta["updated_at"] = utc_iso()
-    meta["updated_ts"] = now_ts
-
-    if "status" in fields and fields["status"] is not None:
-        job.status = str(fields["status"])
-        if job.status == "running" and not job.started_at:
-            job.started_at = utcnow()
-        if job.status in _TERMINAL_STATUSES:
-            job.finished_at = utcnow()
-
-    if "error" in fields:
-        job.error = fields["error"]
-
-    job.meta = meta
-    flag_modified(job, "meta")
     try:
-        db.session.commit()
+        with _isolated_job_session() as session:
+            job = session.get(AIJob, str(job_id))
+            if not job:
+                return False
+
+            meta = dict(job.meta or {})
+            meta_keys = (
+                "kind",
+                "template_id",
+                "stage",
+                "message",
+                "current",
+                "total",
+                "percent",
+                "stats",
+                "preview_path",
+                "download_ready",
+                "last_logged_pct",
+                "download_url",
+                "started_at",
+                "started_ts",
+            )
+            for key in meta_keys:
+                if key not in fields:
+                    continue
+                value = fields[key]
+                if value is None and key not in ("preview_path", "download_url", "stats", "error"):
+                    continue
+                meta[key] = value
+
+            now_ts = time.time()
+            meta["updated_at"] = utc_iso()
+            meta["updated_ts"] = now_ts
+
+            if "status" in fields and fields["status"] is not None:
+                job.status = str(fields["status"])
+                if job.status == "running" and not job.started_at:
+                    job.started_at = utcnow()
+                if job.status in _TERMINAL_STATUSES:
+                    job.finished_at = utcnow()
+
+            if "error" in fields:
+                job.error = fields["error"]
+
+            job.meta = meta
+            flag_modified(job, "meta")
     except Exception:
-        db.session.rollback()
         logger.exception("Failed to persist async import job %s", job_id)
         raise
     return True
@@ -200,10 +221,11 @@ def request_import_job_cancel(job_id: str) -> bool:
 
 
 def is_import_job_cancel_requested(job_id: str) -> bool:
-    job = AIJob.query.get(str(job_id))
-    if not job:
-        return False
-    return _status_str(job.status) == "cancel_requested"
+    with _isolated_job_session() as session:
+        job = session.get(AIJob, str(job_id))
+        if not job:
+            return False
+        return _status_str(job.status) == "cancel_requested"
 
 
 def cleanup_expired_import_jobs(now_ts: Optional[float] = None) -> None:
@@ -212,24 +234,24 @@ def cleanup_expired_import_jobs(now_ts: Optional[float] = None) -> None:
         now_ts = time.time()
     cutoff = datetime.fromtimestamp(now_ts - IMPORT_JOB_TTL_SECONDS, tz=timezone.utc).replace(tzinfo=None)
     try:
-        expired = (
-            AIJob.query.filter(
-                AIJob.job_type.in_(tuple(IMPORT_JOB_TYPES)),
-                AIJob.status.in_(tuple(_TERMINAL_STATUSES)),
-                AIJob.created_at < cutoff,
-            ).all()
-        )
-        for job in expired:
-            path = (job.meta or {}).get("preview_path")
-            if path and isinstance(path, str):
-                with suppress(Exception):
-                    if os.path.isfile(path):
-                        os.unlink(path)
-            clear_import_job_logging_state(job.id)
-        if expired:
+        with _isolated_job_session() as session:
+            expired = (
+                session.query(AIJob)
+                .filter(
+                    AIJob.job_type.in_(tuple(IMPORT_JOB_TYPES)),
+                    AIJob.status.in_(tuple(_TERMINAL_STATUSES)),
+                    AIJob.created_at < cutoff,
+                )
+                .all()
+            )
             for job in expired:
-                db.session.delete(job)
-            db.session.commit()
+                path = (job.meta or {}).get("preview_path")
+                if path and isinstance(path, str):
+                    with suppress(Exception):
+                        if os.path.isfile(path):
+                            os.unlink(path)
+                clear_import_job_logging_state(job.id)
+            for job in expired:
+                session.delete(job)
     except Exception:
-        db.session.rollback()
         logger.exception("Failed to clean up expired async import jobs")

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Iterable, Sequence
 
 from app.extensions import db
 from app.models.assignments import AssignedForm, ReportingPeriod
 
 ChronologyKey = tuple[date, date, str]
+DashboardAssignmentSortKey = tuple[int, float, str]
 
 
 def _chronology_key_from_bounds(
@@ -127,18 +128,50 @@ def period_chronology_sort_key(
     return _unknown_chronology_key(name)
 
 
-def dashboard_assignment_period_sort_key(item: dict) -> ChronologyKey:
-    """Sort key for dashboard assignment rows grouped by reporting period."""
+def _period_bounds_for_assigned_form(
+    assigned_form: AssignedForm,
+) -> tuple[date | None, date | None]:
+    """Resolve sort bounds from assigned_form dates, falling back to catalog."""
+    name = (assigned_form.period_name or "").strip()
+    catalog_start, catalog_end = catalog_bounds_for_period_name(name)
+    start = assigned_form.period_start if assigned_form.period_start is not None else catalog_start
+    end = assigned_form.period_end if assigned_form.period_end is not None else catalog_end
+    return start, end
+
+
+def _assigned_at_sort_value(assigned_at: datetime | None) -> float:
+    """Latest assigned_at sorts first when the dashboard list uses reverse=True."""
+    if assigned_at is None:
+        return float("-inf")
+    return assigned_at.timestamp()
+
+
+def _reporting_year_for_assigned_form(assigned_form: AssignedForm) -> int:
+    """Reporting year from typed/catalog period_end (0 when unknown)."""
+    _, period_end = _period_bounds_for_assigned_form(assigned_form)
+    return period_end.year if period_end else 0
+
+
+def dashboard_assignment_period_sort_key(item: dict) -> DashboardAssignmentSortKey:
+    """
+    Sort key for dashboard past assignments (latest reporting year first).
+
+    Primary: reporting year (period_end.year from catalog or typed dates).
+    Secondary: assigned_at descending (latest assignment first within the year).
+    """
     if item.get("type") == "assigned":
         aes = item.get("item_object")
         assigned_form = getattr(aes, "assigned_form", None) if aes else None
         if assigned_form is not None:
-            return period_chronology_sort_key(
-                assigned_form.period_name,
-                period_start=assigned_form.period_start,
-                period_end=assigned_form.period_end,
+            name = (assigned_form.period_name or "").strip()
+            return (
+                _reporting_year_for_assigned_form(assigned_form),
+                _assigned_at_sort_value(assigned_form.assigned_at),
+                name,
             )
-    return period_chronology_sort_key(item.get("period"))
+    period_key = period_chronology_sort_key(item.get("period"))
+    year = period_key[0].year if period_key[0] != date.min else 0
+    return (year, float("-inf"), (item.get("period") or "").strip())
 
 
 def sync_assigned_form_reporting_period(assigned_form: AssignedForm) -> None:

@@ -87,8 +87,10 @@
    Do not use overflow-x: auto on the root: AG Grid manages horizontal sync between
    .ag-header-viewport and .ag-body-viewport. A second scrollable layer here causes
    body rows to move while headers stay fixed and “infinite” sideways scroll. */
-.ag-grid-container {
+.ag-grid-container,
+:where([id$="-container"], [id$="Grid-container"]):has([class*="ag-theme-"]) {
     overflow-x: hidden;
+    overflow-y: visible;
     position: relative;
 }
 
@@ -123,6 +125,34 @@
 .ag-theme-quartz .ag-body-viewport,
 .ag-theme-material .ag-body-viewport {
     overscroll-behavior-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+}
+
+/* Touch devices: avoid nested scroll + text-selection gesture fighting vertical pan */
+@media (hover: none) and (pointer: coarse) {
+    .ag-theme-alpine .ag-cell,
+    .ag-theme-balham .ag-cell,
+    .ag-theme-quartz .ag-cell,
+    .ag-theme-material .ag-cell,
+    .ag-cell {
+        -webkit-user-select: none !important;
+        user-select: none !important;
+    }
+
+    .ag-theme-alpine .ag-cell-value,
+    .ag-theme-balham .ag-cell-value,
+    .ag-theme-quartz .ag-cell-value,
+    .ag-theme-material .ag-cell-value,
+    .ag-cell-value,
+    .ag-theme-alpine .ag-cell .ag-cell-value *,
+    .ag-theme-balham .ag-cell .ag-cell-value *,
+    .ag-theme-quartz .ag-cell .ag-cell-value *,
+    .ag-theme-material .ag-cell .ag-cell-value *,
+    .ag-cell .ag-cell-value * {
+        -webkit-user-select: none !important;
+        user-select: none !important;
+    }
 }
 
 /* Loading Spinner Animation */

@@ -103,6 +103,26 @@ class TestShouldSkipApiUsageTracking:
         with app.test_request_context("/api/v1/users"):
             assert _should_skip_api_usage_tracking() is False
 
+    def test_csrf_token_skipped(self, app):
+        with app.test_request_context("/api/v1/csrf-token"):
+            assert _should_skip_api_usage_tracking() is True
+
+    def test_matrix_auto_load_skipped(self, app):
+        with app.test_request_context("/api/v1/matrix/auto-load-entities", method="POST"):
+            assert _should_skip_api_usage_tracking() is True
+
+    def test_completion_rate_skipped(self, app):
+        with app.test_request_context("/api/forms/assignment/1/completion-rate"):
+            assert _should_skip_api_usage_tracking() is True
+
+    def test_dynamic_indicator_render_skipped(self, app):
+        with app.test_request_context("/api/forms/dynamic-indicators/1/render"):
+            assert _should_skip_api_usage_tracking() is True
+
+    def test_mobile_screen_view_skipped(self, app):
+        with app.test_request_context("/api/mobile/v1/analytics/screen-view", method="POST"):
+            assert _should_skip_api_usage_tracking() is True
+
 
 # ────────────────────────────────────────────────────────────────────────────
 # _api_tracker_logger

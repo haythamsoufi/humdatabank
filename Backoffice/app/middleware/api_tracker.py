@@ -3,6 +3,7 @@ from functools import wraps
 from flask import request, g, current_app
 from app.models.api_usage import APIUsage
 from app.utils.api_helpers import get_json_safe
+from app.utils.api_usage_logging_skip import should_skip_api_usage_path
 from app import db
 
 
@@ -11,40 +12,7 @@ def _should_skip_api_usage_tracking() -> bool:
     High-volume or low-signal endpoints excluded from api_usage (and API key usage rows).
     Keep in sync with both before_request and after_request hooks.
     """
-    path = request.path or ""
-    method = (request.method or "").upper()
-
-    if "notifications" in path or "refresh-csrf-token" in path:
-        return True
-    # Live presence heartbeats (not meaningful for aggregate API analytics)
-    if path.startswith("/api/forms/presence/"):
-        return True
-    # WebSocket upgrade endpoints
-    if path in ("/api/ai/v2/ws", "/api/ai/documents/ws"):
-        return True
-    # Streaming / cancel — tracked elsewhere; not comparable to normal REST latency
-    if path in ("/api/ai/v2/chat/stream", "/api/ai/v2/chat/cancel"):
-        return True
-    # Product tour content under document workflows
-    if path.startswith("/api/ai/documents/workflows/") and path.endswith("/tour"):
-        return True
-    # Lookup dropdown option fetches
-    if path.startswith("/api/forms/lookup-lists/") and path.endswith("/options"):
-        return True
-    if path == "/api/forms/dynamic-indicators/render-pending":
-        return True
-    if path == "/api/ai/v2/token":
-        return True
-    if path == "/api/v1/variables/resolve":
-        return True
-    # Polled conversation list / single conversation (GET only)
-    if method == "GET" and path == "/api/ai/v2/conversations":
-        return True
-    if method == "GET" and path.startswith("/api/ai/v2/conversations/"):
-        rest = path[len("/api/ai/v2/conversations/"):]
-        if rest and "/" not in rest:
-            return True
-    return False
+    return should_skip_api_usage_path(request.path, request.method)
 
 
 def _api_tracker_logger():

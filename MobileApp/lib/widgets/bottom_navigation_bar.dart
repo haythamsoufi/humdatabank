@@ -176,8 +176,8 @@ class AppBottomNavigationBar extends StatelessWidget {
             context: context,
             index: aiChatNavIndex,
             selectedTabIndex: selectedTabIndex,
-            icon: Icons.smart_toy_outlined,
-            activeIcon: Icons.smart_toy,
+            icon: Icons.auto_awesome_outlined,
+            activeIcon: Icons.auto_awesome,
             label: l10n.chatbot,
             showBadge: false,
             lightForegroundOnBar: lightForegroundOnBar,
@@ -214,8 +214,8 @@ class AppBottomNavigationBar extends StatelessWidget {
                 context: context,
                 index: 1,
                 selectedTabIndex: selectedTabIndex,
-                icon: Icons.dashboard_outlined,
-                activeIcon: Icons.dashboard,
+                icon: Icons.grid_view_outlined,
+                activeIcon: Icons.grid_view,
                 label: l10n.dashboard,
                 showBadge: false,
                 lightForegroundOnBar: lightForegroundOnBar,
@@ -230,7 +230,7 @@ class AppBottomNavigationBar extends StatelessWidget {
                 index: 2,
                 selectedTabIndex: selectedTabIndex,
                 icon: Icons.home_outlined,
-                activeIcon: Icons.home,
+                activeIcon: Icons.home_rounded,
                 label: l10n.home,
                 showBadge: false,
                 lightForegroundOnBar: lightForegroundOnBar,
@@ -244,8 +244,8 @@ class AppBottomNavigationBar extends StatelessWidget {
                 context: context,
                 index: 3,
                 selectedTabIndex: selectedTabIndex,
-                icon: Icons.description_outlined,
-                activeIcon: Icons.description,
+                icon: Icons.assignment_outlined,
+                activeIcon: Icons.assignment,
                 label: l10n.resourcesUnifiedPlanningSectionTitle,
                 showBadge: false,
                 lightForegroundOnBar: lightForegroundOnBar,
@@ -260,8 +260,8 @@ class AppBottomNavigationBar extends StatelessWidget {
                 context: context,
                 index: shiftedIdx,
                 selectedTabIndex: selectedTabIndex,
-                icon: Icons.admin_panel_settings_outlined,
-                activeIcon: Icons.admin_panel_settings,
+                icon: Icons.shield_outlined,
+                activeIcon: Icons.shield,
                 label: l10n.admin,
                 showBadge: false,
                 lightForegroundOnBar: lightForegroundOnBar,
@@ -279,9 +279,10 @@ class AppBottomNavigationBar extends StatelessWidget {
                   selectedTabIndex: selectedTabIndex,
                   icon: isFocalPoint
                       ? Icons.notifications_outlined
-                      : Icons.folder_outlined,
-                  activeIcon:
-                      isFocalPoint ? Icons.notifications : Icons.folder,
+                      : Icons.folder_open_outlined,
+                  activeIcon: isFocalPoint
+                      ? Icons.notifications
+                      : Icons.folder_open,
                   label: isFocalPoint ? l10n.notifications : l10n.resources,
                   showBadge: isFocalPoint,
                   lightForegroundOnBar: lightForegroundOnBar,
@@ -297,8 +298,8 @@ class AppBottomNavigationBar extends StatelessWidget {
                   context: context,
                   index: 0,
                   selectedTabIndex: selectedTabIndex,
-                  icon: Icons.folder_outlined,
-                  activeIcon: Icons.folder,
+                  icon: Icons.folder_open_outlined,
+                  activeIcon: Icons.folder_open,
                   label: l10n.resources,
                   showBadge: false,
                   lightForegroundOnBar: lightForegroundOnBar,
@@ -313,8 +314,8 @@ class AppBottomNavigationBar extends StatelessWidget {
                   context: context,
                   index: 1,
                   selectedTabIndex: selectedTabIndex,
-                  icon: Icons.library_books_outlined,
-                  activeIcon: Icons.library_books,
+                  icon: Icons.menu_book_outlined,
+                  activeIcon: Icons.menu_book,
                   label: l10n.indicators,
                   showBadge: false,
                   lightForegroundOnBar: lightForegroundOnBar,
@@ -329,8 +330,8 @@ class AppBottomNavigationBar extends StatelessWidget {
                   context: context,
                   index: 1,
                   selectedTabIndex: selectedTabIndex,
-                  icon: Icons.dashboard_outlined,
-                  activeIcon: Icons.dashboard,
+                  icon: Icons.grid_view_outlined,
+                  activeIcon: Icons.grid_view,
                   label: l10n.dashboard,
                   showBadge: false,
                   lightForegroundOnBar: lightForegroundOnBar,
@@ -345,7 +346,7 @@ class AppBottomNavigationBar extends StatelessWidget {
                 index: 2,
                 selectedTabIndex: selectedTabIndex,
                 icon: Icons.home_outlined,
-                activeIcon: Icons.home,
+                activeIcon: Icons.home_rounded,
                 label: l10n.home,
                 showBadge: false,
                 lightForegroundOnBar: lightForegroundOnBar,
@@ -359,8 +360,8 @@ class AppBottomNavigationBar extends StatelessWidget {
                 context: context,
                 index: 3,
                 selectedTabIndex: selectedTabIndex,
-                icon: Icons.description_outlined,
-                activeIcon: Icons.description,
+                icon: Icons.assignment_outlined,
+                activeIcon: Icons.assignment,
                 label: l10n.resourcesUnifiedPlanningSectionTitle,
                 showBadge: false,
                 lightForegroundOnBar: lightForegroundOnBar,
@@ -375,8 +376,8 @@ class AppBottomNavigationBar extends StatelessWidget {
                 context: context,
                 index: shiftedIdx,
                 selectedTabIndex: selectedTabIndex,
-                icon: Icons.analytics_outlined,
-                activeIcon: Icons.analytics,
+                icon: Icons.insights_outlined,
+                activeIcon: Icons.insights,
                 label: l10n.analysis,
                 showBadge: false,
                 lightForegroundOnBar: lightForegroundOnBar,
@@ -433,7 +434,7 @@ class AppBottomNavigationBar extends StatelessWidget {
         child: SizedBox(
           height: 52,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            padding: const EdgeInsets.fromLTRB(6, 0, 6, 4),
             child: child,
           ),
         ),
@@ -470,47 +471,24 @@ class AppBottomNavigationBar extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final primary = cs.primary;
+    final ifrcRed = Color(AppConstants.ifrcRed);
 
-    // Dark mode: pure primary (#011E41) on ~#1E1E1E bar — edges disappear.
-    // Lighten the fill and add a hairline border so the pill reads clearly.
     final Color iconFg;
-    final Color selectedPillColor;
-    final BoxBorder? selectedPillBorder;
+    final Color stripeColor;
     if (lightForegroundOnBar) {
-      final ifrcRed = Color(AppConstants.ifrcRed);
-      if (isSelected) {
-        iconFg = Colors.white;
-        selectedPillColor = ifrcRed.withValues(alpha: 0.92);
-        selectedPillBorder = Border.all(
-          color: Colors.white.withValues(alpha: 0.35),
-          width: 1,
-        );
-      } else {
-        iconFg = Colors.white.withValues(alpha: 0.62);
-        selectedPillColor = Colors.transparent;
-        selectedPillBorder = null;
-      }
+      stripeColor = ifrcRed;
+      iconFg = isSelected
+          ? Colors.white
+          : Colors.white.withValues(alpha: 0.62);
     } else if (isSelected) {
-      if (context.isDarkTheme) {
-        iconFg = cs.onPrimary;
-        selectedPillColor = Color.alphaBlend(
-          Colors.white.withValues(alpha: 0.34),
-          primary,
-        );
-        selectedPillBorder = Border.all(
-          color: Colors.white.withValues(alpha: 0.45),
-          width: 1,
-        );
-      } else {
-        iconFg = primary;
-        selectedPillColor = primary.withValues(alpha: 0.12);
-        selectedPillBorder = null;
-      }
+      stripeColor = ifrcRed;
+      iconFg = context.isDarkTheme
+          ? Color.alphaBlend(Colors.white.withValues(alpha: 0.22), primary)
+          : primary;
     } else {
+      stripeColor = Colors.transparent;
       iconFg = context.iconColor
           .withValues(alpha: context.isDarkTheme ? 0.72 : 0.55);
-      selectedPillColor = Colors.transparent;
-      selectedPillBorder = null;
     }
 
     Widget iconChild;
@@ -584,25 +562,27 @@ class AppBottomNavigationBar extends StatelessWidget {
               : primary.withValues(alpha: 0.06),
           child: SizedBox.expand(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                AnimatedScale(
-                  scale: isSelected ? 1.0 : 0.94,
+                AnimatedContainer(
                   duration: AppConstants.animationFast,
                   curve: Curves.easeOutCubic,
-                  child: AnimatedContainer(
-                    duration: AppConstants.animationFast,
-                    curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected ? selectedPillColor : Colors.transparent,
-                      borderRadius:
-                          BorderRadius.circular(AppConstants.radiusLarge),
-                      border: isSelected ? selectedPillBorder : null,
+                  height: 3,
+                  margin: EdgeInsets.symmetric(horizontal: isSelected ? 10 : 0),
+                  decoration: BoxDecoration(
+                    color: isSelected ? stripeColor : Colors.transparent,
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(1.5),
                     ),
-                    child: iconChild,
+                  ),
+                ),
+                Expanded(
+                  child: Center(
+                    child: AnimatedScale(
+                      scale: isSelected ? 1.0 : 0.94,
+                      duration: AppConstants.animationFast,
+                      curve: Curves.easeOutCubic,
+                      child: iconChild,
+                    ),
                   ),
                 ),
               ],

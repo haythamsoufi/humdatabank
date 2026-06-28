@@ -448,3 +448,206 @@ html[dir="rtl"] .ag-theme-alpine .ag-floating-filter-input input.ag-number-field
     padding-right: 26px !important;
 }
 
+/* ===================================================================
+   MOBILE ACTIONS OVERFLOW (vertical three-dots menu)
+   =================================================================== */
+
+.ag-cell[col-id="actions"],
+.ag-cell[col-id="actions"] .ag-cell-wrapper,
+.ag-cell[col-id="actions"] .ag-cell-value {
+    overflow: visible !important;
+}
+
+@media (min-width: 769px) {
+    .ag-theme-alpine .ag-cell[col-id="actions"],
+    .ag-theme-balham .ag-cell[col-id="actions"],
+    .ag-theme-quartz .ag-cell[col-id="actions"],
+    .ag-theme-material .ag-cell[col-id="actions"],
+    .ag-cell[col-id="actions"] {
+        padding-left: 6px !important;
+        padding-right: 6px !important;
+    }
+}
+
+.ag-actions-overflow {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 2rem;
+}
+
+.ag-actions-overflow-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: 9999px;
+    background: transparent;
+    color: #4b5563;
+    cursor: pointer;
+}
+
+.ag-actions-overflow-btn:hover,
+.ag-actions-overflow-btn:focus-visible {
+    background: #f3f4f6;
+    color: #111827;
+    outline: none;
+}
+
+.ag-actions-overflow-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 10rem;
+    max-width: min(16rem, 70vw);
+    max-height: min(16rem, 60vh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.25rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    background: #fff;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    z-index: 60;
+}
+
+.ag-actions-overflow-menu.ag-actions-overflow-menu--portal {
+    position: fixed;
+    z-index: 10050;
+}
+
+html[dir="rtl"] .ag-actions-overflow-menu {
+    right: auto;
+    left: 0;
+}
+
+.ag-actions-overflow-item {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 0;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: #111827;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    text-align: start;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.ag-actions-overflow-item:hover,
+.ag-actions-overflow-item:focus-visible {
+    background: #f3f4f6;
+    outline: none;
+}
+
+.ag-actions-overflow-source {
+    display: none !important;
+}
+
+@media (max-width: 768px) {
+    /* Compact actions column: minimal header chrome, no pinned-right seam */
+    .ag-pinned-right-header {
+        border-left: none !important;
+        background: transparent !important;
+    }
+
+    .ag-theme-alpine .ag-header-cell[col-id="actions"],
+    .ag-theme-balham .ag-header-cell[col-id="actions"],
+    .ag-theme-quartz .ag-header-cell[col-id="actions"],
+    .ag-theme-material .ag-header-cell[col-id="actions"],
+    .ag-header-cell[col-id="actions"] {
+        width: 40px !important;
+        min-width: 40px !important;
+        max-width: 44px !important;
+        padding: 0 !important;
+        background: transparent !important;
+        border: none !important;
+    }
+
+    .ag-theme-alpine .ag-header-cell[col-id="actions"] .ag-header-cell-label,
+    .ag-theme-balham .ag-header-cell[col-id="actions"] .ag-header-cell-label,
+    .ag-theme-quartz .ag-header-cell[col-id="actions"] .ag-header-cell-label,
+    .ag-theme-material .ag-header-cell[col-id="actions"] .ag-header-cell-label,
+    .ag-header-cell[col-id="actions"] .ag-header-cell-label,
+    .ag-header-cell[col-id="actions"] .ag-header-cell-comp-wrapper,
+    .ag-header-cell[col-id="actions"] .ag-header-cell-resize {
+        display: none !important;
+    }
+
+    .ag-theme-alpine .ag-cell[col-id="actions"].ag-cell-first-right-pinned,
+    .ag-theme-balham .ag-cell[col-id="actions"].ag-cell-first-right-pinned,
+    .ag-theme-quartz .ag-cell[col-id="actions"].ag-cell-first-right-pinned,
+    .ag-theme-material .ag-cell[col-id="actions"].ag-cell-first-right-pinned,
+    .ag-cell[col-id="actions"].ag-cell-first-right-pinned {
+        border-left: none !important;
+    }
+
+    .ag-theme-alpine .ag-cell[col-id="actions"],
+    .ag-theme-balham .ag-cell[col-id="actions"],
+    .ag-theme-quartz .ag-cell[col-id="actions"],
+    .ag-theme-material .ag-cell[col-id="actions"],
+    .ag-cell[col-id="actions"] {
+        width: 40px !important;
+        min-width: 40px !important;
+        max-width: 44px !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    /* Pagination: avoid broken word-wrapping on narrow screens */
+    .ag-theme-alpine .ag-paging-panel,
+    .ag-theme-balham .ag-paging-panel,
+    .ag-theme-quartz .ag-paging-panel,
+    .ag-theme-material .ag-paging-panel,
+    .ag-paging-panel {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        height: auto !important;
+        min-height: 2.75rem;
+        padding: 6px 8px !important;
+        gap: 4px 10px !important;
+    }
+
+    .ag-paging-panel > * {
+        margin: 0 !important;
+    }
+
+    .ag-paging-page-size {
+        flex: 1 1 100%;
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        font-size: 0.75rem !important;
+        white-space: nowrap !important;
+    }
+
+    .ag-paging-row-summary-panel,
+    .ag-paging-page-summary-panel {
+        display: flex !important;
+        align-items: center !important;
+        flex-wrap: nowrap !important;
+        white-space: nowrap !important;
+        font-size: 0.75rem !important;
+        line-height: 1.25 !important;
+        gap: 2px !important;
+    }
+
+    /* Row count is enough on phones; "Page 1 of 1" wraps awkwardly */
+    .ag-paging-page-summary-panel .ag-paging-description {
+        display: none !important;
+    }
+
+    .ag-paging-button {
+        padding: 2px !important;
+    }
+}
+

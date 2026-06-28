@@ -664,19 +664,25 @@
          */
         actions: function(cellRenderer, options) {
             options = options || {};
+            var mobileLayout = typeof AgGridRenderers !== 'undefined'
+                && typeof AgGridRenderers.isMobileActionsLayout === 'function'
+                && AgGridRenderers.isMobileActionsLayout();
             return {
                 field: 'actions',
                 headerName: options.headerName || getTranslation('actions', 'Actions'),
-                width: options.width || 180,
-                minWidth: options.minWidth || 150,
-                maxWidth: options.maxWidth || 250,
+                width: mobileLayout ? 40 : (options.width || 180),
+                minWidth: mobileLayout ? 40 : (options.minWidth || 150),
+                maxWidth: mobileLayout ? 44 : (options.maxWidth || 250),
                 pinned: 'right',
                 lockVisible: true,
                 lockPinned: true,
                 suppressMovable: true,
                 sortable: false,
                 filter: false,
-                cellRenderer: cellRenderer
+                cellRenderer: typeof AgGridRenderers !== 'undefined'
+                    && typeof AgGridRenderers.wrapActionsCellRenderer === 'function'
+                    ? AgGridRenderers.wrapActionsCellRenderer(cellRenderer)
+                    : cellRenderer
             };
         },
 
@@ -849,11 +855,346 @@
         return (params.value != null && params.value !== '') ? params.value : '\u2014';
     }
 
+    var ICON_ACTION_LABELS = {
+        'fa-pen': 'Edit',
+        'fa-edit': 'Edit',
+        'fa-pencil-alt': 'Edit',
+        'fa-eye': 'View',
+        'fa-trash': 'Delete',
+        'fa-pause-circle': 'Deactivate',
+        'fa-play-circle': 'Activate',
+        'fa-undo': 'Reopen',
+        'fa-lock': 'Close',
+        'fa-unlock': 'Unlock',
+        'fa-copy': 'Copy',
+        'fa-download': 'Download',
+        'fa-external-link-alt': 'Open',
+        'fa-check': 'Approve',
+        'fa-times': 'Reject',
+        'fa-ban': 'Revoke'
+    };
+
+    function isMobileActionsLayout() {
+        if (typeof AgGridHelper !== 'undefined' && typeof AgGridHelper.isCoarsePointerDevice === 'function') {
+            return AgGridHelper.isCoarsePointerDevice();
+        }
+        try {
+            return window.matchMedia('(max-width: 768px)').matches;
+        } catch (e) {
+            return (window.innerWidth || 0) <= 768;
+        }
+    }
+
+    function labelFromIconClasses(className) {
+        if (!className) {
+            return '';
+        }
+        var classes = String(className).split(/\s+/);
+        for (var i = 0; i < classes.length; i++) {
+            var cls = classes[i];
+            if (ICON_ACTION_LABELS[cls]) {
+                return ICON_ACTION_LABELS[cls];
+            }
+        }
+        return '';
+    }
+
+    function getActionElementLabel(el) {
+        if (!el) {
+            return getTranslation('actions', 'Actions');
+        }
+
+        var target = el;
+        if (el.tagName === 'FORM') {
+            target = el.querySelector('button[type="submit"], button, a[href]') || el;
+        }
+
+        var title = target.getAttribute && (target.getAttribute('title') || target.getAttribute('aria-label'));
+        if (title && String(title).trim()) {
+            return String(title).trim();
+        }
+
+        var text = target.textContent && String(target.textContent).replace(/\s+/g, ' ').trim();
+        if (text) {
+            return text;
+        }
+
+        var icon = target.querySelector && target.querySelector('i[class*="fa-"]');
+        if (icon) {
+            var fromIcon = labelFromIconClasses(icon.className);
+            if (fromIcon) {
+                return fromIcon;
+            }
+        }
+
+        return getTranslation('action', 'Action');
+    }
+
+    function collectActionElements(root) {
+        var actions = [];
+        if (!root) {
+            return actions;
+        }
+
+        var direct = root.querySelectorAll(':scope > form, :scope > a[href], :scope > button');
+        if (direct.length) {
+            direct.forEach(function(node) {
+                actions.push(node);
+            });
+            return actions;
+        }
+
+        root.querySelectorAll('form, a[href], button').forEach(function(node) {
+            if (node.closest('form') && node.tagName !== 'FORM') {
+                return;
+            }
+            if (actions.indexOf(node) === -1) {
+                actions.push(node);
+            }
+        });
+        return actions;
+    }
+
+    function closeAgActionsOverflowMenus(exceptMenu) {
+        document.querySelectorAll('.ag-actions-overflow-menu').forEach(function(menu) {
+            if (menu === exceptMenu) {
+                return;
+            }
+
+            menu.classList.add('hidden');
+            menu.classList.remove('ag-actions-overflow-menu--portal');
+            menu.style.position = '';
+            menu.style.top = '';
+            menu.style.left = '';
+            menu.style.right = '';
+            menu.style.bottom = '';
+            menu.style.zIndex = '';
+
+            var wrap = menu._agActionsWrap;
+            if (wrap && menu.parentElement === document.body) {
+                wrap.appendChild(menu);
+            }
+
+            var toggle = wrap
+                ? wrap.querySelector('.ag-actions-overflow-btn')
+                : (menu.parentElement
+                    ? menu.parentElement.querySelector('.ag-actions-overflow-btn')
+                    : null);
+            if (toggle) {
+                toggle.setAttribute('aria-expanded', 'false');
+            }
+
+            menu._agActionsWrap = null;
+            menu._agActionsToggle = null;
+        });
+    }
+
+    function positionAgActionsOverflowMenu(toggle, menu) {
+        var rect = toggle.getBoundingClientRect();
+        var menuWidth = menu.offsetWidth || 160;
+        var menuHeight = menu.offsetHeight || 120;
+        var viewportW = window.innerWidth || document.documentElement.clientWidth || 0;
+        var viewportH = window.innerHeight || document.documentElement.clientHeight || 0;
+        var margin = 8;
+        var isRtl = document.documentElement.getAttribute('dir') === 'rtl'
+            || menu.closest('.ag-rtl');
+
+        var left = isRtl ? rect.left : (rect.right - menuWidth);
+        if (left < margin) {
+            left = margin;
+        }
+        if (left + menuWidth > viewportW - margin) {
+            left = Math.max(margin, viewportW - menuWidth - margin);
+        }
+
+        var top = rect.bottom + 4;
+        if (top + menuHeight > viewportH - margin) {
+            top = rect.top - menuHeight - 4;
+        }
+        if (top < margin) {
+            top = margin;
+        }
+
+        menu.style.position = 'fixed';
+        menu.style.left = Math.round(left) + 'px';
+        menu.style.top = Math.round(top) + 'px';
+        menu.style.right = 'auto';
+        menu.style.bottom = 'auto';
+        menu.style.zIndex = '10050';
+    }
+
+    function openAgActionsOverflowMenu(toggle, menu, wrap) {
+        menu._agActionsWrap = wrap;
+        menu._agActionsToggle = toggle;
+        wrap._agActionsMenu = menu;
+
+        if (menu.parentElement !== document.body) {
+            document.body.appendChild(menu);
+        }
+
+        menu.classList.remove('hidden');
+        menu.classList.add('ag-actions-overflow-menu--portal');
+        toggle.setAttribute('aria-expanded', 'true');
+        positionAgActionsOverflowMenu(toggle, menu);
+    }
+
+    function getAgActionsOverflowWrapFromMenu(menu) {
+        if (!menu) {
+            return null;
+        }
+        if (menu._agActionsWrap && document.body.contains(menu._agActionsWrap)) {
+            return menu._agActionsWrap;
+        }
+        return menu.closest('.ag-actions-overflow');
+    }
+
+    function triggerAgActionElement(el) {
+        if (!el) {
+            return;
+        }
+        if (el.tagName === 'FORM') {
+            var submitBtn = el.querySelector('button[type="submit"], button');
+            if (submitBtn) {
+                submitBtn.click();
+            } else if (typeof el.requestSubmit === 'function') {
+                el.requestSubmit();
+            } else {
+                el.submit();
+            }
+            return;
+        }
+        el.click();
+    }
+
+    /**
+     * Render desktop action icons or a compact vertical-dots menu on mobile.
+     * @param {string} desktopHtml - HTML from the page's actions cellRenderer
+     * @param {Object} [params] - AG Grid cell renderer params (optional)
+     * @returns {string}
+     */
+    function renderActionsCell(desktopHtml, params) {
+        if (!desktopHtml || !isMobileActionsLayout()) {
+            return desktopHtml || '';
+        }
+
+        var wrapper = document.createElement('div');
+        wrapper.innerHTML = desktopHtml;
+        var root = wrapper.firstElementChild || wrapper;
+        var actionElements = collectActionElements(root);
+        if (!actionElements.length) {
+            return desktopHtml;
+        }
+
+        var rowKey = (params && params.node && params.node.id != null)
+            ? String(params.node.id)
+            : String((params && params.rowIndex != null) ? params.rowIndex : Math.random().toString(36).slice(2));
+
+        var menuItemsHtml = actionElements.map(function(actionEl, index) {
+            var label = escapeHtml(getActionElementLabel(actionEl));
+            return '<button type="button" role="menuitem" class="ag-actions-overflow-item" data-action-index="' + index + '">' + label + '</button>';
+        }).join('');
+
+        return ''
+            + '<div class="ag-actions-overflow" data-ag-actions-row="' + escapeHtmlAttr(rowKey) + '">'
+            + '<button type="button" class="ag-actions-overflow-btn" aria-haspopup="menu" aria-expanded="false" title="'
+            + escapeHtmlAttr(getTranslation('actions', 'Actions')) + '" aria-label="'
+            + escapeHtmlAttr(getTranslation('actions', 'Actions')) + '">'
+            + '<i class="fas fa-ellipsis-v" aria-hidden="true"></i>'
+            + '</button>'
+            + '<div class="ag-actions-overflow-menu hidden" role="menu">' + menuItemsHtml + '</div>'
+            + '<div class="ag-actions-overflow-source" hidden aria-hidden="true">' + desktopHtml + '</div>'
+            + '</div>';
+    }
+
+    /**
+     * Wrap an actions column cellRenderer to use the mobile overflow menu automatically.
+     * @param {Function|string} originalRenderer
+     * @returns {Function}
+     */
+    function wrapActionsCellRenderer(originalRenderer) {
+        return function(params) {
+            var html = '';
+            if (typeof originalRenderer === 'function') {
+                html = originalRenderer(params);
+            } else if (typeof originalRenderer === 'string') {
+                html = originalRenderer;
+            }
+            return renderActionsCell(html, params);
+        };
+    }
+
+    var agActionsOverflowListenersBound = false;
+    function setupAgActionsOverflowListeners() {
+        if (agActionsOverflowListenersBound) {
+            return;
+        }
+        agActionsOverflowListenersBound = true;
+
+        document.addEventListener('click', function(event) {
+            var toggle = event.target.closest('.ag-actions-overflow-btn');
+            if (toggle) {
+                event.preventDefault();
+                event.stopPropagation();
+                var wrap = toggle.closest('.ag-actions-overflow');
+                if (!wrap) {
+                    return;
+                }
+                var menu = wrap._agActionsMenu || wrap.querySelector('.ag-actions-overflow-menu');
+                if (!menu) {
+                    return;
+                }
+                var isOpen = menu.classList.contains('ag-actions-overflow-menu--portal') &&
+                    !menu.classList.contains('hidden');
+                if (isOpen) {
+                    closeAgActionsOverflowMenus();
+                } else {
+                    closeAgActionsOverflowMenus();
+                    openAgActionsOverflowMenu(toggle, menu, wrap);
+                }
+                return;
+            }
+
+            var menuItem = event.target.closest('.ag-actions-overflow-item');
+            if (menuItem) {
+                event.preventDefault();
+                event.stopPropagation();
+                var menuEl = menuItem.closest('.ag-actions-overflow-menu');
+                var cellWrap = getAgActionsOverflowWrapFromMenu(menuEl);
+                var source = cellWrap ? cellWrap.querySelector('.ag-actions-overflow-source') : null;
+                var index = parseInt(menuItem.getAttribute('data-action-index'), 10);
+                if (source && !isNaN(index)) {
+                    var actionElements = collectActionElements(source.firstElementChild || source);
+                    triggerAgActionElement(actionElements[index]);
+                }
+                closeAgActionsOverflowMenus();
+                return;
+            }
+
+            if (!event.target.closest('.ag-actions-overflow') &&
+                !event.target.closest('.ag-actions-overflow-menu')) {
+                closeAgActionsOverflowMenus();
+            }
+        }, true);
+
+        window.addEventListener('scroll', function() {
+            closeAgActionsOverflowMenus();
+        }, true);
+
+        window.addEventListener('resize', function() {
+            closeAgActionsOverflowMenus();
+        });
+    }
+
+    setupAgActionsOverflowListeners();
+
     // Attach shared utilities to AgGridRenderers
     AgGridRenderers.dateFilterComparator = dateFilterComparator;
     AgGridRenderers.dateFilterParams = dateFilterParams;
     AgGridRenderers.safeStringComparator = safeStringComparator;
     AgGridRenderers.dashIfEmpty = dashIfEmpty;
+    AgGridRenderers.isMobileActionsLayout = isMobileActionsLayout;
+    AgGridRenderers.renderActionsCell = renderActionsCell;
+    AgGridRenderers.wrapActionsCellRenderer = wrapActionsCellRenderer;
 
     // Export to global scope
     window.AgGridRenderers = AgGridRenderers;

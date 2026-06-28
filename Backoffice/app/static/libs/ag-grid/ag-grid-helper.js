@@ -423,6 +423,10 @@
             }
         }
 
+        if (AgGridHelper.shouldUseTouchPageScroll(this.config.heightOptions || {})) {
+            merged.domLayout = 'autoHeight';
+        }
+
         // When the grid body reaches its scroll limit, continue scrolling the page (or nearest scroll parent).
         var userOnGridReady = merged.onGridReady;
         merged.onGridReady = function(params) {
@@ -577,6 +581,8 @@
             );
         }
 
+        AgGridHelper.wrapActionsColumnRenderers(this.config.columnDefs);
+
         // Detect grid API
         const GridConstructor = this.detectGridApi();
         if (!GridConstructor) {
@@ -588,6 +594,8 @@
         this._gridOptions = gridOptions;
 
         try {
+            const self = this;
+
             // Initialize grid based on API type
             let gridInstance;
             if (GridConstructor === agGrid.createGrid) {
@@ -670,13 +678,14 @@
 
             // Mobile: unpin columns so wide cells are not trapped in narrow pinned panes.
             self._mobileColumnPinningDisabled = AgGridHelper.shouldDisableColumnPinning();
+            self._mobileActionsLayout = AgGridHelper.isCoarsePointerDevice();
             AgGridHelper.syncColumnPinningForViewport(self.gridApi, self.columnVisibilityManager);
+            AgGridHelper.applyActionsColumnMobileWidths(self.config.columnDefs, self.gridApi);
 
             // Set dynamic height after a short delay to ensure:
             // 1. Grid is fully rendered and positioned in the DOM
             // 2. Any content above the grid has loaded
             // 3. The viewport calculation is accurate
-            const self = this;
             setTimeout(function() {
                 // Clear any early cached value to ensure fresh calculation
                 self._cachedViewportMinHeight = null;
@@ -1256,19 +1265,6 @@
         const countEl = document.createElement('div');
         countEl.className = 'ag-grid-result-count';
         countEl.setAttribute('data-grid-id', this.config.containerId);
-        countEl.style.cssText = [
-            'box-sizing: border-box',
-            'display: inline-flex',
-            'align-items: center',
-            'min-height: 30px',
-            'padding: 6px 0',
-            'font-size: 13px',
-            'line-height: 1.25',
-            'font-weight: 600',
-            'color: #374151',
-            'white-space: nowrap',
-            'font-family: inherit'
-        ].join('; ');
         this.resultCountElement = countEl;
 
         const insertResultCount = function() {
@@ -1301,6 +1297,37 @@
                 return !!(parent && ph && parent !== ph &&
                     parent.children && parent.children.length === 1 &&
                     parent.firstElementChild === ph);
+            }
+
+            function ensureGridToolbarRow(el) {
+                if (el && el.classList) {
+                    el.classList.add('ag-grid-toolbar-row');
+                }
+            }
+
+            function looksLikeToolbarRow(el) {
+                if (!el || !el.classList) {
+                    return false;
+                }
+                if (el.classList.contains('ag-grid-toolbar-row')) {
+                    return true;
+                }
+                if (el.querySelector('button, .btn, [role="toolbar"]')) {
+                    return true;
+                }
+                const cls = el.className || '';
+                return /(?:^|\s)(?:flex|toolbar|justify-|items-center|gap-)/.test(cls);
+            }
+
+            function mountResultCountInPlaceholder(ph) {
+                const existing = ph.querySelector('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]');
+                if (existing) {
+                    self.resultCountElement = existing;
+                    return true;
+                }
+                ensureGridToolbarRow(ph);
+                ph.insertBefore(countEl, ph.firstChild);
+                return true;
             }
 
             if (placeholderId) {
@@ -1343,7 +1370,6 @@
                 }
 
                 if (titleGroup) {
-                    // Drop counts previously injected into the colvis wrapper (layout bug on narrow wrappers).
                     if (headerRow) {
                         Array.prototype.forEach.call(
                             headerRow.querySelectorAll('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]'),
@@ -1359,55 +1385,38 @@
                         self.resultCountElement = existing;
                         return true;
                     }
-                    countEl.style.marginLeft = '4px';
-                    countEl.style.padding = '0';
                     titleGroup.appendChild(countEl);
                     return true;
                 }
 
-                // Custom toolbar with actions + colvis (e.g. Indicator Bank tab panels).
-                if (placeholderParent.children && placeholderParent.children.length > 1) {
-                    const existingToolbar = placeholderParent.querySelector('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]');
-                    if (existingToolbar) {
-                        self.resultCountElement = existingToolbar;
-                        return true;
-                    }
-                    countEl.style.marginLeft = '0';
-                    countEl.style.marginRight = 'auto';
-                    placeholderParent.style.display = 'flex';
-                    placeholderParent.style.alignItems = 'center';
-                    placeholderParent.style.flexWrap = 'wrap';
-                    placeholderParent.style.gap = '8px';
-                    placeholderParent.style.width = '100%';
-                    placeholderParent.insertBefore(countEl, placeholderParent.firstChild);
-                    return true;
+                // Drop legacy placements (sibling of toolbar wrapper, legend row, etc.).
+                if (headerRow) {
+                    Array.prototype.forEach.call(
+                        headerRow.querySelectorAll('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]'),
+                        function(el) {
+                            if (!placeholder.contains(el)) {
+                                el.remove();
+                            }
+                        }
+                    );
+                } else if (placeholderParent) {
+                    Array.prototype.forEach.call(
+                        placeholderParent.querySelectorAll('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]'),
+                        function(el) {
+                            if (!placeholder.contains(el)) {
+                                el.remove();
+                            }
+                        }
+                    );
                 }
 
-                // Placeholder wrapped alone (e.g. session/login logs colvis toolbar): use header row,
-                // not the inner wrapper — width:100% on the wrapper collapses the title column.
-                const colvisWrapper = isColvisOnlyWrapper(placeholderParent, placeholder);
-                const toolbarRow = colvisWrapper && headerRow ? headerRow : placeholderParent;
-                const existing = toolbarRow.querySelector('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]');
-                if (existing) {
-                    self.resultCountElement = existing;
-                    return true;
+                // Keep count beside the Columns button in every template variant.
+                if (isColvisOnlyWrapper(placeholderParent, placeholder)) {
+                    ensureGridToolbarRow(placeholderParent);
+                } else if (placeholderParent !== placeholder && looksLikeToolbarRow(placeholderParent)) {
+                    ensureGridToolbarRow(placeholderParent);
                 }
-
-                if (colvisWrapper) {
-                    countEl.style.marginLeft = '0';
-                    countEl.style.marginRight = 'auto';
-                    toolbarRow.insertBefore(countEl, placeholderParent);
-                    return true;
-                }
-
-                toolbarRow.style.display = 'flex';
-                toolbarRow.style.alignItems = 'center';
-                toolbarRow.style.justifyContent = 'space-between';
-                toolbarRow.style.gap = '12px';
-                toolbarRow.style.width = '100%';
-                placeholder.style.marginLeft = 'auto';
-                toolbarRow.insertBefore(countEl, placeholder);
-                return true;
+                return mountResultCountInPlaceholder(placeholder);
             }
 
             if (self.gridDiv && self.gridDiv.parentElement) {
@@ -1418,8 +1427,7 @@
                     return true;
                 }
                 const countRow = document.createElement('div');
-                countRow.className = 'ag-grid-result-count-row';
-                countRow.style.cssText = 'display:flex;align-items:center;justify-content:flex-start;margin-bottom:8px;';
+                countRow.className = 'ag-grid-result-count-row ag-grid-toolbar-row';
                 countRow.appendChild(countEl);
                 parent.insertBefore(countRow, self.gridDiv);
                 return true;
@@ -1692,6 +1700,15 @@
                     self._mobileColumnPinningDisabled = mobilePinningDisabled;
                     AgGridHelper.syncColumnPinningForViewport(self.gridApi, self.columnVisibilityManager);
                 }
+
+                var mobileActionsLayout = AgGridHelper.isCoarsePointerDevice();
+                if (mobileActionsLayout !== self._mobileActionsLayout) {
+                    self._mobileActionsLayout = mobileActionsLayout;
+                    AgGridHelper.applyActionsColumnMobileWidths(self.config.columnDefs, self.gridApi);
+                    if (self.gridApi && typeof self.gridApi.refreshCells === 'function') {
+                        self.gridApi.refreshCells({ force: true });
+                    }
+                }
             }, 120);
         });
     };
@@ -1888,14 +1905,32 @@
                     totalRowCount = self.config.rowData.length;
                 }
 
-                // Handle empty state - use viewport-aware height for empty grids too
+                // Handle empty state
                 if (totalRowCount === 0) {
+                    if (AgGridHelper.shouldUseTouchPageScroll(opts)) {
+                        if (self._touchPageScrollLayout) {
+                            self.restoreDesktopGridLayout();
+                        }
+                        const emptyContentHeight = headerHeight + emptyStateHeight +
+                            (paginationEnabled ? paginationHeight : 0);
+                        self.applyGridHeight(emptyContentHeight, emptyContentHeight, emptyContentHeight);
+                        return;
+                    }
                     const resolvedMinHeight = self.resolveMinHeightPx(opts, paginationEnabled);
                     const emptyContentHeight = headerHeight + emptyStateHeight + (paginationEnabled ? paginationHeight : 0);
-                    // Use the larger of: empty content height or viewport-aware min height
                     const emptyHeight = Math.max(emptyContentHeight, resolvedMinHeight);
                     self.applyGridHeight(emptyHeight, resolvedMinHeight, emptyHeight);
                     return;
+                }
+
+                // Phone: size grid to row content; page scroll handles overflow (no empty body gap).
+                if (AgGridHelper.shouldUseTouchPageScroll(opts)) {
+                    self.applyTouchPageScrollLayout();
+                    return;
+                }
+
+                if (self._touchPageScrollLayout) {
+                    self.restoreDesktopGridLayout();
                 }
 
                 // Calculate rows to display
@@ -1941,15 +1976,6 @@
                     calculatedHeight += paginationHeight;
                 }
 
-                // Touch / phone: expand grid to fit visible rows so the page scrolls naturally
-                // instead of trapping users in a nested scroll area inside the grid body.
-                if (AgGridHelper.shouldUseTouchPageScroll(opts)) {
-                    const absoluteMin = opts.absoluteMinHeight || 300;
-                    const touchHeight = Math.max(absoluteMin, calculatedHeight);
-                    self.applyGridHeight(touchHeight, touchHeight, touchHeight);
-                    return;
-                }
-
                 // Calculate minHeight (can be 'viewport', 'auto', or a fixed number)
                 const resolvedMinHeight = self.resolveMinHeightPx(opts, paginationEnabled);
 
@@ -1966,6 +1992,48 @@
                 self.applyGridHeight(finalHeight, effectiveMinHeight, safeMaxHeight);
             });
         });
+    };
+
+    /**
+     * Mobile layout: shrink grid to row content so the page scrolls (no empty body viewport).
+     */
+    AgGridHelper.prototype.applyTouchPageScrollLayout = function() {
+        if (!this.gridDiv) {
+            return;
+        }
+
+        var api = this.gridApi;
+        if (api && typeof api.setGridOption === 'function') {
+            api.setGridOption('domLayout', 'autoHeight');
+        } else if (this.gridInstance && typeof this.gridInstance.setGridOption === 'function') {
+            this.gridInstance.setGridOption('domLayout', 'autoHeight');
+        }
+
+        this.gridDiv.style.height = 'auto';
+        this.gridDiv.style.minHeight = '0';
+        this.gridDiv.style.maxHeight = 'none';
+        this._touchPageScrollLayout = true;
+    };
+
+    /**
+     * Restore normal fixed-height grid layout on desktop after mobile autoHeight mode.
+     */
+    AgGridHelper.prototype.restoreDesktopGridLayout = function() {
+        if (!this.gridDiv) {
+            return;
+        }
+
+        var api = this.gridApi;
+        if (api && typeof api.setGridOption === 'function') {
+            api.setGridOption('domLayout', 'normal');
+        } else if (this.gridInstance && typeof this.gridInstance.setGridOption === 'function') {
+            this.gridInstance.setGridOption('domLayout', 'normal');
+        }
+
+        this.gridDiv.style.height = '';
+        this.gridDiv.style.minHeight = '';
+        this.gridDiv.style.maxHeight = '';
+        this._touchPageScrollLayout = false;
     };
 
     /**
@@ -3982,6 +4050,190 @@
     };
 
     /**
+     * True if a column definition is the standard actions column.
+     * @param {Object} colDef
+     * @returns {boolean}
+     */
+    AgGridHelper.isActionsColumn = function(colDef) {
+        if (!colDef) {
+            return false;
+        }
+        var id = colDef.colId || colDef.field;
+        return id === 'actions';
+    };
+
+    /**
+     * Application metadata for a column def (AG Grid allows colDef.context).
+     * @param {Object} colDef
+     * @returns {Object}
+     * @private
+     */
+    AgGridHelper.getColDefHelperMeta = function(colDef) {
+        if (!colDef) {
+            return {};
+        }
+        if (!colDef.context || typeof colDef.context !== 'object' || Array.isArray(colDef.context)) {
+            colDef.context = {};
+        }
+        if (!colDef.context.__agGridHelper || typeof colDef.context.__agGridHelper !== 'object') {
+            colDef.context.__agGridHelper = {};
+        }
+        return colDef.context.__agGridHelper;
+    };
+
+    /**
+     * Minimum desktop width for inline icon action buttons (not the mobile ⋮ menu).
+     * @param {Object} colDef
+     * @returns {number}
+     */
+    AgGridHelper.getActionsColumnDesktopMinWidth = function(colDef) {
+        var meta = AgGridHelper.getColDefHelperMeta(colDef);
+        var desktop = meta.actionsDesktopWidth || {};
+        var fromDef = colDef.minWidth || colDef.width || 120;
+        var fromSnapshot = desktop.minWidth || desktop.width || 0;
+        return Math.max(fromDef, fromSnapshot, 132);
+    };
+
+    /**
+     * Apply desktop-only safeguards so the actions column is not shrunk by sizeColumnsToFit
+     * or a previously saved mobile width.
+     * @param {Object} colDef
+     */
+    AgGridHelper.applyActionsColumnDesktopLayout = function(colDef) {
+        if (!colDef || AgGridHelper.isCoarsePointerDevice()) {
+            return;
+        }
+        var minW = AgGridHelper.getActionsColumnDesktopMinWidth(colDef);
+        colDef.minWidth = Math.max(colDef.minWidth || 0, minW);
+        if (!colDef.width || colDef.width < minW) {
+            colDef.width = Math.max(colDef.width || 0, minW);
+        }
+        if (colDef.suppressSizeToFit !== false) {
+            colDef.suppressSizeToFit = true;
+        }
+    };
+
+    /**
+     * Wrap actions column renderers so mobile uses a vertical-dots overflow menu.
+     * @param {Array} columnDefs
+     */
+    AgGridHelper.wrapActionsColumnRenderers = function(columnDefs) {
+        if (!Array.isArray(columnDefs)) {
+            return;
+        }
+        columnDefs.forEach(function(colDef) {
+            var meta = AgGridHelper.getColDefHelperMeta(colDef);
+            if (!AgGridHelper.isActionsColumn(colDef) || meta.actionsMobileWrapped) {
+                return;
+            }
+            if (typeof AgGridRenderers !== 'undefined' &&
+                typeof AgGridRenderers.wrapActionsCellRenderer === 'function' &&
+                colDef.cellRenderer) {
+                colDef.cellRenderer = AgGridRenderers.wrapActionsCellRenderer(colDef.cellRenderer);
+            }
+            meta.actionsMobileWrapped = true;
+            if (!AgGridHelper.isCoarsePointerDevice()) {
+                AgGridHelper.applyActionsColumnDesktopLayout(colDef);
+            }
+            AgGridHelper.applyActionsColumnMobileWidths([colDef]);
+        });
+    };
+
+    /**
+     * Narrow the actions column on mobile; restore typical widths on desktop.
+     * @param {Array} columnDefs
+     * @param {Object} [gridApi]
+     */
+    AgGridHelper.applyActionsColumnMobileWidths = function(columnDefs, gridApi) {
+        if (!Array.isArray(columnDefs)) {
+            return;
+        }
+
+        var mobile = AgGridHelper.isCoarsePointerDevice();
+        var state = [];
+
+        columnDefs.forEach(function(colDef) {
+            if (!AgGridHelper.isActionsColumn(colDef)) {
+                return;
+            }
+
+            var meta = AgGridHelper.getColDefHelperMeta(colDef);
+            if (!meta.actionsDesktopWidth) {
+                var snapshotWidth = colDef.width;
+                var snapshotMin = colDef.minWidth;
+                var snapshotMax = colDef.maxWidth;
+                if (mobile && (snapshotWidth <= 44 || snapshotMin <= 44)) {
+                    snapshotWidth = 120;
+                    snapshotMin = 100;
+                    snapshotMax = 180;
+                }
+                meta.actionsDesktopWidth = {
+                    width: snapshotWidth,
+                    minWidth: snapshotMin,
+                    maxWidth: snapshotMax
+                };
+            }
+
+            if (mobile) {
+                if (meta.actionsDesktopHeaderName === undefined) {
+                    meta.actionsDesktopHeaderName = colDef.headerName;
+                }
+                colDef.headerName = '';
+                colDef.pinned = 'right';
+                colDef.lockPinned = true;
+                colDef.width = 40;
+                colDef.minWidth = 40;
+                colDef.maxWidth = 44;
+            } else {
+                if (meta.actionsDesktopHeaderName !== undefined) {
+                    colDef.headerName = meta.actionsDesktopHeaderName;
+                }
+                var desktop = meta.actionsDesktopWidth || {};
+                if (desktop.width) {
+                    colDef.width = desktop.width;
+                }
+                if (desktop.minWidth) {
+                    colDef.minWidth = desktop.minWidth;
+                }
+                if (desktop.maxWidth) {
+                    colDef.maxWidth = desktop.maxWidth;
+                }
+                AgGridHelper.applyActionsColumnDesktopLayout(colDef);
+            }
+
+            if (gridApi && typeof gridApi.applyColumnState === 'function') {
+                var colState = {
+                    colId: colDef.colId || colDef.field || 'actions',
+                    width: Math.max(
+                        colDef.width || 0,
+                        mobile ? 40 : AgGridHelper.getActionsColumnDesktopMinWidth(colDef)
+                    )
+                };
+                if (mobile) {
+                    colState.pinned = 'right';
+                }
+                state.push(colState);
+            }
+        });
+
+        if (gridApi && state.length) {
+            try {
+                gridApi.applyColumnState({ state: state, applyOrder: false });
+            } catch (e) {
+                // Non-fatal
+            }
+        }
+
+        if (gridApi && typeof gridApi.refreshHeader === 'function') {
+            try {
+                gridApi.refreshHeader();
+            } catch (e) {
+                // Non-fatal
+            }
+        }
+    };
+
+    /**
      * Remove pinned flags from column definitions before grid init on mobile.
      * @param {Array} columnDefs
      * @returns {Array}
@@ -3990,9 +4242,14 @@
         if (!columnDefs || !columnDefs.length) {
             return columnDefs;
         }
+        var mobile = AgGridHelper.shouldDisableColumnPinning();
         return columnDefs.map(function(def) {
             var copy = Object.assign({}, def);
-            if (copy.pinned) {
+            if (mobile && AgGridHelper.isActionsColumn(copy)) {
+                copy.pinned = 'right';
+                copy.lockPinned = true;
+                copy.headerName = '';
+            } else if (copy.pinned) {
                 copy.pinned = null;
             }
             if (copy.children && copy.children.length) {
@@ -4000,6 +4257,27 @@
             }
             return copy;
         });
+    };
+
+    /**
+     * Pin the compact actions column on the right for mobile layouts.
+     * @param {Object} gridApi
+     */
+    AgGridHelper.pinMobileActionsColumn = function(gridApi) {
+        if (!gridApi || !AgGridHelper.isCoarsePointerDevice()) {
+            return;
+        }
+        if (typeof gridApi.applyColumnState !== 'function') {
+            return;
+        }
+        try {
+            gridApi.applyColumnState({
+                state: [{ colId: 'actions', pinned: 'right' }],
+                applyOrder: false
+            });
+        } catch (e) {
+            console.warn('AgGridHelper: pinMobileActionsColumn failed:', e);
+        }
     };
 
     /**
@@ -4051,6 +4329,7 @@
 
         if (AgGridHelper.shouldDisableColumnPinning()) {
             AgGridHelper.clearAllColumnPins(gridApi);
+            AgGridHelper.pinMobileActionsColumn(gridApi);
             AgGridHelper.ensureSelectionColumnFirst(gridApi, gridDiv);
             return;
         }
@@ -4194,7 +4473,12 @@
         var state = [];
         columns.forEach(function(col) {
             var def = col.getColDef();
-            var minW = def.minWidth || def.width;
+            var minW;
+            if (AgGridHelper.isActionsColumn(def) && !AgGridHelper.isCoarsePointerDevice()) {
+                minW = AgGridHelper.getActionsColumnDesktopMinWidth(def);
+            } else {
+                minW = def.minWidth || def.width;
+            }
             if (!minW) {
                 return;
             }

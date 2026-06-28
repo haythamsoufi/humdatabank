@@ -256,6 +256,9 @@
      */
     ColumnVisibilityManager.prototype.resolvePinnedForApply = function(colDef, saved) {
         if (typeof AgGridHelper !== 'undefined' && AgGridHelper.shouldDisableColumnPinning()) {
+            if (AgGridHelper.isActionsColumn(colDef)) {
+                return 'right';
+            }
             return null;
         }
         if (colDef.lockPinned && colDef.pinned) {
@@ -433,6 +436,11 @@
                         : this.resolvePinnedForApply(colDef, saved);
                     var width = saved.width || colDef.width;
                     var minW = colDef.minWidth;
+                    if (typeof AgGridHelper !== 'undefined' &&
+                        AgGridHelper.isActionsColumn(colDef) &&
+                        !AgGridHelper.isCoarsePointerDevice()) {
+                        minW = AgGridHelper.getActionsColumnDesktopMinWidth(colDef);
+                    }
                     if (minW && (!width || width < minW)) {
                         width = minW;
                     }

@@ -15,7 +15,60 @@
     display: flex !important;
     align-items: center !important;
     justify-content: flex-end !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
     margin: 0 !important;
+}
+
+/* Record count + column visibility (+ clear filters) on one row */
+.ag-grid-toolbar-row,
+.ag-grid-result-count-row {
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+    min-width: 0;
+}
+
+.ag-grid-result-count {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    min-height: 30px;
+    padding: 6px 0;
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.25;
+    font-weight: 600;
+    color: #374151;
+    white-space: nowrap;
+    font-family: inherit;
+}
+
+[data-ag-grid-title-group] .ag-grid-result-count,
+h1 .ag-grid-result-count,
+h2 .ag-grid-result-count,
+h3 .ag-grid-result-count,
+h4 .ag-grid-result-count {
+    display: inline;
+    min-height: 0;
+    padding: 0;
+    margin-left: 4px;
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
+}
+
+.ag-grid-result-count-row {
+    justify-content: flex-start;
+    margin-bottom: 8px;
+}
+
+.ag-grid-toolbar-row > .ag-column-visibility-button-container,
+[id*="colvis"] > .ag-column-visibility-button-container,
+[id*="col-vis"] > .ag-column-visibility-button-container {
+    margin-left: 0 !important;
 }
 
 .ag-column-visibility-button-container {
@@ -513,15 +566,33 @@ button.ag-clear-filters-button i {
         max-width: none;
     }
 
+    .ag-grid-toolbar-row,
+    .ag-grid-result-count-row,
+    [id*="column-visibility-button-placeholder"],
+    #column-visibility-button-placeholder,
+    #pending-column-visibility-button-placeholder,
+    #processed-column-visibility-button-placeholder {
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+    }
+
+    .ag-grid-result-count {
+        font-size: 12px;
+        min-height: 28px;
+        padding: 4px 0;
+    }
+
     .ag-column-visibility-button-container {
         position: relative;
         top: 0;
         right: 0;
-        margin-bottom: 10px;
+        margin-bottom: 0;
+        flex-shrink: 0;
     }
 
     .ag-column-visibility-button {
-        width: 100%;
-        justify-content: center;
+        width: auto;
+        min-width: 0;
+        padding: 6px 10px !important;
     }
 }

@@ -108,8 +108,8 @@ def refresh_token():
         return mobile_auth_error('Refresh token has already been used. Please log in again.')
 
     if claims.sid:
-        from app.services.user_analytics_service import is_session_blacklisted
-        if is_session_blacklisted(claims.sid):
+        from app.services.user_analytics_service import should_block_mobile_jwt_session
+        if should_block_mobile_jwt_session(claims.sid):
             return mobile_auth_error('Session has been revoked.')
 
     user = User.query.get(claims.user_id)
@@ -125,8 +125,15 @@ def refresh_token():
         old_session = UserSessionLog.query.filter_by(session_id=session_id).first()
         if old_session is None or not old_session.is_active:
             from app.services.user_analytics_service import start_user_session, log_user_activity
+            previous_sid = session_id
             session_id = str(_uuid.uuid4())
             start_user_session(user, session_id)
+            ended_by = getattr(old_session, 'ended_by', None) if old_session else None
+            current_app.logger.info(
+                "Mobile JWT refresh: new session %s for user %s "
+                "(previous sid %s ended_by=%s)",
+                session_id, user.id, previous_sid, ended_by,
+            )
             log_user_activity(
                 activity_type='login',
                 description=f'User {user.email} resumed mobile session after inactivity',
@@ -134,7 +141,8 @@ def refresh_token():
                     'user_id': user.id,
                     'auth_method': 'jwt_refresh',
                     'new_session_id': session_id,
-                    'previous_session_id': claims.sid,
+                    'previous_session_id': previous_sid,
+                    'previous_ended_by': ended_by,
                 },
             )
 

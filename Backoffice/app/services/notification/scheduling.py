@@ -245,37 +245,30 @@ def process_scheduled_notifications() -> int:
     Returns:
         Number of notifications processed
     """
-    from sqlalchemy import text
     from app.utils.constants import DEFAULT_SCHEDULED_NOTIFICATIONS_LOCK_ID
+    from app.utils.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
 
-    lock_conn = None
     lock_acquired = False
     lock_id = None
+    use_pg_lock = False
     try:
         now = utcnow()
 
         # PostgreSQL advisory lock: prevents two concurrent invocations (e.g. during a
         # worker restart race) from double-sending the same scheduled notification.
         # The scheduler's file-based worker election already prevents most overlap, but
-        # this acts as a second layer of defence.
-        dialect = db.engine.dialect.name
-        if dialect == "postgresql":
+        # this acts as a second layer of defence. Lock on db.session's connection so
+        # acquire/release stay on the same backend session as the ORM work.
+        use_pg_lock = db.engine.dialect.name == "postgresql"
+        if use_pg_lock:
             lock_id = int(current_app.config.get(
                 'SCHEDULED_NOTIFICATIONS_LOCK_ID', DEFAULT_SCHEDULED_NOTIFICATIONS_LOCK_ID
             ))
-            lock_conn = db.engine.connect()
-            lock_acquired = bool(
-                lock_conn.execute(
-                    text("SELECT pg_try_advisory_lock(:lock_id)"),
-                    {"lock_id": lock_id},
-                ).scalar()
-            )
+            lock_acquired = try_session_advisory_lock(db.session, lock_id)
             if not lock_acquired:
                 current_app.logger.debug(
                     "Skipping scheduled notification processing — another run is in progress"
                 )
-                lock_conn.close()
-                lock_conn = None
                 return 0
 
         # Find all notifications scheduled for now or earlier that haven't been sent
@@ -418,13 +411,8 @@ def process_scheduled_notifications() -> int:
         db.session.rollback()
         return 0
     finally:
-        if lock_conn:
+        if use_pg_lock and lock_id is not None:
             try:
-                if lock_acquired and lock_id is not None:
-                    lock_conn.execute(
-                        text("SELECT pg_advisory_unlock(:lock_id)"),
-                        {"lock_id": lock_id},
-                    )
+                release_session_advisory_lock(db.session, lock_id, acquired=lock_acquired)
             except Exception:
                 pass
-            lock_conn.close()

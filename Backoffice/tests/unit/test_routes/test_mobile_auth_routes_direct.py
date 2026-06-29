@@ -71,6 +71,90 @@ class TestRefreshTokenDirect:
             status = resp.status_code
         assert status == 401
 
+    def test_refresh_resumes_after_scheduled_cleanup(self, app, db_session):
+        """Inactive row from cleanup must not block a valid refresh JWT."""
+        from app.models.core import UserSessionLog
+        from app.routes.api.mobile.auth import refresh_token
+        from app.utils.mobile_jwt import issue_token_pair, decode_mobile_token
+        from app.utils.datetime_helpers import utcnow
+
+        sid = 'cleanup-resume-direct-sid'
+        with app.app_context():
+            user = create_test_user(
+                db_session, email='refresh-resume@example.com', password='Pass123!',
+            )
+            db_session.add(UserSessionLog(
+                user_id=user.id,
+                session_id=sid,
+                ip_address='127.0.0.1',
+                is_active=False,
+                ended_by='inactivity_timeout',
+                session_end=utcnow(),
+            ))
+            db_session.commit()
+            tokens = issue_token_pair(user.id, session_id=sid)
+
+        with app.test_request_context(
+            '/api/mobile/v1/auth/refresh',
+            method='POST',
+            data=json.dumps({'refresh_token': tokens['refresh_token']}),
+            content_type='application/json',
+        ):
+            with patch('app.services.user_analytics_service.log_user_activity'):
+                resp = refresh_token()
+
+        if isinstance(resp, tuple):
+            body, status = resp
+        else:
+            body, status = resp, resp.status_code
+        assert status == 200
+        data = body.get_json()['data']
+        assert 'access_token' in data
+        assert 'refresh_token' in data
+
+        with app.app_context():
+            new_claims = decode_mobile_token(data['refresh_token'], expected_type='refresh')
+            assert new_claims.sid != sid
+            new_row = UserSessionLog.query.filter_by(session_id=new_claims.sid).first()
+            assert new_row is not None
+            assert new_row.is_active is True
+
+    def test_refresh_blocked_after_user_logout(self, app, db_session):
+        from app.models.core import UserSessionLog
+        from app.routes.api.mobile.auth import refresh_token
+        from app.utils.mobile_jwt import issue_token_pair
+        from app.utils.datetime_helpers import utcnow
+
+        sid = 'refresh-logout-block-sid'
+        with app.app_context():
+            user = create_test_user(
+                db_session, email='refresh-block@example.com', password='Pass123!',
+            )
+            db_session.add(UserSessionLog(
+                user_id=user.id,
+                session_id=sid,
+                ip_address='127.0.0.1',
+                is_active=False,
+                ended_by='logout',
+                session_end=utcnow(),
+            ))
+            db_session.commit()
+            tokens = issue_token_pair(user.id, session_id=sid)
+
+        with app.test_request_context(
+            '/api/mobile/v1/auth/refresh',
+            method='POST',
+            data=json.dumps({'refresh_token': tokens['refresh_token']}),
+            content_type='application/json',
+        ):
+            resp = refresh_token()
+
+        if isinstance(resp, tuple):
+            _, status = resp
+        else:
+            status = resp.status_code
+        assert status == 401
+
 
 @pytest.mark.unit
 class TestExchangeSessionDirect:

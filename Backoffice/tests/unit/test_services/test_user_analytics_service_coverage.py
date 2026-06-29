@@ -522,6 +522,90 @@ class TestSessionBlacklist:
                 assert _svc.is_session_blacklisted("sess-db-error") is False
 
 
+class TestShouldBlockMobileJwtSession:
+    def setup_method(self):
+        import app.services.user_analytics_service as m
+        m._blacklisted_sessions.clear()
+
+    def _inactive_row(self, ended_by):
+        row = MagicMock()
+        row.is_active = False
+        row.ended_by = ended_by
+        return row
+
+    def test_explicit_blacklist_blocks(self, app):
+        with app.app_context():
+            _svc.add_session_to_blacklist("sess-explicit")
+            assert _svc.should_block_mobile_jwt_session("sess-explicit") is True
+
+    def test_active_session_not_blocked(self, app):
+        with app.app_context():
+            row = MagicMock()
+            row.is_active = True
+            row.ended_by = None
+            with patch("app.services.user_analytics_service.UserSessionLog") as MockSL:
+                MockSL.query.with_entities.return_value.filter_by.return_value.first.return_value = row
+                assert _svc.should_block_mobile_jwt_session("sess-active") is False
+
+    def test_inactivity_timeout_resumable(self, app):
+        with app.app_context():
+            with patch("app.services.user_analytics_service.UserSessionLog") as MockSL:
+                MockSL.query.with_entities.return_value.filter_by.return_value.first.return_value = (
+                    self._inactive_row("inactivity_timeout")
+                )
+                assert _svc.should_block_mobile_jwt_session("sess-cleanup") is False
+
+    def test_max_duration_resumable(self, app):
+        with app.app_context():
+            with patch("app.services.user_analytics_service.UserSessionLog") as MockSL:
+                MockSL.query.with_entities.return_value.filter_by.return_value.first.return_value = (
+                    self._inactive_row("max_duration_exceeded")
+                )
+                assert _svc.should_block_mobile_jwt_session("sess-max") is False
+
+    def test_logout_still_blocks(self, app):
+        with app.app_context():
+            with patch("app.services.user_analytics_service.UserSessionLog") as MockSL:
+                MockSL.query.with_entities.return_value.filter_by.return_value.first.return_value = (
+                    self._inactive_row("logout")
+                )
+                assert _svc.should_block_mobile_jwt_session("sess-logout") is True
+
+    def test_admin_action_still_blocks(self, app):
+        with app.app_context():
+            with patch("app.services.user_analytics_service.UserSessionLog") as MockSL:
+                MockSL.query.with_entities.return_value.filter_by.return_value.first.return_value = (
+                    self._inactive_row("admin_action")
+                )
+                assert _svc.should_block_mobile_jwt_session("sess-admin") is True
+
+    def test_unknown_ended_by_blocks(self, app):
+        with app.app_context():
+            with patch("app.services.user_analytics_service.UserSessionLog") as MockSL:
+                MockSL.query.with_entities.return_value.filter_by.return_value.first.return_value = (
+                    self._inactive_row("force_cleanup")
+                )
+                assert _svc.should_block_mobile_jwt_session("sess-unknown") is True
+
+    def test_missing_row_not_blocked(self, app):
+        with app.app_context():
+            with patch("app.services.user_analytics_service.UserSessionLog") as MockSL:
+                MockSL.query.with_entities.return_value.filter_by.return_value.first.return_value = None
+                assert _svc.should_block_mobile_jwt_session("sess-missing") is False
+
+    def test_does_not_warm_blacklist_cache(self, app):
+        import app.services.user_analytics_service as m
+        with app.app_context():
+            with patch("app.services.user_analytics_service.UserSessionLog") as MockSL:
+                MockSL.query.with_entities.return_value.filter_by.return_value.first.return_value = (
+                    self._inactive_row("inactivity_timeout")
+                )
+                _svc.should_block_mobile_jwt_session("sess-no-warm")
+                assert "sess-no-warm" not in m._blacklisted_sessions
+                _svc.is_session_blacklisted("sess-no-warm")
+                assert "sess-no-warm" in m._blacklisted_sessions
+
+
 # ===========================================================================
 # end_user_session
 # ===========================================================================

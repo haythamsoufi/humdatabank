@@ -173,6 +173,40 @@
         'actions'
     ];
 
+    function isCompactSessionActionsLayout() {
+        if (typeof AgGridRenderers !== 'undefined' && typeof AgGridRenderers.isMobileActionsLayout === 'function') {
+            return AgGridRenderers.isMobileActionsLayout();
+        }
+        try {
+            return window.matchMedia('(max-width: 768px)').matches;
+        } catch (e) {
+            return (window.innerWidth || 0) <= 768;
+        }
+    }
+
+    function renderSessionActionsCell(params, t) {
+        var compact = isCompactSessionActionsLayout();
+        if (!params.data || !params.data.is_active) {
+            if (compact) {
+                var endedLabel = t.sessionEnded || 'Session ended';
+                return '<span class="session-log-action-ended" title="' + esc(endedLabel) + '" aria-label="' + esc(endedLabel) + '">' +
+                    '<i class="fas fa-power-off" aria-hidden="true"></i></span>';
+            }
+            return '<span class="text-xs text-gray-500">' + esc(t.sessionEnded || 'Session ended') + '</span>';
+        }
+
+        var sid = String(params.data.session_id || '');
+        var logoutLabel = t.forceLogout || 'Force logout';
+        if (compact) {
+            return '<button type="button" class="session-force-logout-btn session-log-action-logout" data-session-id="' +
+                esc(sid) + '" title="' + esc(logoutLabel) + '" aria-label="' + esc(logoutLabel) + '">' +
+                '<i class="fas fa-sign-out-alt" aria-hidden="true"></i></button>';
+        }
+        return '<button type="button" class="btn btn-danger btn-sm session-force-logout-btn" data-session-id="' +
+            esc(sid) + '">' +
+            '<i class="fas fa-sign-out-alt mr-1"></i>' + esc(logoutLabel) + '</button>';
+    }
+
     function applySessionLogsColumnOrder(api, visibilityManager) {
         if (!api || typeof AgGridHelper === 'undefined' || typeof AgGridHelper.pinActionsColumn !== 'function') {
             return;
@@ -406,14 +440,13 @@
                 sortable: false,
                 filter: false,
                 lockVisible: true,
-                cellRenderer: function(params) {
-                    if (!params.data || !params.data.is_active) {
-                        return '<span class="text-xs text-gray-500">' + esc(t.sessionEnded || 'Session ended') + '</span>';
+                context: {
+                    __agGridHelper: {
+                        skipMobileActionsOverflow: true
                     }
-                    var sid = String(params.data.session_id || '');
-                    return '<button type="button" class="btn btn-danger btn-sm session-force-logout-btn" data-session-id="' +
-                        esc(sid) + '">' +
-                        '<i class="fas fa-sign-out-alt mr-1"></i>' + esc(t.forceLogout || 'Force Logout') + '</button>';
+                },
+                cellRenderer: function(params) {
+                    return renderSessionActionsCell(params, t);
                 }
             }
         ];

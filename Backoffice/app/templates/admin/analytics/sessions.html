@@ -14,6 +14,35 @@
     .admin-sessions-logs-wrap .relative {
         min-height: 600px;
     }
+    /* Compact pinned actions column on phones */
+    .session-log-action-logout {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        padding: 0;
+        border: 0;
+        border-radius: 9999px;
+        background: transparent;
+        color: #dc2626;
+        cursor: pointer;
+    }
+    .session-log-action-logout:hover,
+    .session-log-action-logout:focus-visible {
+        background: #fef2f2;
+        color: #b91c1c;
+        outline: none;
+    }
+    .session-log-action-ended {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        color: #9ca3af;
+        font-size: 0.875rem;
+    }
 </style>
 {% endblock %}
 

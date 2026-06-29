@@ -942,6 +942,64 @@ def is_session_blacklisted(session_id):
     return False
 
 
+# UserSessionLog.ended_by values after which a valid mobile refresh JWT may mint a
+# new session row. Scheduled cleanup and web idle timeout close the analytics row
+# but must not force re-login while the refresh token (up to ~30 days) is valid.
+#
+# Web cookie replay is still rejected via is_session_blacklisted() for every
+# inactive row — this set applies only to mobile Bearer JWT access/refresh.
+_MOBILE_JWT_RESUMABLE_ENDED_BY = frozenset({
+    'inactivity_timeout',
+    'max_duration_exceeded',
+    'timeout_and_max_duration',
+    'timeout',  # web idle middleware; mobile refresh is independent
+})
+
+
+def should_block_mobile_jwt_session(session_id: str | None) -> bool:
+    """
+    Whether a mobile Bearer JWT (access or refresh) must be rejected for ``session_id``.
+
+    ``is_session_blacklisted()`` treats **every** inactive ``UserSessionLog`` as dead
+    so replayed **web cookies** cannot resurrect ended sessions. Mobile clients also
+    hold a long-lived **refresh token**; when the row was closed by scheduled cleanup
+    or web idle timeout, rotation should succeed without re-entering credentials.
+
+    Blocks: explicit in-memory blacklist (admin force-logout, mobile logout, refresh
+    reuse), user logout, admin_action, force_cleanup, and any unknown ``ended_by``.
+
+    Does **not** warm ``_blacklisted_sessions`` from the DB (avoids poisoning web
+    checks after a mobile-only resume).
+    """
+    if not session_id:
+        return False
+
+    global _blacklisted_sessions
+    if session_id in _blacklisted_sessions:
+        return True
+
+    try:
+        row = (
+            UserSessionLog.query
+            .with_entities(UserSessionLog.is_active, UserSessionLog.ended_by)
+            .filter_by(session_id=session_id)
+            .first()
+        )
+        if row is None:
+            return False
+        if row.is_active:
+            return False
+        ended_by = (row.ended_by or '').strip()
+        if ended_by in _MOBILE_JWT_RESUMABLE_ENDED_BY:
+            return False
+        return True
+    except Exception as e:
+        current_app.logger.debug(
+            "should_block_mobile_jwt_session DB check failed (blocking): %s", e
+        )
+        return True
+
+
 def remove_session_from_blacklist(session_id):
     """
     Remove a session ID from the blacklist (cleanup after logout).
@@ -1486,12 +1544,13 @@ def cleanup_inactive_sessions(inactivity_hours=None, max_session_hours=None):
         inactivity_hours (int): Hours of inactivity before session is considered stale
         max_session_hours (int): Maximum session duration in hours
     """
-    lock_conn = None
     lock_acquired = False
     lock_id = None
+    use_pg_lock = False
     try:
         from config import Config
         from flask import current_app
+        from app.utils.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
 
         inspector = inspect(db.engine)
         table_name = UserSessionLog.__tablename__
@@ -1503,19 +1562,11 @@ def cleanup_inactive_sessions(inactivity_hours=None, max_session_hours=None):
         lock_id = int(current_app.config.get('SESSION_CLEANUP_LOCK_ID', DEFAULT_SESSION_CLEANUP_LOCK_ID))
 
         # PostgreSQL advisory lock avoids duplicate cleanup across workers; SQLite etc. skip the lock.
-        dialect = db.engine.dialect.name
-        if dialect == "postgresql":
-            lock_conn = db.engine.connect()
-            lock_acquired = bool(
-                lock_conn.execute(
-                    text("SELECT pg_try_advisory_lock(:lock_id)"),
-                    {"lock_id": lock_id},
-                ).scalar()
-            )
+        use_pg_lock = db.engine.dialect.name == "postgresql"
+        if use_pg_lock:
+            lock_acquired = try_session_advisory_lock(db.session, lock_id)
             if not lock_acquired:
                 current_app.logger.info("Skipping session cleanup - another worker is running cleanup")
-                lock_conn.close()
-                lock_conn = None
                 return 0
 
         # Use config values if not provided
@@ -1592,14 +1643,11 @@ def cleanup_inactive_sessions(inactivity_hours=None, max_session_hours=None):
         _rollback_transaction("cleanup_inactive_sessions_error")
         return 0
     finally:
-        if lock_conn is not None:
+        if use_pg_lock and lock_id is not None:
             try:
-                if lock_acquired and lock_id is not None and db.engine.dialect.name == "postgresql":
-                    lock_conn.execute(text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": lock_id})
+                release_session_advisory_lock(db.session, lock_id, acquired=lock_acquired)
             except Exception as unlock_error:
                 current_app.logger.warning(f"Failed to release session cleanup lock: {unlock_error}")
-            finally:
-                lock_conn.close()
 
 
 def get_active_sessions_count():

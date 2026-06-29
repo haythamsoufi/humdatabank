@@ -389,13 +389,23 @@ class FormItem(db.Model):
     @property
     def supports_disaggregation(self):
         """Returns True if this indicator supports disaggregation based on type and unit."""
+        shadow = self.__dict__.get('supports_disaggregation')
+        if isinstance(shadow, bool):
+            return shadow
+
         if not self.is_indicator:
             return False
         t_ok = self.type and str(self.type).lower() == 'number'
         if not t_ok:
             return False
-        if self.indicator_unit_id and self.measurement_unit is not None:
-            return bool(self.measurement_unit.allows_disaggregation)
+        if self.indicator_unit_id:
+            try:
+                mu = self.measurement_unit
+                if mu is not None:
+                    return bool(mu.allows_disaggregation)
+            except Exception:
+                # Detached ORM instance during stream_template render — fall back below.
+                pass
         from config import Config
         u = (self.unit or '').strip()
         if not u:

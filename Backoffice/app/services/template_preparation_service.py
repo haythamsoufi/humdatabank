@@ -225,7 +225,7 @@ class TemplatePreparationService:
             _raw_items = (
                 FormItem.query
                 .filter(FormItem.id.in_(_cached_item_ids))
-                .options(_jl(FormItem.indicator_bank))
+                .options(_jl(FormItem.indicator_bank), _jl(FormItem.measurement_unit))
                 .order_by(FormItem.section_id, FormItem.order)
                 .all()
             ) if _cached_item_ids else []
@@ -256,7 +256,7 @@ class TemplatePreparationService:
                         FormItem.section_id.in_(section_ids_for_cache),
                         FormItem.archived == False
                     )
-                    .options(_jl(FormItem.indicator_bank))
+                    .options(_jl(FormItem.indicator_bank), _jl(FormItem.measurement_unit))
                     .order_by(FormItem.section_id, FormItem.order)
                     .all()
                 )

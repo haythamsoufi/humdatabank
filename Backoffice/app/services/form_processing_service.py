@@ -13,9 +13,18 @@ import re
 from typing import Dict, List, Tuple, Any, Optional
 import logging
 from contextlib import suppress
+from sqlalchemy.orm import joinedload
 
 # Set up logging
 forms_logger = logging.getLogger('forms')
+
+
+def form_item_template_load_options():
+    """Eager-load relationships used while rendering entry-form templates."""
+    return (
+        joinedload(FormItem.indicator_bank),
+        joinedload(FormItem.measurement_unit),
+    )
 
 
 def slugify_age_group(age_group_str) -> str:
@@ -312,14 +321,16 @@ class FormItemProcessor:
     @classmethod
     def _add_disaggregation_support(cls, form_item: FormItem):
         """Add disaggregation support for both indicators and questions"""
-        # Both indicators and questions can have disaggregation
-        if form_item.is_indicator or form_item.is_question:
-            # Note: effective_age_groups and effective_sex_categories are computed properties
-            # that automatically return appropriate values based on configuration
-
-            # Use the actual database values for data availability flags
-            # These are already set in the FormItem model, so we don't need to override them
-            pass
+        if form_item.is_indicator:
+            # Resolve while the ORM session is still bound. stream_template with
+            # gunicorn gthread can continue rendering after request teardown, so
+            # lazy-loading measurement_unit in Jinja would raise DetachedInstanceError.
+            try:
+                form_item.supports_disaggregation = bool(
+                    FormItem.supports_disaggregation.fget(form_item)
+                )
+            except Exception:
+                form_item.supports_disaggregation = False
 
     @classmethod
     def process_form_item_data(cls, form_item: FormItem, form_data: Dict, assignment_entity_status_id: int, field_prefix: str = None) -> Tuple[Any, bool, bool, bool]:
@@ -893,7 +904,13 @@ def get_form_items_for_section(section_obj: FormSection, assignment_entity_statu
     current_section_fields = []
 
     # Get FormItems for this section using the unified approach (exclude archived items)
-    form_items = FormItem.query.filter_by(section_id=section_obj.id, archived=False).order_by(FormItem.order).all()
+    form_items = (
+        FormItem.query
+        .filter_by(section_id=section_obj.id, archived=False)
+        .options(*form_item_template_load_options())
+        .order_by(FormItem.order)
+        .all()
+    )
 
     for form_item in form_items:
         # Set up the form item using our unified processor

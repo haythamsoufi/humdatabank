@@ -4123,7 +4123,7 @@
         }
         columnDefs.forEach(function(colDef) {
             var meta = AgGridHelper.getColDefHelperMeta(colDef);
-            if (!AgGridHelper.isActionsColumn(colDef) || meta.actionsMobileWrapped) {
+            if (!AgGridHelper.isActionsColumn(colDef) || meta.actionsMobileWrapped || meta.skipMobileActionsOverflow) {
                 return;
             }
             if (typeof AgGridRenderers !== 'undefined' &&

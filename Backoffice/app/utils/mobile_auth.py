@@ -55,8 +55,8 @@ def _try_jwt_auth() -> bool:
     # Honour admin force-logout: if the session embedded in this token has been
     # blacklisted (e.g. by an admin via the sessions UI), reject the token.
     if claims.sid:
-        from app.services.user_analytics_service import is_session_blacklisted
-        if is_session_blacklisted(claims.sid):
+        from app.services.user_analytics_service import should_block_mobile_jwt_session
+        if should_block_mobile_jwt_session(claims.sid):
             return False
 
     login_user(user, remember=False)

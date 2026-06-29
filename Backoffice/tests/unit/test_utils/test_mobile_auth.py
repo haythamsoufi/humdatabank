@@ -44,7 +44,7 @@ class TestTryJwtAuth:
         headers = _make_jwt_headers(app, user, session_id=sid)
         token = headers['Authorization'].split(' ', 1)[1]
         with app.test_request_context(headers={'Authorization': f'Bearer {token}'}):
-            with patch('app.services.user_analytics_service.is_session_blacklisted', return_value=True):
+            with patch('app.services.user_analytics_service.should_block_mobile_jwt_session', return_value=True):
                 assert _try_jwt_auth() is False
 
     def test_inactive_user_rejected(self, app, db_session):

@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 from app.extensions import db
 from app.models import User
 from app.models.rbac import RbacPermission, RbacRole, RbacRolePermission, RbacUserRole
+from app.utils.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
 from app.utils.transactions import atomic, safe_remove
 
 
@@ -424,11 +425,9 @@ def seed_rbac_permissions_and_roles(*, use_advisory_lock: bool = True) -> Dict[s
     lock_key = 915_037_121  # arbitrary stable integer constant
     lock_acquired = False
 
-    if use_advisory_lock:
+    if use_advisory_lock and db.engine.dialect.name == "postgresql":
         try:
-            lock_acquired = bool(
-                db.session.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": int(lock_key)}).scalar()
-            )
+            lock_acquired = try_session_advisory_lock(db.session, lock_key)
             if not lock_acquired:
                 return {
                     "skipped_due_to_lock": 1,
@@ -602,9 +601,9 @@ def seed_rbac_permissions_and_roles(*, use_advisory_lock: bool = True) -> Dict[s
             "deleted_role_permission_links": int(deleted_links),
         }
     finally:
-        if lock_acquired:
+        if lock_acquired and db.engine.dialect.name == "postgresql":
             try:
-                db.session.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": int(lock_key)})
+                release_session_advisory_lock(db.session, lock_key, acquired=True)
             except Exception as e:
                 logger.debug("RBAC seed: pg_advisory_unlock failed: %s", e)
         safe_remove(reason="rbac_seed")

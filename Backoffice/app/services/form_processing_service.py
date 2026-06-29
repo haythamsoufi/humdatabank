@@ -325,12 +325,12 @@ class FormItemProcessor:
             # Resolve while the ORM session is still bound. stream_template with
             # gunicorn gthread can continue rendering after request teardown, so
             # lazy-loading measurement_unit in Jinja would raise DetachedInstanceError.
+            # Store on __dict__ — the @property has no setter.
             try:
-                form_item.supports_disaggregation = bool(
-                    FormItem.supports_disaggregation.fget(form_item)
-                )
+                resolved = bool(FormItem.supports_disaggregation.fget(form_item))
             except Exception:
-                form_item.supports_disaggregation = False
+                resolved = False
+            form_item.__dict__['supports_disaggregation'] = resolved
 
     @classmethod
     def process_form_item_data(cls, form_item: FormItem, form_data: Dict, assignment_entity_status_id: int, field_prefix: str = None) -> Tuple[Any, bool, bool, bool]:

@@ -620,6 +620,25 @@ def retry_email_delivery_log(log):
             db.session.refresh(log)
             return result or log.status == 'sent'
 
+        if orphan_kind == 'fds_access_request_digest':
+            from app.services.country_access_request_service import (
+                pending_country_access_requests_by_fds_member,
+            )
+            from app.services.email.fds_access_request_digest import (
+                send_fds_access_request_digest_email,
+            )
+            requests = pending_country_access_requests_by_fds_member().get(user.id, [])
+            if not requests:
+                mark_email_failed(
+                    log.id,
+                    "No pending access requests remain for this FDS member",
+                    retry=False,
+                )
+                return False
+            result = send_fds_access_request_digest_email(user, requests, existing_log=log)
+            db.session.refresh(log)
+            return result or log.status == 'sent'
+
         return _retry_digest_email_log(user, log)
 
     except Exception as e:

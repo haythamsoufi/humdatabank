@@ -6,7 +6,7 @@
 {% block head %}
     {{ super() }}
     <link rel="stylesheet" href="{{ static_url('css/notifications.css') }}">
-
+    <link rel="stylesheet" href="{{ static_url('css/admin/email-template-editor.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -378,63 +378,276 @@
                     </div>
                 </div>
 
-                <!-- Content Section -->
+                <!-- Delivery Section (choose channels before composing) -->
                 <div class="border border-gray-200 rounded-lg p-6">
                     <h3 class="text-lg font-semibold text-gray-900 mb-4">
                         <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold mr-3">2</span>
-                        {{ _('Content') }}
+                        {{ _('Delivery Options') }}
                     </h3>
 
                     <div class="space-y-4">
-                        <!-- Quick Templates (loaded from DB via System Configuration → Emails) -->
                         <div>
-                            <label for="notification-template-select" class="block text-sm font-medium text-gray-700 mb-2">
-                                {{ _('Quick Templates') }} <span class="text-xs font-normal text-gray-500">({{ _('Optional') }})</span>
+                            <label class="block text-sm font-medium text-gray-700 mb-3">
+                                {{ _('Delivery Method') }} <span class="text-red-500">*</span>
                             </label>
-                            <div class="flex gap-2">
-                                <select id="notification-template-select" class="form-select flex-1">
-                                    <option value="">{{ _('Select a template...') }}</option>
-                                    {% for key, tpl in notification_templates.items() %}
-                                    <option value="{{ key }}">{{ tpl.label or key|replace('_', ' ')|title }}</option>
-                                    {% endfor %}
-                                </select>
-                                <button type="button" id="clear-template" class="btn btn-secondary">
-                                    {{ _('Clear') }}
-                                </button>
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                <div class="lg:col-span-2 p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <label class="flex items-center space-x-3 cursor-pointer">
+                                            <input type="checkbox"
+                                                   id="send-email"
+                                                   class="form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded"
+                                                   checked>
+                                            <div>
+                                                <span class="text-gray-700 font-medium block">{{ _('Email') }}</span>
+                                                <span class="text-xs text-gray-500">{{ _('HTML email with optional template') }}</span>
+                                            </div>
+                                        </label>
+                                        <label class="flex items-center space-x-3 cursor-pointer">
+                                            <input type="checkbox"
+                                                   id="send-push"
+                                                   class="form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded">
+                                            <div>
+                                                <span class="text-gray-700 font-medium block">{{ _('Mobile Push') }}</span>
+                                                <span class="text-xs text-gray-500">{{ _('Short alert on registered devices') }}</span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    <p id="delivery-method-hint" class="text-xs text-gray-500 mt-3 mb-0 hidden"></p>
+                                </div>
+
+                                <div id="email-override-preferences-wrap" class="p-4 border border-gray-200 rounded-lg hover:border-yellow-300 hover:bg-yellow-50 transition-colors">
+                                    <label class="flex items-start space-x-3 cursor-pointer">
+                                        <input type="checkbox"
+                                               id="override-preferences"
+                                               class="form-checkbox h-5 w-5 text-yellow-600 focus:ring-yellow-500 focus:ring-2 rounded mt-0.5">
+                                        <div>
+                                            <span class="text-gray-700 font-medium block">{{ _('Override User Preferences') }}</span>
+                                            <span class="text-xs text-gray-600 mt-1 block">
+                                                {{ _('Send via email even if users have disabled email notifications. Use for critical messages.') }}
+                                            </span>
+                                        </div>
+                                    </label>
+                                </div>
                             </div>
-                            {% if not notification_templates %}
-                            <p class="text-xs text-amber-600 mt-1">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                {{ _('No quick templates configured. Run the seed script or add templates in') }}
-                                <a href="{{ url_for('settings.manage_settings') }}#emails" class="underline hover:text-amber-800">{{ _('System Configuration → Emails') }}</a>.
-                            </p>
-                            {% endif %}
                         </div>
 
-                        <!-- Title -->
-                        <div>
-                            <label for="admin-notification-title" class="block text-sm font-medium text-gray-700 mb-2">
+                        <!-- Mobile push only -->
+                        <div id="push-delivery-options" class="hidden rounded-lg border border-indigo-200 bg-indigo-50/40 p-4 space-y-4">
+                            <div class="flex items-center gap-2 text-sm font-semibold text-indigo-900">
+                                <i class="fas fa-mobile-alt" aria-hidden="true"></i>
+                                {{ _('Mobile push options') }}
+                            </div>
+
+                            <div id="redirect-section">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    {{ _('Tap opens') }} <span class="text-xs font-normal text-gray-500">({{ _('Optional') }})</span>
+                                </label>
+                                <p class="text-xs text-gray-500 mb-2">{{ _('Where the app navigates when the user taps the push notification.') }}</p>
+
+                                <div class="mb-3 flex space-x-4 border-b border-gray-200">
+                                    <button type="button"
+                                            id="redirect-type-app"
+                                            class="btn btn-ghost btn-sm px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 redirect-type-btn active">
+                                        {{ _('App Screen') }}
+                                    </button>
+                                    <button type="button"
+                                            id="redirect-type-custom"
+                                            class="btn btn-ghost btn-sm px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 redirect-type-btn">
+                                        {{ _('Custom URL') }}
+                                    </button>
+                                </div>
+
+                                <div id="redirect-app-screen-group" class="redirect-group">
+                                    <select id="admin-notification-redirect-screen" class="form-select w-full">
+                                        <option value="">{{ _('No redirect (open notification center)') }}</option>
+                                        <optgroup label="{{ _('Main Screens') }}">
+                                            <option value="/dashboard">{{ _('Dashboard') }}</option>
+                                            <option value="/notifications">{{ _('Notifications') }}</option>
+                                            <option value="/settings">{{ _('Settings') }}</option>
+                                        </optgroup>
+                                        <optgroup label="{{ _('Public Screens') }}">
+                                            <option value="/resources">{{ _('Resources') }}</option>
+                                            <option value="/indicator-bank">{{ _('Indicator Bank') }}</option>
+                                            <option value="/disaggregation-analysis">{{ _('Disaggregation Analysis') }}</option>
+                                        </optgroup>
+                                        <optgroup label="{{ _('Admin Screens') }}">
+                                            <option value="/admin/dashboard">{{ _('Admin Dashboard') }}</option>
+                                            <option value="/admin/users">{{ _('User Management') }}</option>
+                                            <option value="/admin/templates">{{ _('Templates') }}</option>
+                                            <option value="/admin/assignments">{{ _('Assignments') }}</option>
+                                            <option value="/admin/documents">{{ _('Document Management') }}</option>
+                                            <option value="/admin/translations/manage">{{ _('Translation Management') }}</option>
+                                            <option value="/admin/plugins">{{ _('Plugin Management') }}</option>
+                                            <option value="/admin/settings">{{ _('System Configuration') }}</option>
+                                            <option value="/admin/resources">{{ _('Resources Management') }}</option>
+                                            <option value="/admin/organization">{{ _('Organizational Structure') }}</option>
+                                            <option value="/admin/indicator_bank">{{ _('Indicator Bank Admin') }}</option>
+                                            <option value="/admin/analytics/dashboard">{{ _('User Analytics') }}</option>
+                                            <option value="/admin/analytics/audit-trail">{{ _('Audit Trail') }}</option>
+                                            <option value="/admin/api-management">{{ _('API Management') }}</option>
+                                        </optgroup>
+                                    </select>
+                                </div>
+
+                                <div id="redirect-custom-url-group" class="redirect-group hidden">
+                                    <input type="text"
+                                           id="admin-notification-redirect-url"
+                                           placeholder="{{ _('e.g., /forms/assignment/123') }}"
+                                           class="form-input w-full">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Content Section -->
+                <div id="compose-content-section" class="border border-gray-200 rounded-lg p-6">
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-0">
+                            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold mr-3">3</span>
+                            {{ _('Content') }}
+                        </h3>
+                        <div class="flex flex-wrap items-center gap-2">
+                            {% if not campaigns %}
+                            <span class="inline-flex"
+                                  title="{{ _('No saved campaigns yet. Compose a message and use Save as Campaign, or open the Campaigns tab to create one.') }}">
+                                <button type="button"
+                                        id="open-load-campaign-modal"
+                                        class="btn btn-secondary inline-flex items-center gap-2 pointer-events-none"
+                                        disabled
+                                        aria-disabled="true">
+                                    <i class="fas fa-folder-open" aria-hidden="true"></i>
+                                    {{ _('Load from campaign') }}
+                                </button>
+                            </span>
+                            {% else %}
+                            <button type="button"
+                                    id="open-load-campaign-modal"
+                                    class="btn btn-secondary inline-flex items-center gap-2">
+                                <i class="fas fa-folder-open" aria-hidden="true"></i>
+                                {{ _('Load from campaign') }}
+                            </button>
+                            {% endif %}
+                            <button type="button" id="clear-send-form" class="btn btn-secondary hidden" title="{{ _('Clear load campaign selection') }}">
+                                {{ _('Clear') }}
+                            </button>
+                        </div>
+                    </div>
+
+                    {% if campaigns %}
+                    <p class="text-xs text-gray-500 mb-4">
+                        {{ _('Reuse content from a draft or previously sent campaign.') }}
+                    </p>
+                    {% endif %}
+
+                    <p id="compose-content-disabled-hint" class="hidden text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+                        {{ _('Select at least one delivery method above to compose your message.') }}
+                    </p>
+
+                    <div id="compose-content-fields" class="space-y-4">
+                        <div id="compose-channel-tabs-wrap" class="hidden mb-4">
+                            {% call scroll_tab_bar(border_bottom=true, inner_id='compose-channel-tabs', aria_label=_('Compose by channel'), inner_class='items-center gap-1', wrapper_class='mb-0') %}
+                                <button type="button"
+                                        role="tab"
+                                        id="compose-tab-email"
+                                        class="compose-channel-tab {{ admin_underline_tab_btn_classes(true, size='compact', extra_classes='cursor-pointer') }}"
+                                        data-channel="email"
+                                        aria-selected="true">
+                                    <i class="fas fa-envelope text-[10px] mr-1.5" aria-hidden="true"></i>{{ _('Email') }}
+                                </button>
+                                <button type="button"
+                                        role="tab"
+                                        id="compose-tab-push"
+                                        class="compose-channel-tab {{ admin_underline_tab_btn_classes(false, size='compact', extra_classes='cursor-pointer') }}"
+                                        data-channel="push"
+                                        aria-selected="false">
+                                    <i class="fas fa-mobile-alt text-[10px] mr-1.5" aria-hidden="true"></i>{{ _('Mobile Push') }}
+                                </button>
+                            {% endcall %}
+                        </div>
+
+                        <div id="compose-pane-email" class="compose-channel-pane space-y-4">
+                            <div id="email-content-block" class="space-y-4">
+                                <div id="campaign-email-template-wrap">
+                                    <label for="campaign-email-template-select" class="block text-sm font-medium text-gray-700 mb-2">
+                                        {{ _('Email template') }} <span class="text-xs font-normal text-gray-500">({{ _('Optional') }})</span>
+                                    </label>
+                                    <select id="campaign-email-template-select" class="form-select w-full max-w-xl">
+                                        <option value="">{{ _('Default notification email') }}</option>
+                                        {% for tpl_key in campaign_compose_templates %}
+                                        {% set meta = campaign_compose_templates[tpl_key] %}
+                                        <option value="{{ tpl_key }}"
+                                                data-compose-title="{{ meta.title|e }}"
+                                                data-compose-message="{{ meta.message|e }}"
+                                                data-compose-priority="{{ meta.priority|e }}">
+                                            {{ meta.label or tpl_key }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% include "admin/communication/_campaign_email_compose_editor.html" %}
+                            </div>
+                            <div id="compose-email-text-slot" class="space-y-4"></div>
+                        </div>
+
+                        <div id="compose-pane-push" class="compose-channel-pane space-y-4 hidden">
+                            <div id="compose-push-text-slot" class="space-y-4"></div>
+                        </div>
+
+                        <!-- Title + message (reparented into active channel pane by JS) -->
+                        <div id="title-field-wrap" class="hidden">
+                            <label for="admin-notification-title" class="block text-sm font-medium text-gray-700 mb-1">
                                 {{ _('Title') }} <span class="text-red-500">*</span>
                             </label>
+                            <p class="text-xs text-gray-500 mb-2" id="title-field-description"></p>
+                            <div class="flex flex-wrap gap-1.5 mb-2" id="title-channel-badges"></div>
                             <input type="text"
                                    id="admin-notification-title"
-                                   placeholder="{{ _('Notification title') }}"
+                                   placeholder="{{ _('e.g., Reporting period now open') }}"
                                    class="form-input w-full"
                                    maxlength="100"
                                    required>
+                            <div class="mt-3" id="title-channel-previews">
+                                <div id="preview-email-subject-card" class="hidden rounded-lg border border-blue-200 bg-blue-50/60 p-3">
+                                    <div class="flex items-center gap-2 text-xs font-semibold text-blue-800 mb-1.5">
+                                        <i class="fas fa-envelope" aria-hidden="true"></i>
+                                        {{ _('Email subject line') }}
+                                    </div>
+                                    <p class="text-sm text-gray-900 font-medium break-words" id="preview-email-subject-text">—</p>
+                                    <p class="text-xs text-gray-500 mt-1" id="preview-email-subject-note"></p>
+                                </div>
+                                <div id="preview-push-title-card" class="hidden rounded-lg border border-indigo-200 bg-indigo-50/60 p-3">
+                                    <div class="flex items-center gap-2 text-xs font-semibold text-indigo-800 mb-1.5">
+                                        <i class="fas fa-mobile-alt" aria-hidden="true"></i>
+                                        {{ _('Push notification title') }}
+                                    </div>
+                                    <p class="text-sm text-gray-900 font-medium break-words" id="preview-push-title-text">—</p>
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Message -->
-                        <div>
-                            <label for="admin-notification-message" class="block text-sm font-medium text-gray-700 mb-2">
+                        <div id="message-field-wrap" class="hidden">
+                            <label for="admin-notification-message" class="block text-sm font-medium text-gray-700 mb-1" id="message-field-label">
                                 {{ _('Message') }} <span class="text-red-500">*</span>
                             </label>
+                            <p class="text-xs text-gray-500 mb-2" id="message-field-hint"></p>
                             <textarea id="admin-notification-message"
-                                      placeholder="{{ _('Notification message') }}"
+                                      placeholder="{{ _('Short summary shown in the app and on devices…') }}"
                                       class="form-textarea w-full"
-                                      rows="5"
+                                      rows="4"
                                       maxlength="500"
                                       required></textarea>
+                            <div id="push-body-preview-card" class="hidden mt-3 rounded-lg border border-indigo-200 bg-indigo-50/60 p-3 max-w-md">
+                                <div class="flex items-center gap-2 text-xs font-semibold text-indigo-800 mb-2">
+                                    <i class="fas fa-mobile-alt" aria-hidden="true"></i>
+                                    {{ _('Push notification preview') }}
+                                </div>
+                                <div class="rounded-lg bg-white shadow-sm border border-gray-200 p-3 text-sm">
+                                    <div class="font-semibold text-gray-900 mb-0.5" id="preview-push-body-title">—</div>
+                                    <div class="text-gray-600 text-xs leading-snug" id="preview-push-body-text">—</div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Priority, Category, Tags -->
@@ -475,10 +688,10 @@
                     </div>
                 </div>
 
-                <!-- Attachments Section -->
-                <div class="border border-gray-200 rounded-lg p-6">
+                <!-- Attachments Section (email only) -->
+                <div id="email-attachments-section" class="border border-gray-200 rounded-lg p-6">
                     <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold mr-3">2b</span>
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold mr-3">3b</span>
                         {{ _('Include Attachments') }}
                     </h3>
                     <p class="text-sm text-gray-600 mb-4">
@@ -525,156 +738,6 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Delivery Section -->
-                <div class="border border-gray-200 rounded-lg p-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold mr-3">3</span>
-                        {{ _('Delivery Options') }}
-                    </h3>
-
-                    <div class="space-y-4">
-                        <!-- Delivery Method and Override Preferences -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-3">
-                                {{ _('Delivery Method') }} <span class="text-red-500">*</span>
-                            </label>
-                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                                <!-- Combined Email and Push Box -->
-                                <div class="lg:col-span-2 p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors">
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <label class="flex items-center space-x-3 cursor-pointer">
-                                            <input type="checkbox"
-                                                   id="send-email"
-                                                   class="form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded"
-                                                   checked>
-                                            <div>
-                                                <span class="text-gray-700 font-medium block">{{ _('Email') }}</span>
-                                                <span class="text-xs text-gray-500">{{ _('Send via email') }}</span>
-                                            </div>
-                                        </label>
-                                        <label class="flex items-center space-x-3 cursor-pointer">
-                                            <input type="checkbox"
-                                                   id="send-push"
-                                                   class="form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded"
-                                                   checked>
-                                            <div>
-                                                <span class="text-gray-700 font-medium block">{{ _('Mobile Push') }}</span>
-                                                <span class="text-xs text-gray-500">{{ _('Send push notification') }}</span>
-                                            </div>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <!-- Override User Preferences -->
-                                <div class="p-4 border border-gray-200 rounded-lg hover:border-yellow-300 hover:bg-yellow-50 transition-colors">
-                                    <label class="flex items-start space-x-3 cursor-pointer">
-                                        <input type="checkbox"
-                                               id="override-preferences"
-                                               class="form-checkbox h-5 w-5 text-yellow-600 focus:ring-yellow-500 focus:ring-2 rounded mt-0.5">
-                                        <div>
-                                            <span class="text-gray-700 font-medium block">{{ _('Override User Preferences') }}</span>
-                                            <span class="text-xs text-gray-600 mt-1 block">
-                                                {{ _('Send via email even if users have disabled email notifications. Use for critical messages.') }}
-                                            </span>
-                                        </div>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Redirect URL/Screen (only for push notifications) -->
-                        <div id="redirect-section" class="hidden">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                {{ _('Redirect URL or Screen') }} <span class="text-xs font-normal text-gray-500">({{ _('Optional') }})</span>
-                            </label>
-
-                            <div class="mb-3 flex space-x-4 border-b border-gray-200">
-                                <button type="button"
-                                        id="redirect-type-app"
-                                        class="btn btn-ghost btn-sm px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 redirect-type-btn active">
-                                    {{ _('App Screen') }}
-                                </button>
-                                <button type="button"
-                                        id="redirect-type-custom"
-                                        class="btn btn-ghost btn-sm px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 redirect-type-btn">
-                                    {{ _('Custom URL') }}
-                                </button>
-                            </div>
-
-                            <div id="redirect-app-screen-group" class="redirect-group">
-                                <select id="admin-notification-redirect-screen" class="form-select w-full">
-                                    <option value="">{{ _('No redirect (open notification center)') }}</option>
-                                    <optgroup label="{{ _('Main Screens') }}">
-                                        <option value="/dashboard">{{ _('Dashboard') }}</option>
-                                        <option value="/notifications">{{ _('Notifications') }}</option>
-                                        <option value="/settings">{{ _('Settings') }}</option>
-                                    </optgroup>
-                                    <optgroup label="{{ _('Public Screens') }}">
-                                        <option value="/resources">{{ _('Resources') }}</option>
-                                        <option value="/indicator-bank">{{ _('Indicator Bank') }}</option>
-                                        <option value="/disaggregation-analysis">{{ _('Disaggregation Analysis') }}</option>
-                                    </optgroup>
-                                    <optgroup label="{{ _('Admin Screens') }}">
-                                        <option value="/admin/dashboard">{{ _('Admin Dashboard') }}</option>
-                                        <option value="/admin/users">{{ _('User Management') }}</option>
-                                        <option value="/admin/templates">{{ _('Templates') }}</option>
-                                        <option value="/admin/assignments">{{ _('Assignments') }}</option>
-                                        <option value="/admin/documents">{{ _('Document Management') }}</option>
-                                        <option value="/admin/translations/manage">{{ _('Translation Management') }}</option>
-                                        <option value="/admin/plugins">{{ _('Plugin Management') }}</option>
-                                        <option value="/admin/settings">{{ _('System Configuration') }}</option>
-                                        <option value="/admin/resources">{{ _('Resources Management') }}</option>
-                                        <option value="/admin/organization">{{ _('Organizational Structure') }}</option>
-                                        <option value="/admin/indicator_bank">{{ _('Indicator Bank Admin') }}</option>
-                                        <option value="/admin/analytics/dashboard">{{ _('User Analytics') }}</option>
-                                        <option value="/admin/analytics/audit-trail">{{ _('Audit Trail') }}</option>
-                                        <option value="/admin/api-management">{{ _('API Management') }}</option>
-                                    </optgroup>
-                                </select>
-                            </div>
-
-                            <div id="redirect-custom-url-group" class="redirect-group hidden">
-                                <input type="text"
-                                       id="admin-notification-redirect-url"
-                                       placeholder="{{ _('e.g., https://example.com or /forms/assignment/123') }}"
-                                       class="form-input w-full">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Preview Section -->
-                <div class="border border-gray-200 rounded-lg p-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold mr-3">4</span>
-                        {{ _('Preview') }}
-                    </h3>
-                    <div id="notification-preview" class="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                            <div class="flex items-center justify-between mb-3">
-                                <h4 class="text-sm font-semibold text-gray-700">{{ _('Preview') }}</h4>
-                                <button type="button" id="toggle-preview" class="btn btn-icon btn-xs btn-secondary">
-                                    <i class="fas fa-chevron-up"></i>
-                                </button>
-                            </div>
-                            <div id="preview-content" class="space-y-3">
-                                <div id="email-preview" class="bg-white p-3 rounded border border-gray-300 hidden">
-                                    <div class="text-xs font-medium text-gray-500 mb-2">{{ _('Email Notification') }}</div>
-                                    <div class="text-sm">
-                                        <div class="font-semibold text-gray-900 mb-1" id="preview-email-title"></div>
-                                        <div class="text-gray-600" id="preview-email-message"></div>
-                                    </div>
-                                </div>
-                                <div id="push-preview" class="bg-white p-3 rounded border border-gray-300 hidden">
-                                    <div class="text-xs font-medium text-gray-500 mb-2">{{ _('Push Notification') }}</div>
-                                    <div class="text-sm">
-                                        <div class="font-semibold text-gray-900 mb-1" id="preview-push-title"></div>
-                                        <div class="text-gray-600" id="preview-push-message"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
                 <!-- Campaign Fields (shown when editing) -->
                 <div id="campaign-edit-fields" class="hidden space-y-4 mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -1151,6 +1214,57 @@
     </div>
 </div>
 
+<!-- Load from Campaign Modal -->
+<div id="load-campaign-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+    <div class="relative mx-auto p-6 border w-full max-w-md shadow-xl rounded-lg bg-white">
+        <div class="flex items-center justify-between mb-5 flex-shrink-0 border-b border-gray-200 pb-4">
+            <h3 class="text-xl font-bold text-gray-900">
+                <i class="fas fa-folder-open mr-2 text-blue-600"></i>
+                {{ _('Load from campaign') }}
+            </h3>
+            <button type="button" id="close-load-campaign-modal" class="btn btn-close-icon" aria-label="{{ _('Close') }}">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+
+        <div class="space-y-4">
+            <div>
+                <label for="load-campaign-select" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ _('Campaign') }} <span class="text-red-500">*</span>
+                </label>
+                <select id="load-campaign-select" class="form-select w-full">
+                    <option value="">{{ _('Select a campaign...') }}</option>
+                    {% for campaign in campaigns %}
+                    <option value="{{ campaign.id }}" data-status="{{ campaign.status }}">
+                        {{ campaign.name }} ({{ campaign.status_display }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <label class="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input type="checkbox"
+                       id="load-campaign-include-recipients"
+                       class="form-checkbox h-4 w-4 text-blue-600">
+                <span>{{ _('Include recipients') }}</span>
+            </label>
+            <p class="text-xs text-gray-500">
+                {{ _('Sent campaigns load content only unless you include recipients. Draft and scheduled campaigns can include recipients by default.') }}
+            </p>
+
+            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                <button type="button" id="cancel-load-campaign-modal" class="btn btn-secondary">
+                    {{ _('Cancel') }}
+                </button>
+                <button type="button" id="confirm-load-campaign" class="btn btn-primary">
+                    <i class="fas fa-download w-4 h-4 inline-block mr-2"></i>
+                    {{ _('Load') }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Campaign Creation Modal -->
 <div id="campaign-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
     <div class="relative mx-auto p-6 border w-full max-w-md shadow-xl rounded-lg bg-white">
@@ -1272,12 +1386,49 @@
         'retryingEmail': {{ _('Retrying email...')|tojson }},
         'dismissingEmail': {{ _('Dismissing...')|tojson }},
         'cancelled': {{ _('Dismissed')|tojson }},
+        'composeBothChannelsHint': {{ _('Use the Email and Mobile Push tabs to compose each channel. The same title is used as the email subject and push title.')|tojson }},
+        'composeEmailOnlyHint': {{ _('Email only — title becomes the subject line; message appears in-app and in the email body.')|tojson }},
+        'composePushOnlyHint': {{ _('Push only — title and message appear on registered mobile devices.')|tojson }},
+        'titleDescBoth': {{ _('Same title for email subject line and push notification. Also shown in the in-app notification center.')|tojson }},
+        'titleDescEmail': {{ _('Becomes the email subject line and in-app notification title.')|tojson }},
+        'titleDescPush': {{ _('Shown as the push notification title on mobile devices and in the in-app notification center.')|tojson }},
+        'badgeEmailSubject': {{ _('Email subject')|tojson }},
+        'badgePushTitle': {{ _('Push title')|tojson }},
+        'badgeInApp': {{ _('In-app')|tojson }},
+        'badgeTemplateVar': {{ ('Template ' ~ '{{title}}')|tojson }},
+        'messageLabelBoth': {{ _('Message')|tojson }},
+        'messageLabelPush': {{ _('Push notification body')|tojson }},
+        'messageLabelEmail': {{ _('In-app summary')|tojson }},
+        'messageHintBoth': {{ _('Push notification body, in-app summary, and email template variable {{ message }}. Email layout comes from the HTML template above.')|tojson }},
+        'messageHintPush': {{ _('Short text shown on the user\'s mobile device and in the in-app notification center.')|tojson }},
+        'messageHintEmail': {{ _('Shown in the notification center. Also available as {{ message }} in your email HTML template.')|tojson }},
+        'messagePlaceholderBoth': {{ _('Short text for push, in-app, and template…')|tojson }},
+        'messagePlaceholderPush': {{ _('e.g., Please complete your assignment by Friday…')|tojson }},
+        'messagePlaceholderEmail': {{ _('Brief summary for the in-app notification list…')|tojson }},
+        'emailSubjectHighPriorityNote': {{ _('High priority — subject is sent as-is (no prefix).')|tojson }},
+        'emailSubjectNormalNote': {{ _('Normal priority emails prepend “New Notification:”.')|tojson }},
+        'previewUntitled': {{ _('(No title)')|tojson }},
+        'previewNoMessage': {{ _('(No message)')|tojson }},
     };
     window.NOTIFICATION_TRANSLATIONS = window.COMMUNICATION_TRANSLATIONS;
 
     // Pass data to JavaScript - backend already formatted it
     window.notificationsData = {{ notifications|tojson|safe }};
     window.campaignsData = {{ campaigns|tojson|safe }};
+
+    window.communicationPageConfig = {
+        campaignEmailTemplates: {{ campaign_email_templates|tojson|safe }},
+        urls: {
+            campaignEmailComposePreview: {{ url_for('admin_communication.api_campaign_email_compose_preview')|tojson }},
+            tinymceBase: {{ url_for('static', filename='libs/tinymce')|tojson }},
+        },
+        t: {
+            tinymceVarTip: {{ _('Click to switch: edit the template with Jinja placeholders, or see sample values (server-rendered preview, not saved).')|tojson }},
+            variables: {{ _('Variables')|tojson }},
+            couldNotLoadSampleValues: {{ _('Could not load sample values for this template.')|tojson }},
+            addContentFirst: {{ _('Add some template content first, then show sample values.')|tojson }},
+        },
+    };
 
     // Initialize grids after data is ready
     document.addEventListener('DOMContentLoaded', function() {
@@ -1329,8 +1480,8 @@
             window.ORG_NAME = {{ ORG_NAME | tojson }};
             window.ORG_SHORT_NAME = {{ ORG_SHORT_NAME | tojson }};
         }
-        // Notification quick-templates loaded from the database
-        window.NOTIFICATION_TEMPLATES = {{ notification_templates | tojson | safe }};
     </script>
+    <script src="{{ static_url('js/admin/email-template-editor-core.js') }}"></script>
+    <script src="{{ static_url('js/admin/communication-campaign-email.js') }}"></script>
     <script src="{{ static_url('js/admin/communication.js') }}"></script>
 {% endblock %}

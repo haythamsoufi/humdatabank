@@ -337,20 +337,6 @@ def admin_dashboard():
                 current_app.logger.debug("Security audit metrics failed: %s", e)
                 db.session.rollback()
 
-        # Translation coverage metrics for dashboard widget (load once in Python, no SQL JSON functions)
-        translation_widget = {"avg_name_pct": 0.0, "avg_def_pct": 0.0, "by_lang": {}}
-        try:
-            from app.services.governance_metrics_service import _get_translation_metrics
-            tr = _get_translation_metrics()
-            db.session.rollback()
-            if tr:
-                avg_name = round(sum(v.get("name_pct", 0) for v in tr.values()) / len(tr), 1)
-                avg_def  = round(sum(v.get("def_pct",  0) for v in tr.values()) / len(tr), 1)
-                translation_widget = {"avg_name_pct": avg_name, "avg_def_pct": avg_def, "by_lang": tr}
-        except Exception as e:
-            current_app.logger.debug("Translation metrics failed: %s", e)
-            db.session.rollback()
-
         return render_template("admin/dashboard.html",
                              user_count=user_count,
                              country_count=country_count,
@@ -370,7 +356,6 @@ def admin_dashboard():
                              overdue_assignments=overdue_assignments,
                              pending_public_submissions_count=pending_public_submissions_count,
                              security_audit_widget=security_audit_widget,
-                             translation_widget=translation_widget,
                              kobo_data_import_url=kobo_data_import_url,
                              data_sync_url=data_sync_url,
                              title="Admin Dashboard")
@@ -397,7 +382,6 @@ def admin_dashboard():
                              overdue_assignments=0,
                              pending_public_submissions_count=0,
                              security_audit_widget={"high_risk_actions_30d": 0, "suspicious_logins_30d": 0, "failed_login_rate_30d": 0.0},
-                             translation_widget={"avg_name_pct": 0.0, "avg_def_pct": 0.0, "by_lang": {}},
                              kobo_data_import_url=kobo_data_import_url,
                              data_sync_url=data_sync_url,
                              title="Admin Dashboard",

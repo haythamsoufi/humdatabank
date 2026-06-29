@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.utils.logging_handlers import SafeRotatingFileHandler, create_rotating_file_handler
+from app.utils.logging_handlers import SafeRotatingFileHandler, create_app_log_formatter, create_rotating_file_handler
 
 
 class TestSafeRotatingFileHandler:
@@ -66,3 +66,25 @@ class TestSafeRotatingFileHandler:
 
             logger.removeHandler(handler)
             handler.close()
+
+
+@pytest.mark.unit
+class TestOrgTimezoneLogging:
+    def test_create_app_log_formatter_geneva_winter(self):
+        import logging
+        from datetime import datetime, timezone
+
+        formatter = create_app_log_formatter("[%(asctime)s] %(message)s")
+        record = logging.LogRecord("test", logging.INFO, "", 0, "hello", (), None)
+        record.created = datetime(2024, 1, 15, 12, 0, tzinfo=timezone.utc).timestamp()
+        rendered = formatter.format(record)
+        assert "13:00:00" in rendered
+        assert "hello" in rendered
+
+    def test_configure_process_org_timezone_sets_env(self, monkeypatch):
+        from app.utils.logging_handlers import configure_process_org_timezone
+
+        monkeypatch.delenv("TZ", raising=False)
+        tz = configure_process_org_timezone()
+        assert tz == "Europe/Zurich"
+        assert os.environ.get("TZ") == "Europe/Zurich"

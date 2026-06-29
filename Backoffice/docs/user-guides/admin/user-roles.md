@@ -92,7 +92,7 @@ Admin roles provide access to administrative functions. Users can have multiple 
 - Alternative to manually selecting many granular admin roles
 
 **Includes:**
-- All admin module roles (Users, Templates, Assignments, Countries, Indicators, Content, Analytics, Audit, Data Explorer, AI, Notifications, Translations, API)
+- All admin module roles (Users, Templates, Assignments, Countries, Indicators, Content, Analytics, Audit, Data Explorer, AI, Communication, Translations, API)
 - **Excludes:** Settings and Plugins (these must be assigned separately)
 - **Includes:** All roles from Admin Essentials preset (see below)
 
@@ -270,12 +270,12 @@ These roles provide access to specific admin modules. Assign multiple roles as n
 
 **When to use:** For AI system administrators.
 
-#### Admin: Notifications Manager
-**Role Code:** `admin_notifications_manager`
+#### Admin: Communication Manager
+**Role Code:** `admin_communication_manager`
 
 **Capabilities:**
-- View all notifications
-- Send notifications
+- View all communications
+- Send notifications, email, and push from Communication Center
 
 **When to use:** For communication administrators.
 

@@ -98,6 +98,10 @@ graceful_timeout = int(os.environ.get('GUNICORN_GRACEFUL_TIMEOUT', '30'))
 
 def on_starting(server):
     """Called just before the master process is initialized."""
+    from app.utils.logging_handlers import configure_process_org_timezone, create_app_log_formatter
+
+    configure_process_org_timezone()
+
     # Configure Gunicorn's logger to route by level
     # INFO and below -> stdout (normal color in Azure Log Stream)
     # WARNING and above -> stderr (red in Azure Log Stream)
@@ -116,10 +120,7 @@ def on_starting(server):
     error_handler.setLevel(logging.WARNING)
 
     # Use Gunicorn's default formatter style
-    formatter = logging.Formatter(
-        '[%(asctime)s] [%(levelname)s] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
+    formatter = create_app_log_formatter('[%(asctime)s] [%(levelname)s] %(message)s')
     info_handler.setFormatter(formatter)
     error_handler.setFormatter(formatter)
 

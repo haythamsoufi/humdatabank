@@ -562,7 +562,7 @@ MOBILE_ENDPOINT_REGISTRY = [
      'description': 'System audit trail events',
      'flutter': 'AuditTrailProvider'},
     {'group': 'Admin: Analytics', 'path': '/api/mobile/v1/admin/notifications/send', 'methods': ['POST'],
-     'auth': 'rbac', 'permission': 'admin.notifications.manage',
+     'auth': 'rbac', 'permission': 'admin.communication.manage',
      'description': 'Send push notification to selected users',
      'flutter': 'AdminDashboardProvider'},
 

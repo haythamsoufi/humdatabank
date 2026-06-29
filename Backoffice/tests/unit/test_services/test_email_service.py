@@ -881,13 +881,6 @@ class TestSendWelcomeEmail:
 
             with patch("app.services.email.service.send_email", return_value=True), \
                  patch("app.services.email.service.get_email_template", side_effect=lambda k, d: d), \
-                 patch("app.services.email.service.get_notification_templates", return_value={
-                     "email_template_welcome": {
-                         "title": "Welcome to {{org_name}}!",
-                         "message": "Hello from {{org_name}}",
-                         "priority": "normal",
-                     }
-                 }), \
                  patch("app.services.email.service.get_org_name", return_value="IFRC"), \
                  patch("app.services.email.service.get_org_copyright_year", return_value="2024"):
                 result = send_welcome_email(user)

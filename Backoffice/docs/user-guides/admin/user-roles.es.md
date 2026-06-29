@@ -92,7 +92,7 @@ Los roles de administrador proporcionan acceso a funciones administrativas. Los 
 - Alternativa a seleccionar manualmente muchos roles de administración granulares
 
 **Incluye:**
-- Todos los roles de módulos de administración (Usuarios, Plantillas, Asignaciones, Países, Indicadores, Contenido, Analíticas, Auditoría, Explorador de datos, IA, Notificaciones, Traducciones, API)
+- Todos los roles de módulos de administración (Usuarios, Plantillas, Asignaciones, Países, Indicadores, Contenido, Analíticas, Auditoría, Explorador de datos, IA, Comunicación, Traducciones, API)
 - **Excluye:** Configuración y Plugins (estos deben asignarse por separado)
 - **Incluye:** Todos los roles del preajuste Esenciales de administrador (ver abajo)
 
@@ -270,12 +270,12 @@ Estos roles proporcionan acceso a módulos de administración específicos. Asig
 
 **Cuándo usar:** Para administradores de sistemas de IA.
 
-#### Administrador: Gestor de notificaciones
-**Código de rol:** `admin_notifications_manager`
+#### Administrador: Gestor de comunicación
+**Código de rol:** `admin_communication_manager`
 
 **Capacidades:**
-- Ver todas las notificaciones
-- Enviar notificaciones
+- Ver todas las comunicaciones
+- Enviar notificaciones, correos electrónicos y push desde el Centro de comunicación
 
 **Cuándo usar:** Para administradores de comunicaciones.
 

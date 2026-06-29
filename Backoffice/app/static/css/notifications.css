@@ -738,7 +738,7 @@
     font-size: 0.75rem;
 }
 
-/* Quick filter buttons (Notifications Center) */
+/* Quick filter buttons (Communication Center) */
 .quick-filter-btn.active {
     background-color: #3B82F6;
     color: white;
@@ -751,7 +751,7 @@
     background-color: #2563EB;
 }
 
-/* Drag and drop (Notifications Center) */
+/* Drag and drop (Communication Center) */
 .draggable-user-type {
     user-select: none;
     transition: all 0.2s ease;

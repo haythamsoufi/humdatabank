@@ -91,7 +91,7 @@ Header includes **app version** and an **Updates** check when implemented. Deep 
 
 **Where:** Admin → **Communication Center** → `/admin/communication/center`.
 
-**Who:** `admin.notifications.manage`.
+**Who:** `admin.communication.manage`.
 
 **What you get:**
 
@@ -345,7 +345,7 @@ These are used heavily alongside admin work:
 | Translation Management | `admin.translations.manage` |
 | Plugin Management | `admin.plugins.manage` |
 | System Configuration | `admin.settings.manage` |
-| Communication Center | `admin.notifications.manage` |
+| Communication Center | `admin.communication.manage` |
 | Documentation (in-app) | `admin.docs.view` |
 | Manage Users | `admin.users.view` |
 | Manage Templates | `admin.templates.view` |

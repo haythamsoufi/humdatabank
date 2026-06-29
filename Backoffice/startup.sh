@@ -5,6 +5,8 @@ echo "=========================================="
 echo "Starting Humanitarian Databank on Azure"
 echo "=========================================="
 
+export TZ="${APP_TIMEZONE:-Europe/Zurich}"
+
 # Print environment info
 echo "Python version: $(python --version)"
 echo "Working directory: $(pwd)"

@@ -339,3 +339,18 @@ def register_commands(app):
             f"Pre-fill metadata: {stats['metadata']['seeded']} seeded, "
             f"{stats['metadata']['skipped']} skipped.\n"
         )
+
+    @app.cli.command('seed-campaign-email-templates')
+    @click.option('--force', is_flag=True, help='Overwrite existing campaign template values.')
+    @with_appcontext
+    def seed_campaign_email_templates_cmd(force):
+        """Seed default Communication Center campaign email templates."""
+        from scripts.seed_campaign_email_templates import seed_campaign_templates
+
+        click.echo("\n=== Seeding Campaign Email Templates ===\n")
+        stats = seed_campaign_templates(force=force)
+        email_stats = stats.get('email', {})
+        click.echo(
+            f"\nDone!  Email content: {email_stats.get('seeded', 0)} seeded, "
+            f"{email_stats.get('skipped', 0)} skipped.\n"
+        )

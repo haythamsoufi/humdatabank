@@ -6,7 +6,7 @@ from app.utils.datetime_helpers import utcnow
 from app.utils.organization_helpers import (
     get_org_name, get_org_short_name, get_org_copyright_year, get_org_team_email
 )
-from app.services.app_settings_service import get_email_template, get_notification_templates
+from app.services.app_settings_service import get_email_template
 import logging
 from contextlib import suppress
 from markupsafe import escape
@@ -806,44 +806,20 @@ def send_security_alert(subject=None, event_type=None, severity=None, descriptio
         return False
 
 
-def _render_email_template_metadata(text: str, **context) -> str:
-    """Replace ``{{key}}`` placeholders in email template metadata strings."""
-    if not text:
-        return ''
-    result = str(text)
-    for key, value in context.items():
-        for pattern in (f'{{{{{key}}}}}', f'{{{{ {key} }}}}'):
-            result = result.replace(pattern, str(value))
-    return result.strip()
-
-
 def _create_welcome_notification(user, org_name: str):
     """Create the in-app welcome notification linked to the welcome email."""
     from app.models.enums import NotificationType
     from app.services.notification.core import create_notification
 
-    welcome_meta = get_notification_templates().get('email_template_welcome', {})
-    render_ctx = {'org_name': org_name}
-
-    custom_title = _render_email_template_metadata(welcome_meta.get('title', ''), **render_ctx)
-    custom_message = _render_email_template_metadata(welcome_meta.get('message', ''), **render_ctx)
-
-    title_params = {'org_name': org_name}
-    message_params = {'org_name': org_name}
-    if custom_title:
-        title_params['custom_title'] = custom_title
-    if custom_message:
-        message_params['message'] = custom_message
-
     notifications = create_notification(
         user_ids=user.id,
         notification_type=NotificationType.account_welcome,
         title_key='notification.account_welcome.title',
-        title_params=title_params,
+        title_params={'org_name': org_name},
         message_key='notification.account_welcome.message',
-        message_params=message_params,
+        message_params={'org_name': org_name},
         related_url='/',
-        priority=(welcome_meta.get('priority') or 'normal').strip() or 'normal',
+        priority='normal',
         icon='fa-user-check',
         category='system',
         tags=['welcome', 'onboarding'],
@@ -1015,3 +991,67 @@ def send_welcome_email(user, existing_log=None):
     except Exception as e:
         current_app.logger.error(f"Error in send_welcome_email: {str(e)}", exc_info=True)
         return False
+
+
+def get_fds_access_request_digest_default_template() -> str:
+    """Inline fallback HTML for the FDS access request daily digest email."""
+    return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Country Access Requests</title>
+            <style>
+                body { margin: 0; padding: 0; background: #eef2f7; color: #1f2937;
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                  line-height: 1.65; -webkit-font-smoothing: antialiased; }
+                .email-outer { max-width: 960px; width: 100%; margin: 0 auto; padding: 28px 20px; box-sizing: border-box; }
+                .email-card { background: #ffffff; border: 1px solid #e2e8f0; }
+                .email-header { background: #0d9488; color: #ffffff; padding: 32px 40px; text-align: center; }
+                .email-header h1 { margin: 0 0 8px; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+                .email-header h2 { margin: 0; font-size: 18px; font-weight: 500; opacity: 0.95; }
+                .email-body { padding: 36px 40px 32px; background: #ffffff; }
+                .email-body p { margin: 0 0 16px; }
+                .email-footer { padding: 22px 40px; text-align: center; font-size: 12px; color: #64748b;
+                  background: #f8fafc; border-top: 1px solid #e2e8f0; }
+                .action-button { display: inline-block; background: #0d9488; color: #ffffff !important; padding: 12px 24px;
+                  text-decoration: none; font-weight: 600; font-size: 15px; margin: 16px 0 0; border: 1px solid #0f766e; }
+                .request-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+                .request-table th, .request-table td { border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; vertical-align: top; }
+                .request-table th { background: #f1f5f9; font-weight: 600; color: #334155; }
+                .muted { color: #64748b; font-size: 13px; }
+            </style>
+        </head>
+        <body>
+            <div class="email-outer">
+                <div class="email-card">
+                    <div class="email-header">
+                        <h1>{{ org_name }}</h1>
+                        <h2>Pending Country Access Requests</h2>
+                    </div>
+                    <div class="email-body">
+                        <p>Hello {{ user_name }},</p>
+                        <p>You have <strong>{{ request_count }}</strong> country access request(s) waiting for your review as the assigned FDS member.</p>
+                        <table class="request-table">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Country</th>
+                                    <th>Requested</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{ request_rows_html | safe }}
+                            </tbody>
+                        </table>
+                        <p><a href="{{ access_requests_url }}" class="action-button">Review access requests</a></p>
+                    </div>
+                    <div class="email-footer">
+                        <p>&copy; {{ copyright_year }} {{ org_name }}. All rights reserved.</p>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """

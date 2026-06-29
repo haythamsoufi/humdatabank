@@ -1461,6 +1461,41 @@ class TestAutoApproveAccessRequests:
                 assert svc.get_auto_approve_access_requests() is False
 
 
+class TestFdsAccessRequestDigestSettings:
+    def test_defaults_when_unset(self, app, db_session):
+        with app.app_context():
+            _clear_settings(db_session, app)
+            settings = svc.get_fds_access_request_digest_settings()
+        assert settings["enabled"] is True
+        assert settings["local_hour"] == 7
+
+    def test_set_and_get(self, app, db_session):
+        with app.app_context():
+            _clear_settings(db_session, app)
+            assert svc.set_fds_access_request_digest_settings(False, 9) is True
+            settings = svc.get_fds_access_request_digest_settings()
+        assert settings["enabled"] is False
+        assert settings["local_hour"] == 9
+
+    def test_legacy_utc_hour_key_migrated_on_read(self, app, db_session):
+        with app.app_context():
+            _clear_settings(db_session, app)
+            data = svc.read_settings()
+            data[svc.FDS_ACCESS_REQUEST_DIGEST_SETTINGS_KEY] = {
+                "enabled": True,
+                "utc_hour": 11,
+            }
+            svc.write_settings(data)
+            settings = svc.get_fds_access_request_digest_settings()
+        assert settings["local_hour"] == 11
+
+    def test_invalid_hour_raises(self, app, db_session):
+        with app.app_context():
+            _clear_settings(db_session, app)
+            with pytest.raises(ValueError):
+                svc.set_fds_access_request_digest_settings(True, 24)
+
+
 # ---------------------------------------------------------------------------
 # Email templates
 # ---------------------------------------------------------------------------
@@ -1549,15 +1584,6 @@ class TestEmailTemplates:
             with pytest.raises(ValueError):
                 svc.set_all_email_templates({"bad_key": "content"})
 
-    def test_set_all_email_templates_with_metadata(self, app, db_session):
-        with app.app_context():
-            _clear_settings(db_session, app)
-            templates = {self._VALID_KEY: {"en": "Hi"}}
-            metadata = {self._VALID_KEY: {"label": "Welcome Email", "priority": "high"}}
-            svc.set_all_email_templates(templates, metadata=metadata)
-            notif_tpl = svc.get_notification_templates()
-        assert notif_tpl[self._VALID_KEY]["label"] == "Welcome Email"
-
     def test_set_all_email_templates_string_content(self, app, db_session):
         with app.app_context():
             _clear_settings(db_session, app)
@@ -1565,18 +1591,6 @@ class TestEmailTemplates:
             svc.set_all_email_templates(templates)
             all_tpl = svc.get_all_email_templates()
         assert all_tpl[self._VALID_KEY].get("en") == "String Content"
-
-    def test_get_notification_templates(self, app, db_session):
-        with app.app_context():
-            _clear_settings(db_session, app)
-            result = svc.get_notification_templates()
-        assert self._VALID_KEY in result
-        assert "label" in result[self._VALID_KEY]
-
-    def test_get_template_metadata_alias(self, app, db_session):
-        with app.app_context():
-            _clear_settings(db_session, app)
-            assert svc.get_template_metadata() == svc.get_notification_templates()
 
 
 # ---------------------------------------------------------------------------

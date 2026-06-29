@@ -198,10 +198,10 @@ NOTIFICATION_TYPE_REGISTRY_SPECS: List[Dict[str, Any]] = [
         "emitter_active": True,
         "audiences": [],
         "description": (
-            "Custom notification from the Notifications Center (email/push broadcasts)."
+            "Custom notification from the Communication Center (email/push broadcasts)."
         ),
         "recipients": (
-            "Only users explicitly chosen when sending from the Notifications Center; "
+            "Only users explicitly chosen when sending from the Communication Center; "
             "optional email and mobile push per send. Audience toggles do not apply."
         ),
     },

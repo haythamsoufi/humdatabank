@@ -179,4 +179,73 @@ def get_email_template_preview_context(
             "org_name": org_name,
         }
 
+    if template_key == "email_template_fds_access_request_digest":
+        return {
+            "user_name": "Alex Admin",
+            "request_count": 2,
+            "request_rows_html": (
+                "<tr><td>Jamie Example</td><td>Example Country</td>"
+                "<td>2026-06-29 09:00 Geneva</td></tr>"
+                "<tr><td>Chris Sample</td><td>Sample Country</td>"
+                "<td>2026-06-28 14:30 Geneva<br><span class=\"muted\">Note: Need access for reporting</span></td></tr>"
+            ),
+            "access_requests_url": f"{base_url}/admin/access-requests",
+            "org_name": org_name,
+            "copyright_year": copyright_year,
+        }
+
     return {}
+
+
+def get_campaign_email_template_preview_context(
+    template_key: str, template_language: Optional[str] = None
+) -> Dict[str, Any]:
+    """Sample Jinja context for campaign email template preview."""
+    from app.services.campaign_email_templates_service import CAMPAIGN_EMAIL_TEMPLATE_KEYS
+
+    if template_key not in CAMPAIGN_EMAIL_TEMPLATE_KEYS:
+        return {}
+
+    base_url = (current_app.config.get("BASE_URL") or "http://localhost:5000").rstrip("/")
+    tlang = normalize_template_language(template_language)
+    org_name = get_org_name(locale=tlang)
+    copyright_year = get_org_copyright_year()
+
+    return {
+        "title": "Sample campaign subject line",
+        "message": (
+            "This is sample campaign body text for preview. "
+            "It will be replaced with the title and message you compose when sending."
+        ),
+        "user_name": "Jamie Example",
+        "user_email": "user@example.org",
+        "org_name": org_name,
+        "org_short_name": org_name,
+        "copyright_year": copyright_year,
+        "dashboard_url": f"{base_url}/",
+        "documentation_url": f"{base_url}/help/docs/",
+        "reporting_url": f"{base_url}/",
+        "action_url": f"{base_url}/",
+        "period_name": "2026 Annual Reporting",
+        "deadline_date": "30 April 2026",
+    }
+
+
+def get_campaign_compose_preview_context(
+    template_key: str,
+    *,
+    title: str = "",
+    message: str = "",
+    template_language: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Preview context using compose form title/message when provided."""
+    ctx = get_campaign_email_template_preview_context(
+        template_key, template_language=template_language
+    )
+    if not ctx:
+        return {}
+    if title:
+        ctx["title"] = title
+    if message:
+        ctx["message"] = message
+    return ctx

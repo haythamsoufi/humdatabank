@@ -1,0 +1,73 @@
+{# Per-campaign HTML editor (shown when email + template selected) — matches Settings email template workspace #}
+<div id="campaign-email-compose-editor" class="hidden email-templates-panel campaign-email-compose-panel mt-4">
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+        <div class="min-w-0 flex-1">
+            <h4 class="text-sm font-semibold text-gray-800">{{ _('Email HTML') }}</h4>
+            <p class="text-xs text-gray-500 mt-0.5">
+                {{ _('Customize the template for this send or draft. Title and message from the form are injected when previewing and sending.') }}
+                <a href="{{ url_for('settings.manage_settings') }}#campaign-emails" class="text-blue-600 hover:underline">{{ _('Edit global templates in Settings') }}</a>
+            </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 sm:justify-end sm:flex-shrink-0">
+            <button type="button"
+                    id="campaign-email-reset-html-btn"
+                    class="text-xs px-3 py-1.5 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-100">
+                <i class="fas fa-undo mr-1"></i>{{ _('Reset to template') }}
+            </button>
+        </div>
+    </div>
+
+    <div class="flex flex-wrap gap-1.5 mb-3">
+        <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ org_name }}' }}">{{ _('Org Name') }}</button>
+        <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ title }}' }}">{{ _('Title') }}</button>
+        <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ message }}' }}">{{ _('Message') }}</button>
+        <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ user_name }}' }}">{{ _('User Name') }}</button>
+        <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ dashboard_url }}' }}">{{ _('Dashboard URL') }}</button>
+    </div>
+
+    <div class="email-template-workspace rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div class="email-template-workspace-top flex flex-col gap-2.5 sm:flex-row-reverse sm:items-end sm:justify-between sm:gap-3 px-3 py-2.5 border-b border-gray-200 bg-slate-50/90">
+            <div class="flex flex-wrap items-center gap-2 sm:justify-end sm:flex-shrink-0">
+                <div class="email-template-view-toggle inline-flex rounded-md border border-gray-200 overflow-hidden shadow-sm divide-x divide-gray-200">
+                    <button type="button"
+                            class="email-template-mode-btn email-template-mode-edit-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors bg-white text-blue-600 relative z-10"
+                            data-mode="edit" aria-pressed="true">
+                        <i class="fas fa-code text-[10px]" aria-hidden="true"></i>{{ _('HTML') }}
+                    </button>
+                    <button type="button"
+                            class="email-template-mode-btn email-template-mode-visual-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                            data-mode="visual" aria-pressed="false">
+                        <i class="fas fa-magic text-[10px]" aria-hidden="true"></i>{{ _('Visual') }}
+                    </button>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 min-w-0 sm:flex-1">
+                {{ _('Use Jinja variables in HTML mode, or switch to Visual for rich editing. The Variables toolbar button shows sample rendered values.') }}
+            </p>
+        </div>
+
+        <div class="email-template-code-surface min-w-0" data-template-key="campaign-email-compose">
+            <div class="email-template-edit-pane">
+                <div class="email-template-edit-wrap overflow-hidden">
+                    <pre class="email-template-syntax-backdrop" aria-hidden="true"></pre>
+                    <textarea id="campaign-email-compose"
+                              class="email-template-body-textarea"
+                              data-current-lang="en"
+                              rows="20"
+                              spellcheck="false"
+                              placeholder="{{ _('Enter Jinja2 template HTML here…') }}"></textarea>
+                </div>
+            </div>
+            <div class="email-template-visual-pane hidden flex flex-col bg-white min-h-0">
+                <div class="email-template-visual-tinymce-wrap flex-1 min-h-0 px-3 py-2">
+                    <textarea id="campaign-email-compose-visual"
+                              class="email-template-visual-ta w-full text-sm"
+                              data-email-visual-for="campaign-email-compose"
+                              rows="1"
+                              spellcheck="true"
+                              aria-label="{{ _('Visual email editor') }}"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

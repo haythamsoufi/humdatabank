@@ -18,9 +18,11 @@ from app.services.country_service import (
     assign_country_fds_member_user,
     countries_with_fds_member_query,
     fds_member_user_display_name,
+    get_fds_member_filter_options,
     get_fds_member_user_options_for_country,
     parse_fds_member_user_id,
     resolve_fds_member_user_id_from_import,
+    user_is_fds_member,
 )
 from tests.factories import (
     create_test_admin,
@@ -316,3 +318,23 @@ class TestCountriesWithFdsMemberQuery:
             # Should be an executable SQLAlchemy query
             results = query.all()
             assert isinstance(results, list)
+
+
+@pytest.mark.unit
+class TestFdsMemberHelpers:
+    def test_user_is_fds_member(self, db_session, app, admin_user):
+        with app.app_context():
+            country = create_test_country(db_session, iso3="FDS", iso2="FD")
+            country.fds_member_user_id = admin_user.id
+            db_session.commit()
+            assert user_is_fds_member(admin_user.id) is True
+            assert user_is_fds_member(None) is False
+
+    def test_get_fds_member_filter_options(self, db_session, app, admin_user):
+        with app.app_context():
+            country = create_test_country(db_session, iso3="OPT", iso2="OP")
+            country.fds_member_user_id = admin_user.id
+            db_session.commit()
+            options = get_fds_member_filter_options()
+            ids = {opt['id'] for opt in options}
+            assert admin_user.id in ids

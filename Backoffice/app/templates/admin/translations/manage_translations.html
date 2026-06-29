@@ -589,6 +589,16 @@
 <script id="languages-json" type="application/json">{{ languages | tojson | safe }}</script>
 <script id="language-names-json" type="application/json">{{ language_names | tojson | safe }}</script>
 <script id="all-language-names-json" type="application/json">{{ ALL_LANGUAGES_DISPLAY_NAMES | tojson | safe }}</script>
+<script id="empty-translation-counts-json" type="application/json">{{ empty_translation_counts | tojson | safe }}</script>
+<script id="empty-translation-msgids-json" type="application/json">{{ empty_translation_msgids | tojson | safe }}</script>
+<script id="all-translation-msgids-json" type="application/json">{{ active_translation_msgids | tojson | safe }}</script>
+<script id="translation-lang-map-json" type="application/json">[
+{%- for lang_code in TRANSLATABLE_LANGUAGES -%}
+{%- set _lc_norm = (lang_code|string|lower|replace('-', '_')) -%}
+{%- set _lc_base = (_lc_norm.split('_')[0] if _lc_norm else lang_code) -%}
+{{ [_lc_base, _lc_base]|tojson }}{%- if not loop.last -%},{%- endif -%}
+{%- endfor -%}
+]</script>
 
 <script nonce="{{ csp_nonce() }}">
 window.manageTranslationsConfig = {

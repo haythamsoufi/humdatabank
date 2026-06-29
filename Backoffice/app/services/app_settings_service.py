@@ -1297,62 +1297,99 @@ def get_auto_approve_access_requests() -> bool:
     return value.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+# ---------------------------------------------------------------------------
+# FDS access request digest (daily email to assigned FDS members)
+# ---------------------------------------------------------------------------
+
+FDS_ACCESS_REQUEST_DIGEST_SETTINGS_KEY = "fds_access_request_digest"
+_DEFAULT_FDS_ACCESS_REQUEST_DIGEST_ENABLED = True
+_DEFAULT_FDS_ACCESS_REQUEST_DIGEST_LOCAL_HOUR = 7
+
+
+def get_fds_access_request_digest_settings() -> Dict[str, Any]:
+    """Return FDS access request digest schedule settings from System Configuration."""
+    data = read_settings()
+    raw = data.get(FDS_ACCESS_REQUEST_DIGEST_SETTINGS_KEY)
+    stored = raw if isinstance(raw, dict) else {}
+
+    enabled = _coerce_bool(stored.get("enabled"), _DEFAULT_FDS_ACCESS_REQUEST_DIGEST_ENABLED)
+    hour_raw = stored.get("local_hour", stored.get("utc_hour", _DEFAULT_FDS_ACCESS_REQUEST_DIGEST_LOCAL_HOUR))
+    try:
+        local_hour = int(hour_raw)
+    except (TypeError, ValueError):
+        local_hour = _DEFAULT_FDS_ACCESS_REQUEST_DIGEST_LOCAL_HOUR
+    local_hour = max(0, min(23, local_hour))
+
+    return {
+        "enabled": bool(enabled),
+        "local_hour": local_hour,
+    }
+
+
+def get_fds_access_request_digest_enabled() -> bool:
+    return bool(get_fds_access_request_digest_settings()["enabled"])
+
+
+def get_fds_access_request_digest_local_hour() -> int:
+    return int(get_fds_access_request_digest_settings()["local_hour"])
+
+
+def get_fds_access_request_digest_utc_hour() -> int:
+    """Deprecated alias — hour is org-local (Geneva), not UTC."""
+    return get_fds_access_request_digest_local_hour()
+
+
+def set_fds_access_request_digest_settings(
+    enabled: bool,
+    local_hour: Any,
+    user_id: Optional[int] = None,
+) -> bool:
+    """Persist FDS access request digest schedule settings."""
+    from app.utils.datetime_helpers import ORG_TIMEZONE_LABEL
+
+    try:
+        hour = int(local_hour)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"Send time must be an integer hour between 0 and 23 ({ORG_TIMEZONE_LABEL} time)."
+        )
+    if hour < 0 or hour > 23:
+        raise ValueError(
+            f"Send time must be an integer hour between 0 and 23 ({ORG_TIMEZONE_LABEL} time)."
+        )
+
+    payload = {
+        "enabled": bool(enabled),
+        "local_hour": hour,
+    }
+    data = read_settings()
+    data[FDS_ACCESS_REQUEST_DIGEST_SETTINGS_KEY] = payload
+    return write_settings(data, user_id=user_id)
+
+
 # Email Template Management Functions
-# Each template is used for both: (1) email HTML body, (2) Notifications Center pre-fill.
-# Stored under "email_templates" as: key -> { lang: content, label?, notification_title?, notification_message?, priority? }
+# Stored under "email_templates" as: key -> { lang: content }
 EMAIL_TEMPLATE_KEYS = [
     'email_template_suggestion_confirmation',
     'email_template_admin_notification',
     'email_template_security_alert',
     'email_template_welcome',
     'email_template_notification',
+    'email_template_fds_access_request_digest',
 ]
 
-# Metadata keys stored in the same email_templates[key] for Notifications Center pre-fill.
-_TEMPLATE_METADATA_KEYS = frozenset(("label", "notification_title", "notification_message", "priority"))
+# Legacy metadata keys (no longer written; ignored when reading HTML content).
+_LEGACY_TEMPLATE_METADATA_KEYS = frozenset(("label", "notification_title", "notification_message", "priority"))
 
 
 def _is_lang_key(k: str) -> bool:
-    """True if k is a language code (e.g. en, fr), not metadata."""
+    """True if k is a language code (e.g. en, fr), not legacy metadata."""
     if not k or not isinstance(k, str):
         return False
     k = k.strip().lower()
-    if k in _TEMPLATE_METADATA_KEYS:
+    if k in _LEGACY_TEMPLATE_METADATA_KEYS:
         return False
     return len(k) >= 2 and len(k) <= 5 and k.replace("-", "").replace("_", "").isalpha()
-
-
-def get_notification_templates() -> Dict[str, Dict[str, str]]:
-    """Return notification pre-fill data from the same templates used for emails.
-
-    Reads label, notification_title, notification_message, priority from each
-    email_templates[key]. Used by the Notifications Center dropdown.
-
-    Returns:
-        ``{key: {"label": ..., "title": ..., "message": ..., "priority": ...}}``
-    """
-    data = read_settings()
-    templates = data.get("email_templates", {})
-    if not isinstance(templates, dict):
-        return {}
-    result: Dict[str, Dict[str, str]] = {}
-    for key in EMAIL_TEMPLATE_KEYS:
-        val = templates.get(key)
-        if not isinstance(val, dict):
-            result[key] = {"label": "", "title": "", "message": "", "priority": "normal"}
-            continue
-        result[key] = {
-            "label": (val.get("label") or "").strip() or key.replace("_", " ").title(),
-            "title": (val.get("notification_title") or "").strip(),
-            "message": (val.get("notification_message") or "").strip(),
-            "priority": (val.get("priority") or "normal").strip() or "normal",
-        }
-    return result
-
-
-def get_template_metadata() -> Dict[str, Dict[str, str]]:
-    """Return metadata (label, notification_title, notification_message, priority) per template key."""
-    return get_notification_templates()
 
 
 def get_email_template(template_key: str, default: Optional[str] = None, language: str = "en") -> str:
@@ -1456,18 +1493,14 @@ def get_all_email_templates() -> Dict[str, Dict[str, str]]:
 
 def set_all_email_templates(
     templates: Dict,
-    metadata: Optional[Dict[str, Dict[str, str]]] = None,
     user_id: Optional[int] = None,
 ) -> bool:
     """Save all email templates to database.
 
-    Each template is stored with both HTML content (per lang) and optional
-    metadata (label, notification_title, notification_message, priority)
-    for use in the Notifications Center.
+    Each template is stored as HTML content per language key (e.g. en, fr).
 
     Args:
         templates: Dictionary mapping template keys to {lang: content} or string
-        metadata: Optional {key: {label, notification_title, notification_message, priority}}
         user_id: User ID who made the change
 
     Returns:
@@ -1497,42 +1530,6 @@ def set_all_email_templates(
         else:
             content_part = {}
 
-        meta = (metadata or {}).get(key) or {}
-        meta_part = {}
-        for m in _TEMPLATE_METADATA_KEYS:
-            v = meta.get(m)
-            if isinstance(v, str) and v.strip():
-                meta_part[m] = v.strip()
+        data["email_templates"][key] = content_part
 
-        data["email_templates"][key] = {**content_part, **meta_part}
-
-    return write_settings(data, user_id=user_id)
-
-
-def set_template_metadata(
-    metadata: Dict[str, Dict[str, str]],
-    user_id: Optional[int] = None,
-) -> bool:
-    """Persist notification metadata for email templates without changing HTML content."""
-    if not isinstance(metadata, dict):
-        raise ValueError("metadata must be a dictionary")
-
-    data = read_settings()
-    email_templates = data.get("email_templates") or {}
-    if not isinstance(email_templates, dict):
-        email_templates = {}
-
-    for key, meta in metadata.items():
-        if key not in EMAIL_TEMPLATE_KEYS or not isinstance(meta, dict):
-            continue
-        entry = email_templates.get(key)
-        if not isinstance(entry, dict):
-            entry = {"en": entry} if isinstance(entry, str) and entry.strip() else {}
-        for field in ("label", "notification_title", "notification_message", "priority"):
-            val = meta.get(field)
-            if isinstance(val, str) and val.strip():
-                entry[field] = val.strip()
-        email_templates[key] = entry
-
-    data["email_templates"] = email_templates
     return write_settings(data, user_id=user_id)

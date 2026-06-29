@@ -4,7 +4,18 @@ Unit tests for app/utils/datetime_helpers.py – 100% coverage target.
 import pytest
 from datetime import datetime, timezone, timedelta
 
-from app.utils.datetime_helpers import utcnow, isoformat_utc, ensure_utc
+from app.utils.datetime_helpers import (
+    ORG_TIMEZONE_LABEL,
+    ORG_TIMEZONE_NAME,
+    ensure_utc,
+    format_in_org_timezone,
+    get_org_timezone,
+    get_timezone,
+    isoformat_utc,
+    now_in_org_timezone,
+    org_day_start_utc,
+    utcnow,
+)
 
 
 @pytest.mark.unit
@@ -88,3 +99,34 @@ class TestEnsureUtc:
         assert result.utcoffset() == timedelta(0)
         # 09:00 UTC-3 == 12:00 UTC
         assert result.hour == 12
+
+
+@pytest.mark.unit
+class TestOrgTimezone:
+    def test_constants(self):
+        assert ORG_TIMEZONE_NAME == "Europe/Zurich"
+        assert ORG_TIMEZONE_LABEL == "Geneva"
+
+    def test_get_org_timezone(self):
+        tz = get_org_timezone()
+        assert tz is not None
+
+    def test_now_in_org_timezone_is_aware(self):
+        result = now_in_org_timezone()
+        assert result.tzinfo is not None
+
+    def test_org_day_start_utc_is_utc(self):
+        start = org_day_start_utc()
+        assert start.tzinfo == timezone.utc
+
+    def test_format_in_org_timezone_none(self):
+        assert format_in_org_timezone(None) == ""
+
+    def test_format_in_org_timezone_utc_input(self):
+        dt = datetime(2024, 1, 15, 12, 0, tzinfo=timezone.utc)
+        result = format_in_org_timezone(dt)
+        assert ORG_TIMEZONE_LABEL in result
+
+    def test_get_timezone_invalid_falls_back_to_utc(self):
+        tz = get_timezone("Not/A_Real_Zone")
+        assert tz == timezone.utc

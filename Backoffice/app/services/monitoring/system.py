@@ -52,7 +52,7 @@ class SystemMonitor:
                 # Create system log file path
                 self.log_file_path = os.path.join(logs_dir, 'system.log')
 
-                from app.utils.logging_handlers import create_rotating_file_handler
+                from app.utils.logging_handlers import create_app_log_formatter, create_rotating_file_handler
                 max_bytes = app.config.get('SYSTEM_LOG_MAX_BYTES', 10 * 1024 * 1024)  # 10MB default
                 backup_count = app.config.get('SYSTEM_LOG_BACKUP_COUNT', 5)  # Keep 5 backups
                 self.file_handler = create_rotating_file_handler(
@@ -63,10 +63,7 @@ class SystemMonitor:
                 self.file_handler.setLevel(logging.INFO)
 
                 # Create formatter for system logs
-                formatter = logging.Formatter(
-                    '[%(asctime)s] %(levelname)s: %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S'
-                )
+                formatter = create_app_log_formatter('[%(asctime)s] %(levelname)s: %(message)s')
                 self.file_handler.setFormatter(formatter)
 
                 # Create a separate logger for system metrics

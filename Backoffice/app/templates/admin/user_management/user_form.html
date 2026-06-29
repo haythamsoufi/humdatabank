@@ -439,7 +439,7 @@
                                     other=[]
                                 ) %}
                                 {% for feature in admin_features %}
-                                    {% if feature in ['Settings', 'Documents', 'Docs'] %}
+                                    {% if feature in ['Settings', 'Documents', 'Docs', 'Communication', 'Notifications'] %}
                                         {% set __ = admin_cats.general.append(feature) %}
                                     {% elif feature in ['Plugins'] %}
                                         {# Plugins should appear under General (system managers only) #}
@@ -462,7 +462,7 @@
                                 {% endfor %}
 
                                 {# Helper: render a category block using a preferred feature order (sidebar-ish) #}
-                                {% set ordered_general = ['Docs', 'Settings', 'Documents', 'Plugins'] %}
+                                {% set ordered_general = ['Docs', 'Settings', 'Documents', 'Communication', 'Notifications', 'Plugins'] %}
                                 {% set ordered_user_mgmt = ['Users'] %}
                                 {% set ordered_form_data = ['Templates', 'Assignments', 'Data Explorer', 'Validation Dashboard', 'Validation Questions', 'Validation Rules'] %}
                                 {% set ordered_website = ['Content'] %}
@@ -478,7 +478,7 @@
                                             {% for feature in ordered_list if feature in category_items %}
                                                 <div class="js-role-feature-card p-2 border border-gray-200 rounded bg-white">
                                                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                                        <div class="text-sm font-medium text-gray-800">{{ feature }}</div>
+                                                        <div class="text-sm font-medium text-gray-800">{{ _('Communication') if feature == 'Notifications' else feature }}</div>
                                                         <div class="flex flex-wrap gap-x-4 gap-y-2">
                                                             {% for subfield in rbac_groups.admin %}
                                                                 {% set raw_label = (subfield.label.text or '') %}

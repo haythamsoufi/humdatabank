@@ -63,6 +63,10 @@
                 class="{{ admin_underline_tab_btn_classes(false) }}">
           <i class="fas fa-envelope mr-1.5"></i>{{ _('Emails') }}
         </button>
+        <button type="button" role="tab" data-tab="campaign-emails"
+                class="{{ admin_underline_tab_btn_classes(false) }}">
+          <i class="fas fa-bullhorn mr-1.5"></i>{{ _('Campaign emails') }}
+        </button>
         <button type="button" role="tab" data-tab="notifications"
                 class="{{ admin_underline_tab_btn_classes(false) }}">
           <i class="fas fa-bell mr-1.5"></i>{{ _('Notifications') }}
@@ -665,23 +669,23 @@
     </div>{# /panel-branding #}
 
     {# ═══════════════ TAB: Emails ═══════════════ #}
-    <div class="settings-panel hidden" id="panel-emails">
+    <div class="settings-panel hidden email-templates-panel" id="panel-emails">
     {# NOTE: Email templates are saved via JSON (base64) to avoid WAF false positives. #}
     <input type="hidden" name="email_templates_present" value="0" />
 
     <style nonce="{{ csp_nonce() }}">
     /* Jinja / Mustache variable syntax (double braces) - highlight layer behind transparent textarea, edit tab only */
-    #panel-emails .email-template-edit-wrap {
+    .email-templates-panel .email-template-edit-wrap {
       position: relative;
       border: 1px solid #e5e7eb;
       border-radius: 0.375rem;
       border-top-left-radius: 0;
       background: #fff;
     }
-    #panel-emails .email-template-edit-wrap:focus-within {
+    .email-templates-panel .email-template-edit-wrap:focus-within {
       box-shadow: 0 0 0 1px #fff, 0 0 0 3px #3b82f6;
     }
-    #panel-emails .email-template-syntax-backdrop {
+    .email-templates-panel .email-template-syntax-backdrop {
       position: absolute;
       left: 0;
       top: 0;
@@ -701,14 +705,14 @@
       tab-size: 2;
       -moz-tab-size: 2;
     }
-    #panel-emails .email-template-jinja-var {
+    .email-templates-panel .email-template-jinja-var {
       color: #0d9488;
       font-weight: 500;
       text-decoration: underline;
       text-decoration-color: rgba(13, 148, 136, 0.45);
       text-underline-offset: 2px;
     }
-    #panel-emails .email-template-body-textarea {
+    .email-templates-panel .email-template-body-textarea {
       position: relative;
       z-index: 1;
       display: block;
@@ -730,129 +734,129 @@
       resize: vertical;
       overflow-y: auto;
     }
-    #panel-emails .email-template-body-textarea::placeholder { color: #9ca3af; }
-    #panel-emails .email-template-body-textarea:focus { outline: none; }
+    .email-templates-panel .email-template-body-textarea::placeholder { color: #9ca3af; }
+    .email-templates-panel .email-template-body-textarea:focus { outline: none; }
     /* Code + visual: keep surface height consistent when switching */
-    #panel-emails .email-template-code-surface {
+    .email-templates-panel .email-template-code-surface {
       min-height: 20rem;
     }
-    #panel-emails .email-template-workspace .email-template-edit-wrap {
+    .email-templates-panel .email-template-workspace .email-template-edit-wrap {
       border: 0;
       border-radius: 0;
       background: #fff;
     }
-    #panel-emails .email-template-workspace .email-template-edit-wrap:focus-within {
+    .email-templates-panel .email-template-workspace .email-template-edit-wrap:focus-within {
       box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.25);
     }
-    #panel-emails .email-template-workspace .email-template-edit-wrap .email-template-body-textarea,
-    #panel-emails .email-template-workspace .email-template-edit-wrap .email-template-syntax-backdrop {
+    .email-templates-panel .email-template-workspace .email-template-edit-wrap .email-template-body-textarea,
+    .email-templates-panel .email-template-workspace .email-template-edit-wrap .email-template-syntax-backdrop {
       min-height: 20rem;
     }
     /* Visual: flex children need min-height:0 so the frame does not stretch with content. Scrolling is inside the iframe (TinyMCE height fixed; do not use autoresize). */
-    #panel-emails .email-template-workspace .email-template-visual-tinymce-wrap {
+    .email-templates-panel .email-template-workspace .email-template-visual-tinymce-wrap {
       min-height: 0;
     }
-    #panel-emails .email-template-workspace .tox .tox-edit-container,
-    #panel-emails .email-template-workspace .tox .tox-edit-area,
-    #panel-emails .email-template-workspace .tox .tox-edit-area__iframe {
+    .email-templates-panel .email-template-workspace .tox .tox-edit-container,
+    .email-templates-panel .email-template-workspace .tox .tox-edit-area,
+    .email-templates-panel .email-template-workspace .tox .tox-edit-area__iframe {
       min-height: 0;
     }
-    #panel-emails .email-template-visual-ta {
+    .email-templates-panel .email-template-visual-ta {
       min-height: 0;
       width: 100%;
     }
     /* TinyMCE chrome: match workspace (slate strip, gray borders, no heavy shadow) */
-    #panel-emails .email-template-workspace .tox-tinymce {
+    .email-templates-panel .email-template-workspace .tox-tinymce {
       border: 1px solid #e5e7eb;
       border-radius: 0.375rem;
       box-shadow: none;
       background: #fff;
     }
-    #panel-emails .email-template-workspace .tox .tox-editor-header {
+    .email-templates-panel .email-template-workspace .tox .tox-editor-header {
       border: 0;
       box-shadow: none;
       padding: 0;
       background: #f8fafc;
     }
-    #panel-emails .email-template-workspace .tox .tox-menubar,
-    #panel-emails .email-template-workspace .tox .tox-menubar + * {
+    .email-templates-panel .email-template-workspace .tox .tox-menubar,
+    .email-templates-panel .email-template-workspace .tox .tox-menubar + * {
       border: 0;
     }
-    #panel-emails .email-template-workspace .tox .tox-toolbar,
-    #panel-emails .email-template-workspace .tox .tox-toolbar__overflow,
-    #panel-emails .email-template-workspace .tox .tox-toolbar__primary {
+    .email-templates-panel .email-template-workspace .tox .tox-toolbar,
+    .email-templates-panel .email-template-workspace .tox .tox-toolbar__overflow,
+    .email-templates-panel .email-template-workspace .tox .tox-toolbar__primary {
       background: #f8fafc;
       background-image: none;
       border: 0;
       border-bottom: 1px solid #e5e7eb;
       min-height: 0;
     }
-    #panel-emails .email-template-workspace .tox .tox-toolbar-overlord,
-    #panel-emails .email-template-workspace .tox .tox-editor-header,
-    #panel-emails .email-template-workspace .tox .tox-toolbar__primary {
+    .email-templates-panel .email-template-workspace .tox .tox-toolbar-overlord,
+    .email-templates-panel .email-template-workspace .tox .tox-editor-header,
+    .email-templates-panel .email-template-workspace .tox .tox-toolbar__primary {
       padding: 0.25rem 0.5rem 0.375rem;
     }
-    #panel-emails .email-template-workspace .tox .tox-toolbar__group {
+    .email-templates-panel .email-template-workspace .tox .tox-toolbar__group {
       margin: 0 0.1rem 0.15rem 0;
     }
-    #panel-emails .email-template-workspace .tox .tox-toolbar__group:not(:last-of-type) {
+    .email-templates-panel .email-template-workspace .tox .tox-toolbar__group:not(:last-of-type) {
       border-right: 0;
     }
-    #panel-emails .email-template-workspace .tox .tox-tbtn--select {
+    .email-templates-panel .email-template-workspace .tox .tox-tbtn--select {
       min-width: 4.5rem;
       max-width: 7.5rem;
     }
-    #panel-emails .email-template-workspace .tox .tox-tbtn {
+    .email-templates-panel .email-template-workspace .tox .tox-tbtn {
       border-radius: 0.25rem;
       color: #4b5563;
       min-height: 1.75rem;
       min-width: 1.6rem;
       width: auto;
     }
-    #panel-emails .email-template-workspace .tox .tox-tbtn--bespoke,
-    #panel-emails .email-template-workspace .tox .tox-tbtn[aria-label] {
+    .email-templates-panel .email-template-workspace .tox .tox-tbtn--bespoke,
+    .email-templates-panel .email-template-workspace .tox .tox-tbtn[aria-label] {
       font-size: 0.7rem;
       font-weight: 500;
     }
-    #panel-emails .email-template-workspace .tox .tox-tbtn--select .tox-tbtn__select-chevron,
-    #panel-emails .email-template-workspace .tox .tox-tbtn--select {
+    .email-templates-panel .email-template-workspace .tox .tox-tbtn--select .tox-tbtn__select-chevron,
+    .email-templates-panel .email-template-workspace .tox .tox-tbtn--select {
       line-height: 1.2;
     }
-    #panel-emails .email-template-workspace .tox .tox-tbtn--enabled,
-    #panel-emails .email-template-workspace .tox .tox-tbtn:hover {
+    .email-templates-panel .email-template-workspace .tox .tox-tbtn--enabled,
+    .email-templates-panel .email-template-workspace .tox .tox-tbtn:hover {
       background: #eff6ff;
       color: #1d4ed8;
     }
-    #panel-emails .email-template-workspace .tox .tox-tbtn[aria-pressed="true"] {
+    .email-templates-panel .email-template-workspace .tox .tox-tbtn[aria-pressed="true"] {
       background: #dbeafe;
       color: #1e40af;
     }
-    #panel-emails .email-template-workspace .tox .tox-tbtn:disabled,
-    #panel-emails .email-template-workspace .tox .tox-tbtn[aria-disabled="true"] {
+    .email-templates-panel .email-template-workspace .tox .tox-tbtn:disabled,
+    .email-templates-panel .email-template-workspace .tox .tox-tbtn[aria-disabled="true"] {
       color: #9ca3af;
     }
-    #panel-emails .email-template-workspace .tox .tox-tbtn .tox-icon {
+    .email-templates-panel .email-template-workspace .tox .tox-tbtn .tox-icon {
       fill: currentColor;
     }
-    #panel-emails .email-template-workspace .tox .tox-toolbar__group .tox-toolbar__group {
+    .email-templates-panel .email-template-workspace .tox .tox-toolbar__group .tox-toolbar__group {
       border-left: 0;
     }
-    #panel-emails .email-template-workspace .tox .tox-tbtn--select .tox-tbtn__select-label,
-    #panel-emails .email-template-workspace .tox .tox-tbtn[aria-label] {
+    .email-templates-panel .email-template-workspace .tox .tox-tbtn--select .tox-tbtn__select-label,
+    .email-templates-panel .email-template-workspace .tox .tox-tbtn[aria-label] {
       text-transform: none;
     }
-    #panel-emails .email-template-workspace .tox .tox-edit-area,
-    #panel-emails .email-template-workspace .tox .tox-edit-area::before {
+    .email-templates-panel .email-template-workspace .tox .tox-edit-area,
+    .email-templates-panel .email-template-workspace .tox .tox-edit-area::before {
       border: 0;
     }
-    #panel-emails .email-template-workspace .tox .tox-edit-area__iframe {
+    .email-templates-panel .email-template-workspace .tox .tox-edit-area__iframe {
       background: #fff;
     }
-    #panel-emails .email-template-workspace .tox-tinymce:focus-within {
+    .email-templates-panel .email-template-workspace .tox-tinymce:focus-within {
       border-color: #c7d2fe;
       box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
     }
-    #panel-emails .email-template-workspace .tox .tox-sidebar-wrap {
+    .email-templates-panel .email-template-workspace .tox .tox-sidebar-wrap {
       border: 0;
     }
     /* Context table toolbar + floating (same page has only this editor) */
@@ -881,8 +885,8 @@
       box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     }
     /* RTL language tab: editor + syntax layer (mixed HTML + Arabic) */
-    #panel-emails .email-template-edit-wrap[dir="rtl"] .email-template-body-textarea,
-    #panel-emails .email-template-edit-wrap[dir="rtl"] .email-template-syntax-backdrop {
+    .email-templates-panel .email-template-edit-wrap[dir="rtl"] .email-template-body-textarea,
+    .email-templates-panel .email-template-edit-wrap[dir="rtl"] .email-template-syntax-backdrop {
       direction: rtl;
       text-align: start;
       unicode-bidi: plaintext;
@@ -891,11 +895,11 @@
 
     {# ── Group: Email Templates ────────────────────────── #}
     <div class="mb-6">
-      <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Email & Notification Templates') }}</label>
+      <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('System Email Templates') }}</label>
       {# Placeholder names stay literal (not gettext): they match Jinja variables and should not be auto-translated. #}
       <p class="text-xs text-gray-500 mb-3">
-        {{ _('Templates are used for both system emails and the Communication Center. Each template has an HTML body (per language) and optional pre-fill fields (title, message, priority) used when composing a notification. Use Jinja2 syntax. Typical placeholder names include:') }}
-        <span class="font-mono text-xs bg-gray-100 px-1 rounded ml-0.5">org_name, org_short_name, copyright_year, user_name, submitter_name, etc.</span>
+        {{ _('HTML templates used when the system sends email automatically (registration welcome, security alerts, indicator suggestions, and the Communication Center email wrapper). Use Jinja2 syntax. Typical placeholder names include:') }}
+        <span class="font-mono text-xs bg-gray-100 px-1 rounded ml-0.5">org_name, org_short_name, copyright_year, user_name, submitter_name, title, message, etc.</span>
       </p>
 
       {% set email_templates = [
@@ -923,6 +927,11 @@
           'key': 'email_template_notification',
           'label': _('Notification Email Wrapper'),
           'description': _('HTML wrapper used when sending notifications from the Communication Center via email. Variables: title, message, org_name')
+        },
+        {
+          'key': 'email_template_fds_access_request_digest',
+          'label': _('FDS Access Request Digest'),
+          'description': _('Daily email sent to FDS members with pending country access requests for their countries. Variables: user_name, request_count, request_rows_html, access_requests_url, org_name, copyright_year')
         }
       ] %}
 
@@ -1043,40 +1052,13 @@
           </div>
         </div>
 
-        {# Notification Center pre-fill (same template, used when composing a notification) #}
-        {% set meta = current_template_metadata.get(template.key, {}) %}
-        <div class="mt-4 pt-4 border-t border-gray-200">
-          <p class="text-xs font-medium text-gray-600 mb-2">{{ _('Communication Center pre-fill') }}</p>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
-            <div>
-              <label class="block text-xs text-gray-500 mb-0.5">{{ _('Display label') }}</label>
-              <input type="text" class="template-metadata-label w-full text-sm rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}" value="{{ meta.label or '' }}" placeholder="{{ template.label }}">
-            </div>
-            <div>
-              <label class="block text-xs text-gray-500 mb-0.5">{{ _('Pre-fill priority') }}</label>
-              <select class="template-metadata-priority w-full text-sm rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}">
-                <option value="normal" {% if (meta.priority or 'normal') != 'high' %}selected{% endif %}>{{ _('Normal') }}</option>
-                <option value="high" {% if meta.priority == 'high' %}selected{% endif %}>{{ _('High') }}</option>
-              </select>
-            </div>
-          </div>
-          <div class="mb-2">
-            <label class="block text-xs text-gray-500 mb-0.5">{{ _('Pre-fill title') }}</label>
-            <input type="text" class="template-metadata-title w-full text-sm rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}" value="{{ meta.title or '' }}" placeholder="{{ _('Title when used in Communication Center') }}">
-          </div>
-          <div>
-            <label class="block text-xs text-gray-500 mb-0.5">{{ _('Pre-fill message') }}</label>
-            <textarea class="template-metadata-message w-full text-xs rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}" rows="2" placeholder="{{ _('Message body when used in Communication Center') }}">{{ meta.message or '' }}</textarea>
-          </div>
-        </div>
-
         <p class="text-xs text-gray-400 mt-2">
           {{ _('Leave empty to use system default template. Non-English versions fall back to English when empty.') }}
         </p>
       </div>
       {% endfor %}
 
-      {# Bundled defaults: below per-template editors (each includes Communication Center pre-fill) #}
+      {# Bundled defaults: below per-template editors #}
       <div class="mt-6 pt-6 border-t border-gray-200">
         <div class="relative inline-block text-left"
              id="email-templates-seed-dropdown"
@@ -1116,8 +1098,6 @@
         <p class="text-xs text-gray-500 mt-2 mb-0">{{ _('Fills or overwrites from the current release’s bundled HTML (same as the flask seed-email-templates command). The page reloads after a successful run.') }}</p>
       </div>
     </div>
-
-    <input type="hidden" id="template-metadata-json" data-settings-email-metadata-hidden="1" value="{{ current_template_metadata | tojson | forceescape }}" />
 
     {% call modal_shell('email-template-test-send-modal', _('Send test email'), max_width='max-w-md', z_index=60) %}
       <p class="text-sm text-gray-600 mb-4">
@@ -1169,6 +1149,11 @@
     {% endcall %}
 
     </div>{# /panel-emails #}
+
+    {# ═══════════════ TAB: Campaign emails ═══════════════ #}
+    <div class="settings-panel hidden email-templates-panel" id="panel-campaign-emails">
+      {% include "admin/settings/_campaign_email_templates_panel.html" %}
+    </div>{# /panel-campaign-emails #}
 
     {# ═══════════════ TAB: Notifications ═══════════════ #}
     <div class="settings-panel hidden" id="panel-notifications">
@@ -1470,6 +1455,10 @@ window.settingsPageConfig = {
         emailTestSend: {{ url_for('settings.api_settings_email_template_test_send')|tojson }},
         emailSeed: {{ url_for('settings.api_settings_email_templates_seed')|tojson }},
         emailTemplates: {{ url_for('settings.api_settings_email_templates')|tojson }},
+        campaignEmailTemplates: {{ url_for('admin_communication.api_campaign_email_templates_save')|tojson }},
+        campaignEmailPreview: {{ url_for('admin_communication.api_campaign_email_template_preview')|tojson }},
+        campaignEmailSeed: {{ url_for('admin_communication.api_campaign_email_templates_seed')|tojson }},
+        campaignEmailTestSend: {{ url_for('admin_communication.api_campaign_email_template_test_send')|tojson }},
         tinymceBase: {{ url_for('static', filename='libs/tinymce')|tojson }},
         brandingUpload: {{ url_for('settings.branding_assets_upload')|tojson }}
     },
@@ -1511,9 +1500,8 @@ window.settingsPageConfig = {
         variables: {{ _('Variables')|tojson }},
         couldNotLoadSampleValues: {{ _('Could not load sample values for this template.')|tojson }},
         addContentFirst: {{ _('Add some template content first, then show sample values.')|tojson }},
-        seedConfirmForce: {{ _('Replace every email and notification template with the built-in defaults from this version? Custom HTML and pre-fill text will be lost.')|tojson }},
+        seedConfirmForce: {{ _('Replace every system email template with the built-in defaults from this version? Custom HTML will be lost.')|tojson }},
         templateHtml: {{ _('Template HTML')|tojson }},
-        notificationPrefill: {{ _('Notification pre-fill')|tojson }},
         updatedFromDefaults: {{ _('updated from defaults')|tojson }},
         leftUnchanged: {{ _('left unchanged')|tojson }},
         enTemplateEmpty: {{ _('The English version of this template is empty. Add or save English text first, then try again.')|tojson }},

@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 """
-Seed script: populate email & notification templates (unified).
+Seed script: populate system email templates.
 
-The same templates are used for both system emails and the Notifications Center.
 Run from the Backoffice directory:
 
     python scripts/seed_email_templates.py          # seed everything
@@ -322,7 +321,7 @@ DEFAULT_EMAIL_TEMPLATES = {
 </html>"""
     },
 
-    # ── Notification Email Wrapper (used by Notifications Center) ────
+    # ── Notification Email Wrapper (used by Communication Center) ────
     "email_template_notification": {
         "en": """\
 <!DOCTYPE html>
@@ -364,65 +363,49 @@ DEFAULT_EMAIL_TEMPLATES = {
 </body>
 </html>"""
     },
-}
 
-
-# ═══════════════════════════════════════════════════════════════════════
-# Metadata for the same templates (Notifications Center pre-fill).
-# Keys must match EMAIL_TEMPLATE_KEYS; each template is used for both
-# emails and the Notifications Center dropdown.
-# ═══════════════════════════════════════════════════════════════════════
-
-DEFAULT_TEMPLATE_METADATA = {
-    "email_template_suggestion_confirmation": {
-        "label": "Indicator Suggestion Confirmation",
-        "notification_title": "Indicator Suggestion Received",
-        "notification_message": (
-            "Thank you for your indicator suggestion. We have received it "
-            "and it is under review. We will contact you at your email address "
-            "if we need more information."
-        ),
-        "priority": "normal",
-    },
-    "email_template_admin_notification": {
-        "label": "Admin Notification (New Suggestion)",
-        "notification_title": "New Suggestion for Review",
-        "notification_message": (
-            "A new indicator suggestion has been submitted and requires your review. "
-            "Use the review link in the email to open it under Admin → Indicator suggestions."
-        ),
-        "priority": "high",
-    },
-    "email_template_security_alert": {
-        "label": "Security Alert",
-        "notification_title": "Security Alert",
-        "notification_message": (
-            "A security-related event has been detected. "
-            "Please review the security dashboard for details."
-        ),
-        "priority": "high",
-    },
-    "email_template_welcome": {
-        "label": "Welcome Message",
-        "notification_title": "Welcome to {{org_name}}!",
-        "notification_message": (
-            "Welcome to {{org_name}}! We're excited to have you on board. "
-            "Your account has been successfully created. To get started, "
-            "open your dashboard, review your assignments, and use Documentation "
-            "from the main navigation for getting-started and user guides. "
-            "If you need access to additional countries, you can request access from your dashboard. "
-            "We look forward to working with you!"
-        ),
-        "priority": "normal",
-    },
-    "email_template_notification": {
-        "label": "Notification (generic)",
-        "notification_title": "Notification from {{org_name}}",
-        "notification_message": (
-            "This is an automated message from {{org_name}}. "
-            "Please review the content above for details."
-        ),
-        "priority": "normal",
+    # ── FDS Access Request Daily Digest ──────────────────────────────
+    "email_template_fds_access_request_digest": {
+        "en": """\
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Country Access Requests</title>
+    <style>body{margin:0;padding:0;background:#eef2f7;color:#1f2937;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;line-height:1.65;-webkit-font-smoothing:antialiased}.email-outer{max-width:960px;width:100%;margin:0 auto;padding:28px 20px;box-sizing:border-box}.email-card{background:#fff;border:1px solid #e2e8f0}.email-header{background:#0d9488;color:#fff;padding:32px 40px;text-align:center}.email-header h1{margin:0 0 8px;font-size:26px;font-weight:600;letter-spacing:-.02em}.email-header h2{margin:0;font-size:18px;font-weight:500;opacity:.95}.email-body{padding:36px 40px 32px;background:#fff}.email-body p{margin:0 0 16px}.email-footer{padding:22px 40px;text-align:center;font-size:12px;color:#64748b;background:#f8fafc;border-top:1px solid #e2e8f0}.action-button{display:inline-block;background:#0d9488;color:#fff!important;padding:12px 24px;text-decoration:none;font-weight:600;font-size:15px;margin:16px 0 0;border:1px solid #0f766e}.request-table{width:100%;border-collapse:collapse;margin:20px 0;font-size:14px}.request-table th,.request-table td{border:1px solid #e2e8f0;padding:10px 12px;text-align:left;vertical-align:top}.request-table th{background:#f1f5f9;font-weight:600;color:#334155}.muted{color:#64748b;font-size:13px}</style>
+</head>
+<body>
+    <div class="email-outer">
+        <div class="email-card">
+            <div class="email-header">
+                <h1>{{ org_name }}</h1>
+                <h2>Pending Country Access Requests</h2>
+            </div>
+            <div class="email-body">
+                <p>Hello {{ user_name }},</p>
+                <p>You have <strong>{{ request_count }}</strong> country access request(s) waiting for your review as the assigned FDS member.</p>
+                <table class="request-table">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Country</th>
+                            <th>Requested</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ request_rows_html | safe }}
+                    </tbody>
+                </table>
+                <p><a href="{{ access_requests_url }}" class="action-button">Review access requests</a></p>
+            </div>
+            <div class="email-footer">
+                <p>&copy; {{ copyright_year }} {{ org_name }}. All rights reserved.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>"""
     },
 }
 
@@ -432,10 +415,7 @@ DEFAULT_TEMPLATE_METADATA = {
 # ═══════════════════════════════════════════════════════════════════════
 
 def seed_templates(force: bool = False, user_id: Optional[int] = None) -> dict:
-    """Seed email + notification templates into the database.
-
-    Each template is stored once and used for both emails and the
-    Notifications Center (same template, same storage).
+    """Seed system email templates into the database.
 
     Args:
         force: If True, overwrite existing values. Otherwise skip
@@ -443,49 +423,38 @@ def seed_templates(force: bool = False, user_id: Optional[int] = None) -> dict:
         user_id: Optional user id for settings audit (e.g. admin who triggered seed).
 
     Returns:
-        ``{"email": {"seeded": N, "skipped": N}, "metadata": {"seeded": N, "skipped": N}}``
+        ``{"email": {"seeded": N, "skipped": N}}``
     """
     from app.services.app_settings_service import (
         get_all_email_templates,
-        get_template_metadata,
         set_all_email_templates,
     )
 
     stats = {
         "email": {"seeded": 0, "skipped": 0},
-        "metadata": {"seeded": 0, "skipped": 0},
     }
 
     existing_email = get_all_email_templates()
-    existing_meta = get_template_metadata()
     merged_email = dict(existing_email)
-    merged_meta = dict(existing_meta)
 
     for key in DEFAULT_EMAIL_TEMPLATES:
         lang_dict = DEFAULT_EMAIL_TEMPLATES[key]
-        meta = DEFAULT_TEMPLATE_METADATA.get(key, {})
         if key in merged_email and merged_email[key] and not force:
             stats["email"]["skipped"] += 1
             logger.info("  [skip]  template '%s' already has content", key)
         else:
             merged_email[key] = lang_dict
             stats["email"]["seeded"] += 1
-            logger.info("  [seed]  template '%s' (email + notification)", key)
-        if meta:
-            if key in merged_meta and merged_meta[key].get("title") and not force:
-                stats["metadata"]["skipped"] += 1
-            else:
-                merged_meta[key] = meta
-                stats["metadata"]["seeded"] += 1
+            logger.info("  [seed]  template '%s'", key)
 
-    set_all_email_templates(merged_email, metadata=merged_meta, user_id=user_id)
+    set_all_email_templates(merged_email, user_id=user_id)
 
     return stats
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Seed default email & notification templates (unified) into the database."
+        description="Seed default system email templates into the database."
     )
     parser.add_argument(
         "--force",
@@ -498,12 +467,11 @@ def main():
     from run import app  # noqa: E402
 
     with app.app_context():
-        logger.info("\n=== Seeding Email & Notification Templates (unified) ===\n")
+        logger.info("\n=== Seeding System Email Templates ===\n")
         stats = seed_templates(force=args.force)
         logger.info(
-            "\nDone!  Email content: %d seeded, %d skipped.  Pre-fill metadata: %d seeded, %d skipped.\n",
+            "\nDone!  Email content: %d seeded, %d skipped.\n",
             stats['email']['seeded'], stats['email']['skipped'],
-            stats['metadata']['seeded'], stats['metadata']['skipped']
         )
 
 

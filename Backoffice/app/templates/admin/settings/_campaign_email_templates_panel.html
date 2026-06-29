@@ -1,0 +1,182 @@
+{# Campaign email templates — included from manage_settings.html #}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+
+<input type="hidden" name="campaign_email_templates_present" value="0" />
+
+<div class="mb-6">
+  <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Campaign Email Templates') }}</label>
+  <p class="text-xs text-gray-500 mb-3">
+    {{ _('HTML templates for Communication Center email campaigns. Each template supports multiple languages and optional default compose text (title, message, priority) used when starting a new campaign. Variables include:') }}
+    <span class="font-mono text-xs bg-gray-100 px-1 rounded ml-0.5">title, message, user_name, org_name, dashboard_url, period_name, deadline_date, action_url, documentation_url, copyright_year</span>
+  </p>
+
+  {% set campaign_email_templates = [
+    {
+      'key': 'campaign_template_data_collection_launch',
+      'label': _('Data collection launch'),
+      'description': _('Announces that a new reporting / data collection period is open. Variables: title, message, user_name, period_name, dashboard_url, org_name, copyright_year')
+    },
+    {
+      'key': 'campaign_template_submission_reminder',
+      'label': _('Submission reminder'),
+      'description': _('Reminds focal points to complete pending assignments. Variables: title, message, user_name, dashboard_url, org_name, copyright_year')
+    },
+    {
+      'key': 'campaign_template_deadline_reminder',
+      'label': _('Deadline reminder'),
+      'description': _('Urgent reminder before a reporting deadline. Variables: title, message, user_name, deadline_date, action_url, org_name, copyright_year')
+    },
+    {
+      'key': 'campaign_template_training_announcement',
+      'label': _('Training announcement'),
+      'description': _('Invites users to a training session or webinar. Variables: title, message, user_name, action_url, org_name, copyright_year')
+    },
+    {
+      'key': 'campaign_template_general_announcement',
+      'label': _('General announcement'),
+      'description': _('Flexible template for platform updates and general messages. Variables: title, message, user_name, documentation_url, org_name, copyright_year')
+    }
+  ] %}
+
+  <div class="mb-4 max-w-3xl">
+    <label for="campaign-email-template-selector" class="block text-sm font-medium text-gray-700 mb-2">{{ _('Select Template to Edit') }}</label>
+    <select id="campaign-email-template-selector"
+            class="w-full md:w-1/2 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+      {% for template in campaign_email_templates %}
+      <option value="{{ template.key }}" {% if loop.first %}selected{% endif %}>{{ template.label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {% for template in campaign_email_templates %}
+  {% set meta = current_campaign_template_metadata.get(template.key, {}) %}
+  <div class="email-template-editor mb-8"
+       id="editor-{{ template.key }}"
+       {% if not loop.first %}style="display: none;"{% endif %}>
+
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-3">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2 flex-wrap mb-1">
+          <label class="text-sm font-medium text-gray-700">{{ template.label }}</label>
+        </div>
+        <p class="text-xs text-gray-500 mb-0">{{ template.description }}</p>
+      </div>
+      <div class="flex flex-wrap gap-1.5 sm:justify-end sm:flex-shrink-0">
+        <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ org_name }}' }}" data-target="{{ template.key }}">{{ _('Org Name') }}</button>
+        <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ title }}' }}" data-target="{{ template.key }}">{{ _('Title') }}</button>
+        <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ message }}' }}" data-target="{{ template.key }}">{{ _('Message') }}</button>
+        <button type="button" class="insert-variable-btn text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200" data-variable="{{ '{{ user_name }}' }}" data-target="{{ template.key }}">{{ _('User Name') }}</button>
+      </div>
+    </div>
+
+    <div class="email-template-workspace rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <div class="email-template-workspace-top flex flex-col gap-2.5 sm:flex-row-reverse sm:items-end sm:justify-between sm:gap-3 px-3 py-2.5 border-b border-gray-200 bg-slate-50/90">
+        <div class="flex flex-wrap items-center gap-2 sm:justify-end sm:flex-shrink-0">
+          <div class="email-template-test-send-wrap max-w-full">
+            <button type="button"
+                    class="btn btn-sm btn-primary campaign-email-template-test-send-btn inline-flex items-center gap-1.5 whitespace-nowrap"
+                    data-template-key="{{ template.key }}">
+              <i class="fas fa-paper-plane text-[10px]" aria-hidden="true"></i>{{ _('Send test email') }}
+            </button>
+          </div>
+          <div class="email-template-view-toggle inline-flex rounded-md border border-gray-200 overflow-hidden shadow-sm divide-x divide-gray-200">
+            <button type="button"
+                    class="email-template-mode-btn email-template-mode-edit-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors bg-white text-blue-600 relative z-10"
+                    data-mode="edit" data-template-key="{{ template.key }}" aria-pressed="true">
+              <i class="fas fa-code text-[10px]" aria-hidden="true"></i>{{ _('HTML') }}
+            </button>
+            <button type="button"
+                    class="email-template-mode-btn email-template-mode-visual-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors bg-gray-50 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                    data-mode="visual" data-template-key="{{ template.key }}" aria-pressed="false">
+              <i class="fas fa-magic text-[10px]" aria-hidden="true"></i>{{ _('Visual') }}
+            </button>
+          </div>
+        </div>
+        <div class="min-w-0 w-full sm:flex-1 sm:max-w-[min(100%,42rem)]">
+          {% call scroll_tab_bar(border_bottom=true, lang_tabs_for=template.key, inner_class='items-center gap-1', wrapper_class='mb-0') %}
+            {% for lang in current_supported %}
+            <button type="button"
+                    class="email-lang-tab {{ admin_underline_tab_btn_classes(lang == 'en', size='compact', extra_classes='cursor-pointer') }}"
+                    data-template-key="{{ template.key }}"
+                    data-lang="{{ lang }}">
+              {{ language_endonym(lang) or LANGUAGE_DISPLAY_NAMES.get(lang) or ALL_LANGUAGES_DISPLAY_NAMES.get(lang) or lang|upper }}
+              {% if lang == 'en' %}<span class="text-gray-400 font-normal ml-0.5">({{ _('default') }})</span>{% endif %}
+            </button>
+            {% endfor %}
+          {% endcall %}
+        </div>
+      </div>
+
+      <div class="email-template-code-surface min-w-0" data-template-key="{{ template.key }}">
+        <div class="email-template-edit-pane">
+          <div class="email-template-edit-wrap overflow-hidden">
+            <pre class="email-template-syntax-backdrop" aria-hidden="true"></pre>
+            <textarea id="{{ template.key }}"
+                      class="email-template-body-textarea"
+                      data-current-lang="en"
+                      rows="20"
+                      spellcheck="false"
+                      placeholder="{{ _('Enter Jinja2 template HTML here...') }}">{{ current_campaign_email_templates.get(template.key, {}).get('en', '') }}</textarea>
+          </div>
+          <input type="hidden"
+                 id="{{ template.key }}-translations"
+                 data-campaign-email-template-hidden="1"
+                 value="{{ current_campaign_email_templates.get(template.key, {}) | tojson | forceescape }}" />
+        </div>
+        <div class="email-template-visual-pane hidden flex flex-col bg-white min-h-0" data-template-key="{{ template.key }}">
+          <div class="email-template-visual-tinymce-wrap flex-1 min-h-0 px-3 py-2">
+            <textarea id="{{ template.key }}-visual"
+                      class="email-template-visual-ta w-full text-sm"
+                      data-email-visual-for="{{ template.key }}"
+                      rows="1"
+                      spellcheck="true"
+                      aria-label="{{ _('Visual email editor') }}"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-4 pt-4 border-t border-gray-200">
+      <p class="text-xs font-medium text-gray-600 mb-2">{{ _('Communication Center compose defaults') }}</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+        <div>
+          <label class="block text-xs text-gray-500 mb-0.5">{{ _('Display label') }}</label>
+          <input type="text" class="campaign-template-metadata-label w-full text-sm rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}" value="{{ meta.label or '' }}" placeholder="{{ template.label }}">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-0.5">{{ _('Default priority') }}</label>
+          <select class="campaign-template-metadata-priority w-full text-sm rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}">
+            <option value="normal" {% if (meta.priority or 'normal') != 'high' %}selected{% endif %}>{{ _('Normal') }}</option>
+            <option value="high" {% if meta.priority == 'high' %}selected{% endif %}>{{ _('High') }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="mb-2">
+        <label class="block text-xs text-gray-500 mb-0.5">{{ _('Default title') }}</label>
+        <input type="text" class="campaign-template-metadata-title w-full text-sm rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}" value="{{ meta.title or '' }}">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-0.5">{{ _('Default message') }}</label>
+        <textarea class="campaign-template-metadata-message w-full text-xs rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}" rows="2">{{ meta.message or '' }}</textarea>
+      </div>
+    </div>
+
+    <p class="text-xs text-gray-400 mt-2">{{ _('Non-English versions fall back to English when empty.') }}</p>
+  </div>
+  {% endfor %}
+
+  <div class="mt-6 pt-6 border-t border-gray-200">
+    <div class="relative inline-block text-left" id="campaign-email-templates-seed-dropdown" role="group">
+      <button type="button" id="campaign-email-templates-seed-toggle" class="btn btn-secondary btn-sm inline-flex items-center gap-2">
+        <i class="fas fa-seedling text-xs" aria-hidden="true"></i>{{ _('Load starter templates') }}
+      </button>
+      <div id="campaign-email-templates-seed-menu" class="hidden origin-top-left absolute left-0 mt-2 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20">
+        <button type="button" id="campaign-email-templates-seed-gaps-btn" class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50">{{ _('Fill empty only') }}</button>
+        <button type="button" id="campaign-email-templates-seed-force-btn" class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-t border-gray-100">{{ _('Reset all to built-in defaults') }}</button>
+      </div>
+    </div>
+    <p class="text-xs text-gray-500 mt-2 mb-0">{{ _('Starter templates include data collection launch, reminders, and announcements.') }}</p>
+  </div>
+</div>
+
+<input type="hidden" id="campaign-template-metadata-json" data-campaign-email-metadata-hidden="1" value="{{ current_campaign_template_metadata | tojson | forceescape }}" />

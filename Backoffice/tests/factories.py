@@ -243,7 +243,7 @@ def create_test_admin(db_session, **kwargs):
     _grant(role_id, "admin.translations.view")
     _grant(role_id, "admin.translations.edit")
     _grant(role_id, "admin.translations.manage")
-    _grant(role_id, "admin.notifications.manage")
+    _grant(role_id, "admin.communication.manage")
     _grant(role_id, "admin.assignments.public_submissions.manage")
     _grant(role_id, "admin.assignments.entities.manage")
     _grant(role_id, "admin.assignments.create")

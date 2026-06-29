@@ -19,7 +19,13 @@ from app.services.notification_service import NotificationService
 from app.services.email.client import send_email as send_email_message
 from app.services.email.delivery import log_email_attempt, mark_email_sent, mark_email_failed
 from app.services.authorization_service import AuthorizationService
-from app.services.app_settings_service import get_notification_templates, get_email_template
+from app.services.app_settings_service import get_email_template
+from app.services.campaign_email_templates_service import (
+    CAMPAIGN_EMAIL_TEMPLATE_KEYS,
+    get_all_campaign_email_templates,
+    get_campaign_compose_templates,
+    set_all_campaign_email_templates,
+)
 from app.utils.organization_helpers import get_org_name
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.error_handling import handle_json_view_exception
@@ -55,7 +61,7 @@ def _latest_admin_notifications_by_user(user_ids, within_seconds=30):
 
 
 @bp.route("/communication/center", methods=["GET"])
-@permission_required("admin.notifications.manage")
+@permission_required("admin.communication.manage")
 def communication_center():
     """Render the admin Communication Center page"""
     # Get all notification types for the filter dropdown
@@ -236,12 +242,12 @@ def communication_center():
             'recipients_count': len(campaign.user_ids) if campaign.user_ids else 0
         })
 
-    # Load notification quick-templates from the database
-    notification_templates = get_notification_templates()
-
     failed_email_delivery_count = EmailDeliveryLog.query.filter(
         cast(EmailDeliveryLog.status, String).in_(('failed', 'retrying'))
     ).count()
+
+    campaign_compose_templates = get_campaign_compose_templates()
+    campaign_email_templates = get_all_campaign_email_templates()
 
     return render_template(
         "admin/communication/center.html",
@@ -252,13 +258,14 @@ def communication_center():
         per_page=total_count,
         total_pages=1 if total_count else 0,
         campaigns=campaigns_data,
-        notification_templates=notification_templates,
         failed_email_delivery_count=failed_email_delivery_count,
+        campaign_compose_templates=campaign_compose_templates,
+        campaign_email_templates=campaign_email_templates,
     )
 
 
 @bp.route("/communication/registry")
-@permission_required("admin.notifications.manage")
+@permission_required("admin.communication.manage")
 def communication_registry():
     """
     Read-only catalog of NotificationType keys: labels, priorities, TTL, and descriptions.
@@ -367,7 +374,7 @@ def communication_registry():
 
 @bp.route("/api/notifications/send", methods=["POST"])
 @csrf.exempt  # Exempt from CSRF protection for API endpoints used by mobile app
-@permission_required("admin.notifications.manage")
+@permission_required("admin.communication.manage")
 def api_send_notifications():
     """Send custom notifications (email and/or push) to selected users (admin only)"""
     enforce_api_or_csrf_protection()
@@ -689,7 +696,7 @@ def api_send_notifications():
 
 
 @bp.route("/api/notifications/search-users", methods=["GET"])
-@permission_required("admin.notifications.manage")
+@permission_required("admin.communication.manage")
 def api_search_users():
     """Search users by name or email for notification sending"""
     try:
@@ -725,7 +732,7 @@ def api_search_users():
 
 
 @bp.route("/api/notifications/all", methods=["GET"])
-@permission_required("admin.notifications.manage")
+@permission_required("admin.communication.manage")
 def api_get_all_notifications():
     """Get all notifications from all users (admin view)"""
     try:
@@ -845,7 +852,7 @@ def api_get_all_notifications():
 
 
 @bp.route("/api/notifications/campaigns/<int:campaign_id>/recipients", methods=["GET"])
-@permission_required("admin.notifications.manage")
+@permission_required("admin.communication.manage")
 def api_get_campaign_recipients(campaign_id):
     """Get recipients for a notification campaign"""
     try:
@@ -897,7 +904,7 @@ def api_get_campaign_recipients(campaign_id):
 
 
 @bp.route("/api/communications/email-delivery/<int:log_id>/retry", methods=["POST"])
-@permission_required("admin.notifications.manage")
+@permission_required("admin.communication.manage")
 def api_retry_email_delivery(log_id):
     """Manually retry a failed email delivery log."""
     enforce_api_or_csrf_protection()
@@ -913,7 +920,7 @@ def api_retry_email_delivery(log_id):
 
 
 @bp.route("/api/communications/email-delivery/retry-failed", methods=["POST"])
-@permission_required("admin.notifications.manage")
+@permission_required("admin.communication.manage")
 def api_retry_failed_email_deliveries():
     """Manually retry all failed email delivery logs (or a subset by log id)."""
     enforce_api_or_csrf_protection()
@@ -937,7 +944,7 @@ def api_retry_failed_email_deliveries():
 
 
 @bp.route("/api/communications/email-delivery/<int:log_id>/cancel", methods=["POST"])
-@permission_required("admin.notifications.manage")
+@permission_required("admin.communication.manage")
 def api_cancel_email_delivery(log_id):
     """Dismiss a failed email delivery log without retrying."""
     enforce_api_or_csrf_protection()
@@ -953,7 +960,7 @@ def api_cancel_email_delivery(log_id):
 
 
 @bp.route("/api/communications/email-delivery/cancel-failed", methods=["POST"])
-@permission_required("admin.notifications.manage")
+@permission_required("admin.communication.manage")
 def api_cancel_failed_email_deliveries():
     """Dismiss failed email delivery logs (all or selected log ids)."""
     enforce_api_or_csrf_protection()
@@ -976,3 +983,225 @@ def api_cancel_failed_email_deliveries():
         return json_ok(success=result['failure_count'] == 0, message=message, **result)
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+def _b64decode_utf8(value: str) -> str:
+    import base64
+
+    if not value or not isinstance(value, str):
+        return ""
+    try:
+        return base64.b64decode(value).decode("utf-8")
+    except Exception:
+        return ""
+
+
+@bp.route("/api/communication/campaign-email-templates", methods=["POST"])
+@permission_required("admin.settings.manage")
+def api_campaign_email_templates_save():
+    """Save campaign email templates (HTML + compose defaults)."""
+    from flask_login import current_user
+
+    data = get_json_safe()
+    templates_b64 = data.get("email_templates_b64") or {}
+    metadata = data.get("template_metadata") or {}
+
+    if templates_b64 and not isinstance(templates_b64, dict):
+        return json_bad_request("email_templates_b64 must be an object")
+    if metadata and not isinstance(metadata, dict):
+        return json_bad_request("template_metadata must be an object")
+
+    email_templates_data: dict = {}
+    for tpl_key in CAMPAIGN_EMAIL_TEMPLATE_KEYS:
+        raw_lang_map = templates_b64.get(tpl_key) if isinstance(templates_b64, dict) else None
+        if not raw_lang_map or not isinstance(raw_lang_map, dict):
+            email_templates_data[tpl_key] = {}
+            continue
+        decoded_langs: dict = {}
+        for lang, encoded in raw_lang_map.items():
+            if not isinstance(lang, str) or not lang.strip():
+                continue
+            decoded = _b64decode_utf8(encoded)
+            if decoded and decoded.strip():
+                decoded_langs[lang.strip()] = decoded
+        email_templates_data[tpl_key] = decoded_langs
+
+    user_id = current_user.id if current_user.is_authenticated else None
+    try:
+        ok = set_all_campaign_email_templates(
+            email_templates_data,
+            metadata=metadata,
+            user_id=user_id,
+        )
+    except ValueError:
+        return json_bad_request("Invalid campaign email template data.")
+    except Exception as e:
+        current_app.logger.warning("Save campaign email templates failed: %s", e, exc_info=True)
+        return json_server_error("Failed to save campaign email templates.")
+    return json_ok(success=ok)
+
+
+@bp.route("/api/communication/campaign-email-template-preview", methods=["POST"])
+@permission_required("admin.settings.manage")
+def api_campaign_email_template_preview():
+    from app.routes.admin.settings import _parse_email_template_api_request_body
+    from app.services.email.preview_context import get_campaign_email_template_preview_context
+    from app.services.email.rendering import (
+        render_admin_email_template_for_preview,
+        sanitize_admin_email_html_for_api,
+    )
+
+    data, parse_err = _parse_email_template_api_request_body()
+    if parse_err:
+        return parse_err
+    template_key = (data.get("template_key") or "").strip()
+    html_b64 = data.get("html_b64")
+    template_language = data.get("template_language") or data.get("lang")
+    if template_key not in CAMPAIGN_EMAIL_TEMPLATE_KEYS:
+        return json_bad_request("Invalid or missing template_key.")
+    if not isinstance(html_b64, str) or not html_b64.strip():
+        return json_bad_request("html_b64 is required.")
+
+    source = _b64decode_utf8(html_b64)
+    if not source.strip():
+        return json_bad_request("Template content is empty or could not be decoded.")
+
+    context = get_campaign_email_template_preview_context(template_key, template_language=template_language)
+    rendered, err = render_admin_email_template_for_preview(source, **context)
+    if err:
+        return json_bad_request(err)
+    return json_ok(html=sanitize_admin_email_html_for_api(rendered))
+
+
+@bp.route("/api/communication/campaign-email-compose-preview", methods=["POST"])
+@permission_required("admin.communication.manage")
+def api_campaign_email_compose_preview():
+    """Preview campaign email HTML using compose form title and message."""
+    from app.routes.admin.settings import _parse_email_template_api_request_body
+    from app.services.email.preview_context import get_campaign_compose_preview_context
+    from app.services.email.rendering import (
+        render_admin_email_template_for_preview,
+        sanitize_admin_email_html_for_api,
+    )
+
+    data, parse_err = _parse_email_template_api_request_body()
+    if parse_err:
+        return parse_err
+    template_key = (data.get("template_key") or "").strip()
+    html_b64 = data.get("html_b64")
+    template_language = data.get("template_language") or data.get("lang")
+    title = (data.get("title") or "").strip()
+    message = (data.get("message") or "").strip()
+    if template_key not in CAMPAIGN_EMAIL_TEMPLATE_KEYS:
+        return json_bad_request("Invalid or missing template_key.")
+    if not isinstance(html_b64, str) or not html_b64.strip():
+        return json_bad_request("html_b64 is required.")
+
+    source = _b64decode_utf8(html_b64)
+    if not source.strip():
+        return json_bad_request("Template content is empty or could not be decoded.")
+
+    context = get_campaign_compose_preview_context(
+        template_key,
+        title=title,
+        message=message,
+        template_language=template_language,
+    )
+    rendered, err = render_admin_email_template_for_preview(source, **context)
+    if err:
+        return json_bad_request(err)
+    return json_ok(html=sanitize_admin_email_html_for_api(rendered))
+
+
+@bp.route("/api/communication/campaign-email-templates/seed", methods=["POST"])
+@permission_required("admin.settings.manage")
+def api_campaign_email_templates_seed():
+    from flask_login import current_user
+    from scripts.seed_campaign_email_templates import seed_campaign_templates
+
+    data = get_json_safe() or {}
+    force = bool(data.get("force"))
+    try:
+        stats = seed_campaign_templates(
+            force=force,
+            user_id=current_user.id if current_user.is_authenticated else None,
+        )
+    except Exception as e:
+        current_app.logger.warning("Campaign email template seed failed: %s", e, exc_info=True)
+        return json_server_error("Failed to seed campaign email templates.")
+    return json_ok(stats=stats, force=force)
+
+
+@bp.route("/api/communication/campaign-email-template-test-send", methods=["POST"])
+@permission_required("admin.settings.manage")
+def api_campaign_email_template_test_send():
+    """Send a test email using a campaign template (unsaved editor content)."""
+    from app.routes.admin.settings import (
+        _parse_email_template_api_request_body,
+        _personalize_email_preview_context_for_user,
+        _resolve_email_template_test_recipient,
+        _response_for_email_test_send_failure,
+        _message_for_email_test_send_failure,
+    )
+    from app.services.email.client import send_email
+    from app.services.email.preview_context import (
+        get_campaign_email_template_preview_context,
+        normalize_template_language,
+    )
+    from app.services.email.rendering import (
+        render_admin_email_template_for_preview,
+        sanitize_admin_email_html_for_api,
+    )
+
+    data, parse_err = _parse_email_template_api_request_body()
+    if parse_err:
+        return parse_err
+
+    recipient_email, recipient_user, recipient_err = _resolve_email_template_test_recipient(data)
+    if recipient_err:
+        return recipient_err
+
+    template_key = (data.get("template_key") or "").strip()
+    html_b64 = data.get("html_b64")
+    template_language = data.get("template_language") or data.get("lang")
+    if template_key not in CAMPAIGN_EMAIL_TEMPLATE_KEYS:
+        return json_bad_request("Invalid or missing template_key.")
+    if not isinstance(html_b64, str) or not html_b64.strip():
+        return json_bad_request("html_b64 is required.")
+
+    source = _b64decode_utf8(html_b64)
+    if not source.strip():
+        return json_bad_request("Template content is empty or could not be decoded.")
+
+    tlang = normalize_template_language(template_language)
+    context = get_campaign_email_template_preview_context(template_key, template_language=template_language)
+    if recipient_user is not None:
+        context = _personalize_email_preview_context_for_user(context, recipient_user)
+    rendered, err = render_admin_email_template_for_preview(source, **context)
+    if err:
+        return json_bad_request(err)
+    if not (rendered or "").strip():
+        return json_bad_request("Rendered message is empty.")
+
+    meta = get_campaign_compose_templates().get(template_key) or {}
+    label = (meta.get("label") or template_key).strip()
+    subject = f"[Test email] {label} ({tlang})"
+
+    try:
+        failure: list = []
+        ok = send_email(
+            subject=subject,
+            recipients=[recipient_email],
+            html=sanitize_admin_email_html_for_api(rendered),
+            sender=current_app.config.get("MAIL_DEFAULT_SENDER"),
+            _failure_info=failure,
+        )
+    except Exception as e:
+        current_app.logger.warning("Campaign email template test send failed: %s", e, exc_info=True)
+        return json_server_error("Failed to send email. Check mail configuration and logs.")
+
+    if not ok:
+        msg = _message_for_email_test_send_failure(failure)
+        return _response_for_email_test_send_failure(failure, msg)
+
+    return json_ok(success=True, sent_to=recipient_email, subject=subject)

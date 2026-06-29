@@ -3,6 +3,9 @@ set -e
 
 cd /app
 
+# Log timestamps and localtime()-based tools use Geneva (Europe/Zurich) unless overridden.
+export TZ="${APP_TIMEZONE:-Europe/Zurich}"
+
 echo "=========================================="
 echo "Container entrypoint started"
 echo "Time: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"

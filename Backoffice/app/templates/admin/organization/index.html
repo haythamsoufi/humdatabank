@@ -410,6 +410,9 @@ try {
             {% endfor %}
             fds_member_user_id: {{ country.fds_member_user_id|tojson|safe }},
             fds_member_name: {{ ((country.fds_member_user.name or country.fds_member_user.email) if country.fds_member_user else '')|tojson|safe }},
+            fds_member_email: {{ ((country.fds_member_user.email or '') if country.fds_member_user else '')|tojson|safe }},
+            fds_member_active: {{ (country.fds_member_user.active if country.fds_member_user else True)|tojson|safe }},
+            fds_member_profile_color: {{ ((country.fds_member_user.profile_color if country.fds_member_user and country.fds_member_user.profile_color else '') or '')|tojson|safe }},
             edit_url: {{ ('/admin/countries/' ~ country.id ~ '/data')|tojson|safe if can_manage_countries else '""' }},
             delete_url: {{ (url_for(delete_endpoint_name if delete_endpoint_name is defined else 'system_admin.delete_country', country_id=country.id))|tojson|safe if can_manage_countries else '""' }},
             delete_confirm: "{{ _('Are you sure you want to delete this country? This action cannot be undone and may fail if the country is in use.') }}"
@@ -539,16 +542,28 @@ try {
         {
             field: 'fds_member_name',
             headerName: {{ _("FDS Member") | tojson }},
-            width: 180,
-            minWidth: 150,
-            maxWidth: 240,
+            width: 220,
+            minWidth: 180,
+            maxWidth: 300,
             filter: 'agTextColumnFilter',
             sortable: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' },
             valueGetter: function(params) {
                 return params.data && params.data.fds_member_name ? params.data.fds_member_name : '';
             },
             cellRenderer: function(params) {
-                return params.value ? params.value : '<span class="text-gray-400">-</span>';
+                if (!params.data || !params.data.fds_member_user_id) {
+                    return '<span class="text-gray-400">-</span>';
+                }
+                return AgGridRenderers.userHoverCell(params, {
+                    idField: 'fds_member_user_id',
+                    nameField: 'fds_member_name',
+                    emailField: 'fds_member_email',
+                    activeField: 'fds_member_active',
+                    profileColorField: 'fds_member_profile_color',
+                    fallbackLabel: {{ _("Unknown User") | tojson }},
+                    showEmail: true
+                });
             }
         },
         {

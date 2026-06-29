@@ -784,7 +784,7 @@ def api_notification_action(notification_id):
 
 @bp.route("/api/schedule", methods=["POST"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_schedule_notification():
     """Schedule a notification to be sent at a future time"""
     try:
@@ -1175,7 +1175,7 @@ def device_heartbeat():
 
 @bp.route("/api/admin/assignments", methods=["GET"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_admin_assignments():
     """List assignments for attachment dropdown (admin only). Returns id and label (template name - period)."""
     try:
@@ -1204,7 +1204,7 @@ def api_admin_assignments():
 
 @bp.route("/api/admin/send-push", methods=["POST"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 @limiter.limit("10 per minute")
 def api_admin_send_push():
     """Send custom push notification to selected users (admin only)"""
@@ -1227,6 +1227,9 @@ def api_admin_send_push():
         send_push = data.get('send_push', False)  # Default to False - must be explicitly enabled
         category = data.get('category')  # Optional category
         tags = data.get('tags')  # Optional tags (list or comma-separated string)
+        from app.services.campaign_email_templates_service import normalize_campaign_email_template_key
+        email_template_key = normalize_campaign_email_template_key(data.get('email_template_key'))
+        email_template_html = (data.get('email_template_html') or '').strip() or None
 
         # Validation - All validation should be done server-side for security
         # At least one delivery method must be selected
@@ -1262,6 +1265,11 @@ def api_admin_send_push():
 
         if priority not in ['normal', 'high']:
             priority = 'normal'
+
+        if email_template_key and not send_email:
+            error_message = 'Email template can only be used when email delivery is enabled.'
+            flash_if_html(error_message, 'danger')
+            return json_bad_request(error_message, success=False, flash_message=error_message, flash_category='danger')
 
         # Validate redirect URL if provided (only relevant if push is enabled)
         if send_push and redirect_url:
@@ -1381,6 +1389,7 @@ def api_admin_send_push():
         # since admin is explicitly sending to them
         # For admin messages, store custom title and message directly (they're user-generated content)
         # We still use translation keys for structure, but the actual content comes from admin input
+        use_campaign_email_template = bool(send_email and email_template_key)
         notifications = create_notification(
             user_ids=valid_user_ids,
             notification_type=NotificationType.admin_message,
@@ -1393,9 +1402,22 @@ def api_admin_send_push():
             respect_preferences=False,  # Admin explicitly chose these users, so send regardless of preferences
             override_email_preferences=override_preferences,  # Allow admin to override email preferences
             # IMPORTANT: this route controls delivery; create_notification should not auto-send push/email
-            send_email_notifications=send_email,
+            send_email_notifications=send_email and not use_campaign_email_template,
             send_push_notifications=False
         )
+
+        if use_campaign_email_template and notifications:
+            from app.services.email.campaign_broadcast import send_campaign_broadcast_emails_for_users
+
+            send_campaign_broadcast_emails_for_users(
+                user_ids=valid_user_ids,
+                template_key=email_template_key,
+                title=title,
+                message=message,
+                notification_type=NotificationType.admin_message,
+                override_preferences=override_preferences,
+                template_html_override=email_template_html,
+            )
 
         if not notifications:
             error_message = 'No notifications created. All notifications were duplicates - the same notification was already sent to the selected user(s) within the last few minutes. Please wait a moment before sending again, or modify the title/message to create a unique notification.'
@@ -1589,7 +1611,7 @@ def api_admin_send_push():
 
 @bp.route("/api/admin/users/search", methods=["GET"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_admin_search_users():
     """Search users for admin push notification (admin only)"""
     try:
@@ -1635,7 +1657,7 @@ def api_admin_search_users():
 
 @bp.route("/api/admin/users/devices/check", methods=["POST"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_admin_check_user_devices():
     """Check device registration status for selected users (admin only)"""
     try:
@@ -1697,7 +1719,7 @@ def api_admin_check_user_devices():
 
 @bp.route("/api/admin/users/bulk", methods=["GET"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_admin_get_users_bulk():
     """Get users by role, country, and/or entity for bulk selection (admin only)
     All filters are combined with AND logic - users must match all selected filters"""
@@ -2019,7 +2041,7 @@ def api_admin_get_users_bulk():
 
 @bp.route("/api/admin/countries", methods=["GET"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_admin_get_countries():
     """Get list of countries for bulk selection (admin only)"""
     try:
@@ -2042,7 +2064,7 @@ def api_admin_get_countries():
 
 @bp.route("/api/admin/entity-types", methods=["GET"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_admin_get_entity_types():
     """Get list of entity types for bulk selection (admin only)"""
     try:
@@ -2063,7 +2085,7 @@ def api_admin_get_entity_types():
 
 @bp.route("/api/admin/assignments", methods=["GET"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_admin_get_assignments():
     """Get list of assignments (AssignedForm) for bulk selection (admin only)"""
     try:
@@ -2092,7 +2114,7 @@ def api_admin_get_assignments():
 
 @bp.route("/api/admin/templates", methods=["GET"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_admin_get_templates():
     """Get list of form templates for bulk selection (admin only)"""
     try:
@@ -2120,7 +2142,7 @@ def api_admin_get_templates():
 
 @bp.route("/api/admin/all", methods=["GET"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_admin_get_all_notifications():
     """Get all notifications across all users (admin only)"""
     try:
@@ -2224,7 +2246,7 @@ def api_admin_get_all_notifications():
 
 @bp.route("/api/admin/campaigns", methods=["GET"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_get_campaigns():
     """Get all notification campaigns (admin only)"""
     try:
@@ -2276,7 +2298,7 @@ def api_get_campaigns():
 
 @bp.route("/api/admin/campaigns", methods=["POST"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_create_campaign():
     """Create a new notification campaign (admin only)"""
     try:
@@ -2320,6 +2342,15 @@ def api_create_campaign():
 
         # Create campaign
         user_selection_type = data.get('user_selection_type', 'manual')
+        from app.services.campaign_email_templates_service import (
+            merge_campaign_email_attachment_config,
+        )
+
+        attachment_config = merge_campaign_email_attachment_config(
+            data.get('attachment_config') if user_selection_type == 'entity' else None,
+            email_template_key=data.get('email_template_key'),
+            email_template_html=data.get('email_template_html'),
+        )
 
         # Validate entity-based campaigns
         if user_selection_type == 'entity':
@@ -2353,7 +2384,7 @@ def api_create_campaign():
             user_filters=data.get('user_filters') if user_selection_type == 'filter' else None,
             entity_selection=data.get('entity_selection') if user_selection_type == 'entity' else None,
             email_distribution_rules=data.get('email_distribution_rules') if user_selection_type == 'entity' else None,
-            attachment_config=data.get('attachment_config') if user_selection_type == 'entity' else None,
+            attachment_config=attachment_config,
             created_by=current_user.id
         )
 
@@ -2391,11 +2422,16 @@ def api_create_campaign():
 
 @bp.route("/api/admin/campaigns/<int:campaign_id>", methods=["GET"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_get_campaign(campaign_id):
     """Get a specific campaign (admin only)"""
     try:
         campaign = NotificationCampaign.query.get_or_404(campaign_id)
+
+        from app.services.campaign_email_templates_service import (
+            get_email_template_html_from_attachment_config,
+            get_email_template_key_from_attachment_config,
+        )
 
         return json_ok(
             success=True,
@@ -2421,6 +2457,12 @@ def api_get_campaign(campaign_id):
                 'user_filters': campaign.user_filters,
                 'entity_selection': campaign.entity_selection,
                 'email_distribution_rules': campaign.email_distribution_rules,
+                'email_template_key': get_email_template_key_from_attachment_config(
+                    campaign.attachment_config
+                ),
+                'email_template_html': get_email_template_html_from_attachment_config(
+                    campaign.attachment_config
+                ),
                 'created_by': campaign.created_by,
                 'created_at': campaign.created_at.isoformat() if campaign.created_at else None,
                 'updated_at': campaign.updated_at.isoformat() if campaign.updated_at else None,
@@ -2436,7 +2478,7 @@ def api_get_campaign(campaign_id):
 
 @bp.route("/api/admin/campaigns/<int:campaign_id>", methods=["PUT"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_update_campaign(campaign_id):
     """Update a campaign (admin only)"""
     try:
@@ -2493,6 +2535,21 @@ def api_update_campaign(campaign_id):
             campaign.user_ids = data['user_ids']
         if 'user_filters' in data:
             campaign.user_filters = data.get('user_filters')
+        if (
+            'email_template_key' in data
+            or 'email_template_html' in data
+            or 'attachment_config' in data
+        ):
+            from app.services.campaign_email_templates_service import (
+                merge_campaign_email_attachment_config,
+            )
+
+            base_config = data.get('attachment_config', campaign.attachment_config)
+            campaign.attachment_config = merge_campaign_email_attachment_config(
+                base_config,
+                email_template_key=data.get('email_template_key'),
+                email_template_html=data.get('email_template_html'),
+            )
 
         try:
             campaign.updated_at = utcnow()
@@ -2524,7 +2581,7 @@ def api_update_campaign(campaign_id):
 
 @bp.route("/api/admin/campaigns/<int:campaign_id>", methods=["DELETE"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_delete_campaign(campaign_id):
     """Delete a campaign (admin only)"""
     try:
@@ -2557,7 +2614,7 @@ def api_delete_campaign(campaign_id):
 
 @bp.route("/api/admin/campaigns/<int:campaign_id>/send", methods=["POST"])
 @login_required
-@permission_required('admin.notifications.manage')
+@permission_required('admin.communication.manage')
 def api_send_campaign(campaign_id):
     """Send a campaign immediately (admin only)"""
     try:
@@ -2825,6 +2882,14 @@ def api_send_campaign(campaign_id):
                 )
 
         # Send notifications using existing admin send endpoint logic
+        from app.services.campaign_email_templates_service import (
+            get_email_template_html_from_attachment_config,
+            get_email_template_key_from_attachment_config,
+        )
+
+        email_template_key = get_email_template_key_from_attachment_config(campaign.attachment_config)
+        email_template_html = get_email_template_html_from_attachment_config(campaign.attachment_config) or None
+        use_campaign_email_template = bool(campaign.send_email and email_template_key)
         notifications = create_notification(
             user_ids=user_ids,
             notification_type=NotificationType.admin_message,
@@ -2839,9 +2904,22 @@ def api_send_campaign(campaign_id):
             category=campaign.category,
             tags=campaign.tags,
             # IMPORTANT: this route controls delivery; avoid duplicate push/email side effects
-            send_email_notifications=campaign.send_email,
+            send_email_notifications=campaign.send_email and not use_campaign_email_template,
             send_push_notifications=False
         )
+
+        if use_campaign_email_template and notifications:
+            from app.services.email.campaign_broadcast import send_campaign_broadcast_emails_for_users
+
+            send_campaign_broadcast_emails_for_users(
+                user_ids=user_ids,
+                template_key=email_template_key,
+                title=campaign.title,
+                message=campaign.message,
+                notification_type=NotificationType.admin_message,
+                override_preferences=campaign.override_preferences,
+                template_html_override=email_template_html,
+            )
 
         # Send push notifications if enabled
         if campaign.send_push:

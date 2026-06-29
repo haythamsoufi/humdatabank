@@ -111,7 +111,6 @@ class TestManageSettingsGet:
             "set_ai_beta_access_settings": MagicMock(return_value=True),
             "get_all_email_templates": MagicMock(return_value={}),
             "set_all_email_templates": MagicMock(return_value=True),
-            "get_template_metadata": MagicMock(return_value={}),
             "get_notification_priorities": MagicMock(return_value={}),
             "set_notification_priorities": MagicMock(return_value=True),
             "get_merged_notification_audience_rules": MagicMock(return_value={}),
@@ -446,20 +445,6 @@ class TestEmailTemplates:
     def test_save_email_templates_unauthenticated(self, client, db_session):
         resp = client.post("/admin/api/settings/email-templates", follow_redirects=False)
         assert resp.status_code == 302
-
-    def test_save_email_templates_with_metadata(self, logged_in_client, db_session, app):
-        with _auth(), \
-             patch("app.services.app_settings_service.set_all_email_templates", return_value=True), \
-             patch("app.services.app_settings_service.set_template_metadata", return_value=True, create=True):
-            resp = logged_in_client.post(
-                "/admin/api/settings/email-templates",
-                json={
-                    "email_templates_b64": self._valid_b64_templates(),
-                    "template_metadata": {"email_template_welcome": {"subject": "Welcome"}},
-                },
-                headers=_json_headers(),
-            )
-        assert resp.status_code in (200, 400)
 
 
 # ---------------------------------------------------------------------------

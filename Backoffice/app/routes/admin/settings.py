@@ -677,7 +677,6 @@ def manage_settings():
         set_ai_beta_access_settings,
         get_all_email_templates,
         set_all_email_templates,
-        get_template_metadata,
         get_notification_priorities,
         set_notification_priorities,
         get_merged_notification_audience_rules,
@@ -711,7 +710,13 @@ def manage_settings():
     org_name_translations_json = json.dumps(org_name_translations or {}, ensure_ascii=False)
     org_short_name_translations_json = json.dumps(org_short_name_translations or {}, ensure_ascii=False)
     current_email_templates = get_all_email_templates()
-    current_template_metadata = get_template_metadata()
+
+    from app.services.campaign_email_templates_service import (
+        get_all_campaign_email_templates,
+        get_campaign_template_metadata,
+    )
+    current_campaign_email_templates = get_all_campaign_email_templates()
+    current_campaign_template_metadata = get_campaign_template_metadata()
 
     # Translations for list-type settings
     doc_types_translations = get_list_translations("document_types")
@@ -1060,19 +1065,9 @@ def manage_settings():
                             email_templates_data[tpl_key] = {}
                     else:
                         email_templates_data[tpl_key] = {}
-                template_metadata = {}
-                metadata_raw = data.get("template_metadata_json", "").strip()
-                if metadata_raw:
-                    try:
-                        template_metadata = json.loads(metadata_raw)
-                        if not isinstance(template_metadata, dict):
-                            template_metadata = {}
-                    except (json.JSONDecodeError, ValueError):
-                        template_metadata = {}
                 try:
                     templates_ok = set_all_email_templates(
                         email_templates_data,
-                        metadata=template_metadata,
                         user_id=user_id,
                     )
                 except ValueError as e:
@@ -1337,7 +1332,8 @@ def manage_settings():
         org_name_en_value=org_name_en_value,
         org_short_name_en_value=org_short_name_en_value,
         current_email_templates=current_email_templates,
-        current_template_metadata=current_template_metadata,
+        current_campaign_email_templates=current_campaign_email_templates,
+        current_campaign_template_metadata=current_campaign_template_metadata,
         doc_types_translations=doc_types_translations,
         age_groups_translations=age_groups_translations,
         sex_categories_translations=sex_categories_translations,
@@ -1428,8 +1424,7 @@ def api_settings_email_templates():
 
     Expects JSON:
       {
-        "email_templates_b64": { "<tpl_key>": { "<lang>": "<base64 utf-8 html>" } },
-        "template_metadata": { ... }   // optional
+        "email_templates_b64": { "<tpl_key>": { "<lang>": "<base64 utf-8 html>" } }
       }
     """
     from flask_login import current_user
@@ -1437,12 +1432,9 @@ def api_settings_email_templates():
 
     data = get_json_safe()
     templates_b64 = data.get("email_templates_b64") or {}
-    metadata = data.get("template_metadata") or {}
 
     if templates_b64 and not isinstance(templates_b64, dict):
         return json_bad_request("email_templates_b64 must be an object")
-    if metadata and not isinstance(metadata, dict):
-        return json_bad_request("template_metadata must be an object")
 
     user_id = current_user.id if current_user.is_authenticated else None
 
@@ -1466,7 +1458,7 @@ def api_settings_email_templates():
         email_templates_data[tpl_key] = decoded_langs
 
     try:
-        ok = set_all_email_templates(email_templates_data, metadata=metadata, user_id=user_id)
+        ok = set_all_email_templates(email_templates_data, user_id=user_id)
     except ValueError as e:
         current_app.logger.warning("Email template validation failed: %s", e)
         return json_bad_request("Invalid email template data.")
@@ -1552,6 +1544,7 @@ _EMAIL_TEMPLATE_TEST_LABELS = {
     "email_template_security_alert": "Security Alert",
     "email_template_welcome": "Welcome Email",
     "email_template_notification": "Notification Email Wrapper",
+    "email_template_fds_access_request_digest": "FDS Access Request Digest",
 }
 
 _EMAIL_TEST_SEND_FAILURE_MESSAGES = {

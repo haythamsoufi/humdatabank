@@ -1,0 +1,201 @@
+/* Shared email template editor (Settings + Communication Center compose) */
+.email-templates-panel .email-template-edit-wrap {
+  position: relative;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  border-top-left-radius: 0;
+  background: #fff;
+}
+.email-templates-panel .email-template-edit-wrap:focus-within {
+  box-shadow: 0 0 0 1px #fff, 0 0 0 3px #3b82f6;
+}
+.email-templates-panel .email-template-syntax-backdrop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  z-index: 0;
+  margin: 0;
+  padding: 0.5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow: hidden;
+  pointer-events: none;
+  color: #1f2937;
+  tab-size: 2;
+  -moz-tab-size: 2;
+}
+.email-templates-panel .email-template-jinja-var {
+  color: #0d9488;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: rgba(13, 148, 136, 0.45);
+  text-underline-offset: 2px;
+}
+.email-templates-panel .email-template-body-textarea {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  min-height: 20rem;
+  max-height: 70vh;
+  box-sizing: border-box;
+  padding: 0.5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  tab-size: 2;
+  -moz-tab-size: 2;
+  color: transparent;
+  caret-color: #111827;
+  background: transparent;
+  border: 0;
+  border-radius: inherit;
+  resize: vertical;
+  overflow-y: auto;
+}
+.email-templates-panel .email-template-body-textarea::placeholder { color: #9ca3af; }
+.email-templates-panel .email-template-body-textarea:focus { outline: none; }
+.email-templates-panel .email-template-code-surface {
+  min-height: 20rem;
+}
+.email-templates-panel .email-template-workspace .email-template-edit-wrap {
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+}
+.email-templates-panel .email-template-workspace .email-template-edit-wrap:focus-within {
+  box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+.email-templates-panel .email-template-workspace .email-template-edit-wrap .email-template-body-textarea,
+.email-templates-panel .email-template-workspace .email-template-edit-wrap .email-template-syntax-backdrop {
+  min-height: 20rem;
+}
+.email-templates-panel .email-template-workspace .email-template-visual-tinymce-wrap {
+  min-height: 0;
+}
+.email-templates-panel .email-template-workspace .tox .tox-edit-container,
+.email-templates-panel .email-template-workspace .tox .tox-edit-area,
+.email-templates-panel .email-template-workspace .tox .tox-edit-area__iframe {
+  min-height: 0;
+}
+.email-templates-panel .email-template-visual-ta {
+  min-height: 0;
+  width: 100%;
+}
+.email-templates-panel .email-template-workspace .tox-tinymce {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  box-shadow: none;
+  background: #fff;
+}
+.email-templates-panel .email-template-workspace .tox .tox-editor-header {
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  background: #f8fafc;
+}
+.email-templates-panel .email-template-workspace .tox .tox-menubar,
+.email-templates-panel .email-template-workspace .tox .tox-menubar + * {
+  border: 0;
+}
+.email-templates-panel .email-template-workspace .tox .tox-toolbar,
+.email-templates-panel .email-template-workspace .tox .tox-toolbar__overflow,
+.email-templates-panel .email-template-workspace .tox .tox-toolbar__primary {
+  background: #f8fafc;
+  background-image: none;
+  border: 0;
+  border-bottom: 1px solid #e5e7eb;
+  min-height: 0;
+}
+.email-templates-panel .email-template-workspace .tox .tox-toolbar-overlord,
+.email-templates-panel .email-template-workspace .tox .tox-editor-header,
+.email-templates-panel .email-template-workspace .tox .tox-toolbar__primary {
+  padding: 0.25rem 0.5rem 0.375rem;
+}
+.email-templates-panel .email-template-workspace .tox .tox-toolbar__group {
+  margin: 0 0.1rem 0.15rem 0;
+}
+.email-templates-panel .email-template-workspace .tox .tox-toolbar__group:not(:last-of-type) {
+  border-left: 0;
+}
+.email-templates-panel .email-template-workspace .tox .tox-tbtn--select {
+  min-width: 4.5rem;
+  max-width: 7.5rem;
+}
+.email-templates-panel .email-template-workspace .tox .tox-tbtn {
+  border-radius: 0.25rem;
+  color: #4b5563;
+  min-height: 1.75rem;
+  min-width: 1.6rem;
+  width: auto;
+}
+.email-templates-panel .email-template-workspace .tox .tox-tbtn--bespoke,
+.email-templates-panel .email-template-workspace .tox .tox-tbtn[aria-label] {
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+.email-templates-panel .email-template-workspace .tox .tox-tbtn--enabled,
+.email-templates-panel .email-template-workspace .tox .tox-tbtn:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.email-templates-panel .email-template-workspace .tox .tox-tbtn[aria-pressed="true"] {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.email-templates-panel .email-template-workspace .tox .tox-tbtn:disabled,
+.email-templates-panel .email-template-workspace .tox .tox-tbtn[aria-disabled="true"] {
+  color: #9ca3af;
+}
+.email-templates-panel .email-template-workspace .tox .tox-tbtn .tox-icon {
+  fill: currentColor;
+}
+.email-templates-panel .email-template-workspace .tox .tox-edit-area,
+.email-templates-panel .email-template-workspace .tox .tox-edit-area::before {
+  border: 0;
+}
+.email-templates-panel .email-template-workspace .tox .tox-edit-area__iframe {
+  background: #fff;
+}
+.email-templates-panel .email-template-workspace .tox-tinymce:focus-within {
+  border-color: #c7d2fe;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+.email-templates-panel .email-template-workspace .tox .tox-sidebar-wrap {
+  border: 0;
+}
+.tox.tox-silver-sink .tox-toolbar--overflow,
+.tox .tox-pop .tox-toolbar--overflow,
+.tox .tox-pop .tox-toolbar--primary,
+.tox .tox-tinymce-aux .tox-pop .tox-toolbar--overflow {
+  background: #f8fafc !important;
+  background-image: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.tox.tox-silver-sink .tox-menu,
+.tox .tox-tinymce-aux .tox-menu {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+}
+.tox .tox-dialog,
+.tox .tox-dialog__header {
+  border-color: #e5e7eb;
+  border-radius: 0.375rem;
+}
+.tox .tox-dialog {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+.email-templates-panel .email-template-edit-wrap[dir="rtl"] .email-template-body-textarea,
+.email-templates-panel .email-template-edit-wrap[dir="rtl"] .email-template-syntax-backdrop {
+  direction: rtl;
+  text-align: start;
+  unicode-bidi: plaintext;
+}

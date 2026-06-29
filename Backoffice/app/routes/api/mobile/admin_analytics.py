@@ -527,7 +527,7 @@ def audit_trail():
 
 @mobile_bp.route('/admin/notifications/send', methods=['POST'])
 @mobile_rate_limit(requests_per_minute=5)
-@mobile_auth_required(permission='admin.notifications.manage')
+@mobile_auth_required(permission='admin.communication.manage')
 def admin_send_notification():
     """Send push/email notification to selected users (admin)."""
     data = get_json_safe()

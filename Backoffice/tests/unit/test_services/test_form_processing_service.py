@@ -84,6 +84,40 @@ def _make_form_item(
     return fi
 
 
+def _make_real_form_item(**kwargs):
+    """Unattached FormItem for tests that need real @property semantics (not MagicMock)."""
+    from app.models.form_items import FormItem
+
+    item = FormItem.__new__(FormItem)
+    FormItem._sa_class_manager.setup_instance(item)
+    item.item_type = kwargs.get("item_type", "indicator")
+    item.type = kwargs.get("type", "number")
+    item.label = kwargs.get("label", "Test Indicator")
+    item.order = kwargs.get("order", 1.0)
+    item.unit = kwargs.get("unit", "people")
+    item.indicator_unit_id = kwargs.get("indicator_unit_id", None)
+    item.measurement_unit = kwargs.get("measurement_unit", None)
+    item.indicator_bank = kwargs.get("indicator_bank", None)
+    item.relevance_condition = kwargs.get("relevance_condition", None)
+    item.validation_condition = kwargs.get("validation_condition", None)
+    item.label_translations = kwargs.get("label_translations", None)
+    item.definition_translations = kwargs.get("definition_translations", None)
+    item.config = kwargs.get("config", {
+        "is_required": False,
+        "layout_column_width": 12,
+        "layout_break_after": False,
+        "allowed_disaggregation_options": ["total"],
+        "age_groups_config": None,
+        "default_value": None,
+        "allow_data_not_available": False,
+        "allow_not_applicable": False,
+        "allow_disability_questions": False,
+        "indirect_reach": False,
+        "privacy": "ifrc_network",
+    })
+    return item
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # slugify_age_group
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1491,6 +1525,27 @@ class TestSetupFormItemForTemplate:
                  patch("app.get_locale", return_value="en"):
                 result = FormItemProcessor.setup_form_item_for_template(fi, None)
         assert result.display_label == "My Indicator"
+
+    def test_indicator_caches_supports_disaggregation_on_real_form_item(self, app):
+        """Real FormItem has a read-only property; cache must use __dict__, not assignment."""
+        from app.services.form_processing_service import FormItemProcessor
+
+        mock_unit = MagicMock()
+        mock_unit.allows_disaggregation = True
+        item = _make_real_form_item(
+            indicator_unit_id=1,
+            measurement_unit=mock_unit,
+        )
+
+        with app.app_context():
+            with patch("app.utils.form_localization.get_translation_key", return_value="en"), \
+                 patch("app.get_locale", return_value="en"):
+                FormItemProcessor.setup_form_item_for_template(item, None)
+
+        cached = item.__dict__.get("supports_disaggregation")
+        assert isinstance(cached, bool)
+        assert cached is True
+        assert item.supports_disaggregation is True
 
     def test_question_full_setup(self, app):
         from app.services.form_processing_service import FormItemProcessor

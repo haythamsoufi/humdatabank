@@ -58,6 +58,14 @@ class DebugManager:
 
         self.verbose_debug = bool(log_level <= logging.DEBUG)
 
+        from app.utils.logging_handlers import configure_process_org_timezone, create_app_log_formatter
+
+        configure_process_org_timezone()
+
+        formatter = create_app_log_formatter(
+            '[%(asctime)s] %(levelname)s in %(name)s: %(message)s',
+        )
+
         if self.verbose_debug:
             app.logger.info("Terminal logging: DEBUG enabled (LOG_MODE=debug / LOG_LEVEL=DEBUG)")
         elif log_level <= logging.INFO:
@@ -65,10 +73,6 @@ class DebugManager:
         else:
             app.logger.info("Terminal logging: quiet mode enabled (LOG_MODE=quiet / LOG_LEVEL>=WARNING)")
 
-        formatter = logging.Formatter(
-            '[%(asctime)s] %(levelname)s in %(name)s: %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
         managed_handler_attr = "_hdb_managed_logging_handler"
 
         def _mark_managed(handler):
@@ -123,7 +127,7 @@ class DebugManager:
         application_file_handler = None
         if app.config.get('APPLICATION_LOG_FILE_ENABLED', True):
             try:
-                from app.utils.logging_handlers import create_rotating_file_handler
+                from app.utils.logging_handlers import create_app_log_formatter, create_rotating_file_handler
 
                 # Create logs directory if it doesn't exist
                 logs_dir = os.path.join(app.instance_path, 'logs')

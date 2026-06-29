@@ -188,3 +188,33 @@ def assign_country_fds_member_user(country: Country, user_id: int | None) -> Non
 def countries_with_fds_member_query():
     """Countries query with FDS member user eager-loaded for admin tables."""
     return Country.query.options(joinedload(Country.fds_member_user))
+
+
+def user_is_fds_member(user_id: int | None) -> bool:
+    """True when the user is assigned as FDS member for at least one country."""
+    if not user_id:
+        return False
+    return (
+        Country.query.filter(
+            Country.fds_member_user_id == int(user_id),
+        ).limit(1).first()
+        is not None
+    )
+
+
+def get_fds_member_filter_options() -> list[dict]:
+    """Distinct FDS members assigned on countries, sorted by display name."""
+    rows = (
+        User.query.filter(User.active.is_(True))
+        .join(Country, Country.fds_member_user_id == User.id)
+        .order_by(User.name, User.email)
+        .distinct()
+        .all()
+    )
+    return [
+        {
+            'id': user.id,
+            'label': fds_member_user_display_name(user),
+        }
+        for user in rows
+    ]

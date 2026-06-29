@@ -218,6 +218,64 @@ class TestAccessRequestsListRoute:
         resp = _admin_get(logged_in_admin_client, "/admin/access-requests")
         assert resp.status_code == 200
 
+    def test_access_requests_includes_team_member_filter(self, logged_in_admin_client, db_session, admin_user):
+        from tests.factories import create_test_country
+
+        country = create_test_country(db_session, iso3="TMF", iso2="TM")
+        country.fds_member_user_id = admin_user.id
+        db_session.commit()
+
+        resp = _admin_get(logged_in_admin_client, "/admin/access-requests")
+        assert resp.status_code == 200
+        assert b'id="fdsMemberFilter"' in resp.data
+        assert b'Team member' in resp.data or b'team member' in resp.data.lower()
+
+    def test_digest_settings_modal_visible_to_system_manager(self, logged_in_sm_client, db_session):
+        resp = _admin_get(logged_in_sm_client, "/admin/access-requests")
+        assert resp.status_code == 200
+        assert b'id="openFdsDigestSettingsBtn"' in resp.data
+        assert b'id="fds-access-request-digest-modal"' in resp.data
+        assert b'id="fds-access-request-digest-local-hour"' in resp.data
+        assert b'digest-settings' in resp.data
+
+    def test_digest_settings_modal_hidden_from_non_system_manager(self, logged_in_admin_client, db_session):
+        resp = _admin_get(logged_in_admin_client, "/admin/access-requests")
+        assert resp.status_code == 200
+        assert b'id="openFdsDigestSettingsBtn"' not in resp.data
+        assert b'id="fds-access-request-digest-modal"' not in resp.data
+        assert b'id="fds-access-request-digest-utc-hour"' not in resp.data
+        assert b'digest-settings' not in resp.data
+
+    def test_digest_settings_post_requires_system_manager(self, logged_in_admin_client, db_session):
+        resp = _admin_post(
+            logged_in_admin_client,
+            "/admin/access-requests/digest-settings",
+            data={
+                "fds_access_request_digest_enabled": "1",
+                "fds_access_request_digest_local_hour": "8",
+            },
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+
+    def test_digest_settings_post_system_manager(self, logged_in_sm_client, db_session, app):
+        with app.app_context():
+            from app.services.app_settings_service import get_fds_access_request_digest_settings
+
+            resp = _admin_post(
+                logged_in_sm_client,
+                "/admin/access-requests/digest-settings",
+                data={
+                    "fds_access_request_digest_enabled": "1",
+                    "fds_access_request_digest_local_hour": "8",
+                },
+                follow_redirects=False,
+            )
+            assert resp.status_code == 302
+            settings = get_fds_access_request_digest_settings()
+            assert settings["enabled"] is True
+            assert settings["local_hour"] == 8
+
     def test_regular_user_denied(self, client, test_user, app):
         login_session(client, test_user.id)
         resp = _admin_get(client, "/admin/access-requests", follow_redirects=False)

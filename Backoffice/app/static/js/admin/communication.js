@@ -14,6 +14,8 @@ class AdminNotifications {
         this.userSearchTimeout = null;
         this.csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         this.editingCampaignId = null; // Track which campaign is being edited
+        this.composeChannelTab = 'email'; // Active compose tab when email + push both enabled
+        this.composeLoadedCampaignId = null; // Set after Load from campaign succeeds
         this.deviceStatusData = null; // Store device status data for modal
         // Removed filters - AG Grid handles filtering now
 
@@ -39,6 +41,16 @@ class AdminNotifications {
         this.init();
     }
 
+    _initCampaignEmailComposeEditor() {
+        if (typeof window.CampaignEmailComposeEditor !== 'undefined' && window.communicationPageConfig) {
+            window.CampaignEmailComposeEditor.init(window.communicationPageConfig);
+        }
+    }
+
+    _getCampaignEmailTemplateHtmlForPayload() {
+        return window.CampaignEmailComposeEditor?.getHtmlForPayload?.() ?? null;
+    }
+
     /**
      * Format RBAC role codes for display.
      * Input: array of role codes (strings)
@@ -58,6 +70,7 @@ class AdminNotifications {
     init() {
         // Ensure campaign edit fields are not "required" when hidden (prevents HTML5 validation errors)
         this.hideCampaignEditFields();
+        this._initCampaignEmailComposeEditor();
 
         // Tab strip: _initNotificationsCenterTabs() wires #communication-center-tabs (AdminUnderlineTabs, same as manage_settings)
 
@@ -202,41 +215,41 @@ class AdminNotifications {
         document.getElementById('redirect-type-app')?.addEventListener('click', () => this.handleRedirectTypeChange('app'));
         document.getElementById('redirect-type-custom')?.addEventListener('click', () => this.handleRedirectTypeChange('custom'));
 
-        // Get delivery method checkboxes (used for both redirect section and preview)
         const sendEmailCheckbox = document.getElementById('send-email');
         const sendPushCheckbox = document.getElementById('send-push');
-        const redirectSection = document.getElementById('redirect-section');
 
-        // Toggle redirect section visibility based on push notification checkbox
-        if (sendPushCheckbox && redirectSection) {
-            sendPushCheckbox.addEventListener('change', (e) => {
-                if (e.target.checked) {
-                    redirectSection.classList.remove('hidden');
-                } else {
-                    redirectSection.classList.add('hidden');
-                    // Clear redirect values when push is unchecked
-                    document.getElementById('admin-notification-redirect-screen').value = '';
-                    document.getElementById('admin-notification-redirect-url').value = '';
-                }
-                // Also update preview when checkbox changes
-                this.updatePreview();
-            });
-            // Initial state - hide if push is not checked
-            if (!sendPushCheckbox.checked) {
-                redirectSection.classList.add('hidden');
-            }
-        }
+        const onDeliveryChange = () => {
+            this.syncComposeFieldVisibility();
+            this.syncCampaignEmailTemplateWrapVisibility();
+            this.updatePreview();
+        };
+        sendEmailCheckbox?.addEventListener('change', onDeliveryChange);
+        sendPushCheckbox?.addEventListener('change', onDeliveryChange);
 
         // Preview updates
         const titleInput = document.getElementById('admin-notification-title');
         const messageInput = document.getElementById('admin-notification-message');
+        const prioritySelect = document.getElementById('admin-notification-priority');
 
         if (titleInput) titleInput.addEventListener('input', () => this.updatePreview());
         if (messageInput) messageInput.addEventListener('input', () => this.updatePreview());
-        if (sendEmailCheckbox) sendEmailCheckbox.addEventListener('change', () => this.updatePreview());
-        if (sendPushCheckbox) sendPushCheckbox.addEventListener('change', () => this.updatePreview());
+        if (prioritySelect) prioritySelect.addEventListener('change', () => this.updatePreview());
+        this.initComposeChannelTabs();
+        this.syncComposeFieldVisibility();
+        this.syncClearLoadCampaignButton();
 
-        // Toggle preview
+        const campaignEmailTemplateSelect = document.getElementById('campaign-email-template-select');
+        campaignEmailTemplateSelect?.addEventListener('change', (e) => {
+            const key = e.target.value?.trim();
+            if (key) {
+                this.applyCampaignEmailTemplateSelection(e.target);
+                window.CampaignEmailComposeEditor?.loadTemplate(key, '');
+            } else {
+                window.CampaignEmailComposeEditor?.loadTemplate('', '');
+            }
+        });
+
+        // Toggle preview (legacy — section removed; no-op if absent)
         document.getElementById('toggle-preview')?.addEventListener('click', () => {
             const preview = document.getElementById('notification-preview');
             const content = document.getElementById('preview-content');
@@ -341,28 +354,42 @@ class AdminNotifications {
             }
         });
 
-        // Template dropdown
-        const templateSelect = document.getElementById('notification-template-select');
-        if (templateSelect) {
-            templateSelect.addEventListener('change', (e) => {
-                const templateType = e.target.value;
-                console.log('Template dropdown changed:', templateType);
-                if (templateType) {
-                    this.loadTemplate(templateType);
-                    // Reset dropdown after loading (with small delay to ensure template is applied)
-                    setTimeout(() => {
-                        e.target.value = '';
-                    }, 100);
-                }
-            });
-            console.log('Template dropdown event listener attached');
-        } else {
-            console.error('Template select element not found');
-        }
+        // Load from campaign modal
+        document.getElementById('open-load-campaign-modal')?.addEventListener('click', () => {
+            this.openLoadCampaignModal();
+        });
+        document.getElementById('close-load-campaign-modal')?.addEventListener('click', () => {
+            this.closeLoadCampaignModal();
+        });
+        document.getElementById('cancel-load-campaign-modal')?.addEventListener('click', () => {
+            this.closeLoadCampaignModal();
+        });
+        document.getElementById('confirm-load-campaign')?.addEventListener('click', () => {
+            this.handleLoadCampaignConfirm();
+        });
 
-        // Clear template button
-        document.getElementById('clear-template')?.addEventListener('click', () => {
-            this.resetForm();
+        const loadCampaignModal = document.getElementById('load-campaign-modal');
+        loadCampaignModal?.addEventListener('click', (e) => {
+            if (e.target.id === 'load-campaign-modal') {
+                this.closeLoadCampaignModal();
+            }
+        });
+
+        const loadCampaignSelect = document.getElementById('load-campaign-select');
+        loadCampaignSelect?.addEventListener('change', (e) => {
+            const option = e.target.options[e.target.selectedIndex];
+            if (option?.value) {
+                const includeRecipientsCheckbox = document.getElementById('load-campaign-include-recipients');
+                if (includeRecipientsCheckbox) {
+                    const status = option.getAttribute('data-status') || '';
+                    includeRecipientsCheckbox.checked = (status === 'draft' || status === 'scheduled');
+                }
+            }
+            this.syncClearLoadCampaignButton();
+        });
+
+        document.getElementById('clear-send-form')?.addEventListener('click', () => {
+            this.clearLoadCampaignSelection();
         });
 
         // Campaign modal handlers
@@ -405,6 +432,10 @@ class AdminNotifications {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && campaignModal && !campaignModal.classList.contains('hidden')) {
                 this.closeCampaignModal();
+            }
+            const loadModal = document.getElementById('load-campaign-modal');
+            if (e.key === 'Escape' && loadModal && !loadModal.classList.contains('hidden')) {
+                this.closeLoadCampaignModal();
             }
         });
 
@@ -485,6 +516,13 @@ class AdminNotifications {
         if (hash && ['view-all', 'send', 'campaigns'].includes(hash) && document.getElementById(`panel-${hash}`)) {
             this.switchTab(hash);
         }
+        document.querySelectorAll('.communication-tab-link').forEach((link) => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tab = link.getAttribute('data-tab');
+                if (tab) this.switchTab(tab);
+            });
+        });
     }
 
     renderBackendFlash(message, category = 'info') {
@@ -894,44 +932,284 @@ class AdminNotifications {
         }
     }
 
+    initComposeChannelTabs() {
+        document.querySelectorAll('.compose-channel-tab').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const channel = btn.getAttribute('data-channel');
+                if (channel) this.setComposeChannelTab(channel);
+            });
+        });
+    }
+
+    setComposeChannelTab(channel) {
+        const next = channel === 'push' ? 'push' : 'email';
+        this.composeChannelTab = next;
+        document.querySelectorAll('.compose-channel-tab').forEach((btn) => {
+            const active = btn.getAttribute('data-channel') === next;
+            if (window.AdminUnderlineTabs?.setStripButtonActive) {
+                window.AdminUnderlineTabs.setStripButtonActive(btn, active);
+            }
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        this.applyComposeChannelPanels();
+    }
+
+    applyComposeChannelPanels() {
+        const sendEmail = document.getElementById('send-email')?.checked;
+        const sendPush = document.getElementById('send-push')?.checked;
+        const both = !!(sendEmail && sendPush);
+        const tabsWrap = document.getElementById('compose-channel-tabs-wrap');
+        const emailPane = document.getElementById('compose-pane-email');
+        const pushPane = document.getElementById('compose-pane-push');
+        const emailSlot = document.getElementById('compose-email-text-slot');
+        const pushSlot = document.getElementById('compose-push-text-slot');
+        const titleWrap = document.getElementById('title-field-wrap');
+        const messageWrap = document.getElementById('message-field-wrap');
+
+        tabsWrap?.classList.toggle('hidden', !both);
+
+        if (!sendEmail && !sendPush) {
+            titleWrap?.classList.add('hidden');
+            messageWrap?.classList.add('hidden');
+            emailPane?.classList.add('hidden');
+            pushPane?.classList.add('hidden');
+            return;
+        }
+
+        titleWrap?.classList.remove('hidden');
+        messageWrap?.classList.remove('hidden');
+
+        if (both) {
+            if (this.composeChannelTab === 'push' && !sendPush) {
+                this.composeChannelTab = 'email';
+            }
+            if (this.composeChannelTab === 'email' && !sendEmail) {
+                this.composeChannelTab = 'push';
+            }
+            emailPane?.classList.toggle('hidden', this.composeChannelTab !== 'email');
+            pushPane?.classList.toggle('hidden', this.composeChannelTab !== 'push');
+            const slot = this.composeChannelTab === 'push' ? pushSlot : emailSlot;
+            slot?.append(titleWrap, messageWrap);
+            document.querySelectorAll('.compose-channel-tab').forEach((btn) => {
+                const active = btn.getAttribute('data-channel') === this.composeChannelTab;
+                window.AdminUnderlineTabs?.setStripButtonActive(btn, active);
+                btn.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+        } else if (sendEmail) {
+            this.composeChannelTab = 'email';
+            emailPane?.classList.remove('hidden');
+            pushPane?.classList.add('hidden');
+            emailSlot?.append(titleWrap, messageWrap);
+        } else {
+            this.composeChannelTab = 'push';
+            emailPane?.classList.add('hidden');
+            pushPane?.classList.remove('hidden');
+            pushSlot?.append(titleWrap, messageWrap);
+        }
+
+        const sendEmailForLabels = both ? (this.composeChannelTab === 'email') : !!sendEmail;
+        const sendPushForLabels = both ? (this.composeChannelTab === 'push') : !!sendPush;
+        this.updateComposeFieldLabels(sendEmailForLabels, sendPushForLabels, both);
+        this.updatePreview();
+    }
+
+    syncComposeFieldVisibility() {
+        const sendEmail = document.getElementById('send-email')?.checked;
+        const sendPush = document.getElementById('send-push')?.checked;
+        const hasChannel = !!(sendEmail || sendPush);
+        const t = window.COMMUNICATION_TRANSLATIONS || {};
+
+        document.getElementById('compose-content-fields')?.classList.toggle('hidden', !hasChannel);
+        document.getElementById('compose-content-disabled-hint')?.classList.toggle('hidden', hasChannel);
+
+        document.getElementById('email-attachments-section')?.classList.toggle('hidden', !sendEmail);
+        document.getElementById('email-override-preferences-wrap')?.classList.toggle('hidden', !sendEmail);
+
+        const pushOptions = document.getElementById('push-delivery-options');
+        if (pushOptions) {
+            pushOptions.classList.toggle('hidden', !sendPush);
+            if (!sendPush) {
+                const screen = document.getElementById('admin-notification-redirect-screen');
+                const url = document.getElementById('admin-notification-redirect-url');
+                if (screen) screen.value = '';
+                if (url) url.value = '';
+            }
+        }
+
+        const deliveryHint = document.getElementById('delivery-method-hint');
+        if (deliveryHint) {
+            if (sendEmail && sendPush) {
+                deliveryHint.textContent = t.composeBothChannelsHint || 'Use the Email and Mobile Push tabs below to compose each channel. Title is shared as the subject line and push title.';
+                deliveryHint.classList.remove('hidden');
+            } else if (sendEmail) {
+                deliveryHint.textContent = t.composeEmailOnlyHint || 'Email only — title becomes the subject line; message appears in-app and in the email body.';
+                deliveryHint.classList.remove('hidden');
+            } else if (sendPush) {
+                deliveryHint.textContent = t.composePushOnlyHint || 'Push only — title and message appear on registered mobile devices.';
+                deliveryHint.classList.remove('hidden');
+            } else {
+                deliveryHint.classList.add('hidden');
+            }
+        }
+
+        this.applyComposeChannelPanels();
+        window.CampaignEmailComposeEditor?.syncVisibility();
+    }
+
+    updateComposeFieldLabels(sendEmail, sendPush, tabbedMode = false) {
+        const t = window.COMMUNICATION_TRANSLATIONS || {};
+        const titleDesc = document.getElementById('title-field-description');
+        const badges = document.getElementById('title-channel-badges');
+        const msgLabel = document.getElementById('message-field-label');
+        const msgHint = document.getElementById('message-field-hint');
+        const msgInput = document.getElementById('admin-notification-message');
+
+        if (titleDesc) {
+            if (tabbedMode && sendEmail) {
+                titleDesc.textContent = t.titleDescEmail || 'Becomes the email subject line and in-app notification title.';
+            } else if (tabbedMode && sendPush) {
+                titleDesc.textContent = t.titleDescPush || 'Shown as the push notification title on mobile devices and in the in-app notification center.';
+            } else if (sendEmail && sendPush) {
+                titleDesc.textContent = t.titleDescBoth || 'Same title for email subject line and push notification. Also shown in the in-app notification center.';
+            } else if (sendEmail) {
+                titleDesc.textContent = t.titleDescEmail || 'Becomes the email subject line and in-app notification title.';
+            } else if (sendPush) {
+                titleDesc.textContent = t.titleDescPush || 'Shown as the push notification title on mobile devices and in the in-app notification center.';
+            }
+        }
+
+        if (badges) {
+            badges.replaceChildren();
+            const addBadge = (text, cls) => {
+                const span = document.createElement('span');
+                span.className = 'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ' + cls;
+                span.textContent = text;
+                badges.append(span);
+            };
+            if (sendEmail) {
+                addBadge(t.badgeEmailSubject || 'Email subject', 'bg-blue-100 text-blue-800');
+            }
+            if (sendPush) {
+                addBadge(t.badgePushTitle || 'Push title', 'bg-indigo-100 text-indigo-800');
+            }
+            addBadge(t.badgeInApp || 'In-app', 'bg-gray-100 text-gray-700');
+            if (sendEmail) {
+                addBadge(t.badgeTemplateVar || 'Template {{title}}', 'bg-teal-50 text-teal-800');
+            }
+        }
+
+        if (msgLabel && msgHint && msgInput) {
+            if (tabbedMode && sendEmail) {
+                msgLabel.replaceChildren();
+                msgLabel.append(
+                    document.createTextNode(t.messageLabelEmail || 'In-app summary'),
+                    document.createTextNode(' '),
+                    (() => { const s = document.createElement('span'); s.className = 'text-red-500'; s.textContent = '*'; return s; })()
+                );
+                msgHint.textContent = t.messageHintEmail || 'Shown in the notification center. Also available as {{ message }} in your email HTML template.';
+                msgInput.placeholder = t.messagePlaceholderEmail || 'Brief summary for the in-app notification list…';
+            } else if (tabbedMode && sendPush) {
+                msgLabel.replaceChildren();
+                msgLabel.append(
+                    document.createTextNode(t.messageLabelPush || 'Push notification body'),
+                    document.createTextNode(' '),
+                    (() => { const s = document.createElement('span'); s.className = 'text-red-500'; s.textContent = '*'; return s; })()
+                );
+                msgHint.textContent = t.messageHintPush || 'Short text shown on the user\'s mobile device and in the in-app notification center.';
+                msgInput.placeholder = t.messagePlaceholderPush || 'e.g., Please complete your assignment by Friday…';
+            } else if (sendPush && sendEmail) {
+                msgLabel.replaceChildren();
+                msgLabel.append(
+                    document.createTextNode(t.messageLabelBoth || 'Message'),
+                    document.createTextNode(' '),
+                    (() => { const s = document.createElement('span'); s.className = 'text-red-500'; s.textContent = '*'; return s; })()
+                );
+                msgHint.textContent = t.messageHintBoth || 'Push notification body, in-app summary, and email template variable {{ message }}. Email layout comes from the HTML template above.';
+                msgInput.placeholder = t.messagePlaceholderBoth || 'Short text for push, in-app, and template…';
+            } else if (sendPush) {
+                msgLabel.replaceChildren();
+                msgLabel.append(
+                    document.createTextNode(t.messageLabelPush || 'Push notification body'),
+                    document.createTextNode(' '),
+                    (() => { const s = document.createElement('span'); s.className = 'text-red-500'; s.textContent = '*'; return s; })()
+                );
+                msgHint.textContent = t.messageHintPush || 'Short text shown on the user\'s mobile device and in the in-app notification center.';
+                msgInput.placeholder = t.messagePlaceholderPush || 'e.g., Please complete your assignment by Friday…';
+            } else if (sendEmail) {
+                msgLabel.replaceChildren();
+                msgLabel.append(
+                    document.createTextNode(t.messageLabelEmail || 'In-app summary'),
+                    document.createTextNode(' '),
+                    (() => { const s = document.createElement('span'); s.className = 'text-red-500'; s.textContent = '*'; return s; })()
+                );
+                msgHint.textContent = t.messageHintEmail || 'Shown in the notification center. Also available as {{ message }} in your email HTML template.';
+                msgInput.placeholder = t.messagePlaceholderEmail || 'Brief summary for the in-app notification list…';
+            }
+        }
+    }
+
+    getEmailSubjectPreview(title) {
+        const priority = document.getElementById('admin-notification-priority')?.value || 'normal';
+        const trimmed = (title || '').trim();
+        if (!trimmed) return { subject: '—', note: '' };
+        if (priority === 'high') {
+            return {
+                subject: trimmed,
+                note: (window.COMMUNICATION_TRANSLATIONS?.emailSubjectHighPriorityNote)
+                    || 'High priority — subject is sent as-is (no prefix).',
+            };
+        }
+        return {
+            subject: `New Notification: ${trimmed}`,
+            note: (window.COMMUNICATION_TRANSLATIONS?.emailSubjectNormalNote)
+                || 'Normal priority emails prepend “New Notification:”.',
+        };
+    }
+
     updatePreview() {
         const title = document.getElementById('admin-notification-title')?.value || '';
         const message = document.getElementById('admin-notification-message')?.value || '';
         const sendEmail = document.getElementById('send-email')?.checked;
         const sendPush = document.getElementById('send-push')?.checked;
+        const both = !!(sendEmail && sendPush);
+        const activeChannel = both ? this.composeChannelTab : (sendEmail ? 'email' : 'push');
+        const showEmailPreview = sendEmail && (!both || activeChannel === 'email');
+        const showPushPreview = sendPush && (!both || activeChannel === 'push');
+        const t = window.COMMUNICATION_TRANSLATIONS || {};
+        const titleTrimmed = title.trim();
+        const messageTrimmed = message.trim();
 
-        const preview = document.getElementById('notification-preview');
-        if (!preview) return;
-
-        // Only show preview if there's content AND at least one delivery method is selected
-        if ((title || message) && (sendEmail || sendPush)) {
-            preview.classList.remove('hidden');
-
-            // Update email preview - only show if email is selected
-            const emailPreview = document.getElementById('email-preview');
-            if (emailPreview) {
-                if (sendEmail) {
-                    emailPreview.classList.remove('hidden');
-                    document.getElementById('preview-email-title').textContent = title || 'No title';
-                    document.getElementById('preview-email-message').textContent = message || 'No message';
-                } else {
-                    emailPreview.classList.add('hidden');
-                }
+        const emailSubjectCard = document.getElementById('preview-email-subject-card');
+        const emailSubjectText = document.getElementById('preview-email-subject-text');
+        const emailSubjectNote = document.getElementById('preview-email-subject-note');
+        if (emailSubjectCard && emailSubjectText) {
+            const show = showEmailPreview && titleTrimmed;
+            emailSubjectCard.classList.toggle('hidden', !show);
+            if (show) {
+                const { subject, note } = this.getEmailSubjectPreview(titleTrimmed);
+                emailSubjectText.textContent = subject;
+                if (emailSubjectNote) emailSubjectNote.textContent = note;
             }
+        }
 
-            // Update push preview - only show if push is selected
-            const pushPreview = document.getElementById('push-preview');
-            if (pushPreview) {
-                if (sendPush) {
-                    pushPreview.classList.remove('hidden');
-                    document.getElementById('preview-push-title').textContent = title || 'No title';
-                    document.getElementById('preview-push-message').textContent = message || 'No message';
-                } else {
-                    pushPreview.classList.add('hidden');
-                }
+        const pushTitleCard = document.getElementById('preview-push-title-card');
+        const pushTitleText = document.getElementById('preview-push-title-text');
+        if (pushTitleCard && pushTitleText) {
+            const show = showPushPreview && titleTrimmed;
+            pushTitleCard.classList.toggle('hidden', !show);
+            if (show) pushTitleText.textContent = titleTrimmed;
+        }
+
+        const pushBodyCard = document.getElementById('push-body-preview-card');
+        const pushBodyTitle = document.getElementById('preview-push-body-title');
+        const pushBodyText = document.getElementById('preview-push-body-text');
+        if (pushBodyCard && pushBodyTitle && pushBodyText) {
+            const show = showPushPreview && (titleTrimmed || messageTrimmed);
+            pushBodyCard.classList.toggle('hidden', !show);
+            if (show) {
+                pushBodyTitle.textContent = titleTrimmed || (t.previewUntitled || '(No title)');
+                pushBodyText.textContent = messageTrimmed || (t.previewNoMessage || '(No message)');
             }
-        } else {
-            preview.classList.add('hidden');
         }
     }
 
@@ -1410,6 +1688,8 @@ class AdminNotifications {
 
             // Note: Currently only push notifications are supported via API
             // Email notifications are sent automatically when notification is created
+            const emailTemplateKey = document.getElementById('campaign-email-template-select')?.value?.trim() || null;
+            const emailTemplateHtml = this._getCampaignEmailTemplateHtmlForPayload();
             const data = await _anFetch('/notifications/api/admin/send-push', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -1420,7 +1700,9 @@ class AdminNotifications {
                     redirect_url: sendPush ? (redirectUrl || null) : null,
                     override_preferences: overridePreferences,
                     send_email: sendEmail,
-                    send_push: sendPush
+                    send_push: sendPush,
+                    email_template_key: emailTemplateKey,
+                    email_template_html: emailTemplateHtml,
                 })
             });
 
@@ -1449,69 +1731,240 @@ class AdminNotifications {
     // This method is kept for backwards compatibility but should not be used
     // Instead, reload the page after AJAX operations to show flash messages from the backend
 
-    loadTemplate(templateType) {
-        console.log('loadTemplate called with:', templateType);
+    syncCampaignEmailTemplateWrapVisibility() {
+        const wrap = document.getElementById('campaign-email-template-wrap');
+        const sendEmail = document.getElementById('send-email')?.checked;
+        if (!wrap) return;
+        wrap.classList.toggle('hidden', !sendEmail);
+        window.CampaignEmailComposeEditor?.syncVisibility();
+    }
+
+    applyCampaignEmailTemplateSelection(selectEl) {
+        if (!selectEl || !selectEl.value) return;
+        const option = selectEl.options[selectEl.selectedIndex];
+        if (!option) return;
+
         const titleInput = document.getElementById('admin-notification-title');
         const messageInput = document.getElementById('admin-notification-message');
         const prioritySelect = document.getElementById('admin-notification-priority');
+        const composeTitle = option.getAttribute('data-compose-title') || '';
+        const composeMessage = option.getAttribute('data-compose-message') || '';
+        const composePriority = option.getAttribute('data-compose-priority') || 'normal';
 
-        console.log('Input elements found:', {
-            titleInput: !!titleInput,
-            messageInput: !!messageInput,
-            prioritySelect: !!prioritySelect
-        });
+        if (titleInput && composeTitle && !titleInput.value.trim()) {
+            titleInput.value = composeTitle;
+            titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (messageInput && composeMessage && !messageInput.value.trim()) {
+            messageInput.value = composeMessage;
+            messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (prioritySelect && composePriority) {
+            prioritySelect.value = composePriority;
+            prioritySelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        this.updatePreview();
+    }
 
+    populateSendFormFromCampaign(campaign, { includeRecipients = false } = {}) {
+        const titleInput = document.getElementById('admin-notification-title');
+        const messageInput = document.getElementById('admin-notification-message');
         if (!titleInput || !messageInput) {
-            console.error('Required input elements not found');
             return;
         }
 
-        // Load templates from DB (injected via window.NOTIFICATION_TEMPLATES)
-        const dbTemplates = window.NOTIFICATION_TEMPLATES || {};
-        const template = dbTemplates[templateType];
-
-        if (!template) {
-            console.error('Template not found:', templateType);
-            return;
-        }
-
-        console.log('Applying template:', template);
-
-        // Replace {{org_name}} placeholder with actual org name
-        const orgName = window.ORG_NAME || 'Humanitarian Databank';
-        const interpolate = (text) => (text || '').replace(/\{\{\s*org_name\s*\}\}/gi, orgName);
-
-        titleInput.value = interpolate(template.title);
+        titleInput.value = campaign.title || '';
         titleInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-        messageInput.value = interpolate(template.message);
+        messageInput.value = campaign.message || '';
         messageInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-        if (prioritySelect && template.priority) {
-            prioritySelect.value = template.priority;
+        const prioritySelect = document.getElementById('admin-notification-priority');
+        if (prioritySelect) {
+            prioritySelect.value = campaign.priority || 'normal';
             prioritySelect.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
-        // Ensure email and push are enabled
         const emailCheckbox = document.getElementById('send-email');
         const pushCheckbox = document.getElementById('send-push');
         if (emailCheckbox) {
-            emailCheckbox.checked = true;
+            emailCheckbox.checked = campaign.send_email !== false;
             emailCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
         }
         if (pushCheckbox) {
-            pushCheckbox.checked = true;
+            pushCheckbox.checked = campaign.send_push !== false;
             pushCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
-        // Force a re-render by focusing and blurring
+        const templateSelect = document.getElementById('campaign-email-template-select');
+        if (templateSelect) {
+            templateSelect.value = campaign.email_template_key || '';
+            window.CampaignEmailComposeEditor?.loadTemplate(
+                campaign.email_template_key || '',
+                campaign.email_template_html || ''
+            );
+        }
+        this.syncCampaignEmailTemplateWrapVisibility();
+        this.syncComposeFieldVisibility();
+
+        const overrideCheckbox = document.getElementById('override-preferences');
+        if (overrideCheckbox) {
+            overrideCheckbox.checked = campaign.override_preferences || false;
+            overrideCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        const categoryInput = document.getElementById('admin-notification-category');
+        if (categoryInput) {
+            categoryInput.value = campaign.category || '';
+            categoryInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        const tagsInput = document.getElementById('admin-notification-tags');
+        if (tagsInput) {
+            const tags = Array.isArray(campaign.tags) ? campaign.tags : [];
+            tagsInput.value = tags.join(', ');
+            tagsInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        const redirectTypeSelect = document.getElementById('admin-notification-redirect-type');
+        const redirectScreenGroup = document.getElementById('redirect-app-screen-group');
+        const redirectCustomGroup = document.getElementById('redirect-custom-url-group');
+        if (campaign.redirect_url && redirectTypeSelect) {
+            if (campaign.redirect_type === 'app') {
+                redirectTypeSelect.value = 'app';
+                const screenInput = document.getElementById('admin-notification-redirect-screen');
+                if (screenInput) screenInput.value = campaign.redirect_url;
+                redirectScreenGroup?.classList.remove('hidden');
+                redirectCustomGroup?.classList.add('hidden');
+            } else {
+                redirectTypeSelect.value = 'custom';
+                const urlInput = document.getElementById('admin-notification-redirect-url');
+                if (urlInput) urlInput.value = campaign.redirect_url;
+                redirectScreenGroup?.classList.add('hidden');
+                redirectCustomGroup?.classList.remove('hidden');
+            }
+        }
+
+        if (includeRecipients && campaign.user_ids && Array.isArray(campaign.user_ids)) {
+            this.selectedUsers.clear();
+            campaign.user_ids.forEach((userId) => {
+                this.selectedUsers.set(userId, {
+                    id: userId,
+                    name: `User ${userId}`,
+                    email: '',
+                    role: ''
+                });
+            });
+            this.updateSelectedUsersDisplay();
+        }
+
         titleInput.focus();
         setTimeout(() => {
             titleInput.blur();
             this.updatePreview();
         }, 50);
+    }
 
-        console.log('Template applied successfully');
+    async loadCampaignContent(campaignId, { includeRecipients = false } = {}) {
+        try {
+            const data = await _anFetch(`/notifications/api/admin/campaigns/${campaignId}`);
+            if (!data.success || !data.campaign) {
+                throw new Error('Campaign not found');
+            }
+            this.populateSendFormFromCampaign(data.campaign, { includeRecipients });
+            return true;
+        } catch (error) {
+            console.error('Error loading campaign content:', error);
+            return false;
+        }
+    }
+
+    openLoadCampaignModal() {
+        const modal = document.getElementById('load-campaign-modal');
+        const select = document.getElementById('load-campaign-select');
+        const includeRecipientsCheckbox = document.getElementById('load-campaign-include-recipients');
+        if (!modal) return;
+        if (select) select.value = '';
+        if (includeRecipientsCheckbox) includeRecipientsCheckbox.checked = false;
+        modal.classList.remove('hidden');
+        select?.focus();
+        this.syncClearLoadCampaignButton();
+    }
+
+    closeLoadCampaignModal() {
+        const modal = document.getElementById('load-campaign-modal');
+        const confirmBtn = document.getElementById('confirm-load-campaign');
+        if (modal) modal.classList.add('hidden');
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.replaceChildren();
+            const icon = document.createElement('i');
+            icon.className = 'fas fa-download w-4 h-4 inline-block mr-2';
+            confirmBtn.append(icon, document.createTextNode('Load'));
+        }
+        this.syncClearLoadCampaignButton();
+    }
+
+    async handleLoadCampaignConfirm() {
+        const select = document.getElementById('load-campaign-select');
+        const confirmBtn = document.getElementById('confirm-load-campaign');
+        const campaignId = select?.value?.trim();
+        if (!campaignId) {
+            select?.focus();
+            return;
+        }
+
+        const includeRecipients = document.getElementById('load-campaign-include-recipients')?.checked ?? false;
+        const originalNodes = confirmBtn ? Array.from(confirmBtn.childNodes).map((n) => n.cloneNode(true)) : null;
+        const restoreBtn = () => {
+            if (!confirmBtn || !originalNodes) return;
+            confirmBtn.replaceChildren(...originalNodes.map((n) => n.cloneNode(true)));
+        };
+
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.replaceChildren();
+            const icon = document.createElement('i');
+            icon.className = 'fas fa-spinner fa-spin w-4 h-4 inline-block mr-2';
+            confirmBtn.append(icon, document.createTextNode('Loading...'));
+        }
+
+        try {
+            const ok = await this.loadCampaignContent(campaignId, { includeRecipients });
+            if (ok) {
+                this.composeLoadedCampaignId = campaignId;
+                this.closeLoadCampaignModal();
+                this.syncClearLoadCampaignButton();
+            }
+        } finally {
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                restoreBtn();
+            }
+        }
+    }
+
+    syncClearLoadCampaignButton() {
+        const btn = document.getElementById('clear-send-form');
+        if (!btn) return;
+        const select = document.getElementById('load-campaign-select');
+        const modal = document.getElementById('load-campaign-modal');
+        const modalOpen = modal && !modal.classList.contains('hidden');
+        const hasModalSelection = modalOpen && !!(select?.value?.trim());
+        const hasLoaded = !!this.composeLoadedCampaignId;
+        const show = hasModalSelection || hasLoaded;
+        btn.classList.toggle('hidden', !show);
+        btn.disabled = !show;
+    }
+
+    clearLoadCampaignSelection() {
+        this.composeLoadedCampaignId = null;
+        const loadCampaignSelect = document.getElementById('load-campaign-select');
+        if (loadCampaignSelect) loadCampaignSelect.value = '';
+        const includeRecipientsCheckbox = document.getElementById('load-campaign-include-recipients');
+        if (includeRecipientsCheckbox) includeRecipientsCheckbox.checked = false;
+        this.closeLoadCampaignModal();
+        this.syncClearLoadCampaignButton();
     }
 
     resetForm() {
@@ -1558,14 +2011,14 @@ class AdminNotifications {
         // Reset redirect type to app screen
         this.handleRedirectTypeChange('app');
 
-        // Reset checkboxes to checked
+        // Reset delivery checkboxes to match form HTML defaults (email on, push off)
         const emailCheckbox = document.getElementById('send-email');
         const pushCheckbox = document.getElementById('send-push');
         if (emailCheckbox) {
             emailCheckbox.checked = true;
             emailCheckbox.disabled = false;
         }
-        if (pushCheckbox) pushCheckbox.checked = true;
+        if (pushCheckbox) pushCheckbox.checked = false;
 
         // Reset campaign modal fields
         const campaignModalName = document.getElementById('campaign-modal-name');
@@ -1578,6 +2031,13 @@ class AdminNotifications {
         // Reset campaign edit fields
         this.hideCampaignEditFields();
         this.editingCampaignId = null;
+        this.composeChannelTab = 'email';
+
+        this.clearLoadCampaignSelection();
+        const campaignEmailTemplateSelect = document.getElementById('campaign-email-template-select');
+        if (campaignEmailTemplateSelect) campaignEmailTemplateSelect.value = '';
+        this.syncCampaignEmailTemplateWrapVisibility();
+        this.syncComposeFieldVisibility();
         this.updateTabNameForEdit(false);
         this.closeCampaignModal();
 
@@ -1709,61 +2169,7 @@ class AdminNotifications {
             // Switch to send tab
             this.switchTab('send');
 
-            // Populate the main form with campaign data
-            document.getElementById('admin-notification-title').value = campaign.title || '';
-            document.getElementById('admin-notification-message').value = campaign.message || '';
-            document.getElementById('admin-notification-priority').value = campaign.priority || 'normal';
-            document.getElementById('send-email').checked = campaign.send_email !== false;
-            document.getElementById('send-push').checked = campaign.send_push !== false;
-            document.getElementById('override-preferences').checked = campaign.override_preferences || false;
-
-            if (campaign.category) {
-                const categoryInput = document.getElementById('admin-notification-category');
-                if (categoryInput) {
-                    categoryInput.value = campaign.category;
-                }
-            }
-
-            if (campaign.tags && Array.isArray(campaign.tags)) {
-                const tagsInput = document.getElementById('admin-notification-tags');
-                if (tagsInput) {
-                    tagsInput.value = campaign.tags.join(', ');
-                }
-            }
-
-            // Handle redirect URL
-            if (campaign.redirect_url) {
-                if (campaign.redirect_type === 'app') {
-                    document.getElementById('admin-notification-redirect-type').value = 'app';
-                    document.getElementById('admin-notification-redirect-screen').value = campaign.redirect_url;
-                    document.getElementById('redirect-app-screen-group').classList.remove('hidden');
-                    document.getElementById('redirect-custom-url-group').classList.add('hidden');
-                } else {
-                    document.getElementById('admin-notification-redirect-type').value = 'custom';
-                    document.getElementById('admin-notification-redirect-url').value = campaign.redirect_url;
-                    document.getElementById('redirect-app-screen-group').classList.add('hidden');
-                    document.getElementById('redirect-custom-url-group').classList.remove('hidden');
-                }
-            }
-
-            // Load selected users
-            if (campaign.user_ids && Array.isArray(campaign.user_ids)) {
-                this.selectedUsers.clear();
-                // For now, store user IDs - users can be re-selected if needed
-                // The campaign will work with the stored user IDs
-                campaign.user_ids.forEach(userId => {
-                    // Store with minimal info - user details will be loaded if they search
-                    this.selectedUsers.set(userId, {
-                        id: userId,
-                        name: `User ${userId}`,
-                        email: '',
-                        role: ''
-                    });
-                });
-                this.updateSelectedUsersDisplay();
-                // Note: User names/emails will be populated if user searches for them
-                // For editing, the user IDs are preserved which is what matters
-            }
+            this.populateSendFormFromCampaign(campaign, { includeRecipients: true });
 
             // Store campaign ID for update
             this.editingCampaignId = campaignId;
@@ -2141,7 +2547,9 @@ class AdminNotifications {
                 scheduled_for: campaignScheduledFor || null,
                 user_selection_type: 'manual',
                 user_ids: userIds,
-                user_filters: null
+                user_filters: null,
+                email_template_key: document.getElementById('campaign-email-template-select')?.value?.trim() || null,
+                email_template_html: this._getCampaignEmailTemplateHtmlForPayload(),
             };
 
             const data = await _anFetch(`/notifications/api/admin/campaigns/${this.editingCampaignId}`, {
@@ -2289,7 +2697,9 @@ class AdminNotifications {
                 scheduled_for: campaignScheduledFor || null,
                 user_selection_type: 'manual',
                 user_ids: userIds,
-                user_filters: null
+                user_filters: null,
+                email_template_key: document.getElementById('campaign-email-template-select')?.value?.trim() || null,
+                email_template_html: this._getCampaignEmailTemplateHtmlForPayload(),
             };
 
             const url = isEdit

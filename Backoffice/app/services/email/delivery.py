@@ -77,6 +77,8 @@ def classify_orphan_email_log(subject: Optional[str]) -> str:
         return 'weekly_digest'
     if 'daily notification digest' in text:
         return 'daily_digest'
+    if text.startswith('country access requests -'):
+        return 'fds_access_request_digest'
     if text.startswith('welcome to'):
         return 'welcome'
     return 'unsupported'

@@ -91,7 +91,7 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         # Content
         ("admin.resources.manage", "Manage resources", "Manage resources (including publications)"),
         ("admin.documents.manage", "Manage documents", "Manage documents"),
-        ("admin.notifications.manage", "Manage notifications", "Manage admin notifications center (view/send)"),
+        ("admin.communication.manage", "Manage communication", "Manage admin Communication Center (view all communications and send)"),
         ("admin.translations.manage", "Manage translations", "Manage translation strings and compilation"),
 
         # Analytics / Audit / Security
@@ -325,10 +325,10 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
             "permission_codes": ["admin.validation.rules"],
         },
         {
-            "code": "admin_notifications_manager",
-            "name": "Admin: Notifications (Manage)",
-            "description": "Manage admin notifications center (view all notifications and send notifications).",
-            "permission_codes": ["admin.notifications.manage"],
+            "code": "admin_communication_manager",
+            "name": "Admin: Communication (Manage)",
+            "description": "Manage admin Communication Center (view all communications and send notifications, email, and push).",
+            "permission_codes": ["admin.communication.manage"],
         },
         {
             "code": "admin_translations_manager",

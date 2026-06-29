@@ -135,14 +135,23 @@ def access_requests():
     """List and manage country access requests."""
     from app.services.app_settings_service import get_auto_approve_access_requests
     from app.services.country_access_request_service import AUTO_RESOLVED_ADMIN_NOTE
+    from app.services.country_service import (
+        get_fds_member_filter_options,
+        user_is_fds_member,
+    )
 
     reconcile_fulfilled_pending_country_access_requests()
+    from sqlalchemy.orm import joinedload
+
     pending_requests = (
         pending_country_access_requests_query()
+        .options(
+            joinedload(CountryAccessRequest.user),
+            joinedload(CountryAccessRequest.country).joinedload(Country.fds_member_user),
+        )
         .order_by(CountryAccessRequest.created_at.asc())
         .all()
     )
-    from sqlalchemy.orm import joinedload
 
     processed_base = processed_country_access_requests_query()
     processed_requests_total = processed_base.count()
@@ -150,7 +159,7 @@ def access_requests():
     processed_requests = (
         processed_base.options(
             joinedload(CountryAccessRequest.user),
-            joinedload(CountryAccessRequest.country),
+            joinedload(CountryAccessRequest.country).joinedload(Country.fds_member_user),
             joinedload(CountryAccessRequest.processed_by),
         )
         .order_by(
@@ -160,6 +169,19 @@ def access_requests():
         .limit(processed_requests_limit)
         .all()
     )
+
+    fds_member_options = get_fds_member_filter_options()
+    default_fds_member_user_id = (
+        current_user.id if user_is_fds_member(current_user.id) else None
+    )
+
+    from app.services.authorization_service import AuthorizationService
+    from app.services.app_settings_service import get_fds_access_request_digest_settings
+    from app.utils.datetime_helpers import ORG_TIMEZONE_LABEL
+
+    can_manage_fds_digest = AuthorizationService.is_system_manager(current_user)
+    fds_digest_settings = get_fds_access_request_digest_settings() if can_manage_fds_digest else None
+
     return render_template(
         "admin/user_management/access_requests.html",
         title="Country Access Requests",
@@ -169,7 +191,49 @@ def access_requests():
         processed_requests_limit=processed_requests_limit,
         auto_approve_enabled=get_auto_approve_access_requests(),
         auto_resolved_admin_note=AUTO_RESOLVED_ADMIN_NOTE,
+        fds_member_options=fds_member_options,
+        default_fds_member_user_id=default_fds_member_user_id,
+        can_manage_fds_digest=can_manage_fds_digest,
+        fds_access_request_digest_enabled=(
+            bool(fds_digest_settings.get("enabled", True)) if fds_digest_settings else False
+        ),
+        fds_access_request_digest_local_hour=(
+            int(fds_digest_settings.get("local_hour", 7)) if fds_digest_settings else 7
+        ),
+        fds_access_request_digest_timezone_label=ORG_TIMEZONE_LABEL,
     )
+
+
+@bp.route("/access-requests/digest-settings", methods=["POST"])
+@permission_required_any('admin.access_requests.view', 'admin.users.edit')
+def update_access_requests_digest_settings():
+    """Update FDS access request digest schedule (system managers only)."""
+    from app.services.authorization_service import AuthorizationService
+    from app.services.app_settings_service import set_fds_access_request_digest_settings
+
+    if not AuthorizationService.is_system_manager(current_user):
+        flash("Only system managers can change digest email settings.", "danger")
+        return redirect(url_for("user_management.access_requests"))
+
+    try:
+        ok = set_fds_access_request_digest_settings(
+            enabled=request.form.get("fds_access_request_digest_enabled") == "1",
+            local_hour=request.form.get("fds_access_request_digest_local_hour", 7),
+            user_id=current_user.id,
+        )
+    except ValueError as e:
+        flash(str(e), "danger")
+        return redirect(url_for("user_management.access_requests"))
+    except Exception:
+        current_app.logger.exception("set_fds_access_request_digest_settings failed")
+        flash(GENERIC_ERROR_MESSAGE, "danger")
+        return redirect(url_for("user_management.access_requests"))
+
+    if ok:
+        flash("Digest email settings saved.", "success")
+    else:
+        flash("Failed to save digest email settings.", "danger")
+    return redirect(url_for("user_management.access_requests"))
 
 @bp.route("/access-requests/<int:request_id>/approve", methods=["POST"])
 @permission_required_any('admin.access_requests.approve', 'admin.users.edit')

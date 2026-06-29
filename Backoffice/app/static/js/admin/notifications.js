@@ -1,5 +1,5 @@
 /**
- * Admin Notifications Center - Send notifications and view all notifications
+ * Admin Communication Center - Send communications and view all notifications
  */
 
 async function _anFetch(url, options = {}) {

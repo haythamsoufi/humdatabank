@@ -168,6 +168,23 @@ def init_scheduler(app, is_reloader):
                         from app.services.notification.emails import send_notification_emails
                         send_notification_emails()
 
+                    def _send_fds_access_request_digests():
+                        from app.utils.datetime_helpers import now_in_org_timezone
+                        from app.services.app_settings_service import (
+                            get_fds_access_request_digest_enabled,
+                            get_fds_access_request_digest_local_hour,
+                        )
+                        if not get_fds_access_request_digest_enabled():
+                            return
+                        if now_in_org_timezone().hour != get_fds_access_request_digest_local_hour():
+                            return
+                        from app.services.email.fds_access_request_digest import send_fds_access_request_digests
+                        sent = send_fds_access_request_digests()
+                        if sent > 0:
+                            app.logger.info(
+                                "Sent %d FDS access request digest email(s)", sent
+                            )
+
                     def _process_scheduled_notifications():
                         from app.services.notification.scheduling import process_scheduled_notifications
                         processed = process_scheduled_notifications()
@@ -214,6 +231,16 @@ def init_scheduler(app, is_reloader):
                         func=lambda: _run_scheduled_job(app, 'send_digest_emails', _send_digest_emails),
                         trigger="interval", minutes=digest_interval,
                         id='check_and_send_digest_emails', name='Send notification digest emails',
+                        replace_existing=True
+                    )
+
+                    scheduler.add_job(
+                        func=lambda: _run_scheduled_job(
+                            app, 'send_fds_access_request_digests', _send_fds_access_request_digests
+                        ),
+                        trigger="cron", minute=0,
+                        id='send_fds_access_request_digests',
+                        name='Send FDS access request digest emails',
                         replace_existing=True
                     )
 

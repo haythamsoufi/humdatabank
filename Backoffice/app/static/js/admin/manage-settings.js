@@ -1364,7 +1364,6 @@
   /* ── In-memory store: { templateKey: { lang: content } } ── */
   var templateLangData = {};
   var templateInitialData = {};
-  var metadataInitial = '';
   var emailTemplatesDirty = false;
 
   /* Decode HTML entities that Jinja's forceescape may introduce */
@@ -1487,16 +1486,13 @@
     applyEmailTemplateTextDirection(ta);
   });
 
-  /* Template metadata initial snapshot (Notification Center pre-fill) */
-  (function initMetadataSnapshot() {
-    var metaInput = document.getElementById('template-metadata-json');
-    if (!metaInput) { metadataInitial = '{}'; return; }
-    metadataInitial = (decodeEntities(metaInput.value || '') || '').trim() || '{}';
-  })();
 
   /* ── Email template: HTML / visual (TinyMCE) toggle (inline in code area) ── */
   var EMAIL_PREVIEW_URL = cfg.urls.emailPreview;
   var EMAIL_TEST_SEND_URL = cfg.urls.emailTestSend;
+  var CAMPAIGN_EMAIL_PREVIEW_URL = cfg.urls.campaignEmailPreview;
+  var CAMPAIGN_EMAIL_TEST_SEND_URL = cfg.urls.campaignEmailTestSend;
+  var CAMPAIGN_EMAIL_SEED_URL = cfg.urls.campaignEmailSeed;
   var L_TINYMCE_VAR_TIP = cfg.t.tinymceVarTip;
   var L_TINYMCE_VAR_BTN = cfg.t.variables;
   var MSG_TINYMCE_VAR_PREVIEW_FAIL = cfg.t.couldNotLoadSampleValues;
@@ -1504,7 +1500,6 @@
   var EMAIL_SEED_URL = cfg.urls.emailSeed;
   var MSG_SEED_CONFIRM_FORCE = cfg.t.seedConfirmForce;
   var L_SEED_BODIES = cfg.t.templateHtml;
-  var L_SEED_PREFILL = cfg.t.notificationPrefill;
   var L_SEED_UPD = cfg.t.updatedFromDefaults;
   var L_SEED_LEFT = cfg.t.leftUnchanged;
   var emailTemplateViewMode = 'edit';
@@ -1904,8 +1899,27 @@
     }
   }
 
+  function isCampaignEmailTemplateKey(templateKey) {
+    return !!(templateKey && String(templateKey).indexOf('campaign_template_') === 0);
+  }
+
+  function getEmailPreviewUrlForKey(templateKey) {
+    if (isCampaignEmailTemplateKey(templateKey) && CAMPAIGN_EMAIL_PREVIEW_URL) {
+      return CAMPAIGN_EMAIL_PREVIEW_URL;
+    }
+    return EMAIL_PREVIEW_URL;
+  }
+
+  function getEmailTestSendUrlForKey(templateKey) {
+    if (isCampaignEmailTemplateKey(templateKey) && CAMPAIGN_EMAIL_TEST_SEND_URL) {
+      return CAMPAIGN_EMAIL_TEST_SEND_URL;
+    }
+    return EMAIL_TEST_SEND_URL;
+  }
+
   function runEmailTinymceSampleValuesRequest(templateKey, onDone) {
-    if (!EMAIL_PREVIEW_URL) {
+    var previewUrl = getEmailPreviewUrlForKey(templateKey);
+    if (!previewUrl) {
       onDone(new Error('url'));
       return;
     }
@@ -1920,8 +1934,8 @@
     var bodyStr = wrapEmailTemplateApiJsonBody({ template_key: templateKey, html_b64: b64, template_language: plang });
     if (!bodyStr) { onDone(new Error('wrap')); return; }
     var csrf = getCsrfForEmailPreview();
-    _debugEmailSettingsApi('template-var-preview request', { url: EMAIL_PREVIEW_URL, template_key: templateKey, template_language: plang });
-    ((window.getFetch && window.getFetch()) || fetch)(EMAIL_PREVIEW_URL, {
+    _debugEmailSettingsApi('template-var-preview request', { url: previewUrl, template_key: templateKey, template_language: plang });
+    ((window.getFetch && window.getFetch()) || fetch)(previewUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2223,8 +2237,7 @@
   }
 
   function applyEmailTemplateViewMode() {
-    var sel = document.getElementById('email-template-selector');
-    var activeKey = sel ? sel.value : '';
+    var activeKey = getActiveTemplateSelectorValue();
     document.querySelectorAll('.email-template-editor').forEach(function (ed) {
       var key = getTemplateKeyFromEditorBlock(ed);
       var isActive = activeKey && ed.id === 'editor-' + activeKey;
@@ -2287,12 +2300,26 @@
     }
   }
 
+  function getActiveTemplateSelectorValue() {
+    var campaignPanel = document.getElementById('panel-campaign-emails');
+    var campaignSel = document.getElementById('campaign-email-template-selector');
+    if (campaignPanel && campaignSel && !campaignPanel.classList.contains('hidden')) {
+      return campaignSel.value;
+    }
+    var sel = document.getElementById('email-template-selector');
+    return sel ? sel.value : '';
+  }
+
   var selector = document.getElementById('email-template-selector');
   if (selector) {
     selector.addEventListener('change', function () { showEmailTemplate(this.value); });
     if (selector.value) {
       showEmailTemplate(selector.value);
     }
+  }
+  var campaignSelector = document.getElementById('campaign-email-template-selector');
+  if (campaignSelector) {
+    campaignSelector.addEventListener('change', function () { showEmailTemplate(this.value); });
   }
   updateEmailTemplateViewToggle();
 
@@ -2355,20 +2382,21 @@
 
   /* Edit / visual: one state; buttons duplicated per template — delegate from Emails panel */
   (function initEmailViewToggle() {
-    var panel = document.getElementById('panel-emails');
-    if (!panel) return;
-    panel.addEventListener('click', function (e) {
-      var btn = e.target.closest('.email-template-mode-btn');
-      if (!btn || !panel.contains(btn)) return;
-      var mode = btn.getAttribute('data-mode');
-      if (mode === 'edit') setEmailTemplateViewMode('edit');
-      else if (mode === 'visual') setEmailTemplateViewMode('visual');
+    document.querySelectorAll('.email-templates-panel').forEach(function (panel) {
+      if (!panel) return;
+      panel.addEventListener('click', function (e) {
+        var btn = e.target.closest('.email-template-mode-btn');
+        if (!btn || !panel.contains(btn)) return;
+        var mode = btn.getAttribute('data-mode');
+        if (mode === 'edit') setEmailTemplateViewMode('edit');
+        else if (mode === 'visual') setEmailTemplateViewMode('visual');
+      });
     });
   })();
 
   (function initEmailTemplateAutotrans() {
-    var panel = document.getElementById('panel-emails');
-    if (!panel) return;
+    document.querySelectorAll('.email-templates-panel').forEach(function (panel) {
+      if (!panel) return;
 
     panel.addEventListener('click', function (e) {
       var btn = e.target.closest('.email-template-autotrans-btn');
@@ -2457,17 +2485,19 @@
         }
       });
     });
+    });
   })();
 
   (function initEmailTemplateTestSend() {
     var panel = document.getElementById('panel-emails');
+    var campaignPanel = document.getElementById('panel-campaign-emails');
     var modal = document.getElementById('email-template-test-send-modal');
     var recipientRoot = document.getElementById('email-template-test-recipient');
     var userWrap = document.getElementById('email-template-test-user-wrap');
     var userSelect = document.getElementById('email-template-test-user-select');
     var confirmBtn = modal ? modal.querySelector('.email-template-test-send-confirm') : null;
-    if (!panel || !modal || !recipientRoot || !userWrap || !userSelect || !confirmBtn) return;
-    if (!EMAIL_TEST_SEND_URL) return;
+    if ((!panel && !campaignPanel) || !modal || !recipientRoot || !userWrap || !userSelect || !confirmBtn) return;
+    if (!EMAIL_TEST_SEND_URL && !CAMPAIGN_EMAIL_TEST_SEND_URL) return;
 
     var currentUserEmail = (recipientRoot.getAttribute('data-current-user-email') || '').trim();
     var pendingSend = null;
@@ -2574,6 +2604,12 @@
       var templateKey = pendingSend.templateKey;
       var lang = pendingSend.lang;
       var b64 = pendingSend.b64;
+      var testSendUrl = getEmailTestSendUrlForKey(templateKey);
+      if (!testSendUrl) {
+        restoreConfirmBtn();
+        if (window.showAlert) window.showAlert(cfg.t.couldNotPrepareEmailBody, 'error');
+        return;
+      }
       confirmBtn.classList.add('btn-loading');
       confirmBtn.disabled = true;
 
@@ -2589,13 +2625,13 @@
         return;
       }
       _debugEmailSettingsApi('test-send request', {
-        url: EMAIL_TEST_SEND_URL,
+        url: testSendUrl,
         template_key: templateKey,
         template_language: lang,
         body_wrapped: true,
         post_body_len: testBodyStr.length
       });
-      ((window.getFetch && window.getFetch()) || fetch)(EMAIL_TEST_SEND_URL, {
+      ((window.getFetch && window.getFetch()) || fetch)(testSendUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2655,40 +2691,46 @@
     });
     confirmBtn.addEventListener('click', executeTestSend);
 
-    panel.addEventListener('click', function (e) {
-      var btn = e.target.closest('.email-template-test-send-btn');
-      if (!btn || !panel.contains(btn)) return;
-      var templateKey = btn.getAttribute('data-template-key') || '';
-      if (!templateKey) return;
-      var textarea = document.getElementById(templateKey);
-      if (!textarea) return;
+    function bindTestSendPanel(root) {
+      if (!root) return;
+      root.addEventListener('click', function (e) {
+        var btn = e.target.closest('.email-template-test-send-btn, .campaign-email-template-test-send-btn');
+        if (!btn || !root.contains(btn)) return;
+        var templateKey = btn.getAttribute('data-template-key') || '';
+        if (!templateKey) return;
+        var textarea = document.getElementById(templateKey);
+        if (!textarea) return;
 
-      syncActiveEmailTemplateToMap();
-      var lang = (textarea.dataset && textarea.dataset.currentLang) ? String(textarea.dataset.currentLang).trim() : 'en';
-      var html = '';
-      if (templateLangData[templateKey] && typeof templateLangData[templateKey][lang] === 'string') {
-        html = templateLangData[templateKey][lang];
-      } else {
-        html = textarea.value;
-      }
-      var trimmed = (html || '').trim();
-      if (!trimmed) {
-        if (window.showAlert) window.showAlert(cfg.t.noTemplateContent, 'warning');
-        return;
-      }
-      var b64;
-      try {
-        b64 = base64EncodeUtf8Preview(trimmed);
-      } catch (err) {
-        if (window.showAlert) window.showAlert(String(err), 'error');
-        return;
-      }
-      if (!b64) {
-        if (window.showAlert) window.showAlert(cfg.t.couldNotPrepareEmailBody, 'error');
-        return;
-      }
-      openTestSendModal({ templateKey: templateKey, lang: lang, b64: b64 });
-    });
+        syncActiveEmailTemplateToMap();
+        var lang = (textarea.dataset && textarea.dataset.currentLang) ? String(textarea.dataset.currentLang).trim() : 'en';
+        var html = '';
+        if (templateLangData[templateKey] && typeof templateLangData[templateKey][lang] === 'string') {
+          html = templateLangData[templateKey][lang];
+        } else {
+          html = textarea.value;
+        }
+        var trimmed = (html || '').trim();
+        if (!trimmed) {
+          if (window.showAlert) window.showAlert(cfg.t.noTemplateContent, 'warning');
+          return;
+        }
+        var b64;
+        try {
+          b64 = base64EncodeUtf8Preview(trimmed);
+        } catch (err) {
+          if (window.showAlert) window.showAlert(String(err), 'error');
+          return;
+        }
+        if (!b64) {
+          if (window.showAlert) window.showAlert(cfg.t.couldNotPrepareEmailBody, 'error');
+          return;
+        }
+        openTestSendModal({ templateKey: templateKey, lang: lang, b64: b64 });
+      });
+    }
+
+    bindTestSendPanel(panel);
+    bindTestSendPanel(campaignPanel);
 
     syncRecipientUi();
   })();
@@ -2730,13 +2772,9 @@
     function describeSeedStats(st) {
       st = st || {};
       var e = st.email || {};
-      var m = st.metadata || {};
       var parts = [];
       if (e.seeded != null || e.skipped != null) {
         parts.push(L_SEED_BODIES + ': ' + (e.seeded != null ? e.seeded : '0') + ' ' + L_SEED_UPD + ', ' + (e.skipped != null ? e.skipped : '0') + ' ' + L_SEED_LEFT);
-      }
-      if (m.seeded != null || m.skipped != null) {
-        parts.push(L_SEED_PREFILL + ': ' + (m.seeded != null ? m.seeded : '0') + ' ' + L_SEED_UPD + ', ' + (m.skipped != null ? m.skipped : '0') + ' ' + L_SEED_LEFT);
       }
       return parts.join(' — ');
     }
@@ -2788,6 +2826,100 @@
     });
   })();
 
+  /* ── Seed default campaign email templates ── */
+  (function initCampaignEmailTemplateSeed() {
+    var gapsBtn = document.getElementById('campaign-email-templates-seed-gaps-btn');
+    var forceBtn = document.getElementById('campaign-email-templates-seed-force-btn');
+    var toggleBtn = document.getElementById('campaign-email-templates-seed-toggle');
+    var seedMenu = document.getElementById('campaign-email-templates-seed-menu');
+    if (!gapsBtn || !forceBtn || !toggleBtn || !seedMenu || !CAMPAIGN_EMAIL_SEED_URL) return;
+
+    function closeSeedMenu() {
+      seedMenu.classList.add('hidden');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    toggleBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var isOpen = !seedMenu.classList.contains('hidden');
+      seedMenu.classList.toggle('hidden', isOpen);
+      toggleBtn.setAttribute('aria-expanded', String(!isOpen));
+    });
+    document.addEventListener('click', closeSeedMenu);
+    seedMenu.addEventListener('click', function (e) { e.stopPropagation(); });
+
+    function setBusy(yes, loadingBtn) {
+      [toggleBtn, gapsBtn, forceBtn].forEach(function (b) {
+        b.disabled = !!yes;
+        if (yes) {
+          if (loadingBtn && b === loadingBtn) b.classList.add('btn-loading');
+          else b.classList.remove('btn-loading');
+        } else {
+          b.classList.remove('btn-loading');
+        }
+      });
+    }
+
+    function describeSeedStats(st) {
+      st = st || {};
+      var e = st.email || {};
+      if (e.seeded != null || e.skipped != null) {
+        return L_SEED_BODIES + ': ' + (e.seeded != null ? e.seeded : '0') + ' ' + L_SEED_UPD + ', ' + (e.skipped != null ? e.skipped : '0') + ' ' + L_SEED_LEFT;
+      }
+      return '';
+    }
+
+    function doSeed(force, activeBtn) {
+      if (force && !window.confirm(MSG_SEED_CONFIRM_FORCE)) return;
+      setBusy(true, activeBtn);
+      ((window.getFetch && window.getFetch()) || fetch)(CAMPAIGN_EMAIL_SEED_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfForEmailPreview()
+        },
+        body: JSON.stringify({ force: !!force })
+      }).then(function (resp) {
+        return resp.json().then(function (payload) {
+          return { ok: resp.ok, status: resp.status, payload: payload || {} };
+        });
+      }).then(function (r) {
+        setBusy(false);
+        if (r.ok && r.payload && r.payload.success) {
+          var line = describeSeedStats(r.payload.stats) || cfg.t.seedingCompleted;
+          if (window.showAlert) {
+            window.showAlert(line, 'success', null, function () { window.location.reload(); });
+          } else {
+            window.location.reload();
+          }
+          return;
+        }
+        var err = (r.payload && (r.payload.message || r.payload.error)) ? (r.payload.message || r.payload.error) : (cfg.t.seedingFailed + (r.status ? ' (' + r.status + ')' : ''));
+        if (window.showAlert) window.showAlert(String(err), 'error');
+      }).catch(function () {
+        setBusy(false);
+        if (window.showAlert) window.showAlert(cfg.t.networkErrorSeeding, 'error');
+      });
+    }
+
+    gapsBtn.addEventListener('click', function () {
+      closeSeedMenu();
+      doSeed(false, toggleBtn);
+    });
+    forceBtn.addEventListener('click', function () {
+      closeSeedMenu();
+      doSeed(true, toggleBtn);
+    });
+  })();
+
+  document.addEventListener('settings-tab-activated', function (e) {
+    if (!e.detail || e.detail.tab !== 'campaign-emails') return;
+    var campaignSel = document.getElementById('campaign-email-template-selector');
+    if (campaignSel && campaignSel.value && typeof showEmailTemplate === 'function') {
+      showEmailTemplate(campaignSel.value);
+    }
+  });
+
   /* ── Sync in-memory data → hidden inputs on form submit ── */
   var form = document.getElementById('manage-settings-form');
   if (form) {
@@ -2795,7 +2927,7 @@
       try {
         copyEmailTinymceToTextareaForAll();
         document.querySelectorAll('.email-template-editor').forEach(function (editor) {
-          var textarea    = editor.querySelector('textarea[id^="email_template_"]');
+          var textarea    = editor.querySelector('textarea.email-template-body-textarea');
           var hiddenInput = editor.querySelector('input[type="hidden"][id$="-translations"]');
           if (!textarea || !hiddenInput) return;
           var key = textarea.id;
@@ -2811,6 +2943,7 @@
           }
           hiddenInput.value = JSON.stringify(cleaned);
         });
+        syncCampaignTemplateMetadataHidden();
       } catch (err) {
         if (typeof window.__clientWarn === 'function') {
           window.__clientWarn('[settings-save] email-template sync failed: ' + ((err && err.message) || err));
@@ -3206,26 +3339,6 @@
     return { ok: true, skipped: false, paths: paths };
   }
 
-  function collectTemplateMetadataFromEditors() {
-    var meta = {};
-    document.querySelectorAll('.email-template-editor').forEach(function (editor) {
-      var id = editor.id || '';
-      if (id.indexOf('editor-') !== 0) return;
-      var key = id.replace('editor-', '');
-      var labelEl = editor.querySelector('.template-metadata-label');
-      var titleEl = editor.querySelector('.template-metadata-title');
-      var messageEl = editor.querySelector('.template-metadata-message');
-      var priorityEl = editor.querySelector('.template-metadata-priority');
-      meta[key] = {
-        label: (labelEl && labelEl.value) ? labelEl.value.trim() : '',
-        notification_title: (titleEl && titleEl.value) ? titleEl.value.trim() : '',
-        notification_message: (messageEl && messageEl.value) ? messageEl.value.trim() : '',
-        priority: (priorityEl && priorityEl.value) ? priorityEl.value.trim() : 'normal'
-      };
-    });
-    return meta;
-  }
-
   function collectEmailTemplatesFromHidden() {
     // Each hidden input contains JSON { lang: html }
     var out = {};
@@ -3245,65 +3358,10 @@
     try { return JSON.stringify(obj || {}); } catch (_) { return '{}'; }
   }
 
-  /* The hidden ``template-metadata-json`` is rendered server-side from
-     ``get_template_metadata()`` which exposes ``label/title/message/priority``,
-     but the persistence layer keeps ``label/notification_title/notification_message/priority``.
-     ``collectTemplateMetadataFromEditors`` writes the persistence shape, so normalise both
-     to the persistence shape before comparing — otherwise metaChanged is always true and
-     the email-templates API runs on every save. */
-  function normalizeEmailTemplateMetadataShape(meta) {
-    var out = {};
-    if (!meta || typeof meta !== 'object') return out;
-    Object.keys(meta).forEach(function (key) {
-      var entry = meta[key];
-      if (!entry || typeof entry !== 'object') return;
-      var label = entry.label != null ? String(entry.label).trim() : '';
-      var title = entry.notification_title != null
-        ? String(entry.notification_title).trim()
-        : (entry.title != null ? String(entry.title).trim() : '');
-      var message = entry.notification_message != null
-        ? String(entry.notification_message).trim()
-        : (entry.message != null ? String(entry.message).trim() : '');
-      var priority = entry.priority != null ? String(entry.priority).trim() : '';
-      out[key] = {
-        label: label,
-        notification_title: title,
-        notification_message: message,
-        priority: priority || 'normal'
-      };
-    });
-    return out;
-  }
-
-  /* Sorted-key JSON for two-level objects (template_key → metadata fields). */
-  function stableStringifyEmailMetadata(metaByKey) {
-    if (!metaByKey || typeof metaByKey !== 'object') return '{}';
-    var outerKeys = Object.keys(metaByKey).sort();
-    var ordered = {};
-    outerKeys.forEach(function (k) {
-      var entry = metaByKey[k] || {};
-      var innerKeys = Object.keys(entry).sort();
-      var inner = {};
-      innerKeys.forEach(function (ik) { inner[ik] = entry[ik]; });
-      ordered[k] = inner;
-    });
-    try { return JSON.stringify(ordered); } catch (_) { return '{}'; }
-  }
-
   async function saveEmailTemplatesIfChanged() {
     var currentTemplates = collectEmailTemplatesFromHidden();
-    var currentMeta = collectTemplateMetadataFromEditors();
-
-    // Compare to initial snapshots stored in the hidden metadata input (server-rendered).
-    var metaInput = document.getElementById('template-metadata-json');
-    var metaInitialRaw = metaInput ? ((decodeEntities(metaInput.value || '') || '').trim() || '{}') : '{}';
-    var metaInitialParsed = {};
-    try { metaInitialParsed = JSON.parse(metaInitialRaw) || {}; } catch (_) { metaInitialParsed = {}; }
-    var metaInitialNormalized = stableStringifyEmailMetadata(normalizeEmailTemplateMetadataShape(metaInitialParsed));
-    var metaCurrentNormalized = stableStringifyEmailMetadata(normalizeEmailTemplateMetadataShape(currentMeta));
 
     // Initial template values are already present in the hidden inputs on load; we compare raw JSON.
-    // This is intentionally conservative: if any editor wrote changes into hidden inputs, we treat as dirty.
     var templatesInitialRaw = {};
     document.querySelectorAll('input[data-settings-email-template-hidden="1"]').forEach(function (inp) {
       var id = inp.id || '';
@@ -3316,13 +3374,12 @@
       templatesNowRaw[k] = stableJson(currentTemplates[k]);
     });
 
-    var metaChanged = metaCurrentNormalized !== metaInitialNormalized;
     var templatesChanged = false;
     Object.keys(templatesNowRaw).forEach(function (k) {
       if ((templatesInitialRaw[k] || '{}') !== templatesNowRaw[k]) templatesChanged = true;
     });
 
-    if (!metaChanged && !templatesChanged) {
+    if (!templatesChanged) {
       return { success: true, skipped: true };
     }
 
@@ -3349,14 +3406,132 @@
         'X-CSRFToken': csrf
       },
       body: JSON.stringify({
-        email_templates_b64: b64,
-        template_metadata: currentMeta
+        email_templates_b64: b64
       })
     });
     var payload = {};
     try { payload = await resp.json(); } catch (_) {}
     if (!resp.ok || !payload || payload.success !== true) {
       throw new Error((payload && payload.message) ? payload.message : ('Failed to save email templates (' + resp.status + ')'));
+    }
+    return { success: true, skipped: false };
+  }
+
+  function syncCampaignTemplateMetadataHidden() {
+    var hidden = document.getElementById('campaign-template-metadata-json');
+    if (!hidden) return;
+    hidden.value = JSON.stringify(collectCampaignTemplateMetadataFromEditors());
+  }
+
+  function collectCampaignEmailTemplatesFromHidden() {
+    var out = {};
+    document.querySelectorAll('input[data-campaign-email-template-hidden="1"]').forEach(function (inp) {
+      var id = inp.id || '';
+      if (!id || id.indexOf('-translations') === -1) return;
+      var key = id.replace(/-translations$/, '');
+      var parsed = {};
+      try { parsed = JSON.parse(decodeEntities(inp.value || '') || '{}') || {}; } catch (_) { parsed = {}; }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) parsed = {};
+      out[key] = parsed;
+    });
+    return out;
+  }
+
+  function collectCampaignTemplateMetadataFromEditors() {
+    var out = {};
+    document.querySelectorAll('.campaign-template-metadata-label').forEach(function (inp) {
+      var key = inp.getAttribute('data-tpl-key');
+      if (!key) return;
+      if (!out[key]) out[key] = {};
+      out[key].label = (inp.value || '').trim();
+    });
+    document.querySelectorAll('.campaign-template-metadata-priority').forEach(function (sel) {
+      var key = sel.getAttribute('data-tpl-key');
+      if (!key) return;
+      if (!out[key]) out[key] = {};
+      out[key].priority = (sel.value || 'normal').trim() || 'normal';
+    });
+    document.querySelectorAll('.campaign-template-metadata-title').forEach(function (inp) {
+      var key = inp.getAttribute('data-tpl-key');
+      if (!key) return;
+      if (!out[key]) out[key] = {};
+      out[key].compose_title = (inp.value || '').trim();
+    });
+    document.querySelectorAll('.campaign-template-metadata-message').forEach(function (ta) {
+      var key = ta.getAttribute('data-tpl-key');
+      if (!key) return;
+      if (!out[key]) out[key] = {};
+      out[key].compose_message = (ta.value || '').trim();
+    });
+    return out;
+  }
+
+  async function saveCampaignEmailTemplatesIfChanged() {
+    if (!cfg.urls.campaignEmailTemplates) {
+      return { success: true, skipped: true };
+    }
+
+    syncCampaignTemplateMetadataHidden();
+    var currentTemplates = collectCampaignEmailTemplatesFromHidden();
+    var currentMetadata = collectCampaignTemplateMetadataFromEditors();
+
+    var templatesInitialRaw = {};
+    document.querySelectorAll('input[data-campaign-email-template-hidden="1"]').forEach(function (inp) {
+      var id = inp.id || '';
+      var key = id.replace(/-translations$/, '');
+      templatesInitialRaw[key] = (decodeEntities(inp.defaultValue || inp.value || '') || '').trim() || '{}';
+    });
+
+    var metadataHidden = document.getElementById('campaign-template-metadata-json');
+    var metadataInitialRaw = metadataHidden
+      ? (decodeEntities(metadataHidden.defaultValue || metadataHidden.value || '') || '').trim() || '{}'
+      : '{}';
+
+    var templatesNowRaw = {};
+    Object.keys(currentTemplates || {}).forEach(function (k) {
+      templatesNowRaw[k] = stableJson(currentTemplates[k]);
+    });
+    var metadataNowRaw = stableJson(currentMetadata);
+
+    var templatesChanged = false;
+    Object.keys(templatesNowRaw).forEach(function (k) {
+      if ((templatesInitialRaw[k] || '{}') !== templatesNowRaw[k]) templatesChanged = true;
+    });
+    var metadataChanged = metadataInitialRaw !== metadataNowRaw;
+    if (!templatesChanged && !metadataChanged) {
+      return { success: true, skipped: true };
+    }
+
+    var b64 = {};
+    Object.keys(currentTemplates || {}).forEach(function (tplKey) {
+      var langMap = currentTemplates[tplKey] || {};
+      if (!langMap || typeof langMap !== 'object') return;
+      b64[tplKey] = {};
+      Object.keys(langMap).forEach(function (lang) {
+        var html = langMap[lang];
+        if (typeof html !== 'string') return;
+        var trimmed = html.trim();
+        if (!trimmed) return;
+        b64[tplKey][lang] = base64EncodeUtf8(trimmed);
+      });
+    });
+
+    var csrf = getCsrfToken();
+    var resp = await ((window.getFetch && window.getFetch()) || fetch)(cfg.urls.campaignEmailTemplates, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrf
+      },
+      body: JSON.stringify({
+        email_templates_b64: b64,
+        template_metadata: currentMetadata
+      })
+    });
+    var payload = {};
+    try { payload = await resp.json(); } catch (_) {}
+    if (!resp.ok || !payload || payload.success !== true) {
+      throw new Error((payload && payload.message) ? payload.message : ('Failed to save campaign email templates (' + resp.status + ')'));
     }
     return { success: true, skipped: false };
   }
@@ -3378,6 +3553,8 @@
       log('email-templates');
       var emailTemplatesSaveResult = await saveEmailTemplatesIfChanged();
       log('email-templates-done');
+      var campaignEmailTemplatesSaveResult = await saveCampaignEmailTemplatesIfChanged();
+      log('campaign-email-templates-done');
 
       await uploadBrandingVisualAssetsIfNeeded();
 
@@ -3393,7 +3570,7 @@
       // Temporarily disable hidden email-template inputs and metadata to keep request small.
       // try/finally below guarantees they are re-enabled even on network/JSON errors.
       var disabled = [];
-      document.querySelectorAll('input[data-settings-email-template-hidden="1"], input[data-settings-email-metadata-hidden="1"]').forEach(function (inp) {
+      document.querySelectorAll('input[data-settings-email-template-hidden="1"], input[data-settings-email-metadata-hidden="1"], input[data-campaign-email-template-hidden="1"], input[data-campaign-email-metadata-hidden="1"]').forEach(function (inp) {
         if (!inp.disabled) {
           inp.disabled = true;
           disabled.push(inp);
@@ -3414,7 +3591,8 @@
           /* Email template JSON lives in inputs without a `name` attribute (WAF / size), so they are
              omitted from FormData and never appear in this diff. Email content is saved via the
              dedicated API above; when that ran, treat as a successful save even if changedKeys is empty. */
-          var emailTemplatesPersisted = emailTemplatesSaveResult && emailTemplatesSaveResult.skipped !== true;
+          var emailTemplatesPersisted = (emailTemplatesSaveResult && emailTemplatesSaveResult.skipped !== true)
+            || (campaignEmailTemplatesSaveResult && campaignEmailTemplatesSaveResult.skipped !== true);
           if (changedKeys.length === 0) {
             delete form.dataset.settingsSaveInFlight;
             setSaveButtonSaving(false, originalSubmitHtml);

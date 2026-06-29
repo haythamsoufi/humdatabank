@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from sqlalchemy import and_, exists
+from sqlalchemy.orm import joinedload
 
 from app.extensions import db
 from app.models import CountryAccessRequest, UserEntityPermission
@@ -121,3 +122,31 @@ def reconcile_fulfilled_pending_country_access_requests(
 
     db.session.flush()
     return len(requests_to_close)
+
+
+def pending_country_access_requests_by_fds_member() -> dict[int, list[CountryAccessRequest]]:
+    """
+    Group pending access requests by the country's assigned FDS member.
+
+    Requests for countries without an FDS member are omitted.
+    """
+    pending = (
+        pending_country_access_requests_query()
+        .options(
+            joinedload(CountryAccessRequest.user),
+            joinedload(CountryAccessRequest.country),
+        )
+        .order_by(CountryAccessRequest.created_at.asc())
+        .all()
+    )
+    grouped: dict[int, list[CountryAccessRequest]] = {}
+    for req in pending:
+        country = req.country
+        fds_user_id = country.fds_member_user_id if country else None
+        if not fds_user_id:
+            continue
+        grouped.setdefault(int(fds_user_id), []).append(req)
+    return grouped
+
+
+FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX = "Country Access Requests - "

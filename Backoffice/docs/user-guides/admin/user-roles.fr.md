@@ -92,7 +92,7 @@ Les rôles d'administrateur fournissent l'accès aux fonctions administratives. 
 - Alternative à la sélection manuelle de nombreux rôles d'administration granulaires
 
 **Inclut :**
-- Tous les rôles de modules d'administration (Utilisateurs, Modèles, Missions, Pays, Indicateurs, Contenu, Analytiques, Audit, Explorateur de données, IA, Notifications, Traductions, API)
+- Tous les rôles de modules d'administration (Utilisateurs, Modèles, Missions, Pays, Indicateurs, Contenu, Analytiques, Audit, Explorateur de données, IA, Communication, Traductions, API)
 - **Exclut :** Paramètres et Plugins (ceux-ci doivent être assignés séparément)
 - **Inclut :** Tous les rôles du préréglage Essentiels administrateur (voir ci-dessous)
 
@@ -270,12 +270,12 @@ Ces rôles fournissent l'accès à des modules d'administration spécifiques. As
 
 **Quand l'utiliser :** Pour les administrateurs de système IA.
 
-#### Administrateur : Gestionnaire de notifications
-**Code de rôle :** `admin_notifications_manager`
+#### Administrateur : Gestionnaire de communication
+**Code de rôle :** `admin_communication_manager`
 
 **Capacités :**
-- Voir toutes les notifications
-- Envoyer des notifications
+- Voir toutes les communications
+- Envoyer des notifications, e-mails et push depuis le Centre de communication
 
 **Quand l'utiliser :** Pour les administrateurs de communication.
 

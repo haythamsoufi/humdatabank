@@ -1,6 +1,7 @@
 {% extends "core/layout.html" %}
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+{% from "macros/modal_shell.html" import modal_shell %}
 
 {% block title %}{{ _('Country Access Requests') }}{% endblock %}
 
@@ -49,6 +50,38 @@
             width: 100%;
             justify-content: center;
         }
+        .access-req-fds-filter {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            max-width: 11rem;
+        }
+        .access-req-fds-filter select {
+            appearance: none;
+            -webkit-appearance: none;
+            background: transparent;
+            border: 0;
+            box-shadow: none;
+            margin: 0;
+            padding: 0 1.125rem 0 0;
+            width: 100%;
+            max-width: 11rem;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            color: #374151;
+            cursor: pointer;
+        }
+        .access-req-fds-filter select:focus {
+            outline: none;
+            box-shadow: none;
+        }
+        .access-req-fds-filter .access-req-fds-filter-chevron {
+            position: absolute;
+            right: 0;
+            pointer-events: none;
+            font-size: 0.625rem;
+            color: #6b7280;
+        }
     </style>
 {% endblock %}
 
@@ -66,13 +99,15 @@
         'text': _('Approve All') ~ ' (' ~ pending_requests|length ~ ')'
     }) %}
 {% endif %}
-{% set __ = header_actions.items.append({
-    'type': 'link',
-    'text': _('Back to Users'),
-    'url': url_for('user_management.manage_users'),
-    'icon': 'fas fa-users',
-    'classes': 'professional-action-btn'
-}) %}
+{% if can_manage_fds_digest %}
+    {% set __ = header_actions.items.append({
+        'type': 'button',
+        'text': _('Digest emails'),
+        'icon': 'fas fa-envelope-open-text',
+        'classes': 'professional-action-btn',
+        'attributes': {'id': 'openFdsDigestSettingsBtn', 'aria-haspopup': 'dialog'}
+    }) %}
+{% endif %}
 
 {{ page_header(
     title=_('Country Access Requests'),
@@ -117,8 +152,19 @@
         </button>
       {% endcall %}
     </div>
-    <div class="flex shrink-0 items-center px-4 pb-3 sm:px-6 sm:pb-3">
-      <label for="groupByRequestToggle" class="inline-flex items-center gap-2.5 cursor-pointer select-none text-sm text-gray-700">
+    <div class="flex shrink-0 flex-row flex-nowrap items-center gap-3 px-4 pb-3 sm:px-6 sm:pb-3">
+      {% if fds_member_options %}
+      <div class="access-req-fds-filter shrink-0">
+        <select id="fdsMemberFilter" aria-label="{{ _('Team member') }}">
+          <option value="">{{ _('All team members') }}</option>
+          {% for option in fds_member_options %}
+          <option value="{{ option.id }}"{% if default_fds_member_user_id == option.id %} selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+        <i class="fas fa-chevron-down access-req-fds-filter-chevron" aria-hidden="true"></i>
+      </div>
+      {% endif %}
+      <label for="groupByRequestToggle" class="inline-flex shrink-0 items-center gap-2.5 cursor-pointer select-none whitespace-nowrap text-sm text-gray-700">
         <span>{{ _('Group by request') }}</span>
         <span class="relative inline-flex shrink-0 items-center">
           <input type="checkbox" id="groupByRequestToggle" class="sr-only peer" aria-describedby="groupByRequestToggleHint" />
@@ -165,12 +211,84 @@
   </div>
 </div>
 
+{% if can_manage_fds_digest %}
+{% call modal_shell('fds-access-request-digest-modal', _('FDS digest emails'), max_width='max-w-lg') %}
+  <form method="POST" action="{{ url_for('user_management.update_access_requests_digest_settings') }}" class="space-y-5">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <p class="text-sm text-gray-600 leading-relaxed">
+      {{ _('Daily email to FDS members who have pending country access requests for countries they oversee. Skipped when auto-approve is enabled via environment variable. Edit the email template under System Configuration → Emails.') }}
+    </p>
+
+    <div class="rounded-lg border border-gray-200 overflow-hidden">
+      <div class="flex items-start justify-between gap-4 p-4 bg-white">
+        <div class="min-w-0 pr-2">
+          <span class="block text-sm font-medium text-gray-900">{{ _('Send daily digest emails') }}</span>
+          <span class="block text-xs text-gray-500 mt-1 leading-snug">
+            {{ _('Each FDS member receives at most one digest per day when they have pending requests.') }}
+          </span>
+        </div>
+        <label class="relative inline-flex shrink-0 items-center cursor-pointer select-none mt-0.5" title="{{ _('Send daily digest emails') }}">
+          <input type="checkbox"
+                 name="fds_access_request_digest_enabled"
+                 value="1"
+                 {% if fds_access_request_digest_enabled %}checked{% endif %}
+                 class="sr-only peer" />
+          <div class="relative w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
+
+      <div class="border-t border-gray-200 p-4 bg-gray-50">
+        <label for="fds-access-request-digest-local-hour" class="block text-sm font-medium text-gray-700 mb-1.5">
+          {{ _('Send time (%(tz)s)', tz=fds_access_request_digest_timezone_label) }}
+        </label>
+        <select id="fds-access-request-digest-local-hour"
+                name="fds_access_request_digest_local_hour"
+                class="block w-full max-w-xs rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm bg-white">
+          {% for hour in range(24) %}
+          <option value="{{ hour }}" {% if fds_access_request_digest_local_hour == hour %}selected{% endif %}>
+            {{ '%02d:00'|format(hour) }} {{ fds_access_request_digest_timezone_label }}
+          </option>
+          {% endfor %}
+        </select>
+        <p class="text-xs text-gray-500 mt-2 leading-relaxed">
+          {{ _('The job runs at the start of each hour and sends when this hour matches in %(tz)s time (CET/CEST).', tz=fds_access_request_digest_timezone_label) }}
+        </p>
+      </div>
+    </div>
+
+    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1 border-t border-gray-100">
+      <button type="button" class="btn btn-secondary close-modal w-full sm:w-auto">
+        {{ _('Cancel') }}
+      </button>
+      <button type="submit" class="btn btn-primary w-full sm:w-auto">
+        <i class="fas fa-save mr-1.5"></i>{{ _('Save digest settings') }}
+      </button>
+    </div>
+  </form>
+{% endcall %}
+{% endif %}
+
 {% endblock %}
 
 {% block extra_js %}
     <!-- AG Grid JS -->
     {% from "components/ag_grid_includes.html" import ag_grid_js %}
     {{ ag_grid_js() }}
+
+    {% if can_manage_fds_digest %}
+    <script nonce="{{ csp_nonce() }}">
+    (function() {
+        var openBtn = document.getElementById('openFdsDigestSettingsBtn');
+        var modal = document.getElementById('fds-access-request-digest-modal');
+        if (openBtn && modal && window.ModalUtils) {
+            var digestModal = window.ModalUtils.makeModal(modal, { closeSelector: '.close-modal' });
+            openBtn.addEventListener('click', function() {
+                digestModal.openModal();
+            });
+        }
+    })();
+    </script>
+    {% endif %}
 
     <script nonce="{{ csp_nonce() }}">
     const GROUP_BY_REQUEST_PENDING_STORAGE_KEY = 'accessRequestsGroupByRequestPending';
@@ -188,6 +306,8 @@
     const USER_NOTE_LABEL = {{ _('User note')|tojson|safe }};
     const RESOLUTION_NOTE_LABEL = {{ _('Resolution')|tojson|safe }};
     const ADMIN_NOTE_LABEL = {{ _('Admin note')|tojson|safe }};
+    const DEFAULT_FDS_MEMBER_USER_ID = {{ default_fds_member_user_id|tojson|safe }};
+    const FDS_MEMBER_FILTER_STORAGE_KEY = 'accessRequestsFdsMemberFilter';
 
     function userAccessRequestsActionUrl(userId, action) {
         return ACCESS_REQUESTS_BASE_URL.replace(/\/?$/, '') + '/user/' + userId + '/' + action;
@@ -326,6 +446,12 @@
             user_active: {{ r.user.active|tojson|safe }},
             user_profile_color: {{ ((r.user.profile_color if r.user.profile_color else '') or '')|tojson|safe }},
             country_name: {{ r.country.name|tojson|safe }},
+            country_id: {{ r.country_id|tojson|safe }},
+            fds_member_user_id: {{ (r.country.fds_member_user_id if r.country else None)|tojson|safe }},
+            fds_member_name: {{ ((r.country.fds_member_user.name or r.country.fds_member_user.email) if r.country and r.country.fds_member_user else '')|tojson|safe }},
+            fds_member_email: {{ ((r.country.fds_member_user.email or '') if r.country and r.country.fds_member_user else '')|tojson|safe }},
+            fds_member_active: {{ (r.country.fds_member_user.active if r.country and r.country.fds_member_user else True)|tojson|safe }},
+            fds_member_profile_color: {{ ((r.country.fds_member_user.profile_color if r.country and r.country.fds_member_user and r.country.fds_member_user.profile_color else '') or '')|tojson|safe }},
             created_at: {{ (r.created_at|datetime_iso if r.created_at else '')|tojson|safe }},
             request_message: {{ (r.request_message or '')|tojson|safe }},
             approve_url: "{{ url_for('user_management.approve_access_request', request_id=r.id) }}",
@@ -346,6 +472,12 @@
             user_active: {{ r.user.active|tojson|safe }},
             user_profile_color: {{ ((r.user.profile_color if r.user.profile_color else '') or '')|tojson|safe }},
             country_name: {{ r.country.name|tojson|safe }},
+            country_id: {{ r.country_id|tojson|safe }},
+            fds_member_user_id: {{ (r.country.fds_member_user_id if r.country else None)|tojson|safe }},
+            fds_member_name: {{ ((r.country.fds_member_user.name or r.country.fds_member_user.email) if r.country and r.country.fds_member_user else '')|tojson|safe }},
+            fds_member_email: {{ ((r.country.fds_member_user.email or '') if r.country and r.country.fds_member_user else '')|tojson|safe }},
+            fds_member_active: {{ (r.country.fds_member_user.active if r.country and r.country.fds_member_user else True)|tojson|safe }},
+            fds_member_profile_color: {{ ((r.country.fds_member_user.profile_color if r.country and r.country.fds_member_user and r.country.fds_member_user.profile_color else '') or '')|tojson|safe }},
             status: {{ r.status|tojson|safe }},
             processed_by_id: {{ (r.processed_by_user_id if r.processed_by_user_id else None)|tojson|safe }},
             processed_by_email: {{ (r.processed_by.email if r.processed_by else '-')|tojson|safe }},
@@ -360,6 +492,32 @@
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
+
+    function getSelectedFdsMemberFilter() {
+        const select = document.getElementById('fdsMemberFilter');
+        if (!select) {
+            return '';
+        }
+        return select.value || '';
+    }
+
+    function filterRequestsByFdsMember(rows) {
+        const selected = getSelectedFdsMemberFilter();
+        if (!selected) {
+            return rows;
+        }
+        return (rows || []).filter(function(row) {
+            return String(row.fds_member_user_id || '') === String(selected);
+        });
+    }
+
+    function getFilteredPendingSource() {
+        return filterRequestsByFdsMember(pendingRequestsData);
+    }
+
+    function getFilteredProcessedSource() {
+        return filterRequestsByFdsMember(processedRequestsData);
+    }
 
     function renderPendingActionsCell(params, grouped) {
         const requests = grouped ? (params.data.requests || []) : [params.data];
@@ -411,6 +569,51 @@
         return rows.join('');
     }
 
+    function summarizeFdsMembersForGroup(requests) {
+        const ids = Array.from(new Set(
+            (requests || [])
+                .map(function(r) { return r.fds_member_user_id; })
+                .filter(function(id) { return id !== null && id !== undefined && id !== ''; })
+        ));
+        const names = Array.from(new Set(
+            (requests || [])
+                .map(function(r) { return (r.fds_member_name || '').trim(); })
+                .filter(Boolean)
+        ));
+        const firstWithMember = (requests || []).find(function(r) { return r.fds_member_user_id; }) || {};
+
+        if (ids.length === 0) {
+            return {
+                fds_member_user_id: null,
+                fds_member_name: '',
+                fds_member_email: '',
+                fds_member_active: true,
+                fds_member_profile_color: '',
+                multiple_fds_members: false
+            };
+        }
+
+        if (ids.length === 1) {
+            return {
+                fds_member_user_id: ids[0],
+                fds_member_name: firstWithMember.fds_member_name || names[0] || '',
+                fds_member_email: firstWithMember.fds_member_email || '',
+                fds_member_active: firstWithMember.fds_member_active !== false,
+                fds_member_profile_color: firstWithMember.fds_member_profile_color || '',
+                multiple_fds_members: false
+            };
+        }
+
+        return {
+            fds_member_user_id: null,
+            fds_member_name: names.join(', '),
+            fds_member_email: '',
+            fds_member_active: true,
+            fds_member_profile_color: '',
+            multiple_fds_members: true
+        };
+    }
+
     function groupPendingByUser(rows) {
         const byUser = new Map();
         rows.forEach(function(row) {
@@ -440,7 +643,8 @@
         });
         return Array.from(byUser.values()).map(function(group) {
             const uniqueMessages = Array.from(new Set(group.request_messages));
-            return Object.assign({}, group, {
+            const fdsSummary = summarizeFdsMembersForGroup(group.requests);
+            return Object.assign({}, group, fdsSummary, {
                 request_count: group.requests.length,
                 country_names_display: group.country_names.join(', '),
                 request_message: uniqueMessages.join('\n\n')
@@ -489,7 +693,8 @@
             const firstRequest = group.requests[0] || {};
             const multipleProcessedBy = uniqueProcessedBy.length > 1;
             const statusSummary = summarizeRequestStatuses(group.requests);
-            return Object.assign({}, group, {
+            const fdsSummary = summarizeFdsMembersForGroup(group.requests);
+            return Object.assign({}, group, fdsSummary, {
                 request_count: group.requests.length,
                 country_names_display: group.country_names.join(', '),
                 request_message: uniqueMessages.join('\n\n'),
@@ -714,6 +919,39 @@
         };
     }
 
+    function createFdsMemberColumnDef() {
+        return {
+            colId: 'fds_member_name',
+            field: 'fds_member_name',
+            headerName: '{{ _("FDS Member") }}',
+            width: 180,
+            minWidth: 150,
+            maxWidth: 280,
+            filter: 'agTextColumnFilter',
+            sortable: true,
+            hide: true,
+            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' },
+            cellRenderer: function(params) {
+                if (!params.data || !params.data.fds_member_user_id) {
+                    if (params.data && params.data.multiple_fds_members && params.value) {
+                        return '<span class="text-sm text-gray-600">' +
+                            AgGridRenderers.escapeHtml(params.value) + '</span>';
+                    }
+                    return '<span class="text-gray-400">—</span>';
+                }
+                return AgGridRenderers.userHoverCell(params, {
+                    idField: 'fds_member_user_id',
+                    nameField: 'fds_member_name',
+                    emailField: 'fds_member_email',
+                    activeField: 'fds_member_active',
+                    profileColorField: 'fds_member_profile_color',
+                    fallbackLabel: '{{ _("Unknown User") }}',
+                    showEmail: true
+                });
+            }
+        };
+    }
+
     function getAccessRequestsRowHeight(params) {
         if (!params || !params.data) {
             return undefined;
@@ -747,16 +985,16 @@
 
     function createPendingColumnOrder(grouped) {
         if (grouped) {
-            return ['created_at', 'user_name', 'country', 'request_message', 'actions'];
+            return ['created_at', 'user_name', 'country', 'fds_member_name', 'request_message', 'actions'];
         }
-        return ['created_at', 'user_name', 'country', 'request_message', 'id', 'actions'];
+        return ['created_at', 'user_name', 'country', 'fds_member_name', 'request_message', 'id', 'actions'];
     }
 
     function createProcessedColumnOrder(grouped) {
         if (grouped) {
-            return ['created_at', 'user_name', 'country', 'request_message', 'status', 'processed_by_email', 'processed_at'];
+            return ['created_at', 'user_name', 'country', 'fds_member_name', 'request_message', 'status', 'processed_by_email', 'processed_at'];
         }
-        return ['created_at', 'user_name', 'country', 'request_message', 'status', 'processed_by_email', 'processed_at', 'id'];
+        return ['created_at', 'user_name', 'country', 'fds_member_name', 'request_message', 'status', 'processed_by_email', 'processed_at', 'id'];
     }
 
     function createPendingActionsColumnDef(grouped) {
@@ -836,6 +1074,7 @@
                     filter: 'agTextColumnFilter',
                     sortable: true
                 },
+            createFdsMemberColumnDef(),
             createMessageColumnDef(),
             createPendingActionsColumnDef(grouped)
         );
@@ -884,6 +1123,7 @@
                     filter: 'agTextColumnFilter',
                     sortable: true
                 },
+            createFdsMemberColumnDef(),
             createProcessedMessageColumnDef(),
             {
                 colId: 'status',
@@ -938,18 +1178,20 @@
     }
 
     function getPendingRowData() {
-        return isGroupByUserForPending() ? groupPendingByUser(pendingRequestsData) : pendingRequestsData;
+        const source = getFilteredPendingSource();
+        return isGroupByUserForPending() ? groupPendingByUser(source) : source;
     }
 
     function getProcessedRowData() {
-        return isGroupByUserForProcessed() ? groupProcessedByUser(processedRequestsData) : processedRequestsData;
+        const source = getFilteredProcessedSource();
+        return isGroupByUserForProcessed() ? groupProcessedByUser(source) : source;
     }
 
     function updateAccessRequestTabLabels() {
         const pendingTab = document.getElementById('tab-pending');
         const processedCountEl = document.getElementById('processedTabCount');
         if (pendingTab) {
-            const pendingReqCount = pendingRequestsData.length;
+            const pendingReqCount = getFilteredPendingSource().length;
             const pendingRowCount = getPendingRowData().length;
             let pendingLabel = String(pendingReqCount);
             if (isGroupByUserForPending() && pendingRowCount !== pendingReqCount) {
@@ -1082,7 +1324,36 @@
         });
     }
 
+    function setupFdsMemberFilter() {
+        const select = document.getElementById('fdsMemberFilter');
+        if (!select) {
+            return;
+        }
+        const stored = localStorage.getItem(FDS_MEMBER_FILTER_STORAGE_KEY);
+        if (stored !== null) {
+            const hasOption = Array.from(select.options).some(function(opt) {
+                return opt.value === stored;
+            });
+            if (hasOption) {
+                select.value = stored;
+            }
+        } else if (DEFAULT_FDS_MEMBER_USER_ID !== null && DEFAULT_FDS_MEMBER_USER_ID !== undefined) {
+            const defaultValue = String(DEFAULT_FDS_MEMBER_USER_ID);
+            const hasDefault = Array.from(select.options).some(function(opt) {
+                return opt.value === defaultValue;
+            });
+            if (hasDefault) {
+                select.value = defaultValue;
+            }
+        }
+        select.addEventListener('change', function() {
+            localStorage.setItem(FDS_MEMBER_FILTER_STORAGE_KEY, select.value || '');
+            applyGroupByUserView();
+        });
+    }
+
     function initializeAccessRequestsGrids() {
+        setupFdsMemberFilter();
         initializePendingGrid();
         setupGroupByRequestToggle();
         setupAccessRequestsTabs();

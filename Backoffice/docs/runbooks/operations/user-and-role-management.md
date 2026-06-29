@@ -126,7 +126,7 @@ Permission codes used in the system follow the pattern `admin.<area>.<action>`. 
 | `admin.indicator_bank.*` | Indicator Bank CRUD |
 | `admin.analytics.view` | Analytics dashboard |
 | `admin.audit.view` | Audit trail |
-| `admin.notifications.manage` | Outbound notifications from Admin |
+| `admin.communication.manage` | Communication Center (view/send from Admin) |
 | `admin.organization.manage` | Org structure (branches/sub-branches) |
 
 System Manager has all permissions. Other roles inherit a curated set. Do not hand-assign individual permissions without updating the RBAC seed in `python -m flask rbac seed`.

@@ -275,5 +275,8 @@ class TestClassifyOrphanEmailLog:
     def test_welcome(self):
         assert classify_orphan_email_log('Welcome to Humanitarian Databank') == 'welcome'
 
+    def test_fds_access_request_digest(self):
+        assert classify_orphan_email_log('Country Access Requests - 2 pending request(s)') == 'fds_access_request_digest'
+
     def test_unsupported(self):
         assert classify_orphan_email_log('Random subject') == 'unsupported'

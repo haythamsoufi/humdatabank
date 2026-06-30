@@ -1,10 +1,14 @@
 <!DOCTYPE html>
-<html lang="{{ lang }}"{% if is_rtl %} dir="rtl"{% endif %}>
+<html lang="{{ lang }}" dir="{{ 'rtl' if is_rtl else 'ltr' }}">
 <head>
     <meta charset="utf-8">
     <title>{{ page_title }}</title>
+    {% if is_rtl %}
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    {% endif %}
 </head>
-<body>
+<body{% if is_rtl %} class="pdf-rtl"{% endif %}>
     <header class="pdf-running-header">
         <table class="pdf-header-table">
             <tr>

@@ -14549,6 +14549,11 @@ msgstr "PDF dokumentum"
 msgid "PDF generation is not available on this deployment."
 msgstr ""
 
+#: app/services/documentation_pdf_service.py:104
+msgid "Generated on %(date)s"
+msgstr "Létrehozva: %(date)s"
+
+
 #: app/templates/components/_ai_policy_modal.html:30
 msgid "PII scrubbing to reduce exposure of personal data."
 msgstr "A PII törlés a személyes adatok kitettségének csökkentése érdekében."

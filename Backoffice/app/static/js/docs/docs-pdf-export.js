@@ -8,13 +8,12 @@
     var isExporting = false;
 
     function sanitizeFilename(name) {
-        var cleaned = (name || 'documentation')
-            .replace(/[^\w\s\u00C0-\u024F\u0600-\u06FF.-]/g, '')
+        var cleaned = (name || 'Documentation')
+            .replace(/[\\/:*?"<>|]/g, '')
+            .replace(/\s+/g, ' ')
             .trim()
-            .replace(/\s+/g, '-')
-            .replace(/-+/g, '-')
-            .replace(/^-|-$/g, '');
-        return (cleaned || 'documentation').substring(0, 80);
+            .replace(/\.+$/, '');
+        return (cleaned || 'Documentation').substring(0, 120);
     }
 
     function getExportPdfUrl() {
@@ -25,15 +24,31 @@
         return path + '/export.pdf';
     }
 
+    function isPlaceholderFilename(name) {
+        if (!name) return true;
+        var stem = name.replace(/\.pdf$/i, '');
+        return !stem || /^[\s_.-]+$/.test(stem);
+    }
+
     function parseFilenameFromDisposition(header) {
         if (!header) return null;
-        var match = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(header);
-        if (!match) return null;
-        try {
-            return decodeURIComponent(match[1] || match[2]);
-        } catch (e) {
-            return match[1] || match[2];
+        var utf8Match = /filename\*=UTF-8''([^;\s]+)/i.exec(header);
+        if (utf8Match) {
+            try {
+                return decodeURIComponent(utf8Match[1].replace(/\+/g, ' '));
+            } catch (e) {
+                /* fall through */
+            }
         }
+        var quoted = /filename="([^"]+)"/i.exec(header);
+        if (quoted && !isPlaceholderFilename(quoted[1])) {
+            return quoted[1];
+        }
+        var plain = /filename=([^;\s]+)/i.exec(header);
+        if (plain && !isPlaceholderFilename(plain[1])) {
+            return plain[1].replace(/^"|"$/g, '');
+        }
+        return null;
     }
 
     function setButtonState(button, exporting) {

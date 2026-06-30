@@ -14065,6 +14065,11 @@ msgstr "上传文档"
 msgid "PDF generation is not available on this deployment."
 msgstr ""
 
+#: app/services/documentation_pdf_service.py:104
+msgid "Generated on %(date)s"
+msgstr "生成于 %(date)s"
+
+
 #: app/templates/components/_ai_policy_modal.html:30
 msgid "PII scrubbing to reduce exposure of personal data."
 msgstr ""

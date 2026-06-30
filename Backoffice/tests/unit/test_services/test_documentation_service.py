@@ -686,6 +686,33 @@ class TestRenderMarkdownFile:
                 )
                 assert result is not None  # returns Markup("")
 
+    def test_translated_doc_mirrors_english_heading_fragments(self, app):
+        with app.app_context():
+            from app.services.documentation_service import render_markdown_file
+            with tempfile.TemporaryDirectory() as tmpdir:
+                root = Path(tmpdir)
+                (root / "guide.md").write_text(
+                    "# English Title\n\n## Data Ownership\n\nEnglish body.",
+                    encoding="utf-8",
+                )
+                (root / "guide.ru.md").write_text(
+                    "# Русский заголовок\n\n"
+                    "## Владение данными\n\n"
+                    "См. [Data ownership](#data-ownership).",
+                    encoding="utf-8",
+                )
+                result = str(
+                    render_markdown_file(
+                        root=root,
+                        file_path=root / "guide.ru.md",
+                        current_rel="guide.ru.md",
+                        doc_url_builder=lambda r: f"/docs/{r}",
+                        asset_url_builder=lambda r: f"/assets/{r}",
+                    )
+                )
+                assert 'id="data-ownership"' in result
+                assert 'href="#data-ownership"' in result
+
 
 class TestExtractPageTitle:
     def test_extracts_h1(self, app):
@@ -901,6 +928,22 @@ class TestResolveDocPath:
                         from app.services.documentation_service import resolve_doc_path
                         path, base_rel = resolve_doc_path(root, "")
                         assert path.name == "README.md"
+
+    def test_empty_path_admin_prefers_user_landing(self, app):
+        with app.app_context():
+            with tempfile.TemporaryDirectory() as tmpdir:
+                root = Path(tmpdir)
+                (root / "README.md").write_text("# Docs", encoding="utf-8")
+                landing = root / "getting-started"
+                landing.mkdir(parents=True)
+                (landing / "start-here.md").write_text("# Start EN", encoding="utf-8")
+                (landing / "start-here.ar.md").write_text("# Start AR", encoding="utf-8")
+                with patch("app.services.documentation_service._get_user_language", return_value="ar"):
+                    with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=True):
+                        from app.services.documentation_service import resolve_doc_path
+                        path, base_rel = resolve_doc_path(root, "", prefer_user_landing=True)
+                        assert path.name == "start-here.ar.md"
+                        assert base_rel == "getting-started/start-here.md"
 
     def test_empty_path_non_admin_gets_landing(self, app):
         with app.app_context():

@@ -304,45 +304,29 @@ html[dir="rtl"] .sidebar-icon.ml-12 { margin-right: 3rem !important; }
     text-align: right;
 }
 
-/* RTL Headings - flip borders from left to right */
-.docs-prose[dir="rtl"] h1 {
-    border-left: none;
-    border-right: 4px solid #3b82f6;
+/* RTL Headings — borders/padding use logical properties in documentation.html */
+.docs-prose[dir="rtl"] h1,
+.docs-prose[dir="rtl"] h2,
+.docs-prose[dir="rtl"] h3,
+.docs-prose[dir="rtl"] h4,
+.docs-prose[dir="rtl"] h5,
+.docs-prose[dir="rtl"] h6 {
     text-align: right;
 }
 
-.docs-prose[dir="rtl"] h2 {
-    border-left: none;
-    border-right: 3px solid #6366f1;
-    text-align: right;
-}
-
-.docs-prose[dir="rtl"] h3 {
-    border-left: none;
-    border-right: 2px solid #8b5cf6;
-    text-align: right;
-}
-
-.docs-prose[dir="rtl"] h4 {
-    border-left: none;
-    border-right: 2px solid #a78bfa;
-    padding-left: 0;
-    padding-right: 0.5rem;
-    text-align: right;
-}
-
-/* RTL Lists - flip padding from left to right */
+/* RTL Lists — padding uses logical properties in documentation.html */
 .docs-prose[dir="rtl"] ul,
 .docs-prose[dir="rtl"] ol {
-    padding-left: 0;
-    padding-right: 1.75rem;
     text-align: right;
 }
 
-/* RTL Blockquotes - flip border from left to right */
+/* RTL Blockquotes — border uses logical properties in documentation.html */
 .docs-prose[dir="rtl"] blockquote {
-    border-left: none;
-    border-right: 4px solid #3b82f6;
+    text-align: right;
+}
+
+/* RTL definition lists */
+.docs-prose[dir="rtl"] dd {
     text-align: right;
 }
 
@@ -421,13 +405,8 @@ html[dir="rtl"] .sidebar-icon.ml-12 { margin-right: 3rem !important; }
     direction: rtl;
 }
 
-.docs-container[dir="rtl"] .nav-category-items {
-    margin-left: 0;
-    margin-right: 0.5rem;
-    padding-left: 0;
-    padding-right: 0.5rem;
-    border-left: none;
-    border-right: 2px solid #e5e7eb;
+.docs-container[dir="rtl"] .nav-category-items,
+.docs-container.docs-rtl .nav-category-items {
     direction: rtl;
     text-align: right;
 }
@@ -438,13 +417,8 @@ html[dir="rtl"] .sidebar-icon.ml-12 { margin-right: 3rem !important; }
     direction: rtl;
 }
 
-.docs-container[dir="rtl"] .nav-item-active {
-    border-left: none;
-    border-right: 2px solid #3b82f6;
-    margin-left: 0;
-    margin-right: -0.5rem;
-    padding-left: 0.75rem;
-    padding-right: 1rem;
+.docs-container[dir="rtl"] .nav-item-active,
+.docs-container.docs-rtl .nav-item-active {
     text-align: right;
     direction: rtl;
 }
@@ -467,25 +441,15 @@ html[dir="rtl"] .sidebar-icon.ml-12 { margin-right: 3rem !important; }
     direction: rtl;
 }
 
-/* RTL Search input - flip icon positioning and text alignment */
+/* RTL Search input — icon/clear use logical inset in documentation.html */
 .docs-container[dir="rtl"] .docs-search-container {
     direction: rtl;
 }
 
-.docs-container[dir="rtl"] .docs-search-input {
-    padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+.docs-container[dir="rtl"] .docs-search-input,
+.docs-container.docs-rtl .docs-search-input {
     direction: rtl;
     text-align: right;
-}
-
-.docs-container[dir="rtl"] .docs-search-icon {
-    right: auto;
-    left: 0.75rem;
-}
-
-.docs-container[dir="rtl"] .docs-search-clear {
-    right: auto;
-    left: 0.75rem;
 }
 
 /* RTL Navigation header text */

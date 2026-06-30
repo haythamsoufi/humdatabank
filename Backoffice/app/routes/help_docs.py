@@ -65,6 +65,7 @@ def export_pdf_index():
         user=current_user,
         visible_top_level_dirs=VISIBLE_TOP_LEVEL_DIRS,
         doc_url_builder=_build_doc_url,
+        prefer_user_landing=True,
     )
 
 
@@ -88,6 +89,7 @@ def export_pdf_doc(doc_path: str):
         user=current_user,
         visible_top_level_dirs=VISIBLE_TOP_LEVEL_DIRS,
         doc_url_builder=_build_doc_url,
+        prefer_user_landing=True,
     )
 
 
@@ -102,7 +104,9 @@ def index():
     build_doc_url = _build_doc_url
     build_asset_url = lambda rel_asset: url_for("help_docs.asset", asset_path=rel_asset)
 
-    file_path, current_rel = docs.resolve_doc_path(root, "", current_user)
+    file_path, current_rel = docs.resolve_doc_path(
+        root, "", current_user, prefer_user_landing=True
+    )
     docs.ensure_doc_page_access(
         current_user,
         current_rel,
@@ -156,7 +160,9 @@ def view_doc(doc_path: str):
     build_doc_url = _build_doc_url
     build_asset_url = lambda rel_asset: url_for("help_docs.asset", asset_path=rel_asset)
 
-    file_path, current_rel = docs.resolve_doc_path(root, doc_path, current_user)
+    file_path, current_rel = docs.resolve_doc_path(
+        root, doc_path, current_user, prefer_user_landing=True
+    )
     docs.ensure_doc_page_access(
         current_user,
         current_rel,

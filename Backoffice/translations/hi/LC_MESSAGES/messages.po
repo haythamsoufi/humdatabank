@@ -14095,6 +14095,11 @@ msgstr "दस्तावेज़ अपलोड करें"
 msgid "PDF generation is not available on this deployment."
 msgstr ""
 
+#: app/services/documentation_pdf_service.py:104
+msgid "Generated on %(date)s"
+msgstr "%(date)s को जनरेट किया गया"
+
+
 #: app/templates/components/_ai_policy_modal.html:30
 msgid "PII scrubbing to reduce exposure of personal data."
 msgstr ""

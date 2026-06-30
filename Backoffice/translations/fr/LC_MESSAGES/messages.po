@@ -14876,6 +14876,10 @@ msgstr "Télécharger un document"
 msgid "PDF generation is not available on this deployment."
 msgstr "La génération PDF n’est pas disponible dans ce déploiement."
 
+#: app/services/documentation_pdf_service.py:104
+msgid "Generated on %(date)s"
+msgstr "Généré le %(date)s"
+
 #: app/templates/components/_ai_policy_modal.html:30
 msgid "PII scrubbing to reduce exposure of personal data."
 msgstr ""
@@ -15629,7 +15633,7 @@ msgstr "Power BI"
 
 #: app/templates/admin/api_management.html:702
 msgid "Power Query (M) — Excel & Power BI"
-msgstr "Power Query (M) — Excel et Power BI"
+msgstr "Power Query (M) - Excel et Power BI"
 
 #: app/templates/core/layout.html:184 app/templates/core/layout.html:454
 msgid "Powered by"

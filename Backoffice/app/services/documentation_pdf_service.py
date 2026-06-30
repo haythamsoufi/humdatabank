@@ -13,12 +13,14 @@ import re
 import tempfile
 from pathlib import Path
 from typing import Callable, Dict, Optional
+from urllib.parse import quote
 
 from flask import Response, current_app, render_template, request, send_file
 from flask_babel import _, force_locale, format_datetime
 from werkzeug.exceptions import ServiceUnavailable
 
 from app.services import documentation_service as docs
+from app.services.documentation_service import _prettify_stem
 from app.services.app_settings_service import _strip_visual_path_prefixes
 from app.utils.branding_visual_assets import relative_path_under_branding
 from app.utils.datetime_helpers import get_org_timezone, utcnow
@@ -49,12 +51,24 @@ def _pdf_asset_url_builder(root: Path) -> Callable[[str], str]:
 
 
 def pdf_filename(page_title: str, current_rel: str) -> str:
-    """Build a safe download filename for a documentation PDF."""
-    base = (page_title or "").strip() or Path(current_rel or "documentation").stem or "documentation"
-    cleaned = re.sub(r"[^\w\s\u00C0-\u024F\u0600-\u06FF.-]", "", base, flags=re.UNICODE)
-    cleaned = re.sub(r"\s+", "-", cleaned.strip())
-    cleaned = re.sub(r"-+", "-", cleaned).strip("-").lower()
-    return (cleaned[:80] or "documentation") + ".pdf"
+    """Build a safe, human-readable download filename for a documentation PDF."""
+    base = (page_title or "").strip()
+    if not base:
+        rel_stem = Path(current_rel or "documentation").stem
+        base = _prettify_stem(rel_stem) if rel_stem else "Documentation"
+    if not base:
+        base = "Documentation"
+
+    # Drop characters that are invalid in common filesystems; keep spaces and casing.
+    cleaned = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "", base)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip().rstrip(".")
+    cleaned = cleaned[:120] or "Documentation"
+    return f"{cleaned}.pdf"
+
+
+def _attachment_disposition(download_name: str) -> str:
+    """RFC 5987 attachment header — avoids ASCII fallbacks that strip non-Latin text."""
+    return f"attachment; filename*=UTF-8''{quote(download_name, safe='')}"
 
 
 def _resolve_logo_uri_for_pdf(logo_path: str) -> Optional[str]:
@@ -95,13 +109,15 @@ def _build_pdf_branding_context(lang: str, page_title: str) -> Dict[str, object]
     generated_at = utcnow().astimezone(get_org_timezone())
 
     with force_locale(lang):
+        formatted_date = format_datetime(generated_at, format="medium")
         return {
             "org_name": get_org_name(locale=lang),
             "logo_uri": logo_uri,
             "page_title": page_title,
             "is_rtl": _is_rtl(lang),
             "lang": lang,
-            "generated_on": _("Generated on %(date)s", date=format_datetime(generated_at, format="medium")),
+            "generated_on": _("Generated on %(date)s")
+            % {"date": formatted_date},
             "page_label": _("Page"),
         }
 
@@ -379,13 +395,51 @@ def _pdf_css(branding: Dict[str, object]) -> str:
         page-break-inside: avoid;
     }}
 
-    html[dir="rtl"] body {{
+    html[dir="rtl"] body,
+    html[dir="rtl"] .pdf-running-header,
+    html[dir="rtl"] .pdf-running-footer,
+    html[dir="rtl"] .doc-title,
+    html[dir="rtl"] .docs-prose {{
         direction: rtl;
+        text-align: right;
+        font-family: {body_font};
+    }}
+
+    html[dir="rtl"] .docs-prose h1,
+    html[dir="rtl"] .docs-prose h2,
+    html[dir="rtl"] .docs-prose h3,
+    html[dir="rtl"] .docs-prose h4,
+    html[dir="rtl"] .docs-prose h5,
+    html[dir="rtl"] .docs-prose h6,
+    html[dir="rtl"] .docs-prose p,
+    html[dir="rtl"] .docs-prose li,
+    html[dir="rtl"] .docs-prose dt,
+    html[dir="rtl"] .docs-prose dd,
+    html[dir="rtl"] .docs-prose th,
+    html[dir="rtl"] .docs-prose td {{
         text-align: right;
     }}
 
-    html[dir="rtl"] .docs-prose th, html[dir="rtl"] .docs-prose td {{
-        text-align: right;
+    html[dir="rtl"] .docs-prose dd {{
+        margin-right: 1.5rem;
+        margin-left: 0;
+        padding-right: 0.75rem;
+        padding-left: 0;
+        border-right: 2pt solid #e2e8f0;
+        border-left: none;
+    }}
+
+    html[dir="rtl"] .docs-prose pre,
+    html[dir="rtl"] .docs-prose .highlight,
+    html[dir="rtl"] .docs-prose pre code {{
+        direction: ltr;
+        text-align: left;
+    }}
+
+    html[dir="rtl"] .docs-prose :not(pre) > code,
+    html[dir="rtl"] .docs-prose kbd,
+    html[dir="rtl"] .docs-prose samp {{
+        direction: ltr;
     }}
     """
 
@@ -442,9 +496,12 @@ def send_doc_pdf(
     user,
     visible_top_level_dirs: set[str],
     doc_url_builder: Callable[[str], str],
+    prefer_user_landing: bool = False,
 ) -> Response:
     """Resolve a doc, enforce access, and return a PDF download response."""
-    file_path, current_rel = docs.resolve_doc_path(root, doc_path, user)
+    file_path, current_rel = docs.resolve_doc_path(
+        root, doc_path, user, prefer_user_landing=prefer_user_landing
+    )
     docs.ensure_doc_page_access(
         user,
         current_rel,
@@ -458,9 +515,12 @@ def send_doc_pdf(
         page_title=page_title,
         doc_url_builder=doc_url_builder,
     )
-    return send_file(
+    download_name = pdf_filename(page_title, current_rel)
+    response = send_file(
         io.BytesIO(pdf_bytes),
         mimetype="application/pdf",
         as_attachment=True,
-        download_name=pdf_filename(page_title, current_rel),
+        download_name=download_name,
     )
+    response.headers["Content-Disposition"] = _attachment_disposition(download_name)
+    return response

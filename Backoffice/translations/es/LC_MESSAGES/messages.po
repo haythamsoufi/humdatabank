@@ -14844,6 +14844,10 @@ msgstr "Subir Documento"
 msgid "PDF generation is not available on this deployment."
 msgstr "La generación de PDF no está disponible en este despliegue."
 
+#: app/services/documentation_pdf_service.py:104
+msgid "Generated on %(date)s"
+msgstr "Generado el %(date)s"
+
 #: app/templates/components/_ai_policy_modal.html:30
 msgid "PII scrubbing to reduce exposure of personal data."
 msgstr ""
@@ -15593,7 +15597,7 @@ msgstr "Power BI"
 
 #: app/templates/admin/api_management.html:702
 msgid "Power Query (M) — Excel & Power BI"
-msgstr "Power Query (M) — Excel y Power BI"
+msgstr "Power Query (M) - Excel y Power BI"
 
 #: app/templates/core/layout.html:184 app/templates/core/layout.html:454
 msgid "Powered by"

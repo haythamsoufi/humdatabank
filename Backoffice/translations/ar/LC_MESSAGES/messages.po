@@ -14516,6 +14516,11 @@ msgstr "رفع مستند"
 msgid "PDF generation is not available on this deployment."
 msgstr "توليد PDF غير متاح في هذا النشر."
 
+#: app/services/documentation_pdf_service.py:104
+msgid "Generated on %(date)s"
+msgstr "تم الإنشاء في %(date)s"
+
+
 #: app/templates/components/_ai_policy_modal.html:30
 msgid "PII scrubbing to reduce exposure of personal data."
 msgstr "مسح المعلومات الشخصية لتقليل كشف البيانات الشخصية."

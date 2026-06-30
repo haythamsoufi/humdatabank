@@ -17,6 +17,7 @@ It is used by both:
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
@@ -108,6 +109,62 @@ def _prettify_stem(stem: str) -> str:
     if len(parts) >= 2 and len(parts[-1]) in (2, 3) and parts[-1].isalpha():
         stem = ".".join(parts[:-1])
     return stem.replace("_", " ").replace("-", " ").strip().title() or "Documentation"
+
+
+def _heading_ids_from_markdown(text: str, *, skip_first_h1: bool = True) -> List[str]:
+    """Return heading anchor IDs in document order, matching the TOC extension."""
+    from markdown.extensions.toc import slugify
+
+    ids: List[str] = []
+    skip_h1 = skip_first_h1
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line.startswith("#"):
+            continue
+        level = len(line) - len(line.lstrip("#"))
+        if level < 1 or level > 6:
+            continue
+        title = line[level:].strip()
+        explicit = re.search(r"\{#([^}]+)\}\s*$", title)
+        if explicit:
+            ids.append(explicit.group(1).strip())
+            if level == 1:
+                skip_h1 = False
+            continue
+        title = re.sub(r"\s*\{#[^}]+\}\s*$", "", title).strip()
+        if skip_h1 and level == 1:
+            skip_h1 = False
+            continue
+        slug = slugify(title, separator="-")
+        ids.append(slug or f"section-{len(ids) + 1}")
+    return ids
+
+
+def _mirror_english_heading_fragment_ids(html: str, base_markdown: str) -> str:
+    """
+    Add English heading IDs as alias anchors on translated pages.
+
+    Translated headings often auto-slug to empty or opaque IDs (e.g. ``_2``) while
+    cross-links still reference stable English fragments such as ``#data-ownership``.
+    """
+    en_ids = _heading_ids_from_markdown(base_markdown, skip_first_h1=True)
+    if not en_ids:
+        return html
+
+    soup = BeautifulSoup(html, "html.parser")
+    headings = soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6"])
+    if not headings:
+        return html
+
+    existing = {el.get("id") for el in soup.find_all(id=True) if el.get("id")}
+    for heading, en_id in zip(headings, en_ids):
+        if not en_id or en_id in existing:
+            continue
+        anchor = soup.new_tag("a", id=en_id)
+        heading.insert(0, anchor)
+        existing.add(en_id)
+
+    return str(soup)
 
 
 def _get_user_language() -> str:
@@ -825,7 +882,13 @@ def build_hierarchical_nav(
     return nav_categories
 
 
-def resolve_doc_path(root: Path, doc_path: str, user=None) -> Tuple[Path, str]:
+def resolve_doc_path(
+    root: Path,
+    doc_path: str,
+    user=None,
+    *,
+    prefer_user_landing: bool = False,
+) -> Tuple[Path, str]:
     """
     Resolve a requested doc path safely under root.
 
@@ -835,16 +898,19 @@ def resolve_doc_path(root: Path, doc_path: str, user=None) -> Tuple[Path, str]:
       - "api/README" (appends .md)
 
     When doc_path is empty, non-admins land on a user guide (not docs/README.md, which lists internal areas).
+    When prefer_user_landing is True (e.g. /help/docs), use that user landing for all users so localized
+    getting-started content is shown instead of the internal English-only docs index.
     """
     raw = (doc_path or "").strip().lstrip("/").replace("\\", "/")
+    user_landing_candidates = (
+        DOCS_NON_ADMIN_LANDING_REL,
+        "getting-started/README.md",
+    )
     if not raw:
-        if _user_is_admin_or_system_manager(user):
-            candidates = ("README.md",)
+        if prefer_user_landing or not _user_is_admin_or_system_manager(user):
+            candidates = user_landing_candidates
         else:
-            candidates = (
-                DOCS_NON_ADMIN_LANDING_REL,
-                "getting-started/README.md",
-            )
+            candidates = ("README.md",)
         chosen: Optional[str] = None
         for candidate in candidates:
             p = (root / candidate).resolve()
@@ -855,13 +921,17 @@ def resolve_doc_path(root: Path, doc_path: str, user=None) -> Tuple[Path, str]:
             abort(404)
         raw = chosen
 
-    if _is_root_readme_request(raw) and not _user_is_admin_or_system_manager(user):
+    if _is_root_readme_request(raw) and (
+        prefer_user_landing or not _user_is_admin_or_system_manager(user)
+    ):
         raw = DOCS_NON_ADMIN_LANDING_REL
 
     if not raw.lower().endswith(".md"):
         raw = f"{raw}.md"
 
-    if raw.lower() == "readme.md" and not _user_is_admin_or_system_manager(user):
+    if raw.lower() == "readme.md" and (
+        prefer_user_landing or not _user_is_admin_or_system_manager(user)
+    ):
         raw = DOCS_NON_ADMIN_LANDING_REL
 
     # Language-aware resolution:
@@ -1144,6 +1214,19 @@ def render_markdown_file(
         asset_url_builder=asset_url_builder,
     )
     html = _deduplicate_html_ids(html)
+
+    base_rel, rel_lang = _split_rel_lang(current_rel)
+    if rel_lang:
+        base_path = root / base_rel
+        if base_path.is_file():
+            try:
+                base_text = base_path.read_text(encoding="utf-8", errors="replace")
+            except Exception as e:
+                current_app.logger.debug("read_text failed for base doc: %s", e)
+                base_text = ""
+            if base_text:
+                html = _mirror_english_heading_fragment_ids(html, base_text)
+
     return Markup(html)
 
 

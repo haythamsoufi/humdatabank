@@ -186,6 +186,10 @@
             try { return JSON.parse(el.textContent || '[]'); } catch(e) { return []; }
         })();
 
+    function isRtlLang(code) {
+        return ['ar', 'fa', 'he', 'ur'].includes(String(code || '').toLowerCase().split('_')[0]);
+    }
+
     // Column definitions for ag-grid - dynamically generated
     const columnDefs = [
         {
@@ -265,6 +269,7 @@
         }
     ].concat((cfg.languages || []).map(function(code) {
         var langName = (cfg.languageNames && cfg.languageNames[code]) || (cfg.allLanguageNames && cfg.allLanguageNames[code]) || code.toUpperCase();
+        var rtl = isRtlLang(code);
         return {
             field: code,
             headerName: langName,
@@ -274,6 +279,7 @@
             filter: 'agTextColumnFilter',
             sortable: true,
             wrapText: true,
+            cellClass: rtl ? 'translations-grid-rtl-cell' : undefined,
             cellRenderer: function(params) {
                 const value = params.value || '';
                 const hasPlaceholders = /%\([^)]+\)[sd]|%(?:[sd]|\.\d+[fd])/.test(value);
@@ -281,10 +287,15 @@
                 if (hasPlaceholders) {
                     display = '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 mr-1" title="' + cfg.t.containsPlaceholders + '"><i class="fas fa-code mr-1"></i>' + display + '</span>';
                 }
-                return '<div title="' + value.replace(/"/g, '&quot;') + '">' + display + '</div>';
+                const rtlAttrs = rtl ? ' dir="rtl" style="direction:rtl;text-align:start;"' : '';
+                return '<div' + rtlAttrs + ' title="' + value.replace(/"/g, '&quot;') + '">' + display + '</div>';
             },
             cellStyle: function(params) {
                 const baseStyle = { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' };
+                if (rtl) {
+                    baseStyle.direction = 'rtl';
+                    baseStyle['text-align'] = 'start';
+                }
                 if (params.data && params.data.removed) {
                     baseStyle['background-color'] = '#fff7f7';
                     baseStyle['color'] = '#9ca3af';

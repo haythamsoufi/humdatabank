@@ -92,6 +92,13 @@
         .action-dropdown-item form {
             display: contents;
         }
+
+        /* RTL formatting for Arabic and other RTL language columns in the translations grid */
+        .ag-cell.translations-grid-rtl-cell {
+            direction: rtl;
+            text-align: start;
+            font-family: 'Tajawal', Arial, sans-serif;
+        }
     </style>
 {% endblock %}
 

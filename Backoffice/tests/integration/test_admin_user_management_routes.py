@@ -237,6 +237,39 @@ class TestAccessRequestsListRoute:
         assert b'id="fds-access-request-digest-modal"' in resp.data
         assert b'id="fds-access-request-digest-local-hour"' in resp.data
         assert b'digest-settings' in resp.data
+        assert b'Send digest now' in resp.data or b'send digest now' in resp.data.lower()
+        assert b'Last sent' in resp.data or b'last sent' in resp.data.lower()
+
+    def test_digest_send_post_requires_system_manager(self, logged_in_admin_client, db_session):
+        resp = _admin_post(
+            logged_in_admin_client,
+            "/admin/access-requests/digest-send",
+            data={},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+
+    def test_digest_send_post_system_manager(self, logged_in_sm_client, db_session, app):
+        with app.app_context():
+            with patch(
+                "app.services.email.fds_access_request_digest.run_fds_access_request_digest_job",
+            ) as mock_run:
+                from app.services.email.fds_access_request_digest import FdsDigestRunResult
+
+                mock_run.return_value = FdsDigestRunResult(
+                    ran=True,
+                    sent_count=2,
+                    skipped_count=0,
+                    failed_count=0,
+                )
+                resp = _admin_post(
+                    logged_in_sm_client,
+                    "/admin/access-requests/digest-send",
+                    data={},
+                    follow_redirects=True,
+                )
+            assert resp.status_code == 200
+            mock_run.assert_called_once_with(manual=True)
 
     def test_digest_settings_modal_hidden_from_non_system_manager(self, logged_in_admin_client, db_session):
         resp = _admin_get(logged_in_admin_client, "/admin/access-requests")

@@ -134,6 +134,17 @@ def _decode_translation_payload(data):
         return None, json_bad_request(_("Invalid translation payload"))
 
 
+def _msgid_from_payload(data):
+    """Return msgid from request data without stripping.
+
+    Gettext message IDs can include significant leading/trailing whitespace.
+    """
+    raw = data.get("msgid")
+    if raw is None:
+        return ""
+    return str(raw)
+
+
 @bp.route("/translations/manage", methods=["GET"])
 @permission_required("admin.translations.manage")
 def manage_translations():
@@ -1057,7 +1068,7 @@ def edit_translation():
         if err:
             return err
 
-        msgid = (data.get('msgid') or '').strip()
+        msgid = _msgid_from_payload(data)
         if not msgid:
             return json_bad_request(_("msgid is required"))
 
@@ -1161,26 +1172,17 @@ def edit_translation():
     return redirect(url_for('utilities.manage_translations'))
 
 
-@bp.route("/translations/delete-removed", methods=["POST"])
-@permission_required("admin.translations.manage")
-def delete_removed_translation():
-    """Remove obsolete (#~) PO entries for a msgid from all locale files (active entries are never deleted)."""
-    if not request.is_json:
-        return json_bad_request(_("Expected JSON body"))
+def _purge_obsolete_po_entries(msgid=None):
+    """Remove obsolete (#~) PO entries across all locale files.
 
-    data = get_request_data()
-    data, err = _decode_translation_payload(data)
-    if err:
-        return err
-
-    msgid = (data.get("msgid") or "").strip()
-    if not msgid:
-        return json_bad_request(_("msgid is required"))
-
+    When *msgid* is set, only entries with that exact msgid are removed.
+    Otherwise all obsolete entries are purged.
+    Returns (files_updated, entries_removed, file_errors).
+    """
     try:
         import polib  # type: ignore
     except ImportError:
-        return json_server_error(_("Translation tools are not available (polib missing)."))
+        return 0, 0, ['polib']
 
     from config import Config
     languages = current_app.config.get("SUPPORTED_LANGUAGES", Config.LANGUAGES)
@@ -1197,16 +1199,40 @@ def delete_removed_translation():
             po = polib.pofile(po_file_path)
             removed_here = 0
             for entry in list(po):
-                if entry.msgid == msgid and getattr(entry, "obsolete", False):
-                    po.remove(entry)
-                    removed_here += 1
+                if not getattr(entry, "obsolete", False):
+                    continue
+                if msgid is not None and entry.msgid != msgid:
+                    continue
+                po.remove(entry)
+                removed_here += 1
             if removed_here:
                 po.save(po_file_path)
                 files_updated += 1
                 entries_removed += removed_here
         except Exception as ex:
-            logger.warning("delete_removed_translation failed for %s: %s", po_file_path, ex)
+            logger.warning("_purge_obsolete_po_entries failed for %s: %s", po_file_path, ex)
             file_errors.append(lang)
+
+    return files_updated, entries_removed, file_errors
+
+
+@bp.route("/translations/delete-removed", methods=["POST"])
+@permission_required("admin.translations.manage")
+def delete_removed_translation():
+    """Remove obsolete (#~) PO entries for a msgid from all locale files (active entries are never deleted)."""
+    if not request.is_json:
+        return json_bad_request(_("Expected JSON body"))
+
+    data = get_request_data()
+    data, err = _decode_translation_payload(data)
+    if err:
+        return err
+
+    msgid = _msgid_from_payload(data)
+    if not msgid:
+        return json_bad_request(_("msgid is required"))
+
+    files_updated, entries_removed, file_errors = _purge_obsolete_po_entries(msgid=msgid)
 
     if entries_removed == 0:
         if file_errors:
@@ -1216,6 +1242,41 @@ def delete_removed_translation():
         )
 
     message = _("Removed obsolete translation entries from %(count)d file(s)", count=files_updated)
+    if file_errors:
+        message = message + " " + _(
+            "Some languages could not be updated: %(langs)s",
+            langs=", ".join(file_errors),
+        )
+
+    return json_ok(
+        message=message,
+        files_updated=files_updated,
+        entries_removed=entries_removed,
+        partial_errors=file_errors or None,
+    )
+
+
+@bp.route("/translations/delete-all-removed", methods=["POST"])
+@permission_required("admin.translations.manage")
+def delete_all_removed_translations():
+    """Remove every obsolete (#~) PO entry from all locale files."""
+    if not request.is_json:
+        return json_bad_request(_("Expected JSON body"))
+
+    files_updated, entries_removed, file_errors = _purge_obsolete_po_entries()
+
+    if entries_removed == 0:
+        if file_errors:
+            return json_server_error(_("Could not update translation files."))
+        return json_bad_request(
+            _("No removed (obsolete) entries found. Try refreshing the page."),
+        )
+
+    message = _(
+        "Removed %(entries)d obsolete translation entries from %(count)d file(s)",
+        entries=entries_removed,
+        count=files_updated,
+    )
     if file_errors:
         message = message + " " + _(
             "Some languages could not be updated: %(langs)s",
@@ -1895,6 +1956,15 @@ def api_bulk_update_translations():
         from app.extensions import db
 
         data = get_json_safe()
+        err = require_json_data(data)
+        if err:
+            return err
+        # Frontend wraps body in { payload: b64 } to avoid WAF false positives on translated text.
+        data, err = _decode_translation_payload(data)
+        if err:
+            return err
+        if hasattr(data, 'to_dict'):
+            data = data.to_dict()
         err = require_json_keys(data, ['items'])
         if err:
             return err

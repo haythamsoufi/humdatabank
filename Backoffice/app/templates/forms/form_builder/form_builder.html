@@ -643,6 +643,21 @@
     auto_translate_permission_code='admin.templates.edit'
 ) }}
 
+{# Plugin Field Translation Modal #}
+{{ translation_modal(
+    modal_id='plugin-translation-modal',
+    modal_title=_('Plugin Field Translations'),
+    context='form_item',
+    tabs=[
+        {'id': 'labels', 'name': _('Field Label')},
+        {'id': 'descriptions', 'name': _('Description')}
+    ],
+    show_auto_translate=true,
+    css_prefix='plugin',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
 {# Matrix Item Translation Modal #}
 {{ translation_modal(
     modal_id='matrix-translation-modal',

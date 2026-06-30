@@ -72,7 +72,7 @@ Detailed setup for optional features and production:
 
 ## Language
 
-Documentation is shown in the language selected in **Account settings**. If a page is not yet translated, the English version is shown.
+Documentation is shown in the language selected in **Account settings**. Supported guide languages include **English**, **French**, **Spanish**, **Arabic**, and **Russian**. If a page is not yet translated, the English version is shown.
 
 ## Interactive tours (workflows)
 

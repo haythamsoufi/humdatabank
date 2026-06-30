@@ -668,6 +668,21 @@
 
     </div>{# /panel-branding #}
 
+    {{ translation_modal(
+        modal_id='org-branding-translations-modal',
+        modal_title=_('Organization Branding Translations'),
+        description=_('Translate the organization name and short name shown across the application.'),
+        context='template_name',
+        tabs=[
+            {'id': 'labels', 'name': _('Organization Name')},
+            {'id': 'definitions', 'name': _('Organization Short Name')}
+        ],
+        show_auto_translate=true,
+        css_prefix='org-branding',
+        auto_translate_permission_context='settings',
+        auto_translate_permission_code='admin.settings.manage'
+    ) }}
+
     {# ═══════════════ TAB: Emails ═══════════════ #}
     <div class="settings-panel hidden email-templates-panel" id="panel-emails">
     {# NOTE: Email templates are saved via JSON (base64) to avoid WAF false positives. #}
@@ -1537,8 +1552,8 @@ window.settingsPageConfig = {
 
 {# Import translation modal JavaScript and utilities #}
 <script type="module" nonce="{{ csp_nonce() }}">
-  import { TranslationModal } from '/static/js/components/translation-modal.js';
-  import { TranslationUtils } from '/static/js/components/translation-utils.js';
+  import { TranslationModal } from '{{ static_url('js/components/translation-modal.js') }}';
+  import { TranslationUtils } from '{{ static_url('js/components/translation-utils.js') }}';
 
   // Make TranslationUtils available globally (required by translation-modal.js)
   if (typeof window !== 'undefined') {

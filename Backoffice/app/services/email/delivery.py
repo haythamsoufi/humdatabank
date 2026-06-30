@@ -9,6 +9,21 @@ from app.models import EmailDeliveryLog
 from app.utils.datetime_helpers import utcnow
 
 
+SKIP_ERROR_PREFIX = '[Skipped] '
+
+
+def email_delivery_log_is_skipped(log: Optional[EmailDeliveryLog]) -> bool:
+    """True when the log was recorded as an intentional skip (not a send failure)."""
+    if log is None:
+        return False
+    return (log.error_message or '').startswith(SKIP_ERROR_PREFIX)
+
+
+def mark_email_skipped(log_id: int, reason: str) -> Optional[EmailDeliveryLog]:
+    """Record a deliberate skip (visible in Communication Center, not retryable)."""
+    return mark_email_failed(log_id, f'{SKIP_ERROR_PREFIX}{reason}', retry=False)
+
+
 def log_email_attempt(notification_id: Optional[int], user_id: int, email_address: str, subject: str) -> EmailDeliveryLog:
     """Create a log entry for an email attempt."""
     log = EmailDeliveryLog(
@@ -95,6 +110,9 @@ def email_delivery_log_can_retry(log: Optional[EmailDeliveryLog]) -> bool:
 
     if log.notification_id:
         return True
+
+    if email_delivery_log_is_skipped(log):
+        return False
 
     return classify_orphan_email_log(log.subject) != 'unsupported'
 

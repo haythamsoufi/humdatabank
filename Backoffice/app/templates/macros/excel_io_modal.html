@@ -55,7 +55,7 @@
     export_intro_html=none,
     import_intro_html=none
 ) -%}
-{% set _title = modal_title if modal_title is not none else (_('<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> ') ~ _('Excel Options')) %}
+{% set _title = modal_title if modal_title is not none else ('<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> ' ~ _('Excel Options')) %}
 {% set _export_tab_label = export_tab_label if export_tab_label is not none else _('Export') %}
 {% set _import_tab_label = import_tab_label if import_tab_label is not none else _('Import') %}
 {% set _export_label = export_label if export_label is not none else _('Export Excel (.xlsx)') %}

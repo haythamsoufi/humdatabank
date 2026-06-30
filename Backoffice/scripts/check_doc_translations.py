@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Check translation coverage for documentation files.
-Reports which files have French, Spanish, and Arabic translations.
+Reports which files have French, Spanish, Arabic, and Russian translations.
 """
 import logging
 import re
@@ -13,7 +13,7 @@ from collections import defaultdict
 def extract_base_name(filename):
     """Extract base name from filename, handling language variants."""
     # Pattern: name.lang.md or name.md
-    match = re.match(r'^(.+?)(?:\.(fr|es|ar))?\.md$', filename)
+    match = re.match(r'^(.+?)(?:\.(fr|es|ar|ru))?\.md$', filename)
     if match:
         return match.group(1), match.group(2)
     return filename, None
@@ -23,7 +23,7 @@ def check_translations(docs_dir):
     docs_path = Path(docs_dir)
 
     # Group files by base name
-    files_by_base = defaultdict(lambda: {'en': False, 'fr': False, 'es': False, 'ar': False, 'path': None})
+    files_by_base = defaultdict(lambda: {'en': False, 'fr': False, 'es': False, 'ar': False, 'ru': False, 'path': None})
 
     # Find all markdown files (excluding archive, _schema, and meta files)
     for md_file in docs_path.rglob('*.md'):
@@ -46,14 +46,15 @@ def check_translations(docs_dir):
 
         if lang is None:
             files_by_base[key]['en'] = True
-        elif lang in ['fr', 'es', 'ar']:
+        elif lang in ['fr', 'es', 'ar', 'ru']:
             files_by_base[key][lang] = True
 
     # Generate report
     missing_translations = {
         'fr': [],
         'es': [],
-        'ar': []
+        'ar': [],
+        'ru': [],
     }
 
     all_files = []
@@ -67,7 +68,8 @@ def check_translations(docs_dir):
             'en': info['en'],
             'fr': info['fr'],
             'es': info['es'],
-            'ar': info['ar']
+            'ar': info['ar'],
+            'ru': info['ru'],
         })
 
         if not info['fr']:
@@ -76,13 +78,15 @@ def check_translations(docs_dir):
             missing_translations['es'].append(info['path'])
         if not info['ar']:
             missing_translations['ar'].append(info['path'])
+        if not info['ru']:
+            missing_translations['ru'].append(info['path'])
 
     return all_files, missing_translations
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    docs_dir = Path(__file__).parent / 'docs'
+    docs_dir = Path(__file__).resolve().parent.parent / 'docs'
 
     all_files, missing = check_translations(docs_dir)
 
@@ -96,13 +100,16 @@ if __name__ == '__main__':
     with_fr = sum(1 for f in all_files if f['fr'])
     with_es = sum(1 for f in all_files if f['es'])
     with_ar = sum(1 for f in all_files if f['ar'])
-    fully_translated = sum(1 for f in all_files if f['fr'] and f['es'] and f['ar'])
+    with_ru = sum(1 for f in all_files if f['ru'])
+    fully_translated = sum(1 for f in all_files if f['fr'] and f['es'] and f['ar'] and f['ru'])
 
     logger.info("Total documentation files: %d", total)
-    logger.info("Files with French translation: %d (%.1f%%)", with_fr, with_fr/total*100)
-    logger.info("Files with Spanish translation: %d (%.1f%%)", with_es, with_es/total*100)
-    logger.info("Files with Arabic translation: %d (%.1f%%)", with_ar, with_ar/total*100)
-    logger.info("Fully translated (FR+ES+AR): %d (%.1f%%)", fully_translated, fully_translated/total*100)
+    if total:
+        logger.info("Files with French translation: %d (%.1f%%)", with_fr, with_fr / total * 100)
+        logger.info("Files with Spanish translation: %d (%.1f%%)", with_es, with_es / total * 100)
+        logger.info("Files with Arabic translation: %d (%.1f%%)", with_ar, with_ar / total * 100)
+        logger.info("Files with Russian translation: %d (%.1f%%)", with_ru, with_ru / total * 100)
+        logger.info("Fully translated (FR+ES+AR+RU): %d (%.1f%%)", fully_translated, fully_translated / total * 100)
     logger.info("")
 
     # Files missing translations
@@ -138,9 +145,19 @@ if __name__ == '__main__':
 
     # Files with all translations
     logger.info("=" * 80)
-    logger.info("FILES WITH ALL TRANSLATIONS (FR+ES+AR)")
+    logger.info("FILES MISSING RUSSIAN TRANSLATION")
     logger.info("=" * 80)
-    fully_translated_files = [f for f in all_files if f['fr'] and f['es'] and f['ar']]
+    if missing['ru']:
+        for path in sorted(missing['ru']):
+            logger.info("  - %s.md", path)
+    else:
+        logger.info("  All files have Russian translations!")
+    logger.info("")
+
+    logger.info("=" * 80)
+    logger.info("FILES WITH ALL TRANSLATIONS (FR+ES+AR+RU)")
+    logger.info("=" * 80)
+    fully_translated_files = [f for f in all_files if f['fr'] and f['es'] and f['ar'] and f['ru']]
     if fully_translated_files:
         for f in sorted(fully_translated_files, key=lambda x: x['path']):
             logger.info("  %s.md", f['path'])

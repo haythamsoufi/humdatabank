@@ -28,7 +28,13 @@ from app.routes.api import api_bp
 # Import utilities
 from app.services.security.monitoring import SecurityMonitor
 from app.services.user_analytics_service import get_client_ip
+from app.services.monitoring.platform_error_diagnostics import (
+    attach_platform_5xx_diagnostics,
+    is_platform_5xx,
+)
 from app.extensions import limiter
+
+PLATFORM_ERROR_DIAGNOSTICS_MAX_CONTEXT_BYTES = 12000
 
 
 def _strip_control_chars(value: Optional[str], *, max_len: int) -> Optional[str]:
@@ -161,22 +167,39 @@ def log_platform_error():
             'referrer': referrer or 'none',
             'user_agent': user_agent or 'unknown',
             'platform': 'azure_app_service',
-            'source': 'custom_error_page'
+            'source': 'client_reporter',
         }
 
         if timestamp:
             context_data['client_timestamp'] = timestamp
 
+        diagnostics_summary = ''
+        if is_platform_5xx(error_code):
+            failed_path = url or 'unknown'
+            context_data = attach_platform_5xx_diagnostics(
+                context_data,
+                error_code=error_code,
+                failed_url=failed_path,
+                max_json_bytes=PLATFORM_ERROR_DIAGNOSTICS_MAX_CONTEXT_BYTES,
+            )
+            diagnostics_summary = context_data.get('diagnostics_summary', '') or ''
+
         # Additional validation: ensure context_data doesn't exceed reasonable size
         import json as json_lib
-        context_json = json_lib.dumps(context_data)
-        if len(context_json) > 2000:  # Limit total context size
+        context_json = json_lib.dumps(context_data, default=str)
+        if len(context_json) > PLATFORM_ERROR_DIAGNOSTICS_MAX_CONTEXT_BYTES:
             # Truncate user_agent if needed
             max_ua_length = 500 - (len(context_json) - len(user_agent))
             if max_ua_length > 0:
                 context_data['user_agent'] = user_agent[:max_ua_length]
             else:
                 context_data['user_agent'] = 'truncated'
+            context_data['context_truncated'] = True
+
+        description = f'Platform error {error_code} occurred at {url or "unknown URL"}'
+        if diagnostics_summary:
+            description = f'{description}. {diagnostics_summary}'
+        description = description[:500]
 
         # Log to SecurityMonitor (creates database record)
         # Note: Database writes are protected by rate limiting above
@@ -184,9 +207,9 @@ def log_platform_error():
             SecurityMonitor.log_security_event(
                 event_type=event_type,
                 severity=severity,
-                description=f'Platform error {error_code} occurred at {url or "unknown URL"}'[:500],  # Limit description length
+                description=description,
                 context_data=context_data,
-                user_id=None  # Platform errors don't have authenticated users
+                user_id=None  # resolved from session when the reporter is authenticated
             )
         except Exception as log_error:
             # If database logging fails, still log to application logs
@@ -197,10 +220,13 @@ def log_platform_error():
             )
 
         # Also log to application logger for immediate visibility
-        current_app.logger.warning(
+        log_message = (
             f"Platform Error {error_code}: {url or 'unknown URL'} "
             f"(IP: {ip_address}, Referrer: {referrer or 'none'})"
         )
+        if diagnostics_summary:
+            log_message = f"{log_message} | {diagnostics_summary}"
+        current_app.logger.warning(log_message)
 
         return json_ok(success=True, message='Error logged successfully')
 

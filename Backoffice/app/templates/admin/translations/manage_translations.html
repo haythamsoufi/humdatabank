@@ -172,6 +172,35 @@
     {% from "components/ag_grid_includes.html" import ag_grid_container %}
     <!-- Main Content Container -->
     <div class="bg-white shadow-md p-6 relative">
+        {% if translation_data and obsolete_msgids %}
+        {% set removed_count = obsolete_msgids|length %}
+        <div id="removed-translations-notice" class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status" aria-live="polite">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div class="flex items-start gap-2">
+                    <i class="fas fa-trash-alt text-amber-600 mt-0.5" aria-hidden="true"></i>
+                    <div>
+                        <p class="font-semibold mb-1">{{ _('Removed translation strings') }}</p>
+                        <p class="mb-0 text-amber-800">
+                            {{ ngettext(
+                                '%(count)s string was removed from the source code and can be permanently deleted from .po files.',
+                                '%(count)s strings were removed from the source code and can be permanently deleted from .po files.',
+                                removed_count,
+                                count=removed_count
+                            ) }}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 sm:flex-shrink-0">
+                    <button type="button" id="show-removed-translations-btn" class="btn btn-secondary btn-sm whitespace-nowrap" data-active="0">
+                        <i class="fas fa-filter"></i> {{ _('Show removed') }}
+                    </button>
+                    <button type="button" id="remove-all-removed-translations-btn" class="btn btn-danger btn-sm whitespace-nowrap">
+                        <i class="fas fa-trash"></i> {{ _('Remove all') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
         {% if translation_data %}
             {{ ag_grid_container('translationsGrid', loading_text=_('Loading translations...'), grid_height='600px', include_card=false) }}
         {% else %}
@@ -602,6 +631,7 @@
 
 <script nonce="{{ csp_nonce() }}">
 window.manageTranslationsConfig = {
+    removedCount: {{ (obsolete_msgids|length if obsolete_msgids else 0)|tojson }},
     languages: JSON.parse((document.getElementById('languages-json') || {}).textContent || '[]'),
     languageNames: JSON.parse((document.getElementById('language-names-json') || {}).textContent || '{}'),
     allLanguageNames: JSON.parse((document.getElementById('all-language-names-json') || {}).textContent || '{}'),
@@ -609,7 +639,8 @@ window.manageTranslationsConfig = {
         exportPo: {{ url_for('utilities.export_translations')|tojson }},
         compilePo: {{ url_for('utilities.compile_translations')|tojson }},
         editTranslation: {{ url_for('utilities.edit_translation')|tojson }},
-        deleteRemovedTranslation: {{ url_for('utilities.delete_removed_translation')|tojson }}
+        deleteRemovedTranslation: {{ url_for('utilities.delete_removed_translation')|tojson }},
+        deleteAllRemovedTranslations: {{ url_for('utilities.delete_all_removed_translations')|tojson }}
     },
     t: {
         sourceCol: {{ _('Source')|tojson }},
@@ -647,6 +678,11 @@ window.manageTranslationsConfig = {
         deleteFailed: {{ _('Delete failed')|tojson }},
         permanentDeleteConfirm: {{ _('This permanently deletes the obsolete (#~) entry for this message from every locale .po file. Active strings are not affected. Continue?')|tojson }},
         deleteRemovedTitle: {{ _('Delete removed string?')|tojson }},
+        deleteAllRemovedTitle: {{ _('Remove all deleted strings?')|tojson }},
+        deleteAllRemovedConfirm: {{ _('This permanently deletes %(count)s obsolete (#~) entries from every locale .po file. Active strings are not affected. Continue?', count=(obsolete_msgids|length if obsolete_msgids else 0))|tojson }},
+        showRemoved: {{ _('Show removed')|tojson }},
+        showAll: {{ _('Show all')|tojson }},
+        removeAll: {{ _('Remove all')|tojson }},
         deleteBtn: {{ _('Delete')|tojson }},
         validationError: {{ _('Translation Validation Error')|tojson }},
         fixErrorsBeforeSaving: {{ _('Please fix these errors before saving.')|tojson }},

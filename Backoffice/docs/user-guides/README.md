@@ -60,4 +60,4 @@ Step-by-step workflows and tutorials for using the Humanitarian Databank Backoff
 
 ## Language
 
-Documentation is shown in the language selected in **Account settings**. If a page is not yet translated, the English version is shown.
+Documentation is shown in the language selected in **Account settings**. Supported guide languages include **English**, **French**, **Spanish**, **Arabic**, and **Russian**. If a page is not yet translated, the English version is shown.

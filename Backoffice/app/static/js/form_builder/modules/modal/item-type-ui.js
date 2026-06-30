@@ -222,6 +222,9 @@ export const ItemTypeUIMixin = {
             Utils.showElement(pluginFieldsContainer);
             setContainerDisabled(pluginFieldsContainer, false);
             PluginItem.setup(this.modalElement, itemType, this.pendingPluginData);
+            if (typeof window.attachPluginTranslationModalLazy === 'function') {
+                window.attachPluginTranslationModalLazy();
+            }
         }
 
         const validationRuleToggle = Utils.getElementById('validation-rule-toggle-section');

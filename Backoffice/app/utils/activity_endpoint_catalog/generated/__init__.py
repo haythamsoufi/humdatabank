@@ -19,6 +19,7 @@ from app.utils.activity_endpoint_catalog.generated.partials.assignment_managemen
 from app.utils.activity_endpoint_catalog.generated.partials.auth import SPECS as _S_auth
 from app.utils.activity_endpoint_catalog.generated.partials.content_management import SPECS as _S_content_management
 from app.utils.activity_endpoint_catalog.generated.partials.data_exploration import SPECS as _S_data_exploration
+from app.utils.activity_endpoint_catalog.generated.partials.data_sync_imputation import SPECS as _S_data_sync_imputation
 from app.utils.activity_endpoint_catalog.generated.partials.embed_management import SPECS as _S_embed_management
 from app.utils.activity_endpoint_catalog.generated.partials.emergency_operations_plugin import SPECS as _S_emergency_operations_plugin
 from app.utils.activity_endpoint_catalog.generated.partials.excel import SPECS as _S_excel
@@ -32,12 +33,11 @@ from app.utils.activity_endpoint_catalog.generated.partials.monitoring import SP
 from app.utils.activity_endpoint_catalog.generated.partials.notifications import SPECS as _S_notifications
 from app.utils.activity_endpoint_catalog.generated.partials.organization import SPECS as _S_organization
 from app.utils.activity_endpoint_catalog.generated.partials.plugin_management import SPECS as _S_plugin_management
-from app.utils.activity_endpoint_catalog.generated.partials.public import SPECS as _S_public
 from app.utils.activity_endpoint_catalog.generated.partials.rbac_management import SPECS as _S_rbac_management
 from app.utils.activity_endpoint_catalog.generated.partials.security import SPECS as _S_security
 from app.utils.activity_endpoint_catalog.generated.partials.settings import SPECS as _S_settings
 from app.utils.activity_endpoint_catalog.generated.partials.system_admin import SPECS as _S_system_admin
-from app.utils.activity_endpoint_catalog.generated.partials.data_sync_imputation import SPECS as _S_data_sync_imputation
+from app.utils.activity_endpoint_catalog.generated.partials.upr_excel_import import SPECS as _S_upr_excel_import
 from app.utils.activity_endpoint_catalog.generated.partials.user_management import SPECS as _S_user_management
 from app.utils.activity_endpoint_catalog.generated.partials.utilities import SPECS as _S_utilities
 
@@ -54,6 +54,7 @@ GENERATED_ACTIVITY_SPECS: dict[tuple[str, str], ActivityEndpointSpec] = merge_ac
     _S_auth,
     _S_content_management,
     _S_data_exploration,
+    _S_data_sync_imputation,
     _S_embed_management,
     _S_emergency_operations_plugin,
     _S_excel,
@@ -67,12 +68,11 @@ GENERATED_ACTIVITY_SPECS: dict[tuple[str, str], ActivityEndpointSpec] = merge_ac
     _S_notifications,
     _S_organization,
     _S_plugin_management,
-    _S_public,
     _S_rbac_management,
     _S_security,
     _S_settings,
     _S_system_admin,
-    _S_data_sync_imputation,
+    _S_upr_excel_import,
     _S_user_management,
     _S_utilities,
     allow_override=False,

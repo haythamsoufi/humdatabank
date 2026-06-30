@@ -227,6 +227,59 @@ function attachDocumentModal() {
   });
 }
 
+function attachPluginModal() {
+  if (!window.TranslationModal) return;
+
+  const tryAttach = () => {
+    const openBtn = document.getElementById('plugin-translations-btn');
+    const modal = document.getElementById('plugin-translation-modal');
+    if (!openBtn || !modal) return false;
+    if (openBtn.dataset.pluginTranslationAttached === 'true') return true;
+
+    window.TranslationModal.attach({
+      openButtonId: 'plugin-translations-btn',
+      modalId: 'plugin-translation-modal',
+      cssPrefix: 'plugin',
+      resolveEnglishText: () => (document.getElementById('item-plugin-label')?.value || ''),
+      resolveTextsByTab: () => ({
+        labels: document.getElementById('item-plugin-label')?.value || '',
+        descriptions: document.getElementById('item-plugin-description')?.value || ''
+      }),
+      onSaveHiddenFields: (collectedByTab) => {
+        const labelTranslationsInput = document.getElementById('item-plugin-label-translations');
+        const descriptionTranslationsInput = document.getElementById('item-plugin-description-translations');
+        if (labelTranslationsInput) labelTranslationsInput.value = JSON.stringify(collectedByTab.labels || {});
+        if (descriptionTranslationsInput) descriptionTranslationsInput.value = JSON.stringify(collectedByTab.descriptions || {});
+      },
+      autoTranslateType: 'form_item',
+      tabSuffixes: ['labels', 'descriptions'],
+      defaultTabSuffix: 'labels',
+      onModalOpen: () => {
+        const labelTranslationsInput = document.getElementById('item-plugin-label-translations');
+        const descriptionTranslationsInput = document.getElementById('item-plugin-description-translations');
+        let labelTranslations = {};
+        let descriptionTranslations = {};
+        if (labelTranslationsInput && labelTranslationsInput.value) {
+          try { labelTranslations = JSON.parse(labelTranslationsInput.value); } catch (_e) {}
+        }
+        if (descriptionTranslationsInput && descriptionTranslationsInput.value) {
+          try { descriptionTranslations = JSON.parse(descriptionTranslationsInput.value); } catch (_e) {}
+        }
+        if (window.TranslationModalUtils) {
+          window.TranslationModalUtils.populateFields('plugin', labelTranslations, '', 'labels');
+          window.TranslationModalUtils.populateFields('plugin', descriptionTranslations, '', 'descriptions');
+        }
+      }
+    });
+
+    openBtn.dataset.pluginTranslationAttached = 'true';
+    return true;
+  };
+
+  tryAttach();
+  window.attachPluginTranslationModalLazy = tryAttach;
+}
+
 function attachMatrixLabelModal() {
   // Use dedicated matrix translation modal
   if (!window.TranslationModal || !document.getElementById('matrix-translations-btn')) return;
@@ -903,6 +956,7 @@ export function attachFormBuilderTranslation() {
     attachSectionModal();
     attachTemplateNameModal();
     attachDocumentModal();
+    attachPluginModal();
     attachMatrixLabelModal();
     attachMatrixLegendTextModal();
     attachMatrixSearchPlaceholderModal();

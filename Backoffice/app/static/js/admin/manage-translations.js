@@ -165,6 +165,16 @@
     // AG Grid helper instance
     let gridHelper = null;
     let gridApi = null;
+    let showRemovedOnly = false;
+
+    function applyRemovedFilter() {
+        if (!gridApi) return;
+        if (typeof gridApi.onFilterChanged === 'function') {
+            gridApi.onFilterChanged();
+        } else if (typeof gridApi.refreshClientSideRowModel === 'function') {
+            gridApi.refreshClientSideRowModel('filter');
+        }
+    }
 
     // Transform translations data for ag-grid.
     // Obsolete (removed) entries carry a source prefixed with \x00 so the renderer
@@ -314,6 +324,14 @@
             .concat(['actions']);
 
         var result = AgGridHelper.create('translationsGrid', 'translations', columnDefs, translationsData, {
+            gridOptions: {
+                isExternalFilterPresent: function() {
+                    return showRemovedOnly;
+                },
+                doesExternalFilterPass: function(node) {
+                    return !!(node.data && node.data.removed);
+                }
+            },
             onReady: function(api, helper) {
                 AgGridHelper.pinActionsColumn(api, desiredOrder, helper && helper.columnVisibilityManager);
             }
@@ -329,6 +347,72 @@
     } else {
         initializeGrid();
     }
+
+    // Removed-strings notice: filter grid or bulk-delete obsolete entries
+    document.addEventListener('DOMContentLoaded', function() {
+        var showBtn = document.getElementById('show-removed-translations-btn');
+        var removeAllBtn = document.getElementById('remove-all-removed-translations-btn');
+
+        if (showBtn) {
+            showBtn.addEventListener('click', function() {
+                var active = showBtn.getAttribute('data-active') === '1';
+                var next = !active;
+                showBtn.setAttribute('data-active', next ? '1' : '0');
+                showBtn.innerHTML = next
+                    ? '<i class="fas fa-list"></i> ' + cfg.t.showAll
+                    : '<i class="fas fa-filter"></i> ' + cfg.t.showRemoved;
+                showRemovedOnly = next;
+                applyRemovedFilter();
+            });
+        }
+
+        function performDeleteAllRemovedTranslations() {
+            var csrfMeta = document.querySelector('meta[name=csrf-token]');
+            var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+            var fetchFn = (window.getFetch && window.getFetch()) || fetch;
+            fetchFn(cfg.urls.deleteAllRemovedTranslations, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ csrf_token: csrfToken })
+            })
+            .then(function(response) { return response.json().then(function(data) { return { ok: response.ok, data: data }; }); })
+            .then(function(result) {
+                if (result.ok && result.data && result.data.success) {
+                    if (window.showAlert) window.showAlert(result.data.message || cfg.t.removedObsolete, 'success');
+                    window.location.reload();
+                    return;
+                }
+                var errMsg = (result.data && (result.data.message || result.data.error))
+                    ? (result.data.message || result.data.error)
+                    : cfg.t.deleteFailed;
+                throw new Error(errMsg);
+            })
+            .catch(function(error) {
+                console.error('delete-all-removed translations:', error);
+                if (window.showAlert) window.showAlert(error.message || cfg.t.deleteFailed, 'error');
+            });
+        }
+
+        if (removeAllBtn) {
+            removeAllBtn.addEventListener('click', function() {
+                var confirmMsg = cfg.t.deleteAllRemovedConfirm;
+                var confirmTitle = cfg.t.deleteAllRemovedTitle;
+                var doDelete = function() { performDeleteAllRemovedTranslations(); };
+                if (window.showDangerConfirmation) {
+                    window.showDangerConfirmation(confirmMsg, doDelete, null, cfg.t.removeAll, cfg.t.cancel, confirmTitle);
+                } else if (window.showConfirmation) {
+                    window.showConfirmation(confirmMsg, doDelete, null, cfg.t.removeAll, cfg.t.cancel, confirmTitle);
+                } else if (window.confirm(confirmMsg)) {
+                    doDelete();
+                }
+            });
+        }
+    });
 
     // Build & Apply dropdown toggle
     document.addEventListener('DOMContentLoaded', function() {
@@ -1169,7 +1253,9 @@
                     window.location.reload();
                     return;
                 }
-                var errMsg = (result.data && result.data.message) ? result.data.message : cfg.t.deleteFailed;
+                var errMsg = (result.data && (result.data.message || result.data.error))
+                    ? (result.data.message || result.data.error)
+                    : cfg.t.deleteFailed;
                 throw new Error(errMsg);
             })
             .catch(function(error) {

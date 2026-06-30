@@ -48,7 +48,6 @@ Ceux-ci doivent être tirés de la Banque d'indicateurs de votre déploiement (c
 
 ## Définitions clés
 
-<a id="key-national-society-figures"></a>
 ### Chiffres clés de la Société nationale
 
 Ces quatre indicateurs apparaissent dans les formulaires de planification et de déclaration.
@@ -60,7 +59,6 @@ Ces quatre indicateurs apparaissent dans les formulaires de planification et de 
 | **Sections** | Une section a ses rôles, responsabilités et relation avec le siège national définis dans les Statuts de la Société nationale, y compris l'autonomie en statut juridique, mobilisation de ressources locales, partenariats locaux et prise de décision par les membres, le conseil et les volontaires de la section. |
 | **Unités locales** | TOUTES les subdivisions d'une Société nationale qui coordonnent et fournissent des services aux personnes. Cela inclut TOUS les niveaux : sections ou chapitres provinciaux, étatiques, municipaux ou de district, siège, bureaux régionaux et intermédiaires, et unités communautaires. |
 
-<a id="high-level-financial-indicators"></a>
 ### Indicateurs financiers de haut niveau
 
 | Terme | Définition |

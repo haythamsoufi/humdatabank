@@ -919,6 +919,51 @@
     font-size: 0.875rem;
 }
 
+.docs-export-pdf-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5625rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #334155;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.docs-export-pdf-button:hover:not(:disabled) {
+    color: #0f172a;
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.docs-export-pdf-button:active:not(:disabled) {
+    background: #f1f5f9;
+    box-shadow: none;
+}
+
+.docs-export-pdf-button:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+
+.docs-export-pdf-button:focus-visible {
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+}
+
+.docs-export-pdf-button .docs-export-pdf-icon {
+    font-size: 1rem;
+    color: #e11d48;
+    line-height: 1;
+}
+
 /* Search bar styles */
 .docs-search-container {
     position: relative;
@@ -1160,7 +1205,16 @@
             <div class="docs-content-header">
                 <div class="flex items-center justify-between gap-4 flex-wrap" id="docs-header-bar">
                     <h1 class="docs-content-title">{{ page_title }}</h1>
-                    <div id="docs-header-actions">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <button type="button"
+                                id="docs-export-pdf-btn"
+                                class="docs-export-pdf-button"
+                                title="{{ _('Download this page as PDF') }}">
+                            <i class="fas fa-file-pdf docs-export-pdf-icon" aria-hidden="true"></i>
+                            <span data-export-label>{{ _('Export PDF') }}</span>
+                            <span data-export-busy hidden>{{ _('Exporting…') }}</span>
+                        </button>
+                        <div id="docs-header-actions">
                         {% if workflow_id is defined and workflow_id %}
                         <button type="button"
                                 id="start-tour-btn"
@@ -1171,6 +1225,7 @@
                             <span>{{ _('Take the Tour') }}</span>
                         </button>
                         {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1199,6 +1254,7 @@
 <script src="{{ url_for('static', filename='js/docs/docs-navigation.js') }}" nonce="{{ csp_nonce() }}"></script>
 <script src="{{ url_for('static', filename='js/docs/docs-search.js') }}" nonce="{{ csp_nonce() }}"></script>
 <script src="{{ url_for('static', filename='js/docs/docs-tour.js') }}" nonce="{{ csp_nonce() }}"></script>
+<script src="{{ url_for('static', filename='js/docs/docs-pdf-export.js') }}" nonce="{{ csp_nonce() }}"></script>
 
 <!-- Template-specific initialization for active category expansion -->
 <script nonce="{{ csp_nonce() }}">

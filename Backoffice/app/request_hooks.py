@@ -60,15 +60,35 @@ def register_request_hooks(app):
         return response
 
     @app.before_request
+    def track_request_pressure():
+        from app.utils.request_utils import is_static_asset_request as _is_static
+        if _is_static():
+            return
+        from app.services.monitoring.request_pressure import record_traffic, track_pressure_start
+        record_traffic()
+        track_pressure_start()
+
+    @app.before_request
     def track_slow_request_start():
         from app.services.monitoring.slow_requests import track_slow_request_start as _track
         _track()
+
+    @app.after_request
+    def track_request_pressure_end(response):
+        from app.services.monitoring.request_pressure import track_pressure_end
+        track_pressure_end()
+        return response
 
     @app.after_request
     def track_slow_request_end(response):
         from app.services.monitoring.slow_requests import track_slow_request_end as _track_end
         _track_end()
         return response
+
+    @app.teardown_request
+    def track_request_pressure_teardown(exc):
+        from app.services.monitoring.request_pressure import track_pressure_end
+        track_pressure_end()
 
     @app.teardown_request
     def track_slow_request_teardown(exc):

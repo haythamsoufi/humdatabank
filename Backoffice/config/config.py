@@ -944,16 +944,6 @@ class Config:
     AZURE_B2C_POST_LOGOUT_REDIRECT_URI = os.environ.get('AZURE_B2C_POST_LOGOUT_REDIRECT_URI')
     AZURE_B2C_SCOPE = os.environ.get('AZURE_B2C_SCOPE', 'openid email profile')
 
-    # Database migration endpoint (/migrate)
-    # Enabled by default for all environments. The endpoint is still protected by
-    # system-manager auth or a valid MIGRATE_TOKEN, so it is safe to leave on.
-    ENABLE_MIGRATE = _parse_bool(os.environ.get('ENABLE_MIGRATE'), default=True)
-
-    # Database diagnostics endpoint (/dbinfo)
-    # Enabled by default for all environments. The endpoint is still protected by
-    # system-manager auth (and localhost-only in production), so it is safe to leave on.
-    ENABLE_DBINFO = _parse_bool(os.environ.get('ENABLE_DBINFO'), default=True)
-
     # Temporary site lock: show a coming-soon page for all routes except health/static.
     # Set COMING_SOON_BYPASS_SECRET so the team can visit /?coming_soon_bypass=<secret>.
     COMING_SOON_LOCK = _parse_bool(os.environ.get('COMING_SOON_LOCK'), default=False)

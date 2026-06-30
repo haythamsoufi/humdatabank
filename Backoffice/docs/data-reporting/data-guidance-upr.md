@@ -50,8 +50,6 @@ These should be drawn from your deployment’s Indicator Bank (configure the URL
 
 ### Key National Society figures
 
-<a id="key-national-society-figures"></a>
-
 These four indicators appear in both the planning and reporting forms.
 
 | Term | Definition |
@@ -62,8 +60,6 @@ These four indicators appear in both the planning and reporting forms.
 | **Local Units** | ALL subdivisions of a National Society that coordinate and deliver services to people. This includes ALL levels: provincial, state, city, district branches, sections or chapters, headquarters, regional and intermediate offices, and community-based units. |
 
 ### High-level financial indicators
-
-<a id="high-level-financial-indicators"></a>
 
 | Term | Definition |
 |---|---|

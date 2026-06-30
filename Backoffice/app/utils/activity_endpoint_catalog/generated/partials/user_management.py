@@ -20,12 +20,16 @@ SPECS: dict[tuple[str, str], ActivityEndpointSpec] = {
     ("POST", "user_management.api_reject_access_request"): ActivityEndpointSpec(description="rejected Access Request", activity_type="admin_users"),
     ("POST", "user_management.approve_access_request"): ActivityEndpointSpec(description="approved Access Request", activity_type="admin_users"),
     ("POST", "user_management.approve_all_access_requests"): ActivityEndpointSpec(description="approved All Access Requests", activity_type="admin_users"),
+    ("POST", "user_management.approve_user_access_requests"): ActivityEndpointSpec(description="approved User Access Requests", activity_type="admin_users"),
     ("POST", "user_management.archive_user"): ActivityEndpointSpec(description="Archived User", activity_type="admin_users"),
     ("POST", "user_management.delete_user"): ActivityEndpointSpec(description="Deleted User", activity_type="admin_users"),
     ("POST", "user_management.edit_user"): ActivityEndpointSpec(description="Edited User", activity_type="admin_users"),
     ("POST", "user_management.kickout_device"): ActivityEndpointSpec(description="Kicked out Device", activity_type="admin_users"),
     ("POST", "user_management.new_user"): ActivityEndpointSpec(description="Created User", activity_type="admin_users"),
     ("POST", "user_management.reject_access_request"): ActivityEndpointSpec(description="rejected Access Request", activity_type="admin_users"),
+    ("POST", "user_management.reject_user_access_requests"): ActivityEndpointSpec(description="rejected User Access Requests", activity_type="admin_users"),
+    ("POST", "user_management.send_access_requests_digest_now"): ActivityEndpointSpec(description="Sent Access Requests Digest Now", activity_type="admin_users"),
+    ("POST", "user_management.update_access_requests_digest_settings"): ActivityEndpointSpec(description="Updated Access Requests Digest Settings", activity_type="admin_users"),
     ("PUT", "user_management.api_user_update"): ActivityEndpointSpec(description="Updated User Update", activity_type="admin_users"),
 }
 

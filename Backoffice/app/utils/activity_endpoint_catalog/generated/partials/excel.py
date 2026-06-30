@@ -10,5 +10,7 @@ from app.utils.activity_endpoint_catalog.spec import ActivityEndpointSpec
 
 SPECS: dict[tuple[str, str], ActivityEndpointSpec] = {
     ("POST", "excel.import_assignment_excel"): ActivityEndpointSpec(description="Imported Assignment Excel", activity_type="admin_assignments"),
+    ("POST", "excel.import_upr_country_reporting_template"): ActivityEndpointSpec(description="Imported Upr Country Reporting Template", activity_type="admin_assignments"),
+    ("POST", "excel.validate_upr_country_reporting_import"): ActivityEndpointSpec(description="Completed Validate Upr Country Reporting Import", activity_type="admin_assignments"),
 }
 

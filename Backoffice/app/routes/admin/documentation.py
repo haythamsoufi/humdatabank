@@ -58,6 +58,47 @@ def _build_doc_url(rel: str) -> str:
     return url_for("admin_docs.view_doc", doc_path=clean)
 
 
+@bp.route("/export.pdf", methods=["GET"])
+@admin_permission_required("admin.docs.view")
+def export_pdf_index():
+    """Download the documentation index as PDF."""
+    root = docs.docs_root()
+    if not root.exists():
+        abort(404)
+    from app.services.documentation_pdf_service import send_doc_pdf
+
+    return send_doc_pdf(
+        root=root,
+        doc_path="",
+        user=current_user,
+        visible_top_level_dirs=VISIBLE_TOP_LEVEL_DIRS,
+        doc_url_builder=_build_doc_url,
+    )
+
+
+@bp.route("/<path:doc_path>/export.pdf", methods=["GET"])
+@admin_permission_required("admin.docs.view")
+def export_pdf_doc(doc_path: str):
+    """Download a documentation page as PDF."""
+    root = docs.docs_root()
+    if not root.exists():
+        abort(404)
+
+    requested = (doc_path or "").strip().lstrip("/").replace("\\", "/")
+    if requested.lower().endswith(".md") or requested.lower() in ("readme", "readme.md"):
+        abort(404)
+
+    from app.services.documentation_pdf_service import send_doc_pdf
+
+    return send_doc_pdf(
+        root=root,
+        doc_path=doc_path,
+        user=current_user,
+        visible_top_level_dirs=VISIBLE_TOP_LEVEL_DIRS,
+        doc_url_builder=_build_doc_url,
+    )
+
+
 @bp.route("/", methods=["GET"])
 @admin_permission_required("admin.docs.view")
 def index():

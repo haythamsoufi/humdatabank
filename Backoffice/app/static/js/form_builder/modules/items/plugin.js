@@ -153,6 +153,9 @@ export const PluginItem = {
                     if (pluginLabel) pluginLabel.setAttribute('required', 'required');
                 }
                 if (this.pendingPluginData) this.populateBasicFields(modalElement, this.pendingPluginData);
+                if (typeof window.attachPluginTranslationModalLazy === 'function') {
+                    window.attachPluginTranslationModalLazy();
+                }
                 resolve();
             })
             .catch(err => {
@@ -192,6 +195,9 @@ export const PluginItem = {
                     if (pluginLabel) pluginLabel.setAttribute('required', 'required');
                 }
                 if (this.pendingPluginData) this.populateBasicFields(modalElement, this.pendingPluginData);
+                if (typeof window.attachPluginTranslationModalLazy === 'function') {
+                    window.attachPluginTranslationModalLazy();
+                }
                 resolve();
             });
         });

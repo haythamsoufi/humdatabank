@@ -165,6 +165,15 @@ class TestSanitizeUrl:
 class TestLogPlatformError:
     """Tests for POST /api/v1/platform-error."""
 
+    @pytest.fixture(autouse=True)
+    def disable_platform_error_rate_limit(self, app):
+        """This class posts to platform-error many times; bypass Flask-Limiter."""
+        from app.extensions import limiter
+        previous = limiter.enabled
+        limiter.enabled = False
+        yield
+        limiter.enabled = previous
+
     def _post(self, client, payload, headers=None):
         h = {**(headers or {}), "Content-Type": "application/json"}
         return client.post(_api("/platform-error"), json=payload, headers=h)
@@ -229,6 +238,29 @@ class TestLogPlatformError:
             })
         assert resp.status_code == 200
         assert captured.get("event_type") == "platform_504_gateway_timeout"
+        ctx = captured.get("context_data", {})
+        assert "diagnostics_summary" in ctx
+        assert "worker_metrics" in ctx
+        assert "likely_causes" in ctx
+        assert "HTTP 504" in captured.get("description", "")
+
+    def test_504_diagnostics_not_added_for_403(self, client, db_session):
+        captured = {}
+
+        def capture_call(**kwargs):
+            captured.update(kwargs)
+
+        with patch(
+            "app.services.security.monitoring.SecurityMonitor.log_security_event",
+            side_effect=capture_call,
+        ):
+            resp = self._post(client, {
+                "error_code": 403,
+                "url": "https://databank.ifrc.org/admin",
+            })
+        assert resp.status_code == 200
+        ctx = captured.get("context_data", {})
+        assert "diagnostics_summary" not in ctx
 
     def test_sensitive_url_params_stripped(self, client, db_session):
         """URL with sensitive params is sanitized before logging."""

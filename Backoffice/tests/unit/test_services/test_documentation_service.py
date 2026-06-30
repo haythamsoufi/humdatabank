@@ -70,6 +70,27 @@ class TestPrettifyStem:
         assert self._call("   ") == "Documentation"
 
 
+class TestDeduplicateHtmlIds:
+    def _call(self, html):
+        from app.services.documentation_service import _deduplicate_html_ids
+        return _deduplicate_html_ids(html)
+
+    def test_removes_empty_anchor_when_heading_has_same_id(self):
+        html = (
+            '<h3 id="high-level-financial-indicators">Title</h3>'
+            '<a id="high-level-financial-indicators"></a>'
+        )
+        result = self._call(html)
+        assert result.count('id="high-level-financial-indicators"') == 1
+        assert "<a " not in result
+
+    def test_uniquifies_non_anchor_duplicates(self):
+        html = '<div id="foo">A</div><div id="foo">B</div>'
+        result = self._call(html)
+        assert 'id="foo"' in result
+        assert 'id="foo-2"' in result
+
+
 class TestSplitRelLang:
     def _call(self, rel):
         from app.services.documentation_service import _split_rel_lang

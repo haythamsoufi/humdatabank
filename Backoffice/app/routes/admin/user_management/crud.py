@@ -177,10 +177,16 @@ def access_requests():
 
     from app.services.authorization_service import AuthorizationService
     from app.services.app_settings_service import get_fds_access_request_digest_settings
+    from app.services.email.fds_access_request_digest import (
+        get_fds_access_request_digest_last_sent_summary,
+    )
     from app.utils.datetime_helpers import ORG_TIMEZONE_LABEL
 
     can_manage_fds_digest = AuthorizationService.is_system_manager(current_user)
     fds_digest_settings = get_fds_access_request_digest_settings() if can_manage_fds_digest else None
+    fds_digest_last_sent = (
+        get_fds_access_request_digest_last_sent_summary() if can_manage_fds_digest else None
+    )
 
     return render_template(
         "admin/user_management/access_requests.html",
@@ -201,7 +207,45 @@ def access_requests():
             int(fds_digest_settings.get("local_hour", 7)) if fds_digest_settings else 7
         ),
         fds_access_request_digest_timezone_label=ORG_TIMEZONE_LABEL,
+        fds_digest_last_sent=fds_digest_last_sent,
     )
+
+
+@bp.route("/access-requests/digest-send", methods=["POST"])
+@permission_required_any('admin.access_requests.view', 'admin.users.edit')
+def send_access_requests_digest_now():
+    """Manually trigger FDS access request digest emails (system managers only)."""
+    from app.services.authorization_service import AuthorizationService
+    from app.services.email.fds_access_request_digest import run_fds_access_request_digest_job
+
+    if not AuthorizationService.is_system_manager(current_user):
+        flash("Only system managers can send digest emails manually.", "danger")
+        return redirect(url_for("user_management.access_requests"))
+
+    try:
+        result = run_fds_access_request_digest_job(manual=True)
+    except Exception:
+        current_app.logger.exception("manual FDS access request digest failed")
+        flash(GENERIC_ERROR_MESSAGE, "danger")
+        return redirect(url_for("user_management.access_requests"))
+
+    if result.skip_reason:
+        flash(result.skip_reason, "warning")
+    elif result.sent_count:
+        flash(
+            f"Digest sent to {result.sent_count} FDS member(s)."
+            + (f" {result.skipped_count} skipped." if result.skipped_count else "")
+            + (f" {result.failed_count} failed." if result.failed_count else ""),
+            "success" if not result.failed_count else "warning",
+        )
+    elif result.failed_count:
+        flash(f"Digest run failed for {result.failed_count} recipient(s).", "danger")
+    elif result.skipped_count:
+        flash(f"No emails sent ({result.skipped_count} recipient(s) skipped).", "info")
+    else:
+        flash("Digest run completed; no emails were sent.", "info")
+
+    return redirect(url_for("user_management.access_requests"))
 
 
 @bp.route("/access-requests/digest-settings", methods=["POST"])

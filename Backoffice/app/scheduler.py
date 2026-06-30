@@ -169,21 +169,10 @@ def init_scheduler(app, is_reloader):
                         send_notification_emails()
 
                     def _send_fds_access_request_digests():
-                        from app.utils.datetime_helpers import now_in_org_timezone
-                        from app.services.app_settings_service import (
-                            get_fds_access_request_digest_enabled,
-                            get_fds_access_request_digest_local_hour,
+                        from app.services.email.fds_access_request_digest import (
+                            run_fds_access_request_digest_job,
                         )
-                        if not get_fds_access_request_digest_enabled():
-                            return
-                        if now_in_org_timezone().hour != get_fds_access_request_digest_local_hour():
-                            return
-                        from app.services.email.fds_access_request_digest import send_fds_access_request_digests
-                        sent = send_fds_access_request_digests()
-                        if sent > 0:
-                            app.logger.info(
-                                "Sent %d FDS access request digest email(s)", sent
-                            )
+                        run_fds_access_request_digest_job()
 
                     def _process_scheduled_notifications():
                         from app.services.notification.scheduling import process_scheduled_notifications

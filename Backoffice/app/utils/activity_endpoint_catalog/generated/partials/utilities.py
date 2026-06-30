@@ -14,6 +14,7 @@ SPECS: dict[tuple[str, str], ActivityEndpointSpec] = {
     ("POST", "utilities.apply_indicator_import"): ActivityEndpointSpec(description="Completed Apply Indicator Import", activity_type="admin_utilities"),
     ("POST", "utilities.cleanup_sessions"): ActivityEndpointSpec(description="Cleaned up Sessions", activity_type="admin_utilities"),
     ("POST", "utilities.compile_translations"): ActivityEndpointSpec(description="Compiled Translations", activity_type="admin_utilities"),
+    ("POST", "utilities.delete_all_removed_translations"): ActivityEndpointSpec(description="Deleted All Removed Translations", activity_type="admin_utilities"),
     ("POST", "utilities.delete_indicator_suggestion"): ActivityEndpointSpec(description="Deleted Indicator Suggestion", activity_type="admin_utilities"),
     ("POST", "utilities.delete_removed_translation"): ActivityEndpointSpec(description="Deleted Translation", activity_type="admin_utilities"),
     ("POST", "utilities.edit_translation"): ActivityEndpointSpec(description="Edited Translation", activity_type="admin_utilities"),

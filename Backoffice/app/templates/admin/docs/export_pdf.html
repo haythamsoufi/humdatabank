@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}"{% if is_rtl %} dir="rtl"{% endif %}>
+<head>
+    <meta charset="utf-8">
+    <title>{{ page_title }}</title>
+</head>
+<body>
+    <header class="pdf-running-header">
+        <table class="pdf-header-table">
+            <tr>
+                <td class="pdf-header-logo-cell">
+                    {% if logo_uri %}
+                    <img src="{{ logo_uri }}" class="pdf-header-logo" alt="">
+                    {% endif %}
+                </td>
+                <td class="pdf-header-brand-cell">
+                    <div class="pdf-header-org">{{ org_name }}</div>
+                </td>
+                <td class="pdf-header-title-cell">{{ page_title }}</td>
+            </tr>
+        </table>
+    </header>
+
+    <footer class="pdf-running-footer">
+        <table class="pdf-footer-table">
+            <tr>
+                <td class="pdf-footer-center">{{ generated_on }}</td>
+                <td class="pdf-footer-page">{{ page_label }} <span class="pdf-page-num"></span></td>
+            </tr>
+        </table>
+    </footer>
+
+    <main class="pdf-body">
+        <h1 class="doc-title">{{ page_title }}</h1>
+        <div class="docs-prose">{{ content_html }}</div>
+    </main>
+</body>
+</html>

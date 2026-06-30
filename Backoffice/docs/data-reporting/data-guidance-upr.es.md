@@ -48,7 +48,6 @@ Estos deben tomarse del Banco de indicadores de tu despliegue (configura la URL 
 
 ## Definiciones clave
 
-<a id="key-national-society-figures"></a>
 ### Cifras clave de la Sociedad Nacional
 
 Estos cuatro indicadores aparecen tanto en los formularios de planificación como de reporte.
@@ -60,7 +59,6 @@ Estos cuatro indicadores aparecen tanto en los formularios de planificación com
 | **Sucursales** | Una sucursal tiene sus funciones, responsabilidades y relación con la sede nacional definidas en los Estatutos de la Sociedad Nacional, incluida autonomía en estatus legal, movilización de recursos locales, alianzas locales y toma de decisiones a través de miembros, junta y voluntarios de la sucursal. |
 | **Unidades locales** | TODAS las subdivisiones de una Sociedad Nacional que coordinan y prestan servicios a las personas. Esto incluye TODOS los niveles: sucursales, secciones o capítulos provinciales, estatales, municipales o de distrito, sede central, oficinas regionales e intermedias, y unidades comunitarias. |
 
-<a id="high-level-financial-indicators"></a>
 ### Indicadores financieros de alto nivel
 
 | Término | Definición |

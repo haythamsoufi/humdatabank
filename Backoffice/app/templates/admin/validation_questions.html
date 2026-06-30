@@ -235,7 +235,7 @@
 
 {% call excel_io_modal(
     'vq-excel-io-modal',
-    modal_title=_('<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> ') ~ _('Excel Import/Export'),
+    modal_title='<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> ' ~ _('Excel Import/Export'),
     layout='simple',
     export_url=url_for('admin.validation_questions_export'),
     export_method='button',

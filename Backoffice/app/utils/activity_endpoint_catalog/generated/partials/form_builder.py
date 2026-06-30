@@ -9,6 +9,9 @@ from app.utils.activity_endpoint_catalog.spec import ActivityEndpointSpec
 
 
 SPECS: dict[tuple[str, str], ActivityEndpointSpec] = {
+    ("POST", "form_builder.ai_extract_document"): ActivityEndpointSpec(description="Completed Ai Extract Document", activity_type="admin_forms"),
+    ("POST", "form_builder.ai_extract_image"): ActivityEndpointSpec(description="Completed Ai Extract Image", activity_type="admin_forms"),
+    ("POST", "form_builder.ai_restore_structure"): ActivityEndpointSpec(description="Completed Ai Restore Structure", activity_type="admin_forms"),
     ("POST", "form_builder.configure_dynamic_section"): ActivityEndpointSpec(description="Configured Dynamic Section", activity_type="admin_forms"),
     ("POST", "form_builder.configure_repeat_section"): ActivityEndpointSpec(description="Configured Repeat Section", activity_type="admin_forms"),
     ("POST", "form_builder.create_draft_version"): ActivityEndpointSpec(description="Created Draft Version", activity_type="admin_forms"),
@@ -30,12 +33,19 @@ SPECS: dict[tuple[str, str], ActivityEndpointSpec] = {
     ("POST", "form_builder.kobo_data_import_match"): ActivityEndpointSpec(description="Completed Kobo Data Import Match", activity_type="admin_forms"),
     ("POST", "form_builder.kobo_data_import_preview"): ActivityEndpointSpec(description="Completed Kobo Data Import Preview", activity_type="admin_forms"),
     ("POST", "form_builder.kobo_data_import_template_structure"): ActivityEndpointSpec(description="Completed Kobo Data Import Template Structure", activity_type="admin_forms"),
+    ("POST", "form_builder.kobo_data_import_validate"): ActivityEndpointSpec(description="Completed Kobo Data Import Validate", activity_type="admin_forms"),
+    ("POST", "form_builder.link_draft_item_route"): ActivityEndpointSpec(description="Completed Link Draft Item Route", activity_type="admin_forms"),
+    ("POST", "form_builder.link_draft_section_route"): ActivityEndpointSpec(description="Completed Link Draft Section Route", activity_type="admin_forms"),
     ("POST", "form_builder.manage_template_variables"): ActivityEndpointSpec(description="Managed Template Variables", activity_type="admin_forms"),
     ("POST", "form_builder.new_template"): ActivityEndpointSpec(description="Created Template", activity_type="admin_forms"),
     ("POST", "form_builder.new_template_section"): ActivityEndpointSpec(description="Created Template Section", activity_type="admin_forms"),
     ("POST", "form_builder.unarchive_item"): ActivityEndpointSpec(description="Completed Unarchive Item", activity_type="admin_forms"),
     ("POST", "form_builder.unarchive_section"): ActivityEndpointSpec(description="Completed Unarchive Section", activity_type="admin_forms"),
+    ("POST", "form_builder.unlink_draft_item_route"): ActivityEndpointSpec(description="Completed Unlink Draft Item Route", activity_type="admin_forms"),
+    ("POST", "form_builder.unlink_draft_section_route"): ActivityEndpointSpec(description="Completed Unlink Draft Section Route", activity_type="admin_forms"),
     ("POST", "form_builder.update_draft_comment"): ActivityEndpointSpec(description="Updated Draft Comment", activity_type="admin_forms"),
     ("POST", "form_builder.update_version_comment"): ActivityEndpointSpec(description="Updated Version Comment", activity_type="admin_forms"),
+    ("POST", "form_builder.validate_excel_import"): ActivityEndpointSpec(description="Completed Validate Excel Import", activity_type="admin_forms"),
+    ("POST", "form_builder.validate_kobo_import"): ActivityEndpointSpec(description="Completed Validate Kobo Import", activity_type="admin_forms"),
 }
 

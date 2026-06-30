@@ -82,6 +82,9 @@
             font-size: 0.625rem;
             color: #6b7280;
         }
+        #fds-access-request-digest-modal details > summary::-webkit-details-marker {
+            display: none;
+        }
     </style>
 {% endblock %}
 
@@ -212,14 +215,17 @@
 </div>
 
 {% if can_manage_fds_digest %}
-{% call modal_shell('fds-access-request-digest-modal', _('FDS digest emails'), max_width='max-w-lg') %}
-  <form method="POST" action="{{ url_for('user_management.update_access_requests_digest_settings') }}" class="space-y-5">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <p class="text-sm text-gray-600 leading-relaxed">
-      {{ _('Daily email to FDS members who have pending country access requests for countries they oversee. Skipped when auto-approve is enabled via environment variable. Edit the email template under System Configuration → Emails.') }}
-    </p>
+{% call modal_shell('fds-access-request-digest-modal', _('FDS digest emails'), max_width='max-w-3xl') %}
+  <p class="text-sm text-gray-600 leading-relaxed mb-5">
+    {{ _('Daily email to FDS members who have pending country access requests for countries they oversee. Skipped when auto-approve is enabled via environment variable. Edit the email template under System Configuration → Emails.') }}
+  </p>
 
-    <div class="rounded-lg border border-gray-200 overflow-hidden">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 items-start">
+    <form method="POST" action="{{ url_for('user_management.update_access_requests_digest_settings') }}" class="space-y-4 min-w-0">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h3 class="text-sm font-semibold text-gray-900">{{ _('Schedule') }}</h3>
+
+      <div class="rounded-lg border border-gray-200 overflow-hidden">
       <div class="flex items-start justify-between gap-4 p-4 bg-white">
         <div class="min-w-0 pr-2">
           <span class="block text-sm font-medium text-gray-900">{{ _('Send daily digest emails') }}</span>
@@ -243,7 +249,7 @@
         </label>
         <select id="fds-access-request-digest-local-hour"
                 name="fds_access_request_digest_local_hour"
-                class="block w-full max-w-xs rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm bg-white">
+                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm bg-white">
           {% for hour in range(24) %}
           <option value="{{ hour }}" {% if fds_access_request_digest_local_hour == hour %}selected{% endif %}>
             {{ '%02d:00'|format(hour) }} {{ fds_access_request_digest_timezone_label }}
@@ -256,15 +262,68 @@
       </div>
     </div>
 
-    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1 border-t border-gray-100">
-      <button type="button" class="btn btn-secondary close-modal w-full sm:w-auto">
-        {{ _('Cancel') }}
+      <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1">
+        <button type="button" class="btn btn-secondary close-modal w-full sm:w-auto">
+          {{ _('Cancel') }}
+        </button>
+        <button type="submit" class="btn btn-primary w-full sm:w-auto">
+          <i class="fas fa-save mr-1.5"></i>{{ _('Save digest settings') }}
+        </button>
+      </div>
+    </form>
+
+    <div class="space-y-4 min-w-0 md:border-l md:border-gray-200 md:pl-6">
+      <h3 class="text-sm font-semibold text-gray-900">{{ _('Manual send') }}</h3>
+
+      <details class="group rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
+      <summary class="cursor-pointer select-none px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 list-none flex items-center justify-between gap-2">
+        <span class="min-w-0">
+          {% if fds_digest_last_sent and fds_digest_last_sent.recipient_count %}
+          <span class="font-medium text-gray-900">{{ _('Last sent') }}:</span>
+          {{ fds_digest_last_sent.sent_at_display }}
+          {{ fds_access_request_digest_timezone_label }}
+          <span class="text-gray-500">— {{ ngettext('%(num)d recipient', '%(num)d recipients', fds_digest_last_sent.recipient_count, num=fds_digest_last_sent.recipient_count) }}</span>
+          {% else %}
+          <span class="font-medium text-gray-900">{{ _('Last sent') }}:</span>
+          <span class="text-gray-500">{{ _('No digest emails sent yet') }}</span>
+          {% endif %}
+        </span>
+        <i class="fas fa-chevron-down text-xs text-gray-400 transition-transform group-open:rotate-180 shrink-0" aria-hidden="true"></i>
+      </summary>
+      <div class="border-t border-gray-200 px-4 py-3 text-sm text-gray-600 bg-white max-h-40 overflow-y-auto">
+        {% if fds_digest_last_sent and fds_digest_last_sent.recipient_count %}
+        <ul class="space-y-1.5">
+          {% for recipient in fds_digest_last_sent.recipients %}
+          <li class="leading-snug">
+            <span class="text-gray-900">{{ recipient.name }}</span>
+            {% if recipient.email %}
+            <span class="text-gray-500">({{ recipient.email }})</span>
+            {% endif %}
+            {% if recipient.request_count is not none %}
+            <span class="text-gray-500">— {{ ngettext('%(num)d request', '%(num)d requests', recipient.request_count, num=recipient.request_count) }}</span>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-gray-500 leading-relaxed">{{ _('Digest emails will appear here after the first successful send.') }}</p>
+        {% endif %}
+      </div>
+    </details>
+
+    <form method="POST"
+          action="{{ url_for('user_management.send_access_requests_digest_now') }}"
+          data-confirm="{{ _('Send digest emails now to all FDS members with pending requests? Manual sends ignore the daily schedule and once-per-day limit.') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-secondary w-full">
+        <i class="fas fa-paper-plane mr-1.5"></i>{{ _('Send digest now') }}
       </button>
-      <button type="submit" class="btn btn-primary w-full sm:w-auto">
-        <i class="fas fa-save mr-1.5"></i>{{ _('Save digest settings') }}
-      </button>
+      <p class="text-xs text-gray-500 mt-2 leading-relaxed">
+        {{ _('Runs immediately for testing or ad-hoc sends. Skipped when auto-approve is enabled.') }}
+      </p>
+    </form>
     </div>
-  </form>
+  </div>
 {% endcall %}
 {% endif %}
 

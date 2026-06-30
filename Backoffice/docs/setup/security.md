@@ -65,11 +65,6 @@ File uploads are validated for:
 
 If not set, secure random passwords are generated. **Test credentials are blocked in production.**
 
-## Debug endpoints
-
-- `/dbinfo` requires admin authentication (admin or system_manager role) and localhost-only access in production; returns 404 when disabled.
-- Set `ENABLE_DBINFO=false` to disable.
-
 ## Deployment security checklist
 
 - [ ] `SECRET_KEY` is set and is a strong random value (32+ characters)
@@ -94,7 +89,6 @@ Use this before handing staging or production to testers. Adjust items if the en
 - [ ] **`DATABASE_URL`** (and any backup restore) uses credentials appropriate for a test window; testers only get accounts you intend.
 - [ ] **`CLIENT_CONSOLE_LOGGING`** is unset or **`false`** so verbose browser output is suppressed on pages that load the client console guard (`components/_client_console_guard.html`). The guard no-ops native `console.log` / `debug` / `info` / `warn` / `group*` / etc., and Jinja templates use gated helpers (`window.__clientLog`, `window.__clientWarn`, …) so those calls respect the same flag even in development. **`console.error`** is still used for genuine failure paths (and is not silenced by the guard).
 - [ ] **`DEBUG_SKIP_LOGIN`** is **`false`** (or unset). Do not enable auto-login shortcuts on assessed environments.
-- [ ] **`ENABLE_DBINFO=false`** (or unset in a way that keeps `/dbinfo` disabled for non-local production use), unless the test plan explicitly includes it.
 
 ### Transport, cookies, and headers
 

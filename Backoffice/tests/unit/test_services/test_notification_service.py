@@ -110,6 +110,38 @@ class TestCountMethods:
             count = NotificationService.get_unread_count(user.id)
         assert count == 0
 
+    def test_get_unread_count_excludes_user_hidden_types(self, app, db_session):
+        from app import db
+
+        with app.app_context():
+            user, notif = _create_user_and_notification(
+                db, 'hidden_digest', nt=NotificationType.email_digest, is_read=False
+            )
+            count = NotificationService.get_unread_count(user.id)
+        assert count == 0
+
+    def test_get_all_count_excludes_user_hidden_types(self, app, db_session):
+        from app import db
+
+        with app.app_context():
+            user, notif = _create_user_and_notification(
+                db, 'hidden_all', nt=NotificationType.email_digest
+            )
+            count = NotificationService.get_all_count(user.id)
+        assert count == 0
+
+    def test_get_archived_count_excludes_user_hidden_types(self, app, db_session):
+        from app import db
+
+        with app.app_context():
+            user, notif = _create_user_and_notification(
+                db, 'hidden_archived',
+                nt=NotificationType.email_digest,
+                is_archived=True,
+            )
+            count = NotificationService.get_archived_count(user.id)
+        assert count == 0
+
     def test_get_unread_count_error_returns_zero(self, app, db_session):
         with app.app_context():
             with patch.object(NotificationService, '_safe_notification_count', return_value=0):
@@ -536,6 +568,18 @@ class TestGetUserNotifications:
         assert isinstance(notifications, list)
         assert isinstance(total, int)
         assert total >= 1
+
+    def test_excludes_user_hidden_types(self, app, db_session):
+        from app import db
+
+        with app.app_context():
+            user, notif = _create_user_and_notification(
+                db, 'hidden_list', nt=NotificationType.email_digest
+            )
+            notifications, total = NotificationService.get_user_notifications(user.id)
+
+        assert notifications == []
+        assert total == 0
 
     def test_filters_unread_only(self, app, db_session):
         from app import db

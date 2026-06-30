@@ -756,10 +756,7 @@ class NotificationService:
                 Notification.user_id == user_id
             )
 
-            if USER_HIDDEN_NOTIFICATION_TYPES:
-                query = query.filter(
-                    Notification.notification_type.notin_(tuple(USER_HIDDEN_NOTIFICATION_TYPES))
-                )
+            query = cls._exclude_user_hidden_types(query)
 
             # Filter out expired notifications
             query = query.filter(
@@ -1132,6 +1129,15 @@ class NotificationService:
             return [], 0
 
     @classmethod
+    def _exclude_user_hidden_types(cls, query):
+        """Exclude internal notification types hidden from end-user lists (e.g. email_digest)."""
+        if USER_HIDDEN_NOTIFICATION_TYPES:
+            query = query.filter(
+                Notification.notification_type.notin_(tuple(USER_HIDDEN_NOTIFICATION_TYPES))
+            )
+        return query
+
+    @classmethod
     def _safe_notification_count(cls, query, error_context: str) -> int:
         """
         Run a lightweight COUNT without autoflush side effects.
@@ -1148,7 +1154,7 @@ class NotificationService:
     @classmethod
     def get_unread_count(cls, user_id: int) -> int:
         """
-        Get count of unread, non-archived, non-expired notifications for a user.
+        Get count of unread, non-archived, non-expired, user-visible notifications.
 
         Args:
             user_id: ID of the user
@@ -1169,6 +1175,7 @@ class NotificationService:
                 ),
             )
         )
+        query = cls._exclude_user_hidden_types(query)
         return cls._safe_notification_count(query, 'unread notification count')
 
     @classmethod
@@ -1194,6 +1201,7 @@ class NotificationService:
                 ),
             )
         )
+        query = cls._exclude_user_hidden_types(query)
         return cls._safe_notification_count(query, 'archived notification count')
 
     @classmethod
@@ -1219,6 +1227,7 @@ class NotificationService:
                 ),
             )
         )
+        query = cls._exclude_user_hidden_types(query)
         return cls._safe_notification_count(query, 'all notification count')
 
     @classmethod

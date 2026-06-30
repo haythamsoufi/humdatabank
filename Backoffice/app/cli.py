@@ -48,6 +48,8 @@ def register_commands(app):
             raise SystemExit(1)
         count = storage.sync_all_system_logos_to_cdn()
         click.echo(f'Mirrored {count} sector logo(s) to the public CDN.')
+
+    @app.cli.command('sync-indicator-embeddings')
     @click.option('--batch-size', type=int, default=100, help='Batch size for embedding API calls')
     @with_appcontext
     def sync_indicator_embeddings(batch_size):

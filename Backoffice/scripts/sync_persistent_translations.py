@@ -141,6 +141,7 @@ def _merge_locale(locale: str, image_po_path: str, persistent_po_path: str) -> N
     image_keys: set[tuple] = set()
     added = 0
     preserved = 0
+    backfilled = 0
 
     for img_entry in image_po:
         if getattr(img_entry, "obsolete", False):
@@ -172,6 +173,17 @@ def _merge_locale(locale: str, image_po_path: str, persistent_po_path: str) -> N
             existing.occurrences = img_entry.occurrences
             existing.comment = img_entry.comment
             existing.tcomment = img_entry.tcomment
+            if not (existing.msgstr or "").strip() and (img_entry.msgstr or "").strip():
+                existing.msgstr = img_entry.msgstr
+                backfilled += 1
+            if getattr(img_entry, "msgstr_plural", None):
+                merged_plural = dict(getattr(existing, "msgstr_plural", None) or {})
+                for form, image_value in img_entry.msgstr_plural.items():
+                    if not (merged_plural.get(form) or "").strip() and (image_value or "").strip():
+                        merged_plural[form] = image_value
+                        backfilled += 1
+                if merged_plural:
+                    existing.msgstr_plural = merged_plural
             preserved += 1
 
     # Mark entries that were removed from the image as obsolete.
@@ -183,8 +195,8 @@ def _merge_locale(locale: str, image_po_path: str, persistent_po_path: str) -> N
 
     persistent_po.save()
     logger.info(
-        "  %s: +%d new, %d preserved, %d obsoleted",
-        locale, added, preserved, obsoleted,
+        "  %s: +%d new, %d backfilled, %d preserved, %d obsoleted",
+        locale, added, backfilled, preserved, obsoleted,
     )
 
 

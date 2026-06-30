@@ -21,7 +21,7 @@
 {% macro sector_avatar(sector, size='md') %}
     {% if sector.has_logo %}
         <span class="sector-avatar-slot sector-avatar-slot--logo flex-shrink-0{% if size == 'sm' %} sector-avatar-slot--sm{% endif %}">
-            <img src="{{ url_for('system_admin.sector_logo', sector_id=sector.id) }}"
+            <img src="{{ sector_logo_url(sector) }}"
                  alt="{{ get_localized_sector_name(sector) }}"
                  class="sector-logo js-sector-logo-img{% if size == 'sm' %} sector-logo-sm{% endif %}">
             <span class="sector-avatar-icon sector-avatar-icon--md sector-avatar-icon--fallback sector-avatar-slot__fallback{% if size == 'sm' %} sector-avatar-icon--sm{% endif %}">
@@ -40,16 +40,7 @@
 {% endmacro %}
 
 {% macro subsector_avatar(subsector) %}
-    {% if subsector.has_logo %}
-        <span class="sector-avatar-slot sector-avatar-slot--logo flex-shrink-0">
-            <img src="{{ url_for('system_admin.subsector_logo', subsector_id=subsector.id) }}"
-                 alt="{{ get_localized_subsector_name(subsector) }}"
-                 class="subsector-logo js-sector-logo-img">
-            <span class="sector-avatar-icon sector-avatar-icon--sm sector-avatar-icon--sub sector-avatar-icon--fallback sector-avatar-slot__fallback">
-                {{ sector_icon_glyph(subsector, sub=true) }}
-            </span>
-        </span>
-    {% elif subsector.icon_class %}
+    {% if subsector.icon_class %}
         <div class="sector-avatar-icon sector-avatar-icon--sm sector-avatar-icon--sub">
             {{ sector_icon_glyph(subsector, sub=true) }}
         </div>
@@ -63,7 +54,7 @@
 {% macro sector_card_icon(sector, theme_idx) %}
     {% if sector.has_logo %}
     <div class="sector-card-icon sector-card-icon--logo sector-avatar-slot">
-        <img src="{{ url_for('system_admin.sector_logo', sector_id=sector.id) }}"
+        <img src="{{ sector_logo_url(sector) }}"
              alt="{{ get_localized_sector_name(sector) }}"
              class="sector-card-icon__img js-sector-logo-img">
         <div class="sector-card-icon sector-card-icon--glyph sector-avatar-slot__fallback" data-theme="{{ theme_idx }}">

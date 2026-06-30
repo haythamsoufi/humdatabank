@@ -907,7 +907,10 @@ class Config:
     AZURE_STORAGE_CONNECTION_STRING = os.environ.get('AZURE_STORAGE_CONNECTION_STRING', '')
     AZURE_STORAGE_CONTAINER = os.environ.get('AZURE_STORAGE_CONTAINER', 'uploads')
     # When set, static_url() serves JS/CSS/images from this CDN/blob origin instead of Gunicorn.
+    # Sector logos are mirrored into this container under system/sectors/ when
+    # UPLOAD_STORAGE_PROVIDER=azure_blob.
     STATIC_CDN_URL = (os.environ.get('STATIC_CDN_URL') or '').strip().rstrip('/')
+    STATIC_BLOB_CONTAINER = (os.environ.get('STATIC_BLOB_CONTAINER') or '').strip()
     _upload_provider_raw = (os.environ.get('UPLOAD_STORAGE_PROVIDER', '') or '').strip().lower()
     UPLOAD_STORAGE_PROVIDER = (
         _upload_provider_raw if _upload_provider_raw in ('filesystem', 'azure_blob')

@@ -455,23 +455,6 @@ class TestDeleteSubSector:
         with app.app_context():
             assert SubSector.query.get(subsector.id) is None
 
-    def test_delete_subsector_with_logo(self, logged_in_client, db_session, app):
-        with app.app_context():
-            sector = _create_sector(db_session, "Delete SubSector Logo Parent")
-            subsector = _create_subsector(db_session, sector.id, "Logo Delete SubSector")
-            subsector.logo_filename = "sublogo.png"
-            db_session.commit()
-
-        with patch(
-            "app.routes.admin.system_admin.sectors._delete_logo_file"
-        ) as mock_delete:
-            resp = logged_in_client.post(
-                f"/admin/subsectors/delete/{subsector.id}",
-                follow_redirects=False,
-            )
-        assert resp.status_code == 302
-        mock_delete.assert_called_once()
-
     def test_delete_exception_flashes_error(self, logged_in_client, db_session, app):
         with app.app_context():
             sector = _create_sector(db_session, "Exception Delete Sub Parent")
@@ -525,37 +508,6 @@ class TestSectorLogo:
             mock_storage.stream_response.return_value = MagicMock(status_code=200)
             mock_storage.SYSTEM = "system"
             resp = logged_in_client.get(f"/admin/sectors/{sector.id}/logo")
-        mock_storage.stream_response.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
-# GET /admin/subsectors/<id>/logo  – serve subsector logo (public)
-# ---------------------------------------------------------------------------
-
-class TestSubSectorLogo:
-    def test_subsector_no_logo_returns_404(self, logged_in_client, db_session, app):
-        with app.app_context():
-            sector = _create_sector(db_session, "No Logo Parent")
-            subsector = _create_subsector(db_session, sector.id, "No Logo SubSector")
-            subsector.logo_filename = None
-            db_session.commit()
-
-        resp = logged_in_client.get(f"/admin/subsectors/{subsector.id}/logo")
-        assert resp.status_code == 404
-
-    def test_subsector_with_logo_streams(self, logged_in_client, db_session, app):
-        with app.app_context():
-            sector = _create_sector(db_session, "Has Logo Parent")
-            subsector = _create_subsector(db_session, sector.id, "Has Logo SubSector")
-            subsector.logo_filename = "sublogo.png"
-            db_session.commit()
-
-        with patch(
-            "app.routes.admin.system_admin.sectors.storage"
-        ) as mock_storage:
-            mock_storage.stream_response.return_value = MagicMock(status_code=200)
-            mock_storage.SYSTEM = "system"
-            resp = logged_in_client.get(f"/admin/subsectors/{subsector.id}/logo")
         mock_storage.stream_response.assert_called_once()
 
 

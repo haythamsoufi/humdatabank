@@ -11,7 +11,7 @@ These are independent services. Blob Storage is accessed via the Azure SDK; Path
 
 ## Azure Blob Storage for Uploads
 
-All user-uploaded files (admin documents, resources, publications, form submission documents, sector/subsector logos, AI Knowledge Base documents) are stored in **Azure Blob Storage** when the `AZURE_STORAGE_CONNECTION_STRING` environment variable is set. Without it, the app falls back to writing files under the local `UPLOAD_FOLDER` directory (suitable for local development only).
+All user-uploaded files (admin documents, resources, publications, form submission documents, sector logos, AI Knowledge Base documents) are stored in **Azure Blob Storage** when the `AZURE_STORAGE_CONNECTION_STRING` environment variable is set. Without it, the app falls back to writing files under the local `UPLOAD_FOLDER` directory (suitable for local development only).
 
 ### Why Blob Storage instead of local disk?
 
@@ -33,7 +33,9 @@ Files are organised by category as blob prefixes (or subdirectories on local dis
 | `admin_documents` | `admin_documents/` | Standalone uploaded documents and their thumbnails |
 | `resources` | `resources/` | Resource and publication files (multilingual) |
 | `submissions` | `submissions/` | Form submission document uploads |
-| `system` | `system/sectors/`, `system/subsectors/` | Sector and subsector logos |
+| `system` | `system/sectors/` | Sector logos |
+
+When `STATIC_CDN_URL` is set and uploads use Azure Blob, sector logos are also mirrored into the public static blob container at `system/sectors/` so browsers load them from the CDN instead of the Flask app. After enabling CDN on an existing deployment, run `flask sync-sector-logos-cdn` once to backfill logos uploaded before mirroring was enabled.
 | `ai_documents` | `ai_documents/` | AI Knowledge Base uploaded files |
 
 ### Required environment variables

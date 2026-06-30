@@ -267,20 +267,77 @@ def _pdf_css(branding: Dict[str, object]) -> str:
 
     .docs-prose h1, .docs-prose h2, .docs-prose h3, .docs-prose h4, .docs-prose h5, .docs-prose h6 {{
         color: #1e293b;
+        font-weight: 600;
         page-break-after: avoid;
         word-wrap: break-word;
         overflow-wrap: anywhere;
     }}
 
-    .docs-prose h1 {{ font-size: 18pt; margin: 18pt 0 10pt; }}
+    .docs-prose h1 {{
+        font-size: 18pt;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 18pt 0 10pt;
+        padding-bottom: 6pt;
+        border-bottom: 2pt solid #e2e8f0;
+    }}
     .docs-prose h2 {{
         font-size: 14pt;
+        font-weight: 600;
+        color: #1e293b;
         margin: 16pt 0 8pt;
         padding-{text_align_start}: 10pt;
         border-{text_align_start}: 3pt solid #6366f1;
     }}
-    .docs-prose h3 {{ font-size: 12pt; margin: 14pt 0 6pt; }}
-    .docs-prose h4 {{ font-size: 11pt; margin: 12pt 0 6pt; color: #475569; }}
+    .docs-prose h3 {{
+        font-size: 12pt;
+        font-weight: 600;
+        color: #334155;
+        margin: 14pt 0 6pt;
+        padding-{text_align_start}: 8pt;
+        border-{text_align_start}: 3pt solid #8b5cf6;
+    }}
+    .docs-prose h4 {{
+        font-size: 11pt;
+        font-weight: 600;
+        color: #475569;
+        margin: 12pt 0 6pt;
+    }}
+    .docs-prose h5 {{
+        font-size: 10.5pt;
+        font-weight: 600;
+        color: #64748b;
+        margin: 10pt 0 5pt;
+    }}
+    .docs-prose h6 {{
+        font-size: 10pt;
+        font-weight: 600;
+        color: #64748b;
+        margin: 8pt 0 4pt;
+    }}
+
+    /* TOC wraps heading text in <a class="toclink"> — keep heading look, not hyperlink */
+    .docs-prose h1 a,
+    .docs-prose h2 a,
+    .docs-prose h3 a,
+    .docs-prose h4 a,
+    .docs-prose h5 a,
+    .docs-prose h6 a {{
+        color: inherit;
+        text-decoration: none;
+        font-weight: inherit;
+        font-size: inherit;
+    }}
+
+    /* Empty bookmark anchors inserted for cross-language fragment targets */
+    .docs-prose h1 > a:not([href]),
+    .docs-prose h2 > a:not([href]),
+    .docs-prose h3 > a:not([href]),
+    .docs-prose h4 > a:not([href]),
+    .docs-prose h5 > a:not([href]),
+    .docs-prose h6 > a:not([href]) {{
+        display: none;
+    }}
 
     .docs-prose p, .docs-prose li, .docs-prose dd, .docs-prose dt {{
         word-wrap: break-word;

@@ -573,8 +573,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Handle existing logo display
                 const logoPreview = document.querySelector('#editSectorModal .file-upload-preview');
                 if (data.logo_filename) {
-                    // Show existing logo
-                    const logoUrl = `{{ url_for('system_admin.sector_logo', sector_id=0) }}`.replace('0', sectorId);
+                    const logoUrl = data.logo_url || `{{ url_for('system_admin.sector_logo', sector_id=0) }}`.replace('0', sectorId);
                     if (logoPreview) {
                         logoPreview.innerHTML = `<img src="${logoUrl}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
                     } else {
@@ -642,28 +641,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const el_subsector_{{ code|replace('-', '_') }} = document.getElementById('edit_subsector_name_{{ code }}');
                 if (el_subsector_{{ code|replace('-', '_') }}) el_subsector_{{ code|replace('-', '_') }}.value = trans['{{ code }}'] || '';
                 {% endfor %}
-
-                // Handle existing logo display
-                const logoPreview = document.querySelector('#editSubsectorModal .file-upload-preview');
-                if (data.logo_filename) {
-                    // Show existing logo
-                    const logoUrl = `{{ url_for('system_admin.subsector_logo', subsector_id=0) }}`.replace('0', subsectorId);
-                    if (logoPreview) {
-                        logoPreview.innerHTML = `<img src="${logoUrl}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
-                    } else {
-                        // Create preview if it doesn't exist
-                        const logoInput = document.querySelector('#editSubsectorModal input[name="logo_file"]');
-                        const previewDiv = document.createElement('div');
-                        previewDiv.classList.add('file-upload-preview');
-                        previewDiv.innerHTML = `<img src="${logoUrl}" alt="Current logo" style="max-width: 100px; max-height: 100px;">`;
-                        logoInput.parentNode.insertBefore(previewDiv, logoInput.nextSibling);
-                    }
-                } else {
-                    // Clear preview if no logo
-                    if (logoPreview) {
-                        logoPreview.innerHTML = '';
-                    }
-                }
 
                 // Update form action
                 const form = document.getElementById('editSubsectorForm');

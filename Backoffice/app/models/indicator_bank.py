@@ -715,7 +715,7 @@ class Sector(db.Model):
 
 
 class SubSector(db.Model):
-    """Model for managing sub-sectors with logos and display information."""
+    """Model for managing sub-sectors with display information."""
     __tablename__ = 'sub_sector'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -754,18 +754,6 @@ class SubSector(db.Model):
             self.created_at = utcnow()
         if self.updated_at is None:
             self.updated_at = utcnow()
-
-    @property
-    def has_logo(self):
-        """True when a logo file is stored (upload uses logo_filename)."""
-        return bool(self.logo_filename or self.logo_path)
-
-    @property
-    def logo_url(self):
-        """Returns the URL path for the logo if it exists."""
-        if self.logo_path:
-            return f"/uploads/subsectors/{self.logo_path}"
-        return None
 
     def __repr__(self):
         return f'<SubSector {self.name}>'

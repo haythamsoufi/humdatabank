@@ -328,6 +328,9 @@ def register_template_context(app, config_class):
         return f"{base_url}?v={asset_version}"
     app.jinja_env.globals['static_url'] = static_url
 
+    from app.utils.sector_logo_urls import sector_logo_url
+    app.jinja_env.globals['sector_logo_url'] = sector_logo_url
+
     def forms_module_import_map():
         """Scoped import map so entry-form relative imports keep ?v= cache keys."""
         from flask import request

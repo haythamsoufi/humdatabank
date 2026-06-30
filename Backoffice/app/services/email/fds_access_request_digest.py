@@ -32,7 +32,6 @@ from app.services.email.delivery import (
 )
 from app.services.email.rendering import render_admin_email_template
 from app.services.email.service import get_fds_access_request_digest_default_template
-from app.services.notification.audience import get_system_manager_user_ids
 from app.utils.datetime_helpers import (
     format_in_org_timezone,
     now_in_org_timezone,
@@ -187,60 +186,26 @@ def _build_request_rows_html(requests) -> str:
     return '\n'.join(rows)
 
 
-def _create_fds_digest_notification(user: User, subject: str, message: str) -> Optional[int]:
-    """In-app notification so the digest attempt appears in Communication Center."""
-    from app.models.enums import NotificationType
-    from app.services.notification.core import create_notification
-
-    created = create_notification(
-        user_ids=user.id,
-        notification_type=NotificationType.email_digest,
-        title_key='notification.email_digest.title',
-        title_params={'custom_title': subject, 'frequency': 'daily', 'count': 0},
-        message_key='notification.email_digest.message',
-        message_params={'message': message, 'frequency': 'daily', 'count': 0},
-        related_url=url_for('user_management.access_requests'),
-        priority='low',
-        icon='fa-envelope-open-text',
-        category='system',
-        tags=['fds-access-request-digest'],
-        respect_preferences=False,
-        send_email_notifications=False,
-        send_push_notifications=False,
-    )
-    return created[0].id if created else None
-
-
 def _begin_fds_digest_delivery_log(
     user: User,
     subject: str,
-    message: str,
     existing_log: Optional[EmailDeliveryLog] = None,
 ) -> Optional[EmailDeliveryLog]:
-    """Create or reuse a delivery log linked to a Communication Center notification."""
+    """Create or reuse an email delivery log (no in-app notification)."""
     if not user or not user.email:
         return None
-
     if existing_log:
-        if not existing_log.notification_id:
-            notification_id = _create_fds_digest_notification(user, subject, message)
-            if notification_id:
-                existing_log.notification_id = notification_id
-                db.session.commit()
         return existing_log
-
-    notification_id = _create_fds_digest_notification(user, subject, message)
-    return log_email_attempt(notification_id, user.id, user.email, subject)
+    return log_email_attempt(None, user.id, user.email, subject)
 
 
 def _record_fds_digest_skip(
     user: User,
     *,
     subject: str,
-    message: str,
     reason: str,
 ) -> None:
-    log = _begin_fds_digest_delivery_log(user, subject, message)
+    log = _begin_fds_digest_delivery_log(user, subject)
     if log:
         mark_email_skipped(log.id, reason)
 
@@ -276,49 +241,6 @@ def _log_fds_digest_run(result: FdsDigestRunResult, *, manual: bool = False) -> 
     )
 
 
-def _notify_system_managers_run_summary(result: FdsDigestRunResult, *, manual: bool = False) -> None:
-    """Record run-level outcome for system managers in Communication Center."""
-    user_ids = get_system_manager_user_ids()
-    if not user_ids:
-        return
-
-    if result.skip_reason:
-        subject = f'{FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX}run skipped'
-        message = result.skip_reason
-        skip_reason = result.skip_reason
-    else:
-        run_label = "Manual run summary" if manual else "Run summary"
-        subject = f'{FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX}{run_label.lower()}'
-        message = (
-            f"{'Manual digest run. ' if manual else ''}"
-            f"Pending requests: {result.pending_total}. "
-            f"Without FDS member: {result.pending_without_fds_member}. "
-            f"FDS members with work: {result.fds_member_count}. "
-            f"Sent: {result.sent_count}, skipped: {result.skipped_count}, failed: {result.failed_count}."
-        )
-        if result.details:
-            message += ' ' + ' | '.join(result.details)
-        skip_reason = (
-            'No digest emails were sent this run.'
-            if result.sent_count == 0 and result.failed_count == 0
-            else None
-        )
-
-    users = User.query.filter(User.id.in_(user_ids), User.active.is_(True)).all()
-    for user in users:
-        if result.skip_reason or skip_reason:
-            _record_fds_digest_skip(
-                user,
-                subject=subject,
-                message=message,
-                reason=skip_reason or result.skip_reason or 'Run skipped',
-            )
-        else:
-            log = _begin_fds_digest_delivery_log(user, subject, message)
-            if log:
-                mark_email_sent(log.id)
-
-
 def _pending_digest_counts() -> tuple[int, int]:
     """Return (total pending, pending on countries without an FDS member)."""
     pending = pending_country_access_requests_query().all()
@@ -342,9 +264,6 @@ def send_fds_access_request_digest_email(user: User, requests, existing_log=None
     org_name = get_org_name()
     copyright_year = get_org_copyright_year()
     user_name = fds_member_user_display_name(user)
-    message = (
-        f"Daily digest email for {user_name} with {count} pending country access request(s)."
-    )
 
     default_template = get_fds_access_request_digest_default_template()
     html_template = get_email_template('email_template_fds_access_request_digest', default_template)
@@ -358,7 +277,7 @@ def send_fds_access_request_digest_email(user: User, requests, existing_log=None
         copyright_year=copyright_year,
     )
 
-    log = _begin_fds_digest_delivery_log(user, subject, message, existing_log=existing_log)
+    log = _begin_fds_digest_delivery_log(user, subject, existing_log=existing_log)
     if not log:
         return False
 
@@ -368,6 +287,7 @@ def send_fds_access_request_digest_email(user: User, requests, existing_log=None
             recipients=[user.email],
             html=body,
             cc=_team_email_cc_for_recipient(user.email),
+            expose_recipients_in_to=True,
         ):
             mark_email_sent(log.id)
             return True
@@ -386,8 +306,8 @@ def send_fds_access_request_digest_email(user: User, requests, existing_log=None
 
 def run_fds_access_request_digest_job(*, manual: bool = False) -> FdsDigestRunResult:
     """
-    Scheduled entry point: run only at the configured Geneva hour, with logging and
-    Communication Center audit rows for sends, skips, and run summaries.
+    Scheduled entry point: run only at the configured Geneva hour, with application logging.
+    Email delivery logs record send/skip/fail outcomes; no in-app notifications are created.
 
     When ``manual=True`` (admin-triggered), bypasses the hour gate, the enabled
     setting, and the once-per-day idempotency guard.
@@ -431,7 +351,6 @@ def run_fds_access_request_digest_job(*, manual: bool = False) -> FdsDigestRunRe
         else:
             result.skip_reason = 'No pending country access requests'
         _log_fds_digest_run(result, manual=manual)
-        _notify_system_managers_run_summary(result, manual=manual)
         db.session.commit()
         return result
 
@@ -446,7 +365,6 @@ def run_fds_access_request_digest_job(*, manual: bool = False) -> FdsDigestRunRe
                 _record_fds_digest_skip(
                     user,
                     subject=f'{FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX}skipped',
-                    message=f'Digest not sent to {fds_member_user_display_name(user)}.',
                     reason='Already sent today',
                 )
             continue
@@ -460,7 +378,6 @@ def run_fds_access_request_digest_job(*, manual: bool = False) -> FdsDigestRunRe
                 _record_fds_digest_skip(
                     user,
                     subject=f'{FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX}skipped',
-                    message='Digest not sent.',
                     reason='Inactive user or missing email address',
                 )
             continue
@@ -474,7 +391,6 @@ def run_fds_access_request_digest_job(*, manual: bool = False) -> FdsDigestRunRe
             result.details.append(f'{user_label}: send failed')
 
     _log_fds_digest_run(result, manual=manual)
-    _notify_system_managers_run_summary(result, manual=manual)
     db.session.commit()
     return result
 

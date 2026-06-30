@@ -1195,7 +1195,7 @@ def _preview_template_impl(template_id):
             selected_entity_type = None
             selected_entity_id = None
 
-    preview_view_as_options = [{"value": "", "label": _("Preview placeholders")}]
+    preview_view_as_options = []
     try:
         option_rows = []
 

@@ -964,18 +964,6 @@ class TestSubSector:
             s = self._create_subsector(db_session, name='My SubSector')
             assert 'My SubSector' in repr(s)
 
-    def test_logo_url_with_path(self, db_session, app):
-        """Test logo_url returns correct URL."""
-        with app.app_context():
-            s = self._create_subsector(db_session, logo_path='nutrition/logo.png')
-            assert '/uploads/subsectors/nutrition/logo.png' == s.logo_url
-
-    def test_logo_url_none(self, db_session, app):
-        """Test logo_url returns None when no path."""
-        with app.app_context():
-            s = self._create_subsector(db_session)
-            assert s.logo_url is None
-
     def test_get_name_translation(self, db_session, app):
         """Test get_name_translation."""
         with app.app_context():

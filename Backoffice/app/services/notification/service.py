@@ -1556,6 +1556,7 @@ class NotificationService:
                 'email_status': None,
                 'email_status_display': '',
                 'email_subject': '',
+                'email_content': '',
                 'email_sent_at': '',
                 'email_failed_at': '',
                 'email_error': '',
@@ -1576,6 +1577,7 @@ class NotificationService:
             'email_status': status_raw,
             'email_status_display': status_display,
             'email_subject': log.subject or '',
+            'email_content': '',
             'email_sent_at': log.sent_at.strftime('%Y-%m-%d %H:%M:%S') if log.sent_at else '',
             'email_failed_at': log.failed_at.strftime('%Y-%m-%d %H:%M:%S') if log.failed_at else '',
             'email_error': log.error_message or '',
@@ -1607,14 +1609,40 @@ class NotificationService:
         return email_delivery_log_can_retry(log)
 
     @classmethod
+    def resolve_display_content(
+        cls,
+        notification: Notification,
+        actor_fields: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[str, str]:
+        """Return (display_title, display_message) for grid and email preview."""
+        message, title = cls._translate_notification_content(notification)
+        if message is None:
+            message = notification.message
+        if title is None:
+            title = notification.title
+
+        primary_is_message = bool((actor_fields or {}).get('primary_is_message'))
+        if primary_is_message:
+            display_title = message or title or ''
+            display_message = title if (title and title != display_title) else ''
+        else:
+            display_title = title or ''
+            display_message = message or ''
+        return display_title, display_message
+
+    @classmethod
     def build_email_delivery_fields_map(
         cls,
         notification_ids: List[int],
+        notifications: Optional[List[Notification]] = None,
+        actor_fields_by_id: Optional[Dict[int, Dict[str, Any]]] = None,
     ) -> Dict[int, Dict[str, Any]]:
         """
         Return the latest EmailDeliveryLog fields per notification_id.
 
         When multiple logs exist (retries), the most recently created row wins.
+        Pass ``notifications`` (and optional ``actor_fields_by_id``) to populate
+        ``email_content`` as a plain-text preview derived from the notification body.
         """
         if not notification_ids:
             return {}
@@ -1633,7 +1661,24 @@ class NotificationService:
             if nid is not None and nid not in latest_by_notification:
                 latest_by_notification[nid] = log
 
-        return {
-            nid: cls._serialize_email_delivery_log(latest_by_notification.get(nid))
-            for nid in notification_ids
-        }
+        notifications_by_id: Dict[int, Notification] = {}
+        if notifications:
+            notifications_by_id = {n.id: n for n in notifications if n.id is not None}
+
+        actor_map = actor_fields_by_id or {}
+        from app.services.notification.emails import derive_email_content_plain
+
+        result: Dict[int, Dict[str, Any]] = {}
+        for nid in notification_ids:
+            fields = dict(cls._serialize_email_delivery_log(latest_by_notification.get(nid)))
+            notification = notifications_by_id.get(nid)
+            if notification and fields.get('has_email'):
+                _display_title, display_message = cls.resolve_display_content(
+                    notification, actor_map.get(nid)
+                )
+                fields['email_content'] = derive_email_content_plain(
+                    fields.get('email_subject') or _display_title,
+                    display_message or notification.message,
+                )
+            result[nid] = fields
+        return result

@@ -2,7 +2,7 @@ from app.utils.transactions import request_transaction_rollback
 from contextlib import suppress
 # Backoffice/app/routes/api/indicators.py
 from app.utils.datetime_helpers import utcnow
-from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.sector_logo_urls import sector_logo_url
 """
 Indicator Bank, Suggestions, and Sector API endpoints.
 Part of the /api/v1 blueprint.
@@ -408,7 +408,6 @@ def get_sectors():
                     'name': subsector.name,
                     'description': subsector.description,
                     'display_order': subsector.display_order,
-                    'logo_url': f"{request.host_url.rstrip('/')}/api/v1/uploads/subsectors/{subsector.logo_filename}" if subsector.logo_filename else None,
                     'multilingual_names': multilingual_subsector_names
                 })
 
@@ -421,7 +420,7 @@ def get_sectors():
                 'name': sector.name,
                 'description': sector.description,
                 'display_order': sector.display_order,
-                'logo_url': f"{request.host_url.rstrip('/')}/api/v1/uploads/sectors/{sector.logo_filename}" if sector.logo_filename else None,
+                'logo_url': sector_logo_url(sector, external=True, via_api=True),
                 'multilingual_names': multilingual_sector_names,
                 'subsectors': subsectors_data
             })
@@ -472,7 +471,6 @@ def get_subsectors():
                 'name': subsector.name,
                 'description': subsector.description,
                 'display_order': subsector.display_order,
-                'logo_url': f"{request.host_url.rstrip('/')}/api/v1/uploads/subsectors/{subsector.logo_filename}" if subsector.logo_filename else None,
                 'parent_sector': parent_sector,
                 'multilingual_names': multilingual_subsector_names
             })
@@ -518,7 +516,6 @@ def get_sectors_subsectors():
                     'name': subsector.name,
                     'description': subsector.description,
                     'display_order': subsector.display_order,
-                    'logo_url': f"{request.host_url.rstrip('/')}/api/v1/uploads/subsectors/{subsector.logo_filename}" if subsector.logo_filename else None,
                     'multilingual_names': multilingual_subsector_names
                 })
 
@@ -531,7 +528,7 @@ def get_sectors_subsectors():
                 'name': sector.name,
                 'description': sector.description,
                 'display_order': sector.display_order,
-                'logo_url': f"{request.host_url.rstrip('/')}/api/v1/uploads/sectors/{sector.logo_filename}" if sector.logo_filename else None,
+                'logo_url': sector_logo_url(sector, external=True, via_api=True),
                 'icon_class': sector.icon_class,
                 'multilingual_names': multilingual_sector_names,
                 'subsectors': subsectors_data

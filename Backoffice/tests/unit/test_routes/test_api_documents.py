@@ -4,7 +4,6 @@ Tests for app/routes/api/documents.py
 Coverage targets:
 - GET /api/v1/submitted-documents            (require_api_key, filters, pagination, exception)
 - GET /api/v1/uploads/sectors/<filename>      (serve_sector_logo, error path)
-- GET /api/v1/uploads/subsectors/<filename>   (serve_subsector_logo, error path)
 - GET /api/v1/uploads/branding/<filename>     (serve_branding_asset, missing name, error)
 """
 import pytest
@@ -294,25 +293,6 @@ class TestServeSectorLogo:
             # The path used must be just the basename, not the traversal path
             path_arg = calls[0][1]  # second positional arg is the path
             assert ".." not in path_arg
-
-
-# ---------------------------------------------------------------------------
-# GET /api/v1/uploads/subsectors/<filename>
-# ---------------------------------------------------------------------------
-
-class TestServeSubsectorLogo:
-    """Tests for GET /api/v1/uploads/subsectors/<filename>."""
-
-    def test_missing_file_returns_404(self, client, db_session):
-        with patch("app.services.storage_service.stream_response", side_effect=Exception("not found")):
-            resp = client.get(_api("/uploads/subsectors/missing.png"))
-        assert resp.status_code == 404
-
-    def test_serves_file(self, client, db_session):
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        with patch("app.services.storage_service.stream_response", return_value=mock_response):
-            client.get(_api("/uploads/subsectors/logo.png"))
 
 
 # ---------------------------------------------------------------------------

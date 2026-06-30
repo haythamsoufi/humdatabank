@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-30 11:43+0200\n"
+"POT-Creation-Date: 2026-06-30 17:12+0200\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: en <LL@li.org>\n"
@@ -14,7 +14,7 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "Generated-By: Babel 2.17.0\n"
 
-#: app/routes/admin/utilities/translations.py:1360
+#: app/routes/admin/utilities/translations.py:1421
 #, python-format
 msgid " (and %(count)d more)"
 msgstr ""
@@ -35,7 +35,7 @@ msgid ""
 "%(count)s data validation question(s) for %(entity)s require your response."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:66
+#: app/templates/admin/communication/center.html:59
 #, python-format
 msgid "%(count)s email delivery failure(s) need attention."
 msgstr ""
@@ -45,9 +45,16 @@ msgstr ""
 msgid "%(count)s field(s) orphaned"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1077
+#: app/templates/forms/form_builder/form_builder.html:1092
 #, python-format
 msgid "%(count)s shared"
+msgstr ""
+
+#: app/templates/admin/translations/manage_translations.html:191
+#, python-format
+msgid ""
+"%(count)s string was removed from the source code and can be permanently "
+"deleted from .po files."
 msgstr ""
 
 #: app/templates/forms/form_builder/field_mapping.html:356
@@ -139,11 +146,11 @@ msgstr ""
 msgid "'%(document)s' (%(document_type)s) was uploaded."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1411
+#: app/templates/admin/communication/center.html:1409
 msgid "(No message)"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1410
+#: app/templates/admin/communication/center.html:1408
 msgid "(No title)"
 msgstr ""
 
@@ -155,11 +162,11 @@ msgstr ""
 msgid "(Offline)"
 msgstr "(オフライン)"
 
-#: app/templates/forms/form_builder/form_builder.html:1179
+#: app/templates/forms/form_builder/form_builder.html:1194
 msgid "(The item will be archived and hidden from the template)"
 msgstr "(アイテムはアーカイブされ、テンプレートから非表示になります)"
 
-#: app/templates/forms/form_builder/form_builder.html:1180
+#: app/templates/forms/form_builder/form_builder.html:1195
 msgid ""
 "(The section and its items will be archived and hidden from the template)"
 msgstr "(そのセクションとそのアイテムはアーカイブされ、テンプレートから非表示になります)"
@@ -248,7 +255,7 @@ msgstr ""
 msgid "?"
 msgstr "?"
 
-#: app/templates/admin/communication/center.html:1292
+#: app/templates/admin/communication/center.html:1288
 msgid "A descriptive name for this campaign"
 msgstr "このキャンペーンの説明的な名称"
 
@@ -301,7 +308,7 @@ msgstr ""
 msgid "AI Assistant"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1329
+#: app/templates/admin/settings/manage_settings.html:1344
 msgid "AI Beta Access"
 msgstr ""
 
@@ -407,7 +414,7 @@ msgstr ""
 msgid "AND"
 msgstr "そして"
 
-#: app/services/documentation_service.py:191
+#: app/services/documentation_service.py:248
 msgid "API"
 msgstr ""
 
@@ -492,7 +499,7 @@ msgstr "APIキー:"
 #: app/templates/admin/api_management.html:4
 #: app/templates/admin/api_management.html:182
 #: app/templates/admin/api_management.html:186
-#: app/templates/admin/communication/center.html:488
+#: app/templates/admin/communication/center.html:484
 #: app/templates/components/_sidebar_nav_categories.html:219
 #: app/templates/components/_sidebar_nav_categories.html:221
 msgid "API Management"
@@ -603,8 +610,8 @@ msgstr "メインダッシュボードにアクセスして、割り当て、指
 msgid "Account Created"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:955
-#: app/templates/admin/communication/center.html:962
+#: app/templates/admin/communication/center.html:951
+#: app/templates/admin/communication/center.html:958
 msgid "Account Status"
 msgstr "口座の状況"
 
@@ -639,7 +646,7 @@ msgstr ""
 #: app/templates/admin/api_keys/list.html:118
 #: app/templates/admin/assignments/assignments.html:121
 #: app/templates/admin/assignments/public_submissions.html:255
-#: app/templates/admin/communication/center.html:1348
+#: app/templates/admin/communication/center.html:1344
 #: app/templates/admin/documents/documents.html:771
 #: app/templates/admin/embed_content/manage_embed_content.html:50
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:153
@@ -662,7 +669,7 @@ msgstr ""
 #: app/templates/admin/rbac/roles.html:59
 #: app/templates/admin/security/dashboard.html:167
 #: app/templates/admin/templates/templates.html:255
-#: app/templates/admin/translations/manage_translations.html:617
+#: app/templates/admin/translations/manage_translations.html:655
 #: app/templates/admin/user_management/access_requests.html:1063
 #: app/templates/admin/validation_questions.html:271
 #: app/templates/admin/validation_rules.html:264
@@ -687,9 +694,9 @@ msgstr ""
 msgid "Activate"
 msgstr "起動"
 
-#: app/routes/admin/communication.py:323
+#: app/routes/admin/communication.py:325
 #: app/templates/admin/analytics/sessions.html:159
-#: app/templates/admin/communication/center.html:967
+#: app/templates/admin/communication/center.html:963
 #: app/templates/admin/indicator_bank/_panel_common_words_body.html:63
 #: app/templates/admin/indicator_bank/_panel_common_words_body.html:132
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:132
@@ -816,7 +823,7 @@ msgstr ""
 msgid "Add"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1137
+#: app/templates/admin/communication/center.html:1133
 msgid "Add All"
 msgstr ""
 
@@ -976,7 +983,7 @@ msgstr ""
 msgid "Add Section"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1134
+#: app/templates/admin/communication/center.html:1130
 msgid "Add Selected"
 msgstr ""
 
@@ -1044,8 +1051,8 @@ msgstr ""
 msgid "Add sector"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1429
-#: app/templates/admin/settings/manage_settings.html:1502
+#: app/templates/admin/communication/center.html:1428
+#: app/templates/admin/settings/manage_settings.html:1517
 msgid "Add some template content first, then show sample values."
 msgstr ""
 
@@ -1147,7 +1154,7 @@ msgid "Add…"
 msgstr ""
 
 #: app/routes/admin/documentation.py:144 app/routes/admin/documentation.py:197
-#: app/services/documentation_service.py:678
+#: app/services/documentation_service.py:735
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:13
 #: app/templates/admin/analytics/activity_logs.html:27
 #: app/templates/admin/analytics/admin_actions.html:33
@@ -1176,7 +1183,7 @@ msgstr ""
 #: app/templates/admin/dashboard.html:26
 #: app/templates/admin/dashboard.html:278
 #: app/templates/admin/data_exploration/explore_data.html:106
-#: app/templates/admin/docs/documentation.html:1087
+#: app/templates/admin/docs/documentation.html:1100
 #: app/templates/admin/embed_content/manage_embed_content.html:18
 #: app/templates/admin/governance/dashboard.html:61
 #: app/templates/admin/indicator_bank/add_indicator_bank.html:71
@@ -1209,7 +1216,7 @@ msgstr ""
 #: app/templates/admin/templates/new_template.html:26
 #: app/templates/admin/templates/templates.html:48
 #: app/templates/admin/templates/upr_excel_import.html:29
-#: app/templates/admin/translations/manage_translations.html:146
+#: app/templates/admin/translations/manage_translations.html:153
 #: app/templates/admin/user_management/access_requests.html:119
 #: app/templates/admin/user_management/user_form.html:281
 #: app/templates/admin/user_management/users.html:85
@@ -1252,7 +1259,7 @@ msgstr ""
 msgid "Admin Actions"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:475
+#: app/templates/admin/communication/center.html:471
 #: app/templates/admin/templates/upr_excel_import.html:143
 #: app/templates/components/_sidebar_nav_categories.html:15
 #: app/templates/components/_sidebar_nav_categories.html:17
@@ -1271,7 +1278,7 @@ msgstr ""
 msgid "Admin Notes"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:913
+#: app/templates/admin/settings/manage_settings.html:928
 msgid "Admin Notification (New Suggestion)"
 msgstr ""
 
@@ -1287,7 +1294,7 @@ msgstr ""
 msgid "Admin Panel"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:474
+#: app/templates/admin/communication/center.html:470
 msgid "Admin Screens"
 msgstr ""
 
@@ -1306,9 +1313,9 @@ msgid ""
 "assignments, and more."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:319
-#: app/templates/admin/communication/center.html:321
-#: app/templates/admin/communication/center.html:883
+#: app/templates/admin/communication/center.html:315
+#: app/templates/admin/communication/center.html:317
+#: app/templates/admin/communication/center.html:879
 #: app/templates/admin/dashboard.html:46
 msgid "Admins"
 msgstr ""
@@ -1329,7 +1336,7 @@ msgstr ""
 msgid "After"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:434
+#: app/templates/admin/translations/manage_translations.html:470
 msgid "After importing, click \"Compile Translations\" to apply changes."
 msgstr ""
 
@@ -1380,7 +1387,7 @@ msgstr ""
 msgid "Aggregated Label Translations"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:673
+#: app/templates/admin/communication/center.html:669
 #: app/templates/notifications/center.html:109
 msgid "Alert"
 msgstr ""
@@ -1437,7 +1444,7 @@ msgstr ""
 msgid "All Endpoints"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1050
+#: app/templates/admin/communication/center.html:1046
 msgid "All Entity Types"
 msgstr ""
 
@@ -1542,11 +1549,6 @@ msgstr ""
 msgid "All clear! No active assignments for"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:57
-#: app/templates/admin/communication/center.html:101
-msgid "All communications"
-msgstr ""
-
 #: app/templates/admin/validation_dashboard.html:251
 msgid "All countries"
 msgstr ""
@@ -1589,7 +1591,7 @@ msgstr ""
 msgid "All pending"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:642
+#: app/templates/admin/translations/manage_translations.html:680
 msgid "All placeholders from the original text must be preserved."
 msgstr ""
 
@@ -1667,9 +1669,9 @@ msgstr ""
 msgid "Allow Self-Reporting (Add to Dashboard Dropdown)"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:311
-#: app/templates/admin/translations/manage_translations.html:382
-#: app/templates/admin/translations/manage_translations.html:421
+#: app/templates/admin/translations/manage_translations.html:347
+#: app/templates/admin/translations/manage_translations.html:418
+#: app/templates/admin/translations/manage_translations.html:457
 msgid "Allow clearing existing translations (dangerous)"
 msgstr ""
 
@@ -1685,7 +1687,7 @@ msgstr ""
 msgid "Allowed"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1344
+#: app/templates/admin/settings/manage_settings.html:1359
 msgid "Allowed Users"
 msgstr ""
 
@@ -1741,12 +1743,12 @@ msgstr ""
 msgid "An error occurred."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:800
-#: app/routes/admin/utilities/translations.py:861
-#: app/routes/admin/utilities/translations.py:993
-#: app/routes/admin/utilities/translations.py:1298
-#: app/routes/admin/utilities/translations.py:1311
-#: app/routes/admin/utilities/translations.py:1375
+#: app/routes/admin/utilities/translations.py:811
+#: app/routes/admin/utilities/translations.py:872
+#: app/routes/admin/utilities/translations.py:1004
+#: app/routes/admin/utilities/translations.py:1359
+#: app/routes/admin/utilities/translations.py:1372
+#: app/routes/admin/utilities/translations.py:1436
 #: app/routes/main/dashboard.py:370 app/routes/main/views.py:124
 #: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:868
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:1312
@@ -1791,7 +1793,7 @@ msgstr ""
 #: app/templates/admin/analytics/page_path_analytics.html:24
 #: app/templates/admin/analytics/sessions.html:56
 #: app/templates/admin/analytics/user_detail.html:16
-#: app/templates/admin/settings/manage_settings.html:1177
+#: app/templates/admin/settings/manage_settings.html:1192
 #: app/templates/admin/user_management/user_form.html:114
 msgid "Analytics"
 msgstr ""
@@ -1902,7 +1904,7 @@ msgstr ""
 msgid "Any value is allowed (suggestions come from existing assignments)."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:452
+#: app/templates/admin/communication/center.html:448
 msgid "App Screen"
 msgstr ""
 
@@ -1998,7 +2000,7 @@ msgstr ""
 #: app/templates/admin/assignments/public_submissions.html:54
 #: app/templates/admin/assignments/public_submissions.html:105
 #: app/templates/admin/assignments/public_submissions.html:178
-#: app/templates/admin/communication/center.html:923
+#: app/templates/admin/communication/center.html:919
 #: app/templates/admin/data_exploration/explore_data.html:584
 #: app/templates/admin/data_exploration/explore_data.html:1105
 #: app/templates/admin/documents/documents.html:334
@@ -2025,15 +2027,15 @@ msgstr ""
 msgid "Apr"
 msgstr ""
 
-#: app/services/documentation_service.py:202
-#: app/templates/admin/communication/center.html:1363
+#: app/services/documentation_service.py:259
+#: app/templates/admin/communication/center.html:1359
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:36
 #: app/templates/notifications/center.html:174
 #: app/templates/notifications/center.html:205
 msgid "Archive"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1352
+#: app/templates/admin/communication/center.html:1348
 #: app/templates/admin/indicator_bank/add_indicator_bank.html:230
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:238
 #: app/templates/admin/indicator_bank/view_indicator_bank.html:40
@@ -2076,7 +2078,7 @@ msgid ""
 "undone."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:659
+#: app/templates/admin/translations/manage_translations.html:702
 msgid ""
 "Are you sure you want to clear all translation fields except English? This "
 "action cannot be undone."
@@ -2330,7 +2332,7 @@ msgstr ""
 
 #: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:764
 #: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:781
-#: app/templates/forms/form_builder/form_builder.html:1252
+#: app/templates/forms/form_builder/form_builder.html:1267
 msgid "Are you sure?"
 msgstr ""
 
@@ -2390,8 +2392,8 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/assignments/public_submissions.html:225
-#: app/templates/admin/communication/center.html:671
-#: app/templates/admin/communication/center.html:732
+#: app/templates/admin/communication/center.html:667
+#: app/templates/admin/communication/center.html:728
 #: app/templates/admin/rbac/grants.html:108
 #: app/templates/admin/user_management/users.html:135
 #: app/templates/admin/user_management/users.html:166
@@ -2439,11 +2441,11 @@ msgstr ""
 msgid "Assignment Created"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:899
+#: app/templates/admin/communication/center.html:895
 msgid "Assignment Filters"
 msgstr ""
 
-#: app/services/documentation_service.py:277
+#: app/services/documentation_service.py:334
 #: app/templates/admin/assignments/assignments.html:54
 #: app/templates/admin/assignments/gantt_chart.html:64
 #: app/templates/admin/assignments/public_submissions.html:31
@@ -2452,7 +2454,7 @@ msgstr ""
 
 #: app/templates/admin/data_exploration/explore_data.html:169
 #: app/templates/admin/data_exploration/explore_data.html:1652
-#: app/templates/forms/form_builder/form_builder.html:806
+#: app/templates/forms/form_builder/form_builder.html:821
 #: app/templates/forms/form_builder/partials/_variables_modal.html:15
 msgid "Assignment Period"
 msgstr ""
@@ -2473,7 +2475,7 @@ msgstr ""
 msgid "Assignment Sent for Review"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:906
+#: app/templates/admin/communication/center.html:902
 msgid "Assignment Status"
 msgstr ""
 
@@ -2577,8 +2579,8 @@ msgid "Assignment:"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:360
-#: app/templates/admin/communication/center.html:478
-#: app/templates/admin/communication/center.html:1008
+#: app/templates/admin/communication/center.html:474
+#: app/templates/admin/communication/center.html:1004
 #: app/templates/admin/dashboard.html:77
 #: app/templates/admin/templates/templates.html:323
 #: app/templates/admin/user_management/users.html:195
@@ -2627,7 +2629,7 @@ msgstr ""
 msgid "Attach"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:729
+#: app/templates/admin/communication/center.html:725
 msgid ""
 "Attach the assignment form PDF for each selected entity. One PDF per entity "
 "will be generated from the chosen assignment."
@@ -2645,7 +2647,7 @@ msgstr ""
 #: app/templates/admin/analytics/audit_trail.html:193
 #: app/templates/admin/analytics/audit_trail.html:198
 #: app/templates/admin/analytics/dashboard.html:304
-#: app/templates/admin/communication/center.html:487
+#: app/templates/admin/communication/center.html:483
 #: app/templates/components/_sidebar_nav_categories.html:201
 #: app/templates/components/_sidebar_nav_categories.html:203
 #: app/templates/forms/form_builder/form_builder.html:29
@@ -2715,7 +2717,7 @@ msgstr ""
 #: app/templates/admin/indicator_bank/measurement_lookup_spef_form_partial.html:136
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:484
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:676
-#: app/templates/admin/translations/manage_translations.html:493
+#: app/templates/admin/translations/manage_translations.html:529
 msgid "Auto Translate"
 msgstr ""
 
@@ -2730,7 +2732,7 @@ msgstr ""
 #: app/templates/admin/organization/index.html:206
 #: app/templates/admin/organization/index.html:237
 #: app/templates/admin/organization/index.html:268
-#: app/templates/admin/translations/manage_translations.html:164
+#: app/templates/admin/translations/manage_translations.html:171
 #: app/templates/forms/form_builder/form_builder.html:44
 msgid "Auto Translate All"
 msgstr "すべて自動翻訳"
@@ -2769,11 +2771,11 @@ msgstr ""
 msgid "Auto-Translate All Sector & Sub-Sector Names"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:723
+#: app/templates/forms/form_builder/form_builder.html:738
 msgid "Auto-Translate All Template Items"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:517
+#: app/templates/admin/translations/manage_translations.html:553
 msgid "Auto-Translate All Translation Fields"
 msgstr ""
 
@@ -2787,7 +2789,7 @@ msgid ""
 " (75vh)."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:726
+#: app/templates/admin/communication/center.html:722
 msgid "Auto-generated attachment"
 msgstr ""
 
@@ -2805,7 +2807,7 @@ msgid ""
 "fields, and page names to all languages"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:167
+#: app/templates/admin/translations/manage_translations.html:174
 msgid "Auto-translate all blank translation fields to all languages"
 msgstr ""
 
@@ -2836,16 +2838,16 @@ msgstr ""
 
 #: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:1019
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:1485
-#: app/templates/admin/translations/manage_translations.html:658
+#: app/templates/admin/translations/manage_translations.html:701
 msgid "Auto-translate failed."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:965
-#: app/templates/admin/settings/manage_settings.html:966
+#: app/templates/admin/settings/manage_settings.html:980
+#: app/templates/admin/settings/manage_settings.html:981
 msgid "Auto-translate from English"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1513
+#: app/templates/admin/settings/manage_settings.html:1528
 msgid "Auto-translate is not available. Refresh the page and try again."
 msgstr ""
 
@@ -2875,7 +2877,7 @@ msgstr ""
 msgid "Automatic flags"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:490
+#: app/templates/admin/translations/manage_translations.html:526
 msgid "Automatically translate blank fields using AI"
 msgstr ""
 
@@ -2887,7 +2889,7 @@ msgid ""
 "Automatically translate blank multilingual name fields from the primary name"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:288
+#: app/templates/admin/communication/center.html:284
 msgid "Available User Types"
 msgstr ""
 
@@ -2985,8 +2987,8 @@ msgstr ""
 msgid "Back to login"
 msgstr ""
 
-#: app/templates/admin/docs/documentation.html:1230
-#: app/templates/admin/docs/documentation.html:1231
+#: app/templates/admin/docs/documentation.html:1243
+#: app/templates/admin/docs/documentation.html:1244
 msgid "Back to top"
 msgstr ""
 
@@ -3030,7 +3032,7 @@ msgid ""
 "Typical for external integrations."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1393
+#: app/templates/admin/communication/center.html:1391
 msgid "Becomes the email subject line and in-app notification title."
 msgstr ""
 
@@ -3050,7 +3052,7 @@ msgstr ""
 msgid "Blank template"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:639
+#: app/templates/admin/translations/manage_translations.html:677
 msgid "Blocked by WAF for translation"
 msgstr ""
 
@@ -3092,7 +3094,7 @@ msgstr ""
 msgid "Breakdown"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1407
+#: app/templates/admin/communication/center.html:1405
 msgid "Brief summary for the in-app notification list…"
 msgstr ""
 
@@ -3139,7 +3141,7 @@ msgstr ""
 msgid "Browsing indicators in the Indicator Bank…"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:111
+#: app/templates/admin/translations/manage_translations.html:118
 msgid "Build & Apply"
 msgstr "ビルドして適用"
 
@@ -3147,11 +3149,11 @@ msgstr "ビルドして適用"
 msgid "Building import preview…"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:155
+#: app/templates/admin/communication/center.html:151
 msgid "Bulk Selection"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:838
+#: app/templates/admin/communication/center.html:834
 msgid "Bulk User Selection"
 msgstr ""
 
@@ -3213,7 +3215,7 @@ msgstr ""
 msgid "By pillar"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:355
+#: app/templates/admin/communication/center.html:351
 msgid "CC"
 msgstr ""
 
@@ -3233,11 +3235,11 @@ msgstr ""
 msgid "Calculating..."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1233
+#: app/templates/admin/communication/center.html:1229
 msgid "Campaign"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:746
+#: app/templates/admin/communication/center.html:742
 msgid "Campaign Details"
 msgstr ""
 
@@ -3245,17 +3247,17 @@ msgstr ""
 msgid "Campaign Email Templates"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:752
-#: app/templates/admin/communication/center.html:1284
-#: app/templates/admin/communication/center.html:1353
+#: app/templates/admin/communication/center.html:748
+#: app/templates/admin/communication/center.html:1280
+#: app/templates/admin/communication/center.html:1349
 msgid "Campaign Name"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1176
+#: app/templates/admin/communication/center.html:1172
 msgid "Campaign Recipients"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:130
+#: app/templates/admin/communication/center.html:126
 msgid "Campaign Type"
 msgstr ""
 
@@ -3287,9 +3289,9 @@ msgstr ""
 #: app/templates/admin/assignments/public_submissions.html:382
 #: app/templates/admin/common_words/manage_common_words.html:911
 #: app/templates/admin/common_words/manage_common_words.html:913
-#: app/templates/admin/communication/center.html:788
-#: app/templates/admin/communication/center.html:1257
-#: app/templates/admin/communication/center.html:1318
+#: app/templates/admin/communication/center.html:784
+#: app/templates/admin/communication/center.html:1253
+#: app/templates/admin/communication/center.html:1314
 #: app/templates/admin/countries/manage_country.html:54
 #: app/templates/admin/data_exploration/explore_data.html:992
 #: app/templates/admin/embed_content/manage_embed_content.html:189
@@ -3322,12 +3324,12 @@ msgstr ""
 #: app/templates/admin/organization/edit_entity.html:135
 #: app/templates/admin/organization/index.html:3047
 #: app/templates/admin/plugin_management.html:181
-#: app/templates/admin/settings/manage_settings.html:1142
-#: app/templates/admin/settings/manage_settings.html:1474
+#: app/templates/admin/settings/manage_settings.html:1157
+#: app/templates/admin/settings/manage_settings.html:1489
 #: app/templates/admin/templates/data_sync_imputation.html:204
 #: app/templates/admin/templates/templates.html:333
-#: app/templates/admin/translations/manage_translations.html:502
-#: app/templates/admin/translations/manage_translations.html:627
+#: app/templates/admin/translations/manage_translations.html:538
+#: app/templates/admin/translations/manage_translations.html:665
 #: app/templates/admin/user_management/access_requests.html:267
 #: app/templates/admin/user_management/user_form.html:648
 #: app/templates/admin/user_management/user_form.html:1212
@@ -3348,8 +3350,8 @@ msgstr ""
 #: app/templates/forms/form_builder/form_builder.html:254
 #: app/templates/forms/form_builder/form_builder.html:263
 #: app/templates/forms/form_builder/form_builder.html:330
-#: app/templates/forms/form_builder/form_builder.html:893
-#: app/templates/forms/form_builder/form_builder.html:1181
+#: app/templates/forms/form_builder/form_builder.html:908
+#: app/templates/forms/form_builder/form_builder.html:1196
 #: app/templates/forms/form_builder/partials/_item_modal.html:933
 #: app/templates/forms/form_builder/partials/_question_modal.html:182
 #: app/templates/forms/form_builder/partials/_section_modal.html:156
@@ -3416,7 +3418,7 @@ msgid "Cards"
 msgstr ""
 
 #: app/templates/admin/ai/documents.html:522
-#: app/templates/admin/communication/center.html:667
+#: app/templates/admin/communication/center.html:663
 #: app/templates/admin/embed_content/manage_embed_content.html:46
 #: app/templates/admin/embed_content/manage_embed_content.html:135
 #: app/templates/admin/indicator_bank/indicator_bank.html:1945
@@ -3589,8 +3591,8 @@ msgstr ""
 msgid "Checking your assignments…"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1477
-#: app/templates/forms/form_builder/form_builder.html:888
+#: app/templates/admin/settings/manage_settings.html:1492
+#: app/templates/forms/form_builder/form_builder.html:903
 msgid "Checking…"
 msgstr ""
 
@@ -3598,7 +3600,7 @@ msgstr ""
 msgid "Choice"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1173
+#: app/templates/forms/form_builder/form_builder.html:1188
 msgid "Choose an option:"
 msgstr ""
 
@@ -3642,7 +3644,7 @@ msgid ""
 "and drag-and-drop panels shown in those pages."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1104
+#: app/templates/admin/settings/manage_settings.html:1119
 msgid ""
 "Choose who should receive this test message. It uses the current template "
 "content and sample placeholder values."
@@ -3669,13 +3671,13 @@ msgstr ""
 #: app/templates/admin/analytics/audit_trail.html:289
 #: app/templates/admin/analytics/page_path_analytics.html:54
 #: app/templates/admin/api_keys/list.html:97
-#: app/templates/admin/communication/center.html:533
-#: app/templates/admin/communication/center.html:714
+#: app/templates/admin/communication/center.html:529
+#: app/templates/admin/communication/center.html:710
 #: app/templates/admin/communication/registry.html:33
 #: app/templates/admin/monitoring/system_monitoring.html:184
 #: app/templates/admin/monitoring/system_monitoring.html:441
-#: app/templates/admin/settings/manage_settings.html:1262
-#: app/templates/admin/translations/manage_translations.html:664
+#: app/templates/admin/settings/manage_settings.html:1277
+#: app/templates/admin/translations/manage_translations.html:707
 #: app/templates/admin/validation_dashboard.html:249
 #: app/templates/components/ag_grid_i18n_js.html:19
 #: app/templates/core/chat_immersive.html:48
@@ -3683,8 +3685,8 @@ msgstr ""
 msgid "Clear"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:174
-#: app/templates/admin/communication/center.html:267
+#: app/templates/admin/communication/center.html:170
+#: app/templates/admin/communication/center.html:263
 msgid "Clear All"
 msgstr ""
 
@@ -3708,11 +3710,11 @@ msgstr ""
 msgid "Clear Parameters"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:497
+#: app/templates/admin/translations/manage_translations.html:533
 msgid "Clear Translations"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:665
+#: app/templates/admin/translations/manage_translations.html:708
 msgid "Clear Translations?"
 msgstr ""
 
@@ -3729,11 +3731,11 @@ msgstr ""
 msgid "Clear all conversations?"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1318
+#: app/templates/admin/settings/manage_settings.html:1333
 msgid "Clear all database-saved AI settings and revert to defaults"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:495
+#: app/templates/admin/translations/manage_translations.html:531
 msgid "Clear all translation fields except English"
 msgstr ""
 
@@ -3746,7 +3748,7 @@ msgstr ""
 msgid "Clear filters"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:532
+#: app/templates/admin/communication/center.html:528
 msgid "Clear load campaign selection"
 msgstr ""
 
@@ -3754,15 +3756,15 @@ msgstr ""
 msgid "Clear probe"
 msgstr ""
 
-#: app/templates/admin/docs/documentation.html:1133
+#: app/templates/admin/docs/documentation.html:1146
 #: app/templates/components/country_dropdown.html:38
 #: app/templates/components/enhanced_search_dropdown.html:41
 #: app/templates/components/entity_dropdown.html:28
 msgid "Clear search"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:90
-#: app/templates/admin/communication/center.html:1381
+#: app/templates/admin/communication/center.html:86
+#: app/templates/admin/communication/center.html:1379
 #: app/templates/admin/documents/documents.html:401
 #: app/templates/admin/settings/manage_settings.html:507
 #: app/templates/admin/settings/manage_settings.html:552
@@ -3775,11 +3777,11 @@ msgstr ""
 msgid "Clear stored key"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:661
+#: app/templates/admin/translations/manage_translations.html:704
 msgid "Cleared"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:660
+#: app/templates/admin/translations/manage_translations.html:703
 msgid "Cleared 1 translation field."
 msgstr ""
 
@@ -3814,7 +3816,7 @@ msgstr ""
 msgid "Click Search or Refresh to load documents from the IFRC API."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1379
+#: app/templates/admin/settings/manage_settings.html:1394
 msgid "Click a provider to edit its settings. Drag to reorder fallback order."
 msgstr ""
 
@@ -3840,7 +3842,7 @@ msgstr ""
 msgid "Click on the method to change how data is imputed for each item."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:298
+#: app/templates/admin/translations/manage_translations.html:334
 #: app/templates/macros/excel_import_dropzone.html:44
 msgid "Click or drag Excel file here"
 msgstr ""
@@ -3856,11 +3858,11 @@ msgstr ""
 msgid "Click or drag Kobo XLSForm file here"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:367
+#: app/templates/admin/translations/manage_translations.html:403
 msgid "Click or drag PO file here"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:406
+#: app/templates/admin/translations/manage_translations.html:442
 msgid "Click or drag ZIP file here"
 msgstr ""
 
@@ -3897,8 +3899,8 @@ msgstr ""
 msgid "Click to repeat this group of fields multiple times"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1426
-#: app/templates/admin/settings/manage_settings.html:1499
+#: app/templates/admin/communication/center.html:1425
+#: app/templates/admin/settings/manage_settings.html:1514
 msgid ""
 "Click to switch: edit the template with Jinja placeholders, or see sample "
 "values (server-rendered preview, not saved)."
@@ -3944,13 +3946,13 @@ msgstr ""
 
 #: app/templates/admin/analytics/sessions.html:177
 #: app/templates/admin/assignments/assignments.html:129
-#: app/templates/admin/communication/center.html:840
-#: app/templates/admin/communication/center.html:1131
-#: app/templates/admin/communication/center.html:1152
-#: app/templates/admin/communication/center.html:1178
-#: app/templates/admin/communication/center.html:1211
-#: app/templates/admin/communication/center.html:1225
-#: app/templates/admin/communication/center.html:1276
+#: app/templates/admin/communication/center.html:836
+#: app/templates/admin/communication/center.html:1127
+#: app/templates/admin/communication/center.html:1148
+#: app/templates/admin/communication/center.html:1174
+#: app/templates/admin/communication/center.html:1207
+#: app/templates/admin/communication/center.html:1221
+#: app/templates/admin/communication/center.html:1272
 #: app/templates/admin/indicator_bank/indicator_bank.html:1752
 #: app/templates/admin/indicator_bank/indicator_bank.html:1756
 #: app/templates/admin/indicator_bank/indicator_bank.html:1776
@@ -3959,8 +3961,8 @@ msgstr ""
 #: app/templates/admin/organization/_nss_component.html:85
 #: app/templates/admin/plugin_management.html:157
 #: app/templates/admin/templates/data_sync_imputation.html:225
-#: app/templates/admin/translations/manage_translations.html:198
-#: app/templates/admin/translations/manage_translations.html:449
+#: app/templates/admin/translations/manage_translations.html:234
+#: app/templates/admin/translations/manage_translations.html:485
 #: app/templates/admin/user_management/user_form.html:1329
 #: app/templates/auth/login.html:642 app/templates/auth/login.html:690
 #: app/templates/components/auto_translate_modal.html:359
@@ -4019,7 +4021,7 @@ msgstr ""
 msgid "Cluster Office Name"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:232
+#: app/templates/admin/communication/center.html:228
 msgid "Cluster Offices"
 msgstr ""
 
@@ -4056,10 +4058,10 @@ msgstr ""
 msgid "Collapse"
 msgstr ""
 
-#: app/templates/admin/docs/documentation.html:1117
-#: app/templates/admin/docs/documentation.html:1118
-#: app/templates/admin/settings/manage_settings.html:1322
-#: app/templates/admin/settings/manage_settings.html:1469
+#: app/templates/admin/docs/documentation.html:1130
+#: app/templates/admin/docs/documentation.html:1131
+#: app/templates/admin/settings/manage_settings.html:1337
+#: app/templates/admin/settings/manage_settings.html:1484
 msgid "Collapse all"
 msgstr ""
 
@@ -4152,7 +4154,7 @@ msgstr ""
 msgid "Comments"
 msgstr ""
 
-#: app/services/documentation_service.py:680
+#: app/services/documentation_service.py:737
 msgid "Common"
 msgstr ""
 
@@ -4186,7 +4188,7 @@ msgstr ""
 msgid "Communication Center compose defaults"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:806
+#: app/templates/admin/communication/center.html:802
 msgid "Communication campaigns"
 msgstr ""
 
@@ -4224,25 +4226,25 @@ msgstr ""
 msgid "Comparison complete · reviewing…"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:127
+#: app/templates/admin/translations/manage_translations.html:134
 msgid "Compile Translations"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:628
+#: app/templates/admin/translations/manage_translations.html:666
 msgid "Compile Translations?"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:125
+#: app/templates/admin/translations/manage_translations.html:132
 msgid "Compile translations and restart the application"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:624
+#: app/templates/admin/translations/manage_translations.html:662
 msgid ""
 "Compiling translations will restart the application. This may cause a brief "
 "interruption in service. Do you want to continue?"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:625
+#: app/templates/admin/translations/manage_translations.html:663
 msgid "Compiling..."
 msgstr ""
 
@@ -4309,12 +4311,12 @@ msgstr ""
 msgid "Compliant Countries"
 msgstr ""
 
-#: app/services/documentation_service.py:195
+#: app/services/documentation_service.py:252
 #: app/templates/core/dashboard.html:2879
 msgid "Components"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:550
+#: app/templates/admin/communication/center.html:546
 msgid "Compose by channel"
 msgstr ""
 
@@ -4404,7 +4406,7 @@ msgstr ""
 msgid "Configured"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1192
+#: app/templates/admin/settings/manage_settings.html:1207
 msgid "Configured via deployment / Config.FEATURES"
 msgstr ""
 
@@ -4489,12 +4491,12 @@ msgstr ""
 msgid "Contains an uppercase letter"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:621
+#: app/templates/admin/translations/manage_translations.html:659
 msgid "Contains format placeholders - preserve them in translations"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:358
-#: app/templates/admin/communication/center.html:509
+#: app/templates/admin/communication/center.html:505
 msgid "Content"
 msgstr ""
 
@@ -4503,8 +4505,8 @@ msgid "Context Data"
 msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:991
-#: app/templates/admin/translations/manage_translations.html:626
-#: app/templates/forms/form_builder/form_builder.html:1182
+#: app/templates/admin/translations/manage_translations.html:664
+#: app/templates/forms/form_builder/form_builder.html:1197
 msgid "Continue"
 msgstr ""
 
@@ -4688,7 +4690,7 @@ msgstr ""
 msgid "Could not build Excel workbook"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:889
+#: app/templates/forms/form_builder/form_builder.html:904
 msgid "Could not check for existing data. Please try again."
 msgstr ""
 
@@ -4743,8 +4745,8 @@ msgstr ""
 msgid "Could not load preview"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1428
-#: app/templates/admin/settings/manage_settings.html:1501
+#: app/templates/admin/communication/center.html:1427
+#: app/templates/admin/settings/manage_settings.html:1516
 msgid "Could not load sample values for this template."
 msgstr ""
 
@@ -4758,11 +4760,11 @@ msgstr ""
 msgid "Could not load the form. Try again or refresh the page."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:645
+#: app/templates/admin/translations/manage_translations.html:683
 msgid "Could not prepare delete request"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1518
+#: app/templates/admin/settings/manage_settings.html:1533
 msgid "Could not prepare the email body."
 msgstr ""
 
@@ -4800,13 +4802,14 @@ msgstr ""
 msgid "Could not undo changes."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1213
+#: app/routes/admin/utilities/translations.py:1239
+#: app/routes/admin/utilities/translations.py:1270
 msgid "Could not update translation files."
 msgstr ""
 
 #: app/templates/admin/templates/kobo_data_import.html:1158
 #: app/templates/admin/templates/new_template.html:873
-#: app/templates/forms/form_builder/form_builder.html:878
+#: app/templates/forms/form_builder/form_builder.html:893
 msgid "Could not validate the file. Please try again."
 msgstr ""
 
@@ -4825,8 +4828,8 @@ msgstr ""
 
 #: app/templates/admin/ai/documents.html:530
 #: app/templates/admin/analytics/audit_trail.html:325
-#: app/templates/admin/communication/center.html:200
-#: app/templates/admin/communication/center.html:1036
+#: app/templates/admin/communication/center.html:196
+#: app/templates/admin/communication/center.html:1032
 #: app/templates/admin/countries/manage_country.html:12
 #: app/templates/admin/organization/_countries_component.html:14
 #: app/templates/admin/organization/index.html:47
@@ -5019,8 +5022,8 @@ msgstr ""
 msgid "Create Assignment"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:815
-#: app/templates/admin/communication/center.html:1322
+#: app/templates/admin/communication/center.html:811
+#: app/templates/admin/communication/center.html:1318
 msgid "Create Campaign"
 msgstr ""
 
@@ -5081,7 +5084,7 @@ msgstr ""
 msgid "Create a new assignment"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:894
+#: app/templates/forms/form_builder/form_builder.html:909
 #: app/templates/forms/form_builder/partials/_excel_modal.html:22
 msgid "Create a new draft version"
 msgstr ""
@@ -5102,7 +5105,7 @@ msgstr ""
 msgid "Create a sector first, then add sub-sectors under it."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:808
+#: app/templates/admin/communication/center.html:804
 msgid ""
 "Create and manage campaigns. Schedule delivery for later or save drafts and "
 "send when ready."
@@ -5189,12 +5192,12 @@ msgstr ""
 msgid "Created"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1347
+#: app/templates/admin/communication/center.html:1343
 #: app/templates/admin/templates/templates.html:245
 msgid "Created At"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1355
+#: app/templates/admin/communication/center.html:1351
 msgid "Created By"
 msgstr ""
 
@@ -5301,7 +5304,7 @@ msgstr ""
 msgid "Custom Name Translations"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:457
+#: app/templates/admin/communication/center.html:453
 msgid "Custom URL"
 msgstr ""
 
@@ -5333,7 +5336,7 @@ msgstr ""
 msgid "Daily digest"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:934
+#: app/templates/admin/settings/manage_settings.html:949
 msgid ""
 "Daily email sent to FDS members with pending country access requests for "
 "their countries. Variables: user_name, request_count, request_rows_html, "
@@ -5347,9 +5350,9 @@ msgid ""
 " variable. Edit the email template under System Configuration → Emails."
 msgstr ""
 
-#: app/routes/help_docs.py:137 app/routes/help_docs.py:191
+#: app/routes/help_docs.py:141 app/routes/help_docs.py:197
 #: app/routes/main/dashboard.py:937
-#: app/templates/admin/communication/center.html:465
+#: app/templates/admin/communication/center.html:461
 #: app/templates/components/_sidebar_nav_categories.html:9
 #: app/templates/components/_sidebar_nav_categories.html:11
 #: app/templates/core/chat_immersive.html:148
@@ -5368,7 +5371,7 @@ msgstr ""
 msgid "Data"
 msgstr ""
 
-#: app/services/documentation_service.py:278
+#: app/services/documentation_service.py:335
 msgid "Data & Export"
 msgstr ""
 
@@ -5415,7 +5418,7 @@ msgid ""
 "sensitive patterns before sending."
 msgstr ""
 
-#: app/services/documentation_service.py:201
+#: app/services/documentation_service.py:258
 msgid "Data Migration"
 msgstr ""
 
@@ -5449,8 +5452,8 @@ msgstr ""
 msgid "Data Quality Index Trend"
 msgstr ""
 
-#: app/services/documentation_service.py:188
-#: app/services/documentation_service.py:816
+#: app/services/documentation_service.py:245
+#: app/services/documentation_service.py:873
 msgid "Data Reporting"
 msgstr ""
 
@@ -5632,7 +5635,7 @@ msgstr ""
 msgid "Default Value (Optional)"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1066
+#: app/templates/admin/settings/manage_settings.html:1081
 msgid "Default email templates"
 msgstr ""
 
@@ -5640,17 +5643,17 @@ msgstr ""
 msgid "Default message"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:577
+#: app/templates/admin/communication/center.html:573
 msgid "Default notification email"
 msgstr ""
 
-#: app/routes/admin/communication.py:338
+#: app/routes/admin/communication.py:340
 #: app/templates/admin/communication/registry.html:63
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:147
 msgid "Default priority"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1075
+#: app/templates/admin/settings/manage_settings.html:1090
 msgid "Default templates"
 msgstr ""
 
@@ -5712,8 +5715,8 @@ msgstr ""
 #: app/templates/admin/assignments/public_submissions.html:277
 #: app/templates/admin/common_words/manage_common_words.html:911
 #: app/templates/admin/common_words/manage_common_words.html:913
-#: app/templates/admin/communication/center.html:1360
-#: app/templates/admin/communication/center.html:1365
+#: app/templates/admin/communication/center.html:1356
+#: app/templates/admin/communication/center.html:1361
 #: app/templates/admin/documents/documents.html:425
 #: app/templates/admin/documents/documents.html:441
 #: app/templates/admin/documents/documents.html:443
@@ -5748,7 +5751,7 @@ msgstr ""
 #: app/templates/admin/resources/edit_resource.html:279
 #: app/templates/admin/resources/edit_resource.html:453
 #: app/templates/admin/templates/templates.html:277
-#: app/templates/admin/translations/manage_translations.html:650
+#: app/templates/admin/translations/manage_translations.html:693
 #: app/templates/admin/user_management/user_form.html:45
 #: app/templates/admin/user_management/user_form.html:1213
 #: app/templates/admin/validation_rules.html:240
@@ -5757,7 +5760,7 @@ msgstr ""
 #: app/templates/components/thumbnail_upload.html:54
 #: app/templates/core/chat_immersive.html:49
 #: app/templates/forms/form_builder/form_builder.html:357
-#: app/templates/forms/form_builder/form_builder.html:1168
+#: app/templates/forms/form_builder/form_builder.html:1183
 #: app/templates/macros/delete_confirm_modal.html:32
 #: app/templates/notifications/center.html:178
 #: app/templates/notifications/center.html:207
@@ -5771,7 +5774,7 @@ msgstr ""
 msgid "Delete Common Word?"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1174
+#: app/templates/forms/form_builder/form_builder.html:1189
 msgid "Delete Data and Remove"
 msgstr ""
 
@@ -5829,7 +5832,7 @@ msgstr ""
 msgid "Delete conversation?"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:892
+#: app/templates/forms/form_builder/form_builder.html:907
 msgid "Delete data & import"
 msgstr ""
 
@@ -5837,7 +5840,7 @@ msgstr ""
 msgid "Delete document"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:647
+#: app/templates/admin/translations/manage_translations.html:685
 msgid "Delete failed"
 msgstr ""
 
@@ -5849,7 +5852,7 @@ msgid ""
 "%(n)s)."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:649
+#: app/templates/admin/translations/manage_translations.html:687
 msgid "Delete removed string?"
 msgstr ""
 
@@ -5908,7 +5911,7 @@ msgstr ""
 msgid "Delete this unit? This cannot be undone."
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:873
+#: app/templates/forms/form_builder/form_builder.html:888
 msgid "Delete this version? This cannot be undone."
 msgstr ""
 
@@ -5947,11 +5950,11 @@ msgstr ""
 msgid "Deleting..."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:391
+#: app/templates/admin/communication/center.html:387
 msgid "Delivery Method"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:385
+#: app/templates/admin/communication/center.html:381
 msgid "Delivery Options"
 msgstr ""
 
@@ -5965,7 +5968,7 @@ msgstr ""
 msgid "Department Name"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:224
+#: app/templates/admin/communication/center.html:220
 #: app/templates/admin/organization/index.html:143
 #: app/templates/admin/organization/index.html:1431
 msgid "Departments"
@@ -6011,7 +6014,7 @@ msgid "Deploy this version"
 msgstr ""
 
 #: app/templates/forms/form_builder/form_builder.html:194
-#: app/templates/forms/form_builder/form_builder.html:872
+#: app/templates/forms/form_builder/form_builder.html:887
 msgid "Deploy this version? This will publish it as the live version."
 msgstr ""
 
@@ -6039,7 +6042,7 @@ msgid ""
 msgstr ""
 
 #: app/forms/form_builder/template_forms.py:21
-#: app/routes/admin/analytics.py:1255 app/routes/admin/communication.py:340
+#: app/routes/admin/analytics.py:1255 app/routes/admin/communication.py:342
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:61
 #: app/templates/admin/analytics/audit_trail.html:268
 #: app/templates/admin/analytics/audit_trail.html:455
@@ -6047,8 +6050,8 @@ msgstr ""
 #: app/templates/admin/api_keys/create_success.html:42
 #: app/templates/admin/api_keys/details.html:253
 #: app/templates/admin/api_management.html:1875
-#: app/templates/admin/communication/center.html:776
-#: app/templates/admin/communication/center.html:1297
+#: app/templates/admin/communication/center.html:772
+#: app/templates/admin/communication/center.html:1293
 #: app/templates/admin/communication/registry.html:65
 #: app/templates/admin/embed_content/manage_embed_content.html:129
 #: app/templates/admin/indicator_bank/_panel_sectors_modals.html:22
@@ -6080,6 +6083,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:2079
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:65
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:139
+#: app/templates/forms/form_builder/form_builder.html:653
 #: app/templates/forms/form_builder/partials/_sections_container.html:477
 #: app/templates/forms/form_builder/partials/_sections_container.html:483
 #: app/templates/forms/form_builder/partials/_sections_container.html:531
@@ -6094,8 +6098,8 @@ msgstr ""
 msgid "Description (Optional)"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:249
-#: app/templates/admin/communication/center.html:1072
+#: app/templates/admin/communication/center.html:245
+#: app/templates/admin/communication/center.html:1068
 #: app/templates/admin/templates/kobo_data_import.html:198
 #: app/templates/components/auto_translate_modal.html:390
 msgid "Deselect All"
@@ -6123,7 +6127,7 @@ msgstr ""
 msgid "Detecting countries"
 msgstr ""
 
-#: app/services/documentation_service.py:194
+#: app/services/documentation_service.py:251
 msgid "Development"
 msgstr ""
 
@@ -6145,7 +6149,7 @@ msgstr ""
 msgid "Device Removed"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1150
+#: app/templates/admin/communication/center.html:1146
 msgid "Device Status Details"
 msgstr ""
 
@@ -6218,7 +6222,7 @@ msgstr ""
 msgid "Disaggregation"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:472
+#: app/templates/admin/communication/center.html:468
 #: app/templates/admin/data_exploration/explore_data.html:131
 msgid "Disaggregation Analysis"
 msgstr ""
@@ -6261,7 +6265,7 @@ msgid "Discard Draft?"
 msgstr ""
 
 #: app/templates/forms/form_builder/form_builder.html:237
-#: app/templates/forms/form_builder/form_builder.html:874
+#: app/templates/forms/form_builder/form_builder.html:889
 msgid "Discard this draft? All changes will be lost and cannot be undone."
 msgstr ""
 
@@ -6292,16 +6296,16 @@ msgstr ""
 msgid "Dismiss"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:73
-#: app/templates/admin/communication/center.html:1378
+#: app/templates/admin/communication/center.html:66
+#: app/templates/admin/communication/center.html:1376
 msgid "Dismiss all failed emails"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1385
+#: app/templates/admin/communication/center.html:1383
 msgid "Dismiss all failed emails without retrying?"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1376
+#: app/templates/admin/communication/center.html:1374
 msgid "Dismiss email failure"
 msgstr ""
 
@@ -6309,12 +6313,12 @@ msgstr ""
 msgid "Dismiss offline notice"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:87
-#: app/templates/admin/communication/center.html:1380
+#: app/templates/admin/communication/center.html:83
+#: app/templates/admin/communication/center.html:1378
 msgid "Dismiss selected"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1384
+#: app/templates/admin/communication/center.html:1382
 msgid "Dismiss selected email failure(s) without retrying?"
 msgstr ""
 
@@ -6322,12 +6326,12 @@ msgstr ""
 msgid "Dismiss warning"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1388
+#: app/templates/admin/communication/center.html:1386
 msgid "Dismissed"
 msgstr ""
 
 #: app/templates/admin/ai/review_detail.html:221
-#: app/templates/admin/communication/center.html:1387
+#: app/templates/admin/communication/center.html:1385
 msgid "Dismissing..."
 msgstr ""
 
@@ -6411,7 +6415,7 @@ msgstr ""
 msgid "Division Name"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:220
+#: app/templates/admin/communication/center.html:216
 #: app/templates/admin/organization/index.html:139
 msgid "Divisions"
 msgstr ""
@@ -6475,7 +6479,7 @@ msgstr ""
 msgid "Document Labels"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:479
+#: app/templates/admin/communication/center.html:475
 #: app/templates/admin/documents/documents.html:38
 #: app/templates/components/_sidebar_nav_categories.html:22
 #: app/templates/components/_sidebar_nav_categories.html:24
@@ -6566,8 +6570,8 @@ msgstr ""
 #: app/routes/admin/documentation.py:190 app/routes/admin/documentation.py:198
 #: app/templates/admin/api_management.html:534
 #: app/templates/admin/docs/documentation.html:4
-#: app/templates/admin/docs/documentation.html:1085
-#: app/templates/admin/docs/documentation.html:1088
+#: app/templates/admin/docs/documentation.html:1098
+#: app/templates/admin/docs/documentation.html:1101
 #: app/templates/components/_sidebar_nav_categories.html:57
 #: app/templates/components/_sidebar_nav_categories.html:59
 #: app/templates/core/layout.html:215 app/templates/core/layout.html:217
@@ -6693,7 +6697,7 @@ msgstr ""
 msgid "Download the sample plugin package and starter guide"
 msgstr ""
 
-#: app/templates/admin/docs/documentation.html:1198
+#: app/templates/admin/docs/documentation.html:1211
 msgid "Download this page as PDF"
 msgstr ""
 
@@ -6751,16 +6755,16 @@ msgstr ""
 msgid "Drag to reorder group"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:345
-#: app/templates/admin/communication/center.html:361
+#: app/templates/admin/communication/center.html:341
+#: app/templates/admin/communication/center.html:357
 msgid "Drag user types here"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:282
+#: app/templates/admin/communication/center.html:278
 msgid "Drag user types to To or CC fields to configure email distribution."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:373
+#: app/templates/admin/communication/center.html:369
 msgid "Drag user types to configure distribution"
 msgstr ""
 
@@ -6845,7 +6849,7 @@ msgid ""
 " and settings."
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1158
+#: app/templates/forms/form_builder/form_builder.html:1173
 msgid ""
 "Duplicate this item? This will copy the item and all of its configuration."
 msgstr ""
@@ -6867,7 +6871,7 @@ msgid ""
 "translations."
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1157
+#: app/templates/forms/form_builder/form_builder.html:1172
 #: app/templates/forms/form_builder/partials/_sections_container.html:166
 msgid ""
 "Duplicate this section? This will copy the section, all sub-sections, and "
@@ -6922,7 +6926,7 @@ msgstr ""
 msgid "Each option can only be selected once in this section"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1166
+#: app/templates/admin/settings/manage_settings.html:1181
 msgid ""
 "Each row describes who receives the in-app notification when it is created, "
 "how long it is kept (TTL), and the default priority for new notifications of"
@@ -6950,7 +6954,7 @@ msgstr ""
 #: app/templates/admin/api_keys/list.html:166
 #: app/templates/admin/assignments/assignments.html:130
 #: app/templates/admin/assignments/public_submissions.html:269
-#: app/templates/admin/communication/center.html:1359
+#: app/templates/admin/communication/center.html:1355
 #: app/templates/admin/documents/documents.html:807
 #: app/templates/admin/embed_content/manage_embed_content.html:87
 #: app/templates/admin/embed_content/manage_embed_content.html:88
@@ -7068,11 +7072,11 @@ msgstr ""
 msgid "Edit Template"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:447
+#: app/templates/admin/translations/manage_translations.html:483
 msgid "Edit Translation"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:622
+#: app/templates/admin/translations/manage_translations.html:660
 msgid "Edit all translations"
 msgstr ""
 
@@ -7132,9 +7136,9 @@ msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:316
 #: app/templates/admin/analytics/user_detail.html:44
-#: app/templates/admin/communication/center.html:402
-#: app/templates/admin/communication/center.html:557
-#: app/templates/admin/communication/center.html:1369
+#: app/templates/admin/communication/center.html:398
+#: app/templates/admin/communication/center.html:553
+#: app/templates/admin/communication/center.html:1365
 #: app/templates/admin/user_management/user_form.html:947
 #: app/templates/admin/user_management/users.html:291
 #: app/templates/auth/forgot_password.html:10
@@ -7146,7 +7150,11 @@ msgstr ""
 msgid "Email"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:279
+#: app/templates/admin/communication/center.html:1368
+msgid "Email Content"
+msgstr ""
+
+#: app/templates/admin/communication/center.html:275
 msgid "Email Distribution Rules"
 msgstr ""
 
@@ -7154,7 +7162,7 @@ msgstr ""
 msgid "Email Domain"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1373
+#: app/templates/admin/communication/center.html:1370
 msgid "Email Error"
 msgstr ""
 
@@ -7166,15 +7174,15 @@ msgstr ""
 msgid "Email HTML"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1372
+#: app/templates/admin/communication/center.html:1369
 msgid "Email Sent At"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1370
+#: app/templates/admin/communication/center.html:1366
 msgid "Email Status"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1371
+#: app/templates/admin/communication/center.html:1367
 msgid "Email Subject"
 msgstr ""
 
@@ -7182,11 +7190,11 @@ msgstr ""
 msgid "Email attempted"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1176
+#: app/templates/admin/settings/manage_settings.html:1191
 msgid "Email digests"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1383
+#: app/templates/admin/communication/center.html:1381
 msgid "Email failure dismissed"
 msgstr ""
 
@@ -7194,13 +7202,13 @@ msgstr ""
 msgid "Email frequency"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1390
+#: app/templates/admin/communication/center.html:1388
 msgid ""
 "Email only — title becomes the subject line; message appears in-app and in "
 "the email body."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:919
+#: app/templates/admin/settings/manage_settings.html:934
 msgid ""
 "Email sent to admins for security events. Variables: event_type_display, "
 "severity_display, formatted_timestamp, header_style, alert_panel_style "
@@ -7209,7 +7217,7 @@ msgid ""
 " org_name, copyright_year"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:914
+#: app/templates/admin/settings/manage_settings.html:929
 msgid ""
 "Email sent to admins when a new indicator suggestion is submitted. "
 "Variables: submitter_name, submitter_email, suggestion_type_display, "
@@ -7217,13 +7225,13 @@ msgid ""
 "additional_notes, admin_url, org_name, copyright_year"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:924
+#: app/templates/admin/settings/manage_settings.html:939
 msgid ""
 "Email sent to new users upon registration. Variables: user_name, "
 "dashboard_url, documentation_url, org_name, copyright_year"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:909
+#: app/templates/admin/settings/manage_settings.html:924
 msgid ""
 "Email sent to users when they submit an indicator suggestion. Variables: "
 "submitter_name, suggestion_type_display, indicator_name, submitted_date, "
@@ -7231,15 +7239,15 @@ msgid ""
 "org_name, copyright_year"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1395
+#: app/templates/admin/communication/center.html:1393
 msgid "Email subject"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:615
+#: app/templates/admin/communication/center.html:611
 msgid "Email subject line"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:574
+#: app/templates/admin/communication/center.html:570
 msgid "Email template"
 msgstr ""
 
@@ -7300,7 +7308,7 @@ msgstr ""
 msgid "Emergency type"
 msgstr ""
 
-#: app/routes/admin/communication.py:337
+#: app/routes/admin/communication.py:339
 msgid "Emitter active"
 msgstr ""
 
@@ -7429,7 +7437,7 @@ msgstr ""
 msgid "Ends with"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:817
+#: app/routes/admin/utilities/translations.py:828
 msgid "English (en) is the source language and should not be imported."
 msgstr ""
 
@@ -7439,7 +7447,7 @@ msgid "Enter Data"
 msgstr ""
 
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:119
-#: app/templates/admin/settings/manage_settings.html:1033
+#: app/templates/admin/settings/manage_settings.html:1048
 msgid "Enter Jinja2 template HTML here..."
 msgstr ""
 
@@ -7465,8 +7473,8 @@ msgstr ""
 msgid "Enter category name..."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1251
-#: app/templates/admin/settings/manage_settings.html:1467
+#: app/templates/admin/settings/manage_settings.html:1266
+#: app/templates/admin/settings/manage_settings.html:1482
 msgid "Enter new value…"
 msgstr ""
 
@@ -7530,15 +7538,15 @@ msgstr ""
 msgid "Entity Assignments"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:802
+#: app/templates/forms/form_builder/form_builder.html:817
 msgid "Entity ID"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:800
+#: app/templates/forms/form_builder/form_builder.html:815
 msgid "Entity Name"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:801
+#: app/templates/forms/form_builder/form_builder.html:816
 msgid "Entity Name (with hierarchy)"
 msgstr ""
 
@@ -7550,12 +7558,12 @@ msgstr ""
 msgid "Entity Scope"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1048
-#: app/templates/forms/form_builder/form_builder.html:803
+#: app/templates/admin/communication/center.html:1044
+#: app/templates/forms/form_builder/form_builder.html:818
 msgid "Entity Type"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:195
+#: app/templates/admin/communication/center.html:191
 msgid "Entity Types to Include"
 msgstr ""
 
@@ -7567,11 +7575,11 @@ msgstr ""
 msgid "Entity assignment type"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:726
+#: app/templates/admin/communication/center.html:722
 msgid "Entity campaigns only"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:139
+#: app/templates/admin/communication/center.html:135
 msgid "Entity-based"
 msgstr ""
 
@@ -7600,7 +7608,7 @@ msgstr ""
 #: app/templates/admin/monitoring/system_monitoring.html:208
 #: app/templates/admin/monitoring/system_monitoring.html:432
 #: app/templates/admin/monitoring/system_monitoring.html:437
-#: app/templates/admin/settings/manage_settings.html:1478
+#: app/templates/admin/settings/manage_settings.html:1493
 #: app/templates/admin/validation_questions.html:166
 msgid "Error"
 msgstr ""
@@ -7634,7 +7642,7 @@ msgstr ""
 msgid "Error approving document:"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1295
+#: app/routes/admin/utilities/translations.py:1356
 #, python-format
 msgid "Error compiling translations: %(error)s"
 msgstr ""
@@ -7660,7 +7668,7 @@ msgstr ""
 msgid "Error during translation"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1369
+#: app/routes/admin/utilities/translations.py:1430
 #, python-format
 msgid "Error extracting/updating translations: %(error)s"
 msgstr ""
@@ -7814,7 +7822,7 @@ msgstr ""
 
 #: app/templates/admin/api_management.html:578
 #: app/templates/admin/api_management.html:588
-#: app/templates/admin/translations/manage_translations.html:477
+#: app/templates/admin/translations/manage_translations.html:513
 msgid "Example:"
 msgstr ""
 
@@ -7829,12 +7837,12 @@ msgstr ""
 msgid "Excel"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:229
+#: app/templates/admin/translations/manage_translations.html:265
 #: app/templates/forms/entry_form/entry_form.html:187
 msgid "Excel Export"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:283
+#: app/templates/admin/translations/manage_translations.html:319
 #: app/templates/forms/entry_form/entry_form.html:189
 msgid "Excel Import"
 msgstr ""
@@ -7877,18 +7885,18 @@ msgid ""
 "Chinese, Russian, Hindi, Active"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:895
+#: app/routes/admin/utilities/translations.py:906
 msgid "Excel file is empty or header row not found."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:985
+#: app/routes/admin/utilities/translations.py:996
 #, python-format
 msgid ""
 "Excel import finished. Updated: %(u)d, skipped missing msgids: %(m)d. (Empty"
 " updates are ignored by default.)"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:901
+#: app/routes/admin/utilities/translations.py:912
 msgid "Excel import requires a 'msgid' column header."
 msgstr ""
 
@@ -7896,7 +7904,7 @@ msgstr ""
 msgid "Excel operations are not available for public submissions."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1092
+#: app/templates/admin/communication/center.html:1088
 msgid "Exclude selected"
 msgstr ""
 
@@ -7921,9 +7929,9 @@ msgstr ""
 msgid "Expand Sections Menu"
 msgstr ""
 
-#: app/templates/admin/docs/documentation.html:1110
-#: app/templates/admin/docs/documentation.html:1111
-#: app/templates/admin/settings/manage_settings.html:1468
+#: app/templates/admin/docs/documentation.html:1123
+#: app/templates/admin/docs/documentation.html:1124
+#: app/templates/admin/settings/manage_settings.html:1483
 msgid "Expand all"
 msgstr ""
 
@@ -7948,7 +7956,8 @@ msgstr ""
 msgid "Expand or collapse filters"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1169
+#: app/routes/admin/utilities/translations.py:1224
+#: app/routes/admin/utilities/translations.py:1264
 msgid "Expected JSON body"
 msgstr ""
 
@@ -8016,8 +8025,8 @@ msgstr ""
 #: app/templates/admin/assignments/gantt_chart.html:247
 #: app/templates/admin/organization/_countries_component.html:148
 #: app/templates/admin/organization/_nss_component.html:56
-#: app/templates/admin/translations/manage_translations.html:208
-#: app/templates/admin/translations/manage_translations.html:260
+#: app/templates/admin/translations/manage_translations.html:244
+#: app/templates/admin/translations/manage_translations.html:296
 #: app/templates/forms/form_builder/partials/_excel_modal.html:62
 #: app/templates/macros/excel_io_modal.html:59
 #: app/templates/notifications/center.html:27
@@ -8042,7 +8051,7 @@ msgstr ""
 msgid "Export Excel"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:236
+#: app/templates/admin/translations/manage_translations.html:272
 #: app/templates/macros/excel_io_modal.html:61
 msgid "Export Excel (.xlsx)"
 msgstr ""
@@ -8051,18 +8060,18 @@ msgstr ""
 msgid "Export Options"
 msgstr ""
 
-#: app/templates/admin/docs/documentation.html:1200
+#: app/templates/admin/docs/documentation.html:1213
 #: app/templates/forms/entry_form/entry_form.html:197
 #: app/templates/forms/entry_form/entry_form.html:230
 msgid "Export PDF"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:246
+#: app/templates/admin/translations/manage_translations.html:282
 msgid ""
 "Export PO files for round-trip fidelity. Preserves plurals and metadata."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:250
+#: app/templates/admin/translations/manage_translations.html:286
 msgid "Export PO for language"
 msgstr ""
 
@@ -8082,7 +8091,7 @@ msgstr ""
 msgid "Export UPR Country Reporting (.xlsx)"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:266
+#: app/templates/admin/translations/manage_translations.html:302
 msgid "Export all PO files (.zip)"
 msgstr ""
 
@@ -8090,7 +8099,7 @@ msgstr ""
 msgid "Export all indicators or only the rows selected in the table."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:232
+#: app/templates/admin/translations/manage_translations.html:268
 msgid ""
 "Export all languages in a single Excel file. Easy to edit and reimport."
 msgstr ""
@@ -8140,12 +8149,12 @@ msgstr ""
 msgid "Export/Import Indicators"
 msgstr ""
 
-#: app/templates/admin/docs/documentation.html:1201
+#: app/templates/admin/docs/documentation.html:1214
 msgid "Exporting…"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:305
-#: app/templates/admin/communication/center.html:307
+#: app/templates/admin/communication/center.html:301
+#: app/templates/admin/communication/center.html:303
 msgid "External"
 msgstr ""
 
@@ -8164,19 +8173,19 @@ msgstr ""
 msgid "External Links"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:118
+#: app/templates/admin/translations/manage_translations.html:125
 msgid ""
 "Extract translatable strings from templates and Python files, then update "
 "all PO files"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:107
+#: app/templates/admin/translations/manage_translations.html:114
 msgid "Extract, compile, and reload translation files"
 msgstr ""
 
 #: app/templates/admin/templates/kobo_data_import.html:1159
 #: app/templates/admin/templates/new_template.html:874
-#: app/templates/forms/form_builder/form_builder.html:879
+#: app/templates/forms/form_builder/form_builder.html:894
 msgid "Extracted details"
 msgstr ""
 
@@ -8184,13 +8193,13 @@ msgstr ""
 msgid "Extracting text from document…"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1330
+#: app/routes/admin/utilities/translations.py:1391
 msgid ""
 "Extraction script not found. Please ensure "
 "scripts/extract_update_translations.py exists."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1373
+#: app/routes/admin/utilities/translations.py:1434
 msgid ""
 "Extraction timed out after 5 minutes. The process may still be running."
 msgstr ""
@@ -8204,7 +8213,7 @@ msgstr ""
 msgid "FDRS KPI Code"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:933
+#: app/templates/admin/settings/manage_settings.html:948
 msgid "FDS Access Request Digest"
 msgstr ""
 
@@ -8231,7 +8240,7 @@ msgstr ""
 #: app/templates/admin/ai/documents.html:560
 #: app/templates/admin/analytics/_user_detail_partial.html:257
 #: app/templates/admin/analytics/login_logs.html:139
-#: app/templates/admin/settings/manage_settings.html:1481
+#: app/templates/admin/settings/manage_settings.html:1496
 #: app/templates/forms/entry_form/validation_summary_pdf.html:190
 #: app/templates/forms/entry_form/validation_summary_progress.html:256
 msgid "Failed"
@@ -8353,7 +8362,7 @@ msgstr ""
 msgid "Failed to load tracker data"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:643
+#: app/templates/admin/translations/manage_translations.html:681
 msgid "Failed to load translation data"
 msgstr ""
 
@@ -8388,7 +8397,7 @@ msgstr ""
 msgid "Failed to save question"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:653
+#: app/templates/admin/translations/manage_translations.html:696
 msgid "Failed to save translation"
 msgstr ""
 
@@ -8431,7 +8440,7 @@ msgstr ""
 #: app/templates/admin/indicator_bank/indicator_bank.html:1467
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:996
 #: app/templates/admin/organization/index.html:2591
-#: app/templates/admin/translations/manage_translations.html:637
+#: app/templates/admin/translations/manage_translations.html:675
 #: app/templates/components/auto_translate_modal_js.html:51
 msgid "Failed to translate"
 msgstr ""
@@ -8473,7 +8482,7 @@ msgstr ""
 msgid "Favicon Path"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1199
+#: app/templates/admin/settings/manage_settings.html:1214
 msgid "Feature flags come from environment variables (see Config.FEATURES)."
 msgstr ""
 
@@ -8481,7 +8490,7 @@ msgstr ""
 msgid "Featured endpoint"
 msgstr ""
 
-#: app/services/documentation_service.py:192
+#: app/services/documentation_service.py:249
 msgid "Features"
 msgstr ""
 
@@ -8508,6 +8517,10 @@ msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:801
 msgid "Field ID"
+msgstr ""
+
+#: app/templates/forms/form_builder/form_builder.html:652
+msgid "Field Label"
 msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:921
@@ -8574,7 +8587,7 @@ msgstr ""
 msgid "File size exceeds 25MB limit. Please select a smaller file."
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:886
+#: app/templates/forms/form_builder/form_builder.html:901
 msgid "File size must be less than 10MB."
 msgstr ""
 
@@ -8596,13 +8609,13 @@ msgstr ""
 msgid "Fill in details"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1073
+#: app/templates/admin/settings/manage_settings.html:1088
 msgid ""
 "Fills empty template fields from this release, or replaces all with built-in"
 " defaults"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1098
+#: app/templates/admin/settings/manage_settings.html:1113
 msgid ""
 "Fills or overwrites from the current release’s bundled HTML (same as the "
 "flask seed-email-templates command). The page reloads after a successful "
@@ -8618,7 +8631,7 @@ msgstr ""
 msgid "Filter Options"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1015
+#: app/templates/admin/communication/center.html:1011
 msgid "Filter by Assignment"
 msgstr ""
 
@@ -8626,8 +8639,8 @@ msgstr ""
 msgid "Filter by ID, user, or date…"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:935
-#: app/templates/admin/communication/center.html:994
+#: app/templates/admin/communication/center.html:931
+#: app/templates/admin/communication/center.html:990
 msgid "Filter by Template"
 msgstr ""
 
@@ -8837,7 +8850,7 @@ msgid ""
 "title, message, user_name, documentation_url, org_name, copyright_year"
 msgstr ""
 
-#: app/services/documentation_service.py:679
+#: app/services/documentation_service.py:736
 #: app/templates/admin/analytics/dashboard.html:250
 #: app/templates/admin/analytics/user_detail.html:51
 #: app/templates/admin/dashboard.html:280
@@ -8847,9 +8860,9 @@ msgstr ""
 msgid "Focal Point"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:312
-#: app/templates/admin/communication/center.html:314
-#: app/templates/admin/communication/center.html:879
+#: app/templates/admin/communication/center.html:308
+#: app/templates/admin/communication/center.html:310
+#: app/templates/admin/communication/center.html:875
 #: app/templates/admin/dashboard.html:55
 #: app/templates/core/dashboard.html:2364
 msgid "Focal Points"
@@ -8859,7 +8872,7 @@ msgstr ""
 msgid "Focal Points for"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1491
+#: app/templates/admin/settings/manage_settings.html:1506
 msgid "Focal points"
 msgstr ""
 
@@ -9004,7 +9017,7 @@ msgstr ""
 msgid "Format"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:470
+#: app/templates/admin/translations/manage_translations.html:506
 msgid "Format String Detected"
 msgstr ""
 
@@ -9180,6 +9193,11 @@ msgstr ""
 msgid "Generated automatically"
 msgstr ""
 
+#: app/services/documentation_pdf_service.py:119
+#, python-format
+msgid "Generated on %(date)s"
+msgstr "%(date)s に生成"
+
 #: app/templates/forms/entry_form/export_pdf.html:24
 #: app/templates/forms/entry_form/validation_summary_pdf.html:22
 msgid "Generated:"
@@ -9205,8 +9223,8 @@ msgstr ""
 msgid "Generic iframe (allowed hosts only)"
 msgstr ""
 
-#: app/services/documentation_service.py:187
-#: app/services/documentation_service.py:804
+#: app/services/documentation_service.py:244
+#: app/services/documentation_service.py:861
 msgid "Getting Started"
 msgstr ""
 
@@ -9303,9 +9321,9 @@ msgstr ""
 msgid "Grounding:"
 msgstr ""
 
-#: app/routes/admin/communication.py:334
+#: app/routes/admin/communication.py:336
 #: app/templates/admin/communication/registry.html:58
-#: app/templates/admin/settings/manage_settings.html:1488
+#: app/templates/admin/settings/manage_settings.html:1503
 msgid "Group"
 msgstr ""
 
@@ -9335,11 +9353,11 @@ msgstr ""
 
 #: app/templates/admin/communication/_campaign_email_compose_editor.html:35
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:86
-#: app/templates/admin/settings/manage_settings.html:998
+#: app/templates/admin/settings/manage_settings.html:1013
 msgid "HTML"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:403
+#: app/templates/admin/communication/center.html:399
 msgid "HTML email with optional template"
 msgstr ""
 
@@ -9358,14 +9376,14 @@ msgid ""
 "message, priority) used when starting a new campaign. Variables include:"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:901
+#: app/templates/admin/settings/manage_settings.html:916
 msgid ""
 "HTML templates used when the system sends email automatically (registration "
 "welcome, security alerts, indicator suggestions, and the Communication "
 "Center email wrapper). Use Jinja2 syntax. Typical placeholder names include:"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:929
+#: app/templates/admin/settings/manage_settings.html:944
 msgid ""
 "HTML wrapper used when sending notifications from the Communication Center "
 "via email. Variables: title, message, org_name"
@@ -9414,9 +9432,9 @@ msgstr ""
 msgid "Health"
 msgstr ""
 
-#: app/routes/help_docs.py:129 app/routes/help_docs.py:130
-#: app/routes/help_docs.py:138 app/routes/help_docs.py:183
-#: app/routes/help_docs.py:184 app/routes/help_docs.py:192
+#: app/routes/help_docs.py:133 app/routes/help_docs.py:134
+#: app/routes/help_docs.py:142 app/routes/help_docs.py:189
+#: app/routes/help_docs.py:190 app/routes/help_docs.py:198
 #: app/templates/forms/form_builder/partials/_item_modal.html:719
 #: app/templates/forms/form_builder/partials/_item_modal.html:794
 msgid "Help"
@@ -9463,9 +9481,9 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:345
-#: app/templates/admin/communication/center.html:661
+#: app/templates/admin/communication/center.html:657
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:150
-#: app/templates/admin/settings/manage_settings.html:1484
+#: app/templates/admin/settings/manage_settings.html:1499
 msgid "High"
 msgstr ""
 
@@ -9477,7 +9495,7 @@ msgstr ""
 msgid "High Severity"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1408
+#: app/templates/admin/communication/center.html:1406
 msgid "High priority — subject is sent as-is (no prefix)."
 msgstr ""
 
@@ -9584,11 +9602,11 @@ msgstr ""
 msgid "Hygiene Promotion"
 msgstr ""
 
-#: app/routes/admin/communication.py:323
+#: app/routes/admin/communication.py:325
 msgid "Hypothetical"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1169
+#: app/templates/admin/settings/manage_settings.html:1184
 msgid ""
 "Hypothetical types are listed at the bottom; the word Hypothetical appears "
 "in the Type column when no in-app notification is emitted for that row yet."
@@ -9653,7 +9671,7 @@ msgstr ""
 msgid "ISO3 Code"
 msgstr ""
 
-#: app/routes/admin/communication.py:341
+#: app/routes/admin/communication.py:343
 #: app/templates/admin/communication/registry.html:62
 msgid "Icon"
 msgstr ""
@@ -9716,14 +9734,14 @@ msgstr ""
 #: app/templates/admin/organization/_nss_component.html:64
 #: app/templates/admin/organization/_nss_component.html:77
 #: app/templates/admin/templates/upr_excel_import.html:40
-#: app/templates/admin/translations/manage_translations.html:213
+#: app/templates/admin/translations/manage_translations.html:249
 #: app/templates/forms/form_builder/partials/_excel_modal.html:63
 #: app/templates/macros/excel_io_modal.html:60
 #: app/templates/macros/excel_io_modal.html:200
 msgid "Import"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:196
+#: app/templates/admin/translations/manage_translations.html:232
 msgid "Import / Export Translations"
 msgstr ""
 
@@ -9737,7 +9755,7 @@ msgstr ""
 msgid "Import Data"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:316
+#: app/templates/admin/translations/manage_translations.html:352
 msgid "Import Excel"
 msgstr ""
 
@@ -9745,11 +9763,11 @@ msgstr ""
 msgid "Import KoBo Data"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:387
+#: app/templates/admin/translations/manage_translations.html:423
 msgid "Import PO"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:426
+#: app/templates/admin/translations/manage_translations.html:462
 msgid "Import PO ZIP"
 msgstr ""
 
@@ -9761,18 +9779,18 @@ msgstr ""
 msgid "Import Template"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:344
+#: app/templates/admin/translations/manage_translations.html:380
 msgid ""
 "Import a PO file for a specific language. Preserves plurals and metadata."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:394
+#: app/templates/admin/translations/manage_translations.html:430
 msgid ""
 "Import a ZIP package containing all languages (same format as the exported "
 "ZIP)."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:286
+#: app/templates/admin/translations/manage_translations.html:322
 msgid "Import an edited Excel file. Updates translations for all languages."
 msgstr ""
 
@@ -9850,13 +9868,13 @@ msgstr ""
 msgid "Import from external API"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:896
+#: app/templates/forms/form_builder/form_builder.html:911
 #: app/templates/forms/form_builder/partials/_excel_modal.html:38
 #, python-format
 msgid "Import into current version (Version %(num)s)"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:895
+#: app/templates/forms/form_builder/form_builder.html:910
 #: app/templates/forms/form_builder/partials/_excel_modal.html:20
 #, python-format
 msgid "Import into existing draft (Version %(num)s)"
@@ -9866,12 +9884,12 @@ msgstr ""
 msgid "Import is in progress. Are you sure you want to leave?"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:204
+#: app/templates/admin/translations/manage_translations.html:240
 #: app/templates/macros/excel_io_modal.html:124
 msgid "Import or export"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:156
+#: app/templates/admin/translations/manage_translations.html:163
 msgid "Import or export translations safely"
 msgstr ""
 
@@ -9912,7 +9930,7 @@ msgstr ""
 msgid "Import template structure from Excel file"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:276
+#: app/templates/admin/translations/manage_translations.html:312
 msgid ""
 "Import your edited files. Only translation values (msgstr) will be updated. "
 "The msgid column is used to match entries and will not be modified. Safety "
@@ -9920,7 +9938,7 @@ msgid ""
 "skipped."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:153
+#: app/templates/admin/translations/manage_translations.html:160
 msgid "Import/Export"
 msgstr "インポート/エクスポート"
 
@@ -9929,7 +9947,7 @@ msgid "Important"
 msgstr ""
 
 #: app/templates/admin/api_management.html:611
-#: app/templates/admin/translations/manage_translations.html:473
+#: app/templates/admin/translations/manage_translations.html:509
 msgid "Important:"
 msgstr ""
 
@@ -9941,7 +9959,7 @@ msgstr ""
 msgid "Importing documents"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:887
+#: app/templates/forms/form_builder/form_builder.html:902
 msgid "Importing template…"
 msgstr ""
 
@@ -10011,16 +10029,21 @@ msgstr ""
 msgid "In this tour you will learn how to:"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1397
+#: app/templates/admin/communication/center.html:1395
 msgid "In-app"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1401
+#: app/templates/admin/communication/center.html:92
+#: app/templates/admin/communication/center.html:101
+msgid "In-app notifications and linked email delivery"
+msgstr ""
+
+#: app/templates/admin/communication/center.html:1399
 msgid "In-app summary"
 msgstr ""
 
 #: app/templates/admin/assignments/assignments.html:122
-#: app/templates/admin/communication/center.html:971
+#: app/templates/admin/communication/center.html:967
 #: app/templates/admin/indicator_bank/_panel_sectors_body.html:138
 #: app/templates/admin/indicator_bank/_panel_sectors_body.html:184
 #: app/templates/admin/organization/_countries_component.html:79
@@ -10048,7 +10071,7 @@ msgid ""
 "access."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:695
+#: app/templates/admin/communication/center.html:691
 msgid "Include Attachments"
 msgstr ""
 
@@ -10065,7 +10088,7 @@ msgstr ""
 msgid "Include non-reported items (no saved value)"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1249
+#: app/templates/admin/communication/center.html:1245
 msgid "Include recipients"
 msgstr ""
 
@@ -10091,7 +10114,7 @@ msgid "Indicator"
 msgstr ""
 
 #: app/templates/admin/common_words/manage_common_words.html:139
-#: app/templates/admin/communication/center.html:471
+#: app/templates/admin/communication/center.html:467
 #: app/templates/admin/indicator_bank/add_indicator_bank.html:72
 #: app/templates/admin/indicator_bank/change_history.html:87
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:51
@@ -10114,7 +10137,7 @@ msgstr ""
 msgid "Indicator Bank (semantic similarity; not country-reported values)"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:485
+#: app/templates/admin/communication/center.html:481
 msgid "Indicator Bank Admin"
 msgstr ""
 
@@ -10150,11 +10173,11 @@ msgstr ""
 msgid "Indicator Name Translations"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:664
+#: app/templates/forms/form_builder/form_builder.html:679
 msgid "Indicator Note Translations"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:908
+#: app/templates/admin/settings/manage_settings.html:923
 msgid "Indicator Suggestion Confirmation"
 msgstr ""
 
@@ -10206,7 +10229,7 @@ msgstr ""
 msgid "Indicator types & units"
 msgstr ""
 
-#: app/services/documentation_service.py:200
+#: app/services/documentation_service.py:257
 #: app/templates/admin/dashboard.html:126
 #: app/templates/admin/indicator_bank/_indicator_bank_tabs.html:10
 #: app/templates/admin/indicator_bank/indicator_bank.html:1948
@@ -10318,7 +10341,7 @@ msgstr ""
 msgid "Integer"
 msgstr ""
 
-#: app/services/documentation_service.py:199
+#: app/services/documentation_service.py:256
 msgid "Integrations"
 msgstr ""
 
@@ -10475,7 +10498,7 @@ msgstr ""
 
 #: app/templates/admin/templates/new_template.html:879
 #: app/templates/forms/entry_form/validation_summary_pdf.html:201
-#: app/templates/forms/form_builder/form_builder.html:883
+#: app/templates/forms/form_builder/form_builder.html:898
 #: app/utils/form_localization.py:129
 msgid "Items"
 msgstr ""
@@ -10587,11 +10610,11 @@ msgstr ""
 msgid "KPI code"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1177
+#: app/templates/forms/form_builder/form_builder.html:1192
 msgid "Keep Data and Archive Item"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:475
+#: app/templates/admin/translations/manage_translations.html:511
 msgid "Keep all placeholders exactly as they appear, for example:"
 msgstr ""
 
@@ -10601,7 +10624,7 @@ msgid ""
 "region controls visible (recommended)."
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1178
+#: app/templates/forms/form_builder/form_builder.html:1193
 msgid "Keep the data entries but archive the"
 msgstr ""
 
@@ -10691,7 +10714,7 @@ msgstr ""
 msgid "LLM Synthesis Used"
 msgstr ""
 
-#: app/routes/admin/communication.py:336
+#: app/routes/admin/communication.py:338
 #: app/templates/admin/communication/registry.html:60
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:111
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:207
@@ -10723,7 +10746,7 @@ msgstr ""
 #: app/templates/admin/ai/documents.html:579
 #: app/templates/admin/documents/documents.html:187
 #: app/templates/admin/documents/documents.html:684
-#: app/templates/admin/translations/manage_translations.html:352
+#: app/templates/admin/translations/manage_translations.html:388
 #: app/templates/admin/validation_rules.html:260
 #: app/templates/core/layout.html:226 app/templates/core/layout.html:384
 #: app/templates/core/layout.html:432
@@ -10891,12 +10914,12 @@ msgstr ""
 msgid "Leave empty for unlimited"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1313
+#: app/templates/admin/communication/center.html:1309
 msgid ""
 "Leave empty to save as draft. Set a date/time to schedule the campaign."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1056
+#: app/templates/admin/settings/manage_settings.html:1071
 msgid ""
 "Leave empty to use system default template. Non-English versions fall back "
 "to English when empty."
@@ -10937,7 +10960,7 @@ msgstr ""
 msgid "Legend Text"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:675
+#: app/templates/forms/form_builder/form_builder.html:690
 msgid "Legend Text Translations"
 msgstr ""
 
@@ -11022,7 +11045,7 @@ msgstr ""
 msgid "Live Flask routes in url_map that are not in the static registry yet."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1261
+#: app/templates/admin/communication/center.html:1257
 #: app/templates/admin/indicator_bank/neural_map.html:197
 msgid "Load"
 msgstr ""
@@ -11042,13 +11065,13 @@ msgstr ""
 msgid "Load a reporting period to filter countries."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1087
+#: app/templates/admin/settings/manage_settings.html:1102
 msgid "Load defaults (fill empty only)"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:521
-#: app/templates/admin/communication/center.html:529
-#: app/templates/admin/communication/center.html:1223
+#: app/templates/admin/communication/center.html:517
+#: app/templates/admin/communication/center.html:525
+#: app/templates/admin/communication/center.html:1219
 msgid "Load from campaign"
 msgstr ""
 
@@ -11096,7 +11119,7 @@ msgstr ""
 msgid "Loading audit entries..."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:823
+#: app/templates/admin/communication/center.html:819
 msgid "Loading campaigns..."
 msgstr ""
 
@@ -11130,7 +11153,7 @@ msgstr ""
 msgid "Loading data..."
 msgstr ""
 
-#: app/templates/admin/docs/documentation.html:1185
+#: app/templates/admin/docs/documentation.html:1198
 msgid "Loading documentation"
 msgstr ""
 
@@ -11149,7 +11172,7 @@ msgstr ""
 msgid "Loading endpoints…"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:256
+#: app/templates/admin/communication/center.html:252
 msgid "Loading entities..."
 msgstr ""
 
@@ -11181,11 +11204,11 @@ msgstr ""
 msgid "Loading metrics..."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1209
+#: app/templates/admin/settings/manage_settings.html:1224
 msgid "Loading notification settings…"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:97
+#: app/templates/admin/communication/center.html:98
 #: app/templates/notifications/center.html:189
 msgid "Loading notifications..."
 msgstr ""
@@ -11207,7 +11230,7 @@ msgstr ""
 msgid "Loading question templates…"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1197
+#: app/templates/admin/communication/center.html:1193
 msgid "Loading recipients..."
 msgstr ""
 
@@ -11257,7 +11280,7 @@ msgstr ""
 msgid "Loading tracker data…"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:176
+#: app/templates/admin/translations/manage_translations.html:212
 msgid "Loading translations..."
 msgstr ""
 
@@ -11265,7 +11288,7 @@ msgstr ""
 msgid "Loading users data..."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1101
+#: app/templates/admin/communication/center.html:1097
 msgid "Loading users..."
 msgstr ""
 
@@ -11299,7 +11322,7 @@ msgstr ""
 msgid "Loading..."
 msgstr ""
 
-#: app/templates/admin/docs/documentation.html:1187
+#: app/templates/admin/docs/documentation.html:1200
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:23
 #: app/templates/admin/indicator_bank/_panel_spef_scripts.html:16
 #: app/templates/admin/indicator_bank/measurement_lookups.html:138
@@ -11330,7 +11353,7 @@ msgid ""
 "to change wording."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1029
+#: app/templates/admin/communication/center.html:1025
 msgid "Location & Access"
 msgstr ""
 
@@ -11435,7 +11458,7 @@ msgid "Looking up information for %(country)s…"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:343
-#: app/templates/admin/settings/manage_settings.html:1486
+#: app/templates/admin/settings/manage_settings.html:1501
 msgid "Low"
 msgstr ""
 
@@ -11443,7 +11466,7 @@ msgstr ""
 msgid "Low-quality traces needing review"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:464
+#: app/templates/admin/communication/center.html:460
 msgid "Main Screens"
 msgstr ""
 
@@ -11568,7 +11591,7 @@ msgstr ""
 msgid "Manage row header translations"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1066
+#: app/templates/forms/form_builder/form_builder.html:1081
 #: app/templates/forms/form_builder/partials/_template_details.html:142
 msgid "Manage template access..."
 msgstr ""
@@ -11596,7 +11619,7 @@ msgid ""
 "in row headers, and you can add translations for each language."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:149
+#: app/templates/admin/translations/manage_translations.html:156
 msgid "Manage translations for the"
 msgstr ""
 
@@ -11683,7 +11706,7 @@ msgstr ""
 msgid "Mark as Resolved"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1362
+#: app/templates/admin/communication/center.html:1358
 #: app/templates/notifications/center.html:204
 msgid "Mark as Unread"
 msgstr ""
@@ -11693,7 +11716,7 @@ msgstr ""
 msgid "Mark as new"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1361
+#: app/templates/admin/communication/center.html:1357
 #: app/templates/notifications/center.html:203
 msgid "Mark as read"
 msgstr ""
@@ -11712,7 +11735,7 @@ msgstr ""
 msgid "Matrix"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:697
+#: app/templates/forms/form_builder/form_builder.html:712
 msgid "Matrix Column Headers Translations Matrix"
 msgstr ""
 
@@ -11720,19 +11743,19 @@ msgstr ""
 msgid "Matrix Configuration"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:653
+#: app/templates/forms/form_builder/form_builder.html:668
 msgid "Matrix Descriptions"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:649
+#: app/templates/forms/form_builder/form_builder.html:664
 msgid "Matrix Item Translations"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:652
+#: app/templates/forms/form_builder/form_builder.html:667
 msgid "Matrix Labels"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:710
+#: app/templates/forms/form_builder/form_builder.html:725
 msgid "Matrix Row Headers Translations Matrix"
 msgstr ""
 
@@ -11884,9 +11907,9 @@ msgstr ""
 
 #: app/templates/admin/ai/conversation_traces.html:215
 #: app/templates/admin/communication/_campaign_email_compose_editor.html:23
-#: app/templates/admin/communication/center.html:632
-#: app/templates/admin/communication/center.html:1344
-#: app/templates/admin/communication/center.html:1399
+#: app/templates/admin/communication/center.html:628
+#: app/templates/admin/communication/center.html:1340
+#: app/templates/admin/communication/center.html:1397
 #: app/templates/admin/indicator_bank/indicator_bank.html:510
 #: app/templates/admin/indicator_bank/indicator_bank.html:1562
 #: app/templates/admin/indicator_bank/indicator_bank.html:1624
@@ -11896,8 +11919,8 @@ msgstr ""
 msgid "Message"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:462
-#: app/templates/admin/translations/manage_translations.html:616
+#: app/templates/admin/translations/manage_translations.html:498
+#: app/templates/admin/translations/manage_translations.html:654
 msgid "Message ID"
 msgstr ""
 
@@ -11977,7 +12000,7 @@ msgstr ""
 msgid "Missing"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:641
+#: app/templates/admin/translations/manage_translations.html:679
 msgid "Missing placeholders"
 msgstr ""
 
@@ -11986,8 +12009,8 @@ msgstr ""
 msgid "Mobile"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:411
-#: app/templates/admin/communication/center.html:565
+#: app/templates/admin/communication/center.html:407
+#: app/templates/admin/communication/center.html:561
 msgid "Mobile Push"
 msgstr ""
 
@@ -12003,7 +12026,7 @@ msgid ""
 "permission code is appended below when known."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:439
+#: app/templates/admin/communication/center.html:435
 msgid "Mobile push options"
 msgstr ""
 
@@ -12133,7 +12156,7 @@ msgstr ""
 #: app/templates/admin/assignments/public_submissions.html:146
 #: app/templates/admin/assignments/public_submissions.html:148
 #: app/templates/admin/assignments/public_submissions.html:149
-#: app/templates/admin/communication/center.html:1374
+#: app/templates/admin/communication/center.html:1371
 #: app/templates/admin/documents/documents.html:578
 #: app/templates/admin/documents/documents.html:579
 #: app/templates/admin/security/dashboard.html:290
@@ -12155,7 +12178,7 @@ msgstr ""
 msgid "NS Branch"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:208
+#: app/templates/admin/communication/center.html:204
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:47
 msgid "NS Branches"
 msgstr ""
@@ -12164,7 +12187,7 @@ msgstr ""
 msgid "NS Local Unit"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:216
+#: app/templates/admin/communication/center.html:212
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:110
 msgid "NS Local Units"
 msgstr ""
@@ -12191,7 +12214,7 @@ msgstr ""
 msgid "NS Sub-branch"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:212
+#: app/templates/admin/communication/center.html:208
 msgid "NS Sub-branches"
 msgstr ""
 
@@ -12237,7 +12260,7 @@ msgstr ""
 msgid "Name/ID mismatches merged by name:"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:204
+#: app/templates/admin/communication/center.html:200
 #: app/templates/admin/organization/_nss_component.html:9
 #: app/templates/admin/organization/index.html:67
 msgid "National Societies"
@@ -12261,7 +12284,7 @@ msgid "National Society Leader"
 msgstr ""
 
 #: app/templates/admin/organization/index.html:874
-#: app/templates/forms/form_builder/form_builder.html:804
+#: app/templates/forms/form_builder/form_builder.html:819
 msgid "National Society Name"
 msgstr ""
 
@@ -12293,7 +12316,7 @@ msgstr ""
 msgid "Navigate your dashboard and access reporting tools"
 msgstr ""
 
-#: app/templates/admin/docs/documentation.html:1104
+#: app/templates/admin/docs/documentation.html:1117
 #: app/templates/forms/entry_form/entry_form.html:386
 msgid "Navigation"
 msgstr ""
@@ -12337,7 +12360,7 @@ msgstr ""
 msgid "Network error"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:640
+#: app/templates/admin/translations/manage_translations.html:678
 msgid "Network error for translation"
 msgstr ""
 
@@ -12354,15 +12377,15 @@ msgstr ""
 msgid "Network error saving"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1522
+#: app/templates/admin/settings/manage_settings.html:1537
 msgid "Network error while seeding templates."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1519
+#: app/templates/admin/settings/manage_settings.html:1534
 msgid "Network error while sending test email."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1472
+#: app/templates/admin/settings/manage_settings.html:1487
 msgid "Network error."
 msgstr ""
 
@@ -12483,7 +12506,7 @@ msgstr ""
 
 #: app/templates/admin/analytics/login_logs.html:105
 #: app/templates/admin/analytics/sessions.html:126
-#: app/templates/admin/communication/center.html:1116
+#: app/templates/admin/communication/center.html:1112
 #: app/templates/admin/monitoring/system_monitoring.html:241
 #: app/templates/admin/templates/upr_excel_import.html:137
 #: app/templates/components/pagination.html:42
@@ -12503,7 +12526,7 @@ msgstr ""
 msgid "Next year"
 msgstr ""
 
-#: app/routes/admin/communication.py:350 app/routes/main/helpers.py:272
+#: app/routes/admin/communication.py:352 app/routes/main/helpers.py:272
 #: app/templates/admin/ai/review_detail.html:126
 #: app/templates/admin/analytics/audit_trail.html:334
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:12
@@ -12537,7 +12560,7 @@ msgstr ""
 msgid "No Assignments Found"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:670
+#: app/templates/admin/communication/center.html:666
 msgid "No Category"
 msgstr ""
 
@@ -12630,7 +12653,7 @@ msgstr ""
 msgid "No branches found."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:826
+#: app/templates/admin/communication/center.html:822
 msgid "No campaigns found."
 msgstr ""
 
@@ -12655,11 +12678,11 @@ msgstr ""
 msgid "No common words found."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1366
+#: app/templates/admin/communication/center.html:1362
 msgid "No communications found"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:106
+#: app/templates/admin/communication/center.html:102
 msgid "No communications found."
 msgstr ""
 
@@ -12814,7 +12837,7 @@ msgstr ""
 
 #: app/routes/admin/form_builder/templates.py:295
 #: app/routes/admin/form_builder/templates.py:323
-#: app/routes/admin/utilities/translations.py:613
+#: app/routes/admin/utilities/translations.py:624
 msgid "No file selected."
 msgstr ""
 
@@ -12876,7 +12899,7 @@ msgstr ""
 msgid "No items found matching your search."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:913
+#: app/routes/admin/utilities/translations.py:924
 msgid "No language columns found in Excel header."
 msgstr ""
 
@@ -12992,7 +13015,7 @@ msgstr ""
 msgid "No recent sessions found."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:463
+#: app/templates/admin/communication/center.html:459
 msgid "No redirect (open notification center)"
 msgstr ""
 
@@ -13008,10 +13031,14 @@ msgstr ""
 msgid "No related events found."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1215
+#: app/routes/admin/utilities/translations.py:1241
 msgid ""
 "No removed (obsolete) entries found for this message. Try refreshing the "
 "page."
+msgstr ""
+
+#: app/routes/admin/utilities/translations.py:1272
+msgid "No removed (obsolete) entries found. Try refreshing the page."
 msgstr ""
 
 #: app/templates/admin/data_exploration/explore_data.html:403
@@ -13053,7 +13080,7 @@ msgstr ""
 msgid "No rows need translation"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:514
+#: app/templates/admin/communication/center.html:510
 msgid ""
 "No saved campaigns yet. Compose a message and use Save as Campaign, or open "
 "the Campaigns tab to create one."
@@ -13104,7 +13131,7 @@ msgstr ""
 msgid "No sessions"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1523
+#: app/templates/admin/settings/manage_settings.html:1538
 msgid "No settings were changed."
 msgstr ""
 
@@ -13162,11 +13189,11 @@ msgstr ""
 msgid "No traces match the current filters"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:629
+#: app/templates/admin/translations/manage_translations.html:667
 msgid "No translation fields found that need translation"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:663
+#: app/templates/admin/translations/manage_translations.html:706
 msgid "No translation fields to clear."
 msgstr ""
 
@@ -13174,11 +13201,11 @@ msgstr ""
 msgid "No translation services configured"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1515
+#: app/templates/admin/settings/manage_settings.html:1530
 msgid "No translation was returned for this language."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:180
+#: app/templates/admin/translations/manage_translations.html:216
 msgid "No translations found"
 msgstr ""
 
@@ -13236,7 +13263,7 @@ msgstr ""
 msgid "No valid countries were selected. Please try again."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:782
+#: app/routes/admin/utilities/translations.py:793
 msgid ""
 "No valid locale PO files found in ZIP. Expected files like: "
 "<lang>/LC_MESSAGES/messages.po"
@@ -13271,13 +13298,13 @@ msgid "None"
 msgstr ""
 
 #: app/templates/admin/analytics/admin_actions.html:158
-#: app/templates/admin/communication/center.html:660
+#: app/templates/admin/communication/center.html:656
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:149
-#: app/templates/admin/settings/manage_settings.html:1483
+#: app/templates/admin/settings/manage_settings.html:1498
 msgid "Normal"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1409
+#: app/templates/admin/communication/center.html:1407
 msgid "Normal priority emails prepend “New Notification:”."
 msgstr ""
 
@@ -13318,7 +13345,7 @@ msgstr ""
 msgid "Not applicable"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1487
+#: app/templates/admin/settings/manage_settings.html:1502
 msgid ""
 "Not applicable for this notification type (no delivery on this channel)."
 msgstr ""
@@ -13330,7 +13357,7 @@ msgstr ""
 msgid "Not assigned"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1251
+#: app/templates/admin/settings/manage_settings.html:1266
 msgid "Not configured"
 msgstr ""
 
@@ -13421,7 +13448,7 @@ msgstr ""
 msgid "Note:"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1366
+#: app/routes/admin/utilities/translations.py:1427
 #, python-format
 msgid "Note: %(note)s"
 msgstr ""
@@ -13440,7 +13467,7 @@ msgstr ""
 msgid "Nothing to compare yet"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:657
+#: app/templates/admin/translations/manage_translations.html:700
 msgid ""
 "Nothing to translate — all enabled language fields already have values."
 msgstr ""
@@ -13451,11 +13478,11 @@ msgid ""
 "Nothing to translate — all multilingual name fields already have values."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1368
+#: app/templates/admin/communication/center.html:1364
 msgid "Notification"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:928
+#: app/templates/admin/settings/manage_settings.html:943
 msgid "Notification Email Wrapper"
 msgstr ""
 
@@ -13487,11 +13514,11 @@ msgstr ""
 msgid "Notification types"
 msgstr ""
 
-#: app/services/documentation_service.py:197
+#: app/services/documentation_service.py:254
 #: app/templates/admin/analytics/audit_trail.html:369
-#: app/templates/admin/communication/center.html:466
+#: app/templates/admin/communication/center.html:462
 #: app/templates/admin/settings/manage_settings.html:72
-#: app/templates/admin/settings/manage_settings.html:1164
+#: app/templates/admin/settings/manage_settings.html:1179
 #: app/templates/auth/account_settings.html:43
 #: app/templates/core/layout.html:259 app/templates/core/layout.html:268
 #: app/templates/notifications/center.html:7
@@ -13499,16 +13526,16 @@ msgstr ""
 msgid "Notifications"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1498
+#: app/templates/admin/settings/manage_settings.html:1513
 msgid "Notify deployment-wide system managers"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1497
+#: app/templates/admin/settings/manage_settings.html:1512
 msgid ""
 "Notify entity-assigned admins (admin_core / admin_*, not system managers)"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1496
+#: app/templates/admin/settings/manage_settings.html:1511
 msgid "Notify focal points (assignment editor/submitter)"
 msgstr ""
 
@@ -13589,8 +13616,8 @@ msgstr ""
 msgid "Oct"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1193
-#: app/templates/admin/settings/manage_settings.html:1194
+#: app/templates/admin/settings/manage_settings.html:1208
+#: app/templates/admin/settings/manage_settings.html:1209
 msgid "Off"
 msgstr ""
 
@@ -13604,8 +13631,8 @@ msgid ""
 "Always start by downloading the template on this page."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1193
-#: app/templates/admin/settings/manage_settings.html:1194
+#: app/templates/admin/settings/manage_settings.html:1208
+#: app/templates/admin/settings/manage_settings.html:1209
 msgid "On"
 msgstr ""
 
@@ -13627,9 +13654,9 @@ msgstr ""
 msgid "Only a System Manager can modify an admin user."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:304
-#: app/templates/admin/translations/manage_translations.html:375
-#: app/templates/admin/translations/manage_translations.html:414
+#: app/templates/admin/translations/manage_translations.html:340
+#: app/templates/admin/translations/manage_translations.html:411
+#: app/templates/admin/translations/manage_translations.html:450
 msgid "Only apply non-empty translations (recommended)"
 msgstr ""
 
@@ -13758,21 +13785,21 @@ msgstr ""
 msgid "Opening workflow guide…"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:444
-#: app/templates/admin/communication/center.html:574
-#: app/templates/admin/communication/center.html:667
-#: app/templates/admin/communication/center.html:680
-#: app/templates/admin/communication/center.html:705
-#: app/templates/admin/communication/center.html:765
-#: app/templates/admin/communication/center.html:776
-#: app/templates/admin/communication/center.html:935
-#: app/templates/admin/communication/center.html:1297
-#: app/templates/admin/communication/center.html:1307
+#: app/templates/admin/communication/center.html:440
+#: app/templates/admin/communication/center.html:570
+#: app/templates/admin/communication/center.html:663
+#: app/templates/admin/communication/center.html:676
+#: app/templates/admin/communication/center.html:701
+#: app/templates/admin/communication/center.html:761
+#: app/templates/admin/communication/center.html:772
+#: app/templates/admin/communication/center.html:931
+#: app/templates/admin/communication/center.html:1293
+#: app/templates/admin/communication/center.html:1303
 msgid "Optional"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:779
-#: app/templates/admin/communication/center.html:1300
+#: app/templates/admin/communication/center.html:775
+#: app/templates/admin/communication/center.html:1296
 msgid "Optional description of this campaign"
 msgstr ""
 
@@ -13813,7 +13840,7 @@ msgid ""
 "then edit the section to select one."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:698
+#: app/templates/admin/communication/center.html:694
 msgid ""
 "Optionally attach files to the email. You can upload static file(s) and/or "
 "attach an auto-generated assignment PDF per recipient entity."
@@ -13847,7 +13874,7 @@ msgstr ""
 
 #: app/templates/admin/communication/_campaign_email_compose_editor.html:21
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:65
-#: app/templates/admin/settings/manage_settings.html:974
+#: app/templates/admin/settings/manage_settings.html:989
 msgid "Org Name"
 msgstr ""
 
@@ -13855,13 +13882,17 @@ msgstr ""
 msgid "Org admin covering this country."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1492
+#: app/templates/admin/settings/manage_settings.html:1507
 msgid "Org admins"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:361
 #: app/templates/admin/organization/edit_entity.html:15
 msgid "Organization"
+msgstr ""
+
+#: app/templates/admin/settings/manage_settings.html:673
+msgid "Organization Branding Translations"
 msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:348
@@ -13879,10 +13910,12 @@ msgid "Organization Management"
 msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:312
+#: app/templates/admin/settings/manage_settings.html:677
 msgid "Organization Name"
 msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:327
+#: app/templates/admin/settings/manage_settings.html:678
 msgid "Organization Short Name"
 msgstr ""
 
@@ -13894,7 +13927,7 @@ msgstr ""
 msgid "Organization sections"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:484
+#: app/templates/admin/communication/center.html:480
 #: app/templates/components/_sidebar_nav_categories.html:166
 #: app/templates/components/_sidebar_nav_categories.html:168
 msgid "Organizational Structure"
@@ -13922,7 +13955,7 @@ msgstr ""
 msgid "Orphaned"
 msgstr ""
 
-#: app/services/documentation_service.py:281
+#: app/services/documentation_service.py:338
 #: app/templates/admin/ai/documents.html:591
 #: app/templates/admin/analytics/audit_trail.html:372
 #: app/templates/admin/data_exploration/explore_data.html:1991
@@ -13973,7 +14006,7 @@ msgstr ""
 msgid "Overlaps"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:425
+#: app/templates/admin/communication/center.html:421
 msgid "Override User Preferences"
 msgstr ""
 
@@ -13985,7 +14018,7 @@ msgstr ""
 msgid "Override label (leave empty to use indicator bank name)"
 msgstr ""
 
-#: app/services/documentation_service.py:675
+#: app/services/documentation_service.py:732
 #: app/templates/admin/data_exploration/explore_data.html:319
 #: app/templates/admin/data_exploration/explore_data.html:350
 msgid "Overview"
@@ -14009,7 +14042,7 @@ msgstr ""
 msgid "Owner"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1074
+#: app/templates/forms/form_builder/form_builder.html:1089
 #, python-format
 msgid "Owner: %(name)s"
 msgstr ""
@@ -14024,14 +14057,9 @@ msgstr ""
 msgid "PDF Document"
 msgstr ""
 
-#: app/services/documentation_pdf_service.py:300
+#: app/services/documentation_pdf_service.py:479
 msgid "PDF generation is not available on this deployment."
 msgstr ""
-
-#: app/services/documentation_pdf_service.py:104
-msgid "Generated on %(date)s"
-msgstr "%(date)s に生成"
-
 
 #: app/templates/components/_ai_policy_modal.html:30
 msgid "PII scrubbing to reduce exposure of personal data."
@@ -14041,36 +14069,36 @@ msgstr ""
 msgid "PNG Image"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:243
+#: app/templates/admin/translations/manage_translations.html:279
 msgid "PO Export"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:324
+#: app/templates/admin/translations/manage_translations.html:360
 msgid "PO Import"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:328
+#: app/templates/admin/translations/manage_translations.html:364
 msgid "PO Import Tabs"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:337
+#: app/templates/admin/translations/manage_translations.html:373
 msgid "PO ZIP (all languages)"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:789
+#: app/routes/admin/utilities/translations.py:800
 #, python-format
 msgid ""
 "PO ZIP import finished. Locales processed: %(p)d, skipped: %(s)d. Updated: "
 "%(u)d, skipped missing: %(m)d, skipped empty: %(e)d."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:384
-#: app/routes/admin/utilities/translations.py:826
+#: app/routes/admin/utilities/translations.py:395
+#: app/routes/admin/utilities/translations.py:837
 #, python-format
 msgid "PO file not found for %(lang)s."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:851
+#: app/routes/admin/utilities/translations.py:862
 #, python-format
 msgid ""
 "PO import finished for %(lang)s. Updated: %(u)d, skipped missing: %(m)d, "
@@ -14080,7 +14108,7 @@ msgstr ""
 #: app/routes/forms/export.py:786 app/routes/forms_validation_summary.py:570
 #: app/routes/forms_validation_summary.py:598
 #: app/routes/forms_validation_summary.py:1537
-#: app/services/documentation_pdf_service.py:53
+#: app/services/documentation_pdf_service.py:121
 #: app/templates/admin/ai/documents.html:592
 #: app/templates/admin/api_management.html:1069
 #: app/templates/admin/api_management.html:1087
@@ -14182,7 +14210,7 @@ msgid "Page-specific translation function not found"
 msgstr ""
 
 #: app/templates/admin/templates/new_template.html:877
-#: app/templates/forms/form_builder/form_builder.html:881
+#: app/templates/forms/form_builder/form_builder.html:896
 msgid "Pages"
 msgstr ""
 
@@ -14297,7 +14325,7 @@ msgstr ""
 #: app/templates/admin/assignments/public_submissions.html:53
 #: app/templates/admin/assignments/public_submissions.html:104
 #: app/templates/admin/assignments/public_submissions.html:177
-#: app/templates/admin/communication/center.html:911
+#: app/templates/admin/communication/center.html:907
 #: app/templates/admin/security/dashboard.html:216
 #: app/templates/admin/security/event_detail.html:38
 #: app/templates/admin/security/event_detail.html:95
@@ -14433,11 +14461,11 @@ msgstr ""
 msgid "Period:"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1175
+#: app/templates/forms/form_builder/form_builder.html:1190
 msgid "Permanently delete all associated data entries and remove the"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:623
+#: app/templates/admin/translations/manage_translations.html:661
 msgid "Permanently delete this removed string from all .po files"
 msgstr ""
 
@@ -14522,7 +14550,7 @@ msgstr ""
 msgid "Please correct the errors in the form."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:656
+#: app/templates/admin/translations/manage_translations.html:699
 msgid "Please ensure English or Message ID has text to translate from."
 msgstr ""
 
@@ -14551,7 +14579,7 @@ msgstr ""
 msgid "Please enter the English label first."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:652
+#: app/templates/admin/translations/manage_translations.html:695
 msgid "Please fix these errors before saving."
 msgstr ""
 
@@ -14581,11 +14609,11 @@ msgstr ""
 msgid "Please select a file"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:811
+#: app/routes/admin/utilities/translations.py:822
 msgid "Please select a language for PO import."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:376
+#: app/routes/admin/utilities/translations.py:387
 msgid "Please select a language to export."
 msgstr ""
 
@@ -14631,11 +14659,11 @@ msgstr ""
 msgid "Please select..."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:821
+#: app/routes/admin/utilities/translations.py:832
 msgid "Please upload a .po file for PO import."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:698
+#: app/routes/admin/utilities/translations.py:709
 msgid "Please upload a .zip file for PO ZIP import."
 msgstr ""
 
@@ -14644,7 +14672,7 @@ msgstr ""
 msgid "Please upload a valid Excel file (.xlsx or .xls)"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:885
+#: app/templates/forms/form_builder/form_builder.html:900
 msgid "Please upload a valid Excel file (.xlsx or .xls)."
 msgstr ""
 
@@ -14652,7 +14680,7 @@ msgstr ""
 msgid "Please upload an Excel file (.xlsx or .xls)"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:871
+#: app/routes/admin/utilities/translations.py:882
 msgid "Please upload an Excel file (.xlsx or .xls)."
 msgstr ""
 
@@ -14690,7 +14718,11 @@ msgstr ""
 msgid "Plugin Details"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:481
+#: app/templates/forms/form_builder/form_builder.html:649
+msgid "Plugin Field Translations"
+msgstr ""
+
+#: app/templates/admin/communication/center.html:477
 #: app/templates/admin/plugin_management.html:7
 #: app/templates/admin/plugin_management.html:13
 #: app/templates/admin/plugin_management.html:17
@@ -14707,7 +14739,7 @@ msgstr ""
 msgid "Plugin scan completed"
 msgstr ""
 
-#: app/services/documentation_service.py:198
+#: app/services/documentation_service.py:255
 #: app/templates/admin/analytics/audit_trail.html:368
 msgid "Plugins"
 msgstr ""
@@ -14798,7 +14830,7 @@ msgstr ""
 msgid "Presets"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1065
+#: app/templates/admin/communication/center.html:1061
 #: app/templates/admin/embed_content/manage_embed_content.html:91
 #: app/templates/admin/embed_content/manage_embed_content.html:198
 #: app/templates/admin/embed_content/manage_embed_content.html:411
@@ -14866,7 +14898,7 @@ msgstr ""
 msgid "Preview version"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:371
+#: app/templates/admin/communication/center.html:367
 msgid "Preview:"
 msgstr ""
 
@@ -14877,7 +14909,7 @@ msgstr ""
 
 #: app/templates/admin/analytics/login_logs.html:101
 #: app/templates/admin/analytics/sessions.html:122
-#: app/templates/admin/communication/center.html:1112
+#: app/templates/admin/communication/center.html:1108
 #: app/templates/admin/monitoring/system_monitoring.html:237
 #: app/templates/components/pagination.html:27
 #: app/templates/components/pagination.html:31
@@ -14922,9 +14954,9 @@ msgstr ""
 msgid "Prior year"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:657
-#: app/templates/admin/communication/center.html:1345
-#: app/templates/admin/settings/manage_settings.html:1495
+#: app/templates/admin/communication/center.html:653
+#: app/templates/admin/communication/center.html:1341
+#: app/templates/admin/settings/manage_settings.html:1510
 msgid "Priority"
 msgstr ""
 
@@ -15072,7 +15104,7 @@ msgstr ""
 msgid "Provide translations of the meaning in different languages (optional)"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1376
+#: app/templates/admin/settings/manage_settings.html:1391
 msgid "Provider Priority"
 msgstr ""
 
@@ -15088,7 +15120,7 @@ msgstr ""
 msgid "Public Document"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:469
+#: app/templates/admin/communication/center.html:465
 msgid "Public Screens"
 msgstr ""
 
@@ -15170,33 +15202,33 @@ msgstr ""
 msgid "Push"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1400
+#: app/templates/admin/communication/center.html:1398
 msgid "Push notification body"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1402
+#: app/templates/admin/communication/center.html:1400
 msgid ""
 "Push notification body, in-app summary, and email template variable {{ "
 "message }}. Email layout comes from the HTML template above."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:644
+#: app/templates/admin/communication/center.html:640
 msgid "Push notification preview"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:623
+#: app/templates/admin/communication/center.html:619
 msgid "Push notification title"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1175
+#: app/templates/admin/settings/manage_settings.html:1190
 msgid "Push notifications"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1391
+#: app/templates/admin/communication/center.html:1389
 msgid "Push only — title and message appear on registered mobile devices."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1396
+#: app/templates/admin/communication/center.html:1394
 msgid "Push title"
 msgstr ""
 
@@ -15404,7 +15436,7 @@ msgstr ""
 msgid "Reactivate"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1350
+#: app/templates/admin/communication/center.html:1346
 msgid "Read"
 msgstr ""
 
@@ -15593,13 +15625,13 @@ msgstr ""
 msgid "Recently Processed"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1108
+#: app/templates/admin/settings/manage_settings.html:1123
 msgid "Recipient"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:124
-#: app/templates/admin/communication/center.html:1357
-#: app/templates/admin/settings/manage_settings.html:1490
+#: app/templates/admin/communication/center.html:120
+#: app/templates/admin/communication/center.html:1353
+#: app/templates/admin/settings/manage_settings.html:1505
 #: app/utils/form_localization.py:148
 msgid "Recipients"
 msgstr ""
@@ -15653,8 +15685,8 @@ msgstr ""
 
 #: app/templates/admin/ai/documents.html:311
 #: app/templates/admin/ai/documents.html:376
-#: app/templates/admin/communication/center.html:1075
-#: app/templates/admin/communication/center.html:1160
+#: app/templates/admin/communication/center.html:1071
+#: app/templates/admin/communication/center.html:1156
 #: app/templates/admin/data_exploration/explore_data.html:537
 #: app/templates/admin/monitoring/system_monitoring.html:122
 #: app/templates/admin/monitoring/system_monitoring.html:178
@@ -15683,8 +15715,8 @@ msgstr ""
 msgid "Refugees"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:120
-#: app/templates/admin/translations/manage_translations.html:181
+#: app/templates/admin/translations/manage_translations.html:127
+#: app/templates/admin/translations/manage_translations.html:217
 msgid "Regenerate Strings"
 msgstr "文字列を再生成"
 
@@ -15713,7 +15745,7 @@ msgstr ""
 msgid "Regional Office Name"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:228
+#: app/templates/admin/communication/center.html:224
 msgid "Regional Offices"
 msgstr ""
 
@@ -15812,7 +15844,7 @@ msgstr ""
 msgid "Reload Page"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:135
+#: app/templates/admin/translations/manage_translations.html:142
 msgid "Reload Translations"
 msgstr ""
 
@@ -15828,11 +15860,11 @@ msgstr ""
 msgid "Reload the builder to see the draft changes"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:133
+#: app/templates/admin/translations/manage_translations.html:140
 msgid "Reload translations without restarting"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:674
+#: app/templates/admin/communication/center.html:670
 #: app/templates/notifications/center.html:110
 msgid "Reminder"
 msgstr ""
@@ -15894,6 +15926,15 @@ msgstr ""
 msgid "Remove Row"
 msgstr ""
 
+#: app/templates/admin/translations/manage_translations.html:205
+#: app/templates/admin/translations/manage_translations.html:692
+msgid "Remove all"
+msgstr ""
+
+#: app/templates/admin/translations/manage_translations.html:688
+msgid "Remove all deleted strings?"
+msgstr ""
+
 #: app/templates/admin/assignments/manage_assignment.html:985
 msgid "Remove entities"
 msgstr ""
@@ -15906,7 +15947,7 @@ msgid "Remove this indicator"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:323
-#: app/templates/admin/translations/manage_translations.html:619
+#: app/templates/admin/translations/manage_translations.html:657
 #: app/templates/components/_status_label.html:62
 msgid "Removed"
 msgstr ""
@@ -15916,19 +15957,29 @@ msgstr ""
 msgid "Removed %(count)d field in %(template)s"
 msgstr ""
 
+#: app/routes/admin/utilities/translations.py:1276
+#, python-format
+msgid ""
+"Removed %(entries)d obsolete translation entries from %(count)d file(s)"
+msgstr ""
+
 #: app/templates/forms/form_builder/field_mapping.html:47
 #: app/templates/forms/form_builder/field_mapping.html:132
 #: app/templates/forms/form_builder/field_mapping.html:274
 msgid "Removed from draft"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:646
+#: app/templates/admin/translations/manage_translations.html:684
 msgid "Removed obsolete entries"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1218
+#: app/routes/admin/utilities/translations.py:1244
 #, python-format
 msgid "Removed obsolete translation entries from %(count)d file(s)"
+msgstr ""
+
+#: app/templates/admin/translations/manage_translations.html:189
+msgid "Removed translation strings"
 msgstr ""
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:259
@@ -15970,7 +16021,7 @@ msgstr ""
 msgid "Replace Document"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1503
+#: app/templates/admin/settings/manage_settings.html:1518
 msgid ""
 "Replace every system email template with the built-in defaults from this "
 "version? Custom HTML will be lost."
@@ -16210,12 +16261,12 @@ msgstr ""
 
 #: app/templates/admin/ai/reasoning_traces.html:136
 #: app/templates/admin/assignments/gantt_chart.html:177
-#: app/templates/admin/settings/manage_settings.html:1473
+#: app/templates/admin/settings/manage_settings.html:1488
 #: app/templates/components/ag_grid_i18n_js.html:20
 msgid "Reset"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1475
+#: app/templates/admin/settings/manage_settings.html:1490
 msgid "Reset AI Settings?"
 msgstr ""
 
@@ -16227,14 +16278,14 @@ msgstr ""
 msgid "Reset Password"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1470
+#: app/templates/admin/settings/manage_settings.html:1485
 msgid ""
 "Reset all AI settings to their defaults? This will remove all database-saved"
 " overrides."
 msgstr ""
 
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:175
-#: app/templates/admin/settings/manage_settings.html:1094
+#: app/templates/admin/settings/manage_settings.html:1109
 msgid "Reset all to built-in defaults"
 msgstr ""
 
@@ -16242,7 +16293,7 @@ msgstr ""
 msgid "Reset camera"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1471
+#: app/templates/admin/settings/manage_settings.html:1486
 msgid "Reset failed."
 msgstr ""
 
@@ -16250,7 +16301,7 @@ msgstr ""
 msgid "Reset to Default"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1319
+#: app/templates/admin/settings/manage_settings.html:1334
 msgid "Reset to defaults"
 msgstr ""
 
@@ -16292,12 +16343,12 @@ msgstr ""
 msgid "Resource Usage"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:470
+#: app/templates/admin/communication/center.html:466
 #: app/templates/admin/dashboard.html:133
 msgid "Resources"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:483
+#: app/templates/admin/communication/center.html:479
 msgid "Resources Management"
 msgstr ""
 
@@ -16305,7 +16356,7 @@ msgstr ""
 msgid "Responses to automatic data checks"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1433
+#: app/templates/admin/settings/manage_settings.html:1448
 msgid "Restart app after saving (recommended to apply across all processes)"
 msgstr ""
 
@@ -16331,21 +16382,21 @@ msgstr ""
 msgid "Retry"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:70
-#: app/templates/admin/communication/center.html:1377
+#: app/templates/admin/communication/center.html:63
+#: app/templates/admin/communication/center.html:1375
 msgid "Retry all failed emails"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1375
+#: app/templates/admin/communication/center.html:1373
 msgid "Retry email"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:84
-#: app/templates/admin/communication/center.html:1379
+#: app/templates/admin/communication/center.html:80
+#: app/templates/admin/communication/center.html:1377
 msgid "Retry selected"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1386
+#: app/templates/admin/communication/center.html:1384
 msgid "Retrying email..."
 msgstr ""
 
@@ -16364,7 +16415,7 @@ msgstr ""
 msgid "Return to form builder"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:540
+#: app/templates/admin/communication/center.html:536
 msgid "Reuse content from a draft or previously sent campaign."
 msgstr ""
 
@@ -16517,8 +16568,8 @@ msgstr ""
 
 #: app/templates/admin/analytics/dashboard.html:229
 #: app/templates/admin/analytics/user_detail.html:48
-#: app/templates/admin/communication/center.html:869
-#: app/templates/admin/communication/center.html:875
+#: app/templates/admin/communication/center.html:865
+#: app/templates/admin/communication/center.html:871
 #: app/templates/admin/user_management/users.html:293
 msgid "Role"
 msgstr ""
@@ -16715,7 +16766,7 @@ msgstr ""
 msgid "Same as assignment period"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1392
+#: app/templates/admin/communication/center.html:1390
 msgid ""
 "Same title for email subject line and push notification. Also shown in the "
 "in-app notification center."
@@ -16774,7 +16825,7 @@ msgstr ""
 msgid "Save Preferences"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1435
+#: app/templates/admin/settings/manage_settings.html:1450
 msgid "Save Settings"
 msgstr ""
 
@@ -16783,7 +16834,7 @@ msgstr ""
 msgid "Save Template"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:505
+#: app/templates/admin/translations/manage_translations.html:541
 msgid "Save Translation"
 msgstr ""
 
@@ -16791,8 +16842,8 @@ msgstr ""
 msgid "Save Translations"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:791
-#: app/templates/admin/communication/center.html:1274
+#: app/templates/admin/communication/center.html:787
+#: app/templates/admin/communication/center.html:1270
 msgid "Save as Campaign"
 msgstr ""
 
@@ -16843,8 +16894,8 @@ msgstr ""
 #: app/templates/admin/indicator_bank/_panel_common_words_scripts.html:135
 #: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:851
 #: app/templates/admin/organization/_countries_component.html:261
-#: app/templates/admin/settings/manage_settings.html:1525
-#: app/templates/admin/translations/manage_translations.html:644
+#: app/templates/admin/settings/manage_settings.html:1540
+#: app/templates/admin/translations/manage_translations.html:682
 msgid "Saving..."
 msgstr ""
 
@@ -16871,12 +16922,12 @@ msgstr ""
 msgid "Schedule"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:765
-#: app/templates/admin/communication/center.html:1307
+#: app/templates/admin/communication/center.html:761
+#: app/templates/admin/communication/center.html:1303
 msgid "Schedule For"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1354
+#: app/templates/admin/communication/center.html:1350
 msgid "Scheduled For"
 msgstr ""
 
@@ -16950,11 +17001,11 @@ msgstr ""
 msgid "Search Placeholder Text"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:686
+#: app/templates/forms/form_builder/form_builder.html:701
 msgid "Search Placeholder Translations"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1186
+#: app/templates/admin/communication/center.html:1182
 msgid "Search Recipients"
 msgstr ""
 
@@ -16966,12 +17017,12 @@ msgstr ""
 msgid "Search Secretariat"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:152
-#: app/templates/admin/communication/center.html:851
+#: app/templates/admin/communication/center.html:148
+#: app/templates/admin/communication/center.html:847
 msgid "Search Users"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:857
+#: app/templates/admin/communication/center.html:853
 msgid "Search across user names, emails, and titles"
 msgstr ""
 
@@ -17009,8 +17060,8 @@ msgstr ""
 msgid "Search by name or email"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:161
-#: app/templates/admin/communication/center.html:1190
+#: app/templates/admin/communication/center.html:157
+#: app/templates/admin/communication/center.html:1186
 msgid "Search by name or email..."
 msgstr ""
 
@@ -17018,7 +17069,7 @@ msgstr ""
 msgid "Search by name, description, or owner…"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:855
+#: app/templates/admin/communication/center.html:851
 msgid "Search by name, email, or title..."
 msgstr ""
 
@@ -17047,7 +17098,7 @@ msgstr ""
 msgid "Search divisions or departments…"
 msgstr ""
 
-#: app/templates/admin/docs/documentation.html:1127
+#: app/templates/admin/docs/documentation.html:1140
 msgid "Search documentation..."
 msgstr ""
 
@@ -17236,7 +17287,7 @@ msgstr ""
 #: app/templates/forms/entry_form/entry_form.html:481
 #: app/templates/forms/entry_form/entry_form.html:749
 #: app/templates/forms/form_builder/field_mapping.html:296
-#: app/templates/forms/form_builder/form_builder.html:882
+#: app/templates/forms/form_builder/form_builder.html:897
 msgid "Sections"
 msgstr ""
 
@@ -17287,7 +17338,7 @@ msgstr ""
 msgid "Security"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:918
+#: app/templates/admin/settings/manage_settings.html:933
 msgid "Security Alert"
 msgstr ""
 
@@ -17354,15 +17405,15 @@ msgid ""
 "when multiple people are editing."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1520
+#: app/templates/admin/settings/manage_settings.html:1535
 msgid "Seeding completed."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1521
+#: app/templates/admin/settings/manage_settings.html:1536
 msgid "Seeding failed"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1069
+#: app/templates/admin/communication/center.html:1065
 #: app/templates/admin/templates/kobo_data_import.html:196
 #: app/templates/components/ag_grid_i18n_js.html:17
 #: app/templates/components/auto_translate_modal.html:387
@@ -17376,7 +17427,7 @@ msgstr ""
 msgid "Select All Countries"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:246
+#: app/templates/admin/communication/center.html:242
 msgid "Select All Visible"
 msgstr ""
 
@@ -17393,7 +17444,7 @@ msgstr ""
 msgid "Select Endpoint"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:242
+#: app/templates/admin/communication/center.html:238
 msgid "Select Entities"
 msgstr ""
 
@@ -17426,11 +17477,11 @@ msgstr ""
 msgid "Select Owner"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:402
+#: app/templates/admin/translations/manage_translations.html:438
 msgid "Select PO ZIP file to import"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:363
+#: app/templates/admin/translations/manage_translations.html:399
 msgid "Select PO file to import"
 msgstr ""
 
@@ -17443,7 +17494,7 @@ msgid "Select Question Type..."
 msgstr ""
 
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:42
-#: app/templates/admin/settings/manage_settings.html:939
+#: app/templates/admin/settings/manage_settings.html:954
 msgid "Select Template to Edit"
 msgstr ""
 
@@ -17455,7 +17506,7 @@ msgstr ""
 msgid "Select Variable..."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1236
+#: app/templates/admin/communication/center.html:1232
 msgid "Select a campaign..."
 msgstr ""
 
@@ -17521,7 +17572,7 @@ msgstr ""
 msgid "Select a translation service"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1509
+#: app/templates/admin/settings/manage_settings.html:1524
 msgid "Select a user to receive the test email."
 msgstr ""
 
@@ -17549,7 +17600,7 @@ msgstr ""
 msgid "Select at least one data status to include."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:545
+#: app/templates/admin/communication/center.html:541
 msgid "Select at least one delivery method above to compose your message."
 msgstr ""
 
@@ -17649,7 +17700,7 @@ msgstr ""
 msgid "Select session…"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:941
+#: app/templates/admin/communication/center.html:937
 msgid ""
 "Select specific templates. Leave empty to include all assignments with the "
 "selected status."
@@ -17680,7 +17731,7 @@ msgstr ""
 msgid "Select the time when you want to receive your digest"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1130
+#: app/templates/admin/settings/manage_settings.html:1145
 msgid "Select user to receive test email"
 msgstr ""
 
@@ -17688,11 +17739,11 @@ msgstr ""
 msgid "Select users..."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1476
+#: app/templates/admin/settings/manage_settings.html:1491
 msgid "Select users…"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1131
+#: app/templates/admin/settings/manage_settings.html:1146
 msgid "Select user…"
 msgstr ""
 
@@ -17700,7 +17751,7 @@ msgstr ""
 msgid "Select verdict"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:235
+#: app/templates/admin/communication/center.html:231
 msgid "Select which entity types to show in the list below"
 msgstr ""
 
@@ -17755,8 +17806,8 @@ msgstr ""
 msgid "Selected indicator: %(name)s"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:172
-#: app/templates/admin/communication/center.html:264
+#: app/templates/admin/communication/center.html:168
+#: app/templates/admin/communication/center.html:260
 msgid "Selected:"
 msgstr ""
 
@@ -17800,11 +17851,11 @@ msgstr ""
 msgid "Send"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:797
+#: app/templates/admin/communication/center.html:793
 msgid "Send Notification"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1358
+#: app/templates/admin/communication/center.html:1354
 msgid "Send Now"
 msgstr ""
 
@@ -17812,13 +17863,13 @@ msgstr ""
 msgid "Send Reset Link"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:115
+#: app/templates/admin/communication/center.html:111
 msgid ""
 "Send a message to one or more users by email and/or mobile push. Configure "
 "recipients, content, delivery, and optional attachments below."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:989
+#: app/templates/admin/settings/manage_settings.html:1004
 msgid "Send a test email using the current template content."
 msgstr ""
 
@@ -17826,7 +17877,7 @@ msgstr ""
 msgid "Send anyway"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:113
+#: app/templates/admin/communication/center.html:109
 msgid "Send custom communication"
 msgstr ""
 
@@ -17864,9 +17915,9 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:79
-#: app/templates/admin/settings/manage_settings.html:990
-#: app/templates/admin/settings/manage_settings.html:1102
-#: app/templates/admin/settings/manage_settings.html:1146
+#: app/templates/admin/settings/manage_settings.html:1005
+#: app/templates/admin/settings/manage_settings.html:1117
+#: app/templates/admin/settings/manage_settings.html:1161
 msgid "Send test email"
 msgstr ""
 
@@ -17881,15 +17932,15 @@ msgstr ""
 msgid "Send time (%(tz)s)"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1124
+#: app/templates/admin/settings/manage_settings.html:1139
 msgid "Send to another user"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1116
+#: app/templates/admin/settings/manage_settings.html:1131
 msgid "Send to me"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:427
+#: app/templates/admin/communication/center.html:423
 msgid ""
 "Send via email even if users have disabled email notifications. Use for "
 "critical messages."
@@ -17903,17 +17954,17 @@ msgstr ""
 msgid "Sensitive information detected. Please remove it before sending."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1247
+#: app/templates/admin/settings/manage_settings.html:1262
 msgid "Sensitive; not stored in database. Set in environment."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1356
+#: app/templates/admin/communication/center.html:1352
 #: app/templates/admin/validation_dashboard.html:213
 #: app/templates/admin/validation_questions.html:269
 msgid "Sent"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1252
+#: app/templates/admin/communication/center.html:1248
 msgid ""
 "Sent campaigns load content only unless you include recipients. Draft and "
 "scheduled campaigns can include recipients by default."
@@ -18026,7 +18077,7 @@ msgstr ""
 msgid "Set a new password"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:698
+#: app/templates/forms/form_builder/form_builder.html:713
 msgid ""
 "Set the English display label and translations for each column. The column "
 "code (used for variable lookups) is shown in the first column. If no English"
@@ -18037,19 +18088,19 @@ msgstr ""
 msgid "Set the name, access, and options for a new blank template."
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:711
+#: app/templates/forms/form_builder/form_builder.html:726
 msgid ""
 "Set translations for each row header. The English text is shown in the first"
 " column as a reference. Translations will be displayed to users based on "
 "their selected language."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1245
+#: app/templates/admin/settings/manage_settings.html:1260
 msgid "Set via environment variable"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:367
-#: app/templates/admin/communication/center.html:467
+#: app/templates/admin/communication/center.html:463
 #: app/templates/admin/dashboard.html:139
 #: app/templates/admin/plugin_management.html:211
 #: app/templates/admin/security/settings.html:14
@@ -18062,7 +18113,7 @@ msgid ""
 "counts."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1524
+#: app/templates/admin/settings/manage_settings.html:1539
 msgid "Settings saved successfully."
 msgstr ""
 
@@ -18070,7 +18121,7 @@ msgstr ""
 msgid "Settings sections"
 msgstr ""
 
-#: app/services/documentation_service.py:193
+#: app/services/documentation_service.py:250
 msgid "Setup"
 msgstr ""
 
@@ -18149,11 +18200,11 @@ msgstr ""
 msgid "Short Name"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:412
+#: app/templates/admin/communication/center.html:408
 msgid "Short alert on registered devices"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:636
+#: app/templates/admin/communication/center.html:632
 msgid "Short summary shown in the app and on devices…"
 msgstr ""
 
@@ -18161,11 +18212,11 @@ msgstr ""
 msgid "Short text answer (one line)."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1405
+#: app/templates/admin/communication/center.html:1403
 msgid "Short text for push, in-app, and template…"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1403
+#: app/templates/admin/communication/center.html:1401
 msgid ""
 "Short text shown on the user's mobile device and in the in-app notification "
 "center."
@@ -18227,6 +18278,10 @@ msgstr ""
 msgid "Show Year/Period selector"
 msgstr ""
 
+#: app/templates/admin/translations/manage_translations.html:691
+msgid "Show all"
+msgstr ""
+
 #: app/templates/admin/analytics/sessions.html:67
 msgid "Show all sessions"
 msgstr ""
@@ -18285,6 +18340,11 @@ msgstr ""
 msgid "Show payload JSON"
 msgstr ""
 
+#: app/templates/admin/translations/manage_translations.html:202
+#: app/templates/admin/translations/manage_translations.html:690
+msgid "Show removed"
+msgstr ""
+
 #: app/templates/core/dashboard.html:1831
 #: app/templates/core/dashboard.html:2881
 msgid "Show score breakdown"
@@ -18308,7 +18368,7 @@ msgstr ""
 msgid "Show/Hide Columns"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1256
+#: app/templates/admin/settings/manage_settings.html:1271
 msgid "Show/hide"
 msgstr ""
 
@@ -18342,13 +18402,13 @@ msgid ""
 "paths."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1394
+#: app/templates/admin/communication/center.html:1392
 msgid ""
 "Shown as the push notification title on mobile devices and in the in-app "
 "notification center."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1404
+#: app/templates/admin/communication/center.html:1402
 msgid ""
 "Shown in the notification center. Also available as {{ message }} in your "
 "email HTML template."
@@ -18381,7 +18441,7 @@ msgstr ""
 msgid "Sign-In Failed"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:332
+#: app/templates/admin/translations/manage_translations.html:368
 msgid "Single PO"
 msgstr ""
 
@@ -18405,7 +18465,7 @@ msgstr ""
 msgid "Skip for now"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:633
+#: app/templates/admin/translations/manage_translations.html:671
 #: app/templates/components/auto_translate_modal.html:470
 msgid "Skipped"
 msgstr ""
@@ -18445,7 +18505,8 @@ msgid ""
 "These are suggested values that you can review and modify as needed."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1221
+#: app/routes/admin/utilities/translations.py:1247
+#: app/routes/admin/utilities/translations.py:1282
 #, python-format
 msgid "Some languages could not be updated: %(langs)s"
 msgstr ""
@@ -18477,7 +18538,7 @@ msgid "Sound"
 msgstr ""
 
 #: app/templates/admin/data_exploration/explore_data.html:1529
-#: app/templates/admin/translations/manage_translations.html:615
+#: app/templates/admin/translations/manage_translations.html:653
 #: app/templates/admin/validation_questions.html:270
 msgid "Source"
 msgstr ""
@@ -18576,7 +18637,7 @@ msgid ""
 "the AI assistant, or import structure from Kobo XLSForm or Excel."
 msgstr ""
 
-#: app/templates/admin/docs/documentation.html:1209
+#: app/templates/admin/docs/documentation.html:1222
 msgid "Start interactive tour for this guide"
 msgstr ""
 
@@ -18634,7 +18695,7 @@ msgstr ""
 msgid "State mismatch. Please try signing in again."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:705
+#: app/templates/admin/communication/center.html:701
 msgid "Static attachment(s)"
 msgstr ""
 
@@ -18658,7 +18719,7 @@ msgstr ""
 #: app/templates/admin/assignments/gantt_chart.html:107
 #: app/templates/admin/assignments/public_submissions.html:70
 #: app/templates/admin/assignments/public_submissions.html:243
-#: app/templates/admin/communication/center.html:1346
+#: app/templates/admin/communication/center.html:1342
 #: app/templates/admin/documents/documents.html:741
 #: app/templates/admin/embed_content/manage_embed_content.html:48
 #: app/templates/admin/indicator_bank/indicator_bank.html:951
@@ -18747,7 +18808,7 @@ msgid "Steps:"
 msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:3165
-#: app/templates/forms/form_builder/form_builder.html:1039
+#: app/templates/forms/form_builder/form_builder.html:1054
 msgid "Still loading…"
 msgstr ""
 
@@ -18898,7 +18959,7 @@ msgid "Submit your request"
 msgstr ""
 
 #: app/routes/main/helpers.py:1227
-#: app/templates/admin/communication/center.html:919
+#: app/templates/admin/communication/center.html:915
 #: app/templates/admin/templates/data_sync_imputation.html:144
 #: app/templates/admin/templates/data_sync_imputation.html:1305
 #: app/templates/admin/validation_dashboard.html:242
@@ -18919,7 +18980,7 @@ msgstr ""
 msgid "Submitted through public link"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:977
+#: app/templates/admin/settings/manage_settings.html:992
 msgid "Submitter"
 msgstr ""
 
@@ -19087,7 +19148,7 @@ msgstr ""
 msgid "Suspicious query content"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:993
+#: app/templates/admin/settings/manage_settings.html:1008
 msgid "Switch between HTML and visual editor"
 msgstr ""
 
@@ -19153,14 +19214,14 @@ msgid "Syncing…"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:362
-#: app/templates/admin/communication/center.html:672
+#: app/templates/admin/communication/center.html:668
 #: app/templates/admin/lists/manage_lists.html:57
 #: app/templates/admin/monitoring/system_monitoring.html:200
 #: app/templates/notifications/center.html:108
 msgid "System"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:482
+#: app/templates/admin/communication/center.html:478
 #: app/templates/admin/settings/manage_settings.html:23
 #: app/templates/admin/settings/manage_settings.html:27
 #: app/templates/components/_sidebar_nav_categories.html:43
@@ -19169,7 +19230,7 @@ msgid "System Configuration"
 msgstr ""
 
 #. Email templates are saved via JSON (base64) to avoid WAF false positives.
-#: app/templates/admin/settings/manage_settings.html:898
+#: app/templates/admin/settings/manage_settings.html:913
 msgid "System Email Templates"
 msgstr ""
 
@@ -19185,9 +19246,9 @@ msgstr ""
 msgid "System Manager"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:326
-#: app/templates/admin/communication/center.html:328
-#: app/templates/admin/communication/center.html:887
+#: app/templates/admin/communication/center.html:322
+#: app/templates/admin/communication/center.html:324
+#: app/templates/admin/communication/center.html:883
 msgid "System Managers"
 msgstr ""
 
@@ -19209,7 +19270,7 @@ msgstr ""
 msgid "System documents"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1493
+#: app/templates/admin/settings/manage_settings.html:1508
 msgid "System managers"
 msgstr ""
 
@@ -19223,11 +19284,11 @@ msgstr ""
 msgid "System settings"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1494
+#: app/templates/admin/settings/manage_settings.html:1509
 msgid "TTL"
 msgstr ""
 
-#: app/routes/admin/communication.py:339
+#: app/routes/admin/communication.py:341
 #: app/templates/admin/communication/registry.html:64
 msgid "TTL (days)"
 msgstr ""
@@ -19248,7 +19309,7 @@ msgstr ""
 msgid "Tablet"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:680
+#: app/templates/admin/communication/center.html:676
 #: app/templates/admin/indicator_bank/indicator_bank.html:803
 #: app/templates/admin/indicator_bank/view_indicator_bank.html:99
 #: app/templates/notifications/center.html:116
@@ -19259,11 +19320,11 @@ msgstr ""
 msgid "Take a quick tour"
 msgstr ""
 
-#: app/templates/admin/docs/documentation.html:1211
+#: app/templates/admin/docs/documentation.html:1224
 msgid "Take the Tour"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:444
+#: app/templates/admin/communication/center.html:440
 msgid "Tap opens"
 msgstr ""
 
@@ -19350,7 +19411,7 @@ msgstr ""
 msgid "Template Access"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1100
+#: app/templates/forms/form_builder/form_builder.html:1115
 msgid "Template Access Management"
 msgstr ""
 
@@ -19374,7 +19435,7 @@ msgstr ""
 msgid "Template Exported"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1504
+#: app/templates/admin/settings/manage_settings.html:1519
 msgid "Template HTML"
 msgstr ""
 
@@ -19387,7 +19448,7 @@ msgstr ""
 msgid "Template Imported"
 msgstr ""
 
-#: app/services/documentation_service.py:276
+#: app/services/documentation_service.py:333
 #: app/templates/admin/lists/list_detail.html:65
 #: app/templates/admin/templates/new_template.html:27
 #: app/templates/admin/templates/templates.html:49
@@ -19409,7 +19470,7 @@ msgid "Template Modified"
 msgstr ""
 
 #: app/forms/form_builder/template_forms.py:20
-#: app/templates/forms/form_builder/form_builder.html:805
+#: app/templates/forms/form_builder/form_builder.html:820
 #: app/templates/forms/form_builder/partials/_template_details.html:23
 msgid "Template Name"
 msgstr ""
@@ -19468,7 +19529,7 @@ msgid "Template details"
 msgstr ""
 
 #: app/templates/admin/templates/new_template.html:880
-#: app/templates/forms/form_builder/form_builder.html:884
+#: app/templates/forms/form_builder/form_builder.html:899
 msgid "Template name"
 msgstr ""
 
@@ -19482,8 +19543,8 @@ msgid "Template:"
 msgstr ""
 
 #: app/templates/admin/assignments/gantt_chart.html:98
-#: app/templates/admin/communication/center.html:477
-#: app/templates/admin/communication/center.html:987
+#: app/templates/admin/communication/center.html:473
+#: app/templates/admin/communication/center.html:983
 #: app/templates/admin/dashboard.html:66
 #: app/templates/admin/user_management/users.html:194
 #: app/templates/admin/validation_dashboard.html:52
@@ -19523,12 +19584,12 @@ msgstr ""
 msgid "Test as an Admin"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1511
+#: app/templates/admin/settings/manage_settings.html:1526
 msgid ""
 "Test email could not be sent. Check the message below or your mail settings."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1510
+#: app/templates/admin/settings/manage_settings.html:1525
 msgid "Test email sent to"
 msgstr ""
 
@@ -19572,7 +19633,7 @@ msgid ""
 "immediately."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1507
+#: app/templates/admin/settings/manage_settings.html:1522
 msgid ""
 "The English version of this template is empty. Add or save English text "
 "first, then try again."
@@ -19674,7 +19735,7 @@ msgid ""
 "calculate) are skipped."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1512
+#: app/templates/admin/settings/manage_settings.html:1527
 msgid ""
 "The visual editor could not be loaded. Check your network, then refresh the "
 "page."
@@ -19718,7 +19779,7 @@ msgstr ""
 msgid "Third (4/12)"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1169
+#: app/templates/forms/form_builder/form_builder.html:1184
 msgid "This"
 msgstr ""
 
@@ -19737,7 +19798,7 @@ msgstr ""
 msgid "This Week"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:891
+#: app/templates/forms/form_builder/form_builder.html:906
 msgid "This action cannot be undone."
 msgstr ""
 
@@ -19850,7 +19911,7 @@ msgid ""
 " the moment you confirm."
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:890
+#: app/templates/forms/form_builder/form_builder.html:905
 msgid "This import will permanently delete existing submission data:"
 msgstr ""
 
@@ -19921,7 +19982,7 @@ msgstr ""
 msgid "This is the one and only system for reporting data to"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:465
+#: app/templates/admin/translations/manage_translations.html:501
 msgid "This is the original text that will be translated."
 msgstr ""
 
@@ -19944,7 +20005,7 @@ msgid ""
 "build URLs. It is not rendered by the server."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1517
+#: app/templates/admin/settings/manage_settings.html:1532
 msgid ""
 "This language has no template content to send. Add HTML in the editor or "
 "pick another language tab."
@@ -19969,7 +20030,14 @@ msgid ""
 "needed."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:648
+#: app/templates/admin/translations/manage_translations.html:689
+#, python-format
+msgid ""
+"This permanently deletes %(count)s obsolete (#~) entries from every locale "
+".po file. Active strings are not affected. Continue?"
+msgstr ""
+
+#: app/templates/admin/translations/manage_translations.html:686
 msgid ""
 "This permanently deletes the obsolete (#~) entry for this message from every"
 " locale .po file. Active strings are not affected. Continue?"
@@ -20003,7 +20071,7 @@ msgstr ""
 msgid "This section contains %(count)s saved data entries."
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1164
+#: app/templates/forms/form_builder/form_builder.html:1179
 #, python-format
 msgid ""
 "This section contains %(count)s saved data entries. Choose an option below."
@@ -20029,13 +20097,13 @@ msgid ""
 "enter or view data."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:471
+#: app/templates/admin/translations/manage_translations.html:507
 msgid ""
 "This string contains placeholders that must be preserved in translations, "
 "for example:"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:620
+#: app/templates/admin/translations/manage_translations.html:658
 msgid "This string was removed from source code"
 msgstr ""
 
@@ -20105,29 +20173,29 @@ msgstr ""
 msgid "This will create a new column in the table for this category."
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:897
+#: app/templates/forms/form_builder/form_builder.html:912
 #: app/templates/forms/form_builder/partials/_excel_modal.html:40
 msgid "This will modify the published version."
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1163
+#: app/templates/forms/form_builder/form_builder.html:1178
 #, python-format
 msgid ""
 "This will permanently delete 1 section and %(n)s sub-section(s) and all "
 "their contents. Are you sure?"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1160
+#: app/templates/forms/form_builder/form_builder.html:1175
 msgid "This will permanently delete __count__ data entries."
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1162
+#: app/templates/forms/form_builder/form_builder.html:1177
 msgid ""
 "This will permanently delete this section and all its contents. Are you "
 "sure?"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1165
+#: app/templates/forms/form_builder/form_builder.html:1180
 #, python-format
 msgid ""
 "This will remove 1 section and %(n)s sub-section(s) and %(count)s saved data"
@@ -20255,8 +20323,8 @@ msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:318
 #: app/templates/admin/communication/_campaign_email_compose_editor.html:22
-#: app/templates/admin/communication/center.html:601
-#: app/templates/admin/communication/center.html:1343
+#: app/templates/admin/communication/center.html:597
+#: app/templates/admin/communication/center.html:1339
 #: app/templates/admin/embed_content/manage_embed_content.html:45
 #: app/templates/admin/embed_content/manage_embed_content.html:124
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:66
@@ -20273,7 +20341,7 @@ msgstr ""
 msgid "Title and Embed URL are required."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:339
+#: app/templates/admin/communication/center.html:335
 msgid "To"
 msgstr ""
 
@@ -20348,7 +20416,7 @@ msgstr ""
 msgid "Tools"
 msgstr ""
 
-#: app/services/documentation_service.py:279
+#: app/services/documentation_service.py:336
 msgid "Tools & Settings"
 msgstr ""
 
@@ -20611,13 +20679,13 @@ msgstr ""
 msgid "Translate all blank organization names to all languages"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:724
+#: app/templates/forms/form_builder/form_builder.html:739
 msgid ""
 "Translate all blank template names, section names, questions, document "
 "fields, and page names to all languages"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:518
+#: app/templates/admin/translations/manage_translations.html:554
 msgid "Translate all blank translation fields to all languages"
 msgstr ""
 
@@ -20632,8 +20700,13 @@ msgid ""
 " fields at once."
 msgstr ""
 
+#: app/templates/admin/settings/manage_settings.html:674
+msgid ""
+"Translate the organization name and short name shown across the application."
+msgstr ""
+
 #: app/templates/admin/organization/index.html:2588
-#: app/templates/admin/translations/manage_translations.html:636
+#: app/templates/admin/translations/manage_translations.html:674
 #: app/templates/components/auto_translate_modal_js.html:48
 msgid "Translated"
 msgstr ""
@@ -20645,7 +20718,7 @@ msgstr ""
 
 #: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:957
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:1423
-#: app/templates/admin/translations/manage_translations.html:655
+#: app/templates/admin/translations/manage_translations.html:698
 msgid "Translating..."
 msgstr ""
 
@@ -20654,8 +20727,8 @@ msgstr ""
 msgid "Translating…"
 msgstr ""
 
-#: app/services/documentation_service.py:196
-#: app/templates/admin/translations/manage_translations.html:666
+#: app/services/documentation_service.py:253
+#: app/templates/admin/translations/manage_translations.html:709
 msgid "Translation"
 msgstr ""
 
@@ -20663,9 +20736,9 @@ msgstr ""
 msgid "Translation Log"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:480
-#: app/templates/admin/translations/manage_translations.html:143
-#: app/templates/admin/translations/manage_translations.html:147
+#: app/templates/admin/communication/center.html:476
+#: app/templates/admin/translations/manage_translations.html:150
+#: app/templates/admin/translations/manage_translations.html:154
 #: app/templates/components/_sidebar_nav_categories.html:29
 #: app/templates/components/_sidebar_nav_categories.html:31
 msgid "Translation Management"
@@ -20679,7 +20752,7 @@ msgstr ""
 msgid "Translation Summary"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:651
+#: app/templates/admin/translations/manage_translations.html:694
 msgid "Translation Validation Error"
 msgstr ""
 
@@ -20700,7 +20773,7 @@ msgstr ""
 #: app/templates/admin/indicator_bank/measurement_lookups.html:983
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:935
 #: app/templates/admin/organization/index.html:2593
-#: app/templates/admin/translations/manage_translations.html:631
+#: app/templates/admin/translations/manage_translations.html:669
 #: app/templates/components/auto_translate_modal_js.html:52
 msgid "Translation completed!"
 msgstr ""
@@ -20715,11 +20788,11 @@ msgstr ""
 msgid "Translation failed."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1514
+#: app/templates/admin/settings/manage_settings.html:1529
 msgid "Translation failed: invalid response from the server."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:181
+#: app/templates/admin/translations/manage_translations.html:217
 #, python-format
 msgid ""
 "Translation files could not be loaded or are empty. Use "
@@ -20763,7 +20836,7 @@ msgstr ""
 msgid "Translation reloading is only available in development mode."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1516
+#: app/templates/admin/settings/manage_settings.html:1531
 msgid "Translation request failed."
 msgstr ""
 
@@ -20775,7 +20848,7 @@ msgstr ""
 msgid "Translation resumed by user. Restarting backend processing..."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:654
+#: app/templates/admin/translations/manage_translations.html:697
 msgid "Translation saved successfully"
 msgstr ""
 
@@ -20790,13 +20863,9 @@ msgstr ""
 #: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:184
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:933
 #: app/templates/admin/organization/index.html:3023
-#: app/templates/admin/translations/manage_translations.html:630
+#: app/templates/admin/translations/manage_translations.html:668
 #: app/templates/components/auto_translate_modal_js.html:61
 msgid "Translation stopped by user."
-msgstr ""
-
-#: app/routes/admin/utilities/translations.py:1183
-msgid "Translation tools are not available (polib missing)."
 msgstr ""
 
 #: app/routes/admin/utilities/translations.py:57
@@ -20821,44 +20890,44 @@ msgstr ""
 msgid "Translations"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1293
+#: app/routes/admin/utilities/translations.py:1354
 msgid "Translations compiled and reloaded successfully!"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1286
+#: app/routes/admin/utilities/translations.py:1347
 msgid ""
 "Translations compiled successfully! Application context refreshed. Please "
 "restart the application via your process manager to apply changes across all"
 " workers."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1274
+#: app/routes/admin/utilities/translations.py:1335
 msgid "Translations compiled successfully! Application restart triggered."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1291
+#: app/routes/admin/utilities/translations.py:1352
 msgid ""
 "Translations compiled successfully! However, automatic restart failed. "
 "Please restart the application manually."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1276
+#: app/routes/admin/utilities/translations.py:1337
 msgid ""
 "Translations compiled successfully! Please restart the application manually "
 "to apply changes."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1289
+#: app/routes/admin/utilities/translations.py:1350
 msgid ""
 "Translations compiled successfully! Please restart the application via your "
 "process manager to apply changes."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1356
+#: app/routes/admin/utilities/translations.py:1417
 msgid "Translations extracted and updated successfully!"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1309
+#: app/routes/admin/utilities/translations.py:1370
 #: app/routes/main/views.py:122
 msgid "Translations reloaded successfully!"
 msgstr ""
@@ -20871,7 +20940,7 @@ msgstr ""
 msgid "Trends Over Time"
 msgstr ""
 
-#: app/services/documentation_service.py:280
+#: app/services/documentation_service.py:337
 msgid "Troubleshooting"
 msgstr ""
 
@@ -20896,7 +20965,7 @@ msgstr ""
 msgid "Tuesday"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1313
+#: app/templates/admin/settings/manage_settings.html:1328
 msgid ""
 "Tune models, limits, RAG, agent behaviour, and chat retention here. Values "
 "are stored in the database and override code defaults. API keys and other "
@@ -20921,13 +20990,13 @@ msgstr ""
 
 #: app/templates/admin/ai/documents.html:340
 #: app/templates/admin/ai/documents.html:650
-#: app/templates/admin/communication/center.html:1342
+#: app/templates/admin/communication/center.html:1338
 #: app/templates/admin/embed_content/manage_embed_content.html:47
 #: app/templates/admin/indicator_bank/indicator_bank.html:819
 #: app/templates/admin/indicator_bank/neural_map.html:188
 #: app/templates/admin/security/alerts.html:24
 #: app/templates/admin/security/event_detail.html:83
-#: app/templates/admin/settings/manage_settings.html:1489
+#: app/templates/admin/settings/manage_settings.html:1504
 #: app/templates/admin/templates/data_sync_imputation.html:395
 #: app/templates/admin/user_management/user_form.html:944
 #: app/templates/components/_builder_items.html:45
@@ -20958,7 +21027,7 @@ msgstr ""
 msgid "Type details"
 msgstr ""
 
-#: app/routes/admin/communication.py:335
+#: app/routes/admin/communication.py:337
 #: app/templates/admin/communication/registry.html:59
 msgid "Type key"
 msgstr ""
@@ -21169,8 +21238,8 @@ msgstr ""
 #: app/templates/admin/security/event_detail.html:37
 #: app/templates/admin/templates/new_template.html:255
 #: app/templates/admin/templates/partials/imputation_badges.html:25
-#: app/templates/admin/translations/manage_translations.html:582
 #: app/templates/admin/translations/manage_translations.html:618
+#: app/templates/admin/translations/manage_translations.html:656
 #: app/templates/core/dashboard.html:1204
 #: app/templates/core/dashboard.html:1206
 #: app/templates/core/dashboard.html:1208
@@ -21179,7 +21248,7 @@ msgstr ""
 #: app/templates/core/dashboard.html:1323
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:119
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:170
-#: app/templates/forms/form_builder/form_builder.html:1073
+#: app/templates/forms/form_builder/form_builder.html:1088
 #: app/utils/form_localization.py:507 app/utils/form_localization.py:513
 #: app/utils/form_localization.py:536
 msgid "Unknown"
@@ -21227,12 +21296,12 @@ msgstr ""
 msgid "Unknown User"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1368
+#: app/routes/admin/utilities/translations.py:1429
 #: app/templates/admin/documents/documents.html:1008
 #: app/templates/admin/documents/documents.html:1042
 #: app/templates/admin/indicator_bank/indicator_bank.html:268
 #: app/templates/admin/organization/index.html:2592
-#: app/templates/admin/translations/manage_translations.html:632
+#: app/templates/admin/translations/manage_translations.html:670
 msgid "Unknown error"
 msgstr ""
 
@@ -21246,8 +21315,8 @@ msgstr ""
 msgid "Unknown user"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:379
-#: app/routes/admin/utilities/translations.py:814
+#: app/routes/admin/utilities/translations.py:390
+#: app/routes/admin/utilities/translations.py:825
 #, python-format
 msgid "Unknown/disabled language: %(lang)s"
 msgstr ""
@@ -21260,7 +21329,7 @@ msgstr ""
 msgid "Unpin column"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1351
+#: app/templates/admin/communication/center.html:1347
 #: app/templates/notifications/center.html:49
 #: app/templates/notifications/center.html:74
 msgid "Unread"
@@ -21275,7 +21344,7 @@ msgstr ""
 msgid "Unresolved Only"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1480
+#: app/templates/admin/settings/manage_settings.html:1495
 msgid "Up to date"
 msgstr ""
 
@@ -21284,7 +21353,7 @@ msgstr ""
 msgid "Update"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:794
+#: app/templates/admin/communication/center.html:790
 msgid "Update Campaign"
 msgstr ""
 
@@ -21336,7 +21405,7 @@ msgid "Updated %(count)d field in %(template)s"
 msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:17
-#: app/templates/admin/settings/manage_settings.html:1482
+#: app/templates/admin/settings/manage_settings.html:1497
 msgid "Updates"
 msgstr ""
 
@@ -21440,7 +21509,7 @@ msgstr ""
 msgid "Upload image"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:717
+#: app/templates/admin/communication/center.html:713
 msgid "Upload one or more files to attach to every email."
 msgstr ""
 
@@ -21498,7 +21567,7 @@ msgid ""
 "matches the type set above."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1485
+#: app/templates/admin/settings/manage_settings.html:1500
 msgid "Urgent"
 msgstr ""
 
@@ -21542,7 +21611,7 @@ msgid ""
 "question, answer, or status."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1106
+#: app/templates/admin/communication/center.html:1102
 msgid "Use filters above to see matching users"
 msgstr ""
 
@@ -21587,7 +21656,7 @@ msgstr ""
 msgid "Use the AI assistant for help with reporting"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1389
+#: app/templates/admin/communication/center.html:1387
 msgid ""
 "Use the Email and Mobile Push tabs to compose each channel. The same title "
 "is used as the email subject and push title."
@@ -21645,7 +21714,7 @@ msgstr ""
 #: app/templates/admin/analytics/security_events.html:186
 #: app/templates/admin/analytics/sessions.html:147
 #: app/templates/admin/analytics/user_detail.html:51
-#: app/templates/admin/communication/center.html:1341
+#: app/templates/admin/communication/center.html:1337
 #: app/templates/admin/dashboard.html:282
 #: app/templates/admin/security/event_detail.html:37
 #: app/templates/admin/user_management/access_requests.html:780
@@ -21677,7 +21746,7 @@ msgstr ""
 
 #: app/templates/admin/analytics/user_detail.html:5
 #: app/templates/admin/analytics/user_detail.html:12
-#: app/templates/admin/communication/center.html:486
+#: app/templates/admin/communication/center.html:482
 #: app/templates/components/_sidebar_nav_categories.html:197
 msgid "User Analytics"
 msgstr ""
@@ -21712,11 +21781,11 @@ msgstr ""
 msgid "User Email"
 msgstr ""
 
-#: app/services/documentation_service.py:810
+#: app/services/documentation_service.py:867
 msgid "User Guide"
 msgstr ""
 
-#: app/services/documentation_service.py:189
+#: app/services/documentation_service.py:246
 msgid "User Guides"
 msgstr ""
 
@@ -21728,8 +21797,8 @@ msgstr ""
 msgid "User JWT — @mobile_auth_required"
 msgstr ""
 
-#: app/services/documentation_service.py:275
-#: app/templates/admin/communication/center.html:476
+#: app/services/documentation_service.py:332
+#: app/templates/admin/communication/center.html:472
 #: app/templates/admin/rbac/grants.html:16
 #: app/templates/admin/rbac/permissions.html:12
 #: app/templates/admin/rbac/role_form.html:13
@@ -21746,7 +21815,7 @@ msgstr ""
 
 #: app/templates/admin/communication/_campaign_email_compose_editor.html:24
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:68
-#: app/templates/admin/settings/manage_settings.html:976
+#: app/templates/admin/settings/manage_settings.html:991
 msgid "User Name"
 msgstr ""
 
@@ -21812,11 +21881,11 @@ msgid ""
 "automated client."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:135
+#: app/templates/admin/communication/center.html:131
 msgid "User-based"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:143
+#: app/templates/admin/communication/center.html:139
 msgid ""
 "User-based: Send individual notifications. Entity-based: Send one email per "
 "entity with all contacts in To/CC."
@@ -21832,7 +21901,7 @@ msgstr ""
 msgid "Users will be able to select rows from this list during data entry."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:961
+#: app/templates/admin/settings/manage_settings.html:976
 msgid ""
 "Uses the English template text for this form as the source. Jinja variables "
 "like org_name are preserved."
@@ -21870,7 +21939,7 @@ msgid "Valid XLSForm"
 msgstr ""
 
 #: app/templates/admin/templates/new_template.html:875
-#: app/templates/forms/form_builder/form_builder.html:880
+#: app/templates/forms/form_builder/form_builder.html:895
 msgid "Valid export"
 msgstr ""
 
@@ -21890,7 +21959,7 @@ msgstr ""
 
 #: app/templates/admin/templates/kobo_data_import.html:1156
 #: app/templates/admin/templates/new_template.html:871
-#: app/templates/forms/form_builder/form_builder.html:876
+#: app/templates/forms/form_builder/form_builder.html:891
 msgid "Validating file…"
 msgstr ""
 
@@ -21954,7 +22023,7 @@ msgstr ""
 
 #: app/templates/admin/templates/kobo_data_import.html:1157
 #: app/templates/admin/templates/new_template.html:872
-#: app/templates/forms/form_builder/form_builder.html:877
+#: app/templates/forms/form_builder/form_builder.html:892
 msgid "Validation failed. Please fix the file and try again."
 msgstr ""
 
@@ -22026,8 +22095,8 @@ msgstr ""
 msgid "Variable value for"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1427
-#: app/templates/admin/settings/manage_settings.html:1500
+#: app/templates/admin/communication/center.html:1426
+#: app/templates/admin/settings/manage_settings.html:1515
 #: app/templates/forms/form_builder/partials/_sections_container.html:510
 #: app/templates/forms/form_builder/partials/_sections_container.html:523
 msgid "Variables"
@@ -22112,8 +22181,8 @@ msgstr ""
 
 #: app/templates/admin/ai/reasoning_traces.html:124
 #: app/templates/admin/assignments/public_submissions.html:268
-#: app/templates/admin/communication/center.html:1349
-#: app/templates/admin/communication/center.html:1364
+#: app/templates/admin/communication/center.html:1345
+#: app/templates/admin/communication/center.html:1360
 #: app/templates/admin/dashboard.html:183
 #: app/templates/admin/dashboard.html:200
 #: app/templates/admin/dashboard.html:217
@@ -22178,7 +22247,7 @@ msgstr ""
 #: app/templates/admin/analytics/dashboard.html:143
 #: app/templates/admin/analytics/dashboard.html:258
 #: app/templates/admin/api_keys/list.html:160
-#: app/templates/admin/communication/center.html:184
+#: app/templates/admin/communication/center.html:180
 #: app/templates/admin/plugin_management.html:210
 msgid "View Details"
 msgstr ""
@@ -22224,20 +22293,6 @@ msgstr ""
 
 #: app/templates/admin/ai/dashboard.html:192
 msgid "View all"
-msgstr ""
-
-#: app/templates/admin/communication/center.html:59
-msgid ""
-"View all in-app notifications and linked email delivery status. Email "
-"columns reflect notification-triggered delivery, not every system email. "
-"Failed emails are not retried automatically — retry or dismiss them from the"
-" grid."
-msgstr ""
-
-#: app/templates/admin/communication/center.html:103
-msgid ""
-"View all in-app notifications and linked email delivery status. Use column "
-"filters to search and narrow the list."
 msgstr ""
 
 #: app/templates/admin/assignments/assignments.html:35
@@ -22309,7 +22364,7 @@ msgstr ""
 
 #: app/templates/admin/communication/_campaign_email_compose_editor.html:40
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:91
-#: app/templates/admin/settings/manage_settings.html:1003
+#: app/templates/admin/settings/manage_settings.html:1018
 msgid "Visual"
 msgstr ""
 
@@ -22319,7 +22374,7 @@ msgstr ""
 
 #: app/templates/admin/communication/_campaign_email_compose_editor.html:68
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:133
-#: app/templates/admin/settings/manage_settings.html:1049
+#: app/templates/admin/settings/manage_settings.html:1064
 msgid "Visual email editor"
 msgstr ""
 
@@ -22375,7 +22430,7 @@ msgstr ""
 msgid "Warning: This action cannot be undone!"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:159
+#: app/routes/admin/utilities/translations.py:170
 msgid ""
 "Warning: polib package not available. Translation file management will be "
 "limited. Install with: pip install polib"
@@ -22415,7 +22470,7 @@ msgid ""
 "We could not send the reset email at this time. Please contact support."
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1020
+#: app/templates/forms/form_builder/form_builder.html:1035
 msgid "We ran into an issue while loading. Please reload the page."
 msgstr ""
 
@@ -22425,11 +22480,11 @@ msgid ""
 "may be processed by external AI providers."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1174
+#: app/templates/admin/settings/manage_settings.html:1189
 msgid "WebSockets"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1178
+#: app/templates/admin/settings/manage_settings.html:1193
 msgid "Webhooks"
 msgstr ""
 
@@ -22455,7 +22510,7 @@ msgstr ""
 msgid "Weight"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:923
+#: app/templates/admin/settings/manage_settings.html:938
 msgid "Welcome Email"
 msgstr ""
 
@@ -22495,7 +22550,7 @@ msgstr ""
 msgid "What you can do"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1331
+#: app/templates/admin/settings/manage_settings.html:1346
 msgid ""
 "When OFF, all users have access to the AI assistant — no restriction is "
 "applied. When ON, only the users added below can access AI (including system"
@@ -22531,7 +22586,7 @@ msgid ""
 "submission, you cannot edit the form unless an admin reopens it."
 msgstr ""
 
-#: app/templates/admin/communication/center.html:446
+#: app/templates/admin/communication/center.html:442
 msgid "Where the app navigates when the user taps the push notification."
 msgstr ""
 
@@ -22547,7 +22602,7 @@ msgstr ""
 msgid "Width"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1466
+#: app/templates/admin/settings/manage_settings.html:1481
 msgid "Will be cleared on save"
 msgstr ""
 
@@ -22588,7 +22643,7 @@ msgstr ""
 msgid "Workflow progress"
 msgstr ""
 
-#: app/services/documentation_service.py:190
+#: app/services/documentation_service.py:247
 msgid "Workflows"
 msgstr ""
 
@@ -22627,7 +22682,7 @@ msgstr ""
 #: app/templates/admin/ai/documents.html:660
 #: app/templates/admin/assignments/manage_assignment.html:95
 #: app/templates/admin/data_exploration/explore_data.html:311
-#: app/templates/admin/settings/manage_settings.html:975
+#: app/templates/admin/settings/manage_settings.html:990
 #: app/templates/forms/form_builder/partials/_item_modal.html:363
 #: app/templates/macros/year_picker.html:24
 msgid "Year"
@@ -22649,7 +22704,7 @@ msgstr ""
 msgid "Years (comma-separated)"
 msgstr ""
 
-#: app/routes/admin/communication.py:350 app/routes/main/helpers.py:270
+#: app/routes/admin/communication.py:352 app/routes/main/helpers.py:270
 #: app/templates/admin/ai/review_detail.html:124
 #: app/templates/admin/analytics/audit_trail.html:333
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:11
@@ -22727,7 +22782,7 @@ msgstr ""
 msgid "You already have pending requests for: %(countries)s"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:898
+#: app/templates/forms/form_builder/form_builder.html:913
 #: app/templates/forms/form_builder/partials/_excel_modal.html:27
 msgid "You are already editing a draft version."
 msgstr ""
@@ -22759,13 +22814,13 @@ msgid ""
 "sensitive data, contact your administrator or the platform support team."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:149
+#: app/templates/admin/translations/manage_translations.html:156
 msgid ""
 "You can add, edit, and delete translations for all supported languages. "
 "After making changes, remember to compile the translations to apply them."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:222
+#: app/templates/admin/translations/manage_translations.html:258
 msgid ""
 "You can edit the exported files and reimport them. When importing, only "
 "translation columns (msgstr) will be updated. The msgid column is used as a "
@@ -22789,7 +22844,7 @@ msgstr ""
 msgid "You can only request one country in total."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:476
+#: app/templates/admin/translations/manage_translations.html:512
 msgid ""
 "You can rearrange the text around the placeholders to fit the target "
 "language"
@@ -22861,7 +22916,7 @@ msgstr ""
 msgid "You're a beta tester — thank you for helping us improve this feature!"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1367
+#: app/templates/admin/communication/center.html:1363
 #: app/templates/notifications/center.html:212
 msgid "You're all caught up!"
 msgstr ""
@@ -22969,7 +23024,7 @@ msgstr ""
 msgid "Your session has expired."
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1508
+#: app/templates/admin/settings/manage_settings.html:1523
 msgid ""
 "Your user account has no email address. Add one in your profile, then try "
 "again."
@@ -22983,6 +23038,10 @@ msgstr ""
 
 #: app/templates/core/dashboard.html:2568
 msgid "You’ll get access once your request is approved."
+msgstr ""
+
+#: app/templates/admin/communication/center.html:1372
+msgid "__COUNT__ email delivery failure(s) need attention."
 msgstr ""
 
 #: app/templates/admin/indicator_bank/neural_map.html:229
@@ -23038,7 +23097,7 @@ msgstr ""
 msgid "at: %(datetime)s"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1479
+#: app/templates/admin/settings/manage_settings.html:1494
 #: app/templates/forms/entry_form/entry_form.html:3906
 msgid "available"
 msgstr ""
@@ -23105,7 +23164,7 @@ msgid "days"
 msgstr ""
 
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:103
-#: app/templates/admin/settings/manage_settings.html:1016
+#: app/templates/admin/settings/manage_settings.html:1031
 msgid "default"
 msgstr ""
 
@@ -23125,7 +23184,7 @@ msgstr ""
 msgid "departments"
 msgstr ""
 
-#: app/routes/admin/communication.py:321
+#: app/routes/admin/communication.py:323
 msgid "description"
 msgstr ""
 
@@ -23174,7 +23233,7 @@ msgstr ""
 msgid "e.g. total_beneficiaries"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:496
+#: app/templates/admin/communication/center.html:492
 msgid "e.g., /forms/assignment/123"
 msgstr ""
 
@@ -23203,8 +23262,8 @@ msgstr ""
 msgid "e.g., IFRC"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:757
-#: app/templates/admin/communication/center.html:1288
+#: app/templates/admin/communication/center.html:753
+#: app/templates/admin/communication/center.html:1284
 msgid "e.g., Monthly Newsletter, System Maintenance"
 msgstr ""
 
@@ -23212,11 +23271,11 @@ msgstr ""
 msgid "e.g., People, %, Items, Days"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1406
+#: app/templates/admin/communication/center.html:1404
 msgid "e.g., Please complete your assignment by Friday…"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:607
+#: app/templates/admin/communication/center.html:603
 msgid "e.g., Reporting period now open"
 msgstr ""
 
@@ -23257,7 +23316,7 @@ msgstr ""
 msgid "e.g., support@humdatabank.org"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:684
+#: app/templates/admin/communication/center.html:680
 #: app/templates/notifications/center.html:118
 msgid "e.g., urgent, action-required"
 msgstr ""
@@ -23270,11 +23329,11 @@ msgstr ""
 msgid "entity"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:264
+#: app/templates/admin/communication/center.html:260
 msgid "entity/entities"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1239
+#: app/templates/admin/settings/manage_settings.html:1254
 msgid "env"
 msgstr ""
 
@@ -23328,7 +23387,7 @@ msgstr ""
 msgid "from selected rows"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1176
+#: app/templates/forms/form_builder/form_builder.html:1191
 msgid "from the template."
 msgstr ""
 
@@ -23341,7 +23400,7 @@ msgstr ""
 msgid "granted directly"
 msgstr ""
 
-#: app/routes/admin/communication.py:320
+#: app/routes/admin/communication.py:322
 msgid "group"
 msgstr ""
 
@@ -23349,7 +23408,7 @@ msgstr ""
 msgid "group, type key, label, description, priority…"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1170
+#: app/templates/forms/form_builder/form_builder.html:1185
 msgid "has"
 msgstr ""
 
@@ -23358,11 +23417,11 @@ msgstr ""
 msgid "imputed"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:477
+#: app/templates/admin/translations/manage_translations.html:513
 msgid "in Arabic could be"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:915
+#: app/templates/admin/communication/center.html:911
 msgid "in_progress"
 msgstr ""
 
@@ -23414,7 +23473,7 @@ msgstr ""
 msgid "last 100"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1506
+#: app/templates/admin/settings/manage_settings.html:1521
 msgid "left unchanged"
 msgstr ""
 
@@ -23442,7 +23501,7 @@ msgstr ""
 msgid "matches"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1172
+#: app/templates/forms/form_builder/form_builder.html:1187
 msgid "may have associated data."
 msgstr ""
 
@@ -23481,8 +23540,8 @@ msgstr ""
 msgid "ms"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1062
-#: app/routes/admin/utilities/translations.py:1178
+#: app/routes/admin/utilities/translations.py:1073
+#: app/routes/admin/utilities/translations.py:1233
 msgid "msgid is required"
 msgstr ""
 
@@ -23527,7 +23586,7 @@ msgstr ""
 msgid "optional"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:477
+#: app/templates/admin/translations/manage_translations.html:513
 msgid "or"
 msgstr ""
 
@@ -23594,15 +23653,15 @@ msgid ""
 "and important limits."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:368
+#: app/routes/admin/utilities/translations.py:379
 msgid "polib is not installed; export is unavailable."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:619
+#: app/routes/admin/utilities/translations.py:630
 msgid "polib is not installed; import is unavailable."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:635
+#: app/templates/admin/translations/manage_translations.html:673
 msgid "proper noun or technical term, no translation available"
 msgstr ""
 
@@ -23618,7 +23677,7 @@ msgstr ""
 msgid "recent failures"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1208
+#: app/templates/admin/communication/center.html:1204
 msgid "recipients"
 msgstr ""
 
@@ -23643,7 +23702,7 @@ msgstr ""
 msgid "req / min"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:927
+#: app/templates/admin/communication/center.html:923
 msgid "requires_revision"
 msgstr ""
 
@@ -23656,8 +23715,8 @@ msgstr ""
 msgid "rounds"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:80
-#: app/templates/admin/communication/center.html:1382
+#: app/templates/admin/communication/center.html:76
+#: app/templates/admin/communication/center.html:1380
 msgid "row(s) selected"
 msgstr ""
 
@@ -23674,7 +23733,7 @@ msgstr ""
 msgid "running"
 msgstr ""
 
-#: app/templates/forms/form_builder/form_builder.html:1171
+#: app/templates/forms/form_builder/form_builder.html:1186
 msgid "saved data entries."
 msgstr ""
 
@@ -23725,7 +23784,7 @@ msgstr ""
 #: app/templates/admin/ai/reasoning_traces.html:147
 #: app/templates/admin/ai/reasoning_traces.html:665
 #: app/templates/admin/ai/reasoning_traces.html:669
-#: app/templates/admin/communication/center.html:1126
+#: app/templates/admin/communication/center.html:1122
 #: app/templates/notifications/center.html:161
 msgid "selected"
 msgstr ""
@@ -23738,7 +23797,7 @@ msgstr ""
 msgid "sessions in period"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1365
+#: app/templates/admin/settings/manage_settings.html:1380
 msgid "settings"
 msgstr ""
 
@@ -23809,7 +23868,7 @@ msgid "templates"
 msgstr ""
 
 #: app/templates/admin/organization/index.html:2590
-#: app/templates/admin/translations/manage_translations.html:638
+#: app/templates/admin/translations/manage_translations.html:676
 #: app/templates/components/ag_grid_i18n_js.html:64
 #: app/templates/components/auto_translate_modal_js.html:50
 #: app/templates/components/pagination.html:57
@@ -23852,15 +23911,15 @@ msgstr ""
 msgid "traces for review."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:520
+#: app/templates/admin/translations/manage_translations.html:556
 msgid "translation fields"
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:662
+#: app/templates/admin/translations/manage_translations.html:705
 msgid "translation fields."
 msgstr ""
 
-#: app/templates/admin/translations/manage_translations.html:634
+#: app/templates/admin/translations/manage_translations.html:672
 msgid "translation for"
 msgstr ""
 
@@ -23892,7 +23951,7 @@ msgstr ""
 msgid "update"
 msgstr ""
 
-#: app/templates/admin/settings/manage_settings.html:1505
+#: app/templates/admin/settings/manage_settings.html:1520
 msgid "updated from defaults"
 msgstr ""
 
@@ -23900,11 +23959,11 @@ msgstr ""
 msgid "use filter input above to narrow down"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:172
+#: app/templates/admin/communication/center.html:168
 msgid "users"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:1086
+#: app/templates/admin/communication/center.html:1082
 msgid "users match filters"
 msgstr ""
 
@@ -23954,7 +24013,7 @@ msgstr ""
 msgid "— Default from methodology —"
 msgstr ""
 
-#: app/templates/admin/communication/center.html:734
+#: app/templates/admin/communication/center.html:730
 msgid "— No auto-generated PDF —"
 msgstr ""
 
@@ -25197,4 +25256,26 @@ msgstr ""
 
 # [Removed] was: app/templates/admin/communication/center.html:640
 #~ msgid "e.g., https://example.com or /forms/assignment/123"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/communication/center.html:57
+#~ msgid "All communications"
+#~ msgstr ""
+
+# [Removed] was: app/routes/admin/utilities/translations.py:1183
+#~ msgid "Translation tools are not available (polib missing)."
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/communication/center.html:59
+#~ msgid ""
+#~ "View all in-app notifications and linked email delivery status. Email "
+#~ "columns reflect notification-triggered delivery, not every system email. "
+#~ "Failed emails are not retried automatically — retry or dismiss them from the"
+#~ " grid."
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/communication/center.html:103
+#~ msgid ""
+#~ "View all in-app notifications and linked email delivery status. Use column "
+#~ "filters to search and narrow the list."
 #~ msgstr ""

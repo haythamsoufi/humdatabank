@@ -18,7 +18,6 @@ Some endpoints are intentionally public (or protected by non-standard controls).
 |---|---|---|---|
 | `/admin/documents/serve/<int:doc_id>` | `content_management.serve_document_file` | `app/routes/admin/content_management.py` | Public rendering of approved public cover images; route also enforces `document_type == "Cover Image"` and `is_public`. |
 | `/admin/sectors/<int:sector_id>/logo` | `system_admin.sector_logo` | `app/routes/admin/system_admin.py` | Public logo asset delivery for sector logos. |
-| `/admin/subsectors/<int:subsector_id>/logo` | `system_admin.subsector_logo` | `app/routes/admin/system_admin.py` | Public logo asset delivery for subsector logos. |
 | `/admin/organization/api/public/branches/<int:country_id>` | `organization.api_get_branches_by_country_public` | `app/routes/admin/organization.py` | Public dynamic selector data for branches. |
 | `/admin/organization/api/public/subbranches/<int:branch_id>` | `organization.api_get_subbranches_by_branch_public` | `app/routes/admin/organization.py` | Public dynamic selector data for sub-branches. |
 | `/admin/organization/api/public/subbranches/by-country/<int:country_id>` | `organization.api_get_subbranches_by_country_public` | `app/routes/admin/organization.py` | Public dynamic selector data for sub-branches by country. |

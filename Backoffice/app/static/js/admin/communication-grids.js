@@ -413,6 +413,7 @@ class CommunicationsGridManager {
                     maxWidth: 160,
                     filter: 'customSetFilter',
                     sortable: true,
+                    hide: true,
                     cellRenderer: (params) => this.renderEmailStatus(params)
                 },
                 {
@@ -423,6 +424,18 @@ class CommunicationsGridManager {
                     maxWidth: 360,
                     filter: 'agTextColumnFilter',
                     sortable: true,
+                    cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
+                },
+                {
+                    field: 'email_content',
+                    headerName: t.emailContent || 'Email Content',
+                    width: 320,
+                    minWidth: 200,
+                    maxWidth: 600,
+                    filter: 'agTextColumnFilter',
+                    sortable: true,
+                    hide: true,
+                    cellRenderer: (params) => this.renderEmailContent(params),
                     cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
                 },
                 {
@@ -480,6 +493,24 @@ class CommunicationsGridManager {
         else if (status === 'failed') badgeClass = 'bg-red-100 text-red-800';
         else if (status === 'cancelled') badgeClass = 'bg-gray-100 text-gray-600';
         return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${badgeClass}">${label}</span>`;
+    }
+
+    renderEmailContent(params) {
+        const t = this.translations;
+        const d = params.data || {};
+        if (!d.has_email) {
+            return `<span class="text-xs text-gray-400">${t.notApplicable || 'N/A'}</span>`;
+        }
+        const raw = (d.email_content || '').trim();
+        if (!raw) {
+            return `<span class="text-xs text-gray-400">${t.notApplicable || 'N/A'}</span>`;
+        }
+        const esc = (s) => String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        return `<span class="text-sm text-gray-700 whitespace-pre-wrap break-words">${esc(raw)}</span>`;
     }
 
     /**

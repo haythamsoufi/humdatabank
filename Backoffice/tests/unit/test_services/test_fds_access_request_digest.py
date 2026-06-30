@@ -7,13 +7,11 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from app.models import CountryAccessRequest, EmailDeliveryLog, Notification
-from app.models.enums import NotificationType
+from app.models import CountryAccessRequest, EmailDeliveryLog
 from app.services.country_access_request_service import (
     FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX,
     pending_country_access_requests_by_fds_member,
 )
-from app.services.email.delivery import SKIP_ERROR_PREFIX, email_delivery_log_is_skipped
 from app.services.email.fds_access_request_digest import (
     run_fds_access_request_digest_job,
     send_fds_access_request_digest_email,
@@ -199,6 +197,7 @@ class TestSendFdsAccessRequestDigests:
             mock_send.assert_called_once()
             assert mock_send.call_args.kwargs["recipients"] == [admin_user.email]
             assert mock_send.call_args.kwargs["cc"] == ["team@ifrc.org"]
+            assert mock_send.call_args.kwargs.get("expose_recipients_in_to") is True
 
     def test_send_digest_email_skips_cc_when_team_is_recipient(self, db_session, app):
         with app.app_context():
@@ -260,18 +259,7 @@ class TestRunFdsAccessRequestDigestJob:
             assert result.geneva_hour == 8
             assert result.configured_hour == 9
 
-    def _fds_digest_notification_for(self, user_id):
-        for notification in (
-            Notification.query.filter_by(user_id=user_id)
-            .order_by(Notification.created_at.desc())
-            .all()
-        ):
-            tags = notification.tags or []
-            if "fds-access-request-digest" in tags:
-                return notification
-        return None
-
-    def test_records_comms_when_no_pending_requests(self, db_session, app):
+    def test_no_system_manager_comms_when_no_pending_requests(self, db_session, app):
         with app.app_context():
             sm = create_test_user(db_session, email="sm-digest@example.com", role="system_manager")
 
@@ -286,17 +274,9 @@ class TestRunFdsAccessRequestDigestJob:
 
             assert result.ran is True
             assert result.skip_reason == "No pending country access requests"
+            assert EmailDeliveryLog.query.filter_by(user_id=sm.id).count() == 0
 
-            notification = self._fds_digest_notification_for(sm.id)
-            assert notification is not None
-            assert notification.notification_type == NotificationType.email_digest
-
-            log = EmailDeliveryLog.query.filter_by(notification_id=notification.id).first()
-            assert log is not None
-            assert email_delivery_log_is_skipped(log)
-            assert SKIP_ERROR_PREFIX in (log.error_message or "")
-
-    def test_creates_comms_notification_on_successful_send(self, db_session, app, admin_user):
+    def test_creates_email_log_without_notification_on_successful_send(self, db_session, app, admin_user):
         with app.app_context():
             country = create_test_country(db_session, iso3="COM", iso2="CM")
             country.fds_member_user_id = admin_user.id
@@ -313,23 +293,17 @@ class TestRunFdsAccessRequestDigestJob:
             ), patch(
                 "app.services.email.fds_access_request_digest.send_email",
                 return_value=True,
-            ), patch(
-                "app.services.email.fds_access_request_digest.get_system_manager_user_ids",
-                return_value=[],
             ):
                 result = run_fds_access_request_digest_job()
 
             assert result.sent_count == 1
 
-            notification = self._fds_digest_notification_for(admin_user.id)
-            assert notification is not None
-
-            log = EmailDeliveryLog.query.filter_by(
-                notification_id=notification.id,
-                user_id=admin_user.id,
+            log = EmailDeliveryLog.query.filter_by(user_id=admin_user.id).order_by(
+                EmailDeliveryLog.created_at.desc()
             ).first()
             assert log is not None
             assert log.status == "sent"
+            assert log.notification_id is None
 
 
 class TestFdsDigestLastSentSummary:
@@ -409,10 +383,7 @@ class TestManualFdsDigestRun:
             ), patch(
                 "app.services.email.fds_access_request_digest.send_fds_access_request_digest_email",
                 return_value=True,
-            ) as mock_send, patch(
-                "app.services.email.fds_access_request_digest.get_system_manager_user_ids",
-                return_value=[],
-            ):
+            ) as mock_send:
                 result = run_fds_access_request_digest_job(manual=True)
 
             assert result.ran is True

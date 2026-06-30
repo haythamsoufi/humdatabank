@@ -1104,6 +1104,72 @@ class TestBuildEmailDeliveryFieldsMap:
         assert row['email_status'] == 'failed'
         assert row['email_can_retry'] is True
 
+    def test_email_content_populated_when_notifications_passed(self, app, db_session):
+        from app.models import User, Notification, NotificationType, EmailDeliveryLog
+        from app import db
+
+        with app.app_context():
+            user = User(email='email_content@test.com', name='Email Content', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+
+            notification = Notification(
+                user_id=user.id,
+                notification_type=NotificationType.admin_message,
+                title='Alert title',
+                message='<p>Hello <b>team</b></p>',
+            )
+            db.session.add(notification)
+            db.session.flush()
+
+            log = EmailDeliveryLog(
+                notification_id=notification.id,
+                user_id=user.id,
+                email_address=user.email,
+                subject='Alert title',
+                status='sent',
+            )
+            db.session.add(log)
+            db.session.commit()
+
+            result = NotificationService.build_email_delivery_fields_map(
+                [notification.id],
+                notifications=[notification],
+            )
+
+        row = result[notification.id]
+        assert row['has_email'] is True
+        assert row['email_content'] == 'Hello team'
+
+    def test_email_content_empty_without_email_log(self, app, db_session):
+        from app.models import User, Notification, NotificationType
+        from app import db
+
+        with app.app_context():
+            user = User(email='no_email_content@test.com', name='No Email', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+
+            notification = Notification(
+                user_id=user.id,
+                notification_type=NotificationType.assignment_created,
+                title='In-app',
+                message='No email sent',
+            )
+            db.session.add(notification)
+            db.session.commit()
+
+            result = NotificationService.build_email_delivery_fields_map(
+                [notification.id],
+                notifications=[notification],
+            )
+
+        row = result[notification.id]
+        assert row['has_email'] is False
+        assert row['email_content'] == ''
+
 
 class TestModuleConstants:
     def test_message_primary_notification_types_is_frozenset(self):

@@ -4,6 +4,8 @@ Email Notification Service
 Background tasks for sending notification digests via email.
 """
 
+import html as html_lib
+import re
 import threading
 from datetime import datetime, timedelta
 from typing import Optional
@@ -216,6 +218,46 @@ def sanitize_for_email(text: str) -> str:
         return ''
     # Explicitly escape HTML (MarkupSafe.escape handles this)
     return escape(str(text))
+
+
+_DIGEST_SUBJECT_PREFIXES = (
+    'Daily Notification Digest',
+    'Weekly Notification Digest',
+)
+
+
+def html_to_plain_text(value: Optional[str]) -> str:
+    """Convert HTML or escaped HTML to readable plain text for admin grids."""
+    text = str(value or '')
+    if not text:
+        return ''
+
+    text = re.sub(r'<\s*br\s*/?\s*>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</\s*(p|div|li|tr|h[1-6])\s*>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<[^>]+>', ' ', text)
+    text = html_lib.unescape(text)
+    text = text.replace('\xa0', ' ')
+    text = re.sub(r'[ \t\f\v]+', ' ', text)
+    text = re.sub(r'\n[ \t]+', '\n', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
+def derive_email_content_plain(subject: Optional[str], message: Optional[str]) -> str:
+    """
+    Best-effort plain-text preview of email body for admin Communication Center.
+
+    Email HTML is not persisted on EmailDeliveryLog; digest subjects are shown as-is.
+    """
+    subject_text = (subject or '').strip()
+    for prefix in _DIGEST_SUBJECT_PREFIXES:
+        if subject_text.startswith(prefix):
+            return subject_text
+
+    plain = html_to_plain_text(message)
+    if plain:
+        return plain
+    return subject_text
 
 
 def _parse_time_string(time_str: str) -> Optional[tuple[int, int]]:

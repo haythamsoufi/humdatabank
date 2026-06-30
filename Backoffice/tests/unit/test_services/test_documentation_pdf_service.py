@@ -79,6 +79,8 @@ def test_pdf_css_includes_tajawal_and_rtl_rules(app):
     assert 'html[dir="rtl"]' in rtl_css
     assert "direction: ltr" in rtl_css
     assert "unicode-bidi" not in rtl_css
+    assert ".docs-prose h2 a" in rtl_css
+    assert "text-decoration: none" in rtl_css
 
     ltr_css = _pdf_css({"is_rtl": False, "page_label": "Page"})
     assert "Tajawal" not in ltr_css

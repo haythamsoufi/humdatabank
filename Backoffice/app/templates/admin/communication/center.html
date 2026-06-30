@@ -50,31 +50,27 @@
     {% endcall %}
 
     <div class="p-6">
+        <div id="failed-email-notice"
+             class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3{% if not (failed_email_delivery_count and failed_email_delivery_count > 0) %} hidden{% endif %}"
+             role="alert"
+             aria-live="polite">
+            <div class="text-sm text-red-900">
+                <i class="fas fa-exclamation-circle mr-2" aria-hidden="true"></i>
+                <span id="failed-email-notice-message">{{ _('%(count)s email delivery failure(s) need attention.', count=failed_email_delivery_count or 0) }}</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button type="button" id="retry-all-failed-emails" class="btn btn-secondary btn-sm whitespace-nowrap">
+                    <i class="fas fa-redo mr-2"></i>{{ _('Retry all failed emails') }}
+                </button>
+                <button type="button" id="dismiss-all-failed-emails" class="btn btn-secondary btn-sm whitespace-nowrap">
+                    <i class="fas fa-times mr-2"></i>{{ _('Dismiss all failed emails') }}
+                </button>
+            </div>
+        </div>
+
         <!-- Tab Content: View All — shell is .admin-communication-center-container -->
         <div id="panel-view-all" class="communication-center-panel relative">
             {% if notifications %}
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('All communications') }}</label>
-                    <p class="text-xs text-gray-500">
-                        {{ _('View all in-app notifications and linked email delivery status. Email columns reflect notification-triggered delivery, not every system email. Failed emails are not retried automatically — retry or dismiss them from the grid.') }}
-                    </p>
-                </div>
-                {% if failed_email_delivery_count and failed_email_delivery_count > 0 %}
-                <div id="failed-email-notice" class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div class="text-sm text-red-900">
-                        <i class="fas fa-exclamation-circle mr-2"></i>
-                        {{ _('%(count)s email delivery failure(s) need attention.', count=failed_email_delivery_count) }}
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" id="retry-all-failed-emails" class="btn btn-secondary btn-sm whitespace-nowrap">
-                            <i class="fas fa-redo mr-2"></i>{{ _('Retry all failed emails') }}
-                        </button>
-                        <button type="button" id="dismiss-all-failed-emails" class="btn btn-secondary btn-sm whitespace-nowrap">
-                            <i class="fas fa-times mr-2"></i>{{ _('Dismiss all failed emails') }}
-                        </button>
-                    </div>
-                </div>
-                {% endif %}
                 <div id="grid-email-selection-toolbar" class="hidden mb-3 p-3 bg-gray-50 border border-gray-200 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div class="text-sm text-gray-700">
                         <span id="grid-email-selection-count">0</span> {{ _('row(s) selected') }}
@@ -91,18 +87,18 @@
                         </button>
                     </div>
                 </div>
-                <div class="flex justify-end items-center mb-4">
-                    <div id="column-visibility-button-placeholder" class="flex-shrink-0"></div>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 mb-4">
+                    <div class="min-w-0 flex-1 flex items-baseline gap-2 flex-wrap" data-ag-grid-title-group>
+                        <h3 class="text-sm font-medium text-gray-900 m-0">{{ _('In-app notifications and linked email delivery') }}</h3>
+                    </div>
+                    <div class="flex flex-shrink-0 justify-end">
+                        <div id="column-visibility-button-placeholder" class="flex-shrink-0"></div>
+                    </div>
                 </div>
                 {{ ag_grid_loading('notifications', loading_text=_('Loading notifications...')) }}
                 <div id="notificationsGrid" class="ag-theme-alpine" style="width: 100%; height: 600px;"></div>
             {% else %}
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('All communications') }}</label>
-                    <p class="text-xs text-gray-500 mb-4">
-                        {{ _('View all in-app notifications and linked email delivery status. Use column filters to search and narrow the list.') }}
-                    </p>
-                </div>
+                <h3 class="text-sm font-medium text-gray-900 m-0 mb-4">{{ _('In-app notifications and linked email delivery') }}</h3>
                 <p class="text-sm text-gray-700">{{ _('No communications found.') }}</p>
             {% endif %}
         </div>
@@ -1369,9 +1365,11 @@
         'emailGroup': {{ _('Email')|tojson }},
         'emailStatus': {{ _('Email Status')|tojson }},
         'emailSubject': {{ _('Email Subject')|tojson }},
+        'emailContent': {{ _('Email Content')|tojson }},
         'emailSentAt': {{ _('Email Sent At')|tojson }},
         'emailError': {{ _('Email Error')|tojson }},
         'notApplicable': {{ _('N/A')|tojson }},
+        'failedEmailNotice': {{ _('__COUNT__ email delivery failure(s) need attention.')|tojson }},
         'retryEmail': {{ _('Retry email')|tojson }},
         'cancelEmail': {{ _('Dismiss email failure')|tojson }},
         'retryAllFailed': {{ _('Retry all failed emails')|tojson }},
@@ -1417,6 +1415,7 @@
     window.campaignsData = {{ campaigns|tojson|safe }};
 
     window.communicationPageConfig = {
+        failedEmailDeliveryCount: {{ (failed_email_delivery_count or 0)|tojson }},
         campaignEmailTemplates: {{ campaign_email_templates|tojson|safe }},
         urls: {
             campaignEmailComposePreview: {{ url_for('admin_communication.api_campaign_email_compose_preview')|tojson }},

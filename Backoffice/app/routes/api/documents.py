@@ -171,20 +171,6 @@ def serve_sector_logo(filename):
         abort(404)
 
 
-@api_bp.route('/uploads/subsectors/<path:filename>', methods=['GET'])
-def serve_subsector_logo(filename):
-    """Serve subsector logo files."""
-    try:
-        safe_name = os.path.basename(filename)
-        return storage.stream_response(
-            storage.SYSTEM, f"subsectors/{safe_name}",
-            filename=safe_name, as_attachment=False,
-        )
-    except Exception as e:
-        current_app.logger.error(f"Error serving subsector logo {filename}: {str(e)}")
-        abort(404)
-
-
 @api_bp.route('/uploads/branding/<path:filename>', methods=['GET'])
 def serve_branding_asset(filename):
     """Serve organization logo/favicon uploaded from System Configuration (branding tab)."""

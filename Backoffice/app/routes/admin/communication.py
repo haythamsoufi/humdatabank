@@ -119,7 +119,9 @@ def communication_center():
         notifications, assignment_status_cache
     )
     email_fields_by_id = NotificationService.build_email_delivery_fields_map(
-        [n.id for n in notifications]
+        [n.id for n in notifications],
+        notifications=notifications,
+        actor_fields_by_id=actor_fields_by_id,
     )
 
     # Format notifications for template
@@ -787,7 +789,9 @@ def api_get_all_notifications():
             notifications, assignment_status_cache
         )
         email_fields_by_id = NotificationService.build_email_delivery_fields_map(
-            [n.id for n in notifications]
+            [n.id for n in notifications],
+            notifications=notifications,
+            actor_fields_by_id=actor_fields_by_id,
         )
 
         # Format notifications

@@ -34,7 +34,20 @@ def register_commands(app):
     from app.cli_commands.ai_regression import ai_regression_cli
     app.cli.add_command(ai_regression_cli)
 
-    @app.cli.command('sync-indicator-embeddings')
+    @app.cli.command('sync-sector-logos-cdn')
+    @with_appcontext
+    def sync_sector_logos_cdn():
+        """Mirror existing sector logos to the public static CDN container."""
+        from app.services import storage_service as storage
+
+        if not storage.public_cdn_enabled():
+            click.echo(
+                'Public CDN mirroring requires UPLOAD_STORAGE_PROVIDER=azure_blob and STATIC_CDN_URL.',
+                err=True,
+            )
+            raise SystemExit(1)
+        count = storage.sync_all_system_logos_to_cdn()
+        click.echo(f'Mirrored {count} sector logo(s) to the public CDN.')
     @click.option('--batch-size', type=int, default=100, help='Batch size for embedding API calls')
     @with_appcontext
     def sync_indicator_embeddings(batch_size):

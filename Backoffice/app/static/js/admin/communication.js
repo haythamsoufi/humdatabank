@@ -8,6 +8,50 @@ async function _anFetch(url, options = {}) {
     return fn(url, options);
 }
 
+function countFailedEmailsInNotificationsData(data) {
+    if (!Array.isArray(data)) {
+        return 0;
+    }
+    return data.filter((row) => {
+        if (!row || !row.has_email) {
+            return false;
+        }
+        const status = String(row.email_status || '').toLowerCase();
+        return status === 'failed' || row.email_can_retry === true;
+    }).length;
+}
+
+function formatFailedEmailNoticeMessage(count) {
+    const t = window.COMMUNICATION_TRANSLATIONS || {};
+    const template = t.failedEmailNotice || '__COUNT__ email delivery failure(s) need attention.';
+    return String(template).replace('__COUNT__', String(count));
+}
+
+function updateFailedEmailNotice(dataOverride) {
+    const notice = document.getElementById('failed-email-notice');
+    if (!notice) {
+        return;
+    }
+    const cfg = window.communicationPageConfig || {};
+    const serverCount = Number(cfg.failedEmailDeliveryCount) || 0;
+    const gridCount = countFailedEmailsInNotificationsData(
+        dataOverride !== undefined ? dataOverride : window.notificationsData
+    );
+    const count = Math.max(serverCount, gridCount);
+    const messageEl = document.getElementById('failed-email-notice-message');
+    if (messageEl) {
+        messageEl.textContent = formatFailedEmailNoticeMessage(count);
+    }
+    if (count > 0) {
+        notice.classList.remove('hidden');
+    } else {
+        notice.classList.add('hidden');
+    }
+}
+
+window.updateFailedEmailNotice = updateFailedEmailNotice;
+window.countFailedEmailsInNotificationsData = countFailedEmailsInNotificationsData;
+
 class AdminNotifications {
     constructor() {
         this.selectedUsers = new Map();
@@ -71,6 +115,7 @@ class AdminNotifications {
         // Ensure campaign edit fields are not "required" when hidden (prevents HTML5 validation errors)
         this.hideCampaignEditFields();
         this._initCampaignEmailComposeEditor();
+        updateFailedEmailNotice();
 
         // Tab strip: _initNotificationsCenterTabs() wires #communication-center-tabs (AdminUnderlineTabs, same as manage_settings)
 
@@ -4790,8 +4835,10 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         adminNotifications = new AdminNotifications();
         window.adminNotifications = adminNotifications;
+        updateFailedEmailNotice();
     });
 } else {
     adminNotifications = new AdminNotifications();
     window.adminNotifications = adminNotifications;
+    updateFailedEmailNotice();
 }

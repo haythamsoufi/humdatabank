@@ -34,6 +34,7 @@ from app.utils.mobile_responses import (
 )
 from app.utils.transactions import request_transaction_rollback
 from app.utils.sql_utils import safe_ilike_pattern
+from app.utils.sector_logo_urls import sector_logo_url
 from app.routes.api.mobile import mobile_bp
 from app.utils.constants import APPEALS_TYPE_DEFAULT_IDS_STR, APPEALS_TYPE_DISPLAY_NAMES
 
@@ -105,11 +106,6 @@ def sectors_subsectors():
                 'name': subsector.name,
                 'description': subsector.description,
                 'display_order': subsector.display_order,
-                'logo_url': (
-                    f"{request.host_url.rstrip('/')}/api/v1/uploads/subsectors/{subsector.logo_filename}"
-                    if subsector.logo_filename
-                    else None
-                ),
                 'multilingual_names': multilingual_subsector_names,
                 'sector_id': subsector.sector_id,
             })
@@ -125,11 +121,7 @@ def sectors_subsectors():
             'name': sector.name,
             'description': sector.description,
             'display_order': sector.display_order,
-            'logo_url': (
-                f"{request.host_url.rstrip('/')}/api/v1/uploads/sectors/{sector.logo_filename}"
-                if sector.logo_filename
-                else None
-            ),
+            'logo_url': sector_logo_url(sector, external=True, via_api=True),
             'icon_class': sector.icon_class,
             'multilingual_names': multilingual_sector_names,
             'subsectors': subsectors_data,

@@ -510,3 +510,124 @@ def ai_aidoc_storage_path_for_submitted(
 def is_azure() -> bool:
     """Return ``True`` when the active provider is Azure Blob Storage."""
     return _provider() == "azure_blob"
+
+
+# ---------------------------------------------------------------------------
+# Public CDN mirror (static blob container) for sector logos
+# ---------------------------------------------------------------------------
+
+_PUBLIC_CDN_CACHE_CONTROL = "max-age=31536000, public, immutable"
+
+
+def static_blob_container_name() -> str:
+    """Resolve the public static blob container name from config or STATIC_CDN_URL."""
+    explicit = (current_app.config.get("STATIC_BLOB_CONTAINER") or "").strip()
+    if explicit:
+        return explicit
+    cdn = (current_app.config.get("STATIC_CDN_URL") or "").strip().rstrip("/")
+    if cdn:
+        from urllib.parse import urlparse
+
+        path = (urlparse(cdn).path or "").strip("/")
+        if path:
+            return path.split("/")[0]
+    return "static"
+
+
+def public_cdn_base_url() -> str:
+    """Return the configured public CDN origin for mirrored system logos."""
+    return (current_app.config.get("STATIC_CDN_URL") or "").strip().rstrip("/")
+
+
+def public_cdn_enabled() -> bool:
+    """True when sector logos should be served from the public static CDN."""
+    return bool(public_cdn_base_url()) and is_azure()
+
+
+def system_logo_cdn_blob_name(subdir: str, filename: str) -> str:
+    """Blob path under the static container for a sector logo."""
+    safe_subdir = _normalize_rel(subdir)
+    safe_name = _normalize_rel(filename).split("/")[-1]
+    return f"system/{safe_subdir}/{safe_name}"
+
+
+def _get_static_container_client():
+    conn = current_app.config.get("AZURE_STORAGE_CONNECTION_STRING")
+    container_name = static_blob_container_name()
+    if not conn:
+        raise RuntimeError(
+            "AZURE_STORAGE_CONNECTION_STRING must be set when mirroring logos to the static CDN"
+        )
+    try:
+        from azure.storage.blob import BlobServiceClient  # type: ignore
+
+        svc = BlobServiceClient.from_connection_string(conn)
+        return svc.get_container_client(container_name)
+    except Exception as e:
+        raise RuntimeError(f"Failed to initialise static CDN blob client: {e}") from e
+
+
+def publish_to_static_cdn(blob_name: str, data: bytes, mimetype: Optional[str] = None) -> None:
+    """Upload bytes to the public static blob container."""
+    from azure.storage.blob import ContentSettings  # type: ignore
+
+    container = _get_static_container_client()
+    container.upload_blob(
+        name=blob_name,
+        data=data,
+        overwrite=True,
+        content_settings=ContentSettings(
+            content_type=mimetype or _guess_mimetype(blob_name),
+            cache_control=_PUBLIC_CDN_CACHE_CONTROL,
+        ),
+    )
+    logger.debug("Published public CDN blob %s (%d bytes)", blob_name, len(data))
+
+
+def delete_from_static_cdn(blob_name: str) -> bool:
+    """Delete a blob from the public static container."""
+    try:
+        container = _get_static_container_client()
+        blob = container.get_blob_client(blob_name)
+        blob.delete_blob()
+        logger.debug("Deleted public CDN blob %s", blob_name)
+        return True
+    except Exception as e:
+        logger.debug("Public CDN blob delete failed for %s: %s", blob_name, e)
+        return False
+
+
+def publish_system_logo_to_cdn(subdir: str, filename: str) -> None:
+    """Mirror a sector logo from private uploads storage to the public CDN."""
+    if not public_cdn_enabled():
+        return
+    rel = f"{subdir}/{filename}"
+    if not exists(SYSTEM, rel):
+        return
+    data = download(SYSTEM, rel)
+    publish_to_static_cdn(
+        system_logo_cdn_blob_name(subdir, filename),
+        data,
+        _guess_mimetype(filename),
+    )
+
+
+def unpublish_system_logo_from_cdn(subdir: str, filename: str) -> None:
+    """Remove a mirrored sector logo from the public CDN."""
+    if not public_cdn_enabled():
+        return
+    delete_from_static_cdn(system_logo_cdn_blob_name(subdir, filename))
+
+
+def sync_all_system_logos_to_cdn() -> int:
+    """Backfill all sector logos to the public CDN. Returns count mirrored."""
+    if not public_cdn_enabled():
+        return 0
+    from app.models.indicator_bank import Sector
+
+    count = 0
+    for sector in Sector.query.filter(Sector.logo_filename.isnot(None)).all():
+        if sector.logo_filename:
+            publish_system_logo_to_cdn("sectors", sector.logo_filename)
+            count += 1
+    return count

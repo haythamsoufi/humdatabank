@@ -35,7 +35,6 @@ def _import():
         get_submissions_upload_path,
         get_system_upload_path,
         get_sector_logo_path,
-        get_subsector_logo_path,
         get_temp_upload_path,
         get_plugin_upload_path,
         normalize_stored_relative_path,
@@ -47,13 +46,12 @@ def _import():
         resolve_submission_file,
         resolve_submitted_document_file,
         resolve_sector_logo,
-        resolve_subsector_logo,
         resolve_temp_file,
         resolve_plugin_file,
         ensure_dir,
         secure_join_filename,
         save_submission_document,
-        save_system_logo,
+        save_sector_logo,
     )
     return locals()
 
@@ -123,11 +121,6 @@ class TestPathGetters:
         from app.utils.file_paths import get_sector_logo_path
         result = get_sector_logo_path()
         assert "sectors" in result
-
-    def test_get_subsector_logo_path(self, app_ctx):
-        from app.utils.file_paths import get_subsector_logo_path
-        result = get_subsector_logo_path()
-        assert "subsectors" in result
 
     def test_get_temp_upload_path(self, app_ctx):
         from app.utils.file_paths import get_temp_upload_path
@@ -268,11 +261,6 @@ class TestConvenienceResolvers:
         from app.utils.file_paths import resolve_sector_logo
         result = resolve_sector_logo("logo.png")
         assert "sectors" in result
-
-    def test_resolve_subsector_logo(self, app_ctx):
-        from app.utils.file_paths import resolve_subsector_logo
-        result = resolve_subsector_logo("icon.png")
-        assert "subsectors" in result
 
     def test_resolve_temp_file(self, app_ctx):
         from app.utils.file_paths import resolve_temp_file
@@ -450,89 +438,76 @@ class TestSaveSubmissionDocument:
 
 
 # ---------------------------------------------------------------------------
-# save_system_logo
+# save_sector_logo
 # ---------------------------------------------------------------------------
 
-class TestSaveSystemLogo:
+class TestSaveSectorLogo:
     def _make_logo(self, data: bytes, filename: str = "logo.png") -> FileStorage:
         return FileStorage(stream=io.BytesIO(data), filename=filename, content_type="image/png")
 
     def test_no_file_returns_none(self, app_ctx):
-        from app.utils.file_paths import save_system_logo
-        assert save_system_logo(None, "MySector") is None
+        from app.utils.file_paths import save_sector_logo
+        assert save_sector_logo(None, "MySector") is None
 
     def test_empty_filename_returns_none(self, app_ctx):
-        from app.utils.file_paths import save_system_logo
+        from app.utils.file_paths import save_sector_logo
         f = FileStorage(stream=io.BytesIO(b""), filename="", content_type="image/png")
-        assert save_system_logo(f, "MySector") is None
+        assert save_sector_logo(f, "MySector") is None
 
     def test_invalid_extension_raises(self, app_ctx):
-        from app.utils.file_paths import save_system_logo
+        from app.utils.file_paths import save_sector_logo
         f = self._make_logo(b"data", "logo.txt")
         with pytest.raises(ValueError, match="not allowed"):
-            save_system_logo(f, "MySector")
+            save_sector_logo(f, "MySector")
 
     def test_file_too_large_raises(self, app_ctx):
-        from app.utils.file_paths import save_system_logo
+        from app.utils.file_paths import save_sector_logo
         large_data = b"x" * (6 * 1024 * 1024)  # 6 MB > 5 MB limit
         f = self._make_logo(large_data, "big.png")
         with pytest.raises(ValueError, match="too large"):
-            save_system_logo(f, "MySector")
+            save_sector_logo(f, "MySector")
 
     def test_valid_sector_logo(self, app_ctx):
-        from app.utils.file_paths import save_system_logo
+        from app.utils.file_paths import save_sector_logo
         f = self._make_logo(b"\x89PNG\r\n\x1a\n" + b"\x00" * 20, "logo.png")
         mock_ss = MagicMock()
         mock_ss.SYSTEM = "system"
         mock_ss.upload.return_value = "sectors/MySector.png"
         with patch("app.services.storage_service", mock_ss):
-            result = save_system_logo(f, "MySector", is_sector=True)
+            result = save_sector_logo(f, "MySector")
         assert result.endswith(".png")
         call_args = mock_ss.upload.call_args
         assert "sectors/" in call_args[0][1]
 
-    def test_valid_subsector_logo(self, app_ctx):
-        from app.utils.file_paths import save_system_logo
-        f = self._make_logo(b"\x89PNG\r\n\x1a\n" + b"\x00" * 20, "icon.jpg")
-        f.filename = "icon.jpg"
-        mock_ss = MagicMock()
-        mock_ss.SYSTEM = "system"
-        mock_ss.upload.return_value = "subsectors/MySubSector.jpg"
-        with patch("app.services.storage_service", mock_ss):
-            result = save_system_logo(f, "MySubSector", is_sector=False)
-        assert result is not None
-        call_args = mock_ss.upload.call_args
-        assert "subsectors/" in call_args[0][1]
-
     def test_webp_extension_allowed(self, app_ctx):
-        from app.utils.file_paths import save_system_logo
+        from app.utils.file_paths import save_sector_logo
         f = self._make_logo(b"RIFF" + b"\x00" * 20, "img.webp")
         f.filename = "img.webp"
         mock_ss = MagicMock()
         mock_ss.SYSTEM = "system"
         mock_ss.upload.return_value = "sectors/MySector.webp"
         with patch("app.services.storage_service", mock_ss):
-            result = save_system_logo(f, "MySector", is_sector=True)
+            result = save_sector_logo(f, "MySector")
         assert result.endswith(".webp")
 
     def test_gif_extension_allowed(self, app_ctx):
-        from app.utils.file_paths import save_system_logo
+        from app.utils.file_paths import save_sector_logo
         f = self._make_logo(b"GIF89a" + b"\x00" * 20, "anim.gif")
         f.filename = "anim.gif"
         mock_ss = MagicMock()
         mock_ss.SYSTEM = "system"
         mock_ss.upload.return_value = "sectors/MySector.gif"
         with patch("app.services.storage_service", mock_ss):
-            result = save_system_logo(f, "MySector")
+            result = save_sector_logo(f, "MySector")
         assert result.endswith(".gif")
 
     def test_jpeg_extension_allowed(self, app_ctx):
-        from app.utils.file_paths import save_system_logo
+        from app.utils.file_paths import save_sector_logo
         f = self._make_logo(b"\xff\xd8\xff" + b"\x00" * 20, "photo.jpeg")
         f.filename = "photo.jpeg"
         mock_ss = MagicMock()
         mock_ss.SYSTEM = "system"
         mock_ss.upload.return_value = "sectors/MySector.jpeg"
         with patch("app.services.storage_service", mock_ss):
-            result = save_system_logo(f, "MySector")
+            result = save_sector_logo(f, "MySector")
         assert result.endswith(".jpeg")

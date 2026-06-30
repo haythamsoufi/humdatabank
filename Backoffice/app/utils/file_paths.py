@@ -38,11 +38,6 @@ def get_sector_logo_path() -> str:
     return _abs(os.path.join(get_system_upload_path(), 'sectors'))
 
 
-def get_subsector_logo_path() -> str:
-    """Return absolute path for subsector logos."""
-    return _abs(os.path.join(get_system_upload_path(), 'subsectors'))
-
-
 def get_temp_upload_path() -> str:
     """Return absolute path for temporary files."""
     return _abs(os.path.join(get_upload_base_path(), 'temp'))
@@ -145,11 +140,6 @@ def resolve_sector_logo(filename: str) -> str:
     return resolve_under(get_sector_logo_path(), normalize_stored_relative_path(filename))
 
 
-def resolve_subsector_logo(filename: str) -> str:
-    """Resolve a subsector logo filename to absolute path."""
-    return resolve_under(get_subsector_logo_path(), normalize_stored_relative_path(filename))
-
-
 def resolve_temp_file(rel_path: str) -> str:
     """Resolve a relative path to a temporary file."""
     return resolve_under(get_temp_upload_path(), normalize_stored_relative_path(rel_path))
@@ -232,23 +222,11 @@ _ALLOWED_LOGO_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp'}
 _MAX_LOGO_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
-def save_system_logo(file_storage, item_name: str, is_sector: bool = True) -> str:
-    """Save a system logo (sector or subsector) and return the filename.
+def save_sector_logo(file_storage, item_name: str) -> str:
+    """Save a sector logo and return the filename.
 
-    Storage path is ``sectors/<filename>`` or ``subsectors/<filename>``; the basename is
-    the sanitized display name plus the uploaded file's extension. Sector and subsector
-    names are unique, and the two trees are separate, so no ``_sector`` suffix is needed.
-
-    Args:
-        file_storage: The file storage object from Flask request
-        item_name: The name of the item (for filename generation)
-        is_sector: True for sector, False for subsector
-
-    Returns:
-        The saved filename (relative to the logo directory)
-
-    Raises:
-        ValueError: If the file type is not allowed or file is too large.
+    Storage path is ``sectors/<filename>``; the basename is the sanitized display
+    name plus the uploaded file's extension.
     """
     from werkzeug.utils import secure_filename
 
@@ -272,10 +250,9 @@ def save_system_logo(file_storage, item_name: str, is_sector: bool = True) -> st
             f"Logo file is too large ({file_size // 1024}KB). Maximum size is {_MAX_LOGO_SIZE_BYTES // (1024*1024)}MB."
         )
 
-    # Deterministic name: edit flow deletes the previous file before a new upload.
     stored_filename = f"{secure_filename(item_name)}{ext}"
 
     from app.services import storage_service as _ss
-    sub = "sectors" if is_sector else "subsectors"
-    _ss.upload(_ss.SYSTEM, f"{sub}/{stored_filename}", file_storage)
+    _ss.upload(_ss.SYSTEM, f"sectors/{stored_filename}", file_storage)
+    _ss.publish_system_logo_to_cdn("sectors", stored_filename)
     return stored_filename

@@ -1,7 +1,4 @@
-from app.utils.file_paths import (
-    get_sector_logo_path, get_subsector_logo_path,
-    save_system_logo,
-)
+from app.utils.file_paths import save_sector_logo
 from app.services import storage_service as storage
 from flask import current_app
 from datetime import datetime
@@ -22,30 +19,22 @@ def _safe_logo_mimetype(filename: str) -> str:
     return _SAFE_LOGO_MIMETYPES.get(ext, 'application/octet-stream')
 
 
-def _save_logo_file(file_storage, base_path, item_name):
-    """Save a logo file using standardized path functions.
-
-    Note: This function is kept for backward compatibility but now uses
-    standardized path functions internally.
-    """
+def _save_logo_file(file_storage, item_name):
+    """Save a sector logo file."""
     try:
         if not file_storage or not file_storage.filename:
             return None
-
-        is_sector = 'sectors' in base_path or base_path == get_sector_logo_path()
-        return save_system_logo(file_storage, item_name, is_sector=is_sector)
-
+        return save_sector_logo(file_storage, item_name)
     except Exception as e:
         current_app.logger.exception("Error saving logo file: %s", e)
         return None
 
 
-def _delete_logo_file(base_path, filename):
-    """Delete a logo file"""
+def _delete_logo_file(filename):
+    """Delete a sector logo file."""
     try:
-        is_sector = 'sectors' in base_path or base_path == get_sector_logo_path()
-        sub = "sectors" if is_sector else "subsectors"
-        storage.delete(storage.SYSTEM, f"{sub}/{filename}")
+        storage.unpublish_system_logo_from_cdn("sectors", filename)
+        storage.delete(storage.SYSTEM, f"sectors/{filename}")
     except Exception as e:
         current_app.logger.exception("Error deleting logo file: %s", e)
 

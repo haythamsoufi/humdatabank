@@ -61,7 +61,7 @@ class TestSaveLogoFile:
     def test_no_file_returns_none(self, app):
         from app.routes.admin.system_admin.helpers import _save_logo_file
         with app.app_context():
-            result = _save_logo_file(None, "/path/to/sectors", "TestSector")
+            result = _save_logo_file(None, "TestSector")
             assert result is None
 
     def test_file_with_no_filename_returns_none(self, app):
@@ -69,47 +69,22 @@ class TestSaveLogoFile:
         mock_file = MagicMock()
         mock_file.filename = ""
         with app.app_context():
-            result = _save_logo_file(mock_file, "/path/to/sectors", "TestSector")
+            result = _save_logo_file(mock_file, "TestSector")
             assert result is None
 
-    def test_valid_file_calls_save_system_logo(self, app):
+    def test_valid_file_calls_save_sector_logo(self, app):
         from app.routes.admin.system_admin.helpers import _save_logo_file
         mock_file = MagicMock()
         mock_file.filename = "logo.png"
 
         with app.app_context():
             with patch(
-                "app.routes.admin.system_admin.helpers.save_system_logo",
+                "app.routes.admin.system_admin.helpers.save_sector_logo",
                 return_value="saved_logo.png",
-            ) as mock_save, patch(
-                "app.routes.admin.system_admin.helpers.get_sector_logo_path",
-                return_value="/sectors",
-            ):
-                result = _save_logo_file(mock_file, "/sectors", "TestSector")
+            ) as mock_save:
+                result = _save_logo_file(mock_file, "TestSector")
         assert result == "saved_logo.png"
-        mock_save.assert_called_once()
-
-    def test_subsector_path_detected(self, app):
-        from app.routes.admin.system_admin.helpers import _save_logo_file
-        mock_file = MagicMock()
-        mock_file.filename = "logo.png"
-
-        with app.app_context():
-            with patch(
-                "app.routes.admin.system_admin.helpers.save_system_logo",
-                return_value="sub_logo.png",
-            ) as mock_save, patch(
-                "app.routes.admin.system_admin.helpers.get_sector_logo_path",
-                return_value="/sectors",
-            ), patch(
-                "app.routes.admin.system_admin.helpers.get_subsector_logo_path",
-                return_value="/subsectors",
-            ):
-                result = _save_logo_file(mock_file, "/subsectors", "TestSubSector")
-        assert result == "sub_logo.png"
-        # is_sector=False for subsector path
-        _, kwargs = mock_save.call_args
-        assert kwargs.get("is_sector") is False
+        mock_save.assert_called_once_with(mock_file, "TestSector")
 
     def test_exception_returns_none(self, app):
         from app.routes.admin.system_admin.helpers import _save_logo_file
@@ -118,13 +93,10 @@ class TestSaveLogoFile:
 
         with app.app_context():
             with patch(
-                "app.routes.admin.system_admin.helpers.save_system_logo",
+                "app.routes.admin.system_admin.helpers.save_sector_logo",
                 side_effect=Exception("storage error"),
-            ), patch(
-                "app.routes.admin.system_admin.helpers.get_sector_logo_path",
-                return_value="/sectors",
             ):
-                result = _save_logo_file(mock_file, "/sectors", "BadSector")
+                result = _save_logo_file(mock_file, "BadSector")
         assert result is None
 
 
@@ -138,42 +110,26 @@ class TestDeleteLogoFile:
         with app.app_context():
             with patch(
                 "app.routes.admin.system_admin.helpers.storage",
-            ) as mock_storage, patch(
-                "app.routes.admin.system_admin.helpers.get_sector_logo_path",
-                return_value="/sectors",
-            ):
+            ) as mock_storage:
                 mock_storage.SYSTEM = "system"
-                _delete_logo_file("/sectors", "logo.png")
-                mock_storage.delete.assert_called_once_with("system", "sectors/logo.png")
-
-    def test_deletes_subsector_logo(self, app):
-        from app.routes.admin.system_admin.helpers import _delete_logo_file
-        with app.app_context():
-            with patch(
-                "app.routes.admin.system_admin.helpers.storage",
-            ) as mock_storage, patch(
-                "app.routes.admin.system_admin.helpers.get_sector_logo_path",
-                return_value="/sectors",
-            ):
-                mock_storage.SYSTEM = "system"
-                _delete_logo_file("/subsectors", "sublogo.png")
-                mock_storage.delete.assert_called_once_with(
-                    "system", "subsectors/sublogo.png"
+                mock_storage.unpublish_system_logo_from_cdn = MagicMock()
+                _delete_logo_file("logo.png")
+                mock_storage.unpublish_system_logo_from_cdn.assert_called_once_with(
+                    "sectors", "logo.png"
                 )
+                mock_storage.delete.assert_called_once_with("system", "sectors/logo.png")
 
     def test_exception_is_logged(self, app):
         from app.routes.admin.system_admin.helpers import _delete_logo_file
         with app.app_context():
             with patch(
                 "app.routes.admin.system_admin.helpers.storage",
-            ) as mock_storage, patch(
-                "app.routes.admin.system_admin.helpers.get_sector_logo_path",
-                return_value="/sectors",
-            ):
+            ) as mock_storage:
                 mock_storage.SYSTEM = "system"
+                mock_storage.unpublish_system_logo_from_cdn = MagicMock()
                 mock_storage.delete.side_effect = Exception("delete error")
                 # Should not raise
-                _delete_logo_file("/sectors", "logo.png")
+                _delete_logo_file("logo.png")
 
 
 # ---------------------------------------------------------------------------

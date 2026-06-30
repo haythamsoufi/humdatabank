@@ -55,6 +55,7 @@
                             <select id="preview-view-as"
                                     name="view_as"
                                     class="min-w-[320px] px-3 py-2 border border-blue-200 rounded-md bg-white text-sm select2-enable">
+                                <option value="" {% if not preview_selected_view_as %}selected{% endif %}>{{ _('Preview placeholders') }}</option>
                                 {% for opt in preview_view_as_options %}
                                     <option value="{{ opt.value }}" {% if opt.value == preview_selected_view_as %}selected{% endif %}>{{ opt.label }}</option>
                                 {% endfor %}
@@ -127,7 +128,11 @@
                         <div class="title-text-group">
                             <h1 class="main-title">{{ get_localized_template_name(assignment_status.assigned_form.template) if (assignment_status.assigned_form.template and get_localized_template_name) else (assignment_status.assigned_form.template.name if assignment_status.assigned_form.template else _('Template Missing')) }}</h1>
                             <p class="page-subtitle">
-                                {{ assignment_status.assigned_form.period_name }} -
+                                {% if is_preview_mode and not preview_selected_period_name %}
+                                    {{ _('Preview Period') }}
+                                {% else %}
+                                    {{ assignment_status.assigned_form.period_name }}
+                                {% endif %} -
                                 {% if assignment_status.entity_type and assignment_status.entity_type != 'country' %}
                                     {# Show entity hierarchy for non-country entities #}
                                     <span class="mr-2">{{ status_label(
@@ -3268,7 +3273,8 @@
                 or 'Template'
             ) | tojson }},
             "assignment_period": {{ (
-                (assignment_status.assigned_form.period_name if assignment_status and assignment_status.assigned_form and assignment_status.assigned_form.period_name else None)
+                (preview_selected_period_name if is_preview_mode and preview_selected_period_name is defined and preview_selected_period_name else None)
+                or (None if is_preview_mode else (assignment_status.assigned_form.period_name if assignment_status and assignment_status.assigned_form and assignment_status.assigned_form.period_name else None))
                 or ''
             ) | tojson }},
             "country_iso": {{ (

@@ -638,7 +638,6 @@ def _import_db_sectors_subsectors(wb, sheetnames, result):
                 if is_active is not None:
                     obj.is_active = is_active
                 obj.icon_class = icon_class
-                obj.logo_filename = logo_filename
                 obj.name_translations = name_translations
                 result["subsectors_imported" if is_new else "subsectors_updated"] += 1
         except Exception as e:

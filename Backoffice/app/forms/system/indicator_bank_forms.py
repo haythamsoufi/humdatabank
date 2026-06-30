@@ -317,12 +317,7 @@ class SubSectorForm(FileUploadForm, MultilingualFieldsMixin):
                                 render_kw={"placeholder": "Order for sorting (0 = first)"})
     is_active = BooleanField("Active", default=True)
 
-    logo_file = FileField(
-        "Logo Image (JPG, PNG, GIF, WEBP, SVG)",
-        validators=FileUploadForm.image_validators
-    )
-
-    icon_class = StringField("FontAwesome Icon Class (fallback)", validators=[Optional(), Length(max=50)],
+    icon_class = StringField("FontAwesome Icon Class", validators=[Optional(), Length(max=50)],
                             render_kw={"placeholder": "e.g., fas fa-stethoscope"})
 
     submit = SubmitField("Save Sub-Sector")

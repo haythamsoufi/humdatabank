@@ -9,6 +9,8 @@ import pytest
 
 from app.services.notification.emails import (
     sanitize_for_email,
+    html_to_plain_text,
+    derive_email_content_plain,
     _parse_time_string,
     _minutes_since,
     _should_trigger_daily_digest,
@@ -47,6 +49,38 @@ class TestSanitizeForEmail:
     def test_converts_non_string(self):
         result = sanitize_for_email(123)
         assert '123' in result
+
+
+# ---------------------------------------------------------------------------
+# html_to_plain_text / derive_email_content_plain
+# ---------------------------------------------------------------------------
+
+class TestHtmlToPlainText:
+    def test_empty_returns_empty(self):
+        assert html_to_plain_text('') == ''
+        assert html_to_plain_text(None) == ''
+
+    def test_strips_tags_and_unescapes(self):
+        result = html_to_plain_text('<p>Hello <strong>world</strong>&nbsp;!</p>')
+        assert result == 'Hello world !'
+
+    def test_br_and_block_tags_become_line_breaks(self):
+        result = html_to_plain_text('<p>Line one</p><p>Line two</p>')
+        assert 'Line one' in result
+        assert 'Line two' in result
+        assert '\n' in result
+
+
+class TestDeriveEmailContentPlain:
+    def test_digest_subject_returned_as_is(self):
+        subject = 'Daily Notification Digest - 3 new notification(s)'
+        assert derive_email_content_plain(subject, '') == subject
+
+    def test_message_html_converted(self):
+        assert derive_email_content_plain('Subject', '<p>Email body</p>') == 'Email body'
+
+    def test_falls_back_to_subject_when_message_empty(self):
+        assert derive_email_content_plain('Only subject', '') == 'Only subject'
 
 
 # ---------------------------------------------------------------------------

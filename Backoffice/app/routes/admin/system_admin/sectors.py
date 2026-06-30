@@ -17,7 +17,7 @@ from app.utils.api_responses import (
 )
 from app.utils.request_utils import is_json_request
 from sqlalchemy.orm.attributes import flag_modified
-from app.utils.file_paths import get_sector_logo_path, get_subsector_logo_path
+from app.utils.sector_logo_urls import sector_logo_url
 from app.services import storage_service as storage
 from app.routes.admin.system_admin import bp
 from app.routes.admin.system_admin.helpers import (
@@ -57,7 +57,6 @@ def new_sector():
             if form.logo_file.data:
                 logo_filename = _save_logo_file(
                     form.logo_file.data,
-                    get_sector_logo_path(),
                     form.name.data,
                 )
                 if logo_filename:
@@ -128,11 +127,10 @@ def edit_sector(sector_id):
 
             if form.logo_file.data:
                 if sector.logo_filename:
-                    _delete_logo_file(get_sector_logo_path(), sector.logo_filename)
+                    _delete_logo_file(sector.logo_filename)
 
                 logo_filename = _save_logo_file(
                     form.logo_file.data,
-                    get_sector_logo_path(),
                     sector.name,
                 )
                 if logo_filename:
@@ -172,6 +170,7 @@ def get_sector(sector_id):
         display_order=sector.display_order or 0,
         icon_class=sector.icon_class or '',
         logo_filename=sector.logo_filename or '',
+        logo_url=sector_logo_url(sector) or '',
         is_active=sector.is_active,
         name_translations=sector.name_translations or {},
         indicator_count=indicator_count,
@@ -206,7 +205,7 @@ def delete_sector(sector_id):
                 flag_modified(indicator, "sector")
 
         if sector.logo_filename:
-            _delete_logo_file(get_sector_logo_path(), sector.logo_filename)
+            _delete_logo_file(sector.logo_filename)
 
         db.session.delete(sector)
         db.session.flush()
@@ -236,15 +235,6 @@ def new_subsector():
                 field = getattr(form, f"name_{lang}", None)
                 if field is not None:
                     new_subsector.set_name_translation(lang, field.data or "")
-
-            if form.logo_file.data:
-                logo_filename = _save_logo_file(
-                    form.logo_file.data,
-                    get_subsector_logo_path(),
-                    form.name.data,
-                )
-                if logo_filename:
-                    new_subsector.logo_filename = logo_filename
 
             db.session.add(new_subsector)
             db.session.flush()
@@ -309,18 +299,6 @@ def edit_subsector(subsector_id):
                     subsector.set_name_translation(lang, field.data or "")
             subsector.sector_id = form.sector_id.data
 
-            if form.logo_file.data:
-                if subsector.logo_filename:
-                    _delete_logo_file(get_subsector_logo_path(), subsector.logo_filename)
-
-                logo_filename = _save_logo_file(
-                    form.logo_file.data,
-                    get_subsector_logo_path(),
-                    subsector.name,
-                )
-                if logo_filename:
-                    subsector.logo_filename = logo_filename
-
             db.session.flush()
             flash(f"Sub-sector '{subsector.name}' updated successfully.", "success")
 
@@ -355,7 +333,6 @@ def get_subsector(subsector_id):
         sector_id=subsector.sector_id,
         display_order=subsector.display_order or 0,
         icon_class=subsector.icon_class or '',
-        logo_filename=subsector.logo_filename or '',
         is_active=subsector.is_active,
         name_translations=subsector.name_translations or {},
         indicator_count=indicator_count,
@@ -384,9 +361,6 @@ def delete_subsector(subsector_id):
                 indicator.sub_sector = updated
                 flag_modified(indicator, "sub_sector")
 
-        if subsector.logo_filename:
-            _delete_logo_file(get_subsector_logo_path(), subsector.logo_filename)
-
         db.session.delete(subsector)
         db.session.flush()
         flash(f"Sub-sector '{subsector.name}' deleted successfully.", "success")
@@ -399,7 +373,7 @@ def delete_subsector(subsector_id):
     return redirect(url_for("system_admin.manage_sectors_subsectors"))
 
 
-# === Static file serving for sector/subsector logos ===
+# === Static file serving for sector logos ===
 
 @bp.route("/sectors/<int:sector_id>/logo", methods=["GET"])
 @rbac_guard_audit_exempt("Intentionally public to allow logo rendering without admin session.")
@@ -414,21 +388,6 @@ def sector_logo(sector_id):
         storage.SYSTEM, rel_path,
         filename=sector.logo_filename, as_attachment=False,
         mimetype=_safe_logo_mimetype(sector.logo_filename),
-    )
-
-@bp.route("/subsectors/<int:subsector_id>/logo", methods=["GET"])
-@rbac_guard_audit_exempt("Intentionally public to allow logo rendering without admin session.")
-def subsector_logo(subsector_id):
-    subsector = SubSector.query.get_or_404(subsector_id)
-    if not subsector.logo_filename:
-        return ("", 404)
-    rel_path = f"subsectors/{subsector.logo_filename}"
-    if not storage.exists(storage.SYSTEM, rel_path):
-        return ("", 404)
-    return storage.stream_response(
-        storage.SYSTEM, rel_path,
-        filename=subsector.logo_filename, as_attachment=False,
-        mimetype=_safe_logo_mimetype(subsector.logo_filename),
     )
 
 

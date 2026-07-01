@@ -9,6 +9,15 @@ import threading
 import pytest
 from unittest.mock import MagicMock, patch, call
 
+from app.scheduler_lock import SchedulerLockResult
+
+
+def _patch_scheduler_lock_acquired():
+    return patch(
+        'app.scheduler.try_acquire_scheduler_lock',
+        return_value=SchedulerLockResult.ACQUIRED,
+    )
+
 
 # ===========================================================================
 # _graceful_shutdown
@@ -67,6 +76,16 @@ class TestGracefulShutdown:
 
         # Should not raise
         fn(mock_scheduler, mock_app)
+
+    def test_releases_scheduler_lock(self):
+        fn = self._import()
+        mock_scheduler = MagicMock()
+        mock_scheduler.running = False
+        mock_app = MagicMock()
+
+        with patch("app.scheduler.release_scheduler_lock") as mock_release:
+            fn(mock_scheduler, mock_app)
+        mock_release.assert_called_once()
 
 
 # ===========================================================================
@@ -155,10 +174,11 @@ class TestInitScheduler:
             if hasattr(app, "_scheduler_lock"):
                 del app._scheduler_lock
 
-            with patch("app.scheduler.threading.Thread") as mock_thread:
-                mock_thread_instance = MagicMock()
-                mock_thread.return_value = mock_thread_instance
-                init_scheduler(app, is_reloader=False)
+            with _patch_scheduler_lock_acquired():
+                with patch("app.scheduler.threading.Thread") as mock_thread:
+                    mock_thread_instance = MagicMock()
+                    mock_thread.return_value = mock_thread_instance
+                    init_scheduler(app, is_reloader=False)
 
             assert hasattr(app, "_scheduler_lock")
             mock_thread_instance.start.assert_called_once()
@@ -197,8 +217,9 @@ class TestInitScheduler:
                 mock_thread_obj.start = MagicMock()
                 return mock_thread_obj
 
-            with patch("app.scheduler.threading.Thread", side_effect=capture_thread):
-                init_scheduler(app, is_reloader=False)
+            with _patch_scheduler_lock_acquired():
+                with patch("app.scheduler.threading.Thread", side_effect=capture_thread):
+                    init_scheduler(app, is_reloader=False)
 
             return captured_target.get("fn")
         finally:
@@ -219,8 +240,9 @@ class TestInitScheduler:
                 del app._scheduler_lock
 
             mock_thread_instance = MagicMock()
-            with patch("app.scheduler.threading.Thread", return_value=mock_thread_instance):
-                init_scheduler(app, is_reloader=False)
+            with _patch_scheduler_lock_acquired():
+                with patch("app.scheduler.threading.Thread", return_value=mock_thread_instance):
+                    init_scheduler(app, is_reloader=False)
 
             mock_thread_instance.start.assert_called_once()
         finally:
@@ -257,8 +279,9 @@ class TestInitScheduler:
             mock_scheduler = MagicMock()
             mock_scheduler.running = False
 
-            with patch("app.scheduler.threading.Thread", CapturingThread):
-                init_scheduler(app, is_reloader=False)
+            with _patch_scheduler_lock_acquired():
+                with patch("app.scheduler.threading.Thread", CapturingThread):
+                    init_scheduler(app, is_reloader=False)
 
             assert "target" in captured
 
@@ -301,8 +324,9 @@ class TestInitScheduler:
                 def start(self):
                     pass
 
-            with patch("app.scheduler.threading.Thread", CapturingThread):
-                init_scheduler(app, is_reloader=False)
+            with _patch_scheduler_lock_acquired():
+                with patch("app.scheduler.threading.Thread", CapturingThread):
+                    init_scheduler(app, is_reloader=False)
 
             # Set scheduler before running the task to simulate "already initialized"
             app.scheduler = MagicMock()
@@ -343,8 +367,9 @@ class TestInitScheduler:
                 def start(self):
                     pass
 
-            with patch("app.scheduler.threading.Thread", CapturingThread):
-                init_scheduler(app, is_reloader=False)
+            with _patch_scheduler_lock_acquired():
+                with patch("app.scheduler.threading.Thread", CapturingThread):
+                    init_scheduler(app, is_reloader=False)
 
             with patch(
                 "apscheduler.schedulers.background.BackgroundScheduler",
@@ -387,8 +412,9 @@ class TestInitScheduler:
             mock_scheduler = MagicMock()
             mock_scheduler.running = True  # already running
 
-            with patch("app.scheduler.threading.Thread", CapturingThread):
-                init_scheduler(app, is_reloader=False)
+            with _patch_scheduler_lock_acquired():
+                with patch("app.scheduler.threading.Thread", CapturingThread):
+                    init_scheduler(app, is_reloader=False)
 
             with patch("apscheduler.schedulers.background.BackgroundScheduler", return_value=mock_scheduler):
                 with patch("app.scheduler.atexit.register"):
@@ -431,8 +457,9 @@ class TestInitScheduler:
             mock_scheduler = MagicMock()
             mock_scheduler.running = False
 
-            with patch("app.scheduler.threading.Thread", CapturingThread):
-                init_scheduler(app, is_reloader=False)
+            with _patch_scheduler_lock_acquired():
+                with patch("app.scheduler.threading.Thread", CapturingThread):
+                    init_scheduler(app, is_reloader=False)
 
             with patch("apscheduler.schedulers.background.BackgroundScheduler", return_value=mock_scheduler) as mock_bg:
                 with patch("app.scheduler.atexit.register"):
@@ -452,6 +479,28 @@ class TestInitScheduler:
                 app.config.pop("SCHEDULER_MISFIRE_GRACE_SECONDS", None)
             if hasattr(app, "scheduler"):
                 app.scheduler = None
+
+
+class TestInitSchedulerLockBehavior:
+    def test_skips_when_lock_held_by_live_owner(self, app):
+        from app.scheduler import init_scheduler
+
+        original_testing = app.config.get("TESTING")
+        original_debug = app.config.get("DEBUG")
+        try:
+            app.config["TESTING"] = False
+            app.config["DEBUG"] = False
+            os.environ.pop("RUNNING_MIGRATION", None)
+            with patch(
+                "app.scheduler.try_acquire_scheduler_lock",
+                return_value=SchedulerLockResult.HELD_BY_LIVE_OWNER,
+            ):
+                with patch("app.scheduler.threading.Thread") as mock_thread:
+                    init_scheduler(app, is_reloader=False)
+            mock_thread.assert_not_called()
+        finally:
+            app.config["TESTING"] = original_testing
+            app.config["DEBUG"] = original_debug
 
 
 # ===========================================================================
@@ -498,8 +547,9 @@ class TestScheduledJobInnerFunctions:
 
             mock_scheduler.add_job.side_effect = capture_add_job
 
-            with patch("app.scheduler.threading.Thread", CapturingThread):
-                init_scheduler(app, is_reloader=False)
+            with _patch_scheduler_lock_acquired():
+                with patch("app.scheduler.threading.Thread", CapturingThread):
+                    init_scheduler(app, is_reloader=False)
 
             with patch(
                 "apscheduler.schedulers.background.BackgroundScheduler",
@@ -572,6 +622,27 @@ class TestScheduledJobInnerFunctions:
         with patch(
             "app.services.notification.emails.send_notification_emails",
             side_effect=Exception("smtp down"),
+        ):
+            fn()  # should be caught
+
+    def test_send_fds_access_request_digests_success(self, app):
+        jobs = self._run_init_and_capture_jobs(app)
+        fn = jobs.get("send_fds_access_request_digests")
+        assert fn is not None
+
+        with patch(
+            "app.services.email.fds_access_request_digest.run_fds_access_request_digest_job"
+        ) as mock_run:
+            fn()
+        mock_run.assert_called_once()
+
+    def test_send_fds_access_request_digests_exception(self, app):
+        jobs = self._run_init_and_capture_jobs(app)
+        fn = jobs.get("send_fds_access_request_digests")
+
+        with patch(
+            "app.services.email.fds_access_request_digest.run_fds_access_request_digest_job",
+            side_effect=Exception("digest failed"),
         ):
             fn()  # should be caught
 

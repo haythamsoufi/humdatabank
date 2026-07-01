@@ -2,9 +2,14 @@
 
 import atexit
 import os
-import tempfile
 import threading
 import time as _time
+
+from app.scheduler_lock import (
+    SchedulerLockResult,
+    release_scheduler_lock,
+    try_acquire_scheduler_lock,
+)
 
 
 def _graceful_shutdown(scheduler, app):
@@ -29,6 +34,7 @@ def _graceful_shutdown(scheduler, app):
             app.scheduler = None
         except Exception:
             pass
+        release_scheduler_lock(os.getppid(), os.getpid())
 
 
 def _is_scheduler_worker() -> bool:
@@ -44,9 +50,9 @@ def _is_scheduler_worker() -> bool:
     Strategy (lowest-ops-overhead):
       1. If SCHEDULER_WORKER_ONLY_PID is set (injected by a pre_exec/post_fork
          hook or the startup script), only the matching PID runs the scheduler.
-      2. Otherwise, only the lowest-numbered gunicorn worker runs it, detected
-         by writing a lock file keyed on the gunicorn master PID.  The first
-         worker to create the file wins; all subsequent workers skip init.
+      2. Otherwise, only one worker per Gunicorn master runs it, detected by a
+         lock file keyed on the master PID.  Stale locks (dead owner PID) are
+         reclaimed automatically.
       3. SCHEDULER_DISABLE_ALL_WORKERS=true disables in every worker (use when
          jobs are handled by an external Azure Function / Container Job).
     """
@@ -60,19 +66,71 @@ def _is_scheduler_worker() -> bool:
         except ValueError:
             pass
 
-    # Lock-file strategy: first worker to create the file wins.
-    master_pid = os.getppid()  # gunicorn worker's parent = master process
-    lock_path = os.path.join(tempfile.gettempdir(), f'hdb_scheduler_{master_pid}.lock')
-    try:
-        fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        os.write(fd, str(os.getpid()).encode())
-        os.close(fd)
-        return True  # this worker created the lock — it owns the scheduler
-    except FileExistsError:
-        return False  # another worker already owns the scheduler
-    except OSError:
-        # Filesystem issue — fall back to allowing this worker (conservative)
-        return True
+    master_pid = os.getppid()
+    result = try_acquire_scheduler_lock(master_pid)
+    return result in (
+        SchedulerLockResult.ACQUIRED,
+        SchedulerLockResult.RECLAIMED_STALE,
+        SchedulerLockResult.FILESYSTEM_FALLBACK,
+    )
+
+
+def _log_scheduler_lock_outcome(app, result: SchedulerLockResult) -> None:
+    """Emit INFO/WARNING logs for scheduler lock acquisition outcomes."""
+    master_pid = os.getppid()
+    worker_pid = os.getpid()
+    if result is SchedulerLockResult.ACQUIRED:
+        app.logger.info(
+            'Scheduler lock acquired by worker pid=%s (master pid=%s)',
+            worker_pid,
+            master_pid,
+        )
+    elif result is SchedulerLockResult.RECLAIMED_STALE:
+        app.logger.info(
+            'Scheduler lock reclaimed by worker pid=%s (master pid=%s)',
+            worker_pid,
+            master_pid,
+        )
+    elif result is SchedulerLockResult.HELD_BY_LIVE_OWNER:
+        app.logger.info(
+            'Scheduler skipped: lock held by live worker (master pid=%s, this pid=%s)',
+            master_pid,
+            worker_pid,
+        )
+    elif result is SchedulerLockResult.FILESYSTEM_FALLBACK:
+        app.logger.warning(
+            'Scheduler lock unavailable; running scheduler without lock (pid=%s)',
+            worker_pid,
+        )
+
+
+def _evaluate_scheduler_worker(app) -> SchedulerLockResult | None:
+    """
+    Decide whether this process should init APScheduler.
+
+    Returns None when scheduler is disabled via environment settings.
+    """
+    if os.environ.get('SCHEDULER_DISABLE_ALL_WORKERS', '').strip().lower() in ('1', 'true', 'yes'):
+        app.logger.info('Scheduler disabled via SCHEDULER_DISABLE_ALL_WORKERS')
+        return None
+
+    only_pid_env = os.environ.get('SCHEDULER_WORKER_ONLY_PID', '').strip()
+    if only_pid_env:
+        try:
+            if os.getpid() == int(only_pid_env):
+                return SchedulerLockResult.ACQUIRED
+        except ValueError:
+            pass
+        app.logger.info(
+            'Scheduler skipped: SCHEDULER_WORKER_ONLY_PID=%s (this pid=%s)',
+            only_pid_env,
+            os.getpid(),
+        )
+        return None
+
+    result = try_acquire_scheduler_lock(os.getppid())
+    _log_scheduler_lock_outcome(app, result)
+    return result
 
 
 def _run_scheduled_job(app, label: str, fn) -> None:
@@ -111,14 +169,15 @@ def init_scheduler(app, is_reloader):
     """Initialize the APScheduler background scheduler for periodic tasks."""
     from app.utils.constants import SESSION_INACTIVITY_SECONDS
 
-    should_init = (
-        not app.config.get('TESTING', False)
-        and not os.environ.get('RUNNING_MIGRATION')
-        and (not app.debug or is_reloader)
-        and _is_scheduler_worker()
-    )
+    if app.config.get('TESTING', False) or os.environ.get('RUNNING_MIGRATION'):
+        return
+    if app.debug and not is_reloader:
+        return
 
-    if not should_init:
+    lock_result = _evaluate_scheduler_worker(app)
+    if lock_result is None:
+        return
+    if lock_result is SchedulerLockResult.HELD_BY_LIVE_OWNER:
         return
 
     if hasattr(app, 'scheduler') and app.scheduler is not None:
@@ -255,14 +314,15 @@ def init_scheduler(app, is_reloader):
                         scheduler.start()
                         atexit.register(_graceful_shutdown, scheduler, app)
                         process_id = os.getpid()
-                        app.logger.debug("Background scheduler started [PID: %d]", process_id)
+                        app.logger.info("Background scheduler started [PID: %d]", process_id)
                     else:
-                        app.logger.debug("Scheduler was already running")
+                        app.logger.info("Scheduler was already running [PID: %d]", os.getpid())
 
         except Exception as e:
             app.logger.warning("Could not start notification scheduler: %s", e)
             if hasattr(app, 'scheduler'):
                 app.scheduler = None
+            release_scheduler_lock(os.getppid(), os.getpid())
 
     scheduler_thread = threading.Thread(target=scheduler_init_task, daemon=True)
     scheduler_thread.start()

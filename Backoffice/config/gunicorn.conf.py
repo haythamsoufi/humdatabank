@@ -133,6 +133,15 @@ def on_starting(server):
 
 def when_ready(server):
     """Called just after the server is started."""
+    try:
+        from app.scheduler_lock import clear_stale_scheduler_locks_for_master
+        if clear_stale_scheduler_locks_for_master(server.pid):
+            server.log.warning(
+                "Removed stale scheduler lock on master start (master pid=%s)",
+                server.pid,
+            )
+    except Exception:
+        pass
     server.log.info("Gunicorn server is ready. Spawning workers...")
 
 def on_exit(server):
@@ -170,35 +179,12 @@ def worker_exit(server, worker):
     in this hook, so the worker would have skipped shutdown every time.
     Gunicorn loads the WSGI callable (e.g. `run:app`) as `worker.wsgi`.
 
-    Also removes the scheduler lock file (written by _is_scheduler_worker in
-    app/scheduler.py) so the next worker that starts can take over the
-    scheduler role after max_requests recycling.
+    Also removes the scheduler lock when this worker owns it so the next
+    worker can take over after max_requests recycling or timeouts.
     """
-    wsgi = getattr(worker, "wsgi", None)
-    if wsgi is None or not hasattr(wsgi, "scheduler"):
-        return
-    sched = wsgi.scheduler
-    if sched is None:
-        return
     try:
-        if sched.running:
-            # Match app.scheduler: wait for the scheduler loop to stop so the
-            # default ThreadPoolExecutor is not half-shut while still submitting.
-            sched.shutdown(wait=True)
-    except Exception:
-        pass
-    try:
-        wsgi.scheduler = None
-    except Exception:
-        pass
-
-    # Release the scheduler lock file so the replacement worker can acquire it.
-    # The lock is keyed on the master PID (server.pid).
-    try:
-        import tempfile
-        lock_path = os.path.join(tempfile.gettempdir(), f'hdb_scheduler_{server.pid}.lock')
-        if os.path.exists(lock_path):
-            os.remove(lock_path)
+        from app.scheduler_lock import shutdown_worker_scheduler
+        shutdown_worker_scheduler(getattr(worker, "wsgi", None), server.pid, worker.pid)
     except Exception:
         pass
 
@@ -211,3 +197,8 @@ def worker_abort(worker):
         worker.pid,
         timeout,
     )
+    try:
+        from app.scheduler_lock import shutdown_worker_scheduler
+        shutdown_worker_scheduler(getattr(worker, "wsgi", None), os.getppid(), worker.pid)
+    except Exception:
+        pass

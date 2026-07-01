@@ -55,6 +55,15 @@ class NavCategory:
     icon: Optional[str] = None
 
 
+# Temporarily disabled until all documentation pages are reviewed for PDF export.
+DOCS_PDF_EXPORT_ENABLED = False
+
+
+def is_pdf_export_enabled() -> bool:
+    """Whether the documentation UI and export.pdf routes are available."""
+    return DOCS_PDF_EXPORT_ENABLED
+
+
 def docs_root() -> Path:
     """
     Resolve docs root path: Backoffice/docs/

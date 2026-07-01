@@ -54,6 +54,8 @@ def _build_doc_url(rel: str) -> str:
 @login_required
 def export_pdf_index():
     """Download the help documentation index as PDF."""
+    if not docs.is_pdf_export_enabled():
+        abort(404)
     root = docs.docs_root()
     if not root.exists():
         abort(404)
@@ -73,6 +75,8 @@ def export_pdf_index():
 @login_required
 def export_pdf_doc(doc_path: str):
     """Download a help documentation page as PDF."""
+    if not docs.is_pdf_export_enabled():
+        abort(404)
     root = docs.docs_root()
     if not root.exists():
         abort(404)

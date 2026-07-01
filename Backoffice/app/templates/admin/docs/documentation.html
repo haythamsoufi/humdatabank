@@ -1205,6 +1205,7 @@
                 <div class="flex items-center justify-between gap-4 flex-wrap" id="docs-header-bar">
                     <h1 class="docs-content-title">{{ page_title }}</h1>
                     <div class="flex items-center gap-2 flex-wrap">
+                        {% if docs_pdf_export_enabled %}
                         <button type="button"
                                 id="docs-export-pdf-btn"
                                 class="docs-export-pdf-button"
@@ -1213,6 +1214,7 @@
                             <span data-export-label>{{ _('Export PDF') }}</span>
                             <span data-export-busy hidden>{{ _('Exporting…') }}</span>
                         </button>
+                        {% endif %}
                         <div id="docs-header-actions">
                         {% if workflow_id is defined and workflow_id %}
                         <button type="button"
@@ -1253,7 +1255,9 @@
 <script src="{{ url_for('static', filename='js/docs/docs-navigation.js') }}" nonce="{{ csp_nonce() }}"></script>
 <script src="{{ url_for('static', filename='js/docs/docs-search.js') }}" nonce="{{ csp_nonce() }}"></script>
 <script src="{{ url_for('static', filename='js/docs/docs-tour.js') }}" nonce="{{ csp_nonce() }}"></script>
+{% if docs_pdf_export_enabled %}
 <script src="{{ url_for('static', filename='js/docs/docs-pdf-export.js') }}" nonce="{{ csp_nonce() }}"></script>
+{% endif %}
 
 <!-- Template-specific initialization for active category expansion -->
 <script nonce="{{ csp_nonce() }}">

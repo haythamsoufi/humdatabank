@@ -303,6 +303,16 @@ def register_template_context(app, config_class):
             current_app.logger.debug("inject_pending_access_requests_count failed: %s", e)
             return {"pending_access_requests_count": 0}
 
+    @app.context_processor
+    def inject_docs_pdf_export_enabled():
+        try:
+            from app.services.documentation_service import is_pdf_export_enabled
+
+            return {"docs_pdf_export_enabled": is_pdf_export_enabled()}
+        except Exception as e:
+            current_app.logger.debug("inject_docs_pdf_export_enabled failed: %s", e)
+            return {"docs_pdf_export_enabled": False}
+
     app.jinja_env.globals['CHATBOT_ENABLED'] = app.config.get('CHATBOT_ENABLED', True)
     app.jinja_env.globals['ASSET_VERSION'] = app.config.get('ASSET_VERSION')
     app.jinja_env.globals['STATIC_CDN_URL'] = (app.config.get('STATIC_CDN_URL') or '').strip().rstrip('/')

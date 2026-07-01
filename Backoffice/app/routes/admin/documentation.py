@@ -62,6 +62,8 @@ def _build_doc_url(rel: str) -> str:
 @admin_permission_required("admin.docs.view")
 def export_pdf_index():
     """Download the documentation index as PDF."""
+    if not docs.is_pdf_export_enabled():
+        abort(404)
     root = docs.docs_root()
     if not root.exists():
         abort(404)
@@ -80,6 +82,8 @@ def export_pdf_index():
 @admin_permission_required("admin.docs.view")
 def export_pdf_doc(doc_path: str):
     """Download a documentation page as PDF."""
+    if not docs.is_pdf_export_enabled():
+        abort(404)
     root = docs.docs_root()
     if not root.exists():
         abort(404)

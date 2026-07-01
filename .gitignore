@@ -153,6 +153,7 @@ pnpm-debug.log*
 /*.png
 
 # Accidental files
+.tmp/
 /hell -NoProfile -Command git status -sb
 /app.db
 *.zip

@@ -1720,28 +1720,39 @@ try {
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1" aria-hidden="true"></i>{{ _("Preparing…") }}';
 
             try {
+                const innerPayload = {
+                    filename,
+                    queries: pkg.parts.map((part) => ({
+                        name: part.queryName || part.title,
+                        formula: part.formula,
+                    })),
+                };
+                // WAF: base64-wrap M formulas so OWASP CRS does not block SQL-like tokens.
+                const payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(innerPayload))));
                 const response = await fetch(POWER_QUERY_WORKBOOK_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         ...(csrfToken ? {'X-CSRFToken': csrfToken} : {}),
                     },
-                    body: JSON.stringify({
-                        filename,
-                        queries: pkg.parts.map((part) => ({
-                            name: part.queryName || part.title,
-                            formula: part.formula,
-                        })),
-                    }),
+                    body: JSON.stringify({ payload: payloadB64 }),
                 });
                 if (!response.ok) {
                     let message = '{{ _("Could not build Excel workbook") }}';
-                    try {
-                        const payload = await response.json();
-                        if (payload && payload.error) {
-                            message = payload.error;
-                        }
-                    } catch (e) {}
+                    if (
+                        response.status === 403
+                        && typeof window.looksLikeWafResponse === 'function'
+                        && window.looksLikeWafResponse(response)
+                    ) {
+                        message = '{{ _("Download was blocked by network security. Refresh the page and try again, or use Copy M for Excel instead.") }}';
+                    } else {
+                        try {
+                            const payload = await response.json();
+                            if (payload && payload.error) {
+                                message = payload.error;
+                            }
+                        } catch (e) {}
+                    }
                     throw new Error(message);
                 }
                 const blob = await response.blob();

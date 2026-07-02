@@ -263,6 +263,48 @@ class TestCreateTemplate:
         assert mc["rows"] == [{"text": "North"}, {"text": "South"}]
         assert mc["columns"] == [{"name": "Staff", "type": "number"}]
 
+    def test_matrix_column_name_translations_preserved(
+        self, db_session, app, service, user, grant_all_rbac
+    ):
+        schema = {
+            "name": "Matrix labels",
+            "sections": [
+                {"name": "S", "items": [
+                    {
+                        "item_type": "matrix",
+                        "label": "PNS staff contributions",
+                        "matrix_config": {
+                            "row_mode": "list_library",
+                            "lookup_list_id": "national_society",
+                            "list_display_column": "name",
+                            "rows": [],
+                            "columns": [
+                                {
+                                    "name": "intl_delegates_hns",
+                                    "type": "number",
+                                    "name_translations": {
+                                        "en": "# of international delegates integrated with the HNS",
+                                    },
+                                },
+                                {
+                                    "name": "intl_delegates_ifrc",
+                                    "type": "number",
+                                    "label": "Delegates with IFRC",
+                                },
+                            ],
+                            "show_row_totals": False,
+                            "show_column_totals": False,
+                        },
+                    }
+                ]}
+            ],
+        }
+        result = service.create_template(schema, user)
+        item = FormItem.query.filter_by(version_id=result["version_id"]).first()
+        cols = item.config["matrix_config"]["columns"]
+        assert cols[0]["name_translations"]["en"].startswith("# of international")
+        assert cols[1]["name_translations"]["en"] == "Delegates with IFRC"
+
     def test_matrix_requires_columns(self, db_session, app, service, user, grant_all_rbac):
         schema = {
             "name": "Bad Matrix",
@@ -334,6 +376,86 @@ class TestApplyEdits:
             s.name for s in FormSection.query.filter_by(version_id=draft.id).all()
         }
         assert "New AI Section" in draft_sections
+
+    def test_add_item_with_published_section_id_maps_to_draft(
+        self, db_session, app, service, user, grant_all_rbac
+    ):
+        """AI often reads published section ids, then edit creates a draft with new ids."""
+        template = create_test_template(db_session)
+        published_id = template.published_version_id
+        section = create_test_section(db_session, template, name="Funding")
+        create_test_item(
+            db_session, section, template, item_type="question", label="Existing Q", type="text"
+        )
+        read = service.get_full_structure(template.id, user)
+        assert read["version_id"] == published_id
+        published_section_id = read["sections"][0]["id"]
+
+        result = service.apply_edits(
+            template.id,
+            [{
+                "op": "add_item",
+                "section_id": published_section_id,
+                "item": {
+                    "item_type": "matrix",
+                    "label": "PNS staff contributions",
+                    "matrix_config": {
+                        "row_mode": "list_library",
+                        "lookup_list_id": "national_society",
+                        "list_display_column": "name",
+                        "rows": [],
+                        "columns": [
+                            {
+                                "name": "intl_delegates_hns",
+                                "type": "number",
+                                "name_translations": {
+                                    "en": "# of international delegates integrated with the HNS",
+                                },
+                            },
+                        ],
+                        "show_row_totals": False,
+                        "show_column_totals": False,
+                    },
+                },
+            }],
+            user,
+        )
+
+        assert result["version_id"] != published_id
+        draft_section = FormSection.query.filter_by(
+            version_id=result["version_id"], name="Funding"
+        ).first()
+        assert draft_section is not None
+        matrix = FormItem.query.filter_by(
+            section_id=draft_section.id, label="PNS staff contributions"
+        ).first()
+        assert matrix is not None
+        cols = matrix.config["matrix_config"]["columns"]
+        assert cols[0]["name_translations"]["en"].startswith("# of international")
+
+    def test_update_item_with_published_section_id_maps_to_draft(
+        self, db_session, app, service, user, grant_all_rbac
+    ):
+        template = create_test_template(db_session)
+        published_id = template.published_version_id
+        section = create_test_section(db_session, template, name="Funding")
+        item = create_test_item(
+            db_session, section, template, item_type="question", label="Old label", type="text"
+        )
+        read = service.get_full_structure(template.id, user)
+        published_item_id = read["sections"][0]["items"][0]["id"]
+
+        result = service.apply_edits(
+            template.id,
+            [{"op": "update_item", "item_id": published_item_id, "label": "New label"}],
+            user,
+        )
+
+        draft_item = FormItem.query.filter_by(
+            version_id=result["version_id"], label="New label"
+        ).first()
+        assert draft_item is not None
+        assert draft_item.id != item.id
 
     def test_update_item_required_flag_and_label(
         self, db_session, app, service, user, grant_all_rbac

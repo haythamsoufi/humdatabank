@@ -769,7 +769,7 @@
                             {# Section — left column; label and dropdown on one line #}
                             <div class="flex items-center gap-2 min-w-0">
                                 <label for="item-section-select" class="shrink-0 w-20 text-sm font-semibold text-gray-700">{{ _('Section') }}</label>
-                                <select name="section_id" id="item-section-select" class="flex-1 min-w-0 py-1.5 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md" required>
+                                <select id="item-section-select" class="flex-1 min-w-0 py-1.5 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md" required aria-label="{{ _('Section') }}">
                                     <option value="">{{ _('Select a section...') }}</option>
                                 </select>
                             </div>

@@ -244,6 +244,27 @@ class TestGetRequestList:
 
 
 @pytest.mark.unit
+class TestGetRequestInt:
+    def test_scalar_value(self):
+        from app.utils.request_utils import get_request_int, _JsonFormProxy
+
+        proxy = _JsonFormProxy({"section_id": "435"})
+        assert get_request_int(proxy, "section_id") == 435
+
+    def test_duplicate_values_use_last_non_empty(self):
+        from app.utils.request_utils import get_request_int, _JsonFormProxy
+
+        proxy = _JsonFormProxy({"section_id": ["435", "500"]})
+        assert get_request_int(proxy, "section_id") == 500
+
+    def test_invalid_value_returns_default(self):
+        from app.utils.request_utils import get_request_int, _JsonFormProxy
+
+        proxy = _JsonFormProxy({"section_id": "not-a-number"})
+        assert get_request_int(proxy, "section_id", default=12) == 12
+
+
+@pytest.mark.unit
 class TestIsStaticAssetRequest:
     def test_static_path(self, app):
         from app.utils.request_utils import is_static_asset_request

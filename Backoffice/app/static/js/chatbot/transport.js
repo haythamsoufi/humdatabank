@@ -416,10 +416,12 @@ export const TransportMixin = {
             if (this._isImmersive()) this._showAiPolicyModal();
             return;
         }
-        const message = overrideMessage !== undefined
+        const rawInput = overrideMessage !== undefined
             ? String(overrideMessage || '').trim()
             : this.elements.input.value.trim();
-        if (!message) return;
+        const hasFbAttachment = !!(this._fbAiConfig && this._hasFormBuilderAttachments?.());
+        if (!rawInput && !hasFbAttachment) return;
+        if (this._fbAiAttachmentBusy) return;
         if (this._isImmersive()) {
             const activeKey = this._getActiveConversationKey();
             if (this.isConversationRunning(activeKey)) {
@@ -439,8 +441,26 @@ export const TransportMixin = {
         this._stopInflightPoll();
         this._clearFormBuilderWelcomeBubble();
 
+        let message = rawInput;
+        let displayMessage = rawInput;
+        let userMsgOpts = {};
+        if (hasFbAttachment && overrideMessage === undefined) {
+            const prepared = await this._prepareFormBuilderOutgoingMessage(rawInput);
+            if (!prepared.ok) return;
+            message = prepared.messageText;
+            displayMessage = prepared.displayed;
+            if (prepared.previewItems?.length) {
+                userMsgOpts.attachmentPreviews = prepared.previewItems;
+            } else if (prepared.previewUrl) {
+                userMsgOpts.previewUrl = prepared.previewUrl;
+            }
+            (this._fbAiAttachments || []).forEach((a) => { a.previewUrl = null; });
+            this._clearFormBuilderAttachment();
+        }
+        if (!message) return;
+
         if (overrideMessage === undefined) {
-            this.addMessage(message, true);
+            this.addMessage(displayMessage, true, userMsgOpts);
             this.elements.input.value = '';
             this._resizeChatInput();
         }

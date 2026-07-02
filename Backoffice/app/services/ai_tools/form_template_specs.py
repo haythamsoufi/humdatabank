@@ -125,7 +125,9 @@ _ITEM_SCHEMA: Dict[str, Any] = {
             "type": "object",
             "description": (
                 "Required for item_type=matrix. {row_mode: 'manual'|'list_library', "
-                "columns: [{name, type: 'number'|'tick'}], rows: [{text}] (manual mode), "
+                "columns: [{name (stable code/slug), type: 'number'|'tick', "
+                "name_translations: {en: 'Column label', ...}, optional group}], "
+                "rows: [{text, name_translations?}] (manual mode), "
                 "lookup_list_id + list_display_column (list_library mode), "
                 "show_row_totals, show_column_totals}."
             ),

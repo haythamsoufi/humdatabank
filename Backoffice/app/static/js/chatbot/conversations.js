@@ -814,6 +814,7 @@ export const ConversationsMixin = {
             return;
         }
         this._setFloatingConversationId(null);
+        this._clearFormBuilderAttachment?.();
         this.loadConversation([]);
         if (this.elements.floatingChatList) this._renderFloatingConversationList();
     },

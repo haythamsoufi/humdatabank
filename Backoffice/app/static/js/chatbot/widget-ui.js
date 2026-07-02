@@ -521,6 +521,11 @@ export const WidgetUiMixin = {
         ta.style.height = '0';
         const h = Math.min(Math.max(ta.scrollHeight, minHeight), maxHeight);
         ta.style.height = h + 'px';
+
+        const pill = ta.closest('.chat-input-pill');
+        if (pill) {
+            pill.classList.toggle('chat-input-pill--multiline', h > minHeight + 4);
+        }
     },
 
     showTypingIndicator() {

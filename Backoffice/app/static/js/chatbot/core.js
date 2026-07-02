@@ -178,6 +178,8 @@ export class HumDatabankChatbot {
         this._fbAiConversationId = null;
         this._fbAiLastEditUndoRedo = null;
         this._fbAiPendingApplyActions = null;
+        this._fbAiAttachments = [];
+        this._fbAiAttachmentBusy = false;
         this._ensureFormBuilderAiIntegration();
 
         this.initializeElements();
@@ -431,6 +433,7 @@ export class HumDatabankChatbot {
         // Auto-resize textarea as user types (grow up to max-height, then scroll)
         if (this.elements.input && this.elements.input.nodeName === 'TEXTAREA') {
             this.elements.input.addEventListener('input', () => this._resizeChatInput());
+            this._resizeChatInput();
         }
 
         // Re-sync body scroll lock when crossing the mobile/desktop breakpoint with chat open
@@ -561,6 +564,10 @@ export class HumDatabankChatbot {
             }
         });
 
+        if (this._loadFormBuilderAiConfig()) {
+            this._setupFormBuilderAttachmentHandlers();
+        }
+
     }
 
 
@@ -628,9 +635,28 @@ export class HumDatabankChatbot {
         messageDiv.setAttribute('dir', 'auto');
 
         if (isUser) {
-            // User messages are always escaped (no HTML allowed)
             const inner = document.createElement('div');
-            inner.textContent = String(message ?? '');
+            inner.className = 'chat-message-user-inner';
+            const text = String(message ?? '');
+            if (text) {
+                const textEl = document.createElement('div');
+                textEl.className = 'chat-message-user-text';
+                textEl.textContent = text;
+                inner.appendChild(textEl);
+            }
+            if (opts.previewUrl) {
+                this._renderFormBuilderUserAttachmentGrid?.(inner, [{
+                    kind: 'image',
+                    url: opts.previewUrl,
+                    alt: opts.previewAlt || 'Attached image',
+                    filename: opts.previewAlt || '',
+                }]);
+            } else if (opts.attachmentPreviews?.length) {
+                this._renderFormBuilderUserAttachmentGrid?.(inner, opts.attachmentPreviews);
+            }
+            if (!inner.childNodes.length) {
+                inner.textContent = text;
+            }
             messageDiv.appendChild(inner);
         } else {
             // Bot/AI messages are sanitized to allow safe HTML formatting
@@ -900,7 +926,7 @@ export class HumDatabankChatbot {
             ? `<p><strong>Describe the form template you want to create.</strong></p>
                <ul>
                  <li>"Create a health programme reporting form with sections for staffing, services and budget"</li>
-                 <li>"Build a template from this questionnaire:" (paste text or describe the questions)</li>
+                 <li>"Build a template from this questionnaire:" (paste text, drop files, or paste multiple screenshots)</li>
                </ul>
                <p class="text-sm text-gray-500">All changes go to a draft version — you review and deploy them in the form builder.</p>`
             : `<p><strong>Describe the changes you want for this template.</strong></p>

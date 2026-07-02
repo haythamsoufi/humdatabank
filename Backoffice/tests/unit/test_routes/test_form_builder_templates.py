@@ -544,6 +544,38 @@ class TestDuplicateTemplate:
             )
         assert resp.status_code == 302
 
+    def test_duplicate_copies_variables(self, logged_in_client, db_session, admin_user, app):
+        """Duplicated template keeps variables from the source published version."""
+        from app.models import FormTemplate, FormTemplateVersion
+
+        _grant_template_permissions(db_session)
+        source = _make_template(db_session, admin_user, name='Source With Vars')
+        source_version = FormTemplateVersion.query.get(source.published_version_id)
+        source_version.variables = {
+            "reporting_year": {
+                "variable_type": "metadata",
+                "metadata_type": "assignment_period",
+            }
+        }
+        db_session.commit()
+
+        with patch('app.routes.admin.form_builder.templates.log_admin_action'):
+            resp = logged_in_client.post(
+                f'/admin/templates/duplicate/{source.id}',
+                data={},
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+
+        copied_template = (
+            FormTemplate.query.filter(FormTemplate.id != source.id)
+            .order_by(FormTemplate.id.desc())
+            .first()
+        )
+        copied_version = FormTemplateVersion.query.get(copied_template.published_version_id)
+        assert copied_version.variables == source_version.variables
+        assert copied_version.variables is not source_version.variables
+
     def test_duplicate_access_denied(self, logged_in_client, db_session, admin_user, app):
         """POST redirects when user lacks access."""
         _grant_template_permissions(db_session)

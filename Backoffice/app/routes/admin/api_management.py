@@ -12,6 +12,7 @@ from app.utils.datetime_helpers import utcnow
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.power_query_workbook import build_power_query_workbook
+from app.utils.request_utils import get_request_data
 from app.utils.sql_utils import safe_ilike_pattern
 from app.services.api_usage_stats import bulk_endpoint_usage_stats, chart_stats_for_period, endpoint_path_prefix
 
@@ -1034,8 +1035,10 @@ def api_management():
 @bp.route('/api-management/power-query-workbook', methods=['POST'])
 @admin_permission_required('admin.api.manage')
 def power_query_workbook():
-    payload = request.get_json(silent=True) or {}
-    queries = payload.get('queries')
+    # Frontend wraps body in { payload: b64 } so Power Query M formulas do not
+    # trigger Azure WAF OWASP CRS false positives (let/in/SQL-like tokens).
+    data = get_request_data()
+    queries = data.get('queries')
     if not isinstance(queries, list) or not queries:
         return json_bad_request('At least one query is required')
 
@@ -1047,7 +1050,7 @@ def power_query_workbook():
         current_app.logger.error('power_query_workbook failed: %s', exc, exc_info=True)
         return json_server_error(GENERIC_ERROR_MESSAGE)
 
-    filename = (payload.get('filename') or 'databank-queries.xlsx').strip()
+    filename = (data.get('filename') or 'databank-queries.xlsx').strip()
     if not filename.lower().endswith('.xlsx'):
         filename = f'{filename}.xlsx'
 

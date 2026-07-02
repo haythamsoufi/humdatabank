@@ -222,6 +222,8 @@ Schema guidance:
   ["Health"]}}]) so data-entry users pick their own indicators.
 - Matrix items: item_type='matrix' with matrix_config (manual rows + number/tick columns, or
   list_library rows from a lookup list). Use these only when the user clearly wants a table.
+  Matrix column `name` is a stable code/slug (e.g. intl_delegates_hns); human-readable headers
+  belong in name_translations (at minimum {{"en": "..."}}) — never put long labels only in `name`.
 
 Importing pasted questionnaires:
 - When the user pastes questionnaire text or an extracted form image is attached, convert it

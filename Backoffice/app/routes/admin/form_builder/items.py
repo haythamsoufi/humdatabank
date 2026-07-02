@@ -12,7 +12,7 @@ from app.models import (FormTemplate, FormSection, FormItem, IndicatorBank,
     FormTemplateVersion)
 from app.forms.form_builder import IndicatorForm, QuestionForm, DocumentFieldForm
 from app.routes.admin.shared import permission_required
-from app.utils.request_utils import is_json_request, get_request_data
+from app.utils.request_utils import is_json_request, get_request_data, get_request_int
 from app.services.user_analytics_service import log_admin_action
 from app.utils.transactions import request_transaction_rollback
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
@@ -231,11 +231,9 @@ def edit_item(item_id):
     template_sections = FormSection.query.filter_by(template_id=template_id, version_id=form_item.version_id).order_by(FormSection.order).all()
     form.section_id.choices = [(s.id, s.name) for s in template_sections]
 
-    if 'section_id' in data and data['section_id']:
-        try:
-            form.section_id.data = int(data['section_id'])
-        except (ValueError, TypeError):
-            form.section_id.data = form_item.section_id
+    parsed_section_id = get_request_int(data, 'section_id')
+    if parsed_section_id is not None:
+        form.section_id.data = parsed_section_id
     else:
         form.section_id.data = form_item.section_id
     if 'order' in data:

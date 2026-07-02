@@ -1638,6 +1638,18 @@ body:not(.chat-immersive) #aiChatWidget.chat-dragging .chat-header {
     gap: 4px;
 }
 
+/* Tall multiline input: cap radius so sides don't become semicircles */
+.chat-input-pill.chat-input-pill--multiline {
+    border-radius: 20px;
+    align-items: flex-end;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.chat-input-pill.chat-input-pill--multiline .chat-input {
+    align-self: auto;
+}
+
 .chat-input-attach,
 .chat-input-mic {
     flex-shrink: 0;
@@ -1714,6 +1726,272 @@ body:not(.chat-immersive) #aiChatWidget.chat-dragging .chat-header {
 
 .chat-input::placeholder {
     color: #9ca3af;
+}
+
+/* Form builder AI attachments (questionnaire import + pasted images) */
+.fb-ai-chat-attachments {
+    padding: 0.5rem 0.65rem 0.35rem;
+    margin-bottom: 0.35rem;
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 1px solid rgba(99, 102, 241, 0.14);
+    border-radius: 0.75rem;
+}
+
+.fb-ai-chat-attachments[hidden] {
+    display: none;
+}
+
+.fb-ai-chat-attachments-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.45rem;
+}
+
+.fb-ai-chat-attachments-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #6366f1;
+}
+
+.fb-ai-chat-attachments-clear {
+    border: none;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.72rem;
+    cursor: pointer;
+    padding: 0.15rem 0.35rem;
+    border-radius: 0.25rem;
+}
+
+.fb-ai-chat-attachments-clear:hover {
+    color: #334155;
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.fb-ai-chat-attachment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+    gap: 0.5rem;
+}
+
+.fb-ai-attach-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.4rem;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.625rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    min-width: 0;
+}
+
+.fb-ai-attach-card-loading {
+    opacity: 0.85;
+}
+
+.fb-ai-attach-card-thumb {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    border-radius: 0.45rem;
+    overflow: hidden;
+    background: #eef2ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fb-ai-attach-card-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    cursor: zoom-in;
+}
+
+.fb-ai-attach-card-doc-icon {
+    font-size: 1.35rem;
+    color: #6366f1;
+}
+
+.fb-ai-attach-card-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+    padding-right: 1.1rem;
+}
+
+.fb-ai-attach-card-name {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: #1f2937;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fb-ai-attach-card-kind {
+    font-size: 0.65rem;
+    color: #64748b;
+}
+
+.fb-ai-attach-card-remove {
+    position: absolute;
+    top: 0.3rem;
+    right: 0.3rem;
+    width: 1.35rem;
+    height: 1.35rem;
+    border: none;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #64748b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+.fb-ai-attach-card-remove:hover {
+    color: #ef4444;
+    background: #fff;
+}
+
+.fb-ai-attach-card-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.72);
+    border-radius: 0.625rem;
+    color: #6366f1;
+    font-size: 1rem;
+}
+
+.fb-ai-msg-attachment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    gap: 0.45rem;
+    margin-top: 0.45rem;
+    max-width: min(320px, 100%);
+}
+
+.fb-ai-msg-attach-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.3rem;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.chat-message.user .fb-ai-msg-attach-card {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+.fb-ai-msg-attach-card-img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border-radius: 0.35rem;
+    cursor: zoom-in;
+}
+
+.fb-ai-msg-attach-card-doc {
+    align-items: center;
+    justify-content: center;
+    min-height: 72px;
+    text-align: center;
+    color: #6366f1;
+}
+
+.fb-ai-msg-attach-card-doc .fa-file-lines {
+    font-size: 1.25rem;
+}
+
+.fb-ai-msg-attach-card-caption {
+    font-size: 0.62rem;
+    line-height: 1.2;
+    color: inherit;
+    opacity: 0.85;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fb-ai-expandable-image {
+    cursor: zoom-in;
+}
+
+.chat-message.user .chat-message-user-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.chat-message.user .chat-message-user-text + .fb-ai-msg-attachment-grid {
+    margin-top: 0.35rem;
+}
+
+#aiChatWidget.fb-ai-chat-drag-over .chat-input-container {
+    outline: 2px dashed #6366f1;
+    outline-offset: -4px;
+    border-radius: 0.75rem;
+}
+
+.fb-ai-image-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.72);
+}
+
+.fb-ai-image-lightbox[hidden] {
+    display: none;
+}
+
+.fb-ai-lightbox-img {
+    max-width: min(96vw, 1400px);
+    max-height: 92vh;
+    object-fit: contain;
+    border-radius: 0.5rem;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.fb-ai-lightbox-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    border: none;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 9999px;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.fb-ai-lightbox-close:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+body.fb-ai-lightbox-open {
+    overflow: hidden;
 }
 
 .chat-input:focus {

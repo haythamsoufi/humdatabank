@@ -169,6 +169,27 @@ class TestPowerQueryWorkbook:
         assert resp.status_code == 200
         assert "spreadsheetml" in resp.content_type
 
+    def test_success_with_waf_payload_b64(self, logged_in_client, db_session, app):
+        import base64
+        import json
+
+        inner = {
+            "queries": [{"name": "Data", "formula": 'let x = 1 in x'}],
+            "filename": "test-export",
+        }
+        wrapped = {"payload": base64.b64encode(json.dumps(inner).encode()).decode()}
+        with patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
+             patch("app.routes.admin.shared.AuthorizationService.has_rbac_permission", return_value=True), \
+             patch("app.routes.admin.api_management.build_power_query_workbook", return_value=b"PK fake xlsx") as mock_build:
+            resp = logged_in_client.post(
+                "/admin/api-management/power-query-workbook",
+                json=wrapped,
+            )
+        assert resp.status_code == 200
+        mock_build.assert_called_once_with(inner["queries"])
+        cd = resp.headers.get("Content-Disposition", "")
+        assert "test-export.xlsx" in cd
+
     def test_value_error_returns_400(self, logged_in_client, db_session, app):
         with patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
              patch("app.routes.admin.shared.AuthorizationService.has_rbac_permission", return_value=True), \

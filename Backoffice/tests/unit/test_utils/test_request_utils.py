@@ -63,3 +63,15 @@ class TestIsJsonRequest:
     def test_plain_html_path_no_headers(self, app):
         with app.test_request_context(path='/admin/dashboard'):
             assert is_json_request() is False
+
+    def test_api_management_page_is_not_json(self, app):
+        with app.test_request_context(path='/admin/api-management'):
+            assert is_json_request() is False
+
+    def test_api_keys_page_is_not_json(self, app):
+        with app.test_request_context(path='/admin/api-keys'):
+            assert is_json_request() is False
+
+    def test_validation_dashboard_api_subpath_is_json(self, app):
+        with app.test_request_context(path='/admin/validation-dashboard/api/periods'):
+            assert is_json_request() is True

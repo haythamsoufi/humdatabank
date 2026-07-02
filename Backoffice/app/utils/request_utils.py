@@ -115,6 +115,23 @@ def get_request_list(data, key):
     return val if isinstance(val, list) else [val]
 
 
+def get_request_int(data, key, default=None):
+    """Read a single integer field, coercing duplicate JSON values to the last non-empty entry."""
+    src = data if data is not None else request.form
+    val = src.get(key, default)
+    if isinstance(val, list):
+        val = next(
+            (v for v in reversed(val) if v is not None and str(v).strip() != ''),
+            default,
+        )
+    if val is None or (isinstance(val, str) and not val.strip()):
+        return default
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
+
 def is_static_asset_request(req=None):
     """True for high-volume static URLs that should not touch the database.
 
@@ -144,8 +161,14 @@ def is_json_request():
     accept = request.headers.get("Accept", "")
     content_type = request.headers.get("Content-Type", "")
     path = request.path or ""
-    # Broader admin API detection: /admin/ with 'api' in path
-    is_admin_api = path.startswith("/admin/") and "api" in path
+    # Broader admin API detection: /admin/.../api/... as a path segment (not substring).
+    # Avoid false positives for HTML pages like /admin/api-management or /admin/api-keys.
+    path_segments = [segment for segment in path.split("/") if segment]
+    is_admin_api = (
+        len(path_segments) > 1
+        and path_segments[0] == "admin"
+        and "api" in path_segments[1:]
+    )
     return (
         request.is_json
         or (content_type.startswith("application/json") if content_type else False)

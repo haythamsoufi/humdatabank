@@ -145,6 +145,34 @@ def _clean_str(value: Any, max_len: int = 2000) -> Optional[str]:
     return s[:max_len]
 
 
+def _supported_language_codes() -> List[str]:
+    try:
+        codes = current_app.config.get("SUPPORTED_LANGUAGES")
+        if codes:
+            return list(codes)
+    except RuntimeError:
+        pass
+    return ["en"]
+
+
+def _normalize_name_translations(value: Any, max_len: int = 500) -> Optional[Dict[str, str]]:
+    """Normalize a locale -> label map (ISO language codes only)."""
+    if not isinstance(value, dict):
+        return None
+    supported = _supported_language_codes()
+    cleaned: Dict[str, str] = {}
+    for raw_code, raw_text in value.items():
+        if not isinstance(raw_code, str):
+            continue
+        code = raw_code.strip().lower().split("_", 1)[0]
+        if code not in supported:
+            continue
+        text = _clean_str(raw_text, max_len)
+        if text:
+            cleaned[code] = text
+    return cleaned or None
+
+
 class FormTemplateAIService:
     """Create and edit form templates from a canonical JSON schema."""
 
@@ -1364,7 +1392,21 @@ class FormTemplateAIService:
                 raise FormTemplateAIError(
                     f"Matrix '{label}': column type '{col_type}' invalid. Allowed: {sorted(MATRIX_COLUMN_TYPES)}"
                 )
-            columns.append({"name": _clean_str(c.get("name"), 200), "type": col_type})
+            col_entry: Dict[str, Any] = {
+                "name": _clean_str(c.get("name"), 200),
+                "type": col_type,
+            }
+            name_translations = _normalize_name_translations(c.get("name_translations"))
+            if not name_translations:
+                fallback_label = _clean_str(c.get("label"), 500)
+                if fallback_label:
+                    name_translations = {"en": fallback_label}
+            if name_translations:
+                col_entry["name_translations"] = name_translations
+            group = _clean_str(c.get("group"), 200)
+            if group:
+                col_entry["group"] = group
+            columns.append(col_entry)
 
         config: Dict[str, Any] = {
             "type": "matrix",
@@ -1384,11 +1426,16 @@ class FormTemplateAIService:
             for r in rows_in:
                 if isinstance(r, dict):
                     text = _clean_str(r.get("text") or r.get("label"), 500)
+                    row_translations = _normalize_name_translations(r.get("name_translations"))
                 else:
                     text = _clean_str(r, 500)
+                    row_translations = None
                 if not text:
                     raise FormTemplateAIError(f"Matrix '{label}': every row needs text.")
-                rows.append({"text": text})
+                row_entry: Dict[str, Any] = {"text": text}
+                if row_translations:
+                    row_entry["name_translations"] = row_translations
+                rows.append(row_entry)
             config["rows"] = rows
         else:
             lookup_list_id = value.get("lookup_list_id")
@@ -1701,8 +1748,71 @@ class FormTemplateAIService:
         return obj_id
 
     @staticmethod
+    def _map_entity_id_to_draft_version(model, entity_id: Optional[int], draft: FormTemplateVersion):
+        """Map an id from another version of the same template onto the draft clone."""
+        if not entity_id:
+            return None
+        in_draft = model.query.filter_by(id=int(entity_id), version_id=draft.id).first()
+        if in_draft:
+            return in_draft
+        source = model.query.filter_by(id=int(entity_id), template_id=draft.template_id).first()
+        if not source or source.version_id == draft.id:
+            return None
+
+        stable_key = getattr(source, "stable_key", None)
+        if stable_key:
+            mapped = model.query.filter_by(
+                template_id=draft.template_id,
+                version_id=draft.id,
+                stable_key=stable_key,
+            ).first()
+            if mapped:
+                return mapped
+
+        if model is FormSection:
+            query = FormSection.query.filter_by(
+                template_id=draft.template_id,
+                version_id=draft.id,
+                name=source.name,
+                order=source.order,
+            )
+            if hasattr(source, "archived"):
+                query = query.filter_by(archived=getattr(source, "archived", False))
+            return query.first()
+
+        if model is FormPage:
+            return FormPage.query.filter_by(
+                template_id=draft.template_id,
+                version_id=draft.id,
+                name=source.name,
+                order=source.order,
+            ).first()
+
+        if model is FormItem:
+            draft_section = FormTemplateAIService._map_entity_id_to_draft_version(
+                FormSection, source.section_id, draft
+            )
+            query = FormItem.query.filter_by(
+                template_id=draft.template_id,
+                version_id=draft.id,
+                label=source.label,
+                order=source.order,
+            )
+            if draft_section:
+                query = query.filter_by(section_id=draft_section.id)
+            if hasattr(source, "archived"):
+                query = query.filter_by(archived=getattr(source, "archived", False))
+            return query.first()
+
+        return None
+
+    @staticmethod
     def _validate_page_id(page_id: Optional[int], template, draft, owner: str) -> int:
         page = FormPage.query.filter_by(id=page_id or 0, version_id=draft.id).first()
+        if not page:
+            page = FormTemplateAIService._map_entity_id_to_draft_version(
+                FormPage, page_id, draft
+            )
         if not page:
             raise FormTemplateAIError(f"Section '{owner}': page {page_id} not found in this draft.")
         return page.id
@@ -1710,6 +1820,10 @@ class FormTemplateAIService:
     @staticmethod
     def _validate_section_id(section_id: Optional[int], draft, owner: str) -> FormSection:
         section = FormSection.query.filter_by(id=section_id or 0, version_id=draft.id).first()
+        if not section:
+            section = FormTemplateAIService._map_entity_id_to_draft_version(
+                FormSection, section_id, draft
+            )
         if not section:
             raise FormTemplateAIError(
                 f"{owner}: section {section_id} not found in the draft version "
@@ -1734,6 +1848,8 @@ class FormTemplateAIService:
             if not item_id:
                 raise FormTemplateAIError(f"{op_name}: 'item_id' (or 'item_ref') is required.")
         item = FormItem.query.filter_by(id=item_id, version_id=draft.id).first()
+        if not item:
+            item = self._map_entity_id_to_draft_version(FormItem, item_id, draft)
         if not item:
             raise FormTemplateAIError(
                 f"{op_name}: item {item_id} not found in the draft version "
@@ -1865,6 +1981,8 @@ class FormTemplateAIService:
         if item_id is None:
             item_id = self._resolve_ref(ref_map, target, "item", owner)
         item = FormItem.query.filter_by(id=item_id, version_id=draft.id).first()
+        if not item:
+            item = self._map_entity_id_to_draft_version(FormItem, item_id, draft)
         if not item:
             raise FormTemplateAIError(
                 f"{owner}: item {target!r} not found in the draft version."

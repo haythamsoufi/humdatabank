@@ -257,6 +257,46 @@ class TestEditItem:
             )
         assert resp.status_code in (200, 302)
 
+    def test_edit_matrix_item_moves_section_with_duplicate_section_id(self, logged_in_client, db_session, admin_user, app):
+        """Duplicate section_id values (hidden + select) should move item to the selected section."""
+        from app import db
+
+        template = _make_owned_template(db_session, admin_user)
+        source_section = _make_section(db_session, template, name='Source Section', order=1)
+        target_section = _make_section(db_session, template, name='Target Section', order=2)
+        matrix_config = (
+            '{"type":"matrix","columns":[{"name":"col_a","type":"number"}],'
+            '"rows":[],"row_mode":"manual","show_row_totals":false,"show_column_totals":false}'
+        )
+        item = _make_item(
+            db_session,
+            source_section,
+            template,
+            item_type='matrix',
+            label='Staff Matrix',
+            config={'matrix_config': {'type': 'matrix', 'columns': [{'name': 'col_a', 'type': 'number'}], 'rows': []}},
+        )
+
+        with patch('app.routes.admin.form_builder.items.log_admin_action'):
+            resp = logged_in_client.post(
+                f'/admin/items/edit/{item.id}',
+                json={
+                    'item_type': 'matrix',
+                    'label': 'Staff Matrix',
+                    'section_id': [str(source_section.id), str(target_section.id)],
+                    'order': '2',
+                    'config': matrix_config,
+                    'version_id': str(item.version_id),
+                },
+                headers={'Content-Type': 'application/json', 'Accept': 'application/json'},
+            )
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['success'] is True
+        db.session.refresh(item)
+        assert item.section_id == target_section.id
+
     def test_edit_item_validation_failure_ajax(self, logged_in_client, db_session, admin_user, app):
         """POST via AJAX with validation error returns 422."""
         template = _make_owned_template(db_session, admin_user)

@@ -250,7 +250,12 @@ export const DlpPolicyMixin = {
             input.placeholder = disabled ? (this._uiString('aiPolicyAckRequired') || 'Please acknowledge the AI policy to continue.') : 'Ask anything';
         }
         if (sendBtn) sendBtn.disabled = disabled;
-        if (attachBtn) attachBtn.disabled = disabled;
+        if (attachBtn) {
+            const fbMode = !!(this._fbAiConfig || this._loadFormBuilderAiConfig?.());
+            attachBtn.hidden = !fbMode;
+            attachBtn.style.display = fbMode ? 'flex' : 'none';
+            attachBtn.disabled = disabled || !fbMode;
+        }
         const ackBtn = document.getElementById('chatAiPolicyAckBtn');
         if (ackBtn) ackBtn.style.display = acked ? 'none' : '';
 

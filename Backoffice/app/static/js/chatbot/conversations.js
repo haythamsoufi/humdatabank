@@ -370,8 +370,8 @@ export const ConversationsMixin = {
     },
 
     _startInflightPoll(conversationId, requestId) {
-        if (!this._isImmersive()) return;
         if (!conversationId) return;
+        if (!this._isImmersive() && !this._fbAiConfig) return;
 
         // Already polling this request
         if (this._inflightPollConversationId === conversationId && this._inflightPollRequestId === requestId && this._inflightPollTimer) {
@@ -431,6 +431,8 @@ export const ConversationsMixin = {
                     this.addMessageToDOM(entry.message, entry.isUser, index, opts);
                 });
                 this.hideTypingIndicator();
+                this.isTyping = false;
+                this._setSendButtonStop(false);
                 this._updateImmersiveQuickPromptsVisibility();
                 this.scrollToBottom();
                 this._stopInflightPoll();

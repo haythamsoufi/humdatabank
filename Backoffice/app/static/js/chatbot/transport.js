@@ -19,6 +19,54 @@ export const TransportMixin = {
         return (ts + '-' + rnd).slice(0, 64);
     },
 
+    _keepsRunningOnDisconnect() {
+        return this._isImmersive() || !!this._fbAiConfig;
+    },
+
+    _isRecoverableStreamFailure(error) {
+        if (!error) return false;
+        const msg = String(error.message || error);
+        return /\b502\b/.test(msg) || /\b503\b/.test(msg) || /\b504\b/.test(msg)
+            || /gateway timeout/i.test(msg) || /platform error/i.test(msg);
+    },
+
+    _isRecoverableHttpStatus(status) {
+        const code = Number(status);
+        return code === 502 || code === 503 || code === 504;
+    },
+
+    _detachStreamForBackgroundRecovery(ctx, inflightState, inflightKey) {
+        if (inflightState) inflightState.detached = true;
+        if (inflightKey) {
+            const inflight = this._inflightByConversationKey.get(inflightKey);
+            if (inflight) inflight.detached = true;
+        }
+        const steps = ctx && Array.isArray(ctx.steps) && ctx.steps.length
+            ? ctx.steps.map((s) => ({
+                message: s.message || '',
+                detail_lines: Array.isArray(s.detail_lines) ? s.detail_lines.slice() : [],
+            }))
+            : null;
+        const pollConvId = (ctx && ctx.conversation_id)
+            || (inflightState && inflightState.conversation_id)
+            || this.getActiveConversationId();
+        if (steps && pollConvId) {
+            this._detachedInflightStepsByKey.set(String(pollConvId), {
+                steps,
+                request_id: (ctx && ctx.request_id) || null,
+            });
+        }
+        if (pollConvId) {
+            this._startInflightPoll(
+                String(pollConvId),
+                (ctx && ctx.request_id) || (inflightState && inflightState.request_id) || null,
+            );
+        }
+        this.isTyping = true;
+        this.showTypingIndicator();
+        this._setSendButtonStop(true);
+    },
+
     _buildUnifiedChatPayload(userMessage, sendOptions = {}) {
         /**
          * Single source of truth for the /api/ai/v2 chat request contract.
@@ -53,9 +101,18 @@ export const TransportMixin = {
         if (sendOptions && sendOptions.branchFromEdit) payload.branch_from_edit = true;
 
         // Always include conversation_id when we have one, regardless of transport.
-        const convId = (this._isImmersive() && this.getActiveConversationId())
+        let convId = (this._isImmersive() && this.getActiveConversationId())
             ? this.getActiveConversationId()
             : (!this._isImmersive() && this._getFloatingConversationId ? this._getFloatingConversationId() : null);
+        // Form-builder AI uses keep_running_on_disconnect; pre-assign an id so gateway
+        // timeouts before SSE meta still allow polling recovery on the server conversation.
+        if (!convId && this._fbAiConfig) {
+            convId = this._generateClientMessageId();
+            try {
+                localStorage.setItem(this.floatingConversationIdKey, convId);
+            } catch (_) { /* ignore */ }
+            this._fbAiConversationId = convId;
+        }
         if (convId) payload.conversation_id = convId;
 
         // Privacy flags (server-side DLP)
@@ -479,8 +536,18 @@ export const TransportMixin = {
         if (!sendOptions.client_message_id) {
             sendOptions.client_message_id = this._generateClientMessageId();
         }
-        const inflightKey = this._isImmersive() ? this._getActiveConversationKey() : (this.getActiveConversationId() || null);
-        const inflightState = this._isImmersive()
+        if (this._fbAiConfig && !this.getActiveConversationId()) {
+            const cid = this._generateClientMessageId();
+            try {
+                localStorage.setItem(this.floatingConversationIdKey, cid);
+            } catch (_) { /* ignore */ }
+            this._fbAiConversationId = cid;
+        }
+        const trackInflight = this._isImmersive() || !!this._fbAiConfig;
+        const inflightKey = this._isImmersive()
+            ? this._getActiveConversationKey()
+            : (this.getActiveConversationId() || null);
+        const inflightState = trackInflight
             ? {
                 key: inflightKey,
                 status: 'in_progress',
@@ -535,35 +602,68 @@ export const TransportMixin = {
                     // Falling back to SSE would send the same query again and produce a
                     // duplicate trace. Propagate as a plain connection error instead.
                     if (wsError && wsError.alreadyDispatchedToServer) {
-                        console.warn('[Chatbot] Transport: WebSocket dropped after send — skipping SSE fallback to prevent duplicate submission');
-                        throw wsError;
+                        if (this._keepsRunningOnDisconnect()) {
+                            console.warn('[Chatbot] Transport: WebSocket dropped after send — detaching for poll recovery');
+                            if (inflightState) {
+                                inflightState.detached = true;
+                                const pollConvId = this.getActiveConversationId();
+                                if (pollConvId) {
+                                    this._startInflightPoll(pollConvId, inflightState.request_id || null);
+                                }
+                            }
+                            streamSucceeded = true;
+                        } else {
+                            console.warn('[Chatbot] Transport: WebSocket dropped after send — skipping SSE fallback to prevent duplicate submission');
+                            throw wsError;
+                        }
+                    } else {
+                        console.warn('[Chatbot] Transport: WebSocket failed, falling back to SSE:', wsError);
+                        this.isTyping = true;
+                        this.hideTypingIndicator(); // clear any partial WS steps before SSE retries from scratch
+                        this.showTypingIndicator();
+                        this._setSendButtonStop(true);
                     }
-                    console.warn('[Chatbot] Transport: WebSocket failed, falling back to SSE:', wsError);
-                    this.isTyping = true;
-                    this.hideTypingIndicator(); // clear any partial WS steps before SSE retries from scratch
-                    this.showTypingIndicator();
-                    this._setSendButtonStop(true);
                 }
             }
 
             if (useStreaming && !streamSucceeded) {
                 try {
-                    await this.streamResponseWithSSE(message, sendOptions, abortRef, detachRef, inflightKey);
+                    await this.streamResponseWithSSE(message, sendOptions, abortRef, detachRef, inflightKey, inflightState);
                     streamSucceeded = true;
                 } catch (sseError) {
                     const isUserAbort = sseError && (sseError.name === 'AbortError' || /aborted|cancelled|canceled/i.test(String(sseError.message || '')));
                     if (isUserAbort) {
                         throw sseError;
                     }
-                    console.warn('[Chatbot] Transport: SSE failed, falling back to HTTP JSON:', sseError);
-                    this.isTyping = true;
-                    this.hideTypingIndicator(); // clear any partial SSE steps before HTTP fallback
-                    this.showTypingIndicator();
-                    this._setSendButtonStop(true);
+                    if (this._keepsRunningOnDisconnect() && this._isRecoverableStreamFailure(sseError)) {
+                        console.warn('[Chatbot] Transport: SSE gateway failure — detaching (server may still run)');
+                        if (inflightState) inflightState.detached = true;
+                        const pollConvId = this.getActiveConversationId();
+                        if (pollConvId) {
+                            this._startInflightPoll(pollConvId, inflightState.request_id || null);
+                        }
+                        streamSucceeded = true;
+                    } else {
+                        console.warn('[Chatbot] Transport: SSE failed, falling back to HTTP JSON:', sseError);
+                        this.isTyping = true;
+                        this.hideTypingIndicator(); // clear any partial SSE steps before HTTP fallback
+                        this.showTypingIndicator();
+                        this._setSendButtonStop(true);
+                    }
                 }
             }
 
             if (!streamSucceeded) {
+                if (this._keepsRunningOnDisconnect()) {
+                    const pollConvId = this.getActiveConversationId();
+                    if (pollConvId) {
+                        if (inflightState) inflightState.detached = true;
+                        this._startInflightPoll(pollConvId, (inflightState && inflightState.request_id) || null);
+                        this.isTyping = true;
+                        this.showTypingIndicator();
+                        return;
+                    }
+                }
                 const response = await this.getAIResponse(message, sendOptions, abortRef);
                 this.hideTypingIndicator();
                 if (this._isServiceUnavailableResponse(response)) {
@@ -616,7 +716,7 @@ export const TransportMixin = {
             } else {
                 console.error('[Chatbot]', error);
             }
-            if (!isAbort) {
+            if (!isAbort && !(inflightState && inflightState.detached && this._keepsRunningOnDisconnect())) {
                 // Show error message in user's preferred language
                 const errorMessages = this.messages.errors?.connectionError || {
                     en: "I'm sorry, but I'm having trouble connecting right now. Please check your internet connection and try again."
@@ -631,9 +731,12 @@ export const TransportMixin = {
             }
         } finally {
             this._currentAbort = null;
-            this.isTyping = false;
-            this._setSendButtonStop(false);
-            this._log('Send button reset to ready');
+            const keepPollingUi = !!(inflightState && inflightState.detached && this._keepsRunningOnDisconnect());
+            if (!keepPollingUi) {
+                this.isTyping = false;
+                this._setSendButtonStop(false);
+                this._log('Send button reset to ready');
+            }
             if (inflightState) {
                 try {
                     // If the stream was detached (user switched to another chat), keep it marked in-progress.
@@ -656,7 +759,7 @@ export const TransportMixin = {
                         // Stream was detached (user switched conversation, SSE timed out,
                         // or page visibility changed).  Start polling the backend so the
                         // UI picks up the completed response when the worker finishes.
-                        if (inflightState.detached && this._isImmersive()) {
+                        if (inflightState.detached && this._keepsRunningOnDisconnect()) {
                             const pollConvId = inflightState.conversation_id
                                 || (keyToClear && !String(keyToClear).startsWith('draft:') ? String(keyToClear) : null);
                             // Always start polling the detached run: pollOnce stops itself if the user
@@ -1244,7 +1347,7 @@ export const TransportMixin = {
         });
     },
 
-    async streamResponseWithSSE(userMessage, sendOptions = {}, abortRef, detachRef, inflightKey) {
+    async streamResponseWithSSE(userMessage, sendOptions = {}, abortRef, detachRef, inflightKey, inflightState) {
         const startTime = performance.now();
 
         const payload = this._buildUnifiedChatPayload(userMessage, sendOptions);
@@ -1374,6 +1477,12 @@ export const TransportMixin = {
                 });
 
                 if (!resp.ok || !resp.body) {
+                    if (this._keepsRunningOnDisconnect() && this._isRecoverableHttpStatus(resp.status)) {
+                        this._log('SSE gateway failure before stream open; detaching for background recovery', { status: resp.status });
+                        this._detachStreamForBackgroundRecovery(ctx, inflightState, inflightKey);
+                        resolve(ctx.buffer || '');
+                        return;
+                    }
                     throw (window.httpErrorSync && window.httpErrorSync(resp, `SSE HTTP error! status: ${resp.status}`)) || new Error(`SSE HTTP error! status: ${resp.status}`);
                 }
                 this._log('SSE response open', { status: resp.status, content_type: resp.headers.get('content-type') });
@@ -1418,21 +1527,26 @@ export const TransportMixin = {
                 // In immersive mode the server may still be running (keep_running_on_disconnect),
                 // so treat as detach and let polling pick up the result.
                 if (!done) {
-                    if (this._isImmersive()) {
+                    if (this._keepsRunningOnDisconnect()) {
                         done = true;
                         clearTimeout(timeout);
                         if (ctx.contentElement) ctx.contentElement.classList.remove('streaming-cursor');
-                        this._log('SSE stream ended without done in immersive mode; treating as detach');
+                        this._log('SSE stream ended without done; treating as detach (server may continue)');
                         if (inflightKey) {
                             const inflight = this._inflightByConversationKey.get(inflightKey);
                             if (inflight) inflight.detached = true;
                         }
+                        if (inflightState) inflightState.detached = true;
                         const steps = Array.isArray(ctx.steps) && ctx.steps.length ? ctx.steps.map(s => ({ message: s.message || '', detail_lines: Array.isArray(s.detail_lines) ? s.detail_lines.slice() : [] })) : null;
                         if (steps) {
                             const key = ctx.conversation_id || (ctx._inflight_key && String(ctx._inflight_key).startsWith('draft:') ? null : ctx._inflight_key);
                             if (key) {
                                 this._detachedInflightStepsByKey.set(key, { steps, request_id: ctx.request_id || null });
                             }
+                        }
+                        const pollConvId = ctx.conversation_id || this.getActiveConversationId();
+                        if (pollConvId) {
+                            this._startInflightPoll(String(pollConvId), ctx.request_id || null);
                         }
                         resolve(ctx.buffer || '');
                     } else {
@@ -1458,18 +1572,18 @@ export const TransportMixin = {
                         }
                         resolve(ctx.buffer || '');
                     } else if (timedOut && !userAborted) {
-                        if (this._isImmersive()) {
-                            // In immersive mode the server continues (keep_running_on_disconnect);
-                            // treat timeout like a detach so polling picks up the result instead of
-                            // falling back to a new HTTP request (which would duplicate the agent execution).
+                        if (this._keepsRunningOnDisconnect()) {
+                            // Server continues (keep_running_on_disconnect); treat timeout like a detach
+                            // so polling picks up the result instead of falling back to HTTP JSON.
                             done = true;
                             clearTimeout(timeout);
                             if (ctx.contentElement) ctx.contentElement.classList.remove('streaming-cursor');
-                            this._log('SSE timed out in immersive mode; treating as detach (server continues)');
+                            this._log('SSE timed out; treating as detach (server continues)');
                             if (inflightKey) {
                                 const inflight = this._inflightByConversationKey.get(inflightKey);
                                 if (inflight) inflight.detached = true;
                             }
+                            if (inflightState) inflightState.detached = true;
                             const steps = Array.isArray(ctx.steps) && ctx.steps.length ? ctx.steps.map(s => ({ message: s.message || '', detail_lines: Array.isArray(s.detail_lines) ? s.detail_lines.slice() : [] })) : null;
                             if (steps) {
                                 const key = ctx.conversation_id || (ctx._inflight_key && String(ctx._inflight_key).startsWith('draft:') ? null : ctx._inflight_key);
@@ -1492,7 +1606,16 @@ export const TransportMixin = {
                         reject(e);
                     }
                 } else {
-                    finish(false, e?.message || 'SSE error');
+                    if (this._keepsRunningOnDisconnect() && this._isRecoverableStreamFailure(e)) {
+                        done = true;
+                        clearTimeout(timeout);
+                        if (ctx.contentElement) ctx.contentElement.classList.remove('streaming-cursor');
+                        this._log('SSE gateway failure during stream; detaching for background recovery');
+                        this._detachStreamForBackgroundRecovery(ctx, inflightState, inflightKey);
+                        resolve(ctx.buffer || '');
+                    } else {
+                        finish(false, e?.message || 'SSE error');
+                    }
                 }
             }
         });

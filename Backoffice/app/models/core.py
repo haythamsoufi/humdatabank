@@ -77,6 +77,7 @@ class User(UserMixin, db.Model):
     # User preferences
     chatbot_enabled = db.Column(db.Boolean, default=True, nullable=False)
     profile_color = db.Column(db.String(7), default='#3B82F6', nullable=False)  # Hex color code
+    preferred_language = db.Column(db.String(10), nullable=True, default='en')
 
     # Quiz game score
     quiz_score = db.Column(db.Integer, default=0, nullable=False)  # Total quiz points accumulated
@@ -109,6 +110,11 @@ class User(UserMixin, db.Model):
     def all_countries(self):
         """Get all countries user has access to via entity permissions."""
         return list(self.countries.all())
+
+    @property
+    def preferred_language_code(self) -> str:
+        """Preferred UI language as ISO code (normalized)."""
+        return Country.normalize_language_code(getattr(self, "preferred_language", None))
 
     def set_password(self, password):
         try:

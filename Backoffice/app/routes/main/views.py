@@ -69,27 +69,15 @@ def language_flag_svg(language):
 def set_language(language):
     """Set the language for the current session"""
     from app.utils.redirect_utils import get_safe_redirect_url, is_safe_redirect_url
-    from config import Config
-    supported = list(current_app.config.get("SUPPORTED_LANGUAGES", Config.LANGUAGES) or [])
-    lang_norm = str(language).lower().replace("-", "_")
-    base = lang_norm.split("_")[0] if lang_norm else ""
+    from app.i18n import persist_user_preferred_language, resolve_supported_language
+    from flask_login import current_user
 
-    resolved = None
-    if language in supported:
-        resolved = str(language).lower()
-    elif lang_norm in supported:
-        resolved = lang_norm
-    elif base and base in supported:
-        resolved = base
-    else:
-        for s in supported:
-            s_norm = str(s).lower().replace("-", "_")
-            if s_norm == lang_norm or (s_norm.split("_")[0] == base and base):
-                resolved = str(s).lower()
-                break
+    resolved = resolve_supported_language(language)
 
     if resolved:
         session["language"] = resolved
+        if current_user.is_authenticated:
+            persist_user_preferred_language(current_user, resolved)
         try:
             from flask_babel import refresh
 

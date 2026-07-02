@@ -1,0 +1,73 @@
+{# Shown when the UI language is not English. Dismissal is persisted in localStorage. #}
+{% set session_lang_norm = (session.get('language', 'en')|string|lower|replace('-', '_')) %}
+{% set session_lang_base = (session_lang_norm.split('_')[0] if session_lang_norm else 'en') %}
+{% if session_lang_base != 'en' %}
+<div id="autoTranslationNoticeBanner"
+     class="auto-translation-notice-banner"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="autoTranslationNoticeTitle"
+     aria-describedby="autoTranslationNoticeDesc">
+    <div class="auto-translation-notice-banner__backdrop modal-backdrop" aria-hidden="true"></div>
+    <div class="auto-translation-notice-banner__panel">
+        <div class="auto-translation-notice-banner__card">
+            <div class="auto-translation-notice-banner__header">
+                <span class="auto-translation-notice-banner__icon" aria-hidden="true">
+                    <i class="fas fa-language"></i>
+                </span>
+                <h2 id="autoTranslationNoticeTitle" class="auto-translation-notice-banner__title">{{ _('Translation notice') }}</h2>
+            </div>
+            <p id="autoTranslationNoticeDesc" class="auto-translation-notice-banner__text">
+                {{ _('Everything is automatically translated. A human review will happen soon.') }}
+            </p>
+            <button type="button"
+                    id="autoTranslationNoticeDismiss"
+                    class="btn btn-success btn-lg btn-block auto-translation-notice-banner__action">
+                {{ _('I understand') }}
+            </button>
+        </div>
+    </div>
+</div>
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    var STORAGE_KEY = 'humdb_auto_translation_notice_dismissed';
+    var banner = document.getElementById('autoTranslationNoticeBanner');
+    if (!banner) return;
+
+    function dismissNotice() {
+        if (banner.classList.contains('auto-translation-notice-banner--dismissed')) return;
+        banner.classList.add('auto-translation-notice-banner--dismissed');
+        document.body.classList.remove('auto-translation-notice-open');
+        try { localStorage.setItem(STORAGE_KEY, '1'); } catch (_) {}
+        setTimeout(function () {
+            if (banner.parentElement) banner.remove();
+        }, 240);
+    }
+
+    try {
+        if (localStorage.getItem(STORAGE_KEY) === '1') {
+            banner.remove();
+            return;
+        }
+    } catch (_) {}
+
+    document.body.classList.add('auto-translation-notice-open');
+
+    document.addEventListener('DOMContentLoaded', function () {
+        var btn = document.getElementById('autoTranslationNoticeDismiss');
+        if (!btn) return;
+
+        btn.addEventListener('click', dismissNotice);
+
+        document.addEventListener('keydown', function onEscape(event) {
+            if (event.key === 'Escape') {
+                dismissNotice();
+                document.removeEventListener('keydown', onEscape);
+            }
+        });
+
+        btn.focus({ preventScroll: true });
+    });
+})();
+</script>
+{% endif %}

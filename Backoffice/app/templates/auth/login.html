@@ -1388,6 +1388,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
 createNodes();
 animate();
+
+(function () {
+    var azureBtn = document.getElementById('azureLoginButton');
+    if (!azureBtn) return;
+    azureBtn.addEventListener('click', function (event) {
+        if (azureBtn.classList.contains('disabled') || azureBtn.getAttribute('aria-disabled') === 'true') {
+            event.preventDefault();
+            return;
+        }
+        azureBtn.classList.add('disabled');
+        azureBtn.setAttribute('aria-disabled', 'true');
+    });
+})();
 </script>
 
 {% endblock %}

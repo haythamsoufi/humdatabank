@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any, Optional
 
-from flask import current_app, url_for
+from flask import current_app
 from markupsafe import escape
 
 from app.extensions import db
@@ -38,6 +38,9 @@ from app.utils.datetime_helpers import (
     org_day_start_utc,
 )
 from app.utils.organization_helpers import get_org_copyright_year, get_org_name, get_org_team_email
+
+# Stable path for user_management.access_requests (scheduler has no HTTP request context).
+ACCESS_REQUESTS_ADMIN_PATH = '/admin/access-requests'
 
 
 @dataclass
@@ -252,6 +255,12 @@ def _pending_digest_counts() -> tuple[int, int]:
     return len(pending), without_fds
 
 
+def _access_requests_admin_url() -> str:
+    """Admin access-requests URL for digest emails (works outside HTTP request context)."""
+    base_url = (current_app.config.get('BASE_URL') or 'http://localhost:5000').rstrip('/')
+    return f"{base_url}{ACCESS_REQUESTS_ADMIN_PATH}"
+
+
 def send_fds_access_request_digest_email(user: User, requests, existing_log=None) -> bool:
     """Send one FDS member digest listing pending access requests for their countries."""
     if not user or not user.email or not requests:
@@ -259,8 +268,7 @@ def send_fds_access_request_digest_email(user: User, requests, existing_log=None
 
     count = len(requests)
     subject = f"{FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX}{count} pending request(s)"
-    base_url = current_app.config.get('BASE_URL', 'http://localhost:5000').rstrip('/')
-    access_requests_url = f"{base_url}{url_for('user_management.access_requests')}"
+    access_requests_url = _access_requests_admin_url()
     org_name = get_org_name()
     copyright_year = get_org_copyright_year()
     user_name = fds_member_user_display_name(user)

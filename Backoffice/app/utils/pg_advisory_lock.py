@@ -53,6 +53,20 @@ def try_session_advisory_lock(session, lock_id: int) -> bool:
     )
 
 
+def acquire_transaction_advisory_lock(session, lock_id: int) -> None:
+    """Acquire a transaction-scoped advisory lock (PostgreSQL only).
+
+    The lock is released automatically when the surrounding transaction commits
+    or rolls back. No-op on non-PostgreSQL dialects (e.g. SQLite tests).
+    """
+    if session.get_bind().dialect.name != "postgresql":
+        return
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(:lock_id)"),
+        {"lock_id": int(lock_id)},
+    )
+
+
 def release_session_advisory_lock(session, lock_id: int, *, acquired: bool) -> None:
     """Release a session advisory lock if this connection still holds it."""
     if not acquired:

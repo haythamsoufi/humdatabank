@@ -69,3 +69,12 @@ class TestUserModel:
             user = create_test_user(db_session, email='test@example.com', name='Test User')
             # Should have some string representation
             assert str(user) or repr(user)
+
+    def test_user_preferred_language_code(self, db_session, app):
+        """Test preferred UI language normalization."""
+        with app.app_context():
+            user = create_test_user(db_session, preferred_language='fr_FR')
+            assert user.preferred_language_code == 'fr'
+
+            user.preferred_language = None
+            assert user.preferred_language_code == 'en'

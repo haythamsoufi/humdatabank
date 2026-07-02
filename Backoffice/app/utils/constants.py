@@ -18,6 +18,9 @@ DEFAULT_SESSION_CLEANUP_LOCK_ID = 702345
 # (prevents two concurrent runs even if the file-based scheduler lock fails)
 DEFAULT_SCHEDULED_NOTIFICATIONS_LOCK_ID = 702346
 
+# Base for per-user OAuth callback advisory locks (lock_id = base + user_id % 1_000_000)
+DEFAULT_OAUTH_CALLBACK_LOCK_ID_BASE = 702347
+
 # ---------------------------------------------------------------------------
 # IFRC API Appeals Type IDs (Unified Planning: Plan, Mid-Year Report, Annual Report)
 # ---------------------------------------------------------------------------

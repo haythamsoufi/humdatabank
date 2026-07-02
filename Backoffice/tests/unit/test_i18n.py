@@ -57,6 +57,73 @@ class TestGetLocale:
                 result = get_locale()
                 assert result in ['ar', 'fr']
 
+    def test_returns_user_preferred_language_when_session_empty(self, app):
+        """Authenticated users fall back to stored preferred_language."""
+        with app.test_request_context('/'):
+            mock_user = MagicMock()
+            mock_user.is_authenticated = True
+            mock_user.preferred_language = 'fr'
+
+            with patch('app.i18n.session', {}):
+                with patch('app.i18n.current_user', mock_user):
+                    app.config['SUPPORTED_LANGUAGES'] = ['en', 'fr']
+                    from app.i18n import get_locale
+                    assert get_locale() == 'fr'
+
+
+class TestResolveSupportedLanguage:
+    def test_exact_match(self, app):
+        with app.app_context():
+            app.config['SUPPORTED_LANGUAGES'] = ['en', 'fr', 'pt_BR']
+            from app.i18n import resolve_supported_language
+            assert resolve_supported_language('fr') == 'fr'
+            assert resolve_supported_language('pt-BR') == 'pt_br'
+
+    def test_unsupported_returns_none(self, app):
+        with app.app_context():
+            app.config['SUPPORTED_LANGUAGES'] = ['en', 'fr']
+            from app.i18n import resolve_supported_language
+            assert resolve_supported_language('zz') is None
+
+
+class TestPersistUserPreferredLanguage:
+    def test_persists_when_value_changes(self, app):
+        with app.app_context():
+            user = MagicMock()
+            user.id = 1
+            user.preferred_language = 'en'
+
+            with patch('app.extensions.db') as mock_db:
+                from app.i18n import persist_user_preferred_language
+                assert persist_user_preferred_language(user, 'fr') is True
+                assert user.preferred_language == 'fr'
+                mock_db.session.commit.assert_called_once()
+
+    def test_skips_commit_when_unchanged(self, app):
+        with app.app_context():
+            user = MagicMock()
+            user.preferred_language = 'fr'
+
+            with patch('app.extensions.db') as mock_db:
+                from app.i18n import persist_user_preferred_language
+                assert persist_user_preferred_language(user, 'fr') is True
+                mock_db.session.commit.assert_not_called()
+
+
+class TestSeedSessionLanguageFromUser:
+    def test_seeds_supported_language(self, app):
+        with app.test_request_context('/'):
+            user = MagicMock()
+            user.preferred_language = 'fr'
+            mock_session = MagicMock()
+
+            with patch('app.i18n.session', mock_session):
+                with patch('app.i18n.resolve_supported_language', return_value='fr'):
+                    from app.i18n import seed_session_language_from_user
+                    seed_session_language_from_user(user)
+                    mock_session.__setitem__.assert_any_call('language', 'fr')
+                    assert mock_session.permanent is True
+
 
 # ---------------------------------------------------------------------------
 # update_session_activity

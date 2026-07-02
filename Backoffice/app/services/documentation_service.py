@@ -55,13 +55,18 @@ class NavCategory:
     icon: Optional[str] = None
 
 
-# Temporarily disabled until all documentation pages are reviewed for PDF export.
-DOCS_PDF_EXPORT_ENABLED = False
-
-
 def is_pdf_export_enabled() -> bool:
-    """Whether the documentation UI and export.pdf routes are available."""
-    return DOCS_PDF_EXPORT_ENABLED
+    """Whether the documentation UI and export.pdf routes are available.
+
+    Temporarily disabled on production until all documentation pages are reviewed.
+    """
+    try:
+        flask_config = current_app.config.get("FLASK_CONFIG")
+    except RuntimeError:
+        flask_config = None
+    if not flask_config:
+        flask_config = os.environ.get("FLASK_CONFIG")
+    return str(flask_config or "").lower() != "production"
 
 
 def docs_root() -> Path:

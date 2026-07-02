@@ -695,6 +695,8 @@ class Config:
     SESSION_INACTIVITY_TIMEOUT = timedelta(
         minutes=int(os.environ.get('SESSION_INACTIVITY_TIMEOUT_MINUTES', 30))
     )
+    # Azure/OAuth: reuse an active session from the same device when duplicate callbacks arrive within this window
+    OAUTH_LOGIN_DEDUP_SECONDS = int(os.environ.get('OAUTH_LOGIN_DEDUP_SECONDS', 90))
 
     # AI Chatbot Configuration
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')

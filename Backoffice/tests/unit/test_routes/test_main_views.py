@@ -112,6 +112,18 @@ class TestSetLanguage:
         with client.session_transaction() as sess:
             assert sess.get("language") == "fr"
 
+    def test_valid_language_persists_for_logged_in_user(self, client, app):
+        app.config["SUPPORTED_LANGUAGES"] = ["en", "fr", "es"]
+        mock_user = MagicMock()
+        mock_user.is_authenticated = True
+
+        with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=False), \
+             patch("flask_login.current_user", mock_user), \
+             patch("app.i18n.persist_user_preferred_language") as persist:
+            resp = client.get("/language/es")
+        assert resp.status_code == 302
+        persist.assert_called_once_with(mock_user, "es")
+
     def test_unsupported_language_still_redirects(self, client, app):
         app.config["SUPPORTED_LANGUAGES"] = ["en", "fr"]
         with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=False):

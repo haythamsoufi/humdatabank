@@ -13,6 +13,8 @@ from app.services.country_access_request_service import (
     pending_country_access_requests_by_fds_member,
 )
 from app.services.email.fds_access_request_digest import (
+    ACCESS_REQUESTS_ADMIN_PATH,
+    _access_requests_admin_url,
     run_fds_access_request_digest_job,
     send_fds_access_request_digest_email,
     send_fds_access_request_digests,
@@ -172,6 +174,13 @@ class TestSendFdsAccessRequestDigests:
         with app.app_context():
             assert send_fds_access_request_digest_email(admin_user, []) is False
 
+    def test_access_requests_admin_url_uses_base_url_without_request_context(self, app):
+        with app.app_context():
+            app.config["BASE_URL"] = "https://databank.ifrc.org"
+            assert _access_requests_admin_url() == (
+                f"https://databank.ifrc.org{ACCESS_REQUESTS_ADMIN_PATH}"
+            )
+
     def test_send_digest_email_ccs_team_email(self, db_session, app, admin_user):
         with app.app_context():
             country = create_test_country(db_session, iso3="TCC", iso2="TC")
@@ -223,6 +232,35 @@ class TestSendFdsAccessRequestDigests:
                 assert send_fds_access_request_digest_email(fds_user, [req]) is True
 
             assert mock_send.call_args.kwargs.get("cc") is None
+
+    def test_send_digest_email_builds_url_without_request_context(
+        self, db_session, app, admin_user
+    ):
+        """Scheduled digest runs in app context only — must not call url_for()."""
+        with app.app_context():
+            app.config["BASE_URL"] = "https://databank.ifrc.org"
+            country = create_test_country(db_session, iso3="URL", iso2="UR")
+            country.fds_member_user_id = admin_user.id
+            db_session.commit()
+            requester = create_test_user(db_session, email="url-test@example.com")
+            req = _make_access_request(db_session, requester, country)
+
+            with patch(
+                "app.services.email.fds_access_request_digest.get_org_team_email",
+                return_value=None,
+            ), patch(
+                "app.services.email.fds_access_request_digest.send_email",
+                return_value=True,
+            ) as mock_send, patch(
+                "app.services.email.fds_access_request_digest.log_email_attempt",
+                return_value=type("Log", (), {"id": 99})(),
+            ), patch(
+                "app.services.email.fds_access_request_digest.mark_email_sent",
+            ):
+                assert send_fds_access_request_digest_email(admin_user, [req]) is True
+
+            html = mock_send.call_args.kwargs["html"]
+            assert "https://databank.ifrc.org/admin/access-requests" in html
 
 
 class TestRunFdsAccessRequestDigestJob:

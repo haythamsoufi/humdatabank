@@ -21,7 +21,7 @@ from jwt.algorithms import RSAAlgorithm
 from app.utils.datetime_helpers import utcnow, ensure_utc
 from app.services.user_analytics_service import (
     log_login_attempt, log_logout, start_user_session, log_user_activity, log_user_activity_for_user,
-    create_security_event, get_client_ip, add_session_to_blacklist,
+    create_security_event, get_client_ip, get_client_info, add_session_to_blacklist,
 )
 from app.utils.redirect_utils import safe_redirect, is_safe_redirect_url
 from app.utils.rate_limiting import auth_rate_limit, password_reset_rate_limit
@@ -223,6 +223,9 @@ def login():
             session.permanent = True
 
             login_user(user)
+            from app.i18n import seed_session_language_from_user
+
+            seed_session_language_from_user(user)
 
             # Log successful login
             log_login_attempt(user.email, success=True, user=user, session_id=session_id)
@@ -768,7 +771,15 @@ def azure_callback():
     # Prevent session fixation: clear pre-auth session data before binding user
     session.clear()
 
-    session_id = str(uuid.uuid4())
+    from app.services.oauth_callback_guard import resolve_azure_b2c_login_session
+
+    client_info = get_client_info()
+    session_id, created_new_session = resolve_azure_b2c_login_session(
+        user=user,
+        ip_address=client_info['ip_address'],
+        browser=client_info.get('browser'),
+        device_type=client_info.get('device_type'),
+    )
     session['session_id'] = session_id
     session['session_start'] = utcnow().isoformat()
     session['last_activity'] = utcnow().isoformat()
@@ -777,15 +788,25 @@ def azure_callback():
         session['b2c_id_token'] = id_token
 
     login_user(user)
+    from app.i18n import seed_session_language_from_user
 
-    # Log successful login
-    with suppress(Exception):
-        log_login_attempt(user.email, success=True, user=user, session_id=session_id)
-        start_user_session(user, session_id)
-        log_user_activity(
-            activity_type='login',
-            description=f'User {user.email} logged in via Azure AD B2C',
-            context_data={'user_id': user.id, 'session_id': session_id, 'idp': 'azure_b2c'}
+    seed_session_language_from_user(user)
+
+    # Log successful login (skip analytics when callback was deduplicated)
+    if created_new_session:
+        with suppress(Exception):
+            log_login_attempt(user.email, success=True, user=user, session_id=session_id)
+            start_user_session(user, session_id)
+            log_user_activity(
+                activity_type='login',
+                description=f'User {user.email} logged in via Azure AD B2C',
+                context_data={'user_id': user.id, 'session_id': session_id, 'idp': 'azure_b2c'}
+            )
+    else:
+        current_app.logger.info(
+            "Azure B2C callback deduplicated for %s — bound cookie to existing session %s",
+            user.email,
+            session_id[:8],
         )
 
     # Clean up any legacy single-key PKCE vars left from old deployments

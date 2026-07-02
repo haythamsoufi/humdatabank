@@ -34,7 +34,7 @@ class APIKeyForm(FlaskForm):
     expires_at = DateTimeField(
         'Expiration Date',
         validators=[Optional()],
-        formats=['%Y-%m-%dT%H:%M', '%Y-%m-%d'],
+        format=['%Y-%m-%dT%H:%M', '%Y-%m-%d'],
         description='Optional expiration date for this API key (leave blank for no expiration)'
     )
 
@@ -70,7 +70,7 @@ class APIKeyEditForm(FlaskForm):
     expires_at = DateTimeField(
         'Expiration Date',
         validators=[Optional()],
-        formats=['%Y-%m-%dT%H:%M', '%Y-%m-%d'],
+        format=['%Y-%m-%dT%H:%M', '%Y-%m-%d'],
         description='Optional expiration date (leave blank for no expiration)'
     )
 

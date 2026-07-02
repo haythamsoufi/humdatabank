@@ -30,6 +30,7 @@ from app.utils.advanced_validation import validate_upload_extension_and_mime
 from app.utils.file_parsing import EXCEL_EXTENSIONS, XLSX_EXTENSIONS
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.api_responses import json_forbidden, json_bad_request, json_not_found, json_ok, json_server_error
+from app.utils.json_helpers import deep_copy_json as _deep_copy_json_value
 from config.config import Config
 from .helpers import (_handle_template_sharing, _handle_template_pages, _populate_template_sharing,
     _build_template_data_for_js, _clone_template_structure_between_templates,
@@ -1658,6 +1659,7 @@ def duplicate_template(template_id):
             enable_data_quality=source_version.enable_data_quality if source_version else False,
             data_quality_methodology=source_version.data_quality_methodology if source_version else None,
             validation_rule_pack=source_version.validation_rule_pack if source_version else None,
+            variables=_deep_copy_json_value(source_version.variables) if source_version and source_version.variables else None,
         )
         db.session.add(new_published)
         db.session.flush()

@@ -12,6 +12,7 @@ from app.utils.datetime_helpers import utcnow
 from sqlalchemy import func
 from config.config import Config
 from .cloning import _clone_template_structure
+from app.utils.json_helpers import deep_copy_json as _deep_copy_json_value
 import json
 
 
@@ -96,7 +97,19 @@ def _get_or_create_draft_version(template: FormTemplate, user_id: int) -> FormTe
             updated_at=now,
             name=version_name,
             name_translations=version_translations,
-            description_translations=version_desc_translations
+            description=first_version.description if first_version else None,
+            description_translations=version_desc_translations,
+            add_to_self_report=first_version.add_to_self_report if first_version else False,
+            display_order_visible=first_version.display_order_visible if first_version else False,
+            is_paginated=first_version.is_paginated if first_version else False,
+            enable_export_pdf=first_version.enable_export_pdf if first_version else False,
+            enable_export_excel=first_version.enable_export_excel if first_version else False,
+            enable_import_excel=first_version.enable_import_excel if first_version else False,
+            enable_ai_validation=first_version.enable_ai_validation if first_version else False,
+            enable_data_quality=first_version.enable_data_quality if first_version else False,
+            data_quality_methodology=first_version.data_quality_methodology if first_version else None,
+            validation_rule_pack=first_version.validation_rule_pack if first_version else None,
+            variables=_deep_copy_json_value(first_version.variables) if first_version and first_version.variables else None,
         )
         db.session.add(published)
         db.session.flush()
@@ -141,7 +154,11 @@ def _get_or_create_draft_version(template: FormTemplate, user_id: int) -> FormTe
         enable_export_pdf=published.enable_export_pdf,
         enable_export_excel=published.enable_export_excel,
         enable_import_excel=published.enable_import_excel,
-        enable_ai_validation=published.enable_ai_validation
+        enable_ai_validation=published.enable_ai_validation,
+        enable_data_quality=published.enable_data_quality,
+        data_quality_methodology=published.data_quality_methodology,
+        validation_rule_pack=published.validation_rule_pack,
+        variables=_deep_copy_json_value(published.variables) if published.variables else None,
     )
     db.session.add(draft)
     db.session.flush()

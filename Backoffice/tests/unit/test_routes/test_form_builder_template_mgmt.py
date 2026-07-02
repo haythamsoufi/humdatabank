@@ -68,6 +68,24 @@ class TestGetOrCreateDraftVersion:
         ).all()
         assert len(cloned) == 1
 
+    def test_creates_draft_copies_variables_from_published_version(self, app, db_session):
+        from app.models import FormTemplateVersion
+        user = create_test_admin(db_session)
+        template = create_test_template(db_session)
+        published = FormTemplateVersion.query.get(template.published_version_id)
+        published.variables = {
+            "reporting_year": {
+                "variable_type": "metadata",
+                "metadata_type": "assignment_period",
+            }
+        }
+        db_session.flush()
+
+        draft = _get_or_create_draft_version(template, user.id)
+
+        assert draft.variables == published.variables
+        assert draft.variables is not published.variables
+
     def test_creates_published_baseline_when_missing(self, app, db_session):
         from app.models import FormTemplate, FormTemplateVersion
         user = create_test_admin(db_session)
@@ -82,7 +100,13 @@ class TestGetOrCreateDraftVersion:
             template_id=template.id,
             version_number=1,
             status='published',
-            name="Test"
+            name="Test",
+            variables={
+                "reporting_year": {
+                    "variable_type": "metadata",
+                    "metadata_type": "assignment_period",
+                }
+            },
         )
         db_session.add(version)
         db_session.flush()
@@ -91,6 +115,8 @@ class TestGetOrCreateDraftVersion:
         draft = _get_or_create_draft_version(template, user.id)
         assert draft is not None
         assert draft.status == 'draft'
+        assert draft.variables == version.variables
+        assert draft.variables is not version.variables
 
 
 class TestHandleTemplatePages:

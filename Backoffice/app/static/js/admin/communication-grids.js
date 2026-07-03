@@ -303,8 +303,49 @@ class CommunicationsGridManager {
     /**
      * Build column definitions for notifications grid
      */
+    hasEmailAttentionRows() {
+        const counter = window.countFailedEmailsInNotificationsData;
+        if (typeof counter === 'function') {
+            return counter(this.data) > 0;
+        }
+        const cfg = window.communicationPageConfig || {};
+        return Number(cfg.failedEmailDeliveryCount) > 0;
+    }
+
+    hasSkippedEmailRows() {
+        if (!Array.isArray(this.data)) {
+            return false;
+        }
+        return this.data.some((row) => row && row.has_email && String(row.email_status || '').toLowerCase() === 'skipped');
+    }
+
+    hasEmailRows() {
+        if (!Array.isArray(this.data)) {
+            return false;
+        }
+        return this.data.some((row) => row && row.has_email);
+    }
+
+    shouldShowEmailDetailColumns() {
+        return this.hasEmailAttentionRows() || this.hasSkippedEmailRows() || this.hasEmailRows();
+    }
+
+    renderNotApplicable() {
+        const t = this.translations;
+        return `<span class="text-xs text-gray-400">${t.notApplicable || 'N/A'}</span>`;
+    }
+
+    isEmailOnlyRow(data) {
+        return !!(data && data.row_kind === 'email');
+    }
+
+    hasNotificationFields(data) {
+        return !!(data && data.has_notification);
+    }
+
     buildColumnDefs() {
         const t = this.translations;
+        const self = this;
         const recipientColumns = [
             {
                 field: 'user_name',
@@ -315,7 +356,11 @@ class CommunicationsGridManager {
                 filter: 'agTextColumnFilter',
                 sortable: true,
                 cellRenderer: (params) => {
-                    const iconHtml = this.renderNotificationPreview(params);
+                    const iconHtml = self.isEmailOnlyRow(params.data)
+                        ? `<div class="notification-grid-action-circle rounded-full flex items-center justify-center" style="width:2.25rem;height:2.25rem;background-color:#eff6ff" aria-hidden="true">
+                            <i class="fas fa-envelope text-sm text-blue-600"></i>
+                           </div>`
+                        : self.renderNotificationPreview(params);
                     const userHtml = AgGridRenderers.userHoverCell(params, {
                         idField: 'user_id',
                         nameField: 'user_name',
@@ -356,6 +401,7 @@ class CommunicationsGridManager {
                     maxWidth: 400,
                     filter: 'agTextColumnFilter',
                     sortable: true,
+                    cellRenderer: (params) => this.renderNotificationField(params, 'title'),
                     cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
                 },
                 {
@@ -367,6 +413,7 @@ class CommunicationsGridManager {
                     filter: 'agTextColumnFilter',
                     sortable: true,
                     hide: true,
+                    cellRenderer: (params) => this.renderNotificationField(params, 'message'),
                     cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
                 },
                 {
@@ -377,7 +424,10 @@ class CommunicationsGridManager {
                     maxWidth: 150,
                     filter: 'customSetFilter',
                     sortable: true,
-                    cellRenderer: (params) => this.renderPriority(params)
+                    hide: true,
+                    cellRenderer: (params) => this.hasNotificationFields(params.data)
+                        ? this.renderPriority(params)
+                        : this.renderNotApplicable()
                 },
                 {
                     field: 'is_read',
@@ -387,7 +437,10 @@ class CommunicationsGridManager {
                     maxWidth: 150,
                     filter: 'customSetFilter',
                     sortable: true,
-                    cellRenderer: (params) => this.renderStatus(params)
+                    hide: true,
+                    cellRenderer: (params) => this.hasNotificationFields(params.data)
+                        ? this.renderStatus(params)
+                        : this.renderNotApplicable()
                 },
                 {
                     field: 'created_at',
@@ -397,7 +450,9 @@ class CommunicationsGridManager {
                     maxWidth: 250,
                     filter: 'agTextColumnFilter',
                     sortable: true,
-                    cellRenderer: AgGridRenderers.dateTime
+                    cellRenderer: (params) => this.hasNotificationFields(params.data)
+                        ? AgGridRenderers.dateTime(params)
+                        : this.renderNotApplicable()
                 }
             ]
         };
@@ -413,7 +468,7 @@ class CommunicationsGridManager {
                     maxWidth: 160,
                     filter: 'customSetFilter',
                     sortable: true,
-                    hide: true,
+                    hide: !this.shouldShowEmailDetailColumns(),
                     cellRenderer: (params) => this.renderEmailStatus(params)
                 },
                 {
@@ -424,6 +479,7 @@ class CommunicationsGridManager {
                     maxWidth: 360,
                     filter: 'agTextColumnFilter',
                     sortable: true,
+                    cellRenderer: (params) => this.renderEmailField(params, 'email_subject'),
                     cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
                 },
                 {
@@ -446,7 +502,18 @@ class CommunicationsGridManager {
                     maxWidth: 220,
                     filter: 'agTextColumnFilter',
                     sortable: true,
-                    cellRenderer: AgGridRenderers.dateTime
+                    cellRenderer: (params) => this.renderEmailTimestamp(params, 'email_sent_at', 'email_logged_at')
+                },
+                {
+                    field: 'email_logged_at',
+                    headerName: t.emailLoggedAt || 'Email Logged At',
+                    width: 170,
+                    minWidth: 140,
+                    maxWidth: 220,
+                    filter: 'agTextColumnFilter',
+                    sortable: true,
+                    hide: true,
+                    cellRenderer: (params) => this.renderEmailField(params, 'email_logged_at', true)
                 },
                 {
                     field: 'email_error',
@@ -479,6 +546,54 @@ class CommunicationsGridManager {
         ]);
     }
 
+    renderNotificationField(params, fieldName) {
+        if (!this.hasNotificationFields(params.data)) {
+            return this.renderNotApplicable();
+        }
+        const value = params.data ? params.data[fieldName] : '';
+        if (!value) {
+            return this.renderNotApplicable();
+        }
+        const esc = (s) => String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        return `<span class="text-sm text-gray-900 break-words">${esc(value)}</span>`;
+    }
+
+    renderEmailField(params, fieldName, asDateTime) {
+        const d = params.data || {};
+        if (!d.has_email) {
+            return this.renderNotApplicable();
+        }
+        const value = d[fieldName];
+        if (!value) {
+            return this.renderNotApplicable();
+        }
+        if (asDateTime && AgGridRenderers.dateTime) {
+            return AgGridRenderers.dateTime({ ...params, value });
+        }
+        const esc = (s) => String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        return `<span class="text-sm text-gray-900 break-words">${esc(value)}</span>`;
+    }
+
+    renderEmailTimestamp(params, primaryField, fallbackField) {
+        const d = params.data || {};
+        if (!d.has_email) {
+            return this.renderNotApplicable();
+        }
+        const value = d[primaryField] || d[fallbackField];
+        if (!value) {
+            return this.renderNotApplicable();
+        }
+        return AgGridRenderers.dateTime({ ...params, value });
+    }
+
     renderEmailStatus(params) {
         const t = this.translations;
         const d = params.data || {};
@@ -491,6 +606,7 @@ class CommunicationsGridManager {
         if (status === 'sent') badgeClass = 'bg-green-100 text-green-800';
         else if (status === 'pending') badgeClass = 'bg-yellow-100 text-yellow-800';
         else if (status === 'failed') badgeClass = 'bg-red-100 text-red-800';
+        else if (status === 'skipped') badgeClass = 'bg-slate-100 text-slate-700';
         else if (status === 'cancelled') badgeClass = 'bg-gray-100 text-gray-600';
         return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${badgeClass}">${label}</span>`;
     }
@@ -554,9 +670,13 @@ class CommunicationsGridManager {
      * Render notification type cell
      */
     renderNotificationType(params) {
-        if (!params.value) return '';
-        // Use formatted display value from backend if available
-        return params.data.notification_type_display || params.value.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        if (!this.hasNotificationFields(params.data)) {
+            return this.renderNotApplicable();
+        }
+        if (!params.value) {
+            return this.renderNotApplicable();
+        }
+        return params.data.notification_type_display || params.value.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
     }
 
     /**
@@ -580,8 +700,12 @@ class CommunicationsGridManager {
      */
     renderStatus(params) {
         const t = this.translations;
-        if (params.data.is_archived) {
-            return `<span class="text-gray-500"><i class="fas fa-archive mr-1"></i>${t.archived || 'Archived'}</span>`;
+        const data = params.data || {};
+        if (data.is_archived) {
+            const archivedLabel = data.included_for_email_failure
+                ? `${t.archived || 'Archived'} · ${t.emailGroup || 'Email'}`
+                : (t.archived || 'Archived');
+            return `<span class="text-gray-500"><i class="fas fa-archive mr-1"></i>${archivedLabel}</span>`;
         } else if (params.value) {
             return `<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>${t.read || 'Read'}</span>`;
         } else {

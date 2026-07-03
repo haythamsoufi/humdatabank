@@ -5,7 +5,8 @@ The legacy ``UserSessionLog.actions_performed`` counter can diverge (e.g. histor
 mobile per-request increments). For admin session grids we count
 ``UserActivityLog`` + ``AdminActionLog`` rows using the same exclusions and session
 window as ``/admin/analytics/audit-trail?session_id=…`` (default view: no page_view).
-Login and logout rows are omitted from this count only; they remain in the audit trail.
+Login and logout are recorded for ``/admin/analytics/login-logs`` but omitted from the
+audit trail and session activity counts.
 """
 
 from __future__ import annotations
@@ -17,6 +18,9 @@ from sqlalchemy import and_, or_
 from app.models import AdminActionLog, User, UserActivityLog, UserSessionLog
 from app.utils.datetime_helpers import ensure_utc, utcnow
 
+# Auth events live on Login Logs; do not surface them in the unified audit trail.
+AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES = ('login', 'logout')
+
 
 def apply_audit_trail_user_activity_noise_filters(activity_query):
     """
@@ -25,6 +29,9 @@ def apply_audit_trail_user_activity_noise_filters(activity_query):
     """
     return (
         activity_query.filter(
+            ~UserActivityLog.activity_type.in_(AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES)
+        )
+        .filter(
             ~(
                 (UserActivityLog.activity_type == 'presence_heartbeat')
                 | (UserActivityLog.endpoint == 'forms_api.api_presence_heartbeat')
@@ -86,10 +93,8 @@ def apply_audit_trail_user_activity_noise_filters(activity_query):
 
 def count_audit_visible_entries_for_session(session_log: UserSessionLog) -> int:
     """
-    Rows that match audit trail default session scope (excludes ``page_view`` at SQL),
-    same window and noise rules as opening audit from session logs. Unlike the audit
-    grid, ``login`` and ``logout`` activity types are not counted so session “activities”
-    reflect post-auth work only.
+    Rows that match audit trail default session scope (excludes ``page_view`` and
+    login/logout at SQL), same window and noise rules as opening audit from session logs.
 
     Admin actions are included when ``admin_user_id`` matches the session user and
     timestamps fall in the session window (same as audit merge).
@@ -127,9 +132,6 @@ def count_audit_visible_entries_for_session(session_log: UserSessionLog) -> int:
     )
     activity_query = apply_audit_trail_user_activity_noise_filters(activity_query)
     activity_query = activity_query.filter(UserActivityLog.activity_type != 'page_view')
-    activity_query = activity_query.filter(
-        ~UserActivityLog.activity_type.in_(('login', 'logout'))
-    )
 
     n_activity = activity_query.count()
 

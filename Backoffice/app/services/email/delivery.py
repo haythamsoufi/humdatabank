@@ -2,7 +2,7 @@
 Simple email delivery tracking for notifications.
 """
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Dict, Optional, List
 from flask import current_app
 from app import db
 from app.models import EmailDeliveryLog
@@ -20,8 +20,15 @@ def email_delivery_log_is_skipped(log: Optional[EmailDeliveryLog]) -> bool:
 
 
 def mark_email_skipped(log_id: int, reason: str) -> Optional[EmailDeliveryLog]:
-    """Record a deliberate skip (visible in Communication Center, not retryable)."""
-    return mark_email_failed(log_id, f'{SKIP_ERROR_PREFIX}{reason}', retry=False)
+    """Record a deliberate skip (audit trail only — not a delivery failure)."""
+    log = EmailDeliveryLog.query.get(log_id)
+    if not log:
+        return None
+    log.status = 'cancelled'
+    log.error_message = f'{SKIP_ERROR_PREFIX}{reason}'
+    log.next_retry_at = None
+    db.session.commit()
+    return log
 
 
 def log_email_attempt(notification_id: Optional[int], user_id: int, email_address: str, subject: str) -> EmailDeliveryLog:
@@ -122,8 +129,112 @@ def email_delivery_log_can_cancel(log: Optional[EmailDeliveryLog]) -> bool:
     if log is None:
         return False
 
+    if email_delivery_log_is_skipped(log):
+        return False
+
     status = log.status.value if hasattr(log.status, 'value') else str(log.status or '')
     return status in ('failed', 'retrying')
+
+
+def _latest_email_logs_by_notification_id(notification_ids: List[int]) -> Dict[int, EmailDeliveryLog]:
+    """Map notification_id -> most recent EmailDeliveryLog row."""
+    if not notification_ids:
+        return {}
+
+    logs = (
+        EmailDeliveryLog.query.filter(EmailDeliveryLog.notification_id.in_(notification_ids))
+        .order_by(EmailDeliveryLog.notification_id, EmailDeliveryLog.created_at.desc())
+        .all()
+    )
+    latest: Dict[int, EmailDeliveryLog] = {}
+    for log in logs:
+        nid = log.notification_id
+        if nid is not None and nid not in latest:
+            latest[nid] = log
+    return latest
+
+
+def email_delivery_log_needs_attention(
+    log: Optional[EmailDeliveryLog],
+    *,
+    latest_by_notification: Optional[Dict[int, EmailDeliveryLog]] = None,
+) -> bool:
+    """
+    True when a failed/retrying log should appear in the Communication Center alert.
+
+    Excludes intentional skips, superseded retry attempts, and non-actionable states.
+    """
+    if log is None:
+        return False
+
+    if email_delivery_log_is_skipped(log):
+        return False
+
+    status = log.status.value if hasattr(log.status, 'value') else str(log.status or '')
+    if status not in ('failed', 'retrying'):
+        return False
+
+    if log.notification_id:
+        latest_map = latest_by_notification
+        if latest_map is None:
+            latest_map = _latest_email_logs_by_notification_id([log.notification_id])
+        latest = latest_map.get(log.notification_id)
+        if not latest or latest.id != log.id:
+            return False
+
+    return email_delivery_log_can_retry(log) or email_delivery_log_can_cancel(log)
+
+
+def get_email_delivery_logs_needing_attention() -> List[EmailDeliveryLog]:
+    """Failed/retrying delivery logs that admins should see in Communication Center."""
+    candidates = (
+        EmailDeliveryLog.query.filter(EmailDeliveryLog.status.in_(('failed', 'retrying')))
+        .order_by(EmailDeliveryLog.created_at.desc())
+        .all()
+    )
+    if not candidates:
+        return []
+
+    notification_ids = list({log.notification_id for log in candidates if log.notification_id})
+    latest_by_notification = _latest_email_logs_by_notification_id(notification_ids)
+
+    return [
+        log
+        for log in candidates
+        if email_delivery_log_needs_attention(log, latest_by_notification=latest_by_notification)
+    ]
+
+
+def count_email_delivery_logs_needing_attention() -> int:
+    """Count of delivery failures that should trigger the Communication Center banner."""
+    return len(get_email_delivery_logs_needing_attention())
+
+
+def get_skipped_email_delivery_logs() -> List[EmailDeliveryLog]:
+    """
+    Skipped delivery logs for the Communication Center grid (audit trail).
+
+    Includes orphan digests and notification-linked skips when the skip is the
+    latest attempt for that notification.
+    """
+    candidates = (
+        EmailDeliveryLog.query.filter(EmailDeliveryLog.status.in_(('failed', 'retrying', 'cancelled')))
+        .order_by(EmailDeliveryLog.created_at.desc())
+        .all()
+    )
+    skipped = [log for log in candidates if email_delivery_log_is_skipped(log)]
+    if not skipped:
+        return []
+
+    notification_ids = list({log.notification_id for log in skipped if log.notification_id})
+    latest_by_notification = _latest_email_logs_by_notification_id(notification_ids)
+
+    return [
+        log
+        for log in skipped
+        if not log.notification_id
+        or latest_by_notification.get(log.notification_id) is log
+    ]
 
 
 def cancel_email_delivery_log(log_id: int) -> tuple[bool, str]:
@@ -147,13 +258,12 @@ def cancel_email_delivery_log(log_id: int) -> tuple[bool, str]:
 
 def admin_cancel_email_delivery_logs(log_ids: Optional[List[int]] = None) -> dict:
     """Dismiss multiple failed delivery logs without retrying."""
-    query = EmailDeliveryLog.query.filter(
-        EmailDeliveryLog.status.in_(('failed', 'retrying'))
-    )
     if log_ids:
-        query = query.filter(EmailDeliveryLog.id.in_(log_ids))
-
-    logs = query.order_by(EmailDeliveryLog.created_at.asc()).all()
+        logs = EmailDeliveryLog.query.filter(EmailDeliveryLog.id.in_(log_ids)).order_by(
+            EmailDeliveryLog.created_at.asc()
+        ).all()
+    else:
+        logs = sorted(get_email_delivery_logs_needing_attention(), key=lambda row: row.created_at or utcnow())
     success_count = 0
     failure_count = 0
     skipped_count = 0
@@ -220,13 +330,12 @@ def admin_retry_email_delivery_log(log_id: int) -> tuple[bool, str]:
 
 def admin_retry_failed_email_delivery_logs(log_ids: Optional[List[int]] = None) -> dict:
     """Retry multiple failed delivery logs. Returns counts for admin UI."""
-    query = EmailDeliveryLog.query.filter(
-        EmailDeliveryLog.status.in_(('failed', 'retrying'))
-    )
     if log_ids:
-        query = query.filter(EmailDeliveryLog.id.in_(log_ids))
-
-    logs = query.order_by(EmailDeliveryLog.created_at.asc()).all()
+        logs = EmailDeliveryLog.query.filter(EmailDeliveryLog.id.in_(log_ids)).order_by(
+            EmailDeliveryLog.created_at.asc()
+        ).all()
+    else:
+        logs = sorted(get_email_delivery_logs_needing_attention(), key=lambda row: row.created_at or utcnow())
     success_count = 0
     failure_count = 0
     skipped_count = 0

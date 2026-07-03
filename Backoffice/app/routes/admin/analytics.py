@@ -37,6 +37,7 @@ from app.utils.api_pagination import validate_pagination_params
 from app.utils.api_responses import json_ok
 from app.services.audit_details_service import format_admin_action_details
 from app.services.audit_trail_session_query import (
+    AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES,
     apply_audit_trail_user_activity_noise_filters,
     count_audit_visible_entries_for_session,
 )
@@ -1091,6 +1092,8 @@ def audit_trail():
         consolidated_types.add(consolidate_activity_type(activity_type_val))
     for action_type_val in raw_action_types:
         consolidated_types.add(consolidate_activity_type(None, action_type_val))
+
+    consolidated_types -= set(AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES)
 
     # Convert to sorted list
     activity_types = sorted(list(consolidated_types))

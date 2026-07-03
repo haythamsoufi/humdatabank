@@ -419,6 +419,7 @@ def end_session(session_id):
 def audit_trail():
     """Paginated audit trail (user activity logs with endpoint noise filtered out)."""
     from app.models import UserActivityLog
+    from app.services.audit_trail_session_query import apply_audit_trail_user_activity_noise_filters
 
     page, per_page = validate_pagination_params(request.args, default_per_page=50, max_per_page=200)
     activity_type_filter = request.args.get('activity_type')
@@ -453,35 +454,7 @@ def audit_trail():
                 except ValueError:
                     pass
 
-            q = q.filter(
-                UserActivityLog.endpoint.notin_((
-                    'mobile_api.device_heartbeat',
-                    'notifications.device_heartbeat',
-                    'admin_analytics_api.session_logs_list_api',
-                    'admin_analytics_api.login_logs_list_api',
-                    'user_management.api_users_profile_summary',
-                    'main.api_users_profile_summary',
-                    'forms_api.api_presence_active_users',
-                    'utilities.refresh_csrf_token',
-                    'utilities.refresh_csrf_token_get',
-                    'forms_api.api_search_indicator_bank',
-                    'forms_api.get_lookup_list_options',
-                    'forms_api.get_lookup_list_config_ui',
-                    'forms_api.api_render_dynamic_indicator',
-                    'user_management.get_user_entities',
-                    'user_management.get_ns_hierarchy',
-                    'user_management.get_secretariat_hierarchy',
-                    'user_management.get_secretariat_regions_hierarchy',
-                    'ai_v2.chat',
-                    'ai_v2.issue_token',
-                    'ai_documents.list_ifrc_api_documents',
-                    'ai_documents.list_ifrc_api_types',
-                    'ai_ws',
-                    'ai_management.list_system_documents',
-                    'settings.api_check_updates',
-                    'utilities.api_translation_services',
-                ))
-            )
+            q = apply_audit_trail_user_activity_noise_filters(q)
 
             q = q.order_by(desc(UserActivityLog.timestamp))
             paginated = q.paginate(page=page, per_page=per_page, error_out=False)

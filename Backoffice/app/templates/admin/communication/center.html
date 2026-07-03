@@ -87,18 +87,18 @@
                         </button>
                     </div>
                 </div>
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 mb-4">
-                    <div class="min-w-0 flex-1 flex items-baseline gap-2 flex-wrap" data-ag-grid-title-group>
-                        <h3 class="text-sm font-medium text-gray-900 m-0">{{ _('In-app notifications and linked email delivery') }}</h3>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-4">
+                    <div class="min-w-0 flex-1 flex flex-col gap-0.5" data-ag-grid-title-group>
+                        <h3 class="text-sm font-medium text-gray-900 m-0">{{ _('Notifications and email delivery') }}</h3>
                     </div>
-                    <div class="flex flex-shrink-0 justify-end">
+                    <div class="flex flex-shrink-0 justify-end sm:pt-0.5">
                         <div id="column-visibility-button-placeholder" class="flex-shrink-0"></div>
                     </div>
                 </div>
                 {{ ag_grid_loading('notifications', loading_text=_('Loading notifications...')) }}
                 <div id="notificationsGrid" class="ag-theme-alpine" style="width: 100%; height: 600px;"></div>
             {% else %}
-                <h3 class="text-sm font-medium text-gray-900 m-0 mb-4">{{ _('In-app notifications and linked email delivery') }}</h3>
+                <h3 class="text-sm font-medium text-gray-900 m-0 mb-4">{{ _('Notifications and email delivery') }}</h3>
                 <p class="text-sm text-gray-700">{{ _('No communications found.') }}</p>
             {% endif %}
         </div>
@@ -813,8 +813,11 @@
             </div>
 
             {% if campaigns %}
-                <div class="flex justify-end items-center mb-4">
-                    <div id="campaigns-column-visibility-button-placeholder"></div>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-4">
+                    <div class="min-w-0 flex-1 flex flex-col gap-0.5" data-ag-grid-title-group></div>
+                    <div class="flex flex-shrink-0 justify-end sm:pt-0.5">
+                        <div id="campaigns-column-visibility-button-placeholder"></div>
+                    </div>
                 </div>
                 {{ ag_grid_loading('campaigns', loading_text=_('Loading campaigns...')) }}
                 <div id="campaignsGrid" class="ag-theme-alpine" style="width: 100%; height: 600px;"></div>
@@ -1363,6 +1366,13 @@
         "You're all caught up!": {{ _("You're all caught up!")|tojson }},
         'notificationGroup': {{ _('Notification')|tojson }},
         'emailGroup': {{ _('Email')|tojson }},
+        'emailLoggedAt': {{ _('Email Logged At')|tojson }},
+        'showing': {{ _('Showing')|tojson }},
+        'of': {{ _('of')|tojson }},
+        'record': {{ _('communication')|tojson }},
+        'records': {{ _('communications')|tojson }},
+        'campaignRecord': {{ _('campaign')|tojson }},
+        'campaignRecords': {{ _('campaigns')|tojson }},
         'emailStatus': {{ _('Email Status')|tojson }},
         'emailSubject': {{ _('Email Subject')|tojson }},
         'emailContent': {{ _('Email Content')|tojson }},
@@ -1409,6 +1419,12 @@
         'previewNoMessage': {{ _('(No message)')|tojson }},
     };
     window.NOTIFICATION_TRANSLATIONS = window.COMMUNICATION_TRANSLATIONS;
+    window.agGridTranslations = Object.assign({}, window.agGridTranslations || {}, {
+        showing: window.COMMUNICATION_TRANSLATIONS.showing,
+        of: window.COMMUNICATION_TRANSLATIONS.of,
+        record: window.COMMUNICATION_TRANSLATIONS.record,
+        records: window.COMMUNICATION_TRANSLATIONS.records,
+    });
 
     // Pass data to JavaScript - backend already formatted it
     window.notificationsData = {{ notifications|tojson|safe }};

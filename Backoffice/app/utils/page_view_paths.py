@@ -1,7 +1,7 @@
 """
 Canonical path keys for session page-view histograms (not Flask endpoint names).
 
-Web: prefer Werkzeug URL rule pattern; fallback to request.path.
+Web: request.path (resolved URL path, e.g. /forms/assignment/1234).
 Mobile: /m/... route or /m/screen/<slug> from screen_name.
 """
 
@@ -29,11 +29,8 @@ def normalize_path_key(raw: str) -> str:
 
 def page_view_path_key_from_request(req: Any) -> str:
     """
-    Stable key for a Backoffice web request: ``url_rule.rule`` if matched, else ``path``.
+    Resolved URL path for a Backoffice web request (``request.path``).
     """
-    rule = getattr(req, "url_rule", None)
-    if rule is not None and getattr(rule, "rule", None):
-        return normalize_path_key(str(rule.rule))
     path = getattr(req, "path", None) or "/"
     return normalize_path_key(str(path))
 

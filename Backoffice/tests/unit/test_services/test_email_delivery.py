@@ -18,11 +18,17 @@ from app.services.email.delivery import (
     log_email_attempt,
     mark_email_sent,
     mark_email_failed,
+    mark_email_skipped,
     get_pending_retries,
     classify_orphan_email_log,
     email_delivery_log_can_retry,
     cancel_email_delivery_log,
     email_delivery_log_can_cancel,
+    email_delivery_log_is_skipped,
+    email_delivery_log_needs_attention,
+    get_email_delivery_logs_needing_attention,
+    count_email_delivery_logs_needing_attention,
+    get_skipped_email_delivery_logs,
 )
 from app.utils.datetime_helpers import utcnow
 
@@ -280,3 +286,134 @@ class TestClassifyOrphanEmailLog:
 
     def test_unsupported(self):
         assert classify_orphan_email_log('Random subject') == 'unsupported'
+
+
+@pytest.mark.usefixtures("db_session")
+class TestMarkEmailSkipped:
+    def test_marks_cancelled_not_failed(self, app):
+        with app.app_context():
+            user = _make_user()
+            db.session.add(user)
+            db.session.commit()
+
+            log = log_email_attempt(None, user.id, user.email, 'Country Access Requests - skipped')
+            result = mark_email_skipped(log.id, 'Already sent today')
+            fetched = EmailDeliveryLog.query.get(log.id)
+
+        assert result is not None
+        status = fetched.status.value if hasattr(fetched.status, 'value') else fetched.status
+        assert status == 'cancelled'
+        assert email_delivery_log_is_skipped(fetched) is True
+        assert email_delivery_log_needs_attention(fetched) is False
+        assert email_delivery_log_can_cancel(fetched) is False
+
+
+@pytest.mark.usefixtures("db_session")
+class TestEmailDeliveryAttention:
+    def test_skipped_legacy_failed_log_not_counted(self, app):
+        with app.app_context():
+            user = _make_user()
+            db.session.add(user)
+            db.session.commit()
+
+            log = log_email_attempt(None, user.id, user.email, 'Country Access Requests - skipped')
+            mark_email_failed(log.id, '[Skipped] Already sent today', retry=False)
+
+            assert email_delivery_log_needs_attention(EmailDeliveryLog.query.get(log.id)) is False
+            assert count_email_delivery_logs_needing_attention() == 0
+            skipped = get_skipped_email_delivery_logs()
+            assert len(skipped) == 1
+            assert skipped[0].id == log.id
+
+    def test_superseded_failure_not_counted(self, app):
+        from app.models import Notification, NotificationType
+
+        with app.app_context():
+            user = _make_user()
+            db.session.add(user)
+            db.session.flush()
+
+            notification = Notification(
+                user_id=user.id,
+                notification_type=NotificationType.admin_message,
+                title='Retry test',
+                message='Body',
+            )
+            db.session.add(notification)
+            db.session.flush()
+
+            failed = EmailDeliveryLog(
+                notification_id=notification.id,
+                user_id=user.id,
+                email_address=user.email,
+                subject='Subject',
+                status='failed',
+                error_message='SMTP error',
+                created_at=utcnow() - timedelta(minutes=5),
+            )
+            sent = EmailDeliveryLog(
+                notification_id=notification.id,
+                user_id=user.id,
+                email_address=user.email,
+                subject='Subject',
+                status='sent',
+                sent_at=utcnow(),
+                created_at=utcnow(),
+            )
+            db.session.add_all([failed, sent])
+            db.session.commit()
+
+            assert email_delivery_log_needs_attention(failed) is False
+            assert get_email_delivery_logs_needing_attention() == []
+
+    def test_active_failure_is_counted(self, app):
+        from app.models import Notification, NotificationType
+
+        with app.app_context():
+            user = _make_user()
+            db.session.add(user)
+            db.session.flush()
+
+            notification = Notification(
+                user_id=user.id,
+                notification_type=NotificationType.admin_message,
+                title='Failure',
+                message='Body',
+            )
+            db.session.add(notification)
+            db.session.flush()
+
+            log = EmailDeliveryLog(
+                notification_id=notification.id,
+                user_id=user.id,
+                email_address=user.email,
+                subject='Subject',
+                status='failed',
+                error_message='SMTP error',
+            )
+            db.session.add(log)
+            db.session.commit()
+
+            attention = get_email_delivery_logs_needing_attention()
+
+        assert len(attention) == 1
+        assert attention[0].id == log.id
+
+    def test_orphan_digest_failure_is_counted(self, app):
+        with app.app_context():
+            user = _make_user()
+            db.session.add(user)
+            db.session.commit()
+
+            log = log_email_attempt(
+                None,
+                user.id,
+                user.email,
+                'Country Access Requests - 2 pending request(s)',
+            )
+            mark_email_failed(log.id, 'SMTP timeout', retry=False)
+
+            attention = get_email_delivery_logs_needing_attention()
+
+        assert len(attention) == 1
+        assert attention[0].id == log.id

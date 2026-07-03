@@ -9,7 +9,7 @@ import io
 from flask import Blueprint, Response, render_template, request, flash, current_app
 from flask_login import current_user
 from app.extensions import csrf, db
-from app.models import User, NotificationType, Notification, NotificationCampaign, EmailDeliveryLog
+from app.models import User, NotificationType, Notification, NotificationCampaign
 from app.routes.admin.shared import permission_required
 from app.utils.sql_utils import safe_ilike_pattern
 from app.services.notification.core import create_notification, get_default_icon_for_notification_type
@@ -17,7 +17,18 @@ from app.utils.request_validation import enforce_api_or_csrf_protection
 from app.services.notification.push import PushNotificationService
 from app.services.notification_service import NotificationService
 from app.services.email.client import send_email as send_email_message
-from app.services.email.delivery import log_email_attempt, mark_email_sent, mark_email_failed
+from app.services.communication_center_service import (
+    build_communications_center_grid,
+    ensure_notifications_for_linked_email_logs,
+    get_orphan_email_delivery_logs_for_grid,
+)
+from app.services.email.delivery import (
+    get_email_delivery_logs_needing_attention,
+    get_skipped_email_delivery_logs,
+    log_email_attempt,
+    mark_email_sent,
+    mark_email_failed,
+)
 from app.services.authorization_service import AuthorizationService
 from app.services.app_settings_service import get_email_template
 from app.services.campaign_email_templates_service import (
@@ -112,7 +123,16 @@ def communication_center():
 
     # All matching rows for the grid (client-side AG Grid pagination)
     notifications = query.order_by(Notification.created_at.desc()).all()
-    total_count = len(notifications)
+    original_notification_ids = {n.id for n in notifications if n.id is not None}
+
+    attention_logs = get_email_delivery_logs_needing_attention()
+    skipped_logs = get_skipped_email_delivery_logs()
+    failed_email_delivery_count = len(attention_logs)
+    linked_email_logs = attention_logs + skipped_logs
+    attention_notification_ids = {log.notification_id for log in attention_logs if log.notification_id}
+
+    notifications = ensure_notifications_for_linked_email_logs(notifications, linked_email_logs)
+    orphan_email_logs = get_orphan_email_delivery_logs_for_grid()
 
     assignment_status_cache, _ = NotificationService._build_assignment_caches_for_notifications(notifications)
     actor_fields_by_id = NotificationService.build_actor_display_fields_map(
@@ -124,72 +144,15 @@ def communication_center():
         actor_fields_by_id=actor_fields_by_id,
     )
 
-    # Format notifications for template
-    notifications_data = []
-    for notification in notifications:
-        user = notification.user
-        message, title = NotificationService._translate_notification_content(notification)
-        if message is None:
-            message = notification.message
-
-        # Use dynamically constructed title if available, otherwise use stored title
-        if title is None:
-            title = notification.title
-
-        ad = actor_fields_by_id.get(notification.id, {})
-        actor_obj = ad.get('actor')
-        actor_action_icon = ad.get('actor_action_icon')
-        primary_is_message = ad.get('primary_is_message', False)
-        if primary_is_message:
-            display_title = message or title
-            display_message = title if (title and title != display_title) else ''
-        else:
-            display_title = title
-            display_message = message
-
-        # Format notification type for display
-        notification_type_value = notification.notification_type.value if hasattr(notification.notification_type, 'value') else str(notification.notification_type)
-        notification_type_display = notification_type_value.replace('_', ' ').title()
-
-        # Format priority for display
-        priority = notification.priority or 'normal'
-        priority_display = priority.title()
-
-        # Determine status display
-        if notification.is_archived:
-            status_display = 'archived'
-        elif notification.is_read:
-            status_display = 'read'
-        else:
-            status_display = 'unread'
-
-        notifications_data.append({
-            'id': notification.id,
-            'user_id': notification.user_id,
-            'user_name': user.name or user.email,
-            'user_email': user.email,
-            'user_title': user.title or '',
-            'user_active': bool(user.active),
-            'user_profile_color': user.profile_color or '',
-            'rbac_role_codes': [],  # populated client-side / via API endpoints
-            'notification_type': notification_type_value,
-            'notification_type_display': notification_type_display,  # Formatted for display
-            'title': display_title,
-            'message': display_message,
-            'primary_is_message': primary_is_message,
-            'actor': actor_obj,
-            'actor_action_icon': actor_action_icon,
-            'is_read': notification.is_read,
-            'is_archived': notification.is_archived,
-            'status_display': status_display,  # Formatted status
-            'priority': priority,
-            'priority_display': priority_display,  # Formatted priority
-            'created_at': notification.created_at.strftime('%Y-%m-%d %H:%M:%S') if notification.created_at else '',
-            'read_at': notification.read_at.strftime('%Y-%m-%d %H:%M:%S') if notification.read_at else '',
-            'related_url': notification.related_url,
-            'icon': get_default_icon_for_notification_type(notification.notification_type),
-            **email_fields_by_id.get(notification.id, NotificationService._serialize_email_delivery_log(None)),
-        })
+    notifications_data = build_communications_center_grid(
+        notifications,
+        orphan_email_logs,
+        actor_fields_by_id=actor_fields_by_id,
+        email_fields_by_id=email_fields_by_id,
+        original_notification_ids=original_notification_ids,
+        attention_notification_ids=attention_notification_ids,
+    )
+    total_count = len(notifications_data)
 
     # Fetch campaigns for the campaigns tab
     campaigns = NotificationCampaign.query.order_by(NotificationCampaign.created_at.desc()).all()
@@ -243,10 +206,6 @@ def communication_center():
             'failed_count': campaign.failed_count,
             'recipients_count': len(campaign.user_ids) if campaign.user_ids else 0
         })
-
-    failed_email_delivery_count = EmailDeliveryLog.query.filter(
-        cast(EmailDeliveryLog.status, String).in_(('failed', 'retrying'))
-    ).count()
 
     campaign_compose_templates = get_campaign_compose_templates()
     campaign_email_templates = get_all_campaign_email_templates()
@@ -779,9 +738,18 @@ def api_get_all_notifications():
             query = query.filter(Notification.created_at <= date_to)
 
         notifications = query.order_by(Notification.created_at.desc()).all()
-        total_count = len(notifications)
+        original_notification_ids = {n.id for n in notifications if n.id is not None}
+
+        attention_logs = get_email_delivery_logs_needing_attention()
+        skipped_logs = get_skipped_email_delivery_logs()
+        linked_email_logs = attention_logs + skipped_logs
+        attention_notification_ids = {log.notification_id for log in attention_logs if log.notification_id}
+        notifications = ensure_notifications_for_linked_email_logs(notifications, linked_email_logs)
+        orphan_email_logs = get_orphan_email_delivery_logs_for_grid()
 
         notif_user_ids = list({n.user_id for n in notifications if getattr(n, "user_id", None) is not None})
+        notif_user_ids.extend(log.user_id for log in orphan_email_logs if log.user_id)
+        notif_user_ids = list({uid for uid in notif_user_ids if uid is not None})
         rbac_role_codes_by_user_id = AuthorizationService.prefetch_role_codes(notif_user_ids)
 
         assignment_status_cache, _ = NotificationService._build_assignment_caches_for_notifications(notifications)
@@ -794,55 +762,26 @@ def api_get_all_notifications():
             actor_fields_by_id=actor_fields_by_id,
         )
 
-        # Format notifications
-        notifications_data = []
-        for notification in notifications:
-            user = notification.user
-            message, title = NotificationService._translate_notification_content(notification)
-            if message is None:
-                message = notification.message
-            if title is None:
-                title = notification.title
+        notifications_data = build_communications_center_grid(
+            notifications,
+            orphan_email_logs,
+            actor_fields_by_id=actor_fields_by_id,
+            email_fields_by_id=email_fields_by_id,
+            original_notification_ids=original_notification_ids,
+            attention_notification_ids=attention_notification_ids,
+            iso_dates=True,
+        )
+        for row in notifications_data:
+            user_id = row.get('user_id')
+            if user_id is not None:
+                row['rbac_role_codes'] = rbac_role_codes_by_user_id.get(user_id, [])
 
-            ad = actor_fields_by_id.get(notification.id, {})
-            actor_obj = ad.get('actor')
-            actor_action_icon = ad.get('actor_action_icon')
-            primary_is_message = ad.get('primary_is_message', False)
-            if primary_is_message:
-                display_title = message or title
-                display_message = title if (title and title != display_title) else ''
-            else:
-                display_title = title
-                display_message = message
-
-            notifications_data.append({
-                'id': notification.id,
-                'user_id': notification.user_id,
-                'user_name': user.name or user.email,
-                'user_email': user.email,
-                'user_title': user.title or '',
-                'user_active': bool(user.active),
-                'user_profile_color': user.profile_color or '',
-                'rbac_role_codes': rbac_role_codes_by_user_id.get(notification.user_id, []),
-                'notification_type': notification.notification_type.value if hasattr(notification.notification_type, 'value') else str(notification.notification_type),
-                'title': display_title,
-                'message': display_message,
-                'primary_is_message': primary_is_message,
-                'actor': actor_obj,
-                'actor_action_icon': actor_action_icon,
-                'is_read': notification.is_read,
-                'is_archived': notification.is_archived,
-                'priority': notification.priority,
-                'created_at': notification.created_at.isoformat() if notification.created_at else None,
-                'read_at': notification.read_at.isoformat() if notification.read_at else None,
-                'related_url': notification.related_url,
-                'icon': get_default_icon_for_notification_type(notification.notification_type),
-                **email_fields_by_id.get(notification.id, NotificationService._serialize_email_delivery_log(None)),
-            })
+        total_count = len(notifications_data)
 
         return json_ok(
             success=True,
             notifications=notifications_data,
+            failed_email_delivery_count=len(attention_logs),
             pagination={
                 'page': 1,
                 'per_page': total_count,

@@ -789,3 +789,16 @@
     border: none !important;
     border-radius: 0 !important;
 }
+
+/* Record count sits below the section title, not inline with it */
+.admin-communication-center-container [data-ag-grid-title-group] .ag-grid-result-count {
+    display: block;
+    margin: 0;
+    padding: 0;
+    min-height: 0;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    font-weight: 400;
+    color: #6b7280;
+    white-space: nowrap;
+}

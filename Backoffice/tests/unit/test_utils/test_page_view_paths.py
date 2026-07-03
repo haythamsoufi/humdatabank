@@ -17,12 +17,20 @@ def test_normalize_path_key_trailing_slash():
     assert normalize_path_key("/") == "/"
 
 
-def test_page_view_key_prefers_url_rule():
+def test_page_view_key_uses_resolved_path():
     class Rule:
         rule = "/admin/users/<int:user_id>"
 
     req = SimpleNamespace(path="/admin/users/5", url_rule=Rule())
-    assert page_view_path_key_from_request(req) == "/admin/users/<int:user_id>"
+    assert page_view_path_key_from_request(req) == "/admin/users/5"
+
+
+def test_page_view_key_form_assignment_path():
+    class Rule:
+        rule = "/<form_type>/<int:form_id>"
+
+    req = SimpleNamespace(path="/forms/assignment/1234", url_rule=Rule())
+    assert page_view_path_key_from_request(req) == "/forms/assignment/1234"
 
 
 def test_page_view_key_fallback_path():

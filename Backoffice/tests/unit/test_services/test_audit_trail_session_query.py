@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 import pytest
 
 from app.services.audit_trail_session_query import (
+    AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES,
     apply_audit_trail_user_activity_noise_filters,
     count_audit_visible_entries_for_session,
 )
@@ -41,6 +42,42 @@ class TestApplyAuditTrailNoiseFilters:
         # This should not raise; tables created by db_session
         count = filtered.count()
         assert count >= 0
+
+    def test_excludes_login_and_logout(self, app, db_session):
+        """login/logout rows are omitted from audit trail queries."""
+        from app.models import UserActivityLog
+        from app.utils.datetime_helpers import utcnow
+        from tests.factories import create_test_user
+
+        user = create_test_user(db_session)
+        now = utcnow()
+
+        for atype in AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES:
+            db_session.add(
+                UserActivityLog(
+                    user_id=user.id,
+                    activity_type=atype,
+                    endpoint="auth.login",
+                    url_path="/login",
+                    ip_address="127.0.0.1",
+                    timestamp=now,
+                )
+            )
+        db_session.add(
+            UserActivityLog(
+                user_id=user.id,
+                activity_type="data_modified",
+                endpoint="analytics.audit_trail",
+                url_path="/admin/analytics/audit-trail",
+                ip_address="127.0.0.1",
+                timestamp=now,
+            )
+        )
+        db_session.commit()
+
+        visible = apply_audit_trail_user_activity_noise_filters(UserActivityLog.query).all()
+        visible_types = {row.activity_type for row in visible}
+        assert visible_types == {"data_modified"}
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +218,8 @@ class TestCountAuditVisibleEntriesForSession:
                 user_id=user.id,
                 user_session_id="test-count-sum-valid-001",
                 activity_type="data_modified",
+                endpoint="analytics.audit_trail",
+                url_path="/admin/analytics/audit-trail",
                 ip_address="127.0.0.1",
                 timestamp=session_start + timedelta(minutes=i + 5),
             )

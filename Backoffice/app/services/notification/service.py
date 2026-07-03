@@ -1558,6 +1558,7 @@ class NotificationService:
                 'email_subject': '',
                 'email_content': '',
                 'email_sent_at': '',
+                'email_logged_at': '',
                 'email_failed_at': '',
                 'email_error': '',
                 'email_retry_count': 0,
@@ -1569,7 +1570,19 @@ class NotificationService:
         if status_raw == 'retrying':
             # Legacy rows from automatic retry — treat as failed in admin UI.
             status_raw = 'failed'
+
+        from app.services.email.delivery import email_delivery_log_is_skipped, SKIP_ERROR_PREFIX
+
+        error_message = log.error_message or ''
+        if email_delivery_log_is_skipped(log):
+            status_raw = 'skipped'
+            if error_message.startswith(SKIP_ERROR_PREFIX):
+                error_message = error_message[len(SKIP_ERROR_PREFIX):]
+
         status_display = status_raw.replace('_', ' ').title() if status_raw else ''
+        if status_raw == 'skipped':
+            from flask_babel import gettext as _
+            status_display = _('Skipped')
 
         return {
             'has_email': True,
@@ -1579,8 +1592,9 @@ class NotificationService:
             'email_subject': log.subject or '',
             'email_content': '',
             'email_sent_at': log.sent_at.strftime('%Y-%m-%d %H:%M:%S') if log.sent_at else '',
+            'email_logged_at': log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '',
             'email_failed_at': log.failed_at.strftime('%Y-%m-%d %H:%M:%S') if log.failed_at else '',
-            'email_error': log.error_message or '',
+            'email_error': error_message,
             'email_retry_count': int(log.retry_count or 0),
             'email_can_retry': NotificationService._email_delivery_log_can_retry(log),
             'email_can_cancel': NotificationService._email_delivery_log_can_cancel(log),

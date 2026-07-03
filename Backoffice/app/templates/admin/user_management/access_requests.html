@@ -51,36 +51,84 @@
             justify-content: center;
         }
         .access-req-fds-filter {
-            position: relative;
             display: inline-flex;
             align-items: center;
-            max-width: 11rem;
+            min-width: 0;
+            max-width: 14rem;
         }
-        .access-req-fds-filter select {
-            appearance: none;
-            -webkit-appearance: none;
-            background: transparent;
-            border: 0;
-            box-shadow: none;
+        .access-req-fds-filter-trigger {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            min-width: 0;
+            max-width: 14rem;
+            padding: 0;
             margin: 0;
-            padding: 0 1.125rem 0 0;
-            width: 100%;
-            max-width: 11rem;
+            border: 0;
+            background: transparent;
             font-size: 0.875rem;
             line-height: 1.25rem;
+            font-weight: 500;
             color: #374151;
             cursor: pointer;
         }
-        .access-req-fds-filter select:focus {
-            outline: none;
-            box-shadow: none;
+        .access-req-fds-filter-trigger:hover {
+            color: #111827;
+        }
+        .access-req-fds-filter-trigger:focus-visible {
+            outline: 2px solid #93c5fd;
+            outline-offset: 2px;
+            border-radius: 0.25rem;
+        }
+        .access-req-fds-filter-label {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         .access-req-fds-filter .access-req-fds-filter-chevron {
-            position: absolute;
-            right: 0;
-            pointer-events: none;
+            flex-shrink: 0;
             font-size: 0.625rem;
             color: #6b7280;
+        }
+        .access-req-fds-menu {
+            position: fixed;
+            z-index: 1100;
+            min-width: 12rem;
+            max-width: min(20rem, calc(100vw - 16px));
+            max-height: 16rem;
+            overflow-y: auto;
+            padding: 0.25rem;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+        }
+        .access-req-fds-menu-item {
+            display: block;
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: none;
+            border-radius: 0.375rem;
+            background: transparent;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            color: #374151;
+            text-align: left;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .access-req-fds-menu-item:hover,
+        .access-req-fds-menu-item:focus-visible {
+            background: #f3f4f6;
+            outline: none;
+        }
+        .access-req-fds-menu-item[aria-selected="true"] {
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-weight: 500;
         }
         #fds-access-request-digest-modal details > summary::-webkit-details-marker {
             display: none;
@@ -155,17 +203,28 @@
         </button>
       {% endcall %}
     </div>
-    <div class="flex shrink-0 flex-row flex-nowrap items-center gap-3 px-4 pb-3 sm:px-6 sm:pb-3">
+    <div class="flex shrink-0 flex-row flex-wrap items-center gap-3 px-4 pb-3 sm:px-6 sm:pb-3">
       {% if fds_member_options %}
-      <div class="access-req-fds-filter shrink-0">
-        <select id="fdsMemberFilter" aria-label="{{ _('Team member') }}">
-          <option value="">{{ _('All team members') }}</option>
-          {% for option in fds_member_options %}
-          <option value="{{ option.id }}"{% if default_fds_member_user_id == option.id %} selected{% endif %}>{{ option.label }}</option>
-          {% endfor %}
-        </select>
-        <i class="fas fa-chevron-down access-req-fds-filter-chevron" aria-hidden="true"></i>
-      </div>
+      <label for="fdsMemberFilterTrigger" class="inline-flex shrink-0 items-center gap-2.5 text-sm text-gray-700">
+        <span class="whitespace-nowrap">{{ _('Team member') }}</span>
+        <span class="access-req-fds-filter shrink min-w-0">
+          <button type="button"
+                  id="fdsMemberFilterTrigger"
+                  class="access-req-fds-filter-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="fdsMemberFilterMenu">
+            <span id="fdsMemberFilterLabel" class="access-req-fds-filter-label">{{ _('All team members') }}</span>
+            <i class="fas fa-chevron-down access-req-fds-filter-chevron" aria-hidden="true"></i>
+          </button>
+          <select id="fdsMemberFilter" class="sr-only" tabindex="-1" aria-hidden="true">
+            <option value="">{{ _('All team members') }}</option>
+            {% for option in fds_member_options %}
+            <option value="{{ option.id }}"{% if default_fds_member_user_id == option.id %} selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </span>
+      </label>
       {% endif %}
       <label for="groupByRequestToggle" class="inline-flex shrink-0 items-center gap-2.5 cursor-pointer select-none whitespace-nowrap text-sm text-gray-700">
         <span>{{ _('Group by request') }}</span>
@@ -1385,16 +1444,141 @@
 
     function setupFdsMemberFilter() {
         const select = document.getElementById('fdsMemberFilter');
-        if (!select) {
+        const trigger = document.getElementById('fdsMemberFilterTrigger');
+        const labelEl = document.getElementById('fdsMemberFilterLabel');
+        if (!select || !trigger || !labelEl) {
             return;
         }
+
+        let menuEl = null;
+        let menuListenersBound = false;
+
+        function getOptionLabel(value) {
+            const match = Array.from(select.options).find(function(opt) {
+                return opt.value === value;
+            });
+            return match ? match.textContent : '';
+        }
+
+        function syncMenuSelection() {
+            if (!menuEl) {
+                return;
+            }
+            menuEl.querySelectorAll('[role="option"]').forEach(function(item) {
+                item.setAttribute(
+                    'aria-selected',
+                    item.getAttribute('data-value') === select.value ? 'true' : 'false'
+                );
+            });
+        }
+
+        function syncTriggerLabel() {
+            labelEl.textContent = getOptionLabel(select.value) || getOptionLabel('');
+        }
+
+        function setSelectedValue(value) {
+            select.value = value;
+            syncTriggerLabel();
+            syncMenuSelection();
+        }
+
+        function closeFdsMemberMenu() {
+            if (menuEl) {
+                menuEl.classList.add('hidden');
+            }
+            trigger.setAttribute('aria-expanded', 'false');
+        }
+
+        function ensureFdsMemberMenu() {
+            if (menuEl) {
+                return menuEl;
+            }
+            menuEl = document.createElement('div');
+            menuEl.id = 'fdsMemberFilterMenu';
+            menuEl.className = 'access-req-fds-menu hidden';
+            menuEl.setAttribute('role', 'listbox');
+            menuEl.setAttribute('aria-labelledby', 'fdsMemberFilterTrigger');
+
+            Array.from(select.options).forEach(function(opt) {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'access-req-fds-menu-item';
+                item.setAttribute('role', 'option');
+                item.setAttribute('data-value', opt.value);
+                item.textContent = opt.textContent;
+                item.setAttribute('aria-selected', opt.value === select.value ? 'true' : 'false');
+                item.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    setSelectedValue(opt.value);
+                    localStorage.setItem(FDS_MEMBER_FILTER_STORAGE_KEY, opt.value || '');
+                    closeFdsMemberMenu();
+                    applyGroupByUserView();
+                });
+                menuEl.appendChild(item);
+            });
+
+            document.body.appendChild(menuEl);
+
+            if (!menuListenersBound) {
+                menuListenersBound = true;
+                document.addEventListener('click', function(e) {
+                    if (!menuEl || menuEl.classList.contains('hidden')) {
+                        return;
+                    }
+                    if (menuEl.contains(e.target)) {
+                        return;
+                    }
+                    if (e.target.closest && e.target.closest('#fdsMemberFilterTrigger')) {
+                        return;
+                    }
+                    closeFdsMemberMenu();
+                });
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') {
+                        closeFdsMemberMenu();
+                    }
+                });
+                window.addEventListener('resize', closeFdsMemberMenu);
+                document.addEventListener('scroll', closeFdsMemberMenu, true);
+            }
+            return menuEl;
+        }
+
+        function positionFdsMemberMenu() {
+            const menu = ensureFdsMemberMenu();
+            const rect = trigger.getBoundingClientRect();
+            const gap = 4;
+            menu.classList.remove('hidden');
+            menu.style.left = rect.left + 'px';
+            menu.style.top = (rect.bottom + gap) + 'px';
+            menu.style.minWidth = Math.max(rect.width, 192) + 'px';
+            let menuRect = menu.getBoundingClientRect();
+            if (menuRect.bottom > window.innerHeight - 8) {
+                menu.style.top = Math.max(8, rect.top - menuRect.height - gap) + 'px';
+                menuRect = menu.getBoundingClientRect();
+            }
+            if (menuRect.right > window.innerWidth - 8) {
+                menu.style.left = Math.max(8, window.innerWidth - menuRect.width - 8) + 'px';
+            }
+        }
+
+        function toggleFdsMemberMenu() {
+            const menu = ensureFdsMemberMenu();
+            if (!menu.classList.contains('hidden')) {
+                closeFdsMemberMenu();
+                return;
+            }
+            positionFdsMemberMenu();
+            trigger.setAttribute('aria-expanded', 'true');
+        }
+
         const stored = localStorage.getItem(FDS_MEMBER_FILTER_STORAGE_KEY);
         if (stored !== null) {
             const hasOption = Array.from(select.options).some(function(opt) {
                 return opt.value === stored;
             });
             if (hasOption) {
-                select.value = stored;
+                setSelectedValue(stored);
             }
         } else if (DEFAULT_FDS_MEMBER_USER_ID !== null && DEFAULT_FDS_MEMBER_USER_ID !== undefined) {
             const defaultValue = String(DEFAULT_FDS_MEMBER_USER_ID);
@@ -1402,12 +1586,15 @@
                 return opt.value === defaultValue;
             });
             if (hasDefault) {
-                select.value = defaultValue;
+                setSelectedValue(defaultValue);
             }
+        } else {
+            syncTriggerLabel();
         }
-        select.addEventListener('change', function() {
-            localStorage.setItem(FDS_MEMBER_FILTER_STORAGE_KEY, select.value || '');
-            applyGroupByUserView();
+
+        trigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleFdsMemberMenu();
         });
     }
 

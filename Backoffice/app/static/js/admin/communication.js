@@ -8,17 +8,22 @@ async function _anFetch(url, options = {}) {
     return fn(url, options);
 }
 
+function rowNeedsEmailAttention(row) {
+    if (!row || !row.has_email || !row.email_log_id) {
+        return false;
+    }
+    const status = String(row.email_status || '').toLowerCase();
+    if (status !== 'failed') {
+        return false;
+    }
+    return row.email_can_retry === true || row.email_can_cancel === true;
+}
+
 function countFailedEmailsInNotificationsData(data) {
     if (!Array.isArray(data)) {
         return 0;
     }
-    return data.filter((row) => {
-        if (!row || !row.has_email) {
-            return false;
-        }
-        const status = String(row.email_status || '').toLowerCase();
-        return status === 'failed' || row.email_can_retry === true;
-    }).length;
+    return data.filter((row) => rowNeedsEmailAttention(row)).length;
 }
 
 function formatFailedEmailNoticeMessage(count) {
@@ -32,12 +37,8 @@ function updateFailedEmailNotice(dataOverride) {
     if (!notice) {
         return;
     }
-    const cfg = window.communicationPageConfig || {};
-    const serverCount = Number(cfg.failedEmailDeliveryCount) || 0;
-    const gridCount = countFailedEmailsInNotificationsData(
-        dataOverride !== undefined ? dataOverride : window.notificationsData
-    );
-    const count = Math.max(serverCount, gridCount);
+    const data = dataOverride !== undefined ? dataOverride : window.notificationsData;
+    const count = countFailedEmailsInNotificationsData(data);
     const messageEl = document.getElementById('failed-email-notice-message');
     if (messageEl) {
         messageEl.textContent = formatFailedEmailNoticeMessage(count);

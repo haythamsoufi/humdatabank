@@ -343,7 +343,7 @@ def import_upr_country_reporting_template(aes_id):
 
     if result.get("success"):
         updated_count = result.get("updated_count", 0)
-        warnings = dedupe_upr_import_warnings(result.get("warnings") or [])
+        warnings = result.get("warnings") or []
         success_msg = (
             f"{UPR_COUNTRY_REPORTING_LABEL} loaded {updated_count} values into the form. "
             "Review your data and click Save to persist."

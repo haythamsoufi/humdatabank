@@ -375,21 +375,47 @@ def _load_core_yes_no_item_ids(
     return out
 
 
-def _reporting_aes_ids_for_import(ctx: UprImportContext, rounds: Optional[Set[str]]) -> Set[int]:
-    """Assignment ids on T33 for the reporting periods included in this import."""
+def _reporting_aes_ids_from_excel(
+    rows: List[Dict[str, Any]],
+    ctx: UprImportContext,
+    *,
+    template_ids: List[int],
+) -> Set[int]:
+    """T33 assignment ids for reporting round+country pairs present in the Excel rows.
+
+    Yes/No defaults must not touch assignments for rounds that are absent from UPR
+    Master (e.g. MYR26 when the workbook only contains MYR25), even when those
+    assignments already exist in the database.
+    """
+    if REPORTING_COUNTRY_TEMPLATE_ID not in template_ids:
+        return set()
+    t33_sections = UPR_TEMPLATE_PROFILES[REPORTING_COUNTRY_TEMPLATE_ID]["sections"]
     tpl_map = ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {})
     if not tpl_map:
         return set()
-    if not rounds:
-        return {int(aes_id) for aes_id in tpl_map.values()}
-    periods = {p for p in (round_to_period(r) for r in rounds) if p}
-    if not periods:
-        return set()
-    return {
-        int(aes_id)
-        for (period, _iso), aes_id in tpl_map.items()
-        if period in periods
-    }
+    out: Set[int] = set()
+    seen_period_iso: Set[Tuple[str, str]] = set()
+    for row in rows:
+        rnd = str(row.get("Round") or "").strip().upper()
+        if not (rnd.startswith("AR") or rnd.startswith("MYR")):
+            continue
+        sec = str(row.get("Section") or "").strip()
+        if sec not in t33_sections:
+            continue
+        iso3 = str(row.get("ISO3") or "").strip().upper()
+        if not iso3:
+            continue
+        period = round_to_period(rnd)
+        if not period:
+            continue
+        key = (period, iso3)
+        if key in seen_period_iso:
+            continue
+        seen_period_iso.add(key)
+        aes_id = tpl_map.get(key)
+        if aes_id is not None:
+            out.add(int(aes_id))
+    return out
 
 
 def _fill_missing_core_yes_no_defaults(
@@ -400,7 +426,7 @@ def _fill_missing_core_yes_no_defaults(
     target_aes_ids: Set[int],
     aes_meta: Dict[int, Tuple[str, str]],
 ) -> None:
-    """Default missing Yes/No core indicators to ``no`` when UPR Master has no row."""
+    """Default missing Yes/No core indicators to ``no`` for Excel-present reporting rounds."""
     if not ctx.core_yes_no_item_ids or not target_aes_ids:
         return
     core_ids = set(ctx.core_yes_no_item_ids)
@@ -2068,7 +2094,7 @@ def transform_to_import_rows(
             ctx=ctx,
             import_rows=import_rows,
             filled_core_yes_no=filled_core_yes_no,
-            target_aes_ids=_reporting_aes_ids_for_import(ctx, rounds),
+            target_aes_ids=_reporting_aes_ids_from_excel(filtered, ctx, template_ids=tids),
             aes_meta=aes_meta,
         )
 

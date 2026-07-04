@@ -14,7 +14,7 @@ from import_upr_excel_data import (  # noqa: E402
     _master_yes_no_value,
     _queue_dynamic_indicator_entry,
     _queue_other_dynamic_indicator,
-    _reporting_aes_ids_for_import,
+    _reporting_aes_ids_from_excel,
     _reporting_indicator_has_import_value,
     _reporting_indicator_import_value,
     _resolve_item_by_bank_and_area,
@@ -177,7 +177,7 @@ class TestMissingCoreYesNoDefaults:
         assert import_rows[0][COL_VALUE] == "no"
         assert (10, 5002) in filled
 
-    def test_reporting_aes_filtered_by_round(self):
+    def test_reporting_aes_ids_from_excel_only_present_rounds(self):
         ctx = UprImportContext(template_ids=[33])
         ctx.assignment_by_template = {
             33: {
@@ -186,7 +186,16 @@ class TestMissingCoreYesNoDefaults:
                 ("2025", "AFG"): 3,
             }
         }
-        aes = _reporting_aes_ids_for_import(ctx, {"MYR25"})
-        assert aes == {1}
-        aes_all = _reporting_aes_ids_for_import(ctx, None)
-        assert aes_all == {1, 2, 3}
+        rows = [
+            {"Round": "MYR25", "ISO3": "AFG", "Section": "Core indicators"},
+            {"Round": "AR25", "ISO3": "AFG", "Section": "NS Data"},
+        ]
+        aes = _reporting_aes_ids_from_excel(rows, ctx, template_ids=[33])
+        assert aes == {1, 3}
+        assert 2 not in aes
+
+    def test_reporting_aes_ids_from_excel_ignores_non_t33_sections(self):
+        ctx = UprImportContext(template_ids=[33])
+        ctx.assignment_by_template = {33: {("2025", "AFG"): 3}}
+        rows = [{"Round": "AR25", "ISO3": "AFG", "Section": "Staff"}]
+        assert _reporting_aes_ids_from_excel(rows, ctx, template_ids=[33]) == set()

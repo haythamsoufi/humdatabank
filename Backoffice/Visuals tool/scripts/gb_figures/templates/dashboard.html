@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+__TAJAWAL_FONT_CSS__
+  :root {
+    --value: #c22526;
+    --target: #f28e2b;
+    --gap: #c1c1c1;
+    --text: #1a1a1a;
+    --muted: #666;
+    --divider: #d8d8d8;
+    --bg: #ffffff;
+    --font: "Segoe UI", "Open Sans", system-ui, -apple-system, sans-serif;
+    --label-col: 290px;
+    --donut-size: 64px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  svg text { font-family: var(--font); }
+
+  #dashboard {
+    width: 827px;
+    padding: 18px 22px 14px;
+    background: var(--bg);
+  }
+
+  #dashboard[dir="rtl"] { text-align: right; }
+
+  .dash-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--value);
+    margin-bottom: 14px;
+    letter-spacing: -0.01em;
+  }
+
+  #dashboard[data-style="modern"] .dash-title {
+    letter-spacing: -0.03em;
+    font-weight: 800;
+    font-size: 16px;
+    margin-bottom: 16px;
+  }
+
+  #dashboard[data-style="modern"] .indicator-row {
+    padding: 14px 0;
+    border-bottom-color: #f0f0f0;
+  }
+
+  #dashboard[data-style="modern"] .indicator-text {
+    font-size: 11px;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+    color: #222;
+    border-right-color: #f0f0f0;
+  }
+
+  #dashboard[data-style="modern"] .metric-labels {
+    color: #8a8a8a;
+    border-right-color: #f0f0f0;
+  }
+
+  #dashboard[data-style="modern"] .table-row {
+    border-bottom-color: #f0f0f0;
+  }
+
+  #dashboard[data-style="modern"] .table-row:first-child {
+    border-top-color: #f0f0f0;
+  }
+
+  #dashboard[data-style="modern"] .x-axis-divider-left,
+  #dashboard[data-style="modern"] .x-axis-divider-right {
+    border-top-color: #f0f0f0;
+  }
+
+  #dashboard[data-style="modern"] .table-cell.year-cell,
+  #dashboard[data-style="modern"] .metric-labels .year-label {
+    letter-spacing: 0.02em;
+  }
+
+  #dashboard[data-style="professional"] .dash-title {
+    letter-spacing: 0;
+    font-weight: 600;
+  }
+
+  #dashboard[data-style="professional"] .indicator-row,
+  #dashboard[data-style="professional"] .donut-row {
+    border-bottom-width: 0.5px;
+  }
+
+  .col-headers {
+    display: none;
+  }
+
+  .indicator-row {
+    display: grid;
+    grid-template-columns: var(--label-col) 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 0 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--divider);
+    align-items: stretch;
+  }
+
+  .indicator-text {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 10.5px;
+    line-height: 1.35;
+    display: flex;
+    align-items: center;
+    padding: 4px 8px 4px 2px;
+    border-right: 1px solid var(--divider);
+    min-height: 110px;
+  }
+
+  .line-chart-wrap {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    min-height: 110px;
+    height: auto;
+  }
+
+  .line-chart-inner {
+    position: relative;
+    width: 481px;
+    max-width: 100%;
+    aspect-ratio: var(--chart-width, 481) / 110;
+  }
+
+  .line-chart-inner > svg,
+  .line-chart-inner > .line-chart-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .x-axis-divider-row {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: var(--label-col) 1fr;
+    gap: 12px;
+    margin: 4px 0 2px;
+  }
+
+  .x-axis-divider-left {
+    border-top: 1px solid var(--divider);
+    margin-left: 50%;
+  }
+
+  #dashboard[dir="rtl"] .x-axis-divider-left {
+    margin-left: 0;
+    margin-right: 50%;
+  }
+
+  .x-axis-divider-right {
+    border-top: 1px solid var(--divider);
+  }
+
+  .x-axis-footer {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    display: grid;
+    grid-template-columns: var(--label-col) 1fr;
+    gap: 12px;
+    min-height: 54px;
+    align-items: stretch;
+  }
+
+  .x-axis-footer.year-only {
+    min-height: 0;
+    align-items: start;
+  }
+
+  .x-axis-footer.year-only .metric-labels,
+  .x-axis-footer.year-only .table-data {
+    min-height: 0;
+    justify-content: flex-start;
+  }
+
+  .metric-labels {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    font-size: 9px;
+    color: var(--muted);
+    text-align: right;
+    padding: 2px 10px 2px 2px;
+    border-right: 1px solid var(--divider);
+  }
+
+  .metric-labels span {
+    line-height: 1.3;
+    min-height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .table-data {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    min-height: 54px;
+  }
+
+  .table-row {
+    position: relative;
+    height: 18px;
+    font-size: 9px;
+    border-bottom: 1px solid var(--divider);
+  }
+
+  .table-row:first-child {
+    border-top: 1px solid var(--divider);
+  }
+
+  .table-vline {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-left: 1px solid var(--divider);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .table-cell {
+    position: absolute;
+    transform: translateX(-50%);
+    color: var(--text);
+    text-align: center;
+    white-space: nowrap;
+    z-index: 1;
+  }
+
+  .table-cell.year-cell {
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .metric-labels .year-label {
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .line-chart-wrap svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .data-table-grid {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    font-size: 9px;
+    width: 100%;
+  }
+
+  .dt-labels {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dt-label {
+    padding: 3px 4px;
+    color: var(--muted);
+    text-align: left;
+    line-height: 1.3;
+    min-height: 17px;
+    display: flex;
+    align-items: center;
+  }
+
+  .dt-data {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dt-row {
+    display: grid;
+    grid-template-columns: repeat(var(--cols), 1fr);
+    text-align: center;
+    min-height: 17px;
+    align-items: center;
+  }
+
+  .dt-cell {
+    padding: 3px 2px;
+    color: var(--text);
+  }
+
+  .col-headers .hdr-chart-panel {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    font-size: 9.5px;
+    font-weight: 700;
+    align-items: end;
+    min-height: 28px;
+  }
+
+  .col-headers .hdr-label-slot {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 1px;
+    font-size: 8px;
+    line-height: 1.15;
+    padding-bottom: 1px;
+  }
+
+  .col-headers .hdr-data {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding-right: 52px;
+  }
+
+  .col-headers .hdr-year { font-size: 9.5px; }
+  .col-headers .hdr-annual { font-size: 9.5px; }
+  .col-headers .hdr-target { font-size: 9.5px; width: 48px; text-align: right; }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9px;
+    table-layout: fixed;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 3px 4px;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .data-table th {
+    font-weight: 400;
+    color: var(--muted);
+    text-align: left;
+    width: 72px;
+  }
+
+  .data-table td { color: var(--text); }
+
+  .donut-row {
+    display: grid;
+    grid-template-columns: var(--label-col) var(--donut-size) 1fr;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--divider);
+    align-items: center;
+  }
+
+  .donut-row .indicator-text,
+  .donut-pair-item .indicator-text {
+    font-size: 10.5px;
+    line-height: 1.35;
+    display: flex;
+    align-items: center;
+    padding: 4px 8px 4px 2px;
+    border-right: 1px solid var(--divider);
+    min-height: 48px;
+  }
+
+  .donut-pair-item .indicator-text {
+    border-right: none;
+    min-height: auto;
+    font-size: 9.5px;
+    padding: 0;
+  }
+
+  .donut-svg { width: var(--donut-size); height: var(--donut-size); }
+
+  .donut-target {
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--text);
+    white-space: pre-line;
+  }
+
+  .donut-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    padding: 14px 0;
+  }
+
+  .section-tail {
+    width: 100%;
+  }
+
+  .donut-pair-item {
+    display: grid;
+    grid-template-columns: 1fr var(--donut-size);
+    gap: 12px;
+    align-items: center;
+  }
+
+  .footnote {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--divider);
+    font-size: 8px;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+
+  /* EF table */
+  .ef-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5px;
+    margin-top: 8px;
+  }
+
+  .ef-table th {
+    font-weight: 700;
+    padding: 6px 8px;
+    text-align: center;
+    border-bottom: 2px solid var(--divider);
+  }
+
+  .ef-table th:first-child,
+  .ef-table td:first-child { text-align: left; }
+
+  .ef-table:not(.no-target) th:nth-child(2),
+  .ef-table:not(.no-target) td:nth-child(2) { text-align: left; width: 120px; }
+
+  .ef-table td {
+    padding: 7px 8px;
+    text-align: center;
+    border-bottom: 1px solid #eee;
+    vertical-align: top;
+  }
+
+  .ef-table td.value-cell .value-main {
+    color: var(--value);
+    font-weight: 700;
+  }
+
+  .ef-table td.value-cell .value-suffix {
+    color: var(--text);
+    font-weight: 400;
+  }
+</style>
+</head>
+<body>
+<div id="dashboard"></div>
+<script>
+const DATA = __DASHBOARD_JSON__;
+const DEFAULT_COLORS = { value: "#c22526", target: "#f28e2b", gap: "#c1c1c1", text: "#1a1a1a", muted: "#666666", divider: "#d8d8d8", bg: "#ffffff" };
+const COLORS = { ...DEFAULT_COLORS, ...(DATA.colors || {}) };
+const FONT = DATA.language === "Arabic"
+  ? '"Tajawal", "Segoe UI", sans-serif'
+  : '"Segoe UI", "Open Sans", system-ui, -apple-system, sans-serif';
+
+function applyTheme() {
+  document.documentElement.style.setProperty("--value", COLORS.value);
+  document.documentElement.style.setProperty("--target", COLORS.target);
+  document.documentElement.style.setProperty("--gap", COLORS.gap);
+  document.documentElement.style.setProperty("--text", COLORS.text);
+  document.documentElement.style.setProperty("--muted", COLORS.muted);
+  document.documentElement.style.setProperty("--divider", COLORS.divider);
+  document.documentElement.style.setProperty("--bg", COLORS.bg);
+}
+
+document.documentElement.style.setProperty("--font", FONT);
+applyTheme();
+if (DATA.language === "Arabic") {
+  document.documentElement.setAttribute("dir", "rtl");
+  document.documentElement.setAttribute("lang", "ar");
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+const CHART_PAD_L = 24;
+const CHART_PAD_R = 52;
+const LINE_CHART_EFFECTS = DATA.line_chart_effects || { area_fill: false, line_shadow: false, marker_ring: false };
+const LINE_STROKE_WIDTH = DATA.line_stroke_width ?? 2.5;
+const MARKER_RADIUS = DATA.marker_radius ?? 3.5;
+
+__LINE_CHART_JS__
+
+function xPercent(i, n, width) {
+  const w = width - CHART_PAD_L - CHART_PAD_R;
+  const step = n > 1 ? w / (n - 1) : 0;
+  const x = CHART_PAD_L + i * step;
+  return (x / width) * 100;
+}
+
+function renderDonutLabel(cx, cy, label) {
+  const lines = String(label ?? "").split("\n");
+  if (lines.length <= 1) {
+    return `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="11" font-weight="700" fill="${COLORS.text}">${esc(label)}</text>`;
+  }
+  const lineHeight = 11;
+  const startY = cy + 2 - ((lines.length - 1) * lineHeight) / 2;
+  return `<text text-anchor="middle" font-size="11" font-weight="700" fill="${COLORS.text}">` +
+    lines.map((line, i) => `<tspan x="${cx}" y="${startY + i * lineHeight}">${esc(line)}</tspan>`).join("") +
+    `</text>`;
+}
+
+function donutHasTarget(item) {
+  const target = Number(item.target);
+  return Number.isFinite(target) && target > 0;
+}
+
+function renderDonut(item) {
+  const size = 64, cx = 32, cy = 32, r = 26, stroke = 10;
+  if (!donutHasTarget(item)) {
+    return `<svg class="donut-svg" viewBox="0 0 ${size} ${size}">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${COLORS.value}" stroke-width="${stroke}"/>
+      ${renderDonutLabel(cx, cy, item.value_label)}
+    </svg>`;
+  }
+  const value = Math.max(item.value, 0);
+  const target = Math.max(item.target, value);
+  const pct = Math.min(value / target, 1);
+  const circ = 2 * Math.PI * r;
+  const filled = circ * pct;
+  const gap = circ - filled;
+  return `<svg class="donut-svg" viewBox="0 0 ${size} ${size}">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${COLORS.gap}" stroke-width="${stroke}"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${COLORS.value}" stroke-width="${stroke}"
+      stroke-dasharray="${filled} ${gap}" stroke-dashoffset="${circ * 0.25}" stroke-linecap="butt"/>
+    ${renderDonutLabel(cx, cy, item.value_label)}
+  </svg>`;
+}
+
+function renderPositionedRow(values, n, chartWidth, cellClass = "") {
+  const cls = cellClass ? ` table-cell ${cellClass}` : " table-cell";
+  return `<div class="table-row">${values.map((v, i) => {
+    const pct = xPercent(i, n, chartWidth);
+    return `<span class="${cls.trim()}" style="left:${pct}%">${esc(v)}</span>`;
+  }).join("")}</div>`;
+}
+
+function renderTableVlines(count, chartWidth) {
+  if (count <= 1) return "";
+  return Array.from({ length: count - 1 }, (_, i) => {
+    const pct = (xPercent(i, count, chartWidth) + xPercent(i + 1, count, chartWidth)) / 2;
+    return `<span class="table-vline" style="left:${pct}%"></span>`;
+  }).join("");
+}
+
+function renderDataTable(item, chartWidth) {
+  const n = item.years.length;
+  let html = `<div class="table-data">
+    ${renderTableVlines(n, chartWidth)}
+    ${renderPositionedRow(item.years, n, chartWidth, "year-cell")}`;
+  if (item.show_ns_breakdown !== false) {
+    html += `
+    ${renderPositionedRow(item.reporting, n, chartWidth)}
+    ${renderPositionedRow(item.implementing, n, chartWidth)}`;
+  }
+  return html + `</div>`;
+}
+
+function renderMetricLabels(labels, showNsBreakdown = true) {
+  let html = `<div class="metric-labels">
+    <span class="year-label">${esc(labels.year)}</span>`;
+  if (showNsBreakdown) {
+    html += `
+    <span>${esc(labels.reporting)}</span>
+    <span>${esc(labels.implementing)}</span>`;
+  }
+  return html + `</div>`;
+}
+
+function appendSectionTail(parts, footnote) {
+  const footnoteHtml = `<div class="footnote">${esc(footnote)}</div>`;
+  if (parts.length > 1) {
+    const last = parts.pop();
+    parts.push(`<div class="section-tail">${last}${footnoteHtml}</div>`);
+  } else {
+    parts.push(footnoteHtml);
+  }
+  return parts.join("");
+}
+
+function renderSP(data) {
+  const root = document.getElementById("dashboard");
+  if (data.language === "Arabic") root.setAttribute("dir", "rtl");
+  if (data.style) root.setAttribute("data-style", data.style);
+
+  const parts = [`<div class="dash-title">${esc(data.title)}</div>`];
+
+  const chartWidth = 827 - 44 - 290 - 12;
+  const targetLabel = data.headers.target;
+
+  data.cumulative.forEach((item, idx) => {
+    const yearOnly = item.show_ns_breakdown === false;
+    const footerClass = yearOnly ? "x-axis-footer year-only" : "x-axis-footer";
+    parts.push(`<div class="indicator-row">
+      <div class="indicator-text">${esc(item.label)}</div>
+      <div class="line-chart-wrap"><div class="line-chart-inner" style="--chart-width:${chartWidth}">${renderLineChart(item, chartWidth, targetLabel, `sp-${idx}`, LINE_CHART_EFFECTS)}</div></div>
+      <div class="x-axis-divider-row">
+        <div class="x-axis-divider-left"></div>
+        <div class="x-axis-divider-right"></div>
+      </div>
+      <div class="${footerClass}">
+        ${renderMetricLabels(data.table_labels, !yearOnly)}
+        ${renderDataTable(item, chartWidth)}
+      </div>
+    </div>`);
+  });
+
+  if (data.donut_pair) {
+    let pairHtml = `<div class="donut-pair">`;
+    data.donut_pair.forEach(item => {
+      pairHtml += `<div class="donut-pair-item">
+        <div class="indicator-text">${esc(item.label)}</div>
+        ${renderDonut(item)}
+      </div>`;
+    });
+    pairHtml += `</div>`;
+    parts.push(pairHtml);
+  }
+
+  data.donuts.forEach(item => {
+    const targetHtml = item.target_label
+      ? `<div class="donut-target">${esc(item.target_label)}</div>`
+      : "";
+    parts.push(`<div class="donut-row">
+      <div class="indicator-text">${esc(item.label)}</div>
+      ${renderDonut(item)}
+      ${targetHtml}
+    </div>`);
+  });
+
+  root.innerHTML = appendSectionTail(parts, data.footnote);
+}
+
+function efColgroup(showTarget, nYears) {
+  if (nYears <= 0) return "";
+  const yearWidth = ((showTarget ? 60 : 55) / nYears).toFixed(4);
+  let html = "<colgroup><col>";
+  if (showTarget) html += '<col style="width:120px">';
+  for (let i = 0; i < nYears; i++) {
+    html += `<col style="width:${yearWidth}%">`;
+  }
+  return html + "</colgroup>";
+}
+
+function renderEfCell(cell) {
+  if (!cell.value) return esc(cell.text);
+  const main = cell.main ?? cell.text;
+  const suffix = cell.suffix ?? "";
+  if (!suffix) return `<span class="value-main">${esc(main)}</span>`;
+  return `<span class="value-main">${esc(main)}</span><span class="value-suffix">${esc(suffix)}</span>`;
+}
+
+function renderEF(data) {
+  const root = document.getElementById("dashboard");
+  if (data.language === "Arabic") root.setAttribute("dir", "rtl");
+  if (data.style) root.setAttribute("data-style", data.style);
+
+  const showTarget = data.show_target_column !== false;
+  const noTargetClass = showTarget ? "" : " no-target";
+
+  let html = `<div class="dash-title">${esc(data.title)}</div>`;
+  html += `<div class="section-tail"><table class="ef-table${noTargetClass}">${efColgroup(showTarget, data.headers.years.length)}<thead><tr>
+    <th>${esc(data.headers.indicator)}</th>`;
+  if (showTarget) {
+    html += `<th>${esc(data.headers.target)}</th>`;
+  }
+  html += `${data.headers.years.map(y => `<th>${esc(y)}</th>`).join("")}
+  </tr></thead><tbody>`;
+
+  data.rows.forEach(row => {
+    html += `<tr>
+      <td>${esc(row.label)}</td>`;
+    if (showTarget) {
+      html += `<td>${esc(row.target)}</td>`;
+    }
+    html += `${row.years.map(c => `<td class="${c.value ? "value-cell" : ""}">${renderEfCell(c)}</td>`).join("")}
+    </tr>`;
+  });
+
+  html += `</tbody></table>`;
+  html += `<div class="footnote">${esc(data.footnote)}</div></div>`;
+  root.innerHTML = html;
+}
+
+if (DATA.type === "ef") renderEF(DATA);
+else renderSP(DATA);
+
+document.body.setAttribute("data-ready", "true");
+</script>
+</body>
+</html>

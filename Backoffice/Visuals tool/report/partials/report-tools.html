@@ -1,0 +1,160 @@
+<style>
+.gb-report-tools {
+  margin: 0 0 1.25rem;
+  padding: 0 0 1rem;
+  border-bottom: 1px solid #e5e5e5;
+}
+.gb-report-tools-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #666;
+  margin: 0 0 0.65rem;
+}
+.gb-report-tools-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.gb-report-tools-list li + li {
+  margin-top: 0.35rem;
+}
+.gb-tool-btn,
+.gb-tool-link {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #ddd;
+  border-radius: 0.25rem;
+  background: #fff;
+  color: #1a1a1a;
+  font-size: 0.88rem;
+  line-height: 1.3;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.gb-tool-btn:hover,
+.gb-tool-link:hover {
+  background: #fafafa;
+  border-color: #ccc;
+  color: #1a1a1a;
+}
+.gb-tool-btn:focus-visible,
+.gb-tool-link:focus-visible {
+  outline: 2px solid #c22526;
+  outline-offset: 2px;
+}
+.gb-tool-btn .bi,
+.gb-tool-link .bi {
+  color: #c22526;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+@media print {
+  .gb-report-tools,
+  .gb-language-selector,
+  .quarto-alternate-formats {
+    display: none !important;
+  }
+}
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const panelsRoot = document.getElementById("gb-language-panels");
+  if (!panelsRoot) return;
+
+  const marginSidebar = document.querySelector("#quarto-margin-sidebar");
+  const leftNav = document.querySelector("#quarto-sidebar nav");
+  const chromeHost = marginSidebar || leftNav;
+  if (!chromeHost) return;
+
+  const languages = Array.from(panelsRoot.querySelectorAll(".gb-lang-panel"))
+    .map((p) => p.dataset.lang)
+    .filter(Boolean);
+
+  function slug(lang) {
+    return lang.toLowerCase().replace(/\s+/g, "-");
+  }
+
+  function figuresZipHref(lang) {
+    return "gb-report-figures-" + slug(lang) + ".zip";
+  }
+
+  const tools = document.createElement("div");
+  tools.className = "gb-report-tools";
+  tools.innerHTML =
+    '<h2 class="gb-report-tools-title">Tools</h2>' +
+    '<ul class="gb-report-tools-list">' +
+    '<li><button type="button" class="gb-tool-btn" id="gb-download-pngs" data-default-label="Download PNG package">' +
+    '<i class="bi bi-file-earmark-zip" aria-hidden="true"></i><span>Download PNG package</span></button></li>' +
+    '<li><a class="gb-tool-link" id="gb-download-pngs-all" href="gb-report-figures-all.zip">' +
+    '<i class="bi bi-file-earmark-zip" aria-hidden="true"></i><span>Download all languages (PNG)</span></a></li>' +
+    '<li><a class="gb-tool-link" id="gb-download-pdf" href="gb-report.pdf">' +
+    '<i class="bi bi-file-earmark-pdf" aria-hidden="true"></i><span>Download PDF</span></a></li>' +
+    '<li><button type="button" class="gb-tool-btn" id="gb-print-report">' +
+    '<i class="bi bi-printer" aria-hidden="true"></i><span>Print report</span></button></li>' +
+    '<li><a class="gb-tool-link" id="gb-download-word" href="gb-report.docx">' +
+    '<i class="bi bi-file-word" aria-hidden="true"></i><span>MS Word</span></a></li>' +
+    "</ul>";
+
+  const alternateFormats = chromeHost.querySelector(".quarto-alternate-formats");
+  if (alternateFormats) {
+    chromeHost.insertBefore(tools, alternateFormats);
+    alternateFormats.remove();
+  } else {
+    chromeHost.insertBefore(tools, chromeHost.firstChild);
+  }
+
+  const pngBtn = tools.querySelector("#gb-download-pngs");
+  const pngBtnLabel = pngBtn.querySelector("span");
+  const pdfLink = tools.querySelector("#gb-download-pdf");
+  const pdfLinkLabel = pdfLink.querySelector("span");
+  const wordLink = tools.querySelector("#gb-download-word");
+  const wordLinkLabel = wordLink.querySelector("span");
+  const defaultPngLabel = pngBtn.dataset.defaultLabel || "Download PNG package";
+
+  function pdfHref(lang) {
+    return "gb-report-" + slug(lang) + ".pdf";
+  }
+
+  function wordHref(lang) {
+    return "gb-report-" + slug(lang) + ".docx";
+  }
+
+  function updateTools(lang) {
+    const zipHref = figuresZipHref(lang);
+    pngBtn.dataset.href = zipHref;
+    pngBtnLabel.textContent = defaultPngLabel + " (" + lang + ")";
+    pdfLink.setAttribute("href", pdfHref(lang));
+    pdfLinkLabel.textContent = "Download PDF (" + lang + ")";
+    wordLink.setAttribute("href", wordHref(lang));
+    wordLinkLabel.textContent = "MS Word (" + lang + ")";
+  }
+
+  pngBtn.addEventListener("click", function () {
+    const href = pngBtn.dataset.href;
+    if (!href) return;
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = href.split("/").pop();
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  });
+
+  tools.querySelector("#gb-print-report").addEventListener("click", function () {
+    window.print();
+  });
+
+  updateTools(localStorage.getItem("gb-report-language") || panelsRoot.dataset.default || languages[0]);
+
+  document.addEventListener("gb-language-changed", function (event) {
+    if (event.detail && event.detail.lang) updateTools(event.detail.lang);
+  });
+});
+</script>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+<meta charset="utf-8">
+
+<style>
+__TAJAWAL_FONT_CSS__
+
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body { background: #fff; font-family: var(--font, "Segoe UI", sans-serif); }
+
+  svg text { font-family: var(--font, "Segoe UI", sans-serif); }
+
+  #asset { background: #fff; }
+
+  #asset.line { width: __WIDTH__px; height: 110px; }
+
+  #asset.donut { width: 64px; height: 64px; }
+
+  svg { display: block; width: 100%; height: 100%; }
+
+</style>
+
+</head>
+
+<body>
+
+<div id="asset" class="__TYPE__"></div>
+
+<script>
+
+const DATA = __DASHBOARD_JSON__;
+
+const DEFAULT_COLORS = { value: "#c22526", target: "#f28e2b", gap: "#c1c1c1", text: "#1a1a1a", muted: "#666666", divider: "#d8d8d8", bg: "#ffffff" };
+
+const COLORS = { ...DEFAULT_COLORS, ...(DATA.colors || {}) };
+
+const FONT = DATA.language === "Arabic"
+
+  ? '"Tajawal", "Segoe UI", sans-serif'
+
+  : '"Segoe UI", sans-serif';
+
+function applyTheme() {
+
+  document.documentElement.style.setProperty("--value", COLORS.value);
+
+  document.documentElement.style.setProperty("--target", COLORS.target);
+
+  document.documentElement.style.setProperty("--gap", COLORS.gap);
+
+  document.documentElement.style.setProperty("--text", COLORS.text);
+
+  document.documentElement.style.setProperty("--muted", COLORS.muted);
+
+  document.documentElement.style.setProperty("--divider", COLORS.divider);
+
+  document.documentElement.style.setProperty("--bg", COLORS.bg);
+
+}
+
+document.documentElement.style.setProperty("--font", FONT);
+
+applyTheme();
+
+const CHART_PAD_L = 24;
+
+const CHART_PAD_R = 52;
+
+const LINE_CHART_EFFECTS = DATA.line_chart_effects || { area_fill: false, line_shadow: false, marker_ring: false };
+
+const LINE_STROKE_WIDTH = DATA.line_stroke_width ?? 2.5;
+
+const MARKER_RADIUS = DATA.marker_radius ?? 3.5;
+
+
+
+function esc(s) {
+
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+}
+
+
+
+__LINE_CHART_JS__
+
+
+
+function renderDonutLabel(cx, cy, label) {
+
+  const lines = String(label ?? "").split("\n");
+
+  if (lines.length <= 1) {
+
+    return `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="11" font-weight="700" fill="${COLORS.text}">${esc(label)}</text>`;
+
+  }
+
+  const lineHeight = 11;
+
+  const startY = cy + 2 - ((lines.length - 1) * lineHeight) / 2;
+
+  return `<text text-anchor="middle" font-size="11" font-weight="700" fill="${COLORS.text}">` +
+
+    lines.map((line, i) => `<tspan x="${cx}" y="${startY + i * lineHeight}">${esc(line)}</tspan>`).join("") +
+
+    `</text>`;
+
+}
+
+
+
+function donutHasTarget(item) {
+
+  const target = Number(item.target);
+
+  return Number.isFinite(target) && target > 0;
+
+}
+
+
+
+function renderDonut(item, showLabel) {
+
+  const size = 64, cx = 32, cy = 32, r = 26, stroke = 10;
+
+  const labelSvg = showLabel !== false ? renderDonutLabel(cx, cy, item.value_label) : "";
+
+  if (!donutHasTarget(item)) {
+
+    return `<svg viewBox="0 0 ${size} ${size}">
+
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${COLORS.value}" stroke-width="${stroke}"/>
+
+      ${labelSvg}
+
+    </svg>`;
+
+  }
+
+  const value = Math.max(item.value, 0);
+
+  const target = Math.max(item.target, value);
+
+  const pct = Math.min(value / target, 1);
+
+  const circ = 2 * Math.PI * r;
+
+  const filled = circ * pct;
+
+  const gap = circ - filled;
+
+  return `<svg viewBox="0 0 ${size} ${size}">
+
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${COLORS.gap}" stroke-width="${stroke}"/>
+
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${COLORS.value}" stroke-width="${stroke}"
+
+      stroke-dasharray="${filled} ${gap}" stroke-dashoffset="${circ * 0.25}" stroke-linecap="butt"/>
+
+    ${labelSvg}
+
+  </svg>`;
+
+}
+
+
+
+const root = document.getElementById("asset");
+
+if (DATA.style) root.setAttribute("data-style", DATA.style);
+
+if (DATA.type === "line") {
+
+  root.innerHTML = renderLineChart(
+
+    DATA.item,
+
+    DATA.width,
+
+    DATA.target_label,
+
+    "asset-line",
+
+    LINE_CHART_EFFECTS,
+
+    DATA.chart_options || {},
+
+  );
+
+} else {
+
+  root.innerHTML = renderDonut(DATA.item, DATA.show_label);
+
+}
+
+document.body.setAttribute("data-ready", "true");
+
+</script>
+
+</body>
+
+</html>
+

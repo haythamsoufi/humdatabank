@@ -32,6 +32,10 @@ from app.services.monitoring.platform_error_diagnostics import (
     attach_platform_5xx_diagnostics,
     is_platform_5xx,
 )
+from app.services.monitoring.worker_investigation import (
+    log_worker_recovery,
+    schedule_504_investigation,
+)
 from app.extensions import limiter
 
 PLATFORM_ERROR_DIAGNOSTICS_MAX_CONTEXT_BYTES = 12000
@@ -104,12 +108,25 @@ def log_platform_error():
         "url": "full URL where error occurred",
         "referrer": "referrer URL (optional)",
         "user_agent": "browser user agent (optional)",
-        "timestamp": "ISO timestamp (optional)"
+        "timestamp": "ISO timestamp (optional)",
+        "probe_delay_s": float (optional) — present only in JS recovery probes, not initial reports
     }
+
+    When error_code is 504 and probe_delay_s is absent, a background investigation
+    thread is started that re-snapshots worker state after a short delay and logs a
+    [WORKER_INVESTIGATION] verdict.
+
+    When probe_delay_s is present (JS recovery probe at T+5s / T+15s), the request
+    is handled as a lightweight recovery confirmation and does not create a security event.
 
     Returns:
         JSON response with success status
     """
+    import time as _time
+    import json as json_lib
+
+    received_at = _time.time()
+
     try:
         # Validate Content-Type
         content_type = request.headers.get('Content-Type', '')
@@ -148,6 +165,25 @@ def log_platform_error():
             except (ValueError, AttributeError):
                 timestamp = None  # Invalid timestamp, ignore it
 
+        # ── Recovery probe fast-path ───────────────────────────────────────────
+        # JS sends follow-up beacons at T+5s and T+15s with probe_delay_s set.
+        # These are cheap confirmations ("a worker is alive now") and do not
+        # create a security event or start a new investigation.
+        raw_probe_delay = data.get('probe_delay_s')
+        if raw_probe_delay is not None and error_code == 504:
+            try:
+                probe_delay_s = float(raw_probe_delay)
+            except (TypeError, ValueError):
+                probe_delay_s = 0.0
+            app = current_app._get_current_object()
+            log_worker_recovery(
+                app,
+                url=url,
+                probe_delay_s=probe_delay_s,
+                reported_at=received_at - probe_delay_s if probe_delay_s > 0 else None,
+            )
+            return json_ok(success=True, message='Recovery probe logged')
+
         # Get client IP using utility function (handles proxies correctly)
         ip_address = get_client_ip() or 'unknown'
 
@@ -185,7 +221,6 @@ def log_platform_error():
             diagnostics_summary = context_data.get('diagnostics_summary', '') or ''
 
         # Additional validation: ensure context_data doesn't exceed reasonable size
-        import json as json_lib
         context_json = json_lib.dumps(context_data, default=str)
         if len(context_json) > PLATFORM_ERROR_DIAGNOSTICS_MAX_CONTEXT_BYTES:
             # Truncate user_agent if needed
@@ -227,6 +262,19 @@ def log_platform_error():
         if diagnostics_summary:
             log_message = f"{log_message} | {diagnostics_summary}"
         current_app.logger.warning(log_message)
+
+        # ── 504-specific: deferred worker investigation ────────────────────────
+        # Start a background thread that re-snapshots worker state after
+        # _DELAY_SECONDS and logs a [WORKER_INVESTIGATION] verdict explaining
+        # why no worker was available at the time of the timeout.
+        if error_code == 504:
+            try:
+                app = current_app._get_current_object()
+                schedule_504_investigation(app, url=url, reported_at=received_at)
+            except Exception as exc:
+                current_app.logger.warning(
+                    'Could not schedule 504 worker investigation: %s', exc
+                )
 
         return json_ok(success=True, message='Error logged successfully')
 

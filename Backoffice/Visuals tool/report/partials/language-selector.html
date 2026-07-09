@@ -1,0 +1,245 @@
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const panelsRoot = document.getElementById("gb-language-panels");
+  const main = document.getElementById("quarto-document-content");
+  if (!panelsRoot) return;
+
+  const panels = Array.from(panelsRoot.querySelectorAll(".gb-lang-panel"));
+  if (!panels.length) return;
+
+  const languages = panels.map((p) => p.dataset.lang).filter(Boolean);
+  const storageKey = "gb-report-language";
+  const defaultLang = panelsRoot.dataset.default || languages[0];
+  let activeLang = localStorage.getItem(storageKey) || defaultLang;
+  if (!languages.includes(activeLang)) activeLang = defaultLang;
+
+  const marginSidebar = document.querySelector("#quarto-margin-sidebar");
+  const leftNav = document.querySelector("#quarto-sidebar nav");
+  const chromeHost = marginSidebar || leftNav;
+
+  const selector = document.createElement("div");
+  selector.className = "gb-language-selector";
+  selector.innerHTML =
+    '<label for="gb-language-select">Language</label>' +
+    '<select id="gb-language-select" aria-label="Report language"></select>';
+
+  if (chromeHost) {
+    chromeHost.insertBefore(selector, chromeHost.firstChild);
+  } else {
+    panelsRoot.parentElement.insertBefore(selector, panelsRoot);
+  }
+
+  const select = selector.querySelector("#gb-language-select");
+  languages.forEach((lang) => {
+    const opt = document.createElement("option");
+    opt.value = lang;
+    opt.textContent = lang;
+    select.appendChild(opt);
+  });
+  select.value = activeLang;
+
+  function slug(lang) {
+    return lang.toLowerCase().replace(/\s+/g, "-");
+  }
+
+  function wordHref(lang) {
+    return "gb-report-" + slug(lang) + ".docx";
+  }
+
+  function clearAnchors() {
+    panels.forEach((panel) => {
+      panel.querySelectorAll("[data-anchor]").forEach((el) => el.removeAttribute("id"));
+    });
+  }
+
+  function applyAnchors(panel) {
+    panel.querySelectorAll("[data-anchor]").forEach((el) => {
+      el.id = el.dataset.anchor;
+    });
+  }
+
+  function rebuildToc(panel) {
+    const host = leftNav || marginSidebar;
+    if (!host) return;
+
+    let toc = host.querySelector("#toc");
+    if (!toc) {
+      const tocNav = document.createElement("nav");
+      tocNav.id = "toc";
+      tocNav.setAttribute("role", "doc-toc");
+      tocNav.className = "toc-active";
+      tocNav.innerHTML =
+        '<h2 id="toc-title">Table of contents</h2><ul class="toc-list"></ul>';
+
+      const anchor = selector.nextSibling;
+      if (anchor) {
+        host.insertBefore(tocNav, anchor);
+      } else {
+        host.appendChild(tocNav);
+      }
+      toc = tocNav;
+    }
+
+    const list = toc.querySelector(".toc-list") || toc.querySelector("ul");
+    if (!list) return;
+    list.innerHTML = "";
+
+    panel.querySelectorAll(".report-part").forEach((partEl) => {
+      const h2 = partEl.querySelector("h2[data-anchor]");
+      if (!h2) return;
+
+      const partItem = document.createElement("li");
+      const partLink = document.createElement("a");
+      partLink.href = "#" + h2.dataset.anchor;
+      partLink.textContent = h2.textContent.trim();
+      partLink.className = "nav-link";
+      partLink.dataset.scrollTarget = "#" + h2.dataset.anchor;
+      partItem.appendChild(partLink);
+
+      const childList = document.createElement("ul");
+      partEl.querySelectorAll(".report-section-title[data-anchor]").forEach((h3) => {
+        const childItem = document.createElement("li");
+        const childLink = document.createElement("a");
+        childLink.href = "#" + h3.dataset.anchor;
+        childLink.textContent = h3.textContent.trim();
+        childLink.className = "nav-link";
+        childLink.dataset.scrollTarget = "#" + h3.dataset.anchor;
+        childItem.appendChild(childLink);
+        childList.appendChild(childItem);
+      });
+      if (childList.children.length) partItem.appendChild(childList);
+      list.appendChild(partItem);
+    });
+  }
+
+  function updateWordLink(lang) {
+    const href = wordHref(lang);
+    const link = document.getElementById("gb-download-word");
+    if (link) link.setAttribute("href", href);
+  }
+
+  let scrollHeaderBar = document.getElementById("gb-scroll-headers");
+  if (!scrollHeaderBar) {
+    scrollHeaderBar = document.createElement("div");
+    scrollHeaderBar.id = "gb-scroll-headers";
+    scrollHeaderBar.innerHTML =
+      '<div class="gb-sticky-bar-part"></div>' +
+      '<div class="gb-sticky-bar-section"></div>';
+    document.body.appendChild(scrollHeaderBar);
+  }
+  const scrollHeaderPart = scrollHeaderBar.querySelector(".gb-sticky-bar-part");
+  const scrollHeaderSection = scrollHeaderBar.querySelector(".gb-sticky-bar-section");
+
+  function updateScrollHeaderOffset() {
+    const height = scrollHeaderBar.classList.contains("is-visible")
+      ? Math.ceil(scrollHeaderBar.getBoundingClientRect().height)
+      : 0;
+    document.documentElement.style.setProperty("--gb-sticky-bar-height", height + "px");
+  }
+
+  function findActiveSection(panel) {
+    const sections = Array.from(panel.querySelectorAll(".report-section"));
+    if (!sections.length) return null;
+
+    const anchorY = (scrollHeaderBar.offsetHeight || 96) + 24;
+    let best = null;
+    let bestOverlap = 0;
+
+    sections.forEach((section) => {
+      const rect = section.getBoundingClientRect();
+      const overlapTop = Math.max(rect.top, anchorY);
+      const overlapBottom = Math.min(rect.bottom, window.innerHeight);
+      const overlap = Math.max(0, overlapBottom - overlapTop);
+      if (overlap > bestOverlap) {
+        bestOverlap = overlap;
+        best = section;
+      }
+    });
+
+    if (best) return best;
+
+    for (let i = sections.length - 1; i >= 0; i -= 1) {
+      if (sections[i].getBoundingClientRect().top <= anchorY) {
+        return sections[i];
+      }
+    }
+
+    return sections[0];
+  }
+
+  function updateScrollHeaders() {
+    const activePanel = panels.find((p) => !p.hidden);
+    if (!activePanel || !scrollHeaderPart || !scrollHeaderSection) return;
+
+    const panelsTop = panelsRoot.getBoundingClientRect().top;
+    const activeSection = findActiveSection(activePanel);
+    if (!activeSection || panelsTop > 8) {
+      scrollHeaderBar.classList.remove("is-visible");
+      updateScrollHeaderOffset();
+      return;
+    }
+
+    const partTitle = activeSection
+      .closest(".report-part")
+      ?.querySelector(".report-part-title");
+    const sectionTitle = activeSection.querySelector(".report-section-title");
+    if (!partTitle || !sectionTitle) {
+      scrollHeaderBar.classList.remove("is-visible");
+      updateScrollHeaderOffset();
+      return;
+    }
+
+    const partTop = partTitle.getBoundingClientRect().top;
+    const showBar = partTop <= 0;
+    if (!showBar) {
+      scrollHeaderBar.classList.remove("is-visible");
+      updateScrollHeaderOffset();
+      return;
+    }
+
+    scrollHeaderPart.textContent = partTitle.textContent.trim();
+    scrollHeaderSection.textContent = sectionTitle.textContent.trim();
+    scrollHeaderBar.setAttribute("dir", activePanel.dataset.dir || "ltr");
+    scrollHeaderBar.classList.add("is-visible");
+    updateScrollHeaderOffset();
+  }
+
+  function setLanguage(lang) {
+    activeLang = lang;
+    localStorage.setItem(storageKey, lang);
+
+    clearAnchors();
+    panels.forEach((panel) => {
+      const show = panel.dataset.lang === lang;
+      panel.hidden = !show;
+    });
+
+    const activePanel = panels.find((p) => p.dataset.lang === lang);
+    if (!activePanel) return;
+
+    applyAnchors(activePanel);
+    rebuildToc(activePanel);
+    updateWordLink(lang);
+
+    const dir = activePanel.dataset.dir || "ltr";
+    if (main) main.setAttribute("dir", dir);
+    document.documentElement.setAttribute("lang", slug(lang).slice(0, 2));
+    document.documentElement.classList.toggle("gb-report-arabic", lang === "Arabic");
+
+    const meta = document.getElementById("gb-active-language");
+    if (meta) meta.textContent = lang;
+
+    document.dispatchEvent(new CustomEvent("gb-language-changed", { detail: { lang } }));
+    updateScrollHeaders();
+  }
+
+  window.addEventListener("scroll", updateScrollHeaders, { passive: true });
+  window.addEventListener("resize", updateScrollHeaders);
+
+  select.addEventListener("change", function () {
+    setLanguage(select.value);
+  });
+
+  setLanguage(activeLang);
+});
+</script>

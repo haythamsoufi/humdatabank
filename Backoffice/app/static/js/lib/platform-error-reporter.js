@@ -156,6 +156,57 @@
         }).catch(function () {});
       }
     } catch (_) {}
+
+    // For 504 specifically: schedule lightweight recovery probes at T+5s and
+    // T+15s.  These arrive when a worker IS healthy and complete the incident
+    // timeline by showing "worker available again" state in the server log.
+    if (code === 504) {
+      scheduleWorkerProbes(failedUrl);
+    }
+  }
+
+  /**
+   * Send a recovery-confirmation beacon after a 504, at T+5s and T+15s.
+   *
+   * The backend receives these as [WORKER_RECOVERY] log entries (no security
+   * event created).  probe_delay_s tells the backend how long after the
+   * original 504 this probe was sent, so it can compute the incident duration.
+   *
+   * Uses nativeFetch (not the wrapped window.fetch) to avoid recursive error
+   * detection. Falls back to sendBeacon so it survives page navigation.
+   *
+   * @param {string} failedUrl - The URL that returned 504
+   */
+  function scheduleWorkerProbes(failedUrl) {
+    var delays = [5000, 15000];
+    for (var i = 0; i < delays.length; i++) {
+      (function (delayMs) {
+        setTimeout(function () {
+          var probePayload = {
+            error_code: 504,
+            url: failedUrl,
+            user_agent: navigator.userAgent || null,
+            timestamp: new Date().toISOString(),
+            probe_delay_s: delayMs / 1000
+          };
+          try {
+            if (nativeFetch) {
+              nativeFetch(ENDPOINT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(probePayload),
+                keepalive: true
+              }).catch(function () {});
+            } else if (navigator.sendBeacon) {
+              navigator.sendBeacon(
+                ENDPOINT,
+                new Blob([JSON.stringify(probePayload)], { type: 'application/json' })
+              );
+            }
+          } catch (_) {}
+        }, delayMs);
+      })(delays[i]);
+    }
   }
 
   /* ── window.fetch wrapper ──────────────────────────────────────────────── */

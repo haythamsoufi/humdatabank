@@ -1,0 +1,8 @@
+output/
+*.quarto_ipynb
+_site/
+figures/
+_body.qmd
+
+/.quarto/
+**/*.quarto_ipynb

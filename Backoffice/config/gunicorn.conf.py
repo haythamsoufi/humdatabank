@@ -150,14 +150,24 @@ def on_exit(server):
 
 def worker_int(worker):
     """Called when a worker receives INT or QUIT signal."""
+    is_scheduler_worker = False
+    try:
+        from app.scheduler_lock import scheduler_lock_path, read_lock_owner
+        is_scheduler_worker = read_lock_owner(scheduler_lock_path(os.getppid())) == worker.pid
+    except Exception:
+        pass
     worker.log.warning(
-        "Worker received INT/QUIT (pid=%s) — shutting down; in-flight requests may be interrupted",
-        worker.pid,
+        "[WORKER_INT] pid=%s scheduler_owner=%s — INT/QUIT received; in-flight requests may be interrupted",
+        worker.pid, is_scheduler_worker,
     )
 
 def pre_fork(server, worker):
     """Called just before a worker is forked."""
-    pass
+    server.log.info(
+        "Forking worker (master pid=%s, active workers=%s)",
+        server.pid,
+        len(server.WORKERS),
+    )
 
 def post_fork(server, worker):
     """Called just after a worker has been forked."""
@@ -166,37 +176,86 @@ def post_fork(server, worker):
         _apply_access_log_filters()
     except Exception:
         pass
-    server.log.info(f"Worker spawned (pid: {worker.pid})")
+    server.log.info("Worker spawned (pid: %s)", worker.pid)
 
 def pre_exec(server):
     """Called just before a new master process is forked."""
     server.log.info("Forking new master process")
 
 def worker_exit(server, worker):
-    """Called when a worker process exits — shut down APScheduler cleanly.
+    """Called (in the master process) when a worker exits.
 
-    Must not use Flask `current_app` here: there is no app/request context
-    in this hook, so the worker would have skipped shutdown every time.
-    Gunicorn loads the WSGI callable (e.g. `run:app`) as `worker.wsgi`.
-
-    Also removes the scheduler lock when this worker owns it so the next
-    worker can take over after max_requests recycling or timeouts.
+    Distinguishes voluntary recycle (max_requests) from other exits and times
+    the scheduler-shutdown + lock-release so slow teardown is visible in logs.
     """
+    import time as _wtime
+    _t0 = _wtime.monotonic()
+
+    # worker.alive is False when the worker initiated its own recycle (max_requests).
+    is_recycle = not getattr(worker, 'alive', True)
+    reason = 'recycle(max_requests)' if is_recycle else 'exit'
+
+    # Check whether this worker owned the scheduler lock BEFORE releasing it.
+    is_scheduler_worker = False
     try:
-        from app.scheduler_lock import shutdown_worker_scheduler
-        shutdown_worker_scheduler(getattr(worker, "wsgi", None), server.pid, worker.pid)
+        from app.scheduler_lock import scheduler_lock_path, read_lock_owner
+        lock_path = scheduler_lock_path(server.pid)
+        is_scheduler_worker = read_lock_owner(lock_path) == worker.pid
     except Exception:
         pass
 
+    server.log.info(
+        "[WORKER_EXIT] pid=%s reason=%s scheduler_owner=%s",
+        worker.pid, reason, is_scheduler_worker,
+    )
+
+    try:
+        from app.scheduler_lock import shutdown_worker_scheduler
+        shutdown_worker_scheduler(
+            getattr(worker, "wsgi", None), server.pid, worker.pid,
+            log_fn=lambda msg: server.log.info(msg),
+        )
+    except Exception as exc:
+        server.log.warning(
+            "[WORKER_EXIT] scheduler shutdown error (pid=%s): %s",
+            worker.pid, exc,
+        )
+
+    elapsed = _wtime.monotonic() - _t0
+    level = 'warning' if elapsed > 5 else 'info'
+    getattr(server.log, level)(
+        "[WORKER_EXIT] pid=%s teardown complete in %.2fs",
+        worker.pid, elapsed,
+    )
+
 
 def worker_abort(worker):
-    """Called when a worker is killed after exceeding GUNICORN_TIMEOUT."""
+    """Called (in the worker process) when Gunicorn kills a worker that exceeded GUNICORN_TIMEOUT.
+
+    This fires *before* SIGKILL, so we have a short window to emit diagnostics.
+    """
+    import time as _wtime
+    _t0 = _wtime.monotonic()
+
+    # worker.alive is False when the worker was already in recycle (max_requests) when killed.
+    is_recycle = not getattr(worker, 'alive', True)
+    recycle_hint = ' [was in recycle — scheduler shutdown likely blocked]' if is_recycle else ''
+
+    # Check whether this worker owned the scheduler lock.
+    is_scheduler_worker = False
+    try:
+        from app.scheduler_lock import scheduler_lock_path, read_lock_owner
+        lock_path = scheduler_lock_path(os.getppid())
+        is_scheduler_worker = read_lock_owner(lock_path) == worker.pid
+    except Exception:
+        pass
+
     worker.log.error(
-        "Worker timed out (ABRT, pid=%s): silent for >%ss — "
-        "check logs for [STUCK_REQUEST] / [SLOW_REQUEST] before this line",
-        worker.pid,
-        timeout,
+        "[WORKER_ABORT] pid=%s timeout=%ss scheduler_owner=%s%s — "
+        "worker was silent for >%ss; check [STUCK_REQUEST]/[SLOW_REQUEST] above",
+        worker.pid, timeout, is_scheduler_worker, recycle_hint, timeout,
     )
+
     # Dump every in-flight request tracked on this worker before the process dies.
     # This runs without a Flask app context; request_pressure handles that constraint.
     try:
@@ -206,9 +265,27 @@ def worker_abort(worker):
             log_fn=lambda msg: worker.log.error(msg),
         )
     except Exception as exc:
-        worker.log.warning("Could not dump in-flight requests on abort (pid=%s): %s", worker.pid, exc)
+        worker.log.warning(
+            "[WORKER_ABORT] Could not dump in-flight requests (pid=%s): %s",
+            worker.pid, exc,
+        )
+
+    # Shut down scheduler without waiting — process is about to be SIGKILLed anyway.
     try:
         from app.scheduler_lock import shutdown_worker_scheduler
-        shutdown_worker_scheduler(getattr(worker, "wsgi", None), os.getppid(), worker.pid)
-    except Exception:
-        pass
+        shutdown_worker_scheduler(
+            getattr(worker, "wsgi", None), os.getppid(), worker.pid,
+            wait=False,
+            log_fn=lambda msg: worker.log.error(msg),
+        )
+    except Exception as exc:
+        worker.log.warning(
+            "[WORKER_ABORT] Scheduler shutdown error (pid=%s): %s",
+            worker.pid, exc,
+        )
+
+    elapsed = _wtime.monotonic() - _t0
+    worker.log.error(
+        "[WORKER_ABORT] pid=%s abort handler finished in %.3fs",
+        worker.pid, elapsed,
+    )

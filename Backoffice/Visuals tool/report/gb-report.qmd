@@ -1,0 +1,18 @@
+---
+title: "Governing Board Report — Figures"
+subtitle: "July 2026"
+author: "IFRC — FDS Team"
+date: today
+date-format: "D MMMM YYYY"
+lang: en
+execute:
+  enabled: false
+
+format:
+  html:
+    code-fold: true
+  docx:
+    toc: false
+---
+
+{{< include _body.qmd >}}

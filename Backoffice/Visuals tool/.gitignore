@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Generated figures and report artifacts
+Figures/*/
+report/figures/
+report/output/
+report/_body.qmd
+report/_freeze/
+report/.quarto/
+
+# Excel temp / lock copies
+~$*.xlsx
+*_build.xlsx
+SG Report._build.xlsx
+
+# Tableau
+~*.twbr
+*.twbr
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store

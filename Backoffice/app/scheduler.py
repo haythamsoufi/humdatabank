@@ -24,11 +24,22 @@ def _graceful_shutdown(scheduler, app):
     executor are fully stopped. wait=False was racing: the default pool can be
     closed while the scheduler loop is still calling submit() for the next job.
     """
+    pid = os.getpid()
+    t0 = _time.monotonic()
     try:
+        app.logger.info("[SCHED_SHUTDOWN] pid=%s graceful scheduler shutdown starting", pid)
         if scheduler.running:
             scheduler.shutdown(wait=True)
-    except Exception:
-        pass
+        elapsed = _time.monotonic() - t0
+        level = 'warning' if elapsed > 5 else 'info'
+        getattr(app.logger, level)(
+            "[SCHED_SHUTDOWN] pid=%s graceful shutdown complete in %.2fs", pid, elapsed
+        )
+    except Exception as exc:
+        elapsed = _time.monotonic() - t0
+        app.logger.error(
+            "[SCHED_SHUTDOWN] pid=%s graceful shutdown error after %.2fs: %s", pid, elapsed, exc
+        )
     finally:
         try:
             app.scheduler = None
@@ -150,6 +161,7 @@ def _run_scheduled_job(app, label: str, fn) -> None:
     session and, for email jobs, hold the connection open during HTTP sends.
     """
     t0 = _time.monotonic()
+    app.logger.debug("[SCHED_JOB] pid=%s '%s' starting", os.getpid(), label)
     try:
         with app.app_context():
             fn()
@@ -158,11 +170,14 @@ def _run_scheduled_job(app, label: str, fn) -> None:
     finally:
         elapsed = _time.monotonic() - t0
         if elapsed >= 30.0:
-            app.logger.warning("Scheduled job '%s' took %.2fs", label, elapsed)
+            app.logger.warning(
+                "[SCHED_JOB] pid=%s '%s' took %.2fs — WARNING: long job may stall worker recycle",
+                os.getpid(), label, elapsed,
+            )
         elif elapsed >= 2.0:
-            app.logger.info("Scheduled job '%s' took %.2fs", label, elapsed)
+            app.logger.info("[SCHED_JOB] pid=%s '%s' took %.2fs", os.getpid(), label, elapsed)
         else:
-            app.logger.debug("Scheduled job '%s' took %.2fs", label, elapsed)
+            app.logger.debug("[SCHED_JOB] pid=%s '%s' took %.2fs", os.getpid(), label, elapsed)
 
 
 def init_scheduler(app, is_reloader):

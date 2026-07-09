@@ -1,0 +1,335 @@
+"""Port of Tableau calculated fields from GB figures.twb."""
+
+from __future__ import annotations
+
+import math
+
+import pandas as pd
+
+from .languages import excel_text
+from .translations import section_title_for, t
+
+# ---------------------------------------------------------------------------
+# UI label codes (resolved via SG Report.xlsx → Translations sheet)
+# ---------------------------------------------------------------------------
+INDICATOR_HEADER = "ui.indicator_header"
+YEAR_HEADER = "ui.year_header"
+TARGET_HEADER = "ui.target_header"
+ANNUAL_TARGET_HEADER = "ui.annual_target_header"
+NS_REPORTING_HEADER = "ui.ns_reporting_header"
+NS_IMPLEMENTING_HEADER = "ui.ns_implementing_header"
+TABLE_REPORTING_ROW = "ui.table_reporting_row"
+TABLE_IMPLEMENTING_ROW = "ui.table_implementing_row"
+NS_REPORTED_SUFFIX = "ui.ns_reported_suffix"
+EFS_HEADER = "ui.part.ef"
+SP_PART_TITLE = "ui.part.sp"
+NOT_APPLICABLE = "ui.not_applicable"
+NOT_AVAILABLE = "ui.not_available"
+TARGET_LABEL_ALL_COVERED = "ui.target_all_covered"
+TARGET_LABEL_EF_ALL = "ui.target_ef_all"
+TARGET_SUFFIX_SP = "ui.target_suffix_sp"
+TARGET_SUFFIX_EF = "ui.target_suffix_ef"
+
+_FOOTNOTES_BY_KEY = {
+    "default": "footnote.default",
+    "sp1": "footnote.sp1",
+    "sp2": "footnote.sp2",
+    "ef4": "footnote.ef4",
+    "dref": "footnote.dref",
+}
+
+# Tableau Indicator field aliases (add ** suffix)
+INDICATOR_ALIASES: dict[str, str] = {
+    "DREF": "**",
+    "649": "**",
+}
+
+
+def label(code: str, language: str) -> str:
+    return t(code, language)
+
+
+def footnote_for_key(key: str, language: str) -> str:
+    code = _FOOTNOTES_BY_KEY.get(key, _FOOTNOTES_BY_KEY["default"])
+    return t(code, language)
+
+
+def indicator_label(row: pd.Series, language: str = "English") -> str:
+    """Tableau [Indicator] — English/French/Spanish/Arabic columns from Mapping."""
+    text = excel_text(row, language, "indicator")
+    indicator_id = str(row.get("ID", "") or "")
+    suffix = INDICATOR_ALIASES.get(indicator_id, "")
+    return f"{text}{suffix}" if text else ""
+
+
+def section_title(row: pd.Series, language: str = "English") -> str:
+    """Section title from Translations sheet (section.SP1, …), else Mapping SP columns."""
+    section = str(row.get("section", "") or "").strip()
+    if section:
+        title = section_title_for(section, language)
+        if title:
+            return title
+    return excel_text(row, language, "section")
+
+
+def annual_target_value(row: pd.Series) -> float | None:
+    """Numeric annual target for chart positioning (Target value or Annual Target)."""
+    raw = row.get("Target value")
+    if raw is not None and not (isinstance(raw, float) and math.isnan(raw)):
+        return float(raw)
+    raw = row.get("Annual Target")
+    if isinstance(raw, (int, float)) and not (isinstance(raw, float) and math.isnan(raw)):
+        return float(raw)
+    return None
+
+
+def _parse_target_number(text: str) -> float | None:
+    cleaned = text.strip().replace(",", "").replace(" ", "")
+    if not cleaned:
+        return None
+    if cleaned.endswith("%"):
+        try:
+            return float(cleaned[:-1]) / 100
+        except ValueError:
+            return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def annual_target_label(row: pd.Series, language: str = "English") -> str | None:
+    """Display label on annual target line — Excel Annual Target / Annual Target AR."""
+    unit = row.get("Unit")
+    text = excel_text(row, language, "annual_target")
+    if text:
+        num = _parse_target_number(text)
+        if num is not None:
+            formatted = format_value(num, unit, language)
+            if formatted:
+                return formatted
+        return text
+    value = annual_target_value(row)
+    return format_value(value, unit, language) if value is not None else None
+
+
+def _format_under_million(value: float) -> str:
+    if value < 1000:
+        return str(int(value))
+    return f"{round(value / 1000):.0f},000"
+
+
+def _format_millions_english(value: float) -> str:
+    millions = round(value / 1_000_000, 1)
+    return f"{millions:g}M"
+
+
+def _format_millions_arabic(value: float) -> str:
+    """Tableau [Formatted] Arabic plural rules for values >= 1,000,000."""
+    millions = round(value / 1_000_000, 1)
+    num = f"{millions:g}"
+    if millions == 1:
+        suffix = " مليون"
+    elif millions == 2:
+        suffix = " مليونان"
+    elif 3 <= millions <= 10:
+        suffix = " ملايين"
+    elif 11 <= millions <= 99:
+        suffix = " مليونا"
+    else:
+        suffix = " مليون"
+    return f"{num}{suffix}"
+
+
+def format_value(value: float | int | None, unit: str | None, language: str = "English") -> str | None:
+    """Tableau [Formatted] calculation."""
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return None
+    if value == 0:
+        return None
+    if unit == "Percentage":
+        return f"{round(value * 100):.0f}%"
+    if value < 1_000_000:
+        return _format_under_million(float(value))
+    if language == "Arabic":
+        return _format_millions_arabic(float(value))
+    return _format_millions_english(float(value))
+
+
+def format_donut_value(value: float | int | None, unit: str | None, language: str = "English") -> str | None:
+    """Tableau [Formatted2] — used for Katya01 donut centre labels."""
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return None
+    if value == 0:
+        return None
+    if unit == "Percentage":
+        return f"{round(value * 100):.0f}%"
+    if value < 1_000_000:
+        return _format_under_million(float(value))
+    if language == "Arabic":
+        return f"{round(float(value) / 1_000_000):.0f}\n مليون"
+    return _format_millions_english(float(value))
+
+
+def format_target(value: float | int | None) -> str | None:
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return None
+    return format_value(value, None)
+
+
+def gap_value(target: float | None, value: float | None) -> float:
+    if target is None or value is None:
+        return 0.0
+    return max(target - value, 0.0)
+
+
+def out_of_suffix(
+    value: float | None,
+    unit: str | None,
+    count: float | None,
+    total_reported: str | None,
+    language: str = "English",
+) -> str | None:
+    """Tableau [Out of] / [NSs Reported] calculations."""
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return None
+    if unit == "Platforms" and count is not None and not math.isnan(count):
+        return f"/{int(count)}{label(NS_REPORTED_SUFFIX, language)}"
+    if total_reported:
+        return f"/ {total_reported}"
+    return None
+
+
+def _ef_target_display(row: pd.Series, language: str = "English") -> str:
+    """Format EF target text before appending the year suffix."""
+    unit = row.get("Unit")
+    excel_target = excel_text(row, language, "target")
+    if excel_target:
+        return _format_ef_target_token(excel_target, unit, language)
+
+    # Some percentage targets live only in Target AR (e.g. 644 → %50).
+    target_ar = row.get("Target AR")
+    if target_ar is not None and not (isinstance(target_ar, float) and math.isnan(target_ar)):
+        ar_text = str(target_ar).strip()
+        if ar_text.startswith("%"):
+            return _format_ef_target_token(ar_text, unit, language)
+
+    raw = row.get("Target")
+    if raw is None or (isinstance(raw, float) and math.isnan(raw)):
+        return ""
+    if unit == "Percentage":
+        return format_value(float(raw), "Percentage", language) or ""
+    formatted = format_value(float(raw), unit, language) if isinstance(raw, (int, float)) else None
+    return formatted or _target_scalar(row)
+
+
+def _format_ef_target_token(text: str, unit: str | None, language: str) -> str:
+    if text.startswith("%"):
+        return f"{text.lstrip('%').strip()}%"
+    try:
+        num = float(text.replace(",", ""))
+        if unit == "Percentage" and 0 <= num <= 1:
+            return format_value(num, "Percentage", language) or text
+        if num == int(num):
+            return str(int(num))
+    except ValueError:
+        pass
+    return text
+
+
+def target_label_ef(row: pd.Series, language: str = "English") -> str:
+    """Tableau [TargetLabel2] for Enabling Functions."""
+    fdrs_kpi = str(row.get("FDRS KPI", "") or "")
+    if fdrs_kpi == "645":
+        return label(TARGET_LABEL_EF_ALL, language)
+
+    target = _ef_target_display(row, language)
+    if not target:
+        return ""
+
+    suffix = label(TARGET_SUFFIX_EF, language)
+    if suffix and suffix in target:
+        return target
+    return f"{target} {suffix}"
+
+
+def target_label_sp(row: pd.Series, language: str = "English") -> str:
+    """Tableau [TargetLabel] for Strategic Priorities."""
+    fdrs_kpi = str(row.get("FDRS KPI", "") or "")
+    indicator_id = str(row.get("ID", "") or "")
+
+    if fdrs_kpi == "All_Covered":
+        return label(TARGET_LABEL_ALL_COVERED, language)
+
+    annual = excel_text(row, language, "annual_target")
+    if indicator_id == "Katya01" and annual:
+        if language == "Arabic":
+            return f"{label(ANNUAL_TARGET_HEADER, language)} \n{annual}"
+        return f"{label(ANNUAL_TARGET_HEADER, language)}\n{annual}"
+
+    excel_target = excel_text(row, language, "target")
+    if excel_target:
+        if language == "Arabic" or excel_target.startswith("%") or len(excel_target.split()) > 2:
+            return excel_target
+        return f"{label(TARGET_HEADER, language)}\n{excel_target}"
+
+    target = _ef_target_display(row, language)
+    if not target:
+        return ""
+    return f"{label(TARGET_HEADER, language)}\n{target}{label(TARGET_SUFFIX_SP, language)}"
+
+
+def _target_scalar(row: pd.Series) -> str:
+    target = row.get("Target")
+    if target is None or (isinstance(target, float) and math.isnan(target)):
+        return ""
+    return str(target)
+
+
+def year_display(year: str) -> str:
+    return f" {year}*" if year == "2025" else year
+
+
+def headers(language: str = "English") -> dict[str, str]:
+    """Tableau column headers (IndicatorHeader, YearHeader, etc.)."""
+    return {
+        "indicator": label(INDICATOR_HEADER, language),
+        "year": label(YEAR_HEADER, language),
+        "target": label(TARGET_HEADER, language),
+        "annual_target": label(ANNUAL_TARGET_HEADER, language),
+        "ns_reporting": label(NS_REPORTING_HEADER, language),
+        "ns_implementing": label(NS_IMPLEMENTING_HEADER, language),
+    }
+
+
+def table_row_labels(language: str = "English") -> dict[str, str]:
+    return {
+        "year": label(YEAR_HEADER, language),
+        "reporting": label(TABLE_REPORTING_ROW, language),
+        "implementing": label(TABLE_IMPLEMENTING_ROW, language),
+    }
+
+
+def part_title(part_id: str, language: str = "English") -> str:
+    if part_id == "ef":
+        return label(EFS_HEADER, language)
+    return label(SP_PART_TITLE, language)
+
+
+def footnote_2025(language: str = "English") -> str:
+    return footnote_for_key("default", language)
+
+
+def section_footnote(section: str, language: str = "English") -> str:
+    from .layouts import SECTION_FOOTNOTE_KEYS
+
+    key = SECTION_FOOTNOTE_KEYS.get(section, "default")
+    return footnote_for_key(key, language)
+
+
+def not_applicable(language: str = "English") -> str:
+    return label(NOT_APPLICABLE, language)
+
+
+def not_available(language: str = "English") -> str:
+    return label(NOT_AVAILABLE, language)

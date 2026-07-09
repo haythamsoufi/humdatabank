@@ -5,8 +5,9 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
+import time as _time
 from enum import Enum
-from typing import Optional
+from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -155,23 +156,61 @@ def clear_stale_scheduler_locks_for_master(master_pid: int) -> bool:
     return True
 
 
-def shutdown_worker_scheduler(wsgi, master_pid: int, worker_pid: int) -> None:
-    """
-    Stop APScheduler and release the lock for a exiting/aborted worker.
+def shutdown_worker_scheduler(
+    wsgi,
+    master_pid: int,
+    worker_pid: int,
+    *,
+    wait: bool = True,
+    log_fn: Optional[Callable[[str], None]] = None,
+) -> None:
+    """Stop APScheduler and release the lock for an exiting/aborted worker.
 
     Used from Gunicorn ``worker_exit`` and ``worker_abort`` hooks.
+
+    Args:
+        wait: Pass ``False`` during ``worker_abort`` so the shutdown call
+              does *not* block waiting for the currently-running job —
+              the process will be SIGKILLed immediately after, so waiting
+              would just delay the abort handler without benefit.
+        log_fn: Optional callable that accepts a plain string and emits it
+                as a log line.  Falls back to the module logger when omitted.
     """
+    _log = log_fn or (lambda msg: logger.info(msg))
+
     if wsgi is not None and hasattr(wsgi, 'scheduler'):
         sched = getattr(wsgi, 'scheduler', None)
-        if sched is not None:
+        if sched is not None and sched.running:
+            _log(
+                f"[SCHED_SHUTDOWN] pid={worker_pid} scheduler shutdown starting"
+                f" (wait={wait})"
+            )
+            t0 = _time.monotonic()
             try:
-                if sched.running:
-                    sched.shutdown(wait=True)
-            except Exception:
-                pass
+                sched.shutdown(wait=wait)
+                elapsed = _time.monotonic() - t0
+                _log(
+                    f"[SCHED_SHUTDOWN] pid={worker_pid} scheduler shutdown complete"
+                    f" in {elapsed:.2f}s (wait={wait})"
+                )
+            except Exception as exc:
+                elapsed = _time.monotonic() - t0
+                _log(
+                    f"[SCHED_SHUTDOWN] pid={worker_pid} scheduler shutdown error"
+                    f" after {elapsed:.2f}s: {exc}"
+                )
             try:
                 wsgi.scheduler = None
             except Exception:
                 pass
+        else:
+            _log(
+                f"[SCHED_SHUTDOWN] pid={worker_pid} scheduler not running — skip shutdown"
+            )
 
-    release_scheduler_lock(master_pid, owner_pid=worker_pid)
+    released = release_scheduler_lock(master_pid, owner_pid=worker_pid)
+    if released:
+        _log(
+            f"[SCHED_SHUTDOWN] pid={worker_pid} scheduler lock released"
+            f" (master_pid={master_pid})"
+        )

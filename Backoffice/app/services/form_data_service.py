@@ -2682,7 +2682,8 @@ class FormDataService:
                          and not key.endswith('_data_not_available')
                          and not key.endswith('_not_applicable')
                          and not key.endswith('_reporting_mode')
-                         and not key.endswith('_emergency_metadata')]
+                         and not key.endswith('_emergency_metadata')
+                         and not key.endswith('_other_text')]
         possible_keys.extend(additional_keys)
 
         for key in possible_keys:
@@ -2831,6 +2832,14 @@ class FormDataService:
             return cls._process_numeric_value(raw_value, field)
         elif question_type == 'multiple_choice':
             return cls._process_multiple_choice_value(raw_value, field_values, field_index)
+        elif question_type == 'single_choice':
+            single_val = str(raw_value).strip() if raw_value else None
+            if single_val == '__other__':
+                other_text = field_values.get(f'field_{field_index}_other_text')
+                if isinstance(other_text, list):
+                    other_text = other_text[0] if other_text else ''
+                return str(other_text).strip() if other_text else None
+            return single_val
         elif question_type == 'yesno':
             return 'true' if raw_value else 'false'
         else:
@@ -2853,9 +2862,22 @@ class FormDataService:
         else:
             # Fallback: collect all values for this field
             for key, value in field_values.items():
-                if key.startswith(f'field_{field_index}') and not key.endswith('_data_not_available') and not key.endswith('_not_applicable'):
+                if (key.startswith(f'field_{field_index}')
+                        and not key.endswith('_data_not_available')
+                        and not key.endswith('_not_applicable')
+                        and not key.endswith('_other_text')):
                     selected_options.append(value)
             cls._log_verbose(f"Fallback multi-choice collection: {selected_options}")
+
+        other_text_key = f'field_{field_index}_other_text'
+        if other_text_key in field_values:
+            other_text = field_values[other_text_key]
+            if isinstance(other_text, list):
+                other_text = other_text[0] if other_text else ''
+            other_text = str(other_text).strip() if other_text else ''
+            selected_options = [v for v in selected_options if v != '__other__']
+            if other_text and other_text not in selected_options:
+                selected_options.append(other_text)
 
         return json.dumps(selected_options) if selected_options else None
 

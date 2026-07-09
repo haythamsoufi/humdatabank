@@ -73,6 +73,7 @@ def manage_users():
     # Preload entity permission counts + country names (avoid N+1 queries in templates)
     entity_counts_by_user_id = {}
     user_countries_by_id = {}
+    fds_member_countries_by_user_id = {}
     try:
         from sqlalchemy import func
 
@@ -105,10 +106,23 @@ def manage_users():
             )
             for uid, cname in country_rows:
                 user_countries_by_id.setdefault(int(uid), []).append(cname)
+
+            # Countries where this user is the assigned FDS member
+            fds_rows = (
+                db.session.query(Country.fds_member_user_id, Country.name)
+                .filter(Country.fds_member_user_id.in_(user_ids))
+                .order_by(Country.name.asc())
+                .all()
+            )
+            for uid, cname in fds_rows:
+                if uid is None:
+                    continue
+                fds_member_countries_by_user_id.setdefault(int(uid), []).append(cname)
     except Exception as e:
         current_app.logger.debug("entity_counts/user_countries query failed: %s", e)
         entity_counts_by_user_id = {}
         user_countries_by_id = {}
+        fds_member_countries_by_user_id = {}
     # Get all countries and group by region
     countries_by_region = defaultdict(list)
     all_countries = Country.query.order_by(Country.region, Country.name).all()
@@ -127,7 +141,8 @@ def manage_users():
                            pending_requests_count=pending_requests_count,
                            rbac_roles_by_user_id=rbac_roles_by_user_id,
                            entity_counts_by_user_id=entity_counts_by_user_id,
-                           user_countries_by_id=user_countries_by_id)
+                           user_countries_by_id=user_countries_by_id,
+                           fds_member_countries_by_user_id=fds_member_countries_by_user_id)
 
 @bp.route("/access-requests", methods=["GET"])
 @permission_required_any('admin.access_requests.view', 'admin.users.edit')

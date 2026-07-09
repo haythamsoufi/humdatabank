@@ -13,6 +13,7 @@
 
 import { debugLog, debugWarn, debugError } from './debug.js';
 import { initRepeatEntryNavigation, syncRepeatEntryNavigation, syncAllRepeatEntryNavigation } from './repeat-entry-nav.js';
+import { appendOtherOptionToSelect, restoreOtherSelectionForCalculatedList } from './question-other-option.js';
 import { updateFieldVisibility } from './field-management.js';
 import { applyLayoutToContainer } from './layout.js';
 import { setupNumberInputFormatting } from './formatting.js';
@@ -311,6 +312,13 @@ function restoreTitleSelectToFieldBlock(repeatEntry) {
 
     fieldBlock.appendChild(titleSelect);
     titleSelect.classList.remove('repeat-entry__title-select');
+
+    // Also move the other-text-input back if it was relocated to titleWrap
+    const titleWrap = repeatEntry.querySelector('.repeat-entry__title-select-wrap');
+    if (titleWrap) {
+        const otherInput = titleWrap.querySelector('.other-text-input');
+        if (otherInput) fieldBlock.appendChild(otherInput);
+    }
 }
 
 function finalizeRepeatEntryDeletion(sectionId, instanceNumber, repeatEntry = null) {
@@ -367,6 +375,18 @@ function setupRepeatEntryTitleDropdown(repeatEntry, sectionId, instanceNumber) {
     titleSelect.classList.remove('mt-1', 'block', 'w-full', 'shadow-sm', 'py-2', 'px-3', 'border', 'border-gray-300', 'rounded-md', 'sm:text-sm', 'bg-white', 'bg-yellow-100', 'border-yellow-300', 'bg-blue-50', 'border-blue-300');
     if (titleSelect.parentElement !== titleWrap) {
         titleWrap.appendChild(titleSelect);
+    }
+
+    // If this field has allow_other, the other-text-input is a sibling of the select
+    // inside fieldBlock (which is now hidden). Move it into titleWrap so it is visible
+    // when the user selects "Other (please specify)..." from the title dropdown.
+    if (titleSelect.dataset.allowOther === 'true') {
+        const sourceBlock = fieldBlock || titleSelect.closest('.form-item-block, .repeat-entry');
+        const otherInput = sourceBlock?.querySelector('.other-text-input');
+        if (otherInput && otherInput.parentElement !== titleWrap) {
+            otherInput.classList.add('mt-2');
+            titleWrap.appendChild(otherInput);
+        }
     }
 
     refreshRepeatEntryTitleDropdownLayout(repeatEntry);
@@ -1241,6 +1261,7 @@ function updateRepeatFieldAttributes(fieldElement, sectionId, instanceNumber, fi
         const isYesNoField = input.type === 'checkbox' && (input.value === 'yes' || input.value === 'no');
         const isRadioButton = input.type === 'radio';
         const isDataAvailabilityCheckbox = originalName.includes('_data_not_available') || originalName.includes('_not_applicable');
+        const isOtherOptionCheckbox = input.classList.contains('other-option-checkbox');
 
         // Normalize the base name to handle both original and already-cloned patterns
         let baseName = originalName;
@@ -1261,6 +1282,7 @@ function updateRepeatFieldAttributes(fieldElement, sectionId, instanceNumber, fi
         // Count ALL checkboxes with the same logical field (before any renaming)
         const relatedCheckboxes = Array.from(inputs).filter(i => {
             if (i.type !== 'checkbox') return false;
+            if (i.classList.contains('other-option-checkbox')) return false;
 
             let iBaseName = i.name;
             if (i.name.startsWith('repeat_')) {
@@ -1281,12 +1303,14 @@ function updateRepeatFieldAttributes(fieldElement, sectionId, instanceNumber, fi
         const isMultiSelectField = input.type === 'checkbox' &&
                                    !isYesNoField &&
                                    !isDataAvailabilityCheckbox &&
+                                   !isOtherOptionCheckbox &&
                                    relatedCheckboxes.length > 1;
 
         fieldTypeMap.set(input, {
             isYesNoField,
             isRadioButton,
             isDataAvailabilityCheckbox,
+            isOtherOptionCheckbox,
             isMultiSelectField,
             relatedCheckboxCount: relatedCheckboxes.length
         });
@@ -1313,7 +1337,7 @@ function updateRepeatFieldAttributes(fieldElement, sectionId, instanceNumber, fi
 
         // Get pre-calculated field types
         const fieldTypes = fieldTypeMap.get(input);
-        const {isYesNoField, isRadioButton, isDataAvailabilityCheckbox, isMultiSelectField} = fieldTypes;
+        const {isYesNoField, isRadioButton, isDataAvailabilityCheckbox, isOtherOptionCheckbox, isMultiSelectField} = fieldTypes;
 
         // Special logging for indirect reach fields
         const isIndirectReach = originalName.includes('indirect_reach');
@@ -1356,12 +1380,18 @@ function updateRepeatFieldAttributes(fieldElement, sectionId, instanceNumber, fi
                 newName = `repeat_${sectionId}_${instanceNumber}_field_${fieldIndex}_${inputIndex}`;
                 newId = `repeat_${sectionId}_${instanceNumber}_field_${fieldIndex}_${inputIndex}`;
             }
+        } else if (originalName.startsWith('field_other_text[')) {
+            newName = `repeat_${sectionId}_${instanceNumber}_field_${fieldIndex}_other_text`;
+            newId = `repeat_${sectionId}_${instanceNumber}_field_${fieldIndex}_other_text`;
+        } else if (isOtherOptionCheckbox) {
+            newName = originalName || '';
+            newId = `repeat_${sectionId}_${instanceNumber}_field_${fieldIndex}_other_cb`;
         } else if (isMultiSelectField) {
             // For multi-select checkboxes, all checkboxes for the same field should have the same name
             newName = `repeat_${sectionId}_${instanceNumber}_field_${fieldIndex}`;
             newId = `repeat_${sectionId}_${instanceNumber}_field_${fieldIndex}_${inputIndex}`;
             debugLog('repeat-sections', `🔄 Multi-select checkbox: ${originalName} → ${newName} (value: ${input.value})`);
-        } else if (input.type === 'checkbox' && !isYesNoField && !isDataAvailabilityCheckbox) {
+        } else if (input.type === 'checkbox' && !isYesNoField && !isDataAvailabilityCheckbox && !isOtherOptionCheckbox) {
             // Fallback: treat any remaining checkbox (that's not yes/no or data availability) as multi-select
             // This ensures consistency even if detection logic fails
             newName = `repeat_${sectionId}_${instanceNumber}_field_${fieldIndex}`;
@@ -1955,6 +1985,10 @@ function setSelectValueWithFallback(select, valueToSet) {
         if (foundOption) {
             select.value = foundOption.value;
             debugLog('repeat-sections', `✅ Found matching option by text, set value to: ${foundOption.value}`);
+        } else if (select.dataset.allowOther === 'true') {
+            appendOtherOptionToSelect(select);
+            restoreOtherSelectionForCalculatedList(select, valueToSet);
+            debugLog('repeat-sections', `✅ Restored custom value "${valueToSet}" as Other`);
         } else if (select.dataset.optionsSource === 'calculated' && window.preserveCalculatedSelectStaleValue) {
             window.preserveCalculatedSelectStaleValue(select, valueToSet);
             debugLog('repeat-sections', `✅ Preserved stale calculated-list value "${valueToSet}"`);

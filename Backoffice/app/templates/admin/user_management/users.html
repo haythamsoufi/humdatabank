@@ -271,6 +271,13 @@
                 {% endfor %}
             },
             "total_countries": {{ countries_by_region.values() | map('length') | sum }},
+            {% set fds_countries = fds_member_countries_by_user_id.get(user.id, []) if fds_member_countries_by_user_id is defined else [] %}
+            "is_fds_member": {{ (fds_countries|length > 0)|tojson }},
+            "fds_member_countries": [
+                {% for country_name in fds_countries %}
+                {{ country_name|tojson }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
             {# Only System Managers can edit other admins; admins can still edit themselves. #}
             {% set can_edit_target_user = can_edit_user and (current_is_system_manager or (not is_admin_user) or (current_user.is_authenticated and user.id == current_user.id)) %}
             {% set edit_denied_message = '' %}
@@ -292,6 +299,7 @@ window.usersGridConfig.t = {
     title_b78a3223: {{ _('Title')|tojson }},
     role_2e083440: {{ _('Role')|tojson }},
     status_ec53a8c4: {{ _('Status')|tojson }},
+    fds_member_7a2c91e4: {{ _('FDS Member')|tojson }},
     entities_3b4d9c2e: {{ _('Entities')|tojson }},
     global_f2a89e71: {{ _('Global')|tojson }},
     countries_790d59ef: {{ _('countries')|tojson }},
@@ -303,6 +311,10 @@ window.usersGridConfig.t = {
     departments_6a7e3c44: {{ _('departments')|tojson }},
     regional_offices_a5bf1c32: {{ _('regional offices')|tojson }},
     clusters_f8d4c77a: {{ _('clusters')|tojson }},
+    active_4d3d769b: {{ _('Active')|tojson }},
+    inactive_3cab7a0a: {{ _('Inactive')|tojson }},
+    yes_93cba074: {{ _('Yes')|tojson }},
+    no_bafd7328: {{ _('No')|tojson }},
 };
 </script>
 <script src="{{ static_url('js/admin/users-grid.js') }}"></script>

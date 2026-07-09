@@ -28,8 +28,7 @@ export function initQuestionOtherOption() {
     attachListeners();
     // Update multi-select button text for any pre-loaded Other selections
     document.querySelectorAll('.other-option-checkbox:checked').forEach(cb => {
-        const fieldId = cb.dataset.fieldId;
-        if (fieldId) refreshMultiSelectButtonText(fieldId);
+        refreshMultiSelectButtonTextFromContext(cb);
     });
 }
 
@@ -63,27 +62,70 @@ function onDocumentChange(e) {
 
     // Any other checkbox inside a multi-select dropdown that has allow_other
     if (target.type === 'checkbox' && target.closest('.multi-select-dropdown')) {
-        const dropdown = target.closest('.multi-select-dropdown');
-        const fieldId = dropdown?.dataset.fieldId;
-        if (fieldId) refreshMultiSelectButtonText(fieldId);
+        refreshMultiSelectButtonTextFromContext(target);
     }
 }
 
 function onDocumentInput(e) {
     const target = e.target;
-    if (target.classList.contains('other-text-input') && target.dataset.forField) {
-        const fieldId = target.dataset.forField;
-        // For multi-select: refresh the button text to show the typed value
-        const multiWrapper = document.getElementById(`field-${fieldId}`);
-        if (multiWrapper?.dataset.allowOther === 'true') {
-            refreshMultiSelectButtonText(fieldId);
-        }
+    // When the user types in the Other free-text field, always attempt to refresh
+    // the multi-select button label. refreshMultiSelectButtonTextFromContext is a
+    // no-op for single-choice (no .multi-select-dropdown found), so it's safe to
+    // call unconditionally here.
+    if (target.classList.contains('other-text-input')) {
+        refreshMultiSelectButtonTextFromContext(target);
     }
 }
 
+function findOtherTextInput(contextElement) {
+    // Prefer searching within the nearest .form-item-block (one field per block).
+    // The other-text-input may be a sibling of the select/wrapper div, not a
+    // descendant, so we search the common ancestor block.
+    const block = contextElement.closest('.form-item-block, .repeat-entry');
+    if (block) {
+        const input = block.querySelector('.other-text-input');
+        if (input) return input;
+    }
+
+    const fieldId = contextElement.dataset?.fieldItemId
+        || contextElement.dataset?.forField
+        || extractFieldId(contextElement.name);
+    if (fieldId) {
+        return document.getElementById(`other-text-${fieldId}`);
+    }
+    return null;
+}
+
+function findMultiSelectParts(contextElement) {
+    // The multi-select wrapper div (which carries data-allow-other) may be an
+    // ANCESTOR of contextElement (when it's a checkbox inside the dropdown) OR a
+    // SIBLING (when contextElement is the other-text-input that sits next to the
+    // wrapper inside .form-item-block).  Handle both cases.
+    let wrapper = contextElement.closest('[data-allow-other="true"]');
+
+    if (!wrapper) {
+        // contextElement is likely the other-text-input — find the wrapper in the
+        // same .form-item-block / .repeat-entry ancestor.
+        const block = contextElement.closest('.form-item-block, .repeat-entry');
+        if (block) wrapper = block.querySelector('[data-allow-other="true"]');
+    }
+    if (!wrapper) return null;
+
+    // The other-text-input is a SIBLING of the wrapper div (rendered by the
+    // partial after the wrapper's closing tag), so search the parent block.
+    const parentBlock = wrapper.closest('.form-item-block, .repeat-entry');
+    const otherInput = parentBlock ? parentBlock.querySelector('.other-text-input') : null;
+
+    return {
+        btn: wrapper.querySelector('.multi-select-btn'),
+        dropdown: wrapper.querySelector('.multi-select-dropdown'),
+        otherInput,
+        textSpan: wrapper.querySelector('.multi-select-text'),
+    };
+}
+
 function handleSingleChoiceChange(select) {
-    const fieldId = extractFieldId(select.name) || select.dataset.fieldItemId;
-    const otherInput = fieldId ? document.getElementById(`other-text-${fieldId}`) : null;
+    const otherInput = findOtherTextInput(select);
     if (!otherInput) return;
 
     if (select.value === OTHER_SENTINEL) {
@@ -94,16 +136,15 @@ function handleSingleChoiceChange(select) {
 }
 
 function handleMultiOtherToggle(checkbox) {
-    const fieldId = checkbox.dataset.fieldId;
-    const otherInput = fieldId ? document.getElementById(`other-text-${fieldId}`) : null;
+    const otherInput = findOtherTextInput(checkbox);
     if (!otherInput) return;
 
     if (checkbox.checked) {
         showOtherInput(otherInput);
-        refreshMultiSelectButtonText(fieldId);
+        refreshMultiSelectButtonTextFromContext(checkbox);
     } else {
         hideOtherInput(otherInput);
-        refreshMultiSelectButtonText(fieldId);
+        refreshMultiSelectButtonTextFromContext(checkbox);
     }
 }
 
@@ -121,43 +162,40 @@ function hideOtherInput(input) {
  * Rebuild the multi-select button label, substituting any "Other" value with
  * the typed free-text so the summary is accurate.
  */
-function refreshMultiSelectButtonText(fieldId) {
-    const btn = document.querySelector(`.multi-select-btn[data-field-id="${fieldId}"]`);
-    const dropdown = document.querySelector(`.multi-select-dropdown[data-field-id="${fieldId}"]`);
-    const otherInput = document.getElementById(`other-text-${fieldId}`);
-    const textSpan = btn?.querySelector('.multi-select-text');
-    if (!btn || !dropdown || !textSpan) return;
+function refreshMultiSelectButtonTextFromContext(contextElement) {
+    const parts = findMultiSelectParts(contextElement);
+    if (!parts?.btn || !parts.dropdown || !parts.textSpan) return;
 
     const labels = [];
 
     // Collect regular (non-Other) checked options
-    dropdown.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
-        if (cb.classList.contains('other-option-checkbox')) return; // handled separately
+    parts.dropdown.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+        if (cb.classList.contains('other-option-checkbox')) return;
         const span = cb.nextElementSibling;
         if (span) labels.push(span.textContent.trim());
     });
 
     // Add Other typed value if checked
-    const otherCb = dropdown.querySelector('.other-option-checkbox');
-    if (otherCb?.checked && otherInput) {
-        const typedVal = otherInput.value.trim();
+    const otherCb = parts.dropdown.querySelector('.other-option-checkbox');
+    if (otherCb?.checked && parts.otherInput) {
+        const typedVal = parts.otherInput.value.trim();
         if (typedVal) labels.push(typedVal);
     }
 
-    textSpan.textContent = labels.length > 0 ? labels.join(', ') : 'Select options...';
+    parts.textSpan.textContent = labels.length > 0 ? labels.join(', ') : 'Select options...';
 }
 
 function extractFieldId(name) {
     if (!name) return null;
-    const m = name.match(/\[(\d+)\]/);
-    return m ? m[1] : null;
+    const bracketMatch = name.match(/\[(\d+)\]/);
+    if (bracketMatch) return bracketMatch[1];
+    return null;
 }
 
 // Re-run after repeat sections add new entries
 document.addEventListener('repeatEntryAdded', () => {
     document.querySelectorAll('.other-option-checkbox:checked').forEach(cb => {
-        const fieldId = cb.dataset.fieldId;
-        if (fieldId) refreshMultiSelectButtonText(fieldId);
+        refreshMultiSelectButtonTextFromContext(cb);
     });
 });
 
@@ -171,8 +209,8 @@ export function appendOtherOptionToSelect(selectElement) {
     selectElement.appendChild(opt);
 }
 
-export function appendOtherOptionToMultiDropdown(dropdown, fieldId) {
-    const wrapper = document.getElementById(`field-${fieldId}`);
+export function appendOtherOptionToMultiDropdown(dropdown) {
+    const wrapper = dropdown.closest('[data-allow-other="true"]');
     if (!wrapper || wrapper.dataset.allowOther !== 'true') return;
     if (dropdown.querySelector('.other-option-checkbox')) return;
 
@@ -185,7 +223,6 @@ export function appendOtherOptionToMultiDropdown(dropdown, fieldId) {
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.className = 'other-option-checkbox form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500';
-    cb.dataset.fieldId = fieldId;
 
     const span = document.createElement('span');
     span.className = 'ml-2 text-sm text-gray-500 italic';
@@ -195,4 +232,20 @@ export function appendOtherOptionToMultiDropdown(dropdown, fieldId) {
     label.appendChild(span);
     divider.appendChild(label);
     dropdown.appendChild(divider);
+}
+
+/** Restore a saved custom value for calculated lists with allow_other enabled. */
+export function restoreOtherSelectionForCalculatedList(selectElement, savedValue) {
+    if (!savedValue || selectElement.dataset.allowOther !== 'true') return;
+
+    appendOtherOptionToSelect(selectElement);
+    selectElement.value = OTHER_SENTINEL;
+
+    const otherInput = findOtherTextInput(selectElement);
+    if (otherInput) {
+        otherInput.value = savedValue;
+        otherInput.classList.remove('hidden');
+    }
+
+    debugLog(MODULE, `Restored calculated-list Other value for field ${selectElement.dataset.fieldItemId || selectElement.id}`);
 }

@@ -1652,66 +1652,9 @@
                                                                 {% endif %}
                                                                 <input type="datetime-local" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (existing_q_value|string|lower == 'none') else (existing_q_value | default('', true)) }}" class="{{ datetime_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
                                                             {% elif field.field_type_for_js == 'single_choice' %}
-                                                                {% set current_q_single = existing_q_value | default('', true) %}
-                                                                {% if field.is_question and field.options_translations and current_q_single %}
-                                                                    {% set current_q_single_display = field.get_option_value_for_display(current_q_single, translation_key) %}
-                                                                {% else %}
-                                                                    {% set current_q_single_display = current_q_single %}
-                                                                {% endif %}
-                                                                {% set select_classes = "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" %}
-                                                                {% if is_prefilled %}
-                                                                    {% set select_classes = select_classes ~ " bg-yellow-100 border-yellow-300" %}
-                                                                {% elif is_imputed %}
-                                                                    {% set select_classes = select_classes ~ " bg-blue-50 border-blue-300" %}
-                                                                {% else %}
-                                                                    {% set select_classes = select_classes ~ " bg-white" %}
-                                                                {% endif %}
-                                                                <select name="field_value[{{ field.id }}]" id="field-{{ field.id }}"
-                                                                       data-field-item-id="{{ field.id }}"
-                                                                       {% if _unique_opts %}data-unique-options-in-section="true"{% endif %}
-                                                                       {% if _limit_entries %}data-limit-entries-to-option-count="true"{% endif %}
-                                                                       {% if field.config and field.config.get('use_as_repeat_entry_title') %}data-use-as-repeat-entry-title="true"{% endif %}
-                                                                       {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}' data-plugin-config='{{ ((field.config or {}).get("question_plugin_config") | tojson | e) if field.config else "{}" }}'{% else %}data-options-source="manual"{% endif %}
-                                                                       class="{{ select_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}> <option value="">{{ _('Select...') }}</option> {% if not field.lookup_list_id %}{% for option in field.options %} {% set opt_val = option.value if option is mapping else option %} {% set opt_label = option.label if option is mapping else option %} {% if field.display_options and field.display_options[loop.index0] is defined %}{% set display_label = field.display_options[loop.index0] %}{% else %}{% set display_label = opt_label %}{% endif %} <option value="{{ opt_val }}" {% if opt_val == current_q_single %}selected{% endif %}>{{ display_label }}</option> {% endfor %}{% endif %} </select>
+                                                                {% include 'forms/entry_form/partials/_question_single_choice.html' %}
                                                             {% elif field.field_type_for_js == 'multiple_choice' %}
-                                                                {% set current_q_multi = existing_q_value if existing_q_value is iterable else [] %}
-                                                                <div class="relative mt-2" id="field-{{ field.id }}"
-                                                                     data-field-item-id="{{ field.id }}"
-                                                                     {% if _unique_opts %}data-unique-options-in-section="true"{% endif %}
-                                                                     {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}' data-plugin-config='{{ ((field.config or {}).get("question_plugin_config") | tojson | e) if field.config else "{}" }}'{% else %}data-options-source="manual"{% endif %}>
-                                                                    <button type="button"
-                                                                            class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-left text-sm focus:outline-none focus:ring-2 focus:ring-green-500 hover:bg-gray-50 multi-select-btn"
-                                                                            data-field-id="{{ field.id }}"
-                                                                            {% if not can_edit %}disabled{% endif %}>
-                                                                        <span class="multi-select-text">{{ _('Select options...') }}</span>
-                                                                        <span class="float-right">
-                                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                                                            </svg>
-                                                                        </span>
-                                                                    </button>
-                                                                    <div class="multi-select-dropdown hidden"
-                                                                         data-field-id="{{ field.id }}">
-                                                                        {% if not field.lookup_list_id %}
-                                                                            {% for option in field.options %}
-                                                                                {% set opt_val = option.value if option is mapping else option %}
-                                                                                {% set opt_label = option.label if option is mapping else option %}
-                                                                                {% if field.display_options and field.display_options[loop.index0] is defined %}{% set display_label = field.display_options[loop.index0] %}{% else %}{% set display_label = opt_label %}{% endif %}
-                                                                                <div class="option-item">
-                                                                                    <label class="inline-flex items-center cursor-pointer w-full">
-                                                                                        <input type="checkbox"
-                                                                                               name="field_value[{{ field.id }}]"
-                                                                                               value="{{ opt_val }}"
-                                                                                               class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                                                                                               {% if opt_val in current_q_multi %}checked{% endif %}
-                                                                                               {% if not can_edit %}disabled{% endif %}>
-                                                                                        <span class="ml-2 text-sm text-gray-700">{{ display_label }}</span>
-                                                                                    </label>
-                                                                                </div>
-                                                                            {% endfor %}
-                                                                        {% endif %}
-                                                                    </div>
-                                                                </div>
+                                                                {% include 'forms/entry_form/partials/_question_multiple_choice.html' %}
                                                             {% elif field.field_type_for_js == 'CHECKBOX' %}
                                                                 <input type="checkbox" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="true" class="form-checkbox h-5 w-5 text-green-600 border-gray-300 rounded focus:ring-green-500 mt-1" {% if existing_q_value == 'true' or existing_q_value == True %}checked{% endif %} {% if not can_edit %}disabled{% endif %}>
                                                             {% else %}
@@ -2426,34 +2369,10 @@
                                                                             {% elif field.field_type_for_js|lower == 'yesno' %} {% set current_q_yesno = existing_q_value | lower if existing_q_value is not none else '' %} <div class="flex items-center gap-4"> <div class="flex items-center gap-3"> <label class="inline-flex items-center cursor-pointer"> <input type="checkbox" name="field_value[{{ field.id }}]" value="yes" class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500" {% if current_q_yesno == 'yes' %}checked{% endif %} {% if not can_edit %}disabled{% endif %}> <span class="ml-2 text-sm font-medium text-green-700">Yes</span> </label> <label class="inline-flex items-center cursor-pointer"> <input type="checkbox" name="field_value[{{ field.id }}]" value="no" class="form-checkbox h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500" {% if current_q_yesno == 'no' %}checked{% endif %} {% if not can_edit %}disabled{% endif %}> <span class="ml-2 text-sm font-medium text-red-700">No</span> </label> </div> </div>
                                                                             {% elif field.field_type_for_js == 'date' %} <input type="date" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (existing_q_value|string|lower == 'none') else (existing_q_value | default('', true)) }}" class="mt-1 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}>
                                                                             {% elif field.field_type_for_js == 'datetime' %} <input type="datetime-local" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (existing_q_value|string|lower == 'none') else (existing_q_value | default('', true)) }}" class="mt-1 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}>
-                                                                            {% elif field.field_type_for_js == 'single_choice' %} {% set current_q_single = existing_q_value | default('', true) %} <select name="field_value[{{ field.id }}]" id="field-{{ field.id }}" data-field-item-id="{{ field.id }}" {% if _unique_opts %}data-unique-options-in-section="true"{% endif %}{% if _limit_entries %} data-limit-entries-to-option-count="true"{% endif %}{% if field.config and field.config.get('use_as_repeat_entry_title') %} data-use-as-repeat-entry-title="true"{% endif %}
-                                                                                   {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}' data-plugin-config='{{ ((field.config or {}).get("question_plugin_config") | tojson | e) if field.config else "{}" }}'{% else %}data-options-source="manual"{% endif %}
-                                                                                   class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" {% if not can_edit %}disabled{% endif %}> <option value="">{{ _('Select...') }}</option> {% if not field.lookup_list_id %}{% for option in field.options %} {% set opt_val = option.value if option is mapping else option %} {% set opt_label = option.label if option is mapping else option %} <option value="{{ opt_val }}" {% if opt_val == current_q_single %}selected{% endif %}>{{ opt_label }}</option> {% endfor %}{% endif %} </select>
-                                                                                                                                                        {% elif field.field_type_for_js == 'multiple_choice' %} {% set current_q_multi = existing_q_value if existing_q_value is iterable else [] %} <div class="mt-2" id="field-{{ field.id }}" data-field-item-id="{{ field.id }}" {% if _unique_opts %}data-unique-options-in-section="true"{% endif %} {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}' data-plugin-config='{{ ((field.config or {}).get("question_plugin_config") | tojson | e) if field.config else "{}" }}'{% else %}data-options-source="manual"{% endif %}> <button type="button"
-                                                                                   class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-left text-sm focus:outline-none focus:ring-2 focus:ring-green-500 hover:bg-gray-50 multi-select-btn"
-                                                                                   data-field-id="{{ field.id }}"
-                                                                                   {% if not can_edit %}disabled{% endif %}>
-                                                                                    <span class="multi-select-text">{{ _('Select options...') }}</span>
-                                                                                    <span class="float-right">
-                                                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                                                                        </svg>
-                                                                                    </span>
-                                                                                </button>
-                                                                                <div class="multi-select-dropdown hidden" data-field-id="{{ field.id }}">
-                                                                                    {% if not field.lookup_list_id %}
-                                                                                        {% for option in field.options %}
-                                                                                            {% set opt_val = option.value if option is mapping else option %}
-                                                                                            {% set opt_label = option.label if option is mapping else option %}
-                                                                                            <div class="option-item">
-                                                                                                <label class="inline-flex items-center cursor-pointer w-full">
-                                                                                                    <input type="checkbox" name="field_value[{{ field.id }}]" value="{{ opt_val }}" class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500" {% if opt_val in current_q_multi %}checked{% endif %} {% if not can_edit %}disabled{% endif %}>
-                                                                                                    <span class="ml-2 text-sm text-gray-700">{{ opt_label }}</span>
-                                                                                                </label>
-                                                                                            </div>
-                                                                                        {% endfor %}
-                                                                                    {% endif %}
-                                                                                </div>
+                                                                            {% elif field.field_type_for_js == 'single_choice' %}
+                                                                                {% include 'forms/entry_form/partials/_question_single_choice.html' %}
+                                                                            {% elif field.field_type_for_js == 'multiple_choice' %}
+                                                                                {% include 'forms/entry_form/partials/_question_multiple_choice.html' %}
                                                                             {% elif field.field_type_for_js == 'CHECKBOX' %} <input type="checkbox" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="true" class="form-checkbox h-5 w-5 text-green-600 border-gray-300 rounded focus:ring-green-500 mt-1" {% if existing_q_value == 'true' or existing_q_value == True %}checked{% endif %} {% if not can_edit %}disabled{% endif %}>
                                                                             {% else %} <input type="text" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ existing_q_value | default('', true) }}" class="mt-1 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}> {% endif %}
 

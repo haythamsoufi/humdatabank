@@ -97,6 +97,11 @@ export const QuestionItem = {
             }
             if (manualContainer) placeAfter(manualContainer, optionsSourceContainer);
             if (listContainer) placeAfter(listContainer, manualContainer || optionsSourceContainer);
+            if (allowOtherWrapper && listContainer && questionFields.contains(listContainer)) {
+                placeAfter(allowOtherWrapper, listContainer);
+            } else if (allowOtherWrapper && questionFields && !questionFields.contains(allowOtherWrapper)) {
+                questionFields.appendChild(allowOtherWrapper);
+            }
         }
 
         if (optionsSourceContainer) {
@@ -157,12 +162,7 @@ export const QuestionItem = {
                     window.ItemModal.currentQuestionType = e.target.value || null;
                     window.ItemModal.ensureUseAsRepeatEntryTitleField('question');
                 }
-                const allowOtherWrapper = modalElement.querySelector('#item-question-allow-other-wrapper');
-                if (allowOtherWrapper) {
-                    const isChoice = ['single_choice', 'multiple_choice'].includes(e.target.value);
-                    if (isChoice) Utils.showElement(allowOtherWrapper);
-                    else Utils.hideElement(allowOtherWrapper);
-                }
+                this.updateAllowOtherVisibility(modalElement, e.target.value);
             }
 
             if (e.target.name === 'options_source') {
@@ -190,18 +190,28 @@ export const QuestionItem = {
         document.addEventListener('input', modalElement._questionInputHandler);
     },
 
+    updateAllowOtherVisibility(modalElement, questionType) {
+        const allowOtherWrapper = modalElement.querySelector('#item-question-allow-other-wrapper');
+        if (!allowOtherWrapper) return;
+        const isChoice = ['single_choice', 'multiple_choice'].includes(questionType || '');
+        if (isChoice) {
+            Utils.showElement(allowOtherWrapper);
+        } else {
+            Utils.hideElement(allowOtherWrapper);
+        }
+    },
+
     initializeOptionsVisibility(modalElement) {
         const typeSelect = modalElement.querySelector('#item-question-type-select');
         const currentType = typeSelect ? typeSelect.value : '';
         const manualContainer = modalElement.querySelector('#item-question-options-container');
         const listContainer = modalElement.querySelector('#item-question-calculated-list-container');
-        const allowOtherWrapper = modalElement.querySelector('#item-question-allow-other-wrapper');
         const defaultSource = modalElement.querySelector('input[name="options_source"]:checked')?.value || 'manual';
         const isChoiceType = ['single_choice', 'multiple_choice'].includes(currentType);
         if (!isChoiceType) {
             Utils.hideElement(manualContainer);
             Utils.hideElement(listContainer);
-            if (allowOtherWrapper) Utils.hideElement(allowOtherWrapper);
+            this.updateAllowOtherVisibility(modalElement, currentType);
         } else {
             if (defaultSource === 'manual') {
                 Utils.showElement(manualContainer);
@@ -211,7 +221,7 @@ export const QuestionItem = {
                 Utils.hideElement(manualContainer);
                 Utils.showElement(listContainer);
             }
-            if (allowOtherWrapper) Utils.showElement(allowOtherWrapper);
+            this.updateAllowOtherVisibility(modalElement, currentType);
         }
     },
 
@@ -348,7 +358,7 @@ export const QuestionItem = {
                 const questionTypeInput = modalElement.querySelector('#item-question-type-input');
                 if (questionTypeInput) questionTypeInput.value = itemData.question_type;
                 this.updateQuestionLabelRequired(modalElement, itemData.question_type);
-                typeSelect.dispatchEvent(new Event('change'));
+                typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
                 if (typeof window.updateOptionsVisibility === 'function') {
                     window.updateOptionsVisibility();
                 }
@@ -359,6 +369,9 @@ export const QuestionItem = {
         if (allowOtherCheckboxEl) {
             allowOtherCheckboxEl.checked = !!(itemData.config && itemData.config.allow_other);
         }
+
+        const resolvedQuestionType = itemData.question_type || (typeSelect && typeSelect.value) || '';
+        this.updateAllowOtherVisibility(modalElement, resolvedQuestionType);
 
         const optionsSource = itemData.options_source;
         if (optionsSource === 'manual') {
@@ -466,5 +479,6 @@ export const QuestionItem = {
         }
 
         this.updateIndirectReachVisibility(modalElement);
+        this.updateAllowOtherVisibility(modalElement, resolvedQuestionType);
     }
 };

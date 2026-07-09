@@ -118,6 +118,20 @@ class TestManageUsers:
         assert "edit_denied_message" in resp.text
         assert "Only a System Manager can modify an admin user." in resp.text
 
+    def test_manage_users_includes_fds_member_data(self, logged_in_client, db_session):
+        """Users assigned as country FDS members appear with is_fds_member in grid JSON."""
+        country = create_test_country(db_session, name="FDS Testland")
+        fds_user = create_test_user(db_session, email="fds_list@example.com", role="admin")
+        country.fds_member_user_id = fds_user.id
+        db_session.commit()
+
+        resp = logged_in_client.get("/admin/users")
+        assert resp.status_code == 200
+        assert "is_fds_member" in resp.text
+        assert "fds_member_countries" in resp.text
+        assert "FDS Member" in resp.text
+        assert "FDS Testland" in resp.text
+
 
 # ---------------------------------------------------------------------------
 # access_requests (GET /admin/access-requests)

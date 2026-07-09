@@ -343,25 +343,31 @@
             return [];
         }
 
-        // Programs column: value is an array
+        // Prefer arrays from filterValueGetter / valueGetter (entities, programs, tools, …)
+        if (Array.isArray(value)) {
+            return value.map(item => String(item).trim()).filter(item => item !== '');
+        }
+
+        // Programs column: comma-separated string fallback
         if (field === 'related_programs_list') {
-            if (Array.isArray(value)) {
-                return value.map(item => String(item).trim()).filter(item => item !== '');
-            }
-            // If it's a string, try to parse as comma-separated
             if (typeof value === 'string') {
                 return value.split(',').map(item => item.trim()).filter(item => item !== '');
             }
             return [];
         }
 
-        // Tools column (e.g. AI reasoning traces): value is an array of tool names
+        // Tools column (e.g. AI reasoning traces): comma-separated string fallback
         if (field === 'tools_used') {
-            if (Array.isArray(value)) {
-                return value.map(item => String(item).trim()).filter(item => item !== '');
-            }
             if (typeof value === 'string') {
                 return value.split(',').map(item => item.trim()).filter(item => item !== '');
+            }
+            return [];
+        }
+
+        // Entities: semicolon-separated display/export text fallback
+        if (field === 'entities') {
+            if (typeof value === 'string' && value.trim() !== '') {
+                return value.split(';').map(item => item.trim()).filter(item => item !== '');
             }
             return [];
         }
@@ -373,12 +379,6 @@
                 // Split by " / " to get individual sector/subsector names
                 return value.split(' / ').map(item => item.trim()).filter(item => item !== '');
             }
-            // If it's an array, return as is
-            if (Array.isArray(value)) {
-                return value.map(item => String(item).trim()).filter(item => item !== '');
-            }
-            // If value is null/undefined/empty, try to get from data directly
-            // This handles cases where valueGetter might return empty but data has values
             return [];
         }
 

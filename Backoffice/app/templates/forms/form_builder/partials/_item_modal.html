@@ -259,14 +259,17 @@
                             <input type="hidden" name="question_plugin_config" id="question-plugin-config-json" value="{}">
                         </div>
 
-                        {# Allow "Other" option — shown for both manual and calculated choice types #}
-                        <div id="item-question-allow-other-wrapper" class="hidden mt-1 pt-3 border-t border-gray-100">
-                            <label class="inline-flex items-start gap-2 cursor-pointer">
+                        {# Allow "Other" option — placed on the right panel with the options list (see updateOptionsVisibility) #}
+                        <div id="item-question-allow-other-wrapper" class="hidden mt-3 pt-3 border-t border-gray-100">
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" id="item-question-allow-other" name="allow_other"
-                                       class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500 mt-0.5 shrink-0">
+                                       class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500 shrink-0">
                                 <span class="text-sm text-gray-700 font-medium">{{ _('Allow "Other" option') }}</span>
+                                <span class="custom-info-tooltip shrink-0 cursor-help" aria-label="{{ _('Help') }}">
+                                    <i class="fas fa-info-circle text-gray-400" aria-hidden="true"></i>
+                                    <span class="tooltip-text">{{ _('Adds an "Other (please specify)" entry to the list. Users can type a custom value that is stored as their answer.') }}</span>
+                                </span>
                             </label>
-                            <p class="mt-1 ml-6 text-xs text-gray-500">{{ _('Adds an "Other (please specify)" entry to the list. Users can type a custom value that is stored as their answer.') }}</p>
                         </div>
                     </div>
 
@@ -952,12 +955,28 @@
         const optionsSourceContainer = document.getElementById('options-source-container');
         const manualOptionsContainer = document.getElementById('item-question-options-container');
         const calculatedListContainer = document.getElementById('item-question-calculated-list-container');
+        const allowOtherWrapper = document.getElementById('item-question-allow-other-wrapper');
         const optionsSourceRadios = document.getElementsByName('options_source');
         // Remember original parent so we can move container back when needed
         const manualOriginalParent = manualOptionsContainer.parentElement;
         const calculatedOriginalParent = calculatedListContainer.parentElement;
+        const allowOtherOriginalParent = allowOtherWrapper ? allowOtherWrapper.parentElement : null;
         const gridContainer = optionsSourceContainer.closest('.modal-grid-container');
         const rightHalf = gridContainer ? gridContainer.querySelector('.modal-right-half') : null;
+
+        function placeAllowOtherAfter(activeContainer) {
+            if (!allowOtherWrapper || !activeContainer) return;
+            if (activeContainer.nextElementSibling !== allowOtherWrapper) {
+                activeContainer.insertAdjacentElement('afterend', allowOtherWrapper);
+            }
+        }
+
+        function restoreAllowOtherToOriginalParent() {
+            if (!allowOtherWrapper || !allowOtherOriginalParent) return;
+            if (!allowOtherOriginalParent.contains(allowOtherWrapper)) {
+                allowOtherOriginalParent.appendChild(allowOtherWrapper);
+            }
+        }
 
         function syncRightPanelLayout() {
             if (window.ItemModal && typeof window.ItemModal.syncRightPanel === 'function') {
@@ -987,6 +1006,8 @@
             if (!isChoice) {
                 Utils.hideElement(manualOptionsContainer);
                 Utils.hideElement(calculatedListContainer);
+                if (allowOtherWrapper) Utils.hideElement(allowOtherWrapper);
+                restoreAllowOtherToOriginalParent();
                 if (manualOriginalParent && !manualOriginalParent.contains(manualOptionsContainer)) {
                     manualOriginalParent.appendChild(manualOptionsContainer);
                 }
@@ -1031,6 +1052,16 @@
                 Utils.hideElement(manualOptionsContainer);
                 if (manualOriginalParent && !manualOriginalParent.contains(manualOptionsContainer)) {
                     manualOriginalParent.appendChild(manualOptionsContainer);
+                }
+            }
+
+            if (allowOtherWrapper) {
+                Utils.showElement(allowOtherWrapper);
+                const activeContainer = isManual
+                    ? manualOptionsContainer
+                    : (isListLibrary ? calculatedListContainer : null);
+                if (activeContainer) {
+                    placeAllowOtherAfter(activeContainer);
                 }
             }
 

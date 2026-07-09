@@ -1,0 +1,60 @@
+{# Single-choice question field. Expects: field, existing_q_value, can_edit, _unique_opts, _limit_entries; optional: is_prefilled, is_imputed, translation_key #}
+{% set existing_q_value = existing_q_value | default('', true) %}
+{% set is_prefilled = is_prefilled | default(false) %}
+{% set is_imputed = is_imputed | default(false) %}
+{% set current_q_single = existing_q_value %}
+{% if field.is_question and field.options_translations and current_q_single and translation_key is defined %}
+    {% set current_q_single_display = field.get_option_value_for_display(current_q_single, translation_key) %}
+{% else %}
+    {% set current_q_single_display = current_q_single %}
+{% endif %}
+{% set q_single_allow_other = field.config.get('allow_other', false) if field.config else false %}
+{% set _ns = namespace(q_single_is_other=false) %}
+{% if q_single_allow_other and current_q_single and not field.lookup_list_id %}
+    {% set _ns2 = namespace(found=false) %}
+    {% for _opt in field.options %}
+        {% set _ov = _opt.value if _opt is mapping else _opt %}
+        {% if _ov == current_q_single %}{% set _ns2.found = true %}{% endif %}
+    {% endfor %}
+    {% set _ns.q_single_is_other = not _ns2.found %}
+{% endif %}
+{% set select_classes = "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" %}
+{% if is_prefilled %}
+    {% set select_classes = select_classes ~ " bg-yellow-100 border-yellow-300" %}
+{% elif is_imputed %}
+    {% set select_classes = select_classes ~ " bg-blue-50 border-blue-300" %}
+{% else %}
+    {% set select_classes = select_classes ~ " bg-white" %}
+{% endif %}
+<select name="field_value[{{ field.id }}]" id="field-{{ field.id }}"
+       data-field-item-id="{{ field.id }}"
+       {% if _unique_opts %}data-unique-options-in-section="true"{% endif %}
+       {% if _limit_entries %}data-limit-entries-to-option-count="true"{% endif %}
+       {% if field.config and field.config.get('use_as_repeat_entry_title') %}data-use-as-repeat-entry-title="true"{% endif %}
+       {% if q_single_allow_other %}data-allow-other="true"{% endif %}
+       {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}' data-plugin-config='{{ ((field.config or {}).get("question_plugin_config") | tojson | e) if field.config else "{}" }}'{% else %}data-options-source="manual"{% endif %}
+       class="{{ select_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
+    <option value="">{{ _('Select...') }}</option>
+    {% if not field.lookup_list_id %}
+        {% for option in field.options %}
+            {% set opt_val = option.value if option is mapping else option %}
+            {% set opt_label = option.label if option is mapping else option %}
+            {% if field.display_options and field.display_options[loop.index0] is defined %}{% set display_label = field.display_options[loop.index0] %}{% else %}{% set display_label = opt_label %}{% endif %}
+            <option value="{{ opt_val }}" {% if opt_val == current_q_single and not _ns.q_single_is_other %}selected{% endif %}>{{ display_label }}</option>
+        {% endfor %}
+        {% if q_single_allow_other %}
+            <option value="__other__" {% if _ns.q_single_is_other %}selected{% endif %}>{{ _('Other (please specify)...') }}</option>
+        {% endif %}
+    {% endif %}
+</select>
+{% if q_single_allow_other %}
+    <input type="text"
+           name="field_other_text[{{ field.id }}]"
+           id="other-text-{{ field.id }}"
+           class="other-text-input mt-2 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md{% if not _ns.q_single_is_other %} hidden{% endif %}"
+           data-for-field="{{ field.id }}"
+           placeholder="{{ _('Please specify...') }}"
+           value="{{ current_q_single if _ns.q_single_is_other else '' }}"
+           autocomplete="off"
+           {% if not can_edit %}disabled{% endif %}>
+{% endif %}

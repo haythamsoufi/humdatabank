@@ -1,6 +1,6 @@
 import { debugLog, debugWarn, debugError } from './debug.js';
 import { getFieldValue, getCurrentFieldValue } from './field-management.js';
-import { appendOtherOptionToSelect, appendOtherOptionToMultiDropdown } from './question-other-option.js';
+import { appendOtherOptionToSelect, appendOtherOptionToMultiDropdown, restoreOtherSelectionForCalculatedList } from './question-other-option.js';
 
 const MODULE = 'calculated-lists-runtime';
 
@@ -1149,13 +1149,22 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
                 }
             }, 100);
         } else if (previousValue) {
-            markSelectStaleSavedValue(selectElement, previousValue);
-            delete selectElement.dataset.pendingValue;
-            attachStaleSavedValueListener(selectElement);
-            if (window.revealRepeatEntryTitleSelect) {
-                window.revealRepeatEntryTitleSelect(selectElement);
+            if (selectElement.dataset.allowOther === 'true') {
+                restoreOtherSelectionForCalculatedList(selectElement, previousValue);
+                delete selectElement.dataset.pendingValue;
+                if (window.revealRepeatEntryTitleSelect) {
+                    window.revealRepeatEntryTitleSelect(selectElement);
+                }
+                debugLog(MODULE, `Restored saved value "${previousValue}" as Other (allow_other enabled)`);
+            } else {
+                markSelectStaleSavedValue(selectElement, previousValue);
+                delete selectElement.dataset.pendingValue;
+                attachStaleSavedValueListener(selectElement);
+                if (window.revealRepeatEntryTitleSelect) {
+                    window.revealRepeatEntryTitleSelect(selectElement);
+                }
+                debugLog(MODULE, `⚠️ Saved value "${previousValue}" is not in current API options — preserved with warning`);
             }
-            debugLog(MODULE, `⚠️ Saved value "${previousValue}" is not in current API options — preserved with warning`);
         } else {
             clearSelectStaleSavedValue(selectElement);
             selectElement.value = '';
@@ -1322,7 +1331,7 @@ async function refreshMultiSelectOptions(multiSelectDiv, fieldId, lookupListId, 
         debugLog(MODULE, `✅ Multi-select options refreshed. Total ${rows.length} rows, dropdown now has ${dropdown.children.length} options.`);
 
         // Append "Other" option for calculated lists that have allow_other enabled
-        appendOtherOptionToMultiDropdown(dropdown, fieldId);
+        appendOtherOptionToMultiDropdown(dropdown);
 
         if (window.applyUniqueSectionOptions) {
             window.applyUniqueSectionOptions(multiSelectDiv.closest('[data-collapsible-id]') || document);

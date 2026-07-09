@@ -346,7 +346,10 @@
             action: function() {
                 const api = params.api || self.gridApi;
                 if (api) {
-                    self.exportTableToCSV(api, 'export.csv');
+                    var exportName = (self.config && self.config.templateId)
+                        ? (String(self.config.templateId).replace(/[^a-z0-9_-]+/gi, '_') + '.csv')
+                        : 'export.csv';
+                    self.exportTableToCSV(api, exportName);
                 }
             }
         });
@@ -2870,7 +2873,10 @@
             });
 
             addItem('Export table to Excel', function() {
-                self.exportTableToCSV(api, 'export.csv');
+                var exportName = (self.config && self.config.templateId)
+                    ? (String(self.config.templateId).replace(/[^a-z0-9_-]+/gi, '_') + '.csv')
+                    : 'export.csv';
+                self.exportTableToCSV(api, exportName);
             });
 
             document.body.appendChild(menu);
@@ -3130,34 +3136,93 @@
     };
 
     /**
+     * Resolve a cell value for CSV/Excel export.
+     * Prefers exportValueGetter, then valueGetter, then raw field data.
+     * @param {Object} col - Column descriptor with field / getters / colDef
+     * @param {Object} node - AG Grid row node (or { data: row })
+     * @returns {*}
+     */
+    AgGridHelper.prototype.getExportCellValue = function(col, node) {
+        if (!col || !node) {
+            return '';
+        }
+        var data = node.data || {};
+        var colDef = col.colDef || col;
+        var params = {
+            data: data,
+            node: node,
+            colDef: colDef,
+            column: col.column || null,
+            getValue: function() {
+                return col.field ? data[col.field] : undefined;
+            }
+        };
+
+        if (typeof colDef.exportValueGetter === 'function') {
+            return colDef.exportValueGetter(params);
+        }
+        if (typeof col.exportValueGetter === 'function') {
+            return col.exportValueGetter(params);
+        }
+        if (typeof colDef.valueGetter === 'function') {
+            return colDef.valueGetter(params);
+        }
+        if (typeof col.valueGetter === 'function') {
+            return col.valueGetter(params);
+        }
+        if (col.field && Object.prototype.hasOwnProperty.call(data, col.field)) {
+            return data[col.field];
+        }
+        return '';
+    };
+
+    /**
+     * Escape a value for CSV and quote when needed.
+     * @param {*} value
+     * @returns {string}
+     */
+    AgGridHelper.prototype.formatCsvCell = function(value) {
+        if (value === null || value === undefined) {
+            return '';
+        }
+        if (typeof value === 'boolean') {
+            value = value ? 'true' : 'false';
+        } else if (Array.isArray(value)) {
+            value = value.join('; ');
+        } else if (typeof value === 'object') {
+            try {
+                value = JSON.stringify(value);
+            } catch (e) {
+                value = String(value);
+            }
+        }
+        var str = String(value).replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/"/g, '""');
+        return str.includes(',') || str.includes('\n') || str.includes('"') ? '"' + str + '"' : str;
+    };
+
+    /**
      * Export selected rows to CSV
      * @param {string} filename - Filename for export (default: 'export.csv')
      */
     AgGridHelper.prototype.exportSelectedToCSV = function(filename) {
         filename = filename || 'export.csv';
         const selectedRows = this.getSelectedRows();
+        const self = this;
 
         if (selectedRows.length === 0) {
             console.warn('AgGridHelper: No rows selected for export');
             return;
         }
 
-        // Simple CSV export
-        const headers = this.config.columnDefs
-            .filter(function(col) { return col.field && !col.hide; })
-            .map(function(col) { return col.headerName || col.field; });
+        const exportCols = this.config.columnDefs
+            .filter(function(col) { return col.field && !col.hide; });
+        const headers = exportCols.map(function(col) { return col.headerName || col.field; });
 
         const rows = selectedRows.map(function(row) {
-            return this.config.columnDefs
-                .filter(function(col) { return col.field && !col.hide; })
-                .map(function(col) {
-                    const value = row[col.field];
-                    // Escape CSV values
-                    if (value === null || value === undefined) return '';
-                    const str = String(value).replace(/"/g, '""');
-                    return str.includes(',') || str.includes('\n') ? '"' + str + '"' : str;
-                });
-        }, this);
+            return exportCols.map(function(col) {
+                return self.formatCsvCell(self.getExportCellValue(col, { data: row }));
+            });
+        });
 
         const csv = [headers.join(','), ...rows.map(function(row) { return row.join(','); })].join('\n');
 
@@ -3185,6 +3250,7 @@
             return;
         }
 
+        var self = this;
         var visibleCols = [];
         if (typeof api.getColumns === 'function') {
             var cols = api.getColumns();
@@ -3194,46 +3260,58 @@
                         var def = col.getColDef ? col.getColDef() : (col.colDef || {});
                         var field = def.field || (col.getColId ? col.getColId() : col.colId);
                         var visible = col.getVisible ? col.getVisible() : (col.visible !== false);
-                        return field && visible;
+                        // Skip selection / auto-group utility columns
+                        if (!field || field === 'ag-Grid-SelectionColumn' || field === 'ag-Grid-AutoColumn') {
+                            return false;
+                        }
+                        return visible;
                     })
                     .map(function(col) {
                         var def = col.getColDef ? col.getColDef() : (col.colDef || {});
                         return {
                             field: def.field || (col.getColId ? col.getColId() : col.colId),
-                            headerName: def.headerName || def.field || (col.getColId ? col.getColId() : col.colId)
+                            headerName: def.headerName || def.field || (col.getColId ? col.getColId() : col.colId),
+                            valueGetter: def.valueGetter,
+                            exportValueGetter: def.exportValueGetter,
+                            colDef: def,
+                            column: col
                         };
                     });
             }
         }
         if (!visibleCols.length) {
             var columnDefs = this.config.columnDefs || [];
-            visibleCols = columnDefs.filter(function(col) { return col.field && col.hide !== true; });
+            visibleCols = columnDefs
+                .filter(function(col) { return col.field && col.hide !== true; })
+                .map(function(col) {
+                    return {
+                        field: col.field,
+                        headerName: col.headerName || col.field,
+                        valueGetter: col.valueGetter,
+                        exportValueGetter: col.exportValueGetter,
+                        colDef: col,
+                        column: null
+                    };
+                });
         }
         var headers = visibleCols.map(function(col) { return col.headerName || col.field; });
 
         const rowData = [];
+        function pushExportRow(node) {
+            if (!node || !node.data) {
+                return;
+            }
+            rowData.push(visibleCols.map(function(col) {
+                return self.formatCsvCell(self.getExportCellValue(col, node));
+            }));
+        }
+
         if (typeof api.forEachNodeAfterFilterAndSort === 'function') {
-            api.forEachNodeAfterFilterAndSort(function(node) {
-                if (node && node.data) {
-                    const row = visibleCols.map(function(col) {
-                        const value = node.data[col.field];
-                        if (value === null || value === undefined) return '';
-                        const str = String(value).replace(/"/g, '""');
-                        return str.includes(',') || str.includes('\n') ? '"' + str + '"' : str;
-                    });
-                    rowData.push(row);
-                }
-            });
+            api.forEachNodeAfterFilterAndSort(pushExportRow);
         } else if (typeof api.forEachNode === 'function') {
             api.forEachNode(function(node) {
-                if (node && node.data && (node.displayed === true || node.displayed === undefined)) {
-                    const row = visibleCols.map(function(col) {
-                        const value = node.data[col.field];
-                        if (value === null || value === undefined) return '';
-                        const str = String(value).replace(/"/g, '""');
-                        return str.includes(',') || str.includes('\n') ? '"' + str + '"' : str;
-                    });
-                    rowData.push(row);
+                if (node && (node.displayed === true || node.displayed === undefined)) {
+                    pushExportRow(node);
                 }
             });
         }

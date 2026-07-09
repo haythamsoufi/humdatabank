@@ -264,6 +264,7 @@ def _create_question_form_item(template, section, form_data, default_order):
         'limit_entries_to_option_count': bool(get_field_value('limit_entries_to_option_count', '')),
         'use_as_repeat_entry_title': bool(get_field_value('use_as_repeat_entry_title', '')),
         'allow_other': get_field_value('allow_other', '') in ['true', 'on', '1'],
+        'max_other_entries': (lambda v: max(0, int(v)) if str(v).lstrip('-').isdigit() else 0)(get_field_value('max_other_entries', '0') or '0'),
     }
 
     # Handle allow_over_100 - check direct field first, then config JSON

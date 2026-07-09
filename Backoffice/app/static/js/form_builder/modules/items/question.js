@@ -61,6 +61,13 @@ export const QuestionItem = {
         if (optionsTranslationsInput) formData.append(`${formPrefix}options_translations_json`, optionsTranslationsInput.value);
         const allowOtherCheckbox = Utils.getElementById('item-question-allow-other');
         if (allowOtherCheckbox) formData.append(`${formPrefix}allow_other`, allowOtherCheckbox.checked ? 'on' : '');
+        const maxOtherInput = Utils.getElementById('item-max-other-entries');
+        if (maxOtherInput && maxOtherInput.closest('#max-other-entries-row')?.style.display !== 'none') {
+            const val = parseInt(maxOtherInput.value, 10);
+            formData.append(`${formPrefix}max_other_entries`, isNaN(val) || val < 1 ? '0' : String(val));
+        } else {
+            formData.append(`${formPrefix}max_other_entries`, '0');
+        }
     },
 
     teardown(modalElement) {
@@ -368,6 +375,16 @@ export const QuestionItem = {
         const allowOtherCheckboxEl = modalElement.querySelector('#item-question-allow-other');
         if (allowOtherCheckboxEl) {
             allowOtherCheckboxEl.checked = !!(itemData.config && itemData.config.allow_other);
+        }
+
+        // max_other_entries — stored on properties module's pending state so
+        // ensureMaxOtherEntriesField() can pick it up after visibility is resolved
+        if (itemData.config && itemData.config.max_other_entries > 0) {
+            if (window.ItemModal && window.ItemModal.properties) {
+                window.ItemModal.properties._pendingMaxOtherEntries = itemData.config.max_other_entries;
+            }
+            const maxOtherInput = modalElement.querySelector('#item-max-other-entries');
+            if (maxOtherInput) maxOtherInput.value = String(itemData.config.max_other_entries);
         }
 
         const resolvedQuestionType = itemData.question_type || (typeSelect && typeSelect.value) || '';

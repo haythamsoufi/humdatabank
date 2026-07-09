@@ -197,6 +197,16 @@ def worker_abort(worker):
         worker.pid,
         timeout,
     )
+    # Dump every in-flight request tracked on this worker before the process dies.
+    # This runs without a Flask app context; request_pressure handles that constraint.
+    try:
+        from app.services.monitoring.request_pressure import dump_inflight_on_abort
+        dump_inflight_on_abort(
+            worker.pid,
+            log_fn=lambda msg: worker.log.error(msg),
+        )
+    except Exception as exc:
+        worker.log.warning("Could not dump in-flight requests on abort (pid=%s): %s", worker.pid, exc)
     try:
         from app.scheduler_lock import shutdown_worker_scheduler
         shutdown_worker_scheduler(getattr(worker, "wsgi", None), os.getppid(), worker.pid)

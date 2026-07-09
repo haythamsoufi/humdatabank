@@ -20,8 +20,10 @@ from app.utils.request_utils import is_static_asset_request
 
 _enabled = False
 _threshold_seconds = 30.0
-_stuck_warning_seconds = 60.0
-_stuck_critical_seconds = 100.0
+# Defaults match config.py so [STUCK_REQUEST] fires before GUNICORN_TIMEOUT=25s even if
+# configure() is somehow not called (e.g. very early startup or test isolation edge cases).
+_stuck_warning_seconds = 15.0
+_stuck_critical_seconds = 23.0
 
 
 def configure(app: Flask) -> None:
@@ -29,8 +31,8 @@ def configure(app: Flask) -> None:
     global _enabled, _threshold_seconds, _stuck_warning_seconds, _stuck_critical_seconds
     _enabled = bool(app.config.get('SLOW_REQUEST_LOG_ENABLED', True))
     _threshold_seconds = float(app.config.get('SLOW_REQUEST_THRESHOLD_SECONDS', 30))
-    _stuck_warning_seconds = float(app.config.get('SLOW_REQUEST_STUCK_WARNING_SECONDS', 60))
-    _stuck_critical_seconds = float(app.config.get('SLOW_REQUEST_STUCK_CRITICAL_SECONDS', 100))
+    _stuck_warning_seconds = float(app.config.get('SLOW_REQUEST_STUCK_WARNING_SECONDS', 15))
+    _stuck_critical_seconds = float(app.config.get('SLOW_REQUEST_STUCK_CRITICAL_SECONDS', 23))
 
 
 def _should_track() -> bool:

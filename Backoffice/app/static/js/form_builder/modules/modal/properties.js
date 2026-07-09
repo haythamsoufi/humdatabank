@@ -172,6 +172,38 @@ export const PropertiesMixin = {
                 this._pendingLimitEntriesToOptionCount = undefined;
             }
         }
+
+        // Wire up change listener once so toggling limit_entries re-evaluates the max_other sub-row
+        if (!checkbox._maxOtherChangeListenerAdded) {
+            checkbox.addEventListener('change', () => this.ensureMaxOtherEntriesField());
+            checkbox._maxOtherChangeListenerAdded = true;
+        }
+        this.ensureMaxOtherEntriesField();
+    },
+
+    ensureMaxOtherEntriesField: function() {
+        if (!this.modalElement) return;
+        const row = this.modalElement.querySelector('#max-other-entries-row');
+        const input = this.modalElement.querySelector('#item-max-other-entries');
+        const limitCheckbox = this.modalElement.querySelector('#item-limit-entries-to-option-count');
+        const allowOtherCheckbox = this.modalElement.querySelector('#item-question-allow-other');
+        if (!row || !input || !limitCheckbox || !allowOtherCheckbox) return;
+
+        const show = limitCheckbox.checked && allowOtherCheckbox.checked;
+        row.style.display = show ? '' : 'none';
+        if (!show) {
+            // Reset to default when hidden so stale values don't persist
+            input.value = '1';
+        } else if (this._pendingMaxOtherEntries !== undefined) {
+            input.value = String(this._pendingMaxOtherEntries);
+            this._pendingMaxOtherEntries = undefined;
+        }
+
+        // Wire the allow_other checkbox change listener once (only when this field is relevant)
+        if (!allowOtherCheckbox._maxOtherChangeListenerAdded) {
+            allowOtherCheckbox.addEventListener('change', () => this.ensureMaxOtherEntriesField());
+            allowOtherCheckbox._maxOtherChangeListenerAdded = true;
+        }
     },
 
     ensureUseAsRepeatEntryTitleField: function(itemType) {

@@ -270,6 +270,17 @@
                                     <span class="tooltip-text">{{ _('Adds an "Other (please specify)" entry to the list. Users can type a custom value that is stored as their answer.') }}</span>
                                 </span>
                             </label>
+                            {# Sub-option: max extra "Other" entries — shown only when limit_entries_to_option_count is also on #}
+                            <div id="max-other-entries-row" class="mt-2 ml-2 pl-4 border-l-2 border-gray-200" style="display:none;">
+                                <label class="flex flex-wrap items-center gap-x-2 gap-y-1 text-gray-700 text-sm">
+                                    <span>{{ _('Allow up to') }}</span>
+                                    <input type="number" name="max_other_entries" id="item-max-other-entries"
+                                           class="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-center focus:ring-green-500 focus:border-green-500"
+                                           min="1" max="99" value="1">
+                                    <span>{{ _('extra "Other" entries (beyond the option count limit)') }}</span>
+                                </label>
+                                <p class="mt-1 text-xs text-gray-500">{{ _('Users can add this many additional "Other" entries on top of the number of list options.') }}</p>
+                            </div>
                         </div>
                     </div>
 

@@ -266,6 +266,11 @@ export const FormPopulationMixin = {
             limitEntriesCheckbox.checked = limitVal;
         }
 
+        // Restore max_other_entries (pending, resolved by ensureMaxOtherEntriesField after visibility settles)
+        if (itemData && itemData.config && itemData.config.max_other_entries > 0) {
+            this._pendingMaxOtherEntries = itemData.config.max_other_entries;
+        }
+
         if (disabilityQuestionsCheckbox) {
             disabilityQuestionsCheckbox.checked = parseBool(itemData.allow_disability_questions);
         }

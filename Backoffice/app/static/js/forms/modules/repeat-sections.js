@@ -658,7 +658,16 @@ function getOptionCountLimit(sectionId) {
         if (fieldId && seenFieldIds.has(fieldId)) return;
         if (fieldId) seenFieldIds.add(fieldId);
 
-        const count = Array.from(sel.options).filter(opt => opt.value !== '').length;
+        // Exclude the placeholder ("") and the __other__ sentinel from the regular option count.
+        // __other__ is an allow_other entry, not a real list option — it is counted separately.
+        const regularCount = Array.from(sel.options).filter(
+            opt => opt.value !== '' && opt.value !== '__other__'
+        ).length;
+
+        // Add the configured extra "Other" slots on top of the regular option count.
+        const maxOther = parseInt(sel.dataset.maxOtherEntries || '0', 10) || 0;
+        const count = regularCount + maxOther;
+
         if (count > 0) {
             min = min === null ? count : Math.min(min, count);
         }
@@ -721,7 +730,18 @@ function addRepeatEntry(sectionId, options = {}) {
     if (effectiveMax !== null && currentEntries >= effectiveMax) {
         debugWarn('repeat-sections', `Cannot add more entries: reached maximum of ${effectiveMax}`);
         if (!silent) {
-            const msg = `All available options are already in use. The number of entries cannot exceed ${effectiveMax} (the number of options in this section).`;
+            // Check whether any limit-field has extra "Other" slots configured so we can
+            // give a more informative message.
+            const sectionContainer = document.getElementById(`section-container-${sectionId}`);
+            const hasOtherSlots = sectionContainer
+                ? Array.from(sectionContainer.querySelectorAll(
+                    'select[data-limit-entries-to-option-count="true"][data-max-other-entries]'
+                  )).some(sel => parseInt(sel.dataset.maxOtherEntries || '0', 10) > 0)
+                : false;
+
+            const msg = hasOtherSlots
+                ? `All available options (including extra "Other" slots) are already in use. The number of entries cannot exceed ${effectiveMax}.`
+                : `All available options are already in use. The number of entries cannot exceed ${effectiveMax} (the number of options in this section).`;
             if (window.showAlert) window.showAlert(msg, 'warning');
             else (window.__clientWarn || console.warn)(msg);
         }

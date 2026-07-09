@@ -590,6 +590,14 @@ def _update_item_config(form_item, form, request_form):
             allow_other = False
     form_item.config['allow_other'] = allow_other
 
+    # Max additional "Other" entries allowed on top of option-count limit
+    try:
+        max_other_entries = int(request_form.get('max_other_entries', 0))
+        max_other_entries = max(0, max_other_entries)
+    except (ValueError, TypeError):
+        max_other_entries = 0
+    form_item.config['max_other_entries'] = max_other_entries
+
     # Limit repeat entries to option count (single choice in repeat sections with unique options)
     limit_entries_to_option_count = False
     if 'limit_entries_to_option_count' in request_form:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any, Dict, List, Optional
 
 from app.services.monitoring.request_pressure import snapshot_inflight
@@ -11,10 +12,12 @@ _PLATFORM_5XX_CODES = {502, 503, 504}
 
 _CAUSE_LABELS = {
     'stale_workers': 'Gunicorn worker(s) blocked on requests exceeding the timeout window',
+    'stale_other_workers': 'Another Gunicorn worker is blocked on a long-running request (cross-worker via Redis)',
+    'recent_worker_abort': 'A Gunicorn worker was recently killed (SIGABRT) with active requests',
     'db_pool_pressure': 'Database connection pool near or at capacity on this worker',
     'high_in_flight': 'Many concurrent requests in flight on this worker',
     'traffic_spike': 'Elevated request rate on this worker in the last minute',
-    'upstream_gateway_timeout': 'Gateway timeout (likely queue/wait; no stale workers visible on this process)',
+    'upstream_gateway_timeout': 'Gateway timeout — no stale workers visible; likely queue wait or single hung request',
 }
 
 
@@ -25,12 +28,19 @@ def is_platform_5xx(error_code: int) -> bool:
 def _infer_likely_causes(metrics: Dict[str, Any]) -> List[str]:
     causes: List[str] = []
     stale = int(metrics.get('stale_in_flight_count') or 0)
+    other_stale = int(metrics.get('other_workers_stale_count') or 0)
     in_flight = int(metrics.get('in_flight_count') or 0)
     traffic_60s = int(metrics.get('traffic_last_60s') or 0)
     pool = metrics.get('db_pool') or {}
+    recent_aborts = metrics.get('recent_worker_aborts') or []
 
     if stale > 0:
         causes.append('stale_workers')
+    # Cross-worker: another worker is stuck even though this one isn't
+    if other_stale > 0 and 'stale_workers' not in causes:
+        causes.append('stale_other_workers')
+    if recent_aborts:
+        causes.append('recent_worker_abort')
     checked_out = pool.get('checked_out')
     pool_size = pool.get('size')
     overflow = pool.get('overflow') or 0
@@ -52,15 +62,41 @@ def _infer_likely_causes(metrics: Dict[str, Any]) -> List[str]:
     return causes
 
 
-def _format_stale_lines(in_flight: List[Dict[str, Any]], limit: int = 3) -> str:
-    stale_rows = [row for row in in_flight if row.get('stale')]
-    if not stale_rows:
-        return ''
-    parts = []
-    for row in stale_rows[:limit]:
-        parts.append(
-            f"{row.get('method')} {row.get('path')} ({row.get('elapsed_s')}s)"
-        )
+def _format_stale_lines(metrics: Dict[str, Any], limit: int = 5) -> str:
+    """Build a human-readable stale-request summary from the full snapshot metrics dict.
+
+    Includes this worker's stale rows, cross-worker stale rows (if Redis is
+    configured), and the most-recent worker-abort in-flight list.
+    """
+    parts: List[str] = []
+
+    for row in (metrics.get('in_flight_requests') or []):
+        if len(parts) >= limit:
+            break
+        if row.get('stale'):
+            parts.append(
+                f"[pid={row.get('pid')}] {row.get('method')} {row.get('path')} ({row.get('elapsed_s')}s)"
+            )
+
+    for row in (metrics.get('other_workers_in_flight') or []):
+        if len(parts) >= limit:
+            break
+        if row.get('stale'):
+            parts.append(
+                f"[pid={row.get('pid')},other-worker] {row.get('method')} {row.get('path')} ({row.get('elapsed_s')}s)"
+            )
+
+    aborts = metrics.get('recent_worker_aborts') or []
+    if aborts and len(parts) < limit:
+        ab = aborts[0]
+        for row in (ab.get('in_flight') or []):
+            if len(parts) >= limit:
+                break
+            tag = 'ABORTED+STUCK' if row.get('stale') else 'ABORTED'
+            parts.append(
+                f"[pid={ab.get('pid')},{tag}] {row.get('method')} {row.get('path')} ({row.get('elapsed_s')}s)"
+            )
+
     return '; '.join(parts)
 
 
@@ -74,7 +110,7 @@ def build_platform_5xx_diagnostics(
     causes = _infer_likely_causes(metrics)
     cause_text = '; '.join(_CAUSE_LABELS.get(key, key) for key in causes)
 
-    stale_summary = _format_stale_lines(metrics.get('in_flight_requests') or [])
+    stale_summary = _format_stale_lines(metrics)
     pool = metrics.get('db_pool') or {}
     pool_text = ''
     if pool.get('checked_out') is not None and pool.get('size') is not None:
@@ -83,20 +119,50 @@ def build_platform_5xx_diagnostics(
             f" (overflow {pool.get('overflow', 0)})"
         )
 
+    other_workers = metrics.get('other_workers_in_flight') or []
+    other_stale = int(metrics.get('other_workers_stale_count') or 0)
+    recent_aborts = metrics.get('recent_worker_aborts') or []
+
     summary_parts = [
         f"HTTP {error_code} platform error",
         f"likely: {cause_text}",
-        f"worker pid {metrics.get('worker_pid')}: "
+        f"reporter worker pid={metrics.get('worker_pid')}: "
         f"{metrics.get('in_flight_count')} in-flight"
         f" ({metrics.get('stale_in_flight_count')} stale ≥{metrics.get('gunicorn_timeout_s')}s)",
         f"traffic {metrics.get('traffic_last_60s')}/min, {metrics.get('traffic_last_5m')}/5m on this worker",
     ]
+
+    if other_workers:
+        summary_parts.append(
+            f"other workers (via Redis): {len(other_workers)} in-flight, {other_stale} stale"
+        )
+
+    if recent_aborts:
+        ab = recent_aborts[0]
+        age_s = round(time.time() - float(ab.get('aborted_at', 0)))
+        ab_paths = ', '.join(
+            f"{r.get('method')} {r.get('path')}"
+            for r in (ab.get('in_flight') or [])[:3]
+        )
+        summary_parts.append(
+            f"recent worker abort {age_s}s ago: pid={ab.get('pid')}"
+            f" had {ab.get('stale_count')} stuck request(s)"
+            + (f" ({ab_paths})" if ab_paths else '')
+        )
+
     if pool_text:
         summary_parts.append(pool_text)
     if stale_summary:
         summary_parts.append(f"stale/holding: {stale_summary}")
     if failed_url:
         summary_parts.append(f"failed URL: {failed_url}")
+    # Only note missing Redis when we have *no* local evidence — that's exactly
+    # when cross-worker visibility would have helped identify the real cause.
+    if not metrics.get('redis_cross_worker') and 'upstream_gateway_timeout' in causes:
+        summary_parts.append(
+            "note: REDIS_URL not set — other worker state not visible; "
+            "set REDIS_URL for cross-worker diagnostics"
+        )
 
     return {
         'diagnostics_summary': '. '.join(summary_parts),
@@ -139,9 +205,9 @@ def attach_platform_5xx_diagnostics(
     trimmed = dict(merged)
     worker_metrics = dict(trimmed.get('worker_metrics') or {})
     worker_metrics['in_flight_requests'] = (worker_metrics.get('in_flight_requests') or [])[:5]
-    worker_metrics['recent_slow_completions'] = (
-        worker_metrics.get('recent_slow_completions') or []
-    )[:3]
+    worker_metrics['other_workers_in_flight'] = (worker_metrics.get('other_workers_in_flight') or [])[:3]
+    worker_metrics['recent_slow_completions'] = (worker_metrics.get('recent_slow_completions') or [])[:3]
+    worker_metrics['recent_worker_aborts'] = (worker_metrics.get('recent_worker_aborts') or [])[:2]
     trimmed['worker_metrics'] = worker_metrics
     trimmed['diagnostics_truncated'] = True
 

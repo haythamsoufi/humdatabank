@@ -45,6 +45,9 @@ _SLOW_COMPLETION_THRESHOLD_SECONDS = 5.0
 _REDIS_KEY_PREFIX = 'humdb:pressure'
 _REDIS_INFLIGHT_TTL = 120   # auto-expire if a worker dies (> GUNICORN_TIMEOUT)
 _REDIS_SLOW_MAX = 50        # entries kept in the global slow-completions ring
+_REDIS_ABORT_KEY = f'{_REDIS_KEY_PREFIX}:aborted_workers'
+_REDIS_ABORT_MAX = 10       # last N worker aborts stored
+_REDIS_ABORT_TTL = 600      # 10 min — long enough to appear in subsequent 504 events
 
 _redis_client: Any = None   # lazy-initialised; None = unavailable
 _redis_init_lock = threading.Lock()
@@ -117,6 +120,38 @@ def _redis_push_slow_completion(completion: Dict[str, Any]) -> None:
         rc.lpush(key, json.dumps(completion))
         rc.ltrim(key, 0, _REDIS_SLOW_MAX - 1)
         rc.expire(key, 3600)
+
+
+def _redis_get_aborted_workers() -> List[Dict[str, Any]]:
+    """Return recent worker-abort dumps from Redis (last N, newest first)."""
+    rc = _get_redis()
+    if rc is None:
+        return []
+    results: List[Dict[str, Any]] = []
+    with suppress(Exception):
+        for raw in rc.lrange(_REDIS_ABORT_KEY, 0, _REDIS_ABORT_MAX - 1):
+            with suppress(Exception):
+                results.append(json.loads(raw))
+    return results
+
+
+def _redis_push_aborted_worker(pid: int, entries: List[Dict[str, Any]], stale_count: int) -> None:
+    """Push an abort-dump record to the cross-worker abort ring in Redis."""
+    rc = _get_redis()
+    if rc is None:
+        return
+    with suppress(Exception):
+        payload = json.dumps({
+            'pid': pid,
+            'aborted_at': time.time(),
+            'stale_count': stale_count,
+            'in_flight': entries,
+        })
+        rc.lpush(_REDIS_ABORT_KEY, payload)
+        rc.ltrim(_REDIS_ABORT_KEY, 0, _REDIS_ABORT_MAX - 1)
+        rc.expire(_REDIS_ABORT_KEY, _REDIS_ABORT_TTL)
+        # Clean up this worker's in-flight hash so stale entries don't linger
+        rc.delete(f'{_REDIS_KEY_PREFIX}:iflt:{pid}')
 
 
 def _redis_get_cross_worker_inflight(
@@ -324,6 +359,9 @@ def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[st
     cross_worker.sort(key=lambda row: (-int(row['stale']), -row['elapsed_s']))
     cross_worker_stale = sum(1 for r in cross_worker if r.get('stale'))
 
+    # Recent worker aborts from Redis (empty list if Redis is unavailable).
+    recent_aborts = _redis_get_aborted_workers()
+
     pool_stats: Dict[str, Any] = {}
     try:
         from app import db
@@ -348,7 +386,7 @@ def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[st
     scope_note = (
         'Cross-worker snapshot via Redis (other workers included).'
         if redis_active
-        else 'Per-worker snapshot (Gunicorn multi-process); other workers not included.'
+        else 'Per-worker snapshot (Gunicorn multi-process); other workers not included. Set REDIS_URL to enable cross-worker visibility.'
     )
 
     return {
@@ -363,12 +401,73 @@ def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[st
         'other_workers_in_flight': cross_worker[:12],
         'other_workers_stale_count': cross_worker_stale,
         'recent_slow_completions': recent_slow[-8:],
+        'recent_worker_aborts': recent_aborts[:5],
         'traffic_last_60s': last_60s,
         'traffic_last_5m': last_5m,
         'db_pool': pool_stats,
         'redis_cross_worker': redis_active,
         'scope_note': scope_note,
     }
+
+
+def dump_inflight_on_abort(pid: int, log_fn=None) -> None:
+    """Called from the Gunicorn worker_abort hook — no Flask app context available.
+
+    Logs every in-flight request tracked on this worker to stderr (or the
+    supplied log_fn), then pushes the dump to the Redis abort ring so subsequent
+    platform-504 security events can surface what was running when this worker
+    was killed.  Safe to call when Redis is unavailable: all Redis operations
+    are fire-and-forget with full exception suppression.
+    """
+    import sys
+
+    if log_fn is None:
+        def log_fn(msg: str) -> None:
+            print(msg, file=sys.stderr, flush=True)
+
+    now = time.time()
+    stale_threshold = _gunicorn_timeout_seconds()
+
+    # Use a non-blocking lock acquire so we never deadlock if SIGABRT
+    # interrupted a thread that was already holding _lock.  In CPython the GIL
+    # makes a bare dict read safe enough for this diagnostic purpose.
+    acquired = _lock.acquire(blocking=False)
+    try:
+        entries = list(_inflight.values())
+    finally:
+        if acquired:
+            _lock.release()
+
+    if not entries:
+        log_fn(f'[WORKER_ABORT] pid={pid} no in-flight requests tracked on this worker')
+        return
+
+    serialised: List[Dict[str, Any]] = []
+    stale_count = 0
+    for entry in sorted(entries, key=lambda e: float(e['started_at'])):
+        elapsed = now - float(entry['started_at'])
+        is_stale = elapsed >= stale_threshold
+        if is_stale:
+            stale_count += 1
+        tag = 'STUCK' if is_stale else 'ACTIVE'
+        log_fn(
+            f'[WORKER_ABORT] pid={pid} [{tag}] '
+            f'{entry.get("method")} {entry.get("path")}'
+            + (f'?{entry.get("query")}' if entry.get('query') else '')
+            + f' elapsed={elapsed:.1f}s endpoint={entry.get("endpoint")}'
+        )
+        serialised.append({
+            'method': entry.get('method'),
+            'path': entry.get('path'),
+            'elapsed_s': round(elapsed, 1),
+            'stale': is_stale,
+        })
+
+    log_fn(
+        f'[WORKER_ABORT] pid={pid} summary: '
+        f'{len(entries)} in-flight, {stale_count} stale (>={stale_threshold:.0f}s)'
+    )
+    _redis_push_aborted_worker(pid, serialised, stale_count)
 
 
 def reset_for_tests() -> None:

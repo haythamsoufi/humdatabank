@@ -9,6 +9,7 @@
     {% set current_q_single_display = current_q_single %}
 {% endif %}
 {% set q_single_allow_other = field.config.get('allow_other', false) if field.config else false %}
+{% set q_single_max_other = field.config.get('max_other_entries', 0) | int if field.config else 0 %}
 {% set _ns = namespace(q_single_is_other=false) %}
 {% if q_single_allow_other and current_q_single and not field.lookup_list_id %}
     {% set _ns2 = namespace(found=false) %}
@@ -32,6 +33,7 @@
        {% if _limit_entries %}data-limit-entries-to-option-count="true"{% endif %}
        {% if field.config and field.config.get('use_as_repeat_entry_title') %}data-use-as-repeat-entry-title="true"{% endif %}
        {% if q_single_allow_other %}data-allow-other="true"{% endif %}
+       {% if q_single_allow_other and q_single_max_other > 0 %}data-max-other-entries="{{ q_single_max_other }}"{% endif %}
        {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}' data-plugin-config='{{ ((field.config or {}).get("question_plugin_config") | tojson | e) if field.config else "{}" }}'{% else %}data-options-source="manual"{% endif %}
        class="{{ select_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
     <option value="">{{ _('Select...') }}</option>

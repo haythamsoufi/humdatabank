@@ -280,7 +280,7 @@ def update_access_requests_digest_settings():
     return redirect(url_for("user_management.access_requests"))
 
 @bp.route("/access-requests/<int:request_id>/approve", methods=["POST"])
-@permission_required_any('admin.access_requests.approve', 'admin.users.edit')
+@permission_required('admin.access_requests.approve')
 def approve_access_request(request_id):
     """Approve a country access request and grant the permission."""
     req = CountryAccessRequest.query.get_or_404(request_id)
@@ -333,7 +333,7 @@ def approve_access_request(request_id):
     return redirect(url_for("user_management.access_requests"))
 
 @bp.route("/access-requests/<int:request_id>/reject", methods=["POST"])
-@permission_required_any('admin.access_requests.reject', 'admin.users.edit')
+@permission_required('admin.access_requests.reject')
 def reject_access_request(request_id):
     """Reject a country access request."""
     req = CountryAccessRequest.query.get_or_404(request_id)
@@ -375,7 +375,7 @@ def reject_access_request(request_id):
     return redirect(url_for("user_management.access_requests"))
 
 @bp.route("/access-requests/approve-all", methods=["POST"])
-@permission_required_any('admin.access_requests.approve', 'admin.users.edit')
+@permission_required('admin.access_requests.approve')
 def approve_all_access_requests():
     """Approve all pending country access requests at once."""
     reconcile_fulfilled_pending_country_access_requests()
@@ -433,7 +433,7 @@ def approve_all_access_requests():
 
 
 @bp.route("/access-requests/user/<int:user_id>/approve-all", methods=["POST"])
-@permission_required_any('admin.access_requests.approve', 'admin.users.edit')
+@permission_required('admin.access_requests.approve')
 def approve_user_access_requests(user_id):
     """Approve all pending country access requests for one user."""
     user = User.query.get_or_404(user_id)
@@ -491,7 +491,7 @@ def approve_user_access_requests(user_id):
 
 
 @bp.route("/access-requests/user/<int:user_id>/reject-all", methods=["POST"])
-@permission_required_any('admin.access_requests.reject', 'admin.users.edit')
+@permission_required('admin.access_requests.reject')
 def reject_user_access_requests(user_id):
     """Reject all pending country access requests for one user."""
     user = User.query.get_or_404(user_id)
@@ -572,6 +572,10 @@ def new_user():
     azure_sso_enabled = _is_azure_sso_enabled()
     current_is_sys_mgr = AuthorizationService.is_system_manager(current_user)
     can_assign_rbac_roles = AuthorizationService.has_rbac_permission(current_user, "admin.users.roles.assign")
+    can_manage_entity_grants_create = (
+        current_is_sys_mgr
+        or AuthorizationService.has_rbac_permission(current_user, 'admin.users.grants.manage')
+    )
 
     # Only a system manager can assign the System Manager RBAC role
     sys_role = RbacRole.query.filter_by(code="system_manager").first()
@@ -647,11 +651,20 @@ def new_user():
                 if (not azure_sso_enabled) and (not password):
                     flash("Password is required to create a new user.", "danger")
                 else:
+                    # Validate password strength before creating the user (local auth only).
+                    if (not azure_sso_enabled) and password:
+                        from app.utils.password_validator import validate_password_strength
+                        pw_valid, pw_errors = validate_password_strength(password)
+                        if not pw_valid:
+                            for err in pw_errors:
+                                form.password.errors.append(err)
+                            flash("Password does not meet strength requirements: " + " ".join(pw_errors), "warning")
+                            return redirect(url_for("user_management.new_user"))
+
                     # Create new user
                     new_user = User(email=email, name=name, title=title)
                     pc = (form.profile_color.data or "").strip() if getattr(form, "profile_color", None) else ""
                     new_user.profile_color = pc if pc else "#3B82F6"
-                    # Hash the password before saving (local auth only)
                     if (not azure_sso_enabled) and password:
                         new_user.set_password(password)
 
@@ -659,18 +672,17 @@ def new_user():
                     db.session.add(new_user)
                     db.session.flush()  # Flush to get the user ID
 
-                    # Assign countries to the new user (legacy)
-                    if 'countries' in enabled_entity_groups and assigned_country_ids:
+                    # Assign countries to the new user (requires grants permission).
+                    if 'countries' in enabled_entity_groups and assigned_country_ids and can_manage_entity_grants_create:
                         selected_countries = Country.query.filter(Country.id.in_(assigned_country_ids)).all()
-
-                        # Also create entity permissions for these countries
                         for country in selected_countries:
-                            perm = UserEntityPermission(
+                            db.session.add(UserEntityPermission(
                                 user_id=new_user.id,
                                 entity_type=EntityType.country.value,
                                 entity_id=country.id
-                            )
-                            db.session.add(perm)
+                            ))
+                    elif not can_manage_entity_grants_create:
+                        assigned_country_ids = []
 
                     reconcile_fulfilled_pending_country_access_requests(
                         user_id=new_user.id,
@@ -699,33 +711,28 @@ def new_user():
                     else:
                         _ensure_user_has_default_rbac_role(new_user, default_role_code="assignment_viewer")
 
-                    # Handle entity permissions from form (NS Structure and Secretariat)
-                    entity_permissions = request.form.getlist('entity_permissions')
-
-                    # Group permissions by entity type
-                    permissions_by_type = {}
-                    for perm_str in entity_permissions:
-                        if ':' in perm_str:
-                            entity_type, entity_id = perm_str.split(':', 1)
-                            try:
-                                entity_id = int(entity_id)
-                                # Skip countries - they're handled separately above
-                                if entity_type != EntityType.country.value and entity_type in allowed_non_country_entity_types:
-                                    if entity_type not in permissions_by_type:
-                                        permissions_by_type[entity_type] = []
-                                    permissions_by_type[entity_type].append(entity_id)
-                            except (ValueError, TypeError):
-                                continue  # Skip invalid entity IDs
-
-                    # Add entity permissions
-                    for entity_type, entity_ids in permissions_by_type.items():
-                        for entity_id in entity_ids:
-                            perm = UserEntityPermission(
-                                user_id=new_user.id,
-                                entity_type=entity_type,
-                                entity_id=entity_id
-                            )
-                            db.session.add(perm)
+                    # Handle entity permissions from form (NS Structure and Secretariat).
+                    # Requires admin.users.grants.manage or system manager.
+                    entity_permissions = []
+                    if can_manage_entity_grants_create:
+                        entity_permissions = request.form.getlist('entity_permissions')
+                        permissions_by_type = {}
+                        for perm_str in entity_permissions:
+                            if ':' in perm_str:
+                                entity_type, entity_id = perm_str.split(':', 1)
+                                try:
+                                    entity_id = int(entity_id)
+                                    if entity_type != EntityType.country.value and entity_type in allowed_non_country_entity_types:
+                                        permissions_by_type.setdefault(entity_type, []).append(entity_id)
+                                except (ValueError, TypeError):
+                                    continue
+                        for entity_type, entity_ids in permissions_by_type.items():
+                            for entity_id in entity_ids:
+                                db.session.add(UserEntityPermission(
+                                    user_id=new_user.id,
+                                    entity_type=entity_type,
+                                    entity_id=entity_id
+                                ))
                     db.session.flush()
 
                     # Log admin action for user creation
@@ -803,6 +810,14 @@ def edit_user(user_id):
     roles_read_only = bool(editing_self and not current_is_sys_mgr)
     if roles_read_only:
         can_assign_rbac_roles = False
+
+    # Entity grants (countries, NS structure, secretariat) require a dedicated permission.
+    # System managers are always allowed; actors editing themselves are blocked unless SM.
+    can_manage_entity_grants = (
+        current_is_sys_mgr
+        or AuthorizationService.has_rbac_permission(current_user, 'admin.users.grants.manage')
+    )
+    entity_grants_locked = not can_manage_entity_grants or (editing_self and not current_is_sys_mgr)
 
     # Only a system manager can assign the System Manager RBAC role
     if sys_role and not current_is_sys_mgr:
@@ -953,38 +968,45 @@ def edit_user(user_id):
 
             # Update password if provided (local auth only)
             if (not azure_sso_enabled) and form.password.data:
+                from app.utils.password_validator import validate_password_strength
+                pw_valid, pw_errors = validate_password_strength(form.password.data)
+                if not pw_valid:
+                    request_transaction_rollback()
+                    for err in pw_errors:
+                        form.password.errors.append(err)
+                    flash("Password does not meet strength requirements: " + " ".join(pw_errors), "warning")
+                    return redirect(url_for("user_management.edit_user", user_id=user.id))
                 user.set_password(form.password.data)
 
-            # Update country assignments (legacy)
+            # Update country assignments — requires entity grants permission.
             if 'countries' in enabled_entity_groups:
-                selected_country_ids = form.countries.data
-                if selected_country_ids:
-                    selected_countries = Country.query.filter(Country.id.in_(selected_country_ids)).all()
-
-                    # Sync entity permissions for countries
-                    # Remove old country permissions
-                    UserEntityPermission.query.filter_by(
-                        user_id=user.id,
-                        entity_type=EntityType.country.value
-                    ).delete()
-
-                    # Add new country permissions
-                    for country in selected_countries:
-                        perm = UserEntityPermission(
+                if not entity_grants_locked:
+                    selected_country_ids = form.countries.data or []
+                    if selected_country_ids:
+                        selected_countries = Country.query.filter(Country.id.in_(selected_country_ids)).all()
+                        UserEntityPermission.query.filter_by(
                             user_id=user.id,
-                            entity_type=EntityType.country.value,
-                            entity_id=country.id
-                        )
-                        db.session.add(perm)
+                            entity_type=EntityType.country.value
+                        ).delete()
+                        for country in selected_countries:
+                            perm = UserEntityPermission(
+                                user_id=user.id,
+                                entity_type=EntityType.country.value,
+                                entity_id=country.id
+                            )
+                            db.session.add(perm)
+                    else:
+                        selected_country_ids = []
+                        UserEntityPermission.query.filter_by(
+                            user_id=user.id,
+                            entity_type=EntityType.country.value
+                        ).delete()
                 else:
-                    selected_country_ids = []
-                    # Remove all country permissions
-                    UserEntityPermission.query.filter_by(
-                        user_id=user.id,
-                        entity_type=EntityType.country.value
-                    ).delete()
+                    # Preserve existing country assignments when the actor lacks grants permission
+                    # or is editing themselves.
+                    selected_country_ids = [c.id for c in user.countries.all()] if hasattr(user, "countries") else []
             else:
-                # Preserve existing assignments when countries are disabled
+                # Countries feature is disabled — preserve existing assignments.
                 selected_country_ids = [c.id for c in user.countries.all()] if hasattr(user, "countries") else []
 
             if 'countries' in enabled_entity_groups:
@@ -1036,44 +1058,38 @@ def edit_user(user_id):
             preferences.notification_types_enabled = [] if all_email_selected else email_types
             preferences.push_notification_types_enabled = [] if all_push_selected else push_types
 
-            # Handle entity permissions from form (NS Structure and Secretariat)
-            # Always remove all non-country entity permissions first, then add back what's in the form
-            entity_permissions = request.form.getlist('entity_permissions')
+            # Handle entity permissions from form (NS Structure and Secretariat).
+            # Requires admin.users.grants.manage or system manager; self-editing is blocked.
+            entity_permissions: list = []
+            if not entity_grants_locked:
+                entity_permissions = request.form.getlist('entity_permissions')
+                all_entity_types = allowed_non_country_entity_types
 
-            # Define all possible entity types (excluding countries which are handled separately)
-            all_entity_types = allowed_non_country_entity_types
-
-            # Remove all old entity permissions (excluding countries)
-            for entity_type in all_entity_types:
-                UserEntityPermission.query.filter_by(
-                    user_id=user.id,
-                    entity_type=entity_type
-                ).delete()
-
-            # Parse and add new entity permissions from form
-            permissions_by_type = {}
-            for perm_str in entity_permissions:
-                if ':' in perm_str:
-                    entity_type, entity_id = perm_str.split(':', 1)
-                    try:
-                        entity_id = int(entity_id)
-                        # Skip countries - they're handled separately above
-                        if entity_type != EntityType.country.value and entity_type in all_entity_types:
-                            if entity_type not in permissions_by_type:
-                                permissions_by_type[entity_type] = []
-                            permissions_by_type[entity_type].append(entity_id)
-                    except (ValueError, TypeError):
-                        continue  # Skip invalid entity IDs
-
-            # Add new entity permissions
-            for entity_type, entity_ids in permissions_by_type.items():
-                for entity_id in entity_ids:
-                    perm = UserEntityPermission(
+                # Replace all non-country entity permissions for this user.
+                for entity_type in all_entity_types:
+                    UserEntityPermission.query.filter_by(
                         user_id=user.id,
-                        entity_type=entity_type,
-                        entity_id=entity_id
-                    )
-                    db.session.add(perm)
+                        entity_type=entity_type
+                    ).delete()
+
+                permissions_by_type = {}
+                for perm_str in entity_permissions:
+                    if ':' in perm_str:
+                        entity_type, entity_id = perm_str.split(':', 1)
+                        try:
+                            entity_id = int(entity_id)
+                            if entity_type != EntityType.country.value and entity_type in all_entity_types:
+                                permissions_by_type.setdefault(entity_type, []).append(entity_id)
+                        except (ValueError, TypeError):
+                            continue
+
+                for entity_type, entity_ids in permissions_by_type.items():
+                    for entity_id in entity_ids:
+                        db.session.add(UserEntityPermission(
+                            user_id=user.id,
+                            entity_type=entity_type,
+                            entity_id=entity_id
+                        ))
 
             # Prepare new values for audit logging
             try:

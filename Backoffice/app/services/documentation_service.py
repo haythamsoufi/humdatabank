@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import os
 import re
+import threading
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
@@ -1176,6 +1178,44 @@ def _deduplicate_html_ids(html: str) -> str:
     return str(soup)
 
 
+# Process-level render cache keyed by (absolute_path_str, mtime).
+# Docs are static files that only change on deploy, so mtime as a cache key is
+# sufficient: the same (path, mtime) tuple always produces the same HTML, and
+# the cache entry is automatically bypassed after a deploy changes the mtime.
+# Max 200 entries (bounded to prevent unbounded growth in long-running workers).
+_render_cache: OrderedDict = OrderedDict()
+_render_cache_lock = threading.Lock()
+_RENDER_CACHE_MAX = 200
+
+
+def _render_cache_get(file_path: Path) -> Optional[Markup]:
+    try:
+        mtime = file_path.stat().st_mtime
+    except OSError:
+        return None
+    key = (str(file_path), mtime)
+    with _render_cache_lock:
+        entry = _render_cache.get(key)
+        if entry is not None:
+            _render_cache.move_to_end(key)
+        return entry
+
+
+def _render_cache_set(file_path: Path, markup: Markup) -> None:
+    try:
+        mtime = file_path.stat().st_mtime
+    except OSError:
+        return
+    key = (str(file_path), mtime)
+    with _render_cache_lock:
+        if key in _render_cache:
+            _render_cache.move_to_end(key)
+        else:
+            if len(_render_cache) >= _RENDER_CACHE_MAX:
+                _render_cache.popitem(last=False)
+        _render_cache[key] = markup
+
+
 def render_markdown_file(
     *,
     root: Path,
@@ -1184,7 +1224,16 @@ def render_markdown_file(
     doc_url_builder: Callable[[str], str],
     asset_url_builder: Callable[[str], str],
 ) -> Markup:
-    """Render markdown file to HTML with proper extensions, sanitization, and link rewriting."""
+    """Render markdown file to HTML with proper extensions, sanitization, and link rewriting.
+
+    Results are cached per (file_path, mtime) in a process-level LRU store so that
+    repeated requests for the same unmodified file skip the markdown parse + BeautifulSoup
+    pipeline entirely.
+    """
+    cached = _render_cache_get(file_path)
+    if cached is not None:
+        return cached
+
     try:
         text = file_path.read_text(encoding="utf-8", errors="replace")
     except Exception as e:
@@ -1241,7 +1290,9 @@ def render_markdown_file(
             if base_text:
                 html = _mirror_english_heading_fragment_ids(html, base_text)
 
-    return Markup(html)
+    result = Markup(html)
+    _render_cache_set(file_path, result)
+    return result
 
 
 def extract_page_title(file_path: Path) -> str:

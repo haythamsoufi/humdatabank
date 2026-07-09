@@ -1343,7 +1343,20 @@ class FormDataService:
 
         elif question.type == 'multiple_choice':
             selected_options = request.form.getlist(field_name)
+            # Replace the __other__ sentinel with the user-typed free text
+            if '__other__' in selected_options:
+                other_text = (request.form.get(f'field_other_text[{question.id}]') or '').strip()
+                selected_options = [v for v in selected_options if v != '__other__']
+                if other_text:
+                    selected_options.append(other_text)
             return json.dumps(selected_options) if selected_options else None
+
+        elif question.type == 'single_choice':
+            single_val = str(raw_value).strip() if raw_value and isinstance(raw_value, str) else None
+            # Replace the __other__ sentinel with the user-typed free text
+            if single_val == '__other__':
+                single_val = (request.form.get(f'field_other_text[{question.id}]') or '').strip() or None
+            return single_val
 
         elif question.type == 'CHECKBOX':
             return 'true' if raw_value else 'false'

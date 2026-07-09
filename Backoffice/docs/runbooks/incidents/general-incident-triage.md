@@ -128,6 +128,8 @@ This prevents all gunicorn workers from starting APScheduler, eliminating schedu
 
 #### F6. Verify the health endpoint is configured as the App Service health probe
 
+See also the dedicated report [Gateway 504 / worker saturation](gateway-504-worker-saturation.md) for recurring presence/notification 504 patterns, evidence from production, and a layered mitigation plan.
+
 In Azure Portal → App Service → Monitoring → **Health check**: set path to `/health`. Azure will automatically restart unhealthy instances and stop routing to them — dramatically reducing how long a 502 window lasts.
 
 ---

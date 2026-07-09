@@ -180,9 +180,9 @@ def check_document_access(f):
                 if blocked is not None:
                     return blocked
 
-                # Get country_id from entity_id when entity_type is 'country'
-                country_id = aes.entity_id if aes.entity_type == 'country' else None
-                if not country_id or not has_country_access(current_user, country_id):
+                # Check assignment access for all entity types (not just countries).
+                from app.services.authorization_service import AuthorizationService
+                if not AuthorizationService.can_access_assignment(aes, current_user):
                     flash("You are not authorized to access this document.", "warning")
                     return redirect(url_for("main.dashboard"))
 

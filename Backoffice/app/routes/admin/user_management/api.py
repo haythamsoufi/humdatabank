@@ -28,6 +28,7 @@ from .helpers import (
     build_admin_user_list_rows,
     _set_user_rbac_roles,
     _filter_requested_admin_roles_for_actor,
+    _apply_role_type_and_implications,
     _country_access_request_to_dict,
     _get_user_deletion_preview,
 )
@@ -135,7 +136,7 @@ def api_user_update(user_id):
             sorted(data.keys()),
         )
 
-        allowed = {"name", "title", "active", "chatbot_enabled", "profile_color", "rbac_role_ids"}
+        allowed = {"name", "title", "active", "chatbot_enabled", "profile_color", "rbac_role_ids", "role_type"}
         if not allowed.intersection(data.keys()):
             return _bad("No updatable fields in request")
 
@@ -272,6 +273,16 @@ def api_user_update(user_id):
 
             if not current_is_sys_mgr:
                 requested_role_ids, _dropped = _filter_requested_admin_roles_for_actor(requested_role_ids, current_user)
+
+            # Mirror the HTML form's role-type/implication enforcement so that focal_point
+            # vs admin mutual exclusion and assignment-role defaults are always applied,
+            # regardless of whether the request comes from the browser or a mobile client.
+            role_type = data.get("role_type") if isinstance(data.get("role_type"), str) else None
+            requested_role_ids = _apply_role_type_and_implications(
+                requested_role_ids,
+                role_type=role_type,
+                drop_role_codes={"assignment_documents_uploader"},
+            )
 
             if not requested_role_ids:
                 return _bad("rbac_role_ids must include at least one role")
@@ -515,7 +526,7 @@ def api_access_requests_list():
 
 
 @bp.route("/api/users/access-requests/<int:request_id>/approve", methods=["POST"])
-@permission_required_any('admin.access_requests.approve', 'admin.users.edit')
+@permission_required('admin.access_requests.approve')
 def api_approve_access_request(request_id):
     """Approve a country access request (JSON; same behaviour as the HTML POST)."""
     req = CountryAccessRequest.query.get_or_404(request_id)
@@ -565,7 +576,7 @@ def api_approve_access_request(request_id):
 
 
 @bp.route("/api/users/access-requests/<int:request_id>/reject", methods=["POST"])
-@permission_required_any('admin.access_requests.reject', 'admin.users.edit')
+@permission_required('admin.access_requests.reject')
 def api_reject_access_request(request_id):
     """Reject a country access request (JSON)."""
     req = CountryAccessRequest.query.get_or_404(request_id)
@@ -611,7 +622,7 @@ def api_reject_access_request(request_id):
 
 
 @bp.route("/api/users/access-requests/approve-all", methods=["POST"])
-@permission_required_any('admin.access_requests.approve', 'admin.users.edit')
+@permission_required('admin.access_requests.approve')
 def api_approve_all_access_requests():
     """Approve all pending country access requests (JSON)."""
     from app.services.country_access_request_service import (

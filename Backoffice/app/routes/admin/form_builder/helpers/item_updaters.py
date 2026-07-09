@@ -578,6 +578,18 @@ def _update_item_config(form_item, form, request_form):
             use_as_repeat_entry_title = False
     form_item.config['use_as_repeat_entry_title'] = use_as_repeat_entry_title
 
+    # Allow "Other" free-text entry for choice questions
+    allow_other = False
+    if 'allow_other' in request_form:
+        allow_other = request_form.get('allow_other') in ['true', 'on', '1']
+    elif request_form.get('config'):
+        try:
+            config_json = json.loads(request_form.get('config'))
+            allow_other = bool(config_json.get('allow_other', False))
+        except (json.JSONDecodeError, TypeError):
+            allow_other = False
+    form_item.config['allow_other'] = allow_other
+
     # Limit repeat entries to option count (single choice in repeat sections with unique options)
     limit_entries_to_option_count = False
     if 'limit_entries_to_option_count' in request_form:

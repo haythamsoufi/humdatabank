@@ -8,6 +8,8 @@ from flask import g
 
 from app.services.monitoring import slow_requests
 
+_GUNICORN_TIMEOUT = 25  # matches gunicorn.conf.py default
+
 
 @pytest.fixture(autouse=True)
 def enable_slow_request_logging(app):
@@ -18,6 +20,31 @@ def enable_slow_request_logging(app):
     slow_requests.configure(app)
     yield
     slow_requests.configure(app)
+
+
+class TestSlowRequestConfigDefaults:
+    """Verify that production config defaults fire before GUNICORN_TIMEOUT kills the worker."""
+
+    def test_stuck_timers_default_before_gunicorn_timeout(self, app):
+        """SLOW_REQUEST_STUCK_WARNING/CRITICAL must both be < GUNICORN_TIMEOUT so
+        [STUCK_REQUEST] lines appear in the log before Gunicorn SIGKILLs the worker."""
+        from config.config import Config
+
+        warning_s = Config.SLOW_REQUEST_STUCK_WARNING_SECONDS
+        critical_s = Config.SLOW_REQUEST_STUCK_CRITICAL_SECONDS
+
+        assert warning_s < _GUNICORN_TIMEOUT, (
+            f"SLOW_REQUEST_STUCK_WARNING_SECONDS ({warning_s}) must be < "
+            f"GUNICORN_TIMEOUT ({_GUNICORN_TIMEOUT}); "
+            "otherwise [STUCK_REQUEST] never fires before the worker is killed"
+        )
+        assert critical_s < _GUNICORN_TIMEOUT, (
+            f"SLOW_REQUEST_STUCK_CRITICAL_SECONDS ({critical_s}) must be < "
+            f"GUNICORN_TIMEOUT ({_GUNICORN_TIMEOUT})"
+        )
+        assert warning_s < critical_s, (
+            f"Warning ({warning_s}s) must fire before critical ({critical_s}s)"
+        )
 
 
 class TestShouldTrack:

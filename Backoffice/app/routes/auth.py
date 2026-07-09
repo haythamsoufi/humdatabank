@@ -24,7 +24,7 @@ from app.services.user_analytics_service import (
     create_security_event, get_client_ip, get_client_info, add_session_to_blacklist,
 )
 from app.utils.redirect_utils import safe_redirect, is_safe_redirect_url
-from app.utils.rate_limiting import auth_rate_limit, password_reset_rate_limit
+from app.utils.rate_limiting import auth_rate_limit, password_reset_rate_limit, rate_limit
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error, json_forbidden
 from app.utils.password_validator import validate_password_strength
 from app.models import PasswordResetToken
@@ -1099,6 +1099,7 @@ def register():
     return render_template('auth/login.html', form=LoginForm(), register_form=form, forgot_form=ForgotPasswordForm(), open_modal='register', title='Login', flask_config=flask_config, test_passwords=_get_test_passwords())
 
 @bp.route('/register/check-email', methods=['GET'])
+@rate_limit(requests_per_minute=10, key_func=lambda: f"check_email_{get_client_ip()}")
 def check_register_email():
     """
     Lightweight endpoint used by the registration modal to check if an email

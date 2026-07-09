@@ -258,6 +258,16 @@
                             <div id="question-plugin-config-container" class="mt-2"></div>
                             <input type="hidden" name="question_plugin_config" id="question-plugin-config-json" value="{}">
                         </div>
+
+                        {# Allow "Other" option — shown for both manual and calculated choice types #}
+                        <div id="item-question-allow-other-wrapper" class="hidden mt-1 pt-3 border-t border-gray-100">
+                            <label class="inline-flex items-start gap-2 cursor-pointer">
+                                <input type="checkbox" id="item-question-allow-other" name="allow_other"
+                                       class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500 mt-0.5 shrink-0">
+                                <span class="text-sm text-gray-700 font-medium">{{ _('Allow "Other" option') }}</span>
+                            </label>
+                            <p class="mt-1 ml-6 text-xs text-gray-500">{{ _('Adds an "Other (please specify)" entry to the list. Users can type a custom value that is stored as their answer.') }}</p>
+                        </div>
                     </div>
 
                     {# Document Field Fields (Initially Hidden) #}

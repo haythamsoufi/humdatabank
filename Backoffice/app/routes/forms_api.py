@@ -1071,7 +1071,10 @@ def api_presence_sync(aes_id):
 def api_presence_leave(aes_id):
     """Remove the current user's presence immediately (tab close / navigation)."""
     try:
-        remove_presence(aes_id=aes_id, user_id=current_user.id)
+        # Silently ignore requests for assignments the user can't access; the
+        # presence record for this user+aes pair simply won't exist in that case.
+        if check_aes_access_light(aes_id):
+            remove_presence(aes_id=aes_id, user_id=current_user.id)
     except Exception as e:
         current_app.logger.debug("presence leave failed for aes=%s user=%s: %s", aes_id, current_user.id, e)
     return json_ok()

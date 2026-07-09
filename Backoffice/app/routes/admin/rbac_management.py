@@ -320,7 +320,7 @@ def list_permissions():
 # ============================================================================
 
 @bp.route("/grants", methods=["GET"])
-@admin_required
+@admin_permission_required('admin.users.grants.manage')
 @system_manager_required
 def manage_grants():
     """List all access grants"""
@@ -357,7 +357,7 @@ def manage_grants():
 
 
 @bp.route("/grants/new", methods=["GET", "POST"])
-@admin_required
+@admin_permission_required('admin.users.grants.manage')
 @system_manager_required
 def new_grant():
     """Create a new access grant"""
@@ -507,7 +507,7 @@ def new_grant():
 
 
 @bp.route("/grants/<int:grant_id>/delete", methods=["POST"])
-@admin_required
+@admin_permission_required('admin.users.grants.manage')
 @system_manager_required
 def delete_grant(grant_id):
     """Delete an access grant"""

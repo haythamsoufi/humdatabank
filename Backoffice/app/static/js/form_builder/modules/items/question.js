@@ -59,6 +59,8 @@ export const QuestionItem = {
         if (definitionTranslationsInput) formData.append(`${formPrefix}definition_translations`, definitionTranslationsInput.value);
         const optionsTranslationsInput = Utils.getElementById('item-question-options-translations-json');
         if (optionsTranslationsInput) formData.append(`${formPrefix}options_translations_json`, optionsTranslationsInput.value);
+        const allowOtherCheckbox = Utils.getElementById('item-question-allow-other');
+        if (allowOtherCheckbox) formData.append(`${formPrefix}allow_other`, allowOtherCheckbox.checked ? 'on' : '');
     },
 
     teardown(modalElement) {
@@ -105,6 +107,11 @@ export const QuestionItem = {
         if (listContainer) Utils.hideElement(listContainer);
         if (displayColumnWrapper) Utils.hideElement(displayColumnWrapper);
 
+        const allowOtherWrapper = modalElement.querySelector('#item-question-allow-other-wrapper');
+        if (allowOtherWrapper) Utils.hideElement(allowOtherWrapper);
+        const allowOtherCheckbox = modalElement.querySelector('#item-question-allow-other');
+        if (allowOtherCheckbox) allowOtherCheckbox.checked = false;
+
         modalElement.querySelectorAll('input[name="options_source"]').forEach((radio) => {
             radio.checked = radio.value === 'manual';
         });
@@ -150,6 +157,12 @@ export const QuestionItem = {
                     window.ItemModal.currentQuestionType = e.target.value || null;
                     window.ItemModal.ensureUseAsRepeatEntryTitleField('question');
                 }
+                const allowOtherWrapper = modalElement.querySelector('#item-question-allow-other-wrapper');
+                if (allowOtherWrapper) {
+                    const isChoice = ['single_choice', 'multiple_choice'].includes(e.target.value);
+                    if (isChoice) Utils.showElement(allowOtherWrapper);
+                    else Utils.hideElement(allowOtherWrapper);
+                }
             }
 
             if (e.target.name === 'options_source') {
@@ -182,11 +195,13 @@ export const QuestionItem = {
         const currentType = typeSelect ? typeSelect.value : '';
         const manualContainer = modalElement.querySelector('#item-question-options-container');
         const listContainer = modalElement.querySelector('#item-question-calculated-list-container');
+        const allowOtherWrapper = modalElement.querySelector('#item-question-allow-other-wrapper');
         const defaultSource = modalElement.querySelector('input[name="options_source"]:checked')?.value || 'manual';
         const isChoiceType = ['single_choice', 'multiple_choice'].includes(currentType);
         if (!isChoiceType) {
             Utils.hideElement(manualContainer);
             Utils.hideElement(listContainer);
+            if (allowOtherWrapper) Utils.hideElement(allowOtherWrapper);
         } else {
             if (defaultSource === 'manual') {
                 Utils.showElement(manualContainer);
@@ -196,6 +211,7 @@ export const QuestionItem = {
                 Utils.hideElement(manualContainer);
                 Utils.showElement(listContainer);
             }
+            if (allowOtherWrapper) Utils.showElement(allowOtherWrapper);
         }
     },
 
@@ -337,6 +353,11 @@ export const QuestionItem = {
                     window.updateOptionsVisibility();
                 }
             }
+        }
+
+        const allowOtherCheckboxEl = modalElement.querySelector('#item-question-allow-other');
+        if (allowOtherCheckboxEl) {
+            allowOtherCheckboxEl.checked = !!(itemData.config && itemData.config.allow_other);
         }
 
         const optionsSource = itemData.options_source;

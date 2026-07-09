@@ -2,10 +2,23 @@
 
 Tracks in-flight HTTP work and recent traffic on each Gunicorn worker. Snapshots
 are attached to platform-error security events to explain worker saturation.
+
+Cross-worker visibility (optional)
+-----------------------------------
+When ``REDIS_URL`` is set the module also mirrors in-flight registrations to a
+Redis hash keyed by worker PID (``humdb:pressure:iflt:<pid>``).  ``snapshot_inflight``
+then reads *other* workers' hashes to expose the full-cluster picture in platform
+502/503/504 security events.  This fixes the "0 stale in-flight on the reporting
+worker" blind spot: the stuck request may be on a different worker that this one
+has no direct visibility into.
+
+All Redis operations are fire-and-forget with full exception suppression.  If Redis
+is unavailable, behaviour is identical to the original per-worker-only mode.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import threading
 import time
@@ -26,6 +39,117 @@ _recent_slow_completions: Deque[Dict[str, Any]] = deque(maxlen=15)
 
 _TRAFFIC_WINDOW_SECONDS = 300.0
 _SLOW_COMPLETION_THRESHOLD_SECONDS = 5.0
+
+# ── Redis cross-worker ring buffer ─────────────────────────────────────────────
+
+_REDIS_KEY_PREFIX = 'humdb:pressure'
+_REDIS_INFLIGHT_TTL = 120   # auto-expire if a worker dies (> GUNICORN_TIMEOUT)
+_REDIS_SLOW_MAX = 50        # entries kept in the global slow-completions ring
+
+_redis_client: Any = None   # lazy-initialised; None = unavailable
+_redis_init_lock = threading.Lock()
+_redis_available: Optional[bool] = None  # None = not yet tried
+
+
+def _get_redis() -> Any:
+    """Return a shared Redis client, or None if Redis is unconfigured/unavailable."""
+    global _redis_client, _redis_available
+    if _redis_available is False:
+        return None
+    if _redis_client is not None:
+        return _redis_client
+    with _redis_init_lock:
+        if _redis_client is not None:
+            return _redis_client
+        url = os.environ.get('REDIS_URL', '').strip()
+        if not url:
+            _redis_available = False
+            return None
+        try:
+            import redis as _redis_lib
+            client = _redis_lib.from_url(
+                url,
+                decode_responses=True,
+                socket_connect_timeout=1,
+                socket_timeout=0.5,
+                health_check_interval=30,
+            )
+            client.ping()
+            _redis_client = client
+            _redis_available = True
+        except Exception:
+            _redis_available = False
+            _redis_client = None
+    return _redis_client
+
+
+def _redis_push_inflight(pid: int, request_id: int, entry: Dict[str, Any]) -> None:
+    rc = _get_redis()
+    if rc is None:
+        return
+    with suppress(Exception):
+        key = f'{_REDIS_KEY_PREFIX}:iflt:{pid}'
+        payload = json.dumps({
+            'method': entry.get('method'),
+            'path': entry.get('path'),
+            'endpoint': entry.get('endpoint'),
+            'started_at': entry.get('started_at'),
+            'pid': pid,
+        })
+        rc.hset(key, request_id, payload)
+        rc.expire(key, _REDIS_INFLIGHT_TTL)
+
+
+def _redis_remove_inflight(pid: int, request_id: int) -> None:
+    rc = _get_redis()
+    if rc is None:
+        return
+    with suppress(Exception):
+        rc.hdel(f'{_REDIS_KEY_PREFIX}:iflt:{pid}', request_id)
+
+
+def _redis_push_slow_completion(completion: Dict[str, Any]) -> None:
+    rc = _get_redis()
+    if rc is None:
+        return
+    with suppress(Exception):
+        key = f'{_REDIS_KEY_PREFIX}:slow'
+        rc.lpush(key, json.dumps(completion))
+        rc.ltrim(key, 0, _REDIS_SLOW_MAX - 1)
+        rc.expire(key, 3600)
+
+
+def _redis_get_cross_worker_inflight(
+    current_pid: int, stale_threshold: float
+) -> List[Dict[str, Any]]:
+    """Read in-flight entries from all OTHER worker PIDs stored in Redis."""
+    rc = _get_redis()
+    if rc is None:
+        return []
+    results: List[Dict[str, Any]] = []
+    now = time.time()
+    pattern = f'{_REDIS_KEY_PREFIX}:iflt:*'
+    with suppress(Exception):
+        for key in rc.scan_iter(pattern, count=20):
+            with suppress(Exception):
+                pid_str = key.rsplit(':', 1)[-1]
+                pid = int(pid_str)
+                if pid == current_pid:
+                    continue
+                entries = rc.hgetall(key)
+                for _, raw in entries.items():
+                    with suppress(Exception):
+                        entry = json.loads(raw)
+                        elapsed = now - float(entry.get('started_at', now))
+                        results.append({
+                            'method': entry.get('method'),
+                            'path': entry.get('path'),
+                            'endpoint': entry.get('endpoint'),
+                            'elapsed_s': round(elapsed, 1),
+                            'stale': elapsed >= stale_threshold,
+                            'pid': pid,
+                        })
+    return results
 
 
 def _should_track_pressure() -> bool:
@@ -88,9 +212,10 @@ def register_inflight(
 ) -> int:
     """Register an in-flight request; returns a handle for unregister."""
     request_id = _next_id()
+    pid = os.getpid()
     entry = {
         'id': request_id,
-        'pid': os.getpid(),
+        'pid': pid,
         'method': method,
         'path': path,
         'endpoint': endpoint,
@@ -99,6 +224,7 @@ def register_inflight(
     }
     with _lock:
         _inflight[request_id] = entry
+    _redis_push_inflight(pid, request_id, entry)
     return request_id
 
 
@@ -108,19 +234,24 @@ def unregister_inflight(request_id: Optional[int], *, duration_seconds: float) -
         return
     with _lock:
         entry = _inflight.pop(request_id, None)
-    if entry and duration_seconds >= _SLOW_COMPLETION_THRESHOLD_SECONDS:
-        _remember_slow_completion(entry, duration_seconds)
+    if entry:
+        _redis_remove_inflight(entry.get('pid', os.getpid()), request_id)
+        if duration_seconds >= _SLOW_COMPLETION_THRESHOLD_SECONDS:
+            _remember_slow_completion(entry, duration_seconds)
 
 
 def _remember_slow_completion(entry: Dict[str, Any], duration_seconds: float) -> None:
+    completion = {
+        'method': entry.get('method'),
+        'path': entry.get('path'),
+        'endpoint': entry.get('endpoint'),
+        'duration_s': round(duration_seconds, 2),
+        'completed_at': time.time(),
+        'pid': entry.get('pid', os.getpid()),
+    }
     with _lock:
-        _recent_slow_completions.append({
-            'method': entry.get('method'),
-            'path': entry.get('path'),
-            'endpoint': entry.get('endpoint'),
-            'duration_s': round(duration_seconds, 2),
-            'completed_at': time.time(),
-        })
+        _recent_slow_completions.append(completion)
+    _redis_push_slow_completion(completion)
 
 
 def _traffic_counts(now: float) -> Tuple[int, int]:
@@ -154,7 +285,13 @@ def _gunicorn_threads() -> Optional[int]:
 
 
 def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[str, Any]:
-    """Return current worker pressure snapshot for security-event context."""
+    """Return current worker pressure snapshot for security-event context.
+
+    When Redis is configured, ``other_workers_in_flight`` contains in-flight
+    requests from all other Gunicorn workers so the caller can detect saturation
+    even when the reporting worker is idle.
+    """
+    current_pid = os.getpid()
     now = time.time()
     stale_threshold = stale_after_seconds if stale_after_seconds is not None else _gunicorn_timeout_seconds()
 
@@ -182,6 +319,11 @@ def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[st
     # Stale / longest-running first so truncation keeps the most useful rows.
     inflight_requests.sort(key=lambda row: (-int(row['stale']), -row['elapsed_s']))
 
+    # Cross-worker in-flight data from Redis (empty list if Redis is unavailable).
+    cross_worker = _redis_get_cross_worker_inflight(current_pid, stale_threshold)
+    cross_worker.sort(key=lambda row: (-int(row['stale']), -row['elapsed_s']))
+    cross_worker_stale = sum(1 for r in cross_worker if r.get('stale'))
+
     pool_stats: Dict[str, Any] = {}
     try:
         from app import db
@@ -202,8 +344,15 @@ def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[st
     except Exception:
         pass
 
+    redis_active = _redis_available is True
+    scope_note = (
+        'Cross-worker snapshot via Redis (other workers included).'
+        if redis_active
+        else 'Per-worker snapshot (Gunicorn multi-process); other workers not included.'
+    )
+
     return {
-        'worker_pid': os.getpid(),
+        'worker_pid': current_pid,
         'snapshot_at': now,
         'gunicorn_timeout_s': stale_threshold,
         'gunicorn_threads': _gunicorn_threads(),
@@ -211,11 +360,14 @@ def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[st
         'in_flight_count': len(inflight_requests),
         'stale_in_flight_count': stale_count,
         'in_flight_requests': inflight_requests[:12],
+        'other_workers_in_flight': cross_worker[:12],
+        'other_workers_stale_count': cross_worker_stale,
         'recent_slow_completions': recent_slow[-8:],
         'traffic_last_60s': last_60s,
         'traffic_last_5m': last_5m,
         'db_pool': pool_stats,
-        'scope_note': 'Per-worker snapshot (Gunicorn multi-process); other workers not included.',
+        'redis_cross_worker': redis_active,
+        'scope_note': scope_note,
     }
 
 

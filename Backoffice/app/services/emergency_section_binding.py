@@ -186,9 +186,42 @@ def _fetch_ordered_operations(
 
     Sort: newest start_date first (missing dates last), tie-break appeal code ascending. This makes the
     "fill remaining slots" step reproducible regardless of raw API ordering.
+
+    Worker-saturation guard: if the EmOps file cache is cold this function returns [] immediately
+    and triggers a background refresh instead of blocking the Gunicorn thread on an external HTTP
+    call (which can take up to the plugin's 10 s timeout). The client-side EmOps widget will fetch
+    the live data via its own AJAX call once the form is loaded.
     """
     if not country_iso:
         return []
+
+    # Pre-check: only proceed if the file cache is warm. A cold cache means we would otherwise
+    # block this worker on a requests.get() to the GO API for up to ~10 s.
+    try:
+        from plugins.emergency_operations.data_store import get_data_store, trigger_background_refresh
+        from plugins.emergency_operations.routes import GO_APPEALS_URL, plugin_config as _eo_plugin_config
+        _store = get_data_store()
+        if _store.load_cached() is None:
+            logger.info(
+                "[EmOps] Cache cold during form render (iso=%s); "
+                "triggering background refresh — skipping blocking server-side EO binding.",
+                country_iso,
+            )
+            try:
+                _cfg = _eo_plugin_config.get_all_config()
+                _qd = _cfg.get('query_defaults', {})
+                _fetch_params = {
+                    'end_date__gte': _qd.get('end_date_gt', '2022-12-31'),
+                    'format': 'json',
+                    'limit': str(_qd.get('limit', 1000)),
+                }
+                trigger_background_refresh(GO_APPEALS_URL, _fetch_params)
+            except Exception as _exc:
+                logger.debug("[EmOps] Background refresh trigger failed: %s", _exc)
+            return []
+    except Exception as exc:
+        logger.debug("EmOps cache pre-check unavailable: %s", exc)
+
     try:
         from plugins.emergency_operations.routes import get_emergency_operations_data
     except Exception as exc:

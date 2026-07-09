@@ -709,7 +709,20 @@ class FormItemProcessor:
 
         elif form_item.type == 'multiple_choice':
             selected_options = form_data.getlist(field_name)
+            # Replace the __other__ sentinel with the user-typed free text
+            if '__other__' in selected_options:
+                other_text = (form_data.get(f'field_other_text[{form_item.id}]') or '').strip()
+                selected_options = [v for v in selected_options if v != '__other__']
+                if other_text:
+                    selected_options.append(other_text)
             final_value = json.dumps(selected_options) if selected_options else None
+
+        elif form_item.type == 'single_choice':
+            single_val = str(raw_value).strip() if raw_value and isinstance(raw_value, str) else None
+            # Replace the __other__ sentinel with the user-typed free text
+            if single_val == '__other__':
+                single_val = (form_data.get(f'field_other_text[{form_item.id}]') or '').strip() or None
+            final_value = single_val
 
         elif form_item.type == 'CHECKBOX':
             final_value = 'true' if raw_value else 'false'

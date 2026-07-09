@@ -975,6 +975,17 @@
                                                                 {% else %}
                                                                     {% set current_q_single_display = current_q_single %}
                                                                 {% endif %}
+                                                                {% set q_single_allow_other = field.config.get('allow_other', false) if field.config else false %}
+                                                                {# Detect if saved value is an "Other" (free-text) value not in the defined options list #}
+                                                                {% set _ns = namespace(q_single_is_other=false) %}
+                                                                {% if q_single_allow_other and current_q_single and not field.lookup_list_id %}
+                                                                    {% set _ns2 = namespace(found=false) %}
+                                                                    {% for _opt in field.options %}
+                                                                        {% set _ov = _opt.value if _opt is mapping else _opt %}
+                                                                        {% if _ov == current_q_single %}{% set _ns2.found = true %}{% endif %}
+                                                                    {% endfor %}
+                                                                    {% set _ns.q_single_is_other = not _ns2.found %}
+                                                                {% endif %}
                                                                 {% set select_classes = "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" %}
                                                                 {% if is_prefilled %}
                                                                     {% set select_classes = select_classes ~ " bg-yellow-100 border-yellow-300" %}
@@ -988,13 +999,53 @@
                                                                        {% if _unique_opts %}data-unique-options-in-section="true"{% endif %}
                                                                        {% if _limit_entries %}data-limit-entries-to-option-count="true"{% endif %}
                                                                        {% if field.config and field.config.get('use_as_repeat_entry_title') %}data-use-as-repeat-entry-title="true"{% endif %}
+                                                                       {% if q_single_allow_other %}data-allow-other="true"{% endif %}
                                                                        {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}' data-plugin-config='{{ ((field.config or {}).get("question_plugin_config") | tojson | e) if field.config else "{}" }}'{% else %}data-options-source="manual"{% endif %}
-                                                                       class="{{ select_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}> <option value="">{{ _('Select...') }}</option> {% if not field.lookup_list_id %}{% for option in field.options %} {% set opt_val = option.value if option is mapping else option %} {% set opt_label = option.label if option is mapping else option %} {% if field.display_options and field.display_options[loop.index0] is defined %}{% set display_label = field.display_options[loop.index0] %}{% else %}{% set display_label = opt_label %}{% endif %} <option value="{{ opt_val }}" {% if opt_val == current_q_single %}selected{% endif %}>{{ display_label }}</option> {% endfor %}{% endif %} </select>
+                                                                       class="{{ select_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
+                                                                    <option value="">{{ _('Select...') }}</option>
+                                                                    {% if not field.lookup_list_id %}
+                                                                        {% for option in field.options %}
+                                                                            {% set opt_val = option.value if option is mapping else option %}
+                                                                            {% set opt_label = option.label if option is mapping else option %}
+                                                                            {% if field.display_options and field.display_options[loop.index0] is defined %}{% set display_label = field.display_options[loop.index0] %}{% else %}{% set display_label = opt_label %}{% endif %}
+                                                                            <option value="{{ opt_val }}" {% if opt_val == current_q_single and not _ns.q_single_is_other %}selected{% endif %}>{{ display_label }}</option>
+                                                                        {% endfor %}
+                                                                        {% if q_single_allow_other %}
+                                                                            <option value="__other__" {% if _ns.q_single_is_other %}selected{% endif %}>{{ _('Other (please specify)...') }}</option>
+                                                                        {% endif %}
+                                                                    {% endif %}
+                                                                </select>
+                                                                {% if q_single_allow_other %}
+                                                                    <input type="text"
+                                                                           name="field_other_text[{{ field.id }}]"
+                                                                           id="other-text-{{ field.id }}"
+                                                                           class="other-text-input mt-2 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md{% if not _ns.q_single_is_other %} hidden{% endif %}"
+                                                                           data-for-field="{{ field.id }}"
+                                                                           placeholder="{{ _('Please specify...') }}"
+                                                                           value="{{ current_q_single if _ns.q_single_is_other else '' }}"
+                                                                           autocomplete="off"
+                                                                           {% if not can_edit %}disabled{% endif %}>
+                                                                {% endif %}
                                                             {% elif field.field_type_for_js == 'multiple_choice' %}
                                                                 {% set current_q_multi = existing_q_value if existing_q_value is iterable else [] %}
+                                                                {% set q_multi_allow_other = field.config.get('allow_other', false) if field.config else false %}
+                                                                {# Detect any saved "Other" value (not in the defined options list) #}
+                                                                {% set _ns3 = namespace(other_val='') %}
+                                                                {% if q_multi_allow_other and current_q_multi and not field.lookup_list_id %}
+                                                                    {% for _mv in current_q_multi %}
+                                                                        {% set _ns4 = namespace(mv_found=false) %}
+                                                                        {% for _opt in field.options %}
+                                                                            {% set _ov = _opt.value if _opt is mapping else _opt %}
+                                                                            {% if _ov == _mv %}{% set _ns4.mv_found = true %}{% endif %}
+                                                                        {% endfor %}
+                                                                        {% if not _ns4.mv_found %}{% set _ns3.other_val = _mv %}{% endif %}
+                                                                    {% endfor %}
+                                                                {% endif %}
+                                                                {% set q_multi_has_other = _ns3.other_val != '' %}
                                                                 <div class="relative mt-2" id="field-{{ field.id }}"
                                                                      data-field-item-id="{{ field.id }}"
                                                                      {% if _unique_opts %}data-unique-options-in-section="true"{% endif %}
+                                                                     {% if q_multi_allow_other %}data-allow-other="true"{% endif %}
                                                                      {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}' data-plugin-config='{{ ((field.config or {}).get("question_plugin_config") | tojson | e) if field.config else "{}" }}'{% else %}data-options-source="manual"{% endif %}>
                                                                     <button type="button"
                                                                             class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-left text-sm focus:outline-none focus:ring-2 focus:ring-green-500 hover:bg-gray-50 multi-select-btn"
@@ -1026,9 +1077,32 @@
                                                                                     </label>
                                                                                 </div>
                                                                             {% endfor %}
+                                                                            {% if q_multi_allow_other %}
+                                                                                <div class="option-item border-t border-gray-100 mt-1 pt-1">
+                                                                                    <label class="inline-flex items-center cursor-pointer w-full">
+                                                                                        <input type="checkbox"
+                                                                                               class="other-option-checkbox form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                                                                                               data-field-id="{{ field.id }}"
+                                                                                               {% if q_multi_has_other %}checked{% endif %}
+                                                                                               {% if not can_edit %}disabled{% endif %}>
+                                                                                        <span class="ml-2 text-sm text-gray-500 italic">{{ _('Other (please specify)...') }}</span>
+                                                                                    </label>
+                                                                                </div>
+                                                                            {% endif %}
                                                                         {% endif %}
                                                                     </div>
                                                                 </div>
+                                                                {% if q_multi_allow_other %}
+                                                                    <input type="text"
+                                                                           name="field_other_text[{{ field.id }}]"
+                                                                           id="other-text-{{ field.id }}"
+                                                                           class="other-text-input mt-2 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md{% if not q_multi_has_other %} hidden{% endif %}"
+                                                                           data-for-field="{{ field.id }}"
+                                                                           placeholder="{{ _('Please specify...') }}"
+                                                                           value="{{ _ns3.other_val }}"
+                                                                           autocomplete="off"
+                                                                           {% if not can_edit %}disabled{% endif %}>
+                                                                {% endif %}
                                                             {% elif field.field_type_for_js == 'CHECKBOX' %}
                                                                 <input type="checkbox" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="true" class="form-checkbox h-5 w-5 text-green-600 border-gray-300 rounded focus:ring-green-500 mt-1" {% if existing_q_value == 'true' or existing_q_value == True %}checked{% endif %} {% if not can_edit %}disabled{% endif %}>
                                                             {% else %}

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flask import Blueprint, abort, render_template, send_from_directory, url_for
+from flask import Blueprint, abort, make_response, render_template, send_from_directory, url_for
 from flask_babel import _
 from flask_login import current_user, login_required
 
@@ -227,4 +227,7 @@ def asset(asset_path: str):
         visible_top_level_dirs=VISIBLE_TOP_LEVEL_DIRS,
     )
 
-    return send_from_directory(root, candidate.relative_to(root).as_posix())
+    response = make_response(send_from_directory(root, candidate.relative_to(root).as_posix()))
+    # Docs assets (images, diagrams) are static between deploys — cache for 1 hour in the browser.
+    response.headers['Cache-Control'] = 'private, max-age=3600'
+    return response

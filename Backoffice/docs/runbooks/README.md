@@ -40,6 +40,7 @@ These runbooks cover the recurring tasks the IFRC ops team performs without need
 | Runbook | When to use |
 |---------|-------------|
 | [General incident triage](incidents/general-incident-triage.md) | First stop for any unexplained production failure |
+| [Gateway 504 / worker saturation](incidents/gateway-504-worker-saturation.md) | Recurring 504 on presence, notifications, or light APIs; worker timeouts in logs |
 | [WAF 403 — form payloads](incidents/waf-403-form-payload-refactor-guide.md) | Azure Application Gateway blocking large admin/form POST bodies |
 
 ---

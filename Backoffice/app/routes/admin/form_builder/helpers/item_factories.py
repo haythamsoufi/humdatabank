@@ -263,6 +263,7 @@ def _create_question_form_item(template, section, form_data, default_order):
         'unique_options_in_section': bool(get_field_value('unique_options_in_section', '')),
         'limit_entries_to_option_count': bool(get_field_value('limit_entries_to_option_count', '')),
         'use_as_repeat_entry_title': bool(get_field_value('use_as_repeat_entry_title', '')),
+        'allow_other': get_field_value('allow_other', '') in ['true', 'on', '1'],
     }
 
     # Handle allow_over_100 - check direct field first, then config JSON

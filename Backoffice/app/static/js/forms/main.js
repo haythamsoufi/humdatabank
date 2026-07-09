@@ -7,6 +7,7 @@ import { initConditions } from './modules/conditions.js';
 import { initFormatting } from './modules/formatting.js';
 import { initLayout } from './modules/layout.js';
 import { initMultiSelect } from './modules/multi-select.js';
+import { initQuestionOtherOption } from './modules/question-other-option.js';
 import { initCheckboxHandlers, handleYesNoCheckbox } from './modules/checkbox-handlers.js';
 import { initDataAvailability } from './modules/data-availability.js';
 import { initDisabilityQuestions } from './modules/disability-questions.js';
@@ -109,6 +110,7 @@ async function initializeEntryForm() {
         if (initDynamicIndicators) safeInit('initDynamicIndicators', () => initDynamicIndicators());
         if (initRepeatSections)    safeInit('initRepeatSections',    () => initRepeatSections());
         safeInit('initMultiSelect', () => initMultiSelect());
+        safeInit('initQuestionOtherOption', () => initQuestionOtherOption());
         safeInit('initCheckboxHandlers', () => initCheckboxHandlers());
         safeInit('initDataAvailability', () => initDataAvailability());
         safeInit('initDisabilityQuestions', () => initDisabilityQuestions());

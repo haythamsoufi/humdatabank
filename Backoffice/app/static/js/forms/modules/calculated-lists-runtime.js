@@ -1,5 +1,6 @@
 import { debugLog, debugWarn, debugError } from './debug.js';
 import { getFieldValue, getCurrentFieldValue } from './field-management.js';
+import { appendOtherOptionToSelect, appendOtherOptionToMultiDropdown } from './question-other-option.js';
 
 const MODULE = 'calculated-lists-runtime';
 
@@ -1108,6 +1109,9 @@ async function refreshSelectOptions(selectElement, lookupListId, displayColumn, 
         debugLog(MODULE, `✅ Options refreshed. Total ${rows.length} rows, select now has ${selectElement.options.length - 1} options.`);
         debugLog(MODULE, `✅ Options refreshed. Total ${rows.length} rows, select now has ${selectElement.options.length - 1} options.`);
 
+        // Append "Other" option for calculated lists that have allow_other enabled
+        appendOtherOptionToSelect(selectElement);
+
         // Restore previous selection if still valid, otherwise preserve stale saved values
         if (previousValue && optionValueExists(selectElement, previousValue)) {
             clearSelectStaleSavedValue(selectElement);
@@ -1316,6 +1320,9 @@ async function refreshMultiSelectOptions(multiSelectDiv, fieldId, lookupListId, 
 
         debugLog(MODULE, `✅ Multi-select options refreshed. Total ${rows.length} rows, dropdown now has ${dropdown.children.length} options.`);
         debugLog(MODULE, `✅ Multi-select options refreshed. Total ${rows.length} rows, dropdown now has ${dropdown.children.length} options.`);
+
+        // Append "Other" option for calculated lists that have allow_other enabled
+        appendOtherOptionToMultiDropdown(dropdown, fieldId);
 
         if (window.applyUniqueSectionOptions) {
             window.applyUniqueSectionOptions(multiSelectDiv.closest('[data-collapsible-id]') || document);

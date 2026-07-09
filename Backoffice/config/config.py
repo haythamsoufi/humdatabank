@@ -1018,10 +1018,13 @@ class Config:
 
     # Slow / stuck request logging (stdout; on by default — surfaces in Azure Log Stream)
     SLOW_REQUEST_LOG_ENABLED = _parse_bool(os.environ.get('SLOW_REQUEST_LOG_ENABLED'), default=True)
-    SLOW_REQUEST_THRESHOLD_SECONDS = float(os.environ.get('SLOW_REQUEST_THRESHOLD_SECONDS', '30'))
-    # In-flight warnings before Gunicorn worker timeout (default GUNICORN_TIMEOUT=120)
-    SLOW_REQUEST_STUCK_WARNING_SECONDS = float(os.environ.get('SLOW_REQUEST_STUCK_WARNING_SECONDS', '60'))
-    SLOW_REQUEST_STUCK_CRITICAL_SECONDS = float(os.environ.get('SLOW_REQUEST_STUCK_CRITICAL_SECONDS', '100'))
+    SLOW_REQUEST_THRESHOLD_SECONDS = float(os.environ.get('SLOW_REQUEST_THRESHOLD_SECONDS', '10'))
+    # In-flight warnings fire BEFORE GUNICORN_TIMEOUT (default 25 s) so [STUCK_REQUEST] appears
+    # in the log before the worker is killed and can no longer log anything.
+    # Warning at 15 s → log appears ~10 s before Gunicorn kills at 25 s.
+    # Critical at 23 s → fires 2 s before the kill, giving one last log entry.
+    SLOW_REQUEST_STUCK_WARNING_SECONDS = float(os.environ.get('SLOW_REQUEST_STUCK_WARNING_SECONDS', '15'))
+    SLOW_REQUEST_STUCK_CRITICAL_SECONDS = float(os.environ.get('SLOW_REQUEST_STUCK_CRITICAL_SECONDS', '23'))
 
     # Logging Performance Optimization Configuration
     # tracemalloc has 5-20% CPU overhead - disable by default in staging/production

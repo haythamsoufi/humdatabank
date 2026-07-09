@@ -14,13 +14,53 @@ from app.models import (
     FormData, FormItem, FormTemplate, FormTemplateVersion,
     AssignedForm, AssignmentEntityStatus
 )
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 import ast
 import logging
 import operator
 import re
+import threading
+import time
 
 logger = logging.getLogger(__name__)
+
+# ── Short-TTL per-request-equivalent cache for resolve_variables ───────────────
+# Each Gunicorn worker resolves the same variables for the same AES/version on
+# every cold form load (~2-4 DB queries per variable, no cross-request cache).
+# A 60-second TTL is safe: form saves invalidate the cache naturally via TTL,
+# and the window is short enough that stale values never persist across a user
+# save+reload cycle. Max 100 entries prevents unbounded growth.
+#
+# Cache key: (aes_id, version_id, row_entity_id)
+# Cache value: (resolved_dict, expires_at)
+
+_var_cache: Dict[Tuple, Tuple] = {}
+_var_cache_lock = threading.Lock()
+_VAR_CACHE_TTL = 60.0   # seconds
+_VAR_CACHE_MAX = 100
+
+
+def _var_cache_get(key: Tuple) -> Optional[Dict]:
+    with _var_cache_lock:
+        entry = _var_cache.get(key)
+    if entry is None:
+        return None
+    resolved, expires_at = entry
+    if time.time() > expires_at:
+        with _var_cache_lock:
+            _var_cache.pop(key, None)
+        return None
+    return resolved
+
+
+def _var_cache_set(key: Tuple, resolved: Dict) -> None:
+    expires_at = time.time() + _VAR_CACHE_TTL
+    with _var_cache_lock:
+        if key not in _var_cache and len(_var_cache) >= _VAR_CACHE_MAX:
+            # Evict the oldest (insertion-order) entry.
+            oldest = next(iter(_var_cache))
+            _var_cache.pop(oldest, None)
+        _var_cache[key] = (resolved, expires_at)
 
 
 class VariableResolutionService:
@@ -227,6 +267,16 @@ class VariableResolutionService:
         if not assignment_entity_status:
             return {}
 
+        # Short-TTL cache keyed by (aes_id, version_id, row_entity_id).
+        # Avoids re-running 2–4 DB queries per variable on every form cold-load
+        # by workers whose per-process cache was just recycled.
+        aes_id = getattr(assignment_entity_status, 'id', None)
+        version_id = getattr(template_version, 'id', None) if template_version else None
+        _cache_key = (aes_id, version_id, row_entity_id)
+        _cached = _var_cache_get(_cache_key)
+        if _cached is not None:
+            return _cached
+
         # Always include built-in metadata tokens (even if the template has no variable definitions).
         builtin_resolved = cls._resolve_builtin_metadata_variables(
             assignment_entity_status=assignment_entity_status,
@@ -295,6 +345,7 @@ class VariableResolutionService:
         for name, value in (builtin_resolved or {}).items():
             resolved.setdefault(name, value)
 
+        _var_cache_set(_cache_key, resolved)
         return resolved
 
     @classmethod

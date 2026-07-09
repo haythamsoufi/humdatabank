@@ -25,19 +25,32 @@ def list_validation_questions():
     status = request.args.get("status", default="open", type=str)
     aes_id = request.args.get("assignment_entity_status_id", type=int)
 
+    has_entity_scope = entity_type and entity_id is not None
+    if not has_entity_scope and not aes_id:
+        return api_error("entity_type+entity_id or assignment_entity_status_id is required", 400)
+
     q = ValidationQuestion.query
     if template_id:
         q = q.filter_by(template_id=template_id)
-    if entity_type and entity_id is not None:
+
+    if has_entity_scope:
         if not _user_can_access_entity(entity_type, entity_id):
             return api_error("Access denied", 403)
         q = q.filter_by(entity_type=entity_type, entity_id=entity_id)
+
+    if aes_id:
+        from app.models.assignments import AssignmentEntityStatus
+        aes = AssignmentEntityStatus.query.get(aes_id)
+        if not aes:
+            return api_error("Assignment not found", 404)
+        if not _user_can_access_entity(aes.entity_type, aes.entity_id):
+            return api_error("Access denied", 403)
+        q = q.filter_by(assignment_entity_status_id=aes_id)
+
     if period:
         q = q.filter_by(period_name=period)
     if status and status != "all":
         q = q.filter_by(status=status)
-    if aes_id:
-        q = q.filter_by(assignment_entity_status_id=aes_id)
 
     rows = q.order_by(ValidationQuestion.severity, ValidationQuestion.asked_at.desc()).all()
     return json_response(

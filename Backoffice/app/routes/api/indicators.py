@@ -78,7 +78,11 @@ def get_indicator_bank():
         )
         indicators_data, _total, _page, _per_page = get_indicator_list(filters)
         current_app.logger.debug("Indicator bank API returning %s items", len(indicators_data))
-        return json_response({'indicators': indicators_data})
+        response = json_response({'indicators': indicators_data})
+        # Public, rarely-changing data. Allow downstream caches (AGW, CDN, BI tools) to
+        # reuse the response for 5 minutes before re-querying the backend.
+        response.headers['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=60'
+        return response
 
     except Exception as e:
         current_app.logger.error(f"API Error fetching indicator bank: {e}", exc_info=True)

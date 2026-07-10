@@ -11,6 +11,7 @@ from flask_login import current_user
 
 from app.pb_progress import bp
 from app.pb_progress.service import PBProgressService
+from app.pb_progress.versions import validate_version
 from app.routes.admin.shared import permission_required, system_manager_required
 from app.services.authorization_service import AuthorizationService
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
@@ -18,16 +19,20 @@ from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 logger = logging.getLogger(__name__)
 
 
-@bp.route("/pb-progress/upload", methods=["POST"])
+@bp.route("/pb-progress/<version>/upload", methods=["POST"])
 @permission_required("admin.data_explore.pb_progress")
 @system_manager_required
-def upload_excel():
+def upload_excel(version: str):
+    try:
+        version_key = validate_version(version)
+    except ValueError as exc:
+        return json_bad_request(str(exc))
     file = request.files.get("excel")
     if not file or not file.filename:
         return json_bad_request("No Excel file provided.")
     try:
-        excel_info = PBProgressService.store_excel(file)
-        return json_ok(excel=excel_info)
+        excel_info = PBProgressService.store_excel(version_key, file)
+        return json_ok(excel=excel_info, version=version_key)
     except ValueError as exc:
         return json_bad_request(str(exc))
     except Exception as exc:
@@ -35,22 +40,34 @@ def upload_excel():
         return json_server_error(str(exc))
 
 
-@bp.route("/pb-progress/excel-info", methods=["GET"])
+@bp.route("/pb-progress/<version>/excel-info", methods=["GET"])
 @permission_required("admin.data_explore.pb_progress")
 @system_manager_required
-def excel_info():
-    return json_ok(excel=PBProgressService.get_excel_info())
+def excel_info(version: str):
+    try:
+        version_key = validate_version(version)
+    except ValueError as exc:
+        return json_bad_request(str(exc))
+    return json_ok(excel=PBProgressService.get_excel_info(version_key), version=version_key)
 
 
-@bp.route("/pb-progress/generate", methods=["POST"])
+@bp.route("/pb-progress/<version>/generate", methods=["POST"])
 @permission_required("admin.data_explore.pb_progress")
 @system_manager_required
-def generate():
+def generate(version: str):
+    try:
+        version_key = validate_version(version)
+    except ValueError as exc:
+        return json_bad_request(str(exc))
     payload = request.get_json(silent=True) or {}
     language = (payload.get("language") or "all").strip() or "all"
     try:
-        job_id = PBProgressService.start_generation(language=language)
-        return json_ok(job_id=job_id, status=PBProgressService.get_status())
+        job_id = PBProgressService.start_generation(version_key, language=language)
+        return json_ok(
+            job_id=job_id,
+            version=version_key,
+            status=PBProgressService.get_status(version_key),
+        )
     except RuntimeError as exc:
         logger.warning("P&B progress generation blocked: %s", exc)
         return json_bad_request(str(exc))
@@ -59,19 +76,27 @@ def generate():
         return json_server_error(str(exc))
 
 
-@bp.route("/pb-progress/status", methods=["GET"])
+@bp.route("/pb-progress/<version>/status", methods=["GET"])
 @permission_required("admin.data_explore.pb_progress")
-def status():
-    if AuthorizationService.is_system_manager(current_user):
-        return json_ok(status=PBProgressService.get_status())
-    return json_ok(status=PBProgressService.get_public_status())
-
-
-@bp.route("/pb-progress/output/<path:filename>", methods=["GET"])
-@permission_required("admin.data_explore.pb_progress")
-def serve_output(filename: str):
+def status(version: str):
     try:
-        return PBProgressService.serve_output(filename)
+        version_key = validate_version(version)
+    except ValueError as exc:
+        return json_bad_request(str(exc))
+    if AuthorizationService.is_system_manager(current_user):
+        return json_ok(status=PBProgressService.get_status(version_key))
+    return json_ok(status=PBProgressService.get_public_status(version_key))
+
+
+@bp.route("/pb-progress/<version>/output/<path:filename>", methods=["GET"])
+@permission_required("admin.data_explore.pb_progress")
+def serve_output(version: str, filename: str):
+    try:
+        version_key = validate_version(version)
+    except ValueError as exc:
+        return json_bad_request(str(exc))
+    try:
+        return PBProgressService.serve_output(version_key, filename)
     except NotFound:
         raise
     except ValueError as exc:

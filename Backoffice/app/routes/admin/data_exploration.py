@@ -23,6 +23,7 @@ from app.routes.admin.shared import admin_required, permission_required, permiss
 from app.services.security.api_authentication import get_user_allowed_template_ids
 from app.utils.datetime_helpers import utcnow
 from app.services.authorization_service import AuthorizationService
+from app.pb_progress.versions import DEFAULT_VERSION, REPORT_VERSIONS, VERSION_ORDER
 from app.services.data_quality.catalogs.fdrs_v1_catalog import COMPLIANCE_DOC_TYPES
 from app.services.data_quality.helpers import (
     active_country_map_query,
@@ -105,6 +106,9 @@ def _render_pb_progress_panel(flags: dict[str, bool], first_tab: str) -> str:
             'pb_progress/tab_panel.html',
             explore_first_tab=first_tab,
             can_manage_pb_progress=flags.get('can_manage_pb_progress', False),
+            pb_report_versions=REPORT_VERSIONS,
+            pb_report_version_order=VERSION_ORDER,
+            pb_default_version=DEFAULT_VERSION,
         )
     except Exception as exc:
         logger.error("Failed to render P&B progress panel: %s", exc, exc_info=True)

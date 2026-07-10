@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from pb_figures.render_embed import _append_section_tail, _render_sp_html  # noqa: E402
+from pb_figures.calculations import table_row_labels  # noqa: E402
 
 
 class SectionTailTests(unittest.TestCase):
@@ -122,6 +123,32 @@ class SectionTailTests(unittest.TestCase):
         self.assertIn("Reporting", html)
         self.assertIn("Implementing", html)
         self.assertNotIn('class="x-axis-footer year-only"', html)
+
+    def test_distinct_ns_table_shows_reporting_row_only(self) -> None:
+        labels = table_row_labels("English")
+        payload = {
+            "section": "SP1",
+            "title": "SP1",
+            "headers": {"target": "Target"},
+            "table_labels": labels,
+            "cumulative": [{
+                "label": "Number of National Societies implementing nature-based solutions",
+                "years": ["2024", "2025"],
+                "values": [40.0, 45.0],
+                "value_labels": ["40", "45"],
+                "reporting": ["40", "45"],
+                "implementing": ["40", "45"],
+                "ns_table_mode": "implementing_count",
+                "show_ns_breakdown": True,
+            }],
+            "donuts": [],
+            "footnote": "Footnote text",
+        }
+        html = _render_sp_html(payload, {})
+        self.assertIn(labels["reporting"], html)
+        self.assertNotIn(labels["implementing"], html)
+        self.assertIn(">40<", html)
+        self.assertIn(">45<", html)
 
 
 if __name__ == "__main__":

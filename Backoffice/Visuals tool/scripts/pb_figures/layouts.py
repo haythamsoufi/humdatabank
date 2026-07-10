@@ -79,12 +79,38 @@ def mapping_indicator_rows(mapping: pd.DataFrame, section: str) -> pd.DataFrame:
     return subset.drop_duplicates(subset=["ID"], keep="first").sort_values("_row_order")
 
 
-def show_ns_breakdown(indicator_type: str | None, unit: str | None) -> bool:
-    """Distinct NS-count indicators show the year row only."""
+NS_TABLE_STANDARD = "standard"
+NS_TABLE_IMPLEMENTING_COUNT = "implementing_count"
+
+
+def is_distinct_ns_count_indicator(indicator_type: str | None, unit: str | None) -> bool:
     type_text = str(indicator_type or "").strip()
     unit_text = str(unit or "").strip()
-    if type_text == "Distinct" and unit_text == "NSs":
-        return False
+    return type_text == "Distinct" and unit_text == "NSs"
+
+
+def ns_table_mode(indicator_type: str | None, unit: str | None) -> str:
+    """Table layout below line charts.
+
+    standard: year + reporting (Count) + implementing (Implementing)
+    implementing_count: year + reporting row labelled as reporting but showing Implementing
+    """
+    if is_distinct_ns_count_indicator(indicator_type, unit):
+        return NS_TABLE_IMPLEMENTING_COUNT
+    return NS_TABLE_STANDARD
+
+
+def cumulative_table_rows(item: dict) -> tuple[bool, bool]:
+    """Return (show_reporting_row, show_implementing_row) for a cumulative payload item."""
+    if not item.get("show_ns_breakdown", True):
+        return False, False
+    if item.get("ns_table_mode") == NS_TABLE_IMPLEMENTING_COUNT:
+        return True, False
+    return True, True
+
+
+def show_ns_breakdown(indicator_type: str | None, unit: str | None) -> bool:
+    """Whether the footer includes NS rows below the year row."""
     return True
 
 

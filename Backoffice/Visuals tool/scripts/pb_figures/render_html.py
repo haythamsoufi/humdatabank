@@ -89,8 +89,17 @@ def _dashboard_height(payload: dict) -> int:
     """Estimate pixel height for viewport sizing."""
     base = 130  # title + headers + footnote
     for item in payload["cumulative"]:
-        base += 119 if item.get("show_ns_breakdown") is False else 155
+        if item.get("unavailable"):
+            base += 96
+        elif item.get("ns_table_mode") == "implementing_count":
+            base += 130
+        elif item.get("show_ns_breakdown") is False:
+            base += 119
+        else:
+            base += 155
     for pair in payload.get("donut_pairs", []):
+        base += 90
+    for _item in payload.get("donuts", []):
         base += 90
     return max(base, 400)
 

@@ -16,8 +16,9 @@ from docx.shared import Inches, Pt, RGBColor
 from .font_faces import inject_tajawal_fonts
 from .languages import ARABIC_VISUAL_FONT, is_rtl
 from .calculations import not_available
-from .payload import build_payload
+from .layouts import cumulative_table_rows
 from .line_chart import inject_line_chart_js
+from .payload import build_payload
 from .styles import style_payload
 from .report_meta import report_parts, report_titles
 
@@ -300,8 +301,8 @@ def _add_cumulative_block(
     render_line_chart_asset(item, target_label, chart_path, language=language, session=session)
 
     n_years = len(item["years"])
-    show_breakdown = item.get("show_ns_breakdown", True)
-    n_rows = 4 if show_breakdown else 2
+    show_reporting, show_implementing = cumulative_table_rows(item)
+    n_rows = 2 + int(show_reporting) + int(show_implementing)
     table = doc.add_table(rows=n_rows, cols=n_years + 1)
     _set_table_inner_borders(table)
     widths = [2.05] + [0.55] * n_years
@@ -315,9 +316,12 @@ def _add_cumulative_block(
     chart_cell.paragraphs[0].add_run().add_picture(str(chart_path), width=Inches(4.45))
 
     _add_data_row(table, 1, labels["year"], item["years"], language=language, bold_label=True, bold_values=True)
-    if show_breakdown:
-        _add_data_row(table, 2, labels["reporting"], item["reporting"], language=language)
-        _add_data_row(table, 3, labels["implementing"], item["implementing"], language=language)
+    row_idx = 2
+    if show_reporting:
+        _add_data_row(table, row_idx, labels["reporting"], item["reporting"], language=language)
+        row_idx += 1
+    if show_implementing:
+        _add_data_row(table, row_idx, labels["implementing"], item["implementing"], language=language)
 
     doc.add_paragraph("")
 

@@ -26,11 +26,13 @@ from .calculations import (
 from .config import DASHBOARD_SIZES
 from .styles import style_payload
 from .layouts import (
+    NS_TABLE_IMPLEMENTING_COUNT,
     build_section_layout,
     indicator_has_values,
     indicators_with_data,
     mapping_from_model,
     mapping_indicator_rows,
+    ns_table_mode,
     show_ns_breakdown,
     visible_donut_pairs,
     visible_indicator_ids,
@@ -66,6 +68,7 @@ def _build_unavailable_cumulative_payload(
     language: str,
 ) -> dict[str, Any]:
     indicator = _indicator_meta_from_mapping(mapping, section, indicator_id)
+    table_mode = ns_table_mode(indicator.get("Type"), indicator.get("Unit"))
     return {
         "label": indicator_label(indicator, language),
         "unavailable": True,
@@ -77,6 +80,7 @@ def _build_unavailable_cumulative_payload(
         "value_labels": [],
         "reporting": [],
         "implementing": [],
+        "ns_table_mode": table_mode,
         "show_ns_breakdown": show_ns_breakdown(indicator.get("Type"), indicator.get("Unit")),
     }
 
@@ -197,6 +201,7 @@ def _build_cumulative_payload(
     rows = model[(model["section"] == section) & (model["ID"] == indicator_id)].sort_values("Year")
     unit = indicator.get("Unit")
     annual_target = annual_target_value(indicator)
+    table_mode = ns_table_mode(indicator.get("Type"), indicator.get("Unit"))
 
     years: list[str] = []
     values: list[float | None] = []
@@ -212,8 +217,10 @@ def _build_cumulative_payload(
         value_labels.append(format_value(val, unit, language) if val is not None else "")
         count = row.get("Count")
         impl = row.get("Implementing")
-        reporting.append(str(int(count)) if pd.notna(count) else not_applicable(language))
-        implementing.append(str(int(impl)) if pd.notna(impl) else not_applicable(language))
+        impl_text = str(int(impl)) if pd.notna(impl) else not_applicable(language)
+        count_text = str(int(count)) if pd.notna(count) else not_applicable(language)
+        implementing.append(impl_text)
+        reporting.append(impl_text if table_mode == NS_TABLE_IMPLEMENTING_COUNT else count_text)
 
     if not any(value is not None for value in values):
         return _build_unavailable_cumulative_payload(mapping, section, indicator_id, language)
@@ -227,6 +234,7 @@ def _build_cumulative_payload(
         "value_labels": value_labels,
         "reporting": reporting,
         "implementing": implementing,
+        "ns_table_mode": table_mode,
         "show_ns_breakdown": show_ns_breakdown(indicator.get("Type"), indicator.get("Unit")),
     }
 

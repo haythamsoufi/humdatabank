@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .payload import build_payload
+from .layouts import cumulative_table_rows
 from .line_chart import (
     CHART_HEIGHT,
     CHART_PAD_L,
@@ -130,30 +131,30 @@ def _render_table_vlines(count: int, chart_width: int) -> str:
 
 def _render_data_table(item: dict[str, Any], chart_width: int) -> str:
     n = len(item["years"])
+    show_reporting, show_implementing = cumulative_table_rows(item)
     parts = [
         '<div class="table-data">',
         _render_table_vlines(n, chart_width),
         _render_positioned_row(item["years"], n, chart_width, cell_class="year-cell"),
     ]
-    if item.get("show_ns_breakdown", True):
-        parts.extend([
-            _render_positioned_row(item["reporting"], n, chart_width),
-            _render_positioned_row(item["implementing"], n, chart_width),
-        ])
+    if show_reporting:
+        parts.append(_render_positioned_row(item["reporting"], n, chart_width))
+    if show_implementing:
+        parts.append(_render_positioned_row(item["implementing"], n, chart_width))
     parts.append("</div>")
     return "".join(parts)
 
 
-def _render_metric_labels(labels: dict[str, str], *, show_ns_breakdown: bool = True) -> str:
+def _render_metric_labels(labels: dict[str, str], item: dict[str, Any]) -> str:
+    show_reporting, show_implementing = cumulative_table_rows(item)
     parts = [
         '<div class="metric-labels">',
         f'<span class="year-label">{_esc(labels["year"])}</span>',
     ]
-    if show_ns_breakdown:
-        parts.extend([
-            f'<span>{_esc(labels["reporting"])}</span>',
-            f'<span>{_esc(labels["implementing"])}</span>',
-        ])
+    if show_reporting:
+        parts.append(f'<span>{_esc(labels["reporting"])}</span>')
+    if show_implementing:
+        parts.append(f'<span>{_esc(labels["implementing"])}</span>')
     parts.append("</div>")
     return "".join(parts)
 
@@ -198,8 +199,8 @@ def _render_line_block(
         '<div class="x-axis-divider-right"></div>'
         "</div>"
         f'<div class="{footer_class}">'
-        f'{_render_metric_labels(table_labels, show_ns_breakdown=not year_only)}'
-        f'{_render_data_table(item, chart_width)}'
+        f"{_render_metric_labels(table_labels, item)}"
+        f"{_render_data_table(item, chart_width)}"
         "</div>"
         "</div>"
     )

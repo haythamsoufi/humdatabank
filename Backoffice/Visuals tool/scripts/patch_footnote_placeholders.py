@@ -39,32 +39,11 @@ SP1_PREFIX = {
     "AR": "انظر أيضًا مؤشر الحد من مخاطر الكوارث ضمن SP2.\n",
 }
 
-SP2_SUFFIX = {
-    "EN": (
-        "\n**In 2025, IFRC-DREF allocated CHF 77M to support 83 National Societies, reaching "
-        "15 million people. Source: IFRC DREF 2025 Annual Report."
-    ),
-    "FR": (
-        "\n**En 2025, le IFRC-DREF a alloué 77 millions CHF pour soutenir 83 Sociétés "
-        "nationales, atteignant 15 millions de personnes. Source : Rapport annuel IFRC DREF 2025."
-    ),
-    "SP": (
-        "\n**En 2025, el Fondo de Emergencia para la Intervención en Casos de Desastre de la "
-        "Federación Internacional asignó 77 millones de francos suizos (CHF) para apoyar a 83 "
-        "Sociedades Nacionales, en beneficio de 15 millones de personas. Fuente: informe anual "
-        "del Fondo de Emergencia (2025)."
-    ),
-    "AR": (
-        "\n**في عام 2025، خصص IFRC-DREF مبلغ 77 مليون فرنك سويسري لدعم 83 جمعية وطنية، ليصل "
-        "إلى 15 مليون شخص. المصدر: التقرير السنوي لـ IFRC DREF لعام 2025."
-    ),
-}
-
 FOOTNOTE_VALUES = {
     "footnote.default": dict(DATA_SOURCE),
     "footnote.ef4": dict(DATA_SOURCE),
     "footnote.sp1": {lang: SP1_PREFIX[lang] + DATA_SOURCE[lang] for lang in DATA_SOURCE},
-    "footnote.sp2": {lang: DATA_SOURCE[lang] + SP2_SUFFIX[lang] for lang in DATA_SOURCE},
+    "footnote.sp2": dict(DATA_SOURCE),
 }
 
 

@@ -311,11 +311,31 @@ def draw_cumulative_indicator(
     unit = indicator.get("Unit")
     label = _wrap_indicator_label(indicator_label(indicator, language))
     hdr = headers(language)
-    use_ns_breakdown = (
-        ns_breakdown
-        if ns_breakdown is not None
-        else indicator_show_ns_breakdown(indicator.get("Type"), indicator.get("Unit"))
-    )
+    table_mode = ns_table_mode(indicator.get("Type"), indicator.get("Unit"))
+    if ns_breakdown is False:
+        show_reporting_row = False
+        show_implementing_row = False
+    elif table_mode == NS_TABLE_IMPLEMENTING_COUNT:
+        show_reporting_row = True
+        show_implementing_row = False
+    else:
+        show_reporting_row = True
+        show_implementing_row = True
+
+    row_labels_dict = table_row_labels(language)
+    row_labels = [row_labels_dict["year"]]
+    table_rows = [[year_display(y) for y in years]]
+    reporting_values = implementing if table_mode == NS_TABLE_IMPLEMENTING_COUNT else reporting
+    if show_reporting_row:
+        row_labels.append(row_labels_dict["reporting"])
+        table_rows.append([
+            str(int(v)) if pd.notna(v) else not_applicable(language) for v in reporting_values
+        ])
+    if show_implementing_row:
+        row_labels.append(row_labels_dict["implementing"])
+        table_rows.append([
+            str(int(v)) if pd.notna(v) else not_applicable(language) for v in implementing
+        ])
 
     label_ax.axis("off")
     label_ax.text(0.02, 0.5, label, ha="left", va="center", fontsize=9,
@@ -376,15 +396,6 @@ def draw_cumulative_indicator(
         chart_ax.text(xi, y_text, text, ha="center", va=va, fontsize=9,
                       fontweight="bold", color=COLOR_VALUE, clip_on=True)
 
-    row_labels_dict = table_row_labels(language)
-    row_labels = [row_labels_dict["year"]]
-    table_rows = [[year_display(y) for y in years]]
-    if use_ns_breakdown:
-        row_labels.extend([row_labels_dict["reporting"], row_labels_dict["implementing"]])
-        table_rows.extend([
-            [str(int(c)) if pd.notna(c) else not_applicable(language) for c in reporting],
-            [str(int(v)) if pd.notna(v) else not_applicable(language) for v in implementing],
-        ])
     table_ax.axis("off")
     table = table_ax.table(cellText=table_rows, rowLabels=row_labels, loc="center", cellLoc="center")
     table.auto_set_font_size(False)
@@ -412,12 +423,13 @@ import matplotlib.gridspec as gridspec  # noqa: E402 (grouped with other matplot
 from .calculations import section_footnote, section_title  # noqa: E402
 from .config import DASHBOARD_SIZES  # noqa: E402
 from .layouts import (  # noqa: E402
+    NS_TABLE_IMPLEMENTING_COUNT,
     build_section_layout,
     indicator_has_values,
     indicators_with_data,
     mapping_from_model,
     section_has_indicators,
-    show_ns_breakdown as indicator_show_ns_breakdown,
+    ns_table_mode,
     visible_donut_pairs,
     visible_indicator_ids,
 )
@@ -431,8 +443,7 @@ from .payload import (  # noqa: E402
 
 def draw_unavailable_cumulative_indicator(
     label_ax,
-    chart_ax,
-    table_ax,
+    message_ax,
     indicator: pd.Series,
     *,
     language: str = "English",
@@ -450,8 +461,8 @@ def draw_unavailable_cumulative_indicator(
         transform=label_ax.transAxes,
     )
     label_ax.axvline(0.98, color=_theme_color("divider", COLOR_DIVIDER), linewidth=0.8, ymin=0.08, ymax=0.92)
-    chart_ax.axis("off")
-    chart_ax.text(
+    message_ax.axis("off")
+    message_ax.text(
         0.5,
         0.5,
         not_available(language),
@@ -459,9 +470,9 @@ def draw_unavailable_cumulative_indicator(
         va="center",
         fontsize=10,
         color="#888888",
-        transform=chart_ax.transAxes,
+        style="italic",
+        transform=message_ax.transAxes,
     )
-    table_ax.axis("off")
 
 
 def _section_subset(model: pd.DataFrame, section: str) -> pd.DataFrame:
@@ -661,8 +672,7 @@ def render_sp_dashboard(
             indicator = _indicator_meta_from_mapping(mapping, section, indicator_id)
             draw_unavailable_cumulative_indicator(
                 fig.add_subplot(panel[0, 0]),
-                fig.add_subplot(content[0]),
-                fig.add_subplot(content[1]),
+                fig.add_subplot(panel[0, 1]),
                 indicator,
                 language=language,
             )
@@ -731,8 +741,7 @@ def render_ef_dashboard(
             indicator = _indicator_meta_from_mapping(mapping, section, indicator_id)
             draw_unavailable_cumulative_indicator(
                 fig.add_subplot(panel[0, 0]),
-                fig.add_subplot(content[0]),
-                fig.add_subplot(content[1]),
+                fig.add_subplot(panel[0, 1]),
                 indicator,
                 language=language,
             )

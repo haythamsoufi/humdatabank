@@ -98,8 +98,13 @@ def _run_quarto(formats: list[str], env: dict[str, str]) -> None:
             "or run: winget install Posit.Quarto"
         )
 
+    label = (env.get("PB_REPORT_LABEL") or "").strip()
+    metadata_args: list[str] = []
+    if label:
+        metadata_args.extend(["-M", f'subtitle:"{label}"'])
+
     for fmt in formats:
-        cmd = [quarto, "render", str(REPORT_DIR / "pb-report.qmd"), "--to", fmt]
+        cmd = [quarto, "render", str(REPORT_DIR / "pb-report.qmd"), "--to", fmt, *metadata_args]
         print(f"[build_report] {' '.join(cmd)}", flush=True)
         subprocess.run(cmd, check=True, cwd=REPORT_DIR, env=env)
 

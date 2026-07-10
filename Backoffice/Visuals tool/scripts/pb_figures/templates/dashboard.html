@@ -456,6 +456,44 @@ __TAJAWAL_FONT_CSS__
     color: var(--text);
     font-weight: 400;
   }
+
+  .indicator-row.indicator-unavailable {
+    grid-template-rows: auto;
+    align-items: center;
+  }
+
+  .indicator-row.indicator-unavailable .indicator-text {
+    min-height: auto;
+  }
+
+  .indicator-unavailable-message {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 72px;
+    padding: 12px 16px;
+    border: 1px dashed var(--divider);
+    border-radius: 4px;
+    background: #fafafa;
+    color: var(--muted);
+    font-size: 10px;
+    font-style: italic;
+    text-align: center;
+  }
+
+  .donut-row.indicator-unavailable,
+  .donut-pair-item.indicator-unavailable {
+    grid-template-columns: var(--label-col) 1fr;
+    align-items: center;
+  }
+
+  .donut-row.indicator-unavailable .indicator-unavailable-message,
+  .donut-pair-item.indicator-unavailable .indicator-unavailable-message {
+    grid-column: 2;
+    min-height: var(--donut-size);
+  }
 </style>
 </head>
 <body>
@@ -565,23 +603,33 @@ function renderTableVlines(count, chartWidth) {
 
 function renderDataTable(item, chartWidth) {
   const n = item.years.length;
+  const showReporting = item.show_ns_breakdown !== false;
+  const showImplementing = showReporting && item.ns_table_mode !== "implementing_count";
   let html = `<div class="table-data">
     ${renderTableVlines(n, chartWidth)}
     ${renderPositionedRow(item.years, n, chartWidth, "year-cell")}`;
-  if (item.show_ns_breakdown !== false) {
+  if (showReporting) {
     html += `
-    ${renderPositionedRow(item.reporting, n, chartWidth)}
+    ${renderPositionedRow(item.reporting, n, chartWidth)}`;
+  }
+  if (showImplementing) {
+    html += `
     ${renderPositionedRow(item.implementing, n, chartWidth)}`;
   }
   return html + `</div>`;
 }
 
-function renderMetricLabels(labels, showNsBreakdown = true) {
+function renderMetricLabels(labels, item) {
+  const showReporting = item.show_ns_breakdown !== false;
+  const showImplementing = showReporting && item.ns_table_mode !== "implementing_count";
   let html = `<div class="metric-labels">
     <span class="year-label">${esc(labels.year)}</span>`;
-  if (showNsBreakdown) {
+  if (showReporting) {
     html += `
-    <span>${esc(labels.reporting)}</span>
+    <span>${esc(labels.reporting)}</span>`;
+  }
+  if (showImplementing) {
+    html += `
     <span>${esc(labels.implementing)}</span>`;
   }
   return html + `</div>`;
@@ -609,6 +657,13 @@ function renderSP(data) {
   const targetLabel = data.headers.target;
 
   data.cumulative.forEach((item, idx) => {
+    if (item.unavailable) {
+      parts.push(`<div class="indicator-row indicator-unavailable">
+        <div class="indicator-text">${esc(item.label)}</div>
+        <div class="indicator-unavailable-message">${esc(item.unavailable_label || "")}</div>
+      </div>`);
+      return;
+    }
     const yearOnly = item.show_ns_breakdown === false;
     const footerClass = yearOnly ? "x-axis-footer year-only" : "x-axis-footer";
     const chartId = `${(data.section || "sp").toLowerCase()}-line-${idx}`;
@@ -620,7 +675,7 @@ function renderSP(data) {
         <div class="x-axis-divider-right"></div>
       </div>
       <div class="${footerClass}">
-        ${renderMetricLabels(data.table_labels, !yearOnly)}
+        ${renderMetricLabels(data.table_labels, item)}
         ${renderDataTable(item, chartWidth)}
       </div>
     </div>`);

@@ -265,9 +265,17 @@
     window[UNHANDLED_FLAG] = true;
     window.addEventListener('unhandledrejection', function (event) {
       var reason = (event && event.reason) || {};
-      // Suppress noise from aborted fetches and cancelled operations.
       var msg = String(reason && reason.message ? reason.message : reason);
+      // Suppress noise from aborted fetches and cancelled operations.
       if (msg === 'AbortError' || msg.indexOf('AbortError') !== -1) return;
+      // Suppress browser-extension message-channel noise.  Third-party extensions
+      // register async chrome.runtime.onMessage listeners (returning `true`) but
+      // close the channel before the response arrives, surfacing as an unhandled
+      // rejection in the host page's context.  This is entirely outside page code.
+      if (msg.indexOf('message channel closed before a response was received') !== -1) {
+        event.preventDefault();
+        return;
+      }
       console.warn('[humdb] Unhandled promise rejection:', reason);
     });
   }

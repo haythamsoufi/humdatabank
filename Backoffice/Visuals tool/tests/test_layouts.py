@@ -12,13 +12,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from pb_figures.layouts import (  # noqa: E402
+    NS_TABLE_IMPLEMENTING_COUNT,
     TEMPORARILY_HIDDEN,
     build_section_layout,
     mapping_indicator_rows,
+    ns_table_mode,
     show_ns_breakdown,
     visible_donut_rows,
     visible_indicator_ids,
 )
+from pb_figures.payload import build_sp_payload  # noqa: E402
 
 
 def _sample_mapping() -> pd.DataFrame:
@@ -64,10 +67,45 @@ class DynamicLayoutTests(unittest.TestCase):
         self.assertEqual(layout["cumulative_ids"], ["629", "630", "631", "632"])
         self.assertEqual(layout["donut_pairs"], [])
 
-    def test_distinct_ns_indicators_hide_breakdown_rows(self) -> None:
-        self.assertFalse(show_ns_breakdown("Distinct", "NSs"))
+    def test_distinct_ns_indicators_use_implementing_count_table(self) -> None:
+        self.assertEqual(ns_table_mode("Distinct", "NSs"), NS_TABLE_IMPLEMENTING_COUNT)
+        self.assertTrue(show_ns_breakdown("Distinct", "NSs"))
         self.assertTrue(show_ns_breakdown("Cumulative", None))
-        self.assertTrue(show_ns_breakdown("Distinct", "Platforms"))
+        self.assertEqual(ns_table_mode("Distinct", "Platforms"), "standard")
+
+    def test_distinct_ns_payload_uses_implementing_values_in_reporting_row(self) -> None:
+        mapping = pd.DataFrame(
+            {
+                "Strategic Priority / Enabling Function": ["SP1"],
+                "ID": ["615"],
+                "Type": ["Distinct"],
+                "Unit": ["NSs"],
+                "English": ["Number of National Societies implementing nature-based solutions"],
+                "SP EN": ["Climate and environment"],
+                "_mapping_order": [0],
+            }
+        )
+        model = pd.DataFrame(
+            {
+                "section": ["SP1"] * 3,
+                "ID": ["615"] * 3,
+                "Year": ["2023", "2024", "2025"],
+                "Value": [40.0, 45.0, 50.0],
+                "Count": [100, 105, 110],
+                "Implementing": [40, 45, 50],
+                "Type": ["Distinct"] * 3,
+                "Unit": ["NSs"] * 3,
+                "English": ["Number of National Societies implementing nature-based solutions"] * 3,
+                "SP EN": ["Climate and environment"] * 3,
+                "_mapping_order": [0] * 3,
+            }
+        )
+        payload = build_sp_payload(model, "SP1", mapping=mapping)
+        item = payload["cumulative"][0]
+        self.assertEqual(item.get("ns_table_mode"), NS_TABLE_IMPLEMENTING_COUNT)
+        self.assertEqual(item["reporting"], ["40", "45", "50"])
+        self.assertEqual(item["implementing"], ["40", "45", "50"])
+        self.assertNotEqual(item["reporting"], ["100", "105", "110"])
 
 
 class LayoutVisibilityTests(unittest.TestCase):

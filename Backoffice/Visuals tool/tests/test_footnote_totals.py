@@ -41,6 +41,30 @@ class TestReportingSourceTotals(unittest.TestCase):
         self.assertNotIn("113", text)
         self.assertNotIn("{upr_ns}", text)
 
+    def test_footnote_substitutes_legacy_hardcoded_template(self) -> None:
+        uploaded = (
+            Path(__file__).resolve().parents[2]
+            / "instance"
+            / "uploads"
+            / "pb_progress"
+            / "source"
+            / "SG_Report.xlsx"
+        )
+        if not uploaded.exists():
+            self.skipTest("uploaded SG_Report.xlsx not present")
+        os.environ["PB_REPORT_EXCEL"] = str(uploaded)
+        os.environ["PB_REPORT_YEAR"] = "2025"
+        try:
+            text = footnote_for_key("default", "English")
+        finally:
+            os.environ.pop("PB_REPORT_EXCEL", None)
+            os.environ.pop("PB_REPORT_YEAR", None)
+
+        self.assertIn("145", text)
+        self.assertIn("90", text)
+        self.assertNotIn("113", text)
+        self.assertNotIn("3 NSs", text)
+
 
 if __name__ == "__main__":
     unittest.main()

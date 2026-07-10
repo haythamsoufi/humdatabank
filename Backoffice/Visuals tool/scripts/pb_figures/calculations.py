@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from functools import lru_cache
 from typing import Any
 
@@ -137,20 +138,73 @@ def _resolve_footnote_totals(
     }
 
 
+_LEGACY_DATA_SOURCE_PATTERNS: dict[str, re.Pattern[str]] = {
+    "English": re.compile(
+        r"(\*)\d{4}( data is based on reports received from )\d+( NSs through the unified "
+        r"reporting process and )\d+( NSs through FDRS)"
+    ),
+    "French": re.compile(
+        r"(\* Les données de )\d{4}( reposent sur les rapports de )\d+( SN via le processus "
+        r"de rapport unifié et de )\d+( SN via le FDRS)"
+    ),
+    "Spanish": re.compile(
+        r"(\* Los datos de )\d{4}( se basan en los informes de )\d+( Sociedades Nacionales "
+        r"a través del proceso unificado de presentación de informes y de )\d+( Sociedades "
+        r"Nacionales a través del (?:banco de datos y sistema de información general interno "
+        r"\(FDRS\)|FDRS))"
+    ),
+    "Arabic": re.compile(
+        r"(\*تستند بيانات عام )\d{4}( إلى تقارير )\d+( جمعيات وطنية من خلال عملية التقارير "
+        r"الموحدة و)\d+( جمعية وطنية من خلال نظام (?:قاعدة البيانات ونظام الإفادة في الاتحاد "
+        r"الدولي|FDRS))"
+    ),
+}
+
+
+def _strip_sp2_dref_paragraph(text: str) -> str:
+    """Remove legacy SP2 DREF allocation footnote (dropped from report)."""
+    markers = (
+        "IFRC-DREF",
+        "IFRC DREF",
+        "Fondo de Emergencia para la Intervención",
+        "77 millions CHF",
+        "77 millones de francos",
+        "77 مليون فرنك",
+    )
+    lines = text.split("\n")
+    kept = [
+        line
+        for line in lines
+        if not (line.strip().startswith("**") and any(marker in line for marker in markers))
+    ]
+    return "\n".join(kept).strip()
+
+
 def _apply_footnote_placeholders(
     template: str,
     *,
     year: str,
     upr_ns: int | None,
     fdrs_ns: int | None,
+    language: str = "English",
 ) -> str:
-    if "{year}" not in template and "{upr_ns}" not in template and "{fdrs_ns}" not in template:
-        return template
-    return template.format(
-        year=year,
-        upr_ns=_format_footnote_count(upr_ns),
-        fdrs_ns=_format_footnote_count(fdrs_ns),
-    )
+    upr = _format_footnote_count(upr_ns)
+    fdrs = _format_footnote_count(fdrs_ns)
+
+    if "{year}" in template or "{upr_ns}" in template or "{fdrs_ns}" in template:
+        return template.format(year=year, upr_ns=upr, fdrs_ns=fdrs)
+
+    pattern = _LEGACY_DATA_SOURCE_PATTERNS.get(language)
+    if pattern and pattern.search(template):
+        return pattern.sub(
+            lambda match: (
+                f"{match.group(1)}{year}{match.group(2)}{upr}"
+                f"{match.group(3)}{fdrs}{match.group(4)}"
+            ),
+            template,
+        )
+
+    return template
 
 
 def footnote_for_key(
@@ -164,12 +218,16 @@ def footnote_for_key(
     code = _FOOTNOTES_BY_KEY.get(key, _FOOTNOTES_BY_KEY["default"])
     template = t(code, language)
     totals = _resolve_footnote_totals(year=year, upr_ns=upr_ns, fdrs_ns=fdrs_ns)
-    return _apply_footnote_placeholders(
+    rendered = _apply_footnote_placeholders(
         template,
         year=str(totals["year"]),
         upr_ns=totals["upr_ns"],
         fdrs_ns=totals["fdrs_ns"],
+        language=language,
     )
+    if key == "sp2":
+        return _strip_sp2_dref_paragraph(rendered)
+    return rendered
 
 
 def indicator_label(row: pd.Series, language: str = "English") -> str:

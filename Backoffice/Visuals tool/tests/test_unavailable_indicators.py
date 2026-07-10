@@ -15,6 +15,7 @@ from pb_figures.calculations import not_available  # noqa: E402
 from pb_figures.layouts import build_section_layout, indicator_has_values  # noqa: E402
 from pb_figures.payload import build_sp_payload  # noqa: E402
 from pb_figures.render_embed import build_dashboard_html  # noqa: E402
+from pb_figures.render_html import _dashboard_height  # noqa: E402
 
 
 def _mapping_frame() -> pd.DataFrame:
@@ -116,6 +117,17 @@ class UnavailableIndicatorTests(unittest.TestCase):
         self.assertEqual(html.count(not_available("English")), 2)
         self.assertIn('class="indicator-row indicator-unavailable"', html)
         self.assertNotIn("x-axis-footer", html.split("cash and vouchers")[1].split(not_available("English"))[0])
+
+    def test_png_dashboard_template_matches_embed_for_unavailable(self) -> None:
+        payload = build_sp_payload(_model_frame(), "SP2", mapping=_mapping_frame())
+        template = (ROOT / "scripts" / "pb_figures" / "templates" / "dashboard.html").read_text(encoding="utf-8")
+        unavailable = [item for item in payload["cumulative"] if item.get("unavailable")]
+        self.assertEqual(len(unavailable), 2)
+        self.assertIn("if (item.unavailable)", template)
+        self.assertIn('class="indicator-row indicator-unavailable"', template)
+        self.assertIn(".indicator-unavailable-message", template)
+        height = _dashboard_height(payload)
+        self.assertEqual(height, 130 + 155 + 96 + 96)
 
     def test_sp4_distinct_indicators_render_as_line_charts(self) -> None:
         mapping = pd.DataFrame(

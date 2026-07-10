@@ -119,7 +119,7 @@
                 'id': 'pb-progress-open-import-btn',
                 'aria-haspopup': 'dialog',
                 'aria-controls': 'pb-progress-import-modal',
-                'title': _('Upload Excel and regenerate the P&B progress report')
+                'title': _('Upload Excel and regenerate the P&B visuals report')
             }
         }
     ] if can_manage_pb_progress else []
@@ -157,7 +157,7 @@
                     data-tab="pb-progress"
                     aria-selected="{{ 'true' if explore_first_tab == 'pb-progress' else 'false' }}"
                     class="settings-tab {{ admin_underline_tab_btn_classes(explore_first_tab == 'pb-progress') }}">
-                <i class="fas fa-chart-line mr-1.5"></i>{{ _('P&B Progress') }}
+                <i class="fas fa-chart-line mr-1.5"></i>{{ _('P&B visuals') }}
             </button>
             {% endif %}
         {% endcall %}

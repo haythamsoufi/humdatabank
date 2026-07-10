@@ -150,10 +150,8 @@ if __name__ == '__main__':
             return False
         env = os.environ.get("FLASK_USE_RELOADER")
         if env is not None:
-            return _parse_bool_env(env, default=False)
-        # Windows: off by default — long-running subprocess builds (P&B report) can
-        # trigger spurious reloads even with exclude_patterns.
-        return os.name != "nt"
+            return _parse_bool_env(env, default=True)
+        return True
 
     use_reloader = _use_dev_reloader(debug)
 
@@ -213,8 +211,8 @@ if __name__ == '__main__':
     use_stat_reloader = os.name == "nt"
     if debug and not use_reloader:
         app.logger.info(
-            "Flask auto-reloader disabled (set FLASK_USE_RELOADER=true to enable). "
-            "Recommended on Windows while running P&B report builds."
+            "Flask auto-reloader disabled (FLASK_USE_RELOADER=false). "
+            "Useful on Windows while running P&B report builds."
         )
     app.logger.debug(
         f"Starting Flask dev server on {host}:{port} "
@@ -243,7 +241,7 @@ if __name__ == '__main__':
     # import; on Windows NTFS that updates the parent directory mtime, which
     # causes the reloader to detect a change and restart Flask mid-build.
     # Add it explicitly so the pattern-based exclusion covers it even when the
-    # reloader is opt-in enabled via FLASK_USE_RELOADER=true.
+    # reloader is enabled (set FLASK_USE_RELOADER=false to disable).
     try:
         import site as _site
         _user_site = _site.getusersitepackages()

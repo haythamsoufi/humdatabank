@@ -1,6 +1,6 @@
 ---
 title: "Plan & Budget Report — Figures"
-subtitle: "July 2026"
+subtitle: "Plan and Budget"
 author: "IFRC — FDS Team"
 date: today
 date-format: "D MMMM YYYY"

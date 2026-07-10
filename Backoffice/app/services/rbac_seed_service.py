@@ -109,7 +109,7 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         ("admin.data_explore.data_table", "Data Explorer: Data Table", "Access the Data Table tab in Data Explorer"),
         ("admin.data_explore.analysis", "Data Explorer: Analysis", "Access the Analysis tab in Data Explorer"),
         ("admin.data_explore.compliance", "Data Explorer: Compliance", "Access the Compliance tab in Data Explorer"),
-        ("admin.data_explore.pb_progress", "Data Explorer: P&B Progress", "Access the Plan and Budget progress tab in Data Explorer"),
+        ("admin.data_explore.pb_progress", "Data Explorer: P&B visuals", "Access the Plan and Budget visuals tab in Data Explorer"),
         # Validation admin
         ("admin.validation.dashboard", "Validation: Dashboard", "Access the Validation Dashboard (tracker, checks, dispatch)"),
         ("admin.validation.questions", "Validation: Questions", "Manage validation questions (list, edit, import/export)"),
@@ -309,8 +309,8 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
         },
         {
             "code": "admin_data_explorer_pb_progress",
-            "name": "Admin: Data Explorer (P&B Progress)",
-            "description": "Access the Plan and Budget progress tab in Data Explorer.",
+            "name": "Admin: Data Explorer (P&B visuals)",
+            "description": "Access the Plan and Budget visuals tab in Data Explorer.",
             "permission_codes": ["admin.data_explore.pb_progress"],
         },
         {

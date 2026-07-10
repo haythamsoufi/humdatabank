@@ -1,8 +1,50 @@
 # Backoffice/app/plugins/base.py
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional
+
 from flask import Blueprint
+
+
+@dataclass(frozen=True)
+class DataExplorerTabConfig:
+    """Configuration for a Data Explorer tab contributed by a plugin."""
+
+    tab_id: str
+    label: str
+    permission: str
+    priority: int
+    panel_template: str
+    plugin_id: str
+    icon: str = "fas fa-puzzle-piece"
+    manage_requires_system_manager: bool = True
+
+
+@dataclass(frozen=True)
+class CspOverride:
+    """Content-Security-Policy override for plugin-served HTML assets."""
+
+    endpoint: str
+    path_predicate: Callable[[str], bool]
+    policy: str
+
+
+@dataclass(frozen=True)
+class SeedPermission:
+    code: str
+    name: str
+    description: str
+
+
+@dataclass(frozen=True)
+class SeedRole:
+    code: str
+    name: str
+    description: str
+    permission_codes: list[str] = field(default_factory=list)
 
 
 class BaseFieldType(ABC):
@@ -201,6 +243,26 @@ class BasePlugin(ABC):
     def get_migrations(self) -> List[str]:
         """Return migration files if this plugin provides any"""
         return []
+
+    def get_data_explorer_tab(self) -> Optional[DataExplorerTabConfig]:
+        """Optional Data Explorer tab for org-specific admin features."""
+        return None
+
+    def get_seed_permissions(self) -> List[SeedPermission]:
+        """RBAC permissions to seed on startup."""
+        return []
+
+    def get_seed_roles(self) -> List[SeedRole]:
+        """RBAC roles to seed on startup."""
+        return []
+
+    def get_csp_overrides(self) -> List[CspOverride]:
+        """CSP overrides for plugin-served HTML assets."""
+        return []
+
+    def get_panel_render_context(self, flags: dict[str, bool], first_tab: str) -> dict[str, Any]:
+        """Extra template context when rendering a Data Explorer panel."""
+        return {}
 
     def install(self) -> bool:
         """Called when plugin is installed"""

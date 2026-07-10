@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from app.pb_progress.service import PBProgressService
-from app.pb_progress.versions import DEFAULT_VERSION
+from plugins.pb_progress.service import PBProgressService
+from plugins.pb_progress.versions import DEFAULT_VERSION
 
 
 def _reset_service_state() -> None:

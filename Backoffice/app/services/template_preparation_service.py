@@ -571,7 +571,7 @@ class TemplatePreparationService:
                     'emergency': str(indicator.emergency).lower() if indicator.emergency is not None else None,
                     'sector': cls._get_indicator_sector_name_cached(indicator, sector_cache),
                     'subsector': cls._get_indicator_subsector_name_cached(indicator, subsector_cache),
-                    'related_programs': cls._process_related_programs(indicator.related_programs),
+                    'related_programs': indicator.related_programs_list[0] if indicator.related_programs_list else None,
                 }
                 for indicator in indicators
             ]

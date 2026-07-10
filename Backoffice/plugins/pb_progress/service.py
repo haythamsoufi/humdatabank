@@ -19,7 +19,7 @@ from typing import Any, ClassVar
 from flask import current_app, url_for
 from werkzeug.datastructures import FileStorage
 
-from app.pb_progress.versions import (
+from plugins.pb_progress.versions import (
     DEFAULT_VERSION,
     LEGACY_EXCEL_REL_PATH,
     LEGACY_OUTPUT_PREFIX,
@@ -47,9 +47,23 @@ PB_BUILD_WORKERS_AZURE = "1"
 PLAYWRIGHT_BROWSERS_PATH = "/home/site/playwright-browsers"
 QUARTO_VERSION = "1.6.42"
 
-VISUALS_TOOL_DIR = Path(__file__).resolve().parents[2] / "Visuals tool"
-BUILD_SCRIPT = VISUALS_TOOL_DIR / "scripts" / "build_report.py"
-REPORT_OUTPUT_DIR = VISUALS_TOOL_DIR / "report" / "output"
+_PLUGIN_DIR = Path(__file__).resolve().parent
+_DEFAULT_VISUALS_TOOL_DIR = _PLUGIN_DIR / "visuals"
+
+
+def _resolve_visuals_tool_dir() -> Path:
+    try:
+        override = current_app.config.get("PB_VISUALS_TOOL_DIR")
+        if override:
+            return Path(override).resolve()
+    except RuntimeError:
+        pass
+    return _DEFAULT_VISUALS_TOOL_DIR
+
+
+def _visuals_paths() -> tuple[Path, Path, Path]:
+    tool_dir = _resolve_visuals_tool_dir()
+    return tool_dir, tool_dir / "scripts" / "build_report.py", tool_dir / "report" / "output"
 
 OUTPUT_LABELS = {
     "pb-report.html": "HTML Report",
@@ -387,8 +401,9 @@ class PBProgressService:
     @classmethod
     def _check_build_prerequisites(cls) -> None:
         issues: list[str] = []
-        if not BUILD_SCRIPT.is_file():
-            issues.append(f"Build script not found: {BUILD_SCRIPT}")
+        _tool_dir, build_script, _output_dir = _visuals_paths()
+        if not build_script.is_file():
+            issues.append(f"Build script not found: {build_script}")
 
         quarto_exe = cls._resolve_quarto_exe()
         if not quarto_exe:
@@ -484,11 +499,12 @@ class PBProgressService:
         names = list(output_names or state.get("output_names") or [])
         if names:
             return names
-        if not REPORT_OUTPUT_DIR.is_dir():
+        _tool_dir, _build_script, report_output_dir = _visuals_paths()
+        if not report_output_dir.is_dir():
             return []
         return sorted(
             p.name
-            for p in REPORT_OUTPUT_DIR.iterdir()
+            for p in report_output_dir.iterdir()
             if p.is_file() and cls._is_publishable_output(p.name)
         )
 
@@ -690,9 +706,10 @@ class PBProgressService:
     @classmethod
     def _copy_outputs_to_storage(cls, version: str) -> list[str]:
         copied: list[str] = []
-        if not REPORT_OUTPUT_DIR.is_dir():
+        _tool_dir, _build_script, report_output_dir = _visuals_paths()
+        if not report_output_dir.is_dir():
             return copied
-        for path in REPORT_OUTPUT_DIR.iterdir():
+        for path in report_output_dir.iterdir():
             if not path.is_file() or not cls._is_publishable_output(path.name):
                 continue
             with open(path, "rb") as handle:
@@ -824,8 +841,9 @@ class PBProgressService:
 
         with app.app_context():
             try:
-                if not BUILD_SCRIPT.is_file():
-                    raise FileNotFoundError(f"Build script not found: {BUILD_SCRIPT}")
+                visuals_tool_dir, build_script, _report_output_dir = _visuals_paths()
+                if not build_script.is_file():
+                    raise FileNotFoundError(f"Build script not found: {build_script}")
 
                 excel_path = storage_service.get_absolute_path(
                     STORAGE_CATEGORY,
@@ -835,7 +853,7 @@ class PBProgressService:
                     temp_excel = excel_path
 
                 env = cls._build_env(version, excel_path, language)
-                cmd = [sys.executable, str(BUILD_SCRIPT), "--format", "html"]
+                cmd = [sys.executable, str(build_script), "--format", "html"]
                 cls._log_build_step(
                     job_id,
                     "started",
@@ -851,7 +869,7 @@ class PBProgressService:
                 try:
                     proc = subprocess.Popen(
                         cmd,
-                        cwd=str(VISUALS_TOOL_DIR),
+                        cwd=str(visuals_tool_dir),
                         env=env,
                         stdout=log_handle,
                         stderr=subprocess.STDOUT,

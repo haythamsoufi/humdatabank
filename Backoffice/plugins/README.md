@@ -87,6 +87,18 @@ def get_entry_form_config(self) -> Dict[str, Any]:
 
 See `interactive_map/` for a complete example plugin implementation.
 
+## Admin feature plugins (org-specific tools)
+
+For **org-specific admin tools** (Data Explorer tabs, custom report pipelines, etc.) that should be removable without editing core app code, use a **plugin** with optional admin hooks on `BasePlugin` — same `plugin.py` entry point as form-field plugins.
+
+- Contract: `Backoffice/app/plugins/base.py` (`BasePlugin`, optional `get_data_explorer_tab()`, `get_seed_permissions()`, `get_seed_roles()`, `get_csp_overrides()`, `get_panel_render_context()`)
+- Discovery: `Backoffice/app/plugins/manager.py` scans `plugins/*/plugin.py`
+- Example: `pb_progress/` (P&B Visuals + Quarto/Playwright pipeline in `visuals/`)
+
+Required file: `plugin.py` with a concrete `BasePlugin` subclass. Set `get_field_types()` to `[]` for admin-only tools. Optional: `routes.py`, `service.py`, `templates/`, `static/`, and tool subfolders.
+
+Admin-feature blueprints register at startup regardless of activate/deactivate state. Templates are referenced as `plugins/<plugin_id>/...`.
+
 ## Best Practices
 
 1. **Self-contained**: All plugin files should be within the plugin directory

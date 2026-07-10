@@ -34,6 +34,7 @@ from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.error_handling import handle_json_view_exception
 from app.services.app_settings_service import is_organization_email
 from app.services.authorization_service import AuthorizationService
+from app.plugins.data_explorer import get_data_explorer_nav_permissions
 
 from app.routes.main import bp
 from app.utils.data_quality_constants import is_data_quality_dashboard_enabled
@@ -81,12 +82,7 @@ def _first_accessible_admin_url_for_user(user):
         (("admin.templates.view",), "form_builder.manage_templates"),
         (("admin.assignments.view",), "assignment_management.manage_assignments"),
         (
-            (
-                "admin.data_explore.data_table",
-                "admin.data_explore.analysis",
-                "admin.data_explore.compliance",
-                "admin.data_explore.pb_progress",
-            ),
+            get_data_explorer_nav_permissions(),
             "data_exploration.explore_data",
         ),
         (("admin.validation.dashboard",), "admin.validation_dashboard"),

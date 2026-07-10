@@ -76,7 +76,7 @@ def create_comparison_table(suggestion, original_indicator):
         ('Sector', 'sector', 'sector'),
         ('Sub-sector', 'sub_sector', 'sub_sector'),
         ('Emergency Context', 'emergency', 'emergency'),
-        ('Related Programs', 'related_programs', 'related_programs')
+        ('Related Programs', 'related_programs_list', 'related_programs')
     ]
 
     table_rows = []
@@ -181,6 +181,10 @@ def create_comparison_table(suggestion, original_indicator):
                     suggested_display = str(suggestion.sub_sector)
             else:
                 suggested_display = ''
+        elif original_field == 'related_programs_list':
+            original_list = getattr(original_indicator, 'related_programs_list', None) if original_indicator else None
+            original_display = ', '.join(original_list) if original_list else ''
+            suggested_display = str(suggested_value) if suggested_value else ''
         else:
             # Format regular values - show empty if no original data
             original_display = str(original_value) if original_value is not None else ''
@@ -199,6 +203,9 @@ def create_comparison_table(suggestion, original_indicator):
             # Normalize subsector data for comparison
             original_compare = normalize_sector_data(original_indicator.sub_sector if original_indicator else None, is_sector=False)
             suggested_compare = normalize_sector_data(suggestion.sub_sector, is_sector=False)
+        elif original_field == 'related_programs_list':
+            original_compare = ', '.join(getattr(original_indicator, 'related_programs_list', None) or [])
+            suggested_compare = str(suggested_value or '')
         else:
             original_compare = original_value
             suggested_compare = suggested_value

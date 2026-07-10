@@ -53,7 +53,6 @@ from app.routes.admin.ai_management import bp as ai_management_bp
 from app.routes.admin.rbac_management import bp as rbac_management_bp
 from app.routes.admin.governance_dashboard import bp as governance_dashboard_bp
 from app.routes.admin.embed_management import bp as embed_management_bp
-from app.pb_progress import bp as pb_progress_bp
 
 # Create main admin blueprint
 bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -106,7 +105,10 @@ def register_admin_blueprints(app):
 
     # Register embed management blueprint
     app.register_blueprint(embed_management_bp)
-    app.register_blueprint(pb_progress_bp)
+
+    # Register admin-feature plugin blueprints (org-specific tools, always on)
+    if hasattr(app, 'plugin_manager'):
+        app.plugin_manager.register_admin_feature_blueprints()
 
 # Plugin management route
 @bp.route("/plugins", methods=["GET"])

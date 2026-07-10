@@ -166,8 +166,8 @@ def build_embedding_scatter(
         primary_subsector_id = (ind.sub_sector or {}).get("primary")
         subsector_name = sub_sectors.get(primary_subsector_id, "") if primary_subsector_id else ""
 
-        programs_raw = (ind.related_programs or "").strip()
-        program = programs_raw.split(",")[0].strip() if programs_raw else ""
+        programs_raw = (ind.related_programs_list[0] if ind.related_programs_list else "").strip()
+        program = programs_raw
 
         sims = sim_matrix[i].copy()
         sims[i] = -1

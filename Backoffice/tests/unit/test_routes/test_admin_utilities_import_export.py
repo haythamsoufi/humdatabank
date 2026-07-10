@@ -838,6 +838,36 @@ class TestApplyIndicatorImport:
         )
         assert resp.status_code == 400
 
+    def test_apply_accepts_form_encoded_import_token(self, logged_in_client, db_session, tmp_path):
+        """Apply step should accept standard form POST (CSRF-friendly), not only JSON."""
+        token = str(uuid.uuid4())
+        temp_file = tmp_path / f"import_{token}.xlsx"
+        temp_file.write_bytes(b"fake")
+
+        import_result = {
+            "success": True,
+            "imported": 1,
+            "updated": 0,
+            "errors": [],
+            "message": "",
+        }
+
+        with patch(
+            "app.routes.admin.utilities.import_export._get_import_temp_path",
+            return_value=str(temp_file),
+        ), patch(
+            "app.routes.admin.utilities.import_export._process_indicator_import",
+            return_value=import_result,
+        ), patch("threading.Thread"):
+            resp = logged_in_client.post(
+                "/admin/indicator_bank/import/apply",
+                data={"import_token": token},
+            )
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "1 indicator(s) created" in data["message"]
+
 
 # ---------------------------------------------------------------------------
 # Route: GET /admin/indicator_bank/change_history

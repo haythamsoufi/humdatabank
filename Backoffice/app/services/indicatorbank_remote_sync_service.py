@@ -337,7 +337,7 @@ def sync_remote_indicator_bank(
                     indicator_type = _normalize_type(item.get("typeOfMeasurement"))
                     archived = bool(item.get("isArchived")) if item.get("isArchived") is not None else False
                     emergency_flag = _is_emergency(item)
-                    related_programs = ", ".join(_get_text_list(item.get("relatedPrograms"))) or None
+                    related_programs_list = _get_text_list(item.get("relatedPrograms")) or None
                     remote_comments = (item.get("comments") or "").strip() or None
 
                     p_sector = _get_or_create_sector_by_name(item.get("primarySector"))
@@ -379,9 +379,9 @@ def sync_remote_indicator_bank(
                             type=indicator_type,
                             unit=unit,
                             emergency=emergency_flag,
-                            related_programs=related_programs,
                             archived=archived,
                         )
+                        existing.related_programs_list = related_programs_list
                         existing.sector = sector_json
                         existing.sub_sector = subsector_json
                         existing.comments = remote_comments
@@ -423,7 +423,7 @@ def sync_remote_indicator_bank(
                         existing.type = indicator_type
                         existing.unit = unit
                         existing.emergency = emergency_flag
-                        existing.related_programs = related_programs
+                        existing.related_programs_list = related_programs_list
                         existing.archived = archived
                         existing.sector = sector_json
                         existing.sub_sector = subsector_json

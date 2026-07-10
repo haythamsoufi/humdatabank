@@ -933,7 +933,7 @@ def export_indicators():
             ws.cell(row=row, column=col, value=_mq_to_str(ind.monitoring_questions_list));                  col += 1
             ws.cell(row=row, column=col, value=", ".join(ind.tags_list));                                   col += 1
             ws.cell(row=row, column=col, value=ind.emergency);                                              col += 1
-            ws.cell(row=row, column=col, value=ind.related_programs);                                       col += 1
+            ws.cell(row=row, column=col, value=", ".join(ind.related_programs_list));                     col += 1
             ws.cell(row=row, column=col, value=ind.archived);                                               col += 1
             ws.cell(row=row, column=col, value=getattr(ind, 'comments', None) or '');                       col += 1
             ws.cell(row=row, column=col,
@@ -1132,7 +1132,9 @@ def get_filtered_indicator_count():
                 elif field == 'related_programs':
                     conditions = []
                     for value in values:
-                        conditions.append(IndicatorBank.related_programs.like(f'%{value}%'))
+                        conditions.append(
+                            cast(IndicatorBank._related_programs_list, String).ilike(f'%{value}%')
+                        )
                     if conditions:
                         query = query.filter(db.or_(*conditions))
                 elif field == 'sector':
@@ -1190,7 +1192,7 @@ def get_filtered_indicator_count():
                     'unit': indicator.unit,
                     'fdrs_kpi_code': getattr(indicator, 'fdrs_kpi_code', None),
                     'definition': indicator.definition,
-                    'related_programs': indicator.related_programs,
+                    'related_programs': indicator.related_programs_list,
                     'emergency': indicator.emergency,
                     'archived': indicator.archived,
                     'sector': indicator.sector,

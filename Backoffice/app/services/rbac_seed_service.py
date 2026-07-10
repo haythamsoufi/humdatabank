@@ -109,7 +109,6 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         ("admin.data_explore.data_table", "Data Explorer: Data Table", "Access the Data Table tab in Data Explorer"),
         ("admin.data_explore.analysis", "Data Explorer: Analysis", "Access the Analysis tab in Data Explorer"),
         ("admin.data_explore.compliance", "Data Explorer: Compliance", "Access the Compliance tab in Data Explorer"),
-        ("admin.data_explore.pb_progress", "Data Explorer: P&B visuals", "Access the Plan and Budget visuals tab in Data Explorer"),
         # Validation admin
         ("admin.validation.dashboard", "Validation: Dashboard", "Access the Validation Dashboard (tracker, checks, dispatch)"),
         ("admin.validation.questions", "Validation: Questions", "Manage validation questions (list, edit, import/export)"),
@@ -308,12 +307,6 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
             "permission_codes": ["admin.data_explore.compliance"],
         },
         {
-            "code": "admin_data_explorer_pb_progress",
-            "name": "Admin: Data Explorer (P&B visuals)",
-            "description": "Access the Plan and Budget visuals tab in Data Explorer.",
-            "permission_codes": ["admin.data_explore.pb_progress"],
-        },
-        {
             "code": "admin_validation_dashboard",
             "name": "Admin: Validation Dashboard (Access)",
             "description": "Access the Validation Dashboard (tracker, checks, dispatch).",
@@ -412,6 +405,32 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
     ]
 
 
+def _extension_permission_catalog() -> List[Tuple[str, str, str]]:
+    try:
+        from flask import current_app
+
+        registry = getattr(current_app, "plugin_manager", None)
+        if registry is None:
+            return []
+        return registry.get_all_seed_permissions()
+    except Exception as exc:
+        logger.debug("Extension permission catalog unavailable: %s", exc)
+        return []
+
+
+def _extension_baseline_roles() -> List[Dict[str, Any]]:
+    try:
+        from flask import current_app
+
+        registry = getattr(current_app, "plugin_manager", None)
+        if registry is None:
+            return []
+        return registry.get_all_seed_roles()
+    except Exception as exc:
+        logger.debug("Extension role catalog unavailable: %s", exc)
+        return []
+
+
 def seed_rbac_permissions_and_roles(*, use_advisory_lock: bool = True) -> Dict[str, int]:
     """
     Seed RBAC permissions and baseline roles (idempotent).
@@ -424,8 +443,8 @@ def seed_rbac_permissions_and_roles(*, use_advisory_lock: bool = True) -> Dict[s
       - created_role_permission_links
       - deleted_role_permission_links
     """
-    permission_catalog = _permission_catalog()
-    baseline_roles = _baseline_roles(permission_catalog)
+    permission_catalog = _permission_catalog() + _extension_permission_catalog()
+    baseline_roles = _baseline_roles(permission_catalog) + _extension_baseline_roles()
 
     # This lock prevents multiple gunicorn workers (or multi-instance rollouts)
     # from racing on unique constraints during seeding.

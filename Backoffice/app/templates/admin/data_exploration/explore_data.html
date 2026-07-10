@@ -99,7 +99,8 @@
 {% block content %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
-    {% set explore_first_tab = explore_first_tab|default('data-table' if can_access_data_table else ('disaggregation' if can_access_analysis else ('compliance' if can_access_compliance else 'pb-progress'))) %}
+    {% set explore_first_tab = explore_first_tab|default('data-table' if can_access_data_table else ('disaggregation' if can_access_analysis else ('compliance' if can_access_compliance else (explorer_extension_tabs_render[0].tab_id if explorer_extension_tabs_render else 'data-table')))) %}
+    {% set pb_manage_tab = (explorer_extension_tabs_render|selectattr('tab_id', 'equalto', 'pb-progress')|selectattr('can_manage')|list|length > 0) %}
 
 {{ page_header(
     title=_('Explore Data'),
@@ -122,7 +123,7 @@
                 'title': _('Upload Excel and regenerate the P&B visuals report')
             }
         }
-    ] if can_manage_pb_progress else []
+    ] if pb_manage_tab else []
 ) }}
 
     <div class="bg-white shadow-md border border-gray-200 mb-6">
@@ -152,14 +153,14 @@
                 <i class="fas fa-clipboard-check mr-1.5"></i>{{ _('Compliance') }}
             </button>
             {% endif %}
-            {% if can_access_pb_progress %}
-            <button type="button" role="tab" id="tab-pb-progress"
-                    data-tab="pb-progress"
-                    aria-selected="{{ 'true' if explore_first_tab == 'pb-progress' else 'false' }}"
-                    class="settings-tab {{ admin_underline_tab_btn_classes(explore_first_tab == 'pb-progress') }}">
-                <i class="fas fa-chart-line mr-1.5"></i>{{ _('P&B visuals') }}
+            {% for ext_tab in explorer_extension_tabs_render|default([]) %}
+            <button type="button" role="tab" id="tab-{{ ext_tab.tab_id }}"
+                    data-tab="{{ ext_tab.tab_id }}"
+                    aria-selected="{{ 'true' if explore_first_tab == ext_tab.tab_id else 'false' }}"
+                    class="settings-tab {{ admin_underline_tab_btn_classes(explore_first_tab == ext_tab.tab_id) }}">
+                <i class="{{ ext_tab.icon }} mr-1.5"></i>{{ _(ext_tab.label) }}
             </button>
-            {% endif %}
+            {% endfor %}
         {% endcall %}
 
         {# Parameters: Data Table only #}
@@ -636,7 +637,9 @@
     {% endif %}
     <!-- End Tab panel: Compliance -->
 
-    {{ pb_progress_panel|default('', true)|safe }}
+    {% for ext_tab in explorer_extension_tabs_render|default([]) %}
+    {{ extension_panels.get(ext_tab.tab_id, '')|safe }}
+    {% endfor %}
 
         </div>{# /p-4 sm:p-6 content wrapper #}
     </div>{# /bg-white card #}

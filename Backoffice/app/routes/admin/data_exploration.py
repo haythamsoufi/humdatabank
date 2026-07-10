@@ -23,7 +23,14 @@ from app.routes.admin.shared import admin_required, permission_required, permiss
 from app.services.security.api_authentication import get_user_allowed_template_ids
 from app.utils.datetime_helpers import utcnow
 from app.services.authorization_service import AuthorizationService
-from app.pb_progress.versions import DEFAULT_VERSION, REPORT_VERSIONS, VERSION_ORDER
+from app.plugins.data_explorer import (
+    CORE_DATA_EXPLORER_PERMISSIONS,
+    explore_first_tab,
+    explore_tab_access_flags,
+    manage_flag_key,
+    tab_flag_key,
+)
+from app.plugins.manager import PluginManager
 from app.services.data_quality.catalogs.fdrs_v1_catalog import COMPLIANCE_DOC_TYPES
 from app.services.data_quality.helpers import (
     active_country_map_query,
@@ -42,13 +49,19 @@ bp = Blueprint("data_exploration", __name__, url_prefix="/admin")
 # FDRS template ID — default for Disaggregation Analysis and compliance checks
 FDRS_TEMPLATE_ID = 21
 
-# Data Explorer permission codes (granular per tab)
-DATA_EXPLORER_PERMISSIONS = [
-    'admin.data_explore.data_table',
-    'admin.data_explore.analysis',
-    'admin.data_explore.compliance',
-    'admin.data_explore.pb_progress',
-]
+# Data Explorer core permission codes (extension tabs add their own at runtime).
+DATA_EXPLORER_PERMISSIONS = list(CORE_DATA_EXPLORER_PERMISSIONS)
+
+
+def _plugin_manager() -> PluginManager:
+    return current_app.plugin_manager
+
+
+def _data_explorer_permissions() -> list[str]:
+    try:
+        return _plugin_manager().get_data_explorer_permission_codes()
+    except Exception:
+        return list(DATA_EXPLORER_PERMISSIONS)
 
 
 def _ai_beta_denied_response():
@@ -71,48 +84,89 @@ def has_any_data_explorer_permission(user) -> bool:
     """Check if user has any Data Explorer permission."""
     if AuthorizationService.is_system_manager(user):
         return True
-    for perm in DATA_EXPLORER_PERMISSIONS:
+    for perm in _data_explorer_permissions():
         if AuthorizationService.has_rbac_permission(user, perm):
             return True
     return False
 
 
 def _explore_tab_access_flags(user) -> dict[str, bool]:
-    is_sm = AuthorizationService.is_system_manager(user)
-    return {
-        'can_access_data_table': is_sm or AuthorizationService.has_rbac_permission(user, 'admin.data_explore.data_table'),
-        'can_access_analysis': is_sm or AuthorizationService.has_rbac_permission(user, 'admin.data_explore.analysis'),
-        'can_access_compliance': is_sm or AuthorizationService.has_rbac_permission(user, 'admin.data_explore.compliance'),
-        'can_access_pb_progress': is_sm or AuthorizationService.has_rbac_permission(user, 'admin.data_explore.pb_progress'),
-        'can_manage_pb_progress': is_sm,
-    }
+    try:
+        return explore_tab_access_flags(user, _plugin_manager())
+    except Exception as exc:
+        logger.debug("Extension tab flags fallback: %s", exc)
+        is_sm = AuthorizationService.is_system_manager(user)
+        return {
+            'can_access_data_table': is_sm or AuthorizationService.has_rbac_permission(user, 'admin.data_explore.data_table'),
+            'can_access_analysis': is_sm or AuthorizationService.has_rbac_permission(user, 'admin.data_explore.analysis'),
+            'can_access_compliance': is_sm or AuthorizationService.has_rbac_permission(user, 'admin.data_explore.compliance'),
+        }
 
 
 def _explore_first_tab(flags: dict[str, bool]) -> str:
-    if flags.get('can_access_data_table'):
-        return 'data-table'
-    if flags.get('can_access_analysis'):
-        return 'disaggregation'
-    if flags.get('can_access_compliance'):
-        return 'compliance'
-    return 'pb-progress'
-
-
-def _render_pb_progress_panel(flags: dict[str, bool], first_tab: str) -> str:
-    if not flags.get('can_access_pb_progress'):
-        return ''
     try:
-        return render_template(
-            'pb_progress/tab_panel.html',
-            explore_first_tab=first_tab,
-            can_manage_pb_progress=flags.get('can_manage_pb_progress', False),
-            pb_report_versions=REPORT_VERSIONS,
-            pb_report_version_order=VERSION_ORDER,
-            pb_default_version=DEFAULT_VERSION,
-        )
+        return explore_first_tab(flags, _plugin_manager())
     except Exception as exc:
-        logger.error("Failed to render P&B progress panel: %s", exc, exc_info=True)
-        return ''
+        logger.debug("Extension first-tab fallback: %s", exc)
+        if flags.get('can_access_data_table'):
+            return 'data-table'
+        if flags.get('can_access_analysis'):
+            return 'disaggregation'
+        if flags.get('can_access_compliance'):
+            return 'compliance'
+        return 'data-table'
+
+
+def _explorer_extension_tabs_render(
+    flags: dict[str, bool],
+    first_tab: str,
+    panels: dict[str, str],
+) -> list[dict[str, Any]]:
+    rendered: list[dict[str, Any]] = []
+    try:
+        plugin_manager = _plugin_manager()
+    except Exception:
+        return rendered
+    for tab in plugin_manager.get_data_explorer_tabs():
+        if not flags.get(tab_flag_key(tab.tab_id)):
+            continue
+        rendered.append(
+            {
+                "tab_id": tab.tab_id,
+                "label": tab.label,
+                "icon": tab.icon,
+                "can_manage": flags.get(manage_flag_key(tab.tab_id), False),
+                "panel_html": panels.get(tab.tab_id, ""),
+                "is_first": tab.tab_id == first_tab,
+            }
+        )
+    return rendered
+
+
+def _render_extension_panels(flags: dict[str, bool], first_tab: str) -> dict[str, str]:
+    panels: dict[str, str] = {}
+    try:
+        plugin_manager = _plugin_manager()
+    except Exception as exc:
+        logger.debug("Extension panel render skipped: %s", exc)
+        return panels
+
+    for tab in plugin_manager.get_data_explorer_tabs():
+        access_key = tab_flag_key(tab.tab_id)
+        if not flags.get(access_key):
+            continue
+        context: dict[str, Any] = {
+            'explore_first_tab': first_tab,
+        }
+        context.update(plugin_manager.get_panel_render_context(tab.plugin_id, flags, first_tab))
+        if tab.manage_requires_system_manager:
+            context[manage_flag_key(tab.tab_id)] = flags.get(manage_flag_key(tab.tab_id), False)
+        try:
+            panels[tab.tab_id] = render_template(tab.panel_template, **context)
+        except Exception as exc:
+            logger.error("Failed to render extension panel %s: %s", tab.tab_id, exc, exc_info=True)
+            panels[tab.tab_id] = ''
+    return panels
 
 
 def data_explorer_required(f):
@@ -132,7 +186,7 @@ def data_explorer_required(f):
         return f(*args, **kwargs)
     # Metadata for startup-time guard auditing
     try:
-        decorated_function._rbac_permissions_any_required = list(DATA_EXPLORER_PERMISSIONS)  # type: ignore[attr-defined]
+        decorated_function._rbac_permissions_any_required = _data_explorer_permissions()  # type: ignore[attr-defined]
         decorated_function._rbac_permissions_required = list(getattr(f, "_rbac_permissions_required", []) or [])  # type: ignore[attr-defined]
         decorated_function._rbac_admin_required = bool(getattr(f, "_rbac_admin_required", False))  # type: ignore[attr-defined]
         decorated_function._rbac_system_manager_required = bool(getattr(f, "_rbac_system_manager_required", False))  # type: ignore[attr-defined]
@@ -148,7 +202,10 @@ def explore_data():
     try:
         tab_flags = _explore_tab_access_flags(current_user)
         explore_first_tab = _explore_first_tab(tab_flags)
-        pb_progress_panel = _render_pb_progress_panel(tab_flags, explore_first_tab)
+        extension_panels = _render_extension_panels(tab_flags, explore_first_tab)
+        explorer_extension_tabs_render = _explorer_extension_tabs_render(
+            tab_flags, explore_first_tab, extension_panels
+        )
         # System managers can see all templates regardless of ownership and sharing
         # Use joinedload for published_version to avoid N+1 queries when accessing template.name
         if AuthorizationService.is_system_manager(current_user):
@@ -184,7 +241,8 @@ def explore_data():
                              period_names=period_names,
                              countries=countries,
                              explore_first_tab=explore_first_tab,
-                             pb_progress_panel=pb_progress_panel,
+                             extension_panels=extension_panels,
+                             explorer_extension_tabs_render=explorer_extension_tabs_render,
                              fdrs_template_id=FDRS_TEMPLATE_ID,
                              title=_("Explore Data"),
                              **tab_flags)
@@ -193,13 +251,17 @@ def explore_data():
         db.session.rollback()
         tab_flags = _explore_tab_access_flags(current_user)
         explore_first_tab = _explore_first_tab(tab_flags)
-        pb_progress_panel = _render_pb_progress_panel(tab_flags, explore_first_tab)
+        extension_panels = _render_extension_panels(tab_flags, explore_first_tab)
+        explorer_extension_tabs_render = _explorer_extension_tabs_render(
+            tab_flags, explore_first_tab, extension_panels
+        )
         return render_template("admin/data_exploration/explore_data.html",
                              templates=[],
                              period_names=[],
                              countries=[],
                              explore_first_tab=explore_first_tab,
-                             pb_progress_panel=pb_progress_panel,
+                             extension_panels=extension_panels,
+                             explorer_extension_tabs_render=explorer_extension_tabs_render,
                              fdrs_template_id=FDRS_TEMPLATE_ID,
                              title=_("Explore Data"),
                              error="Failed to load filter options. Please refresh the page.",

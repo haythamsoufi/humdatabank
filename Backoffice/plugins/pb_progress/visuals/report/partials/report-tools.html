@@ -1,0 +1,360 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600&display=swap">
+<style>
+#pb-report-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem 0.5rem 0 0;
+  background-color: #f9fafb;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  font-family: "Montserrat", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+#pb-report-toolbar.is-pinned {
+  border-radius: 0.5rem;
+}
+
+#pb-report-toolbar-title {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 600;
+  color: #111827;
+  flex-shrink: 0;
+}
+
+#pb-report-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+#pb-report-toolbar-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#pb-report-toolbar-language {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#pb-report-toolbar-language label {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  color: #374151;
+  white-space: nowrap;
+}
+
+#pb-report-toolbar-language select {
+  min-width: 8.5rem;
+  padding: 0.375rem 2rem 0.375rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #374151;
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236b7280' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+#pb-report-toolbar-language select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.2);
+}
+
+#pb-report-toolbar .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 0;
+  outline: none;
+  vertical-align: middle;
+  user-select: none;
+  transition:
+    background-color 0.15s ease-in-out,
+    color 0.15s ease-in-out,
+    box-shadow 0.15s ease-in-out;
+}
+
+#pb-report-toolbar .btn > i {
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+#pb-report-toolbar .btn-secondary {
+  background-color: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+#pb-report-toolbar .btn-secondary:hover {
+  background-color: #f9fafb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+}
+
+#pb-report-toolbar .btn-secondary:active {
+  background-color: #f3f4f6;
+}
+
+#pb-report-toolbar .btn-secondary:focus-visible {
+  box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.2);
+}
+
+#pb-report-toolbar .text-blue-700 { color: #1d4ed8; }
+#pb-report-toolbar .text-red-600 { color: #dc2626; }
+#pb-report-toolbar .text-green-600 { color: #16a34a; }
+#pb-report-toolbar .text-xs { font-size: 0.75rem; line-height: 1rem; }
+#pb-report-toolbar .opacity-60 { opacity: 0.6; }
+#pb-report-toolbar .mr-1 { margin-right: 0.25rem; }
+#pb-report-toolbar .mr-1\.5 { margin-right: 0.375rem; }
+#pb-report-toolbar .shrink-0 { flex-shrink: 0; }
+
+#pb-report-toolbar .relative {
+  position: relative;
+}
+
+#pb-report-toolbar .pb-dl-menu {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  top: calc(100% + 0.25rem);
+  width: 12rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+#pb-report-toolbar .pb-dl-menu.hidden {
+  display: none;
+}
+
+#pb-report-toolbar .pb-dl-menu a {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  color: #374151;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  text-decoration: none;
+  transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+}
+
+#pb-report-toolbar .pb-dl-menu a + a {
+  border-top: 1px solid #f3f4f6;
+}
+
+#pb-report-toolbar .pb-dl-menu a:hover {
+  background-color: #f9fafb;
+}
+
+#pb-report-toolbar .pb-dl-menu a .flex-1 {
+  flex: 1 1 0%;
+}
+
+@media print {
+  #pb-report-toolbar,
+  .pb-language-selector,
+  .quarto-alternate-formats {
+    display: none !important;
+  }
+}
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (window.self !== window.top) return;
+
+  const panelsRoot = document.getElementById("pb-language-panels");
+  const main = document.getElementById("quarto-document-content");
+  if (!panelsRoot || !main) return;
+
+  const LANG_ORDER = ["English", "French", "Spanish", "Arabic"];
+
+  function slug(lang) {
+    return lang.toLowerCase().replace(/\s+/g, "-");
+  }
+
+  function closeMenus() {
+    document.querySelectorAll("#pb-report-toolbar .pb-dl-menu").forEach(function (menu) {
+      menu.classList.add("hidden");
+    });
+  }
+
+  function createTypeDropdown(label, icon, iconColor, items) {
+    if (!items.length) return null;
+
+    const wrap = document.createElement("div");
+    wrap.className = "relative";
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-secondary btn-sm";
+    btn.innerHTML =
+      '<i class="' + icon + " " + iconColor + ' mr-1 shrink-0" aria-hidden="true"></i>' +
+      label +
+      ' <i class="fas fa-chevron-down text-xs opacity-60" aria-hidden="true"></i>';
+
+    const menu = document.createElement("div");
+    menu.className = "pb-dl-menu hidden";
+
+    items.forEach(function (item) {
+      const row = document.createElement("a");
+      row.href = item.href;
+      row.target = "_blank";
+      row.rel = "noopener noreferrer";
+      row.innerHTML = '<span class="flex-1">' + item.lang + "</span>";
+      menu.appendChild(row);
+    });
+
+    btn.addEventListener("click", function (event) {
+      event.stopPropagation();
+      const wasOpen = !menu.classList.contains("hidden");
+      closeMenus();
+      if (!wasOpen) menu.classList.remove("hidden");
+    });
+
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
+    return wrap;
+  }
+
+  function buildDownloadGroups() {
+    const docx = LANG_ORDER.map(function (lang) {
+      return { lang: lang, href: "pb-report-" + slug(lang) + ".docx" };
+    });
+    docx.push({ lang: "All languages", href: "pb-report-docx-all.zip" });
+
+    const pdf = LANG_ORDER.map(function (lang) {
+      return { lang: lang, href: "pb-report-" + slug(lang) + ".pdf" };
+    });
+    pdf.push({ lang: "All languages", href: "pb-report-pdf-all.zip" });
+
+    const figures = LANG_ORDER.map(function (lang) {
+      return { lang: lang, href: "pb-report-figures-" + slug(lang) + ".zip" };
+    });
+    figures.push({ lang: "All languages", href: "pb-report-figures-all.zip" });
+
+    return { docx: docx, pdf: pdf, zip: figures };
+  }
+
+  const toolbar = document.createElement("div");
+  toolbar.id = "pb-report-toolbar";
+
+  const title = document.createElement("h4");
+  title.id = "pb-report-toolbar-title";
+  title.textContent = "Interactive report";
+
+  const actions = document.createElement("div");
+  actions.id = "pb-report-toolbar-actions";
+
+  const languageHost = document.createElement("div");
+  languageHost.id = "pb-report-toolbar-language";
+
+  const downloads = document.createElement("div");
+  downloads.id = "pb-report-toolbar-downloads";
+
+  const groups = buildDownloadGroups();
+  const configs = [
+    { key: "docx", label: "Word", icon: "fas fa-file-word", color: "text-blue-700" },
+    { key: "pdf", label: "PDF", icon: "fas fa-file-pdf", color: "text-red-600" },
+    { key: "zip", label: "Figures", icon: "fas fa-images", color: "text-green-600" },
+  ];
+  configs.forEach(function (cfg) {
+    const el = createTypeDropdown(cfg.label, cfg.icon, cfg.color, groups[cfg.key]);
+    if (el) downloads.appendChild(el);
+  });
+
+  const printBtn = document.createElement("button");
+  printBtn.type = "button";
+  printBtn.className = "btn btn-secondary btn-sm";
+  printBtn.title = "Print report";
+  printBtn.innerHTML = '<i class="fas fa-print mr-1.5" aria-hidden="true"></i>Print';
+  printBtn.addEventListener("click", function () {
+    window.print();
+  });
+
+  actions.appendChild(languageHost);
+  actions.appendChild(downloads);
+  actions.appendChild(printBtn);
+  toolbar.appendChild(title);
+  toolbar.appendChild(actions);
+
+  const titleBlock = main.querySelector("#title-block-header");
+  if (titleBlock && titleBlock.nextSibling) {
+    main.insertBefore(toolbar, titleBlock.nextSibling);
+  } else {
+    main.insertBefore(toolbar, panelsRoot);
+  }
+
+  document.querySelectorAll(".quarto-alternate-formats").forEach(function (node) {
+    node.remove();
+  });
+  document.querySelectorAll(".pb-report-tools").forEach(function (node) {
+    node.remove();
+  });
+
+  function updateToolbarOffset() {
+    const height = Math.ceil(toolbar.getBoundingClientRect().height);
+    document.documentElement.style.setProperty("--pb-report-toolbar-height", height + "px");
+  }
+  window.updatePbReportToolbarOffset = updateToolbarOffset;
+
+  if ("IntersectionObserver" in window) {
+    const pinObserver = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          toolbar.classList.toggle("is-pinned", !entry.isIntersecting);
+        });
+      },
+      { threshold: [1] }
+    );
+    const sentinel = document.createElement("div");
+    sentinel.setAttribute("aria-hidden", "true");
+    sentinel.style.cssText = "height:1px;margin-top:-1px;pointer-events:none;";
+    toolbar.parentNode.insertBefore(sentinel, toolbar);
+    pinObserver.observe(sentinel);
+  }
+
+  updateToolbarOffset();
+  window.addEventListener("resize", updateToolbarOffset);
+  document.addEventListener("click", closeMenus);
+});
+</script>

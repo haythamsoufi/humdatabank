@@ -181,7 +181,7 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
     @classmethod
     def related_programs_from_request(cls):
         values = cls._non_empty_values_from_request("related_programs")
-        return ", ".join(values) if values else None
+        return values or None
 
     def populate_from_indicator_bank(self, indicator_bank):
         """Populates the form fields from an IndicatorBank instance."""
@@ -255,7 +255,8 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
         indicator_bank.archived = self.archived.data
         indicator_bank.emergency = self.emergency.data
         indicator_bank.comments = self.comments.data
-        indicator_bank.related_programs = self.related_programs_from_request()
+        program_values = self._non_empty_values_from_request("related_programs")
+        indicator_bank.related_programs_list = program_values or None
 
         sector_data = {}
         if self.sector_primary.data:

@@ -62,7 +62,7 @@ def indicator_bank_history_snapshot(indicator):
         "archived": indicator.archived,
         "comments": indicator.comments,
         "emergency": indicator.emergency,
-        "related_programs": indicator.related_programs,
+        "related_programs": ", ".join(indicator.related_programs_list) if indicator.related_programs_list else None,
         "sector": indicator.sector,
         "sub_sector": indicator.sub_sector,
     }
@@ -129,6 +129,8 @@ def track_indicator_changes(old_indicator, new_form_data, user):
         elif field_name.startswith('sub_sector_'):
             level = field_name.replace('sub_sector_', '')
             old_value = old_indicator.sub_sector.get(level) if old_indicator.sub_sector else None
+        elif field_name == 'related_programs':
+            old_value = old_indicator.related_programs_list or None
 
         if new_value == '' or new_value == 'None':
             new_value = None

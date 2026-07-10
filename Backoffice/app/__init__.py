@@ -146,15 +146,6 @@ def create_app(config_name=None):
     from app.template_context import register_template_context
     register_template_context(app, config_class)
 
-    from app.routes import register_all_blueprints
-    from app.routes.api import api_bp
-    from app.swagger.routes import swagger_bp
-
-    register_all_blueprints(app, csrf, startup_start)
-
-    if not hasattr(app, 'form_integration'):
-        app.form_integration = None
-
     is_reloading = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
     if not hasattr(app, 'plugin_manager') and (not app.debug or is_reloading or app.config.get('TESTING')):
         from app.plugins import PluginManager
@@ -163,12 +154,25 @@ def create_app(config_name=None):
         app.form_integration = FormIntegration(app.plugin_manager)
         app.plugin_manager.load_plugins()
         app.plugin_manager.register_template_loader()
-        app.plugin_manager.register_blueprints()
+        app.plugin_manager.register_context_processors()
     elif app.debug and not is_reloading and not app.config.get('TESTING'):
         from app.plugins import PluginManager
         from app.plugins.form_integration import FormIntegration
         app.plugin_manager = PluginManager(app)
         app.form_integration = FormIntegration(app.plugin_manager)
+
+    # Compatibility alias — consumers should use plugin_manager directly.
+    if hasattr(app, 'plugin_manager'):
+        app.extension_registry = app.plugin_manager
+
+    from app.routes import register_all_blueprints
+    from app.routes.api import api_bp
+    from app.swagger.routes import swagger_bp
+
+    register_all_blueprints(app, csrf, startup_start)
+
+    if hasattr(app, 'plugin_manager') and (not app.debug or is_reloading or app.config.get('TESTING')):
+        app.plugin_manager.register_blueprints()
 
     from app.error_handlers import register_error_handlers
     register_error_handlers(app)

@@ -100,7 +100,7 @@ def apply_indicator_import():
     """Step 2 of two-step import: apply the changes using the token from preview."""
     temp_path = None
     try:
-        data = request.get_json(silent=True) or {}
+        data = request.get_json(silent=True) or request.form.to_dict() or {}
         token = (data.get('import_token') or '').strip()
         if not token:
             return json_bad_request('No import token provided.')
@@ -388,7 +388,16 @@ def _preview_indicator_import(file_path):
                     db.func.lower(IndicatorBankType.code) == code
                 ).first()
             if obj:
-                summary["types"]["to_update"] += 1
+                # Only flag as update if at least one field actually differs
+                name       = (r.get("name") or "").strip()
+                is_active  = _to_bool(r.get("active"))
+                sort_order = _to_int(r.get("sort order") or r.get("sort_order"))
+                if (
+                    (name and obj.name != name)
+                    or (is_active is not None and obj.is_active != is_active)
+                    or (sort_order is not None and obj.sort_order != sort_order)
+                ):
+                    summary["types"]["to_update"] += 1
             else:
                 summary["types"]["to_create"] += 1
         break
@@ -408,7 +417,17 @@ def _preview_indicator_import(file_path):
                     db.func.lower(IndicatorBankUnit.code) == code
                 ).first()
             if obj:
-                summary["units"]["to_update"] += 1
+                name                  = (r.get("name") or "").strip()
+                is_active             = _to_bool(r.get("active"))
+                sort_order            = _to_int(r.get("sort order") or r.get("sort_order"))
+                allows_disaggregation = _to_bool(r.get("allows disaggregation") or r.get("allows_disaggregation"))
+                if (
+                    (name and obj.name != name)
+                    or (is_active is not None and obj.is_active != is_active)
+                    or (sort_order is not None and obj.sort_order != sort_order)
+                    or (allows_disaggregation is not None and obj.allows_disaggregation != allows_disaggregation)
+                ):
+                    summary["units"]["to_update"] += 1
             else:
                 summary["units"]["to_create"] += 1
         break
@@ -422,7 +441,18 @@ def _preview_indicator_import(file_path):
                 continue
             obj = Sector.query.get(rid) if rid else Sector.query.filter_by(name=name).first()
             if obj:
-                summary["sectors"]["to_update"] += 1
+                description   = r.get("description") or None
+                is_active     = _to_bool(r.get("active"))
+                display_order = _to_int(r.get("display order") or r.get("display_order"))
+                icon_class    = r.get("icon class") or r.get("icon_class") or None
+                if (
+                    (name and obj.name != name)
+                    or (description is not None and obj.description != description)
+                    or (is_active is not None and obj.is_active != is_active)
+                    or (display_order is not None and obj.display_order != display_order)
+                    or (icon_class is not None and obj.icon_class != icon_class)
+                ):
+                    summary["sectors"]["to_update"] += 1
             else:
                 summary["sectors"]["to_create"] += 1
     elif "DB_Sectors_SubSectors" in sheetnames:
@@ -452,7 +482,18 @@ def _preview_indicator_import(file_path):
                 continue
             obj = SubSector.query.get(rid) if rid else SubSector.query.filter_by(name=name).first()
             if obj:
-                summary["subsectors"]["to_update"] += 1
+                description   = r.get("description") or None
+                is_active     = _to_bool(r.get("active"))
+                display_order = _to_int(r.get("display order") or r.get("display_order"))
+                icon_class    = r.get("icon class") or r.get("icon_class") or None
+                if (
+                    (name and obj.name != name)
+                    or (description is not None and obj.description != description)
+                    or (is_active is not None and obj.is_active != is_active)
+                    or (display_order is not None and obj.display_order != display_order)
+                    or (icon_class is not None and obj.icon_class != icon_class)
+                ):
+                    summary["subsectors"]["to_update"] += 1
             else:
                 summary["subsectors"]["to_create"] += 1
 
@@ -467,31 +508,195 @@ def _preview_indicator_import(file_path):
                 continue
             obj = CommonWord.query.get(rid) if rid else CommonWord.query.filter_by(term=term).first()
             if obj:
-                summary["common_words"]["to_update"] += 1
+                meaning   = (r.get("meaning") or "").strip()
+                is_active = _to_bool(r.get("active"))
+                if (
+                    (meaning and obj.meaning != meaning)
+                    or (is_active is not None and obj.is_active != is_active)
+                ):
+                    summary["common_words"]["to_update"] += 1
             else:
                 summary["common_words"]["to_create"] += 1
         break
 
     # Indicators ─────────────────────────────────────────────────────────────
     SAMPLE_LIMIT = 25
+
+    def _rv(row, idx):
+        return row[idx] if idx is not None and 0 <= idx < len(row) else None
+
+    def _str(v):
+        return str(v).strip() if v is not None else ""
+
+    def _indicator_row_has_changes(obj, row, hmap, sector_name_to_id_cache, subsector_name_to_id_cache):
+        """Return True if the Excel row differs from the existing DB indicator."""
+        def rv(key, default_idx=None):
+            idx = hmap.get(key, default_idx)
+            return _rv(row, idx)
+
+        name           = _str(rv("name", 1))
+        definition     = _str(rv("definition", 2))
+        indicator_type = _str(rv("type", 5)) or "numeric"
+        unit           = _str(rv("unit", 6))
+        fdrs_kpi_code  = _str(rv("fdrs kpi code")) or None
+        aggregated_lbl = _str(rv("aggregated label")) or None
+        area           = _str(rv("area")) or None
+        data_source    = _str(rv("data source")) or None
+        dis_guidance   = _str(rv("disaggregation guidance")) or None
+        comments       = _str(rv("comments")) or None
+        programs       = _str(rv("related programs"))
+        emergency      = _to_bool(rv("emergency"))
+        archived       = _to_bool(rv("archived"))
+        mq_raw         = rv("monitoring questions")
+        monitoring_qs  = _mq_str_to_list(mq_raw)
+        tags_raw       = rv("tags")
+        tags           = _tags_str_to_list(tags_raw)
+
+        # Core scalar fields
+        if name and obj.name != name:
+            return True
+        if definition != (obj.definition or ""):
+            return True
+        if obj.type != indicator_type:
+            return True
+        if (obj.unit or "") != unit:
+            return True
+        if getattr(obj, "fdrs_kpi_code", None) != fdrs_kpi_code:
+            return True
+        if emergency is not None and obj.emergency != emergency:
+            return True
+        if archived is not None and obj.archived != archived:
+            return True
+
+        # Optional scalar fields (only compare when Excel has a value)
+        if aggregated_lbl is not None and (getattr(obj, "aggregated_label", None) or "") != (aggregated_lbl or ""):
+            return True
+        if area is not None and (getattr(obj, "area", None) or "") != (area or ""):
+            return True
+        if data_source is not None and (getattr(obj, "data_source", None) or "") != (data_source or ""):
+            return True
+        if dis_guidance is not None and (getattr(obj, "disaggregation_guidance", None) or "") != (dis_guidance or ""):
+            return True
+        if comments is not None and (getattr(obj, "comments", None) or "") != (comments or ""):
+            return True
+
+        # Related programs — exporter joins the list with ", " so we must do the same
+        existing_programs = ""
+        try:
+            rpl = obj.related_programs_list if hasattr(obj, "related_programs_list") else None
+            if isinstance(rpl, list):
+                existing_programs = ", ".join(str(x) for x in rpl if x)
+            elif rpl is not None:
+                existing_programs = str(rpl)
+        except Exception:
+            pass
+        if (programs or "") != (existing_programs or ""):
+            return True
+
+        # List fields
+        if monitoring_qs is not None and (obj.monitoring_questions or []) != monitoring_qs:
+            return True
+        if tags is not None and (obj.tags or []) != tags:
+            return True
+
+        # Name / definition / aggregated-label translations
+        # For "en" we use the same fallback the exporter uses so an
+        # export-then-import-unchanged round-trip doesn't show spurious changes.
+        existing_nt = obj.name_translations or {}
+        existing_dt = obj.definition_translations or {}
+        existing_at = getattr(obj, "aggregated_label_translations", None) or {}
+        for key, col_idx in hmap.items():
+            val = _rv(row, col_idx)
+            if not val or not str(val).strip():
+                continue
+            sval = str(val).strip()
+            if key.startswith("name (") and key.endswith(")"):
+                lang = key[6:-1].strip().lower()
+                if not lang or len(lang) > 6:
+                    continue
+                effective = existing_nt.get(lang) or (obj.name if lang == "en" else None)
+                if effective != sval:
+                    return True
+            elif key.startswith("definition (") and key.endswith(")"):
+                lang = key[12:-1].strip().lower()
+                if not lang or len(lang) > 6:
+                    continue
+                effective = existing_dt.get(lang) or (obj.definition if lang == "en" else None)
+                if effective != sval:
+                    return True
+            elif key.startswith("aggregated label (") and key.endswith(")"):
+                lang = key[18:-1].strip().lower()
+                if lang and len(lang) <= 6 and existing_at.get(lang) != sval:
+                    return True
+
+        # Sector / sub-sector (resolve names → IDs)
+        for level, key in (("primary", "sector primary"), ("secondary", "sector secondary"), ("tertiary", "sector tertiary")):
+            sname_val = _str(rv(key))
+            existing_id = (obj.sector or {}).get(level)
+            if sname_val:
+                resolved_id = sector_name_to_id_cache.get(sname_val)
+                if resolved_id != existing_id:
+                    return True
+            elif existing_id is not None:
+                return True
+
+        for level, key in (("primary", "subsector primary"), ("secondary", "subsector secondary"), ("tertiary", "subsector tertiary")):
+            ssname_val = _str(rv(key))
+            existing_id = (obj.sub_sector or {}).get(level)
+            if ssname_val:
+                resolved_id = subsector_name_to_id_cache.get(ssname_val)
+                if resolved_id != existing_id:
+                    return True
+            elif existing_id is not None:
+                return True
+
+        return False
+
     if "DB_Indicators" in sheetnames:
+        _sector_cache = {s.name: s.id for s in Sector.query.all()}
+        _subsector_cache = {ss.name: ss.id for ss in SubSector.query.all()}
         for r in _sheet_rows_as_dicts(wb["DB_Indicators"]):
             rid  = _to_int(r.get("id"))
             name = (r.get("name") or "").strip()
             if not name and not rid:
                 continue
-            obj    = IndicatorBank.query.get(rid) if rid else IndicatorBank.query.filter_by(name=name).first()
-            action = "update" if obj else "create"
-            summary["indicators"]["to_" + action] += 1
-            if len(summary["indicators"]["sample"]) < SAMPLE_LIMIT:
-                summary["indicators"]["sample"].append({"name": name or f"ID:{rid}", "action": action})
+            obj = IndicatorBank.query.get(rid) if rid else IndicatorBank.query.filter_by(name=name).first()
+            if obj:
+                # Compare key fields (DB_Indicators uses flat dict keys, not row-tuple)
+                definition     = (r.get("definition") or "").strip()
+                indicator_type = (r.get("type") or "").strip() or "numeric"
+                unit           = (r.get("unit") or "").strip()
+                fdrs_kpi_code  = (r.get("fdrs_kpi_code") or "").strip() or None
+                emergency      = _to_bool(r.get("emergency"))
+                archived       = _to_bool(r.get("archived"))
+                if (
+                    (name and obj.name != name)
+                    or (obj.definition or "") != definition
+                    or obj.type != indicator_type
+                    or (obj.unit or "") != unit
+                    or getattr(obj, "fdrs_kpi_code", None) != fdrs_kpi_code
+                    or (emergency is not None and obj.emergency != emergency)
+                    or (archived is not None and obj.archived != archived)
+                ):
+                    summary["indicators"]["to_update"] += 1
+                    if len(summary["indicators"]["sample"]) < SAMPLE_LIMIT:
+                        summary["indicators"]["sample"].append({"name": name or f"ID:{rid}", "action": "update"})
+            else:
+                summary["indicators"]["to_create"] += 1
+                if len(summary["indicators"]["sample"]) < SAMPLE_LIMIT:
+                    summary["indicators"]["sample"].append({"name": name or f"ID:{rid}", "action": "create"})
     else:
         ws_ind = wb.active
         rows_raw = list(ws_ind.iter_rows(values_only=True))
         if rows_raw:
-            headers = [_norm_header(h) for h in rows_raw[0]]
-            hmap    = {h: i for i, h in enumerate(headers) if h}
+            headers  = [_norm_header(h) for h in rows_raw[0]]
+            hmap     = {h: i for i, h in enumerate(headers) if h}
             name_idx = hmap.get("name", 1)
+            id_idx   = hmap.get("id")
+
+            _sector_cache    = {s.name: s.id for s in Sector.query.all()}
+            _subsector_cache = {ss.name: ss.id for ss in SubSector.query.all()}
+
             for r in rows_raw[1:]:
                 if not r or all((c is None or str(c).strip() == "") for c in r):
                     continue
@@ -500,11 +705,17 @@ def _preview_indicator_import(file_path):
                 name = str(r[name_idx] or "").strip()
                 if not name:
                     continue
-                obj    = IndicatorBank.query.filter_by(name=name).first()
-                action = "update" if obj else "create"
-                summary["indicators"]["to_" + action] += 1
-                if len(summary["indicators"]["sample"]) < SAMPLE_LIMIT:
-                    summary["indicators"]["sample"].append({"name": name, "action": action})
+                rid = _to_int(_rv(r, id_idx))
+                obj = IndicatorBank.query.get(rid) if rid else IndicatorBank.query.filter_by(name=name).first()
+                if obj:
+                    if _indicator_row_has_changes(obj, r, hmap, _sector_cache, _subsector_cache):
+                        summary["indicators"]["to_update"] += 1
+                        if len(summary["indicators"]["sample"]) < SAMPLE_LIMIT:
+                            summary["indicators"]["sample"].append({"name": name, "action": "update"})
+                else:
+                    summary["indicators"]["to_create"] += 1
+                    if len(summary["indicators"]["sample"]) < SAMPLE_LIMIT:
+                        summary["indicators"]["sample"].append({"name": name, "action": "create"})
 
     return summary
 
@@ -815,7 +1026,7 @@ def _import_db_indicators(wb, sheetnames, result):
                     name=name, definition=definition, type=indicator_type, unit=unit,
                     fdrs_kpi_code=fdrs_kpi_code,
                     emergency=bool(emergency) if emergency is not None else False,
-                    related_programs=programs, aggregated_label=aggregated_label,
+                    aggregated_label=aggregated_label,
                     area=area, data_source=data_source,
                     disaggregation_guidance=disaggregation_guidance,
                     monitoring_questions=monitoring_questions if isinstance(monitoring_questions, list) else None,
@@ -823,6 +1034,7 @@ def _import_db_indicators(wb, sheetnames, result):
                 )
                 if rid:
                     existing.id = rid
+                existing.related_programs_list = programs or None
                 db.session.add(existing)
                 db.session.flush()
             else:
@@ -837,7 +1049,7 @@ def _import_db_indicators(wb, sheetnames, result):
                 if archived is not None:
                     existing.archived = archived
                 existing.comments   = comments
-                existing.related_programs = programs
+                existing.related_programs_list = programs or None
                 existing.aggregated_label = aggregated_label
                 existing.area       = area
                 existing.data_source = data_source
@@ -915,18 +1127,36 @@ def _import_types_sheet(wb, sheetnames, result):
                 if rid:
                     obj.id = rid
                 db.session.add(obj)
-            if code:
-                obj.code = code
-            if name:
-                obj.name = name
-            if name_translations:
-                obj.name_translations = {**(obj.name_translations or {}), **name_translations}
-                _flag(obj, "name_translations")
-            if sort_order is not None:
-                obj.sort_order = sort_order
-            if is_active is not None:
-                obj.is_active = is_active
-            result["measurement_types_imported" if is_new else "measurement_types_updated"] += 1
+                if code:
+                    obj.code = code
+                if name:
+                    obj.name = name
+                if name_translations:
+                    obj.name_translations = name_translations
+                    _flag(obj, "name_translations")
+                if sort_order is not None:
+                    obj.sort_order = sort_order
+                if is_active is not None:
+                    obj.is_active = is_active
+                result["measurement_types_imported"] += 1
+            else:
+                changed = False
+                if code and obj.code != code:
+                    obj.code = code; changed = True
+                if name and obj.name != name:
+                    obj.name = name; changed = True
+                if name_translations:
+                    merged = {**(obj.name_translations or {}), **name_translations}
+                    if merged != (obj.name_translations or {}):
+                        obj.name_translations = merged
+                        _flag(obj, "name_translations")
+                        changed = True
+                if sort_order is not None and obj.sort_order != sort_order:
+                    obj.sort_order = sort_order; changed = True
+                if is_active is not None and obj.is_active != is_active:
+                    obj.is_active = is_active; changed = True
+                if changed:
+                    result["measurement_types_updated"] += 1
         except Exception as e:
             current_app.logger.error("Error processing Types row %d: %s", idx, e, exc_info=True)
             result["errors"].append(f"Types row {idx}: error.")
@@ -966,20 +1196,40 @@ def _import_units_sheet(wb, sheetnames, result):
                 if rid:
                     obj.id = rid
                 db.session.add(obj)
-            if code:
-                obj.code = code
-            if name:
-                obj.name = name
-            if name_translations:
-                obj.name_translations = {**(obj.name_translations or {}), **name_translations}
-                _flag(obj, "name_translations")
-            if sort_order is not None:
-                obj.sort_order = sort_order
-            if is_active is not None:
-                obj.is_active = is_active
-            if allows_disaggregation is not None:
-                obj.allows_disaggregation = allows_disaggregation
-            result["measurement_units_imported" if is_new else "measurement_units_updated"] += 1
+                if code:
+                    obj.code = code
+                if name:
+                    obj.name = name
+                if name_translations:
+                    obj.name_translations = name_translations
+                    _flag(obj, "name_translations")
+                if sort_order is not None:
+                    obj.sort_order = sort_order
+                if is_active is not None:
+                    obj.is_active = is_active
+                if allows_disaggregation is not None:
+                    obj.allows_disaggregation = allows_disaggregation
+                result["measurement_units_imported"] += 1
+            else:
+                changed = False
+                if code and obj.code != code:
+                    obj.code = code; changed = True
+                if name and obj.name != name:
+                    obj.name = name; changed = True
+                if name_translations:
+                    merged = {**(obj.name_translations or {}), **name_translations}
+                    if merged != (obj.name_translations or {}):
+                        obj.name_translations = merged
+                        _flag(obj, "name_translations")
+                        changed = True
+                if sort_order is not None and obj.sort_order != sort_order:
+                    obj.sort_order = sort_order; changed = True
+                if is_active is not None and obj.is_active != is_active:
+                    obj.is_active = is_active; changed = True
+                if allows_disaggregation is not None and obj.allows_disaggregation != allows_disaggregation:
+                    obj.allows_disaggregation = allows_disaggregation; changed = True
+                if changed:
+                    result["measurement_units_updated"] += 1
         except Exception as e:
             current_app.logger.error("Error processing Units row %d: %s", idx, e, exc_info=True)
             result["errors"].append(f"Units row {idx}: error.")
@@ -1014,19 +1264,37 @@ def _import_sectors_sheet(wb, sheetnames, result):
                 if rid:
                     obj.id = rid
                 db.session.add(obj)
-            if name:
-                obj.name = name
-            if description is not None:
-                obj.description = description
-            if display_order is not None:
-                obj.display_order = display_order
-            if is_active is not None:
-                obj.is_active = is_active
-            if icon_class is not None:
-                obj.icon_class = icon_class
-            if name_translations:
-                obj.name_translations = {**(obj.name_translations or {}), **name_translations}
-            result["sectors_imported" if is_new else "sectors_updated"] += 1
+                if name:
+                    obj.name = name
+                if description is not None:
+                    obj.description = description
+                if display_order is not None:
+                    obj.display_order = display_order
+                if is_active is not None:
+                    obj.is_active = is_active
+                if icon_class is not None:
+                    obj.icon_class = icon_class
+                if name_translations:
+                    obj.name_translations = name_translations
+                result["sectors_imported"] += 1
+            else:
+                changed = False
+                if name and obj.name != name:
+                    obj.name = name; changed = True
+                if description is not None and obj.description != description:
+                    obj.description = description; changed = True
+                if display_order is not None and obj.display_order != display_order:
+                    obj.display_order = display_order; changed = True
+                if is_active is not None and obj.is_active != is_active:
+                    obj.is_active = is_active; changed = True
+                if icon_class is not None and obj.icon_class != icon_class:
+                    obj.icon_class = icon_class; changed = True
+                if name_translations:
+                    merged = {**(obj.name_translations or {}), **name_translations}
+                    if merged != (obj.name_translations or {}):
+                        obj.name_translations = merged; changed = True
+                if changed:
+                    result["sectors_updated"] += 1
         except Exception as e:
             current_app.logger.error("Error processing Sectors row %d: %s", idx, e, exc_info=True)
             result["errors"].append(f"Sectors row {idx}: error.")
@@ -1063,23 +1331,45 @@ def _import_subsectors_sheet(wb, sheetnames, result):
                 if rid:
                     obj.id = rid
                 db.session.add(obj)
-            if name:
-                obj.name = name
-            if sector_name:
-                sid = sector_name_to_id.get(sector_name)
-                if sid:
-                    obj.sector_id = sid
-            if description is not None:
-                obj.description = description
-            if display_order is not None:
-                obj.display_order = display_order
-            if is_active is not None:
-                obj.is_active = is_active
-            if icon_class is not None:
-                obj.icon_class = icon_class
-            if name_translations:
-                obj.name_translations = {**(obj.name_translations or {}), **name_translations}
-            result["subsectors_imported" if is_new else "subsectors_updated"] += 1
+                if name:
+                    obj.name = name
+                if sector_name:
+                    sid = sector_name_to_id.get(sector_name)
+                    if sid:
+                        obj.sector_id = sid
+                if description is not None:
+                    obj.description = description
+                if display_order is not None:
+                    obj.display_order = display_order
+                if is_active is not None:
+                    obj.is_active = is_active
+                if icon_class is not None:
+                    obj.icon_class = icon_class
+                if name_translations:
+                    obj.name_translations = name_translations
+                result["subsectors_imported"] += 1
+            else:
+                changed = False
+                if name and obj.name != name:
+                    obj.name = name; changed = True
+                if sector_name:
+                    sid = sector_name_to_id.get(sector_name)
+                    if sid and obj.sector_id != sid:
+                        obj.sector_id = sid; changed = True
+                if description is not None and obj.description != description:
+                    obj.description = description; changed = True
+                if display_order is not None and obj.display_order != display_order:
+                    obj.display_order = display_order; changed = True
+                if is_active is not None and obj.is_active != is_active:
+                    obj.is_active = is_active; changed = True
+                if icon_class is not None and obj.icon_class != icon_class:
+                    obj.icon_class = icon_class; changed = True
+                if name_translations:
+                    merged = {**(obj.name_translations or {}), **name_translations}
+                    if merged != (obj.name_translations or {}):
+                        obj.name_translations = merged; changed = True
+                if changed:
+                    result["subsectors_updated"] += 1
         except Exception as e:
             current_app.logger.error("Error processing Sub-Sectors row %d: %s", idx, e, exc_info=True)
             result["errors"].append(f"Sub-Sectors row {idx}: error.")
@@ -1112,15 +1402,29 @@ def _import_common_words_sheet(wb, sheetnames, result):
                 if rid:
                     obj.id = rid
                 db.session.add(obj)
-            if term:
-                obj.term = term
-            if meaning:
-                obj.meaning = meaning
-            if is_active is not None:
-                obj.is_active = is_active
-            if meaning_translations:
-                obj.meaning_translations = {**(obj.meaning_translations or {}), **meaning_translations}
-            result["common_words_imported" if is_new else "common_words_updated"] += 1
+                if term:
+                    obj.term = term
+                if meaning:
+                    obj.meaning = meaning
+                if is_active is not None:
+                    obj.is_active = is_active
+                if meaning_translations:
+                    obj.meaning_translations = meaning_translations
+                result["common_words_imported"] += 1
+            else:
+                changed = False
+                if term and obj.term != term:
+                    obj.term = term; changed = True
+                if meaning and obj.meaning != meaning:
+                    obj.meaning = meaning; changed = True
+                if is_active is not None and obj.is_active != is_active:
+                    obj.is_active = is_active; changed = True
+                if meaning_translations:
+                    merged = {**(obj.meaning_translations or {}), **meaning_translations}
+                    if merged != (obj.meaning_translations or {}):
+                        obj.meaning_translations = merged; changed = True
+                if changed:
+                    result["common_words_updated"] += 1
         except Exception as e:
             current_app.logger.error("Error processing Common Words row %d: %s", idx, e, exc_info=True)
             result["errors"].append(f"Common Words row {idx}: error.")
@@ -1231,19 +1535,58 @@ def _import_indicators_main_sheet(wb, result):
                     changes.append(f"Definition changed from '{od[:50]}...' to '{nd[:50]}...'")
                 if existing.type != indicator_type:
                     changes.append(f"Type: {existing.type!r} → {indicator_type!r}")
-                if existing.unit != unit:
+                if (existing.unit or "") != unit:
                     changes.append(f"Unit: {existing.unit!r} → {unit!r}")
                 if getattr(existing, 'fdrs_kpi_code', None) != fdrs_kpi_code:
                     changes.append(f"FDRS KPI Code: {existing.fdrs_kpi_code!r} → {fdrs_kpi_code!r}")
                 if existing.emergency != emergency:
                     changes.append(f"Emergency: {existing.emergency} → {emergency}")
+                if _archived is not None and existing.archived != _archived:
+                    changes.append(f"Archived: {existing.archived} → {_archived}")
+                if aggregated_label is not None and (existing.aggregated_label or '') != (aggregated_label or ''):
+                    changes.append("Aggregated label changed")
+                if area is not None and (existing.area or '') != (area or ''):
+                    changes.append("Area changed")
+                if data_source is not None and (existing.data_source or '') != (data_source or ''):
+                    changes.append("Data source changed")
+                if disaggregation_guidance is not None and (existing.disaggregation_guidance or '') != (disaggregation_guidance or ''):
+                    changes.append("Disaggregation guidance changed")
+                _existing_programs = (existing.related_programs_list or '') if hasattr(existing, 'related_programs_list') else ''
+                if (programs or '') != (_existing_programs or ''):
+                    changes.append("Related programs changed")
+                if monitoring_questions is not None and existing.monitoring_questions != monitoring_questions:
+                    changes.append("Monitoring questions changed")
+                if tags is not None and existing.tags != tags:
+                    changes.append("Tags changed")
+                if comments is not None and (existing.comments or '') != (comments or ''):
+                    changes.append("Comments changed")
+                if name_translations:
+                    merged_nt = {**(existing.name_translations or {}), **name_translations}
+                    if merged_nt != (existing.name_translations or {}):
+                        changes.append("Name translations changed")
+                if definition_translations:
+                    merged_dt = {**(existing.definition_translations or {}), **definition_translations}
+                    if merged_dt != (existing.definition_translations or {}):
+                        changes.append("Definition translations changed")
+                if agg_label_translations:
+                    merged_at = {**(existing.aggregated_label_translations or {}), **agg_label_translations}
+                    if merged_at != (existing.aggregated_label_translations or {}):
+                        changes.append("Aggregated label translations changed")
+                if sector_json is not None and existing.sector != sector_json:
+                    changes.append("Sector changed")
+                if sub_sector_json is not None and existing.sub_sector != sub_sector_json:
+                    changes.append("Sub-sector changed")
+
+                if not changes:
+                    # Nothing actually changed – skip DB write entirely
+                    continue
 
                 existing.definition  = definition
                 existing.type        = indicator_type
                 existing.unit        = unit
                 existing.fdrs_kpi_code = fdrs_kpi_code
                 existing.emergency   = emergency
-                existing.related_programs = programs
+                existing.related_programs_list = programs or None
                 if aggregated_label is not None:
                     existing.aggregated_label = aggregated_label
                 if area is not None:
@@ -1273,8 +1616,7 @@ def _import_indicators_main_sheet(wb, result):
 
                 backfill_fk_from_strings_bank(existing)
 
-                change_description = "; ".join(changes) if changes else \
-                    f"Indicator updated via import by {current_user.name or current_user.email}"
+                change_description = "; ".join(changes)
                 history = IndicatorBankHistory(
                     indicator_bank_id=existing.id,
                     user_id=current_user.id,
@@ -1289,7 +1631,7 @@ def _import_indicators_main_sheet(wb, result):
                 new_indicator = IndicatorBank(
                     name=name, definition=definition, type=indicator_type, unit=unit,
                     fdrs_kpi_code=fdrs_kpi_code, emergency=emergency,
-                    related_programs=programs, aggregated_label=aggregated_label,
+                    aggregated_label=aggregated_label,
                     area=area, data_source=data_source,
                     disaggregation_guidance=disaggregation_guidance,
                     monitoring_questions=monitoring_questions,
@@ -1305,6 +1647,7 @@ def _import_indicators_main_sheet(wb, result):
                     new_indicator.sector = sector_json
                 if sub_sector_json is not None:
                     new_indicator.sub_sector = sub_sector_json
+                new_indicator.related_programs_list = programs or None
                 db.session.add(new_indicator)
                 db.session.flush()
                 backfill_fk_from_strings_bank(new_indicator)

@@ -283,18 +283,20 @@ class TestIndicatorBank:
             assert result == ['WASH', 'Health']
 
     def test_related_programs_list_from_text(self, db_session, app):
-        """Test related_programs_list parsed from text column."""
+        """Test related_programs_list parsed from CSV string via setter."""
         with app.app_context():
-            ind = self._create_indicator(db_session, related_programs='WASH, Health, Shelter')
+            ind = self._create_indicator(db_session)
+            ind.related_programs_list = 'WASH, Health, Shelter'
             result = ind.related_programs_list
             assert 'WASH' in result
             assert 'Health' in result
             assert 'Shelter' in result
 
     def test_related_programs_list_pipe_separator(self, db_session, app):
-        """Test related_programs_list with pipe separator."""
+        """Test related_programs_list with pipe separator via setter."""
         with app.app_context():
-            ind = self._create_indicator(db_session, related_programs='WASH|Health')
+            ind = self._create_indicator(db_session)
+            ind.related_programs_list = 'WASH|Health'
             result = ind.related_programs_list
             assert 'WASH' in result
             assert 'Health' in result
@@ -334,19 +336,19 @@ class TestIndicatorBank:
             assert 'WASH' in ind._related_programs_list
             assert 'Health' in ind._related_programs_list
 
-    def test_related_programs_list_setter_clears_cache(self, db_session, app):
-        """Test setter clears cached programs list."""
+    def test_related_programs_list_setter_overwrites_existing(self, db_session, app):
+        """Test setter replaces existing related programs."""
         with app.app_context():
-            ind = self._create_indicator(db_session, related_programs='Old Program')
-            # Access to set cache
-            _ = ind.related_programs_list
+            ind = self._create_indicator(db_session)
+            ind.related_programs_list = ['Old Program']
             ind.related_programs_list = ['New Program']
-            assert not hasattr(ind, '_cached_programs_list')
+            assert ind.related_programs_list == ['New Program']
 
     def test_related_programs_list_resolved(self, db_session, app):
         """Test related_programs_list_resolved returns list."""
         with app.app_context():
-            ind = self._create_indicator(db_session, related_programs='WASH')
+            ind = self._create_indicator(db_session)
+            ind.related_programs_list = ['WASH']
             result = ind.related_programs_list_resolved
             assert 'WASH' in result
 

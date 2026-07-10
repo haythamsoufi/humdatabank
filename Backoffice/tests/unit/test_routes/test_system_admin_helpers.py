@@ -150,7 +150,7 @@ class TestIndicatorBankHistorySnapshot:
         indicator.archived = False
         indicator.comments = "Some comments"
         indicator.emergency = False
-        indicator.related_programs = []
+        indicator.related_programs_list = []
         indicator.sector = {}
         indicator.sub_sector = {}
 
@@ -182,7 +182,7 @@ class TestIndicatorBankHistorySnapshot:
         indicator = MagicMock(spec=["name", "type", "unit", "definition",
                                      "name_translations", "definition_translations",
                                      "archived", "comments", "emergency",
-                                     "related_programs", "sector", "sub_sector"])
+                                     "related_programs_list", "sector", "sub_sector"])
         indicator.name = "Minimal"
         indicator.type = "number"
         indicator.unit = None
@@ -192,7 +192,7 @@ class TestIndicatorBankHistorySnapshot:
         indicator.archived = False
         indicator.comments = None
         indicator.emergency = False
-        indicator.related_programs = None
+        indicator.related_programs_list = None
         indicator.sector = None
         indicator.sub_sector = None
 
@@ -225,7 +225,7 @@ class TestTrackIndicatorChanges:
         ind.monitoring_questions = None
         ind.tags = None
         ind.comments = "Old comments"
-        ind.related_programs = []
+        ind.related_programs_list = []
         ind.emergency = False
         ind.archived = False
         ind.sector = {"primary": 1}

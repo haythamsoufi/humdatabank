@@ -407,6 +407,29 @@ The admin interface has been modularized from a single monolithic file (340KB, 7
 - **Scalability**: New features can be added without affecting other modules
 - **Code Quality**: Better organization and reduced complexity
 
+### Admin feature plugins (org-specific tools)
+
+Org-specific admin features (e.g. IFRC P&B Visuals) live under [`Backoffice/plugins/<plugin_id>/`](Backoffice/plugins/) as **plugins** using the same `plugin.py` + `BasePlugin` contract as form-field plugins, with optional admin hooks.
+
+| Piece | Location |
+|-------|----------|
+| Plugin contract | [`Backoffice/app/plugins/base.py`](Backoffice/app/plugins/base.py) (`BasePlugin`, optional admin hooks) |
+| Discovery & lifecycle | [`Backoffice/app/plugins/manager.py`](Backoffice/app/plugins/manager.py) (`PluginManager`) |
+| Example plugin | [`Backoffice/plugins/pb_progress/`](Backoffice/plugins/pb_progress/) |
+| Standalone tool scripts | `Backoffice/plugins/<id>/visuals/` (or similar subfolder) |
+
+**To add a new admin-feature plugin:**
+
+1. Create `Backoffice/plugins/<plugin_id>/plugin.py` subclassing `BasePlugin`.
+2. Return `[]` from `get_field_types()` if the plugin has no form fields.
+3. Implement `get_blueprint()`, and optionally `get_data_explorer_tab()`, `get_seed_permissions()`, `get_seed_roles()`, `get_csp_overrides()`, `get_panel_render_context()`.
+4. Add routes, services, templates under the same plugin folder.
+5. No core app file changes required — `PluginManager` discovers `plugin.py` at startup.
+
+**To unplug:** delete the plugin folder. Core Data Explorer tabs remain.
+
+**Config override:** `PB_VISUALS_TOOL_DIR` in Flask config overrides the default `plugins/pb_progress/visuals/` path for the P&B build pipeline.
+
 ## Migration and Data Management
 
 ### Database Migrations

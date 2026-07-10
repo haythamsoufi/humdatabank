@@ -25,6 +25,8 @@ PDF_PREPARE_JS = """
   document.body.classList.add("pb-pdf-export");
 
   [
+    "#pb-report-toolbar",
+    ".pb-report-toolbar",
     ".pb-report-tools",
     ".pb-language-selector",
     "#pb-scroll-headers",

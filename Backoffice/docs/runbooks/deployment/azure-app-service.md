@@ -82,7 +82,7 @@ If traffic passes through Application Gateway or Front Door before reaching App 
 
 ### 3c. P&B Progress report generation
 
-The P&B Progress tab generates multilingual HTML, PDF, Word, and figure packages via a background build (Quarto + Playwright). **No extra App Service settings are required** — defaults are baked into [`entrypoint.sh`](../../../entrypoint.sh) and [`app/pb_progress/service.py`](../../../app/pb_progress/service.py):
+The P&B Progress tab generates multilingual HTML, PDF, Word, and figure packages via a background build (Quarto + Playwright). **No extra App Service settings are required** — defaults are baked into [`entrypoint.sh`](../../../entrypoint.sh) and [`plugins/pb_progress/service.py`](../../../plugins/pb_progress/service.py):
 
 - On Linux container start, `entrypoint.sh` installs Quarto 1.6.42 and Playwright Chromium under `/home/site/playwright-browsers` when missing.
 - On Azure (`azure_blob` storage), the build uses `PB_BUILD_WORKERS=1` (sequential per-language Chromium) and runs Word before PDF to stay within App Service memory limits. Local dev uses `PB_BUILD_WORKERS=2` with parallel Word/PDF when appropriate.

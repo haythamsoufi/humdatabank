@@ -496,7 +496,7 @@ class TestPrepareAvailableIndicators:
             mock_indicator.type = "Number"
             mock_indicator.unit = "unit"
             mock_indicator.emergency = False
-            mock_indicator.related_programs = None
+            mock_indicator.related_programs_list = []
             mock_indicator.sector = None
             mock_indicator.sub_sector = None
 
@@ -612,7 +612,7 @@ class TestPrepareAvailableIndicators:
             mock_ind.type = "Number"
             mock_ind.unit = "count"
             mock_ind.emergency = True
-            mock_ind.related_programs = "Health, Education"
+            mock_ind.related_programs_list = ["Health", "Education"]
             mock_ind.sector = None
             mock_ind.sub_sector = None
 
@@ -638,7 +638,7 @@ class TestPrepareAvailableIndicators:
             mock_ind.type = "Text"
             mock_ind.unit = "text"
             mock_ind.emergency = None
-            mock_ind.related_programs = None
+            mock_ind.related_programs_list = []
             mock_ind.sector = None
             mock_ind.sub_sector = None
 

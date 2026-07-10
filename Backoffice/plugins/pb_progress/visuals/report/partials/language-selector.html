@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const isEmbedded = window.self !== window.top;
   if (isEmbedded) {
     // Hide the iframe's own scrollbar — the parent page handles all scrolling.
+    document.documentElement.classList.add("pb-report-embedded");
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
   }
@@ -39,6 +40,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const marginSidebar = document.querySelector("#quarto-margin-sidebar");
   const leftNav = document.querySelector("#quarto-sidebar nav");
   const chromeHost = marginSidebar || leftNav;
+  const toolbarLangHost = document.getElementById("pb-report-toolbar-language");
 
   const selector = document.createElement("div");
   selector.className = "pb-language-selector";
@@ -46,7 +48,13 @@ document.addEventListener("DOMContentLoaded", function () {
     '<label for="pb-language-select">Language</label>' +
     '<select id="pb-language-select" aria-label="Report language"></select>';
 
-  if (chromeHost) {
+  if (isEmbedded) {
+    selector.classList.add("pb-language-selector--embedded-hidden");
+    document.body.appendChild(selector);
+  } else if (toolbarLangHost) {
+    selector.classList.add("pb-language-selector--toolbar");
+    toolbarLangHost.appendChild(selector);
+  } else if (chromeHost) {
     chromeHost.insertBefore(selector, chromeHost.firstChild);
   } else {
     panelsRoot.parentElement.insertBefore(selector, panelsRoot);
@@ -60,6 +68,59 @@ document.addEventListener("DOMContentLoaded", function () {
     select.appendChild(opt);
   });
   select.value = activeLang;
+
+  function elementDocumentTop(el) {
+    let top = 0;
+    let node = el;
+    while (node) {
+      top += node.offsetTop || 0;
+      node = node.offsetParent;
+    }
+    return top;
+  }
+
+  function scrollToReportAnchor(hash) {
+    const id = (hash || "").replace(/^#/, "");
+    if (!id) return;
+    const target = document.getElementById(id);
+    if (!target) return;
+
+    if (isEmbedded) {
+      const stickyBarH = parseInt(
+        getComputedStyle(document.documentElement).getPropertyValue("--pb-sticky-bar-height"),
+        10
+      ) || 0;
+      try {
+        window.parent.postMessage(
+          {
+            type: "pb-report-scroll",
+            offset: elementDocumentTop(target),
+            padding: stickyBarH + 16,
+          },
+          window.location.origin
+        );
+      } catch (e) {}
+      return;
+    }
+
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function bindEmbeddedTocScroll() {
+    if (!isEmbedded) return;
+    document.addEventListener("click", function (event) {
+      const link = event.target.closest(
+        "#toc a[href^='#'], #quarto-sidebar a[href^='#'], #quarto-margin-sidebar a[href^='#']"
+      );
+      if (!link) return;
+      const href = link.getAttribute("href");
+      if (!href || href === "#") return;
+      event.preventDefault();
+      scrollToReportAnchor(href);
+    });
+  }
+
+  bindEmbeddedTocScroll();
 
   function slug(lang) {
     return lang.toLowerCase().replace(/\s+/g, "-");
@@ -94,7 +155,7 @@ document.addEventListener("DOMContentLoaded", function () {
       tocNav.innerHTML =
         '<h2 id="toc-title">Table of contents</h2><ul class="toc-list"></ul>';
 
-      const anchor = selector.nextSibling;
+      const anchor = host.firstChild;
       if (anchor) {
         host.insertBefore(tocNav, anchor);
       } else {
@@ -253,6 +314,17 @@ document.addEventListener("DOMContentLoaded", function () {
     if (meta) meta.textContent = lang;
 
     document.dispatchEvent(new CustomEvent("pb-language-changed", { detail: { lang } }));
+
+    if (isEmbedded) {
+      try {
+        window.parent.postMessage({ type: "pb-report-language", lang: lang }, window.location.origin);
+      } catch (e) {}
+    }
+
+    if (typeof window.updatePbReportToolbarOffset === "function") {
+      window.updatePbReportToolbarOffset();
+    }
+
     updateScrollHeaders();
     postHeightToParent();
   }
@@ -262,6 +334,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
   select.addEventListener("change", function () {
     setLanguage(select.value);
+  });
+
+  window.addEventListener("message", function (event) {
+    if (event.origin !== window.location.origin) return;
+    if (!event.data || event.data.type !== "pb-report-set-language") return;
+    const lang = event.data.lang;
+    if (!languages.includes(lang) || select.value === lang) return;
+    select.value = lang;
+    setLanguage(lang);
   });
 
   setLanguage(activeLang);

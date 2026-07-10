@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Set
 from flask import Flask, current_app
-from .base import BasePlugin, BaseFieldType
+from .base import BasePlugin, BaseFieldType, CspOverride, DataExplorerTabConfig
 import shutil
 import json
 from datetime import datetime
@@ -20,6 +20,7 @@ import threading
 from jinja2 import ChoiceLoader
 
 from .jinja_plugin_loader import PluginTemplateLoader
+from .data_explorer import CORE_DATA_EXPLORER_PERMISSIONS
 
 class PluginManager:
     """Manages plugin discovery, loading, and lifecycle."""
@@ -58,6 +59,11 @@ class PluginManager:
         # Load plugin states on initialization
         self._load_plugin_states()
         self._load_discovery_cache()
+
+        backoffice_root = Path(app.root_path).parent
+        root_str = str(backoffice_root)
+        if root_str not in sys.path:
+            sys.path.insert(0, root_str)
 
     def _load_plugin_states(self):
         """Load plugin activation states from persistent storage."""
@@ -166,6 +172,8 @@ class PluginManager:
         Register deterministic plugin template loader so templates can be referenced as:
             plugins/<plugin_id>/<template>.html
         """
+        if getattr(self.app, "_plugin_template_loader_registered", False):
+            return
         try:
             existing_loader = self.app.jinja_loader
             plugin_loader = PluginTemplateLoader(lambda pid: self.template_dirs.get(pid))
@@ -178,6 +186,7 @@ class PluginManager:
             # Ensure env uses the updated loader
             if hasattr(self.app, "jinja_env") and self.app.jinja_env is not None:
                 self.app.jinja_env.loader = self.app.jinja_loader
+            self.app._plugin_template_loader_registered = True
         except Exception as e:
             self.logger.error(f"Failed to register plugin template loader: {e}", exc_info=True)
 
@@ -531,13 +540,15 @@ class PluginManager:
                     self.field_type_to_plugin_id[field_type.type_name] = plugin_id
 
     def register_blueprints(self):
-        """Register blueprints from all active plugins."""
+        """Register blueprints from active form-field plugins (not admin-feature plugins)."""
         registered_blueprints = []
         skipped_blueprints = []
 
         for plugin_id in self.active_plugins:
             if plugin_id in self.plugins:
                 plugin = self.plugins[plugin_id]
+                if plugin.get_data_explorer_tab() is not None:
+                    continue
                 blueprint = plugin.get_blueprint()
                 if blueprint:
                     # Check if blueprint is already registered
@@ -951,3 +962,96 @@ class PluginManager:
     def get_all_plugin_installations(self) -> Dict[str, Dict[str, Any]]:
         """Get installation history for all plugins."""
         return self.plugin_installations.copy()
+
+    def register_admin_feature_blueprints(self) -> None:
+        """Register blueprints for admin-feature plugins (always on, not activation-gated)."""
+        registered: list[str] = []
+        for plugin_id, plugin in self.plugins.items():
+            if plugin.get_data_explorer_tab() is None:
+                continue
+            blueprint = plugin.get_blueprint()
+            if blueprint is None:
+                continue
+            if blueprint.name in self.app.blueprints:
+                continue
+            try:
+                self.app.register_blueprint(blueprint)
+                registered.append(plugin_id)
+            except Exception as exc:
+                if "has already been registered" not in str(exc):
+                    self.logger.error(
+                        "Failed to register admin-feature blueprint for %s: %s",
+                        plugin_id,
+                        exc,
+                    )
+
+        if registered:
+            self.logger.info(
+                "Admin-feature routes: Registered %s blueprints [%s]",
+                len(registered),
+                ", ".join(registered),
+            )
+
+    def register_context_processors(self) -> None:
+        @self.app.context_processor
+        def inject_plugin_admin_context():
+            return {
+                "data_explorer_extension_tabs": self.get_data_explorer_tabs(),
+            }
+
+    def get_data_explorer_tabs(self) -> List[DataExplorerTabConfig]:
+        tabs = [
+            plugin.get_data_explorer_tab()
+            for plugin in self.plugins.values()
+            if plugin.get_data_explorer_tab() is not None
+        ]
+        return sorted(tabs, key=lambda tab: tab.priority)
+
+    def get_data_explorer_permission_codes(self) -> List[str]:
+        codes = list(CORE_DATA_EXPLORER_PERMISSIONS)
+        for tab in self.get_data_explorer_tabs():
+            if tab.permission not in codes:
+                codes.append(tab.permission)
+        return codes
+
+    def get_all_seed_permissions(self) -> List[tuple[str, str, str]]:
+        catalog: List[tuple[str, str, str]] = []
+        seen: Set[str] = set()
+        for plugin in self.plugins.values():
+            for perm in plugin.get_seed_permissions():
+                if perm.code in seen:
+                    continue
+                seen.add(perm.code)
+                catalog.append((perm.code, perm.name, perm.description))
+        return catalog
+
+    def get_all_seed_roles(self) -> List[Dict[str, Any]]:
+        roles: List[Dict[str, Any]] = []
+        for plugin in self.plugins.values():
+            for role in plugin.get_seed_roles():
+                roles.append(
+                    {
+                        "code": role.code,
+                        "name": role.name,
+                        "description": role.description,
+                        "permission_codes": list(role.permission_codes),
+                    }
+                )
+        return roles
+
+    def get_csp_override(self, endpoint: Optional[str], path: str) -> Optional[CspOverride]:
+        if not endpoint:
+            return None
+        for plugin in self.plugins.values():
+            for override in plugin.get_csp_overrides():
+                if override.endpoint == endpoint and override.path_predicate(path):
+                    return override
+        return None
+
+    def get_panel_render_context(
+        self, plugin_id: str, flags: dict[str, bool], first_tab: str
+    ) -> Dict[str, Any]:
+        plugin = self.plugins.get(plugin_id)
+        if plugin is None:
+            return {}
+        return plugin.get_panel_render_context(flags, first_tab)

@@ -156,7 +156,7 @@ class TestCreateComparisonTable:
         ind.type = kwargs.get("type", "Count")
         ind.unit = kwargs.get("unit", "People")
         ind.emergency = kwargs.get("emergency", False)
-        ind.related_programs = kwargs.get("related_programs", "Prog")
+        ind.related_programs_list = kwargs.get("related_programs_list", ["Prog"])
         ind.sector = kwargs.get("sector", None)
         ind.sub_sector = kwargs.get("sub_sector", None)
         return ind
@@ -652,7 +652,7 @@ class TestSendSuggestionConfirmationEmail:
             original_ind.type = "Count"
             original_ind.unit = "People"
             original_ind.emergency = False
-            original_ind.related_programs = None
+            original_ind.related_programs_list = []
             original_ind.sector = None
             original_ind.sub_sector = None
             sug.indicator = original_ind
@@ -691,7 +691,7 @@ class TestSendSuggestionConfirmationEmail:
             sug.indicator.type = "C"
             sug.indicator.unit = "U"
             sug.indicator.emergency = False
-            sug.indicator.related_programs = None
+            sug.indicator.related_programs_list = []
             sug.indicator.sector = None
             sug.indicator.sub_sector = None
 
@@ -765,7 +765,7 @@ class TestSendAdminNotificationEmail:
             sug.indicator.type = "C"
             sug.indicator.unit = "U"
             sug.indicator.emergency = False
-            sug.indicator.related_programs = None
+            sug.indicator.related_programs_list = []
             sug.indicator.sector = None
             sug.indicator.sub_sector = None
 

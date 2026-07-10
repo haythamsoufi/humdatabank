@@ -1507,8 +1507,15 @@
                 return;
             }
             jQuery(document).ready(function ($) {
-            // Get CSRF token from meta tag
-            const csrfToken = jQuery('meta[name="csrf-token"]').attr('content');
+            // Always read the current CSRF token (meta is updated by csrf.js refresh).
+            function ibCsrfToken() {
+                if (typeof getCSRFToken === 'function') {
+                    const token = getCSRFToken();
+                    if (token) return token;
+                }
+                return jQuery('meta[name="csrf-token"]').attr('content') || '';
+            }
+            const csrfToken = ibCsrfToken();
 
             var escapeHtml = AgGridRenderers.escapeHtml;
 
@@ -1999,7 +2006,7 @@
 
                 const formData = new FormData();
                 formData.append('file', file);
-                formData.append('csrf_token', csrfToken);
+                formData.append('csrf_token', ibCsrfToken());
 
                 $.ajax({
                     url: "{{ url_for('utilities.preview_indicator_import') }}",
@@ -2056,9 +2063,7 @@
                 $.ajax({
                     url: "{{ url_for('utilities.apply_indicator_import') }}",
                     type: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify({ import_token: _importToken, csrf_token: csrfToken }),
-                    headers: { 'X-CSRFToken': csrfToken },
+                    data: { import_token: _importToken, csrf_token: ibCsrfToken() },
                     success: function(response) {
                         jQuery('#import-confirm-modal').addClass('hidden');
                         if (response && response.success) {

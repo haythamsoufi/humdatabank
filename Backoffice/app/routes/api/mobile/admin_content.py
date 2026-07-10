@@ -604,7 +604,7 @@ def _apply_indicator_edit_from_mobile_json(indicator, data, can_archive):
     if 'comments' in data:
         indicator.comments = data.get('comments')
     if 'related_programs' in data:
-        indicator.related_programs = data.get('related_programs')
+        indicator.related_programs_list = data.get('related_programs')
 
     if 'archived' in data:
         if not can_archive:
@@ -773,7 +773,7 @@ def get_indicator(indicator_id):
             'emergency': getattr(indicator, 'emergency', False),
             'archived': bool(getattr(indicator, 'archived', False)),
             'comments': getattr(indicator, 'comments', None),
-            'related_programs': getattr(indicator, 'related_programs', None),
+            'related_programs': indicator.related_programs_list,
             'name_translations': dict(nt) if nt else {},
             'definition_translations': dict(dt) if dt else {},
             'translatable_languages': langs,

@@ -258,7 +258,7 @@ class TestIndicatorBankForm:
                 mock_req.return_value = mock_data
                 from app.forms.system.indicator_bank_forms import IndicatorBankForm
                 result = IndicatorBankForm.related_programs_from_request()
-                assert result == 'Prog A, Prog B'
+                assert result == ['Prog A', 'Prog B']
 
 
 class TestIndicatorBankFormPopulateFrom:
@@ -412,10 +412,41 @@ class TestIndicatorBankFormPopulateIndicatorBank:
             assert mock_ib.sector == {'primary': 10}
             assert mock_ib.sub_sector == {'primary': 20}
 
+    def test_populate_indicator_bank_syncs_related_programs_list(self, app):
+        with app.app_context():
+            form = _make_ib_form(app, data={'name': 'My IB', 'type': 1})
+            form.name.data = 'Programs Test'
+            form.type.data = 1
+            form.unit.data = None
+            form.fdrs_kpi_code.data = ''
+            form.definition.data = ''
+            form.aggregated_label.data = ''
+            form.area.data = ''
+            form.data_source.data = ''
+            form.disaggregation_guidance.data = ''
+            form.tags.data = ''
+            form.archived.data = False
+            form.emergency.data = False
+            form.comments.data = ''
+            form.sector_primary.data = None
+            form.sector_secondary.data = None
+            form.sector_tertiary.data = None
+            form.sub_sector_primary.data = None
+            form.sub_sector_secondary.data = None
+            form.sub_sector_tertiary.data = None
 
-# ---------------------------------------------------------------------------
-# SectorForm
-# ---------------------------------------------------------------------------
+            mock_ib = MagicMock()
+            mock_ib.set_name_translation = MagicMock()
+            mock_ib.set_aggregated_label_translation = MagicMock()
+            mock_ib.sync_type_unit_string_columns = MagicMock()
+
+            with patch('app.forms.system.indicator_bank_forms.get_request_data') as mock_req:
+                mock_data = MagicMock()
+                mock_data.getlist.return_value = ['Health', 'WASH']
+                mock_req.return_value = mock_data
+                form.populate_indicator_bank(mock_ib)
+
+            assert mock_ib.related_programs_list == ['Health', 'WASH']
 
 class TestSectorForm:
     def test_instantiation(self, app):

@@ -113,12 +113,14 @@ def _build_indicator_fields_config():
     config['unit']['values'] = [{'value': u[0], 'label': u[0]} for u in units if u[0]]
 
     # Get distinct programs
-    programs_raw = db.session.query(IndicatorBank.related_programs).distinct().filter(IndicatorBank.related_programs.isnot(None)).all()
+    programs_raw = db.session.query(IndicatorBank._related_programs_list).filter(
+        IndicatorBank._related_programs_list.isnot(None)
+    ).all()
     programs_set = set()
     for prog_row in programs_raw:
-        if prog_row[0]:
-            for prog in prog_row[0].split(','):
-                prog_clean = prog.strip()
+        if isinstance(prog_row[0], list):
+            for prog in prog_row[0]:
+                prog_clean = str(prog).strip()
                 if prog_clean:
                     programs_set.add(prog_clean)
     config['related_programs']['values'] = [{'value': p, 'label': p} for p in sorted(programs_set)]

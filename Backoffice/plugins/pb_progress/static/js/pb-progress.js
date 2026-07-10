@@ -1,168 +1,10 @@
-{% from "macros/modal_shell.html" import modal_shell %}
-
-<div id="panel-pb-progress"
-     class="explore-panel{% if explore_first_tab != 'pb-progress' %} hidden{% endif %}"
-     role="tabpanel"
-     aria-labelledby="tab-pb-progress">
-    <div class="p-4 sm:p-6 space-y-5">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <h3 class="text-lg font-semibold text-gray-900">{{ _('P&B visuals') }}</h3>
-                <p class="text-sm text-gray-600 mt-1">
-                    {{ _('Browse the interactive report, charts, and downloadable documents for Plan and Budget visuals.') }}
-                </p>
-            </div>
-            <p id="pb-progress-last-generated" class="text-sm text-gray-500 hidden"></p>
-        </div>
-
-        <div class="border-b border-gray-200">
-            <nav id="pb-progress-version-tabs" class="flex flex-wrap gap-1 -mb-px" role="tablist" aria-label="{{ _('P&B report versions') }}">
-                {% for version_id in pb_report_version_order %}
-                {% set version = pb_report_versions[version_id] %}
-                <button type="button"
-                        role="tab"
-                        id="tab-pb-version-{{ version_id }}"
-                        data-pb-version="{{ version_id }}"
-                        aria-selected="{{ 'true' if version_id == pb_default_version else 'false' }}"
-                        class="px-4 py-2 text-sm font-medium border-b-2 transition-colors {{ 'border-blue-600 text-blue-700' if version_id == pb_default_version else 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300' }}">
-                    {{ _(version.label) }}
-                </button>
-                {% endfor %}
-            </nav>
-        </div>
-
-        <div id="pb-progress-empty" class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
-            <i class="fas fa-chart-line text-2xl text-gray-400 mb-3"></i>
-            <p>{{ _('No report is available yet.') }}</p>
-        </div>
-
-        <div id="pb-progress-build" class="hidden rounded-lg border border-blue-200 bg-blue-50 px-4 py-4 space-y-3">
-            <div id="pb-progress-build-active">
-                <div class="flex items-center gap-3 text-sm text-blue-800 mb-2">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <span id="pb-progress-progress-text">{{ _('Generating report...') }}</span>
-                </div>
-                <div class="w-full bg-blue-100 rounded-full h-2 overflow-hidden">
-                    <div id="pb-progress-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: 15%;"></div>
-                </div>
-                <ul id="pb-progress-stages" class="mt-3 space-y-2 text-sm hidden"></ul>
-            </div>
-            <p id="pb-progress-build-message" class="text-sm hidden"></p>
-        </div>
-
-        <div id="pb-progress-viewer" class="space-y-5 hidden">
-            <div class="bg-white border border-gray-200 rounded-lg p-4 sm:p-5 shadow-sm">
-                <h4 class="text-base font-semibold text-gray-900 mb-3">{{ _('Downloads') }}</h4>
-                <div id="pb-progress-downloads" class="flex flex-wrap gap-2"></div>
-            </div>
-
-            <div class="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between gap-3">
-                    <h4 class="text-base font-semibold text-gray-900">{{ _('Interactive report') }}</h4>
-                    <div class="flex items-center gap-2">
-                        <button type="button" id="pb-progress-print-btn"
-                                class="btn btn-secondary btn-sm hidden"
-                                title="{{ _('Print report') }}">
-                            <i class="fas fa-print mr-1.5"></i>{{ _('Print') }}
-                        </button>
-                        <a id="pb-progress-open-tab"
-                           class="btn btn-secondary btn-sm hidden"
-                           target="_blank" rel="noopener noreferrer"
-                           title="{{ _('Open in new tab') }}">
-                            <i class="fas fa-external-link-alt mr-1.5"></i>{{ _('Open') }}
-                        </a>
-                    </div>
-                </div>
-                <div class="relative">
-                    <div id="pb-progress-iframe-loading"
-                         class="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10"
-                         style="min-height: 300px;">
-                        <i class="fas fa-spinner fa-spin text-2xl text-gray-400 mb-2"></i>
-                        <p class="text-sm text-gray-500">{{ _('Loading report…') }}</p>
-                    </div>
-                    <iframe id="pb-progress-iframe"
-                            title="{{ _('P&B visuals preview') }}"
-                            class="w-full block"
-                            style="height: 720px; border: 0;"
-                            loading="lazy"></iframe>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-{% if can_manage_pb_progress %}
-{% call modal_shell('pb-progress-import-modal', _('Import and generate report'), max_width='max-w-2xl', close_id='pb-progress-import-modal-close', content_class='max-h-[80vh] overflow-y-auto') %}
-    <p class="text-sm text-gray-600 mb-2">{{ _('System managers only. Upload SG Report.xlsx and regenerate multilingual HTML, PDF, Word, and figure packages.') }}</p>
-    <p id="pb-progress-import-version-label" class="inline-flex items-center gap-2 rounded-full bg-blue-50 text-blue-900 px-3 py-1 text-sm font-medium mb-4"></p>
-
-    <div id="pb-progress-excel-badge" class="hidden inline-flex items-center gap-2 rounded-full bg-green-50 text-green-800 px-3 py-1 text-sm mb-4">
-        <i class="fas fa-file-excel"></i>
-        <span id="pb-progress-excel-badge-text"></span>
-    </div>
-
-    <div id="pb-progress-no-excel-notice" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 mb-4">
-        <i class="fas fa-info-circle mr-2"></i>{{ _('No workbook uploaded yet. Add SG Report.xlsx below.') }}
-    </div>
-
-    <div id="pb-progress-dropzone"
-         class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-colors hover:border-blue-400 hover:bg-blue-50/40">
-        <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-3"></i>
-        <p class="text-sm text-gray-700 mb-2">{{ _('Drag and drop an Excel file here, or choose a file') }}</p>
-        <input id="pb-progress-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden">
-        <button type="button" id="pb-progress-choose-file-btn" class="btn btn-secondary btn-sm">
-            <i class="fas fa-folder-open mr-2"></i>{{ _('Choose file') }}
-        </button>
-        <p id="pb-progress-selected-file" class="text-sm text-gray-600 mt-3 hidden"></p>
-    </div>
-
-    <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-            <input id="pb-progress-replace-existing" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
-            <span>{{ _('Replace existing workbook when uploading') }}</span>
-        </label>
-        <button type="button" id="pb-progress-upload-btn" class="btn btn-primary" disabled>
-            <i class="fas fa-upload mr-2"></i>{{ _('Upload Excel') }}
-        </button>
-    </div>
-    <p id="pb-progress-upload-message" class="text-sm mt-3 hidden"></p>
-
-    <div class="mt-6 pt-6 border-t border-gray-200">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <div>
-                <h4 class="text-base font-semibold text-gray-900">{{ _('Generate report') }}</h4>
-                <p class="text-sm text-gray-600 mt-1">{{ _('Rebuild all deliverables from the stored workbook.') }}</p>
-            </div>
-            <div class="flex items-center gap-2">
-                <label for="pb-progress-language" class="text-sm font-medium text-gray-700">{{ _('Languages') }}</label>
-                <select id="pb-progress-language" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option value="all">{{ _('All languages') }}</option>
-                    <option value="English">{{ _('English') }}</option>
-                    <option value="French">{{ _('French') }}</option>
-                    <option value="Spanish">{{ _('Spanish') }}</option>
-                    <option value="Arabic">{{ _('Arabic') }}</option>
-                </select>
-            </div>
-        </div>
-
-        <button type="button" id="pb-progress-generate-btn" class="btn btn-primary" disabled>
-            <i class="fas fa-play mr-2"></i>{{ _('Generate Report') }}
-        </button>
-    </div>
-
-    <div class="mt-6 flex justify-end">
-        <button type="button" class="btn btn-secondary close-modal">{{ _('Close') }}</button>
-    </div>
-{% endcall %}
-{% endif %}
-
-<script nonce="{{ csp_nonce() }}">
 (function() {
-    const API_BASE = '/admin/data-exploration/pb-progress';
-    const CAN_MANAGE = {{ can_manage_pb_progress|tojson }};
-    const VERSIONS = {{ pb_report_versions|tojson }};
-    const VERSION_ORDER = {{ pb_report_version_order|tojson }};
-    let activeVersion = {{ pb_default_version|tojson }};
+    const cfg = window.PBProgressConfig || {};
+    const API_BASE = cfg.apiBase || '/admin/data-exploration/pb-progress';
+    const CAN_MANAGE = !!cfg.canManage;
+    const VERSIONS = cfg.versions || {};
+    const VERSION_ORDER = cfg.versionOrder || [];
+    let activeVersion = cfg.defaultVersion || "";
     let pollTimer = null;
     let selectedFile = null;
     let importModal = null;
@@ -191,8 +33,14 @@
         buildActive: document.getElementById('pb-progress-build-active'),
         buildMessage: document.getElementById('pb-progress-build-message'),
         viewer: document.getElementById('pb-progress-viewer'),
+        viewerToolbar: document.getElementById('pb-progress-viewer-toolbar'),
+        viewerToolbarAnchor: document.getElementById('pb-progress-viewer-toolbar-anchor'),
+        viewerToolbarWrap: document.getElementById('pb-progress-viewer-toolbar-wrap'),
+        viewerToolbarSpacer: document.getElementById('pb-progress-viewer-toolbar-spacer'),
         lastGenerated: document.getElementById('pb-progress-last-generated'),
         downloads: document.getElementById('pb-progress-downloads'),
+        reportLanguageWrap: document.getElementById('pb-progress-report-language-wrap'),
+        reportLanguageSelect: document.getElementById('pb-progress-report-language'),
         iframe: document.getElementById('pb-progress-iframe'),
         iframeLoading: document.getElementById('pb-progress-iframe-loading'),
         printBtn: document.getElementById('pb-progress-print-btn'),
@@ -238,7 +86,7 @@
             btn.classList.toggle('text-gray-600', !selected);
         });
         if (els.importVersionLabel) {
-            els.importVersionLabel.textContent = '{{ _("Version:") }} ' + (versionMeta(activeVersion).label || activeVersion);
+            els.importVersionLabel.textContent = (cfg.i18n && cfg.i18n.versionLabel ? cfg.i18n.versionLabel + ' ' : '') + (versionMeta(activeVersion).label || activeVersion);
         }
     }
 
@@ -408,6 +256,102 @@
         });
     }
 
+    let syncingReportLanguage = false;
+    let pendingIframeLanguage = null;
+
+    function getIframeDocument() {
+        if (!els.iframe) return null;
+        try {
+            return els.iframe.contentDocument
+                || (els.iframe.contentWindow && els.iframe.contentWindow.document)
+                || null;
+        } catch (err) {
+            return null;
+        }
+    }
+
+    function prepareEmbeddedReportDoc(doc) {
+        if (!doc || doc.getElementById('pb-embedded-language-hide')) return;
+        var style = doc.createElement('style');
+        style.id = 'pb-embedded-language-hide';
+        style.textContent =
+            'html.pb-report-embedded #quarto-margin-sidebar .pb-language-selector,' +
+            'html.pb-report-embedded #quarto-sidebar .pb-language-selector,' +
+            '#quarto-margin-sidebar .pb-language-selector,' +
+            '#quarto-sidebar .pb-language-selector { display: none !important; }';
+        (doc.head || doc.documentElement).appendChild(style);
+        if (doc.documentElement) {
+            doc.documentElement.classList.add('pb-report-embedded');
+        }
+    }
+
+    function applyIframeReportLanguage(lang) {
+        if (!lang) return false;
+        var doc = getIframeDocument();
+        if (!doc) return false;
+        var select = doc.getElementById('pb-language-select');
+        if (!select) return false;
+        if (select.value !== lang) {
+            select.value = lang;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        return true;
+    }
+
+    function flushPendingIframeLanguage() {
+        if (!pendingIframeLanguage) return;
+        if (applyIframeReportLanguage(pendingIframeLanguage)) {
+            pendingIframeLanguage = null;
+        }
+    }
+
+    function setIframeReportLanguage(lang) {
+        if (!els.iframe || !lang) return;
+        pendingIframeLanguage = lang;
+        if (applyIframeReportLanguage(lang)) {
+            pendingIframeLanguage = null;
+            return;
+        }
+        try {
+            var win = els.iframe.contentWindow;
+            if (win) {
+                win.postMessage({ type: 'pb-report-set-language', lang: lang }, window.location.origin);
+            }
+        } catch (err) {}
+    }
+
+    function syncReportLanguageFromIframe() {
+        if (!els.iframe || !els.reportLanguageSelect) return;
+        try {
+            var doc = getIframeDocument();
+            if (!doc) return;
+            var select = doc.getElementById('pb-language-select');
+            if (!select || !DOWNLOAD_LANG_ORDER.includes(select.value)) return;
+            syncingReportLanguage = true;
+            els.reportLanguageSelect.value = select.value;
+            syncingReportLanguage = false;
+        } catch (err) {}
+    }
+
+    function initializeEmbeddedReportLanguage() {
+        var doc = getIframeDocument();
+        if (!doc) return;
+        prepareEmbeddedReportDoc(doc);
+        if (pendingIframeLanguage) {
+            flushPendingIframeLanguage();
+        } else {
+            syncReportLanguageFromIframe();
+        }
+        window.setTimeout(function() {
+            if (pendingIframeLanguage) {
+                flushPendingIframeLanguage();
+            } else {
+                syncReportLanguageFromIframe();
+            }
+        }, 100);
+        window.setTimeout(flushPendingIframeLanguage, 500);
+    }
+
     function renderConsumerView(status) {
         const outputs = status.outputs || [];
         const REPORT_HTML_NAMES = ['pb-report.html', 'gb-report.html'];
@@ -417,16 +361,25 @@
 
         if (els.empty) els.empty.classList.toggle('hidden', hasOutputs || running);
         if (els.viewer) els.viewer.classList.toggle('hidden', !hasOutputs);
+        if (!hasOutputs) setToolbarPinned(false);
 
         if (!hasOutputs) {
             if (els.iframe) els.iframe.removeAttribute('src');
             if (els.printBtn) els.printBtn.classList.add('hidden');
             if (els.openTab) els.openTab.classList.add('hidden');
+            if (els.reportLanguageWrap) {
+                els.reportLanguageWrap.classList.add('hidden');
+                els.reportLanguageWrap.classList.remove('flex');
+            }
             if (els.lastGenerated) els.lastGenerated.classList.add('hidden');
             return;
         }
 
         if (els.downloads) renderDownloads(els.downloads, outputs);
+        if (els.reportLanguageWrap) {
+            els.reportLanguageWrap.classList.remove('hidden');
+            els.reportLanguageWrap.classList.add('flex');
+        }
 
         if (htmlOutput && els.iframe) {
             if (els.iframe.src !== htmlOutput.url) {
@@ -440,7 +393,7 @@
             }
         }
         if (status.finished_at && els.lastGenerated) {
-            els.lastGenerated.textContent = '{{ _("Last updated:") }} ' + formatUploadedAt(status.finished_at);
+            els.lastGenerated.textContent = (cfg.i18n && cfg.i18n.lastUpdated ? cfg.i18n.lastUpdated + ' ' : '') + formatUploadedAt(status.finished_at);
             els.lastGenerated.classList.remove('hidden');
         }
     }
@@ -491,16 +444,16 @@
         if (els.progressText) {
             els.progressText.textContent = running && status.build_stage_label
                 ? status.build_stage_label
-                : '{{ _("Generating report...") }}';
+                : (cfg.i18n && cfg.i18n.generatingReport) || 'Generating report...';
         }
 
         renderBuildStages(running ? stageList : []);
 
         if (showCompletion && failed) {
-            setMessage(els.buildMessage, status.error || '{{ _("Report generation failed.") }}', 'error');
+            setMessage(els.buildMessage, status.error || (cfg.i18n && cfg.i18n.reportGenerationFailed) || 'Report generation failed.', 'error');
             ui.trackingBuild = false;
         } else if (showCompletion && done) {
-            setMessage(els.buildMessage, '{{ _("Report generated successfully.") }}', 'success');
+            setMessage(els.buildMessage, (cfg.i18n && cfg.i18n.reportGeneratedSuccessfully) || 'Report generated successfully.', 'success');
             ui.trackingBuild = false;
         } else if (running) {
             setMessage(els.buildMessage, '', null);
@@ -550,7 +503,7 @@
         const response = await fetch(url, opts);
         const payload = await response.json().catch(function() { return {}; });
         if (!response.ok) {
-            throw new Error(payload.message || payload.error || '{{ _("Request failed.") }}');
+            throw new Error(payload.message || payload.error || (cfg.i18n && cfg.i18n.requestFailed) || 'Request failed.');
         }
         return payload;
     }
@@ -586,7 +539,7 @@
             if (els.buildActive) els.buildActive.classList.add('hidden');
             setMessage(
                 els.buildMessage,
-                '{{ _("Lost connection to the server while generating. Wait for the server to come back, then refresh this page.") }}',
+                (cfg.i18n && cfg.i18n.lostConnection) || '',
                 'error'
             );
         }
@@ -628,7 +581,7 @@
                 if (els.buildActive) els.buildActive.classList.add('hidden');
                 setMessage(
                     els.buildMessage,
-                    '{{ _("Lost connection to the server while generating. Wait for the server to come back, then refresh this page.") }}',
+                    (cfg.i18n && cfg.i18n.lostConnection) || '',
                     'error'
                 );
             }
@@ -662,19 +615,19 @@
         if (!selectedFile) return;
         const ui = currentUi();
         if (!ui.hasExcel && els.replaceExisting && !els.replaceExisting.checked) {
-            setMessage(els.uploadMessage, '{{ _("Enable replace existing workbook or upload the first source file.") }}', 'error');
+            setMessage(els.uploadMessage, (cfg.i18n && cfg.i18n.enableReplaceWorkbook) || '', 'error');
             return;
         }
         const formData = new FormData();
         formData.append('excel', selectedFile);
-        setMessage(els.uploadMessage, '{{ _("Uploading...") }}', null);
+        setMessage(els.uploadMessage, (cfg.i18n && cfg.i18n.uploading) || 'Uploading...', null);
         try {
             const payload = await fetchJson(apiUrl('/upload'), {
                 method: 'POST',
                 body: formData,
             });
             updateAdminUi(payload.excel || null);
-            setMessage(els.uploadMessage, '{{ _("Excel uploaded successfully.") }}', 'success');
+            setMessage(els.uploadMessage, (cfg.i18n && cfg.i18n.excelUploadedSuccessfully) || 'Excel uploaded successfully.', 'success');
             setSelectedFile(null);
             if (els.fileInput) els.fileInput.value = '';
         } catch (error) {
@@ -691,7 +644,7 @@
         if (els.progressBar) els.progressBar.style.width = '15%';
         if (els.build) els.build.classList.remove('hidden');
         if (els.buildActive) els.buildActive.classList.remove('hidden');
-        if (els.progressText) els.progressText.textContent = '{{ _("Generating report...") }}';
+        if (els.progressText) els.progressText.textContent = (cfg.i18n && cfg.i18n.generatingReport) || 'Generating report...';
         renderBuildStages([]);
         try {
             const payload = await fetchJson(apiUrl('/generate'), {
@@ -789,13 +742,75 @@
         }
     }
 
+    function scrollToIframeOffset(offset, extraPadding) {
+        if (!els.iframe || !Number.isFinite(offset)) return;
+        var padding = Number.isFinite(extraPadding) ? extraPadding : 16;
+        if (els.viewerToolbar) padding += els.viewerToolbar.offsetHeight;
+        var scrollParent = findScrollParent(els.iframe);
+        var iframeRect = els.iframe.getBoundingClientRect();
+        var parentRect = scrollParent.getBoundingClientRect();
+        var top = scrollParent.scrollTop + (iframeRect.top - parentRect.top) + offset - padding;
+        scrollParent.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    }
+
+    function elementDocumentTop(doc, el) {
+        var rect = el.getBoundingClientRect();
+        var rootRect = doc.documentElement.getBoundingClientRect();
+        return rect.top - rootRect.top;
+    }
+
+    function bindIframeTocNavigation() {
+        if (!els.iframe) return;
+        var bind = function() {
+            try {
+                var doc = els.iframe.contentDocument
+                    || (els.iframe.contentWindow && els.iframe.contentWindow.document);
+                if (!doc || doc.documentElement.dataset.pbTocScrollBound === '1') return;
+                doc.documentElement.dataset.pbTocScrollBound = '1';
+                doc.addEventListener('click', function(event) {
+                    var link = event.target.closest(
+                        '#toc a[href^="#"], #quarto-sidebar a[href^="#"], #quarto-margin-sidebar a[href^="#"]'
+                    );
+                    if (!link) return;
+                    var hash = link.hash || link.getAttribute('href') || '';
+                    if (!hash || hash === '#') return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    var id = hash.charAt(0) === '#' ? hash.slice(1) : hash;
+                    var target = doc.getElementById(id);
+                    if (!target) return;
+                    scrollToIframeOffset(elementDocumentTop(doc, target), 16);
+                }, true);
+            } catch (err) {}
+        };
+        els.iframe.addEventListener('load', bind);
+        bind();
+    }
+
     // ── Iframe integration ────────────────────────────────────────────────
     if (els.iframe) {
-        // Hide the loading skeleton once the report finishes loading.
         els.iframe.addEventListener('load', function() {
             if (els.iframeLoading) els.iframeLoading.classList.add('hidden');
+            initializeEmbeddedReportLanguage();
+        });
+        bindIframeTocNavigation();
+    }
+
+    if (els.reportLanguageSelect) {
+        els.reportLanguageSelect.addEventListener('change', function() {
+            if (syncingReportLanguage) return;
+            setIframeReportLanguage(els.reportLanguageSelect.value);
         });
     }
+
+    window.addEventListener('message', function(event) {
+        if (event.origin !== window.location.origin) return;
+        if (!event.data || event.data.type !== 'pb-report-language') return;
+        if (!els.reportLanguageSelect || !DOWNLOAD_LANG_ORDER.includes(event.data.lang)) return;
+        syncingReportLanguage = true;
+        els.reportLanguageSelect.value = event.data.lang;
+        syncingReportLanguage = false;
+    });
 
     if (els.printBtn) {
         els.printBtn.addEventListener('click', function() {
@@ -803,12 +818,119 @@
         });
     }
 
+    function findScrollParent(node) {
+        let parent = node.parentElement;
+        while (parent && parent !== document.body) {
+            const overflowY = window.getComputedStyle(parent).overflowY;
+            if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') {
+                return parent;
+            }
+            parent = parent.parentElement;
+        }
+        return document.scrollingElement || document.documentElement;
+    }
+
+    let toolbarPinObserver = null;
+    let toolbarPinned = false;
+    let toolbarPinInitialized = false;
+
+    function syncPinnedToolbarGeometry() {
+        if (!toolbarPinned || !els.viewerToolbar || !els.viewerToolbarWrap) return;
+        const scrollParent = findScrollParent(els.viewerToolbarWrap);
+        const parentRect = scrollParent.getBoundingClientRect();
+        const wrapRect = els.viewerToolbarWrap.getBoundingClientRect();
+        els.viewerToolbar.style.position = 'fixed';
+        els.viewerToolbar.style.top = Math.max(0, parentRect.top) + 'px';
+        els.viewerToolbar.style.left = wrapRect.left + 'px';
+        els.viewerToolbar.style.width = wrapRect.width + 'px';
+        els.viewerToolbar.style.zIndex = '40';
+    }
+
+    function setToolbarPinned(next) {
+        if (!els.viewerToolbar || !els.viewerToolbarSpacer) return;
+        const wantPinned = !!next;
+        if (wantPinned === toolbarPinned) {
+            if (wantPinned) syncPinnedToolbarGeometry();
+            return;
+        }
+        toolbarPinned = wantPinned;
+        if (toolbarPinned) {
+            const height = els.viewerToolbar.offsetHeight;
+            els.viewerToolbarSpacer.style.height = height + 'px';
+            els.viewerToolbarSpacer.classList.remove('hidden');
+            els.viewerToolbar.classList.add('is-pinned', 'shadow-md');
+            syncPinnedToolbarGeometry();
+        } else {
+            els.viewerToolbar.style.position = '';
+            els.viewerToolbar.style.top = '';
+            els.viewerToolbar.style.left = '';
+            els.viewerToolbar.style.width = '';
+            els.viewerToolbar.style.zIndex = '';
+            els.viewerToolbar.classList.remove('is-pinned', 'shadow-md');
+            els.viewerToolbarSpacer.classList.add('hidden');
+            els.viewerToolbarSpacer.style.height = '';
+        }
+    }
+
+    function initToolbarPin() {
+        if (!els.viewerToolbar || !els.viewerToolbarAnchor || !els.viewerToolbarWrap) return;
+        if (toolbarPinInitialized) return;
+        toolbarPinInitialized = true;
+
+        const scrollParent = findScrollParent(els.viewerToolbarWrap);
+        const onScrollOrResize = function() {
+            if (!els.viewer || els.viewer.classList.contains('hidden')) {
+                setToolbarPinned(false);
+                return;
+            }
+            if (toolbarPinned) syncPinnedToolbarGeometry();
+        };
+
+        scrollParent.addEventListener('scroll', onScrollOrResize, { passive: true });
+        window.addEventListener('resize', onScrollOrResize);
+
+        if (typeof IntersectionObserver === 'undefined') {
+            scrollParent.addEventListener('scroll', function() {
+                if (!els.viewer || els.viewer.classList.contains('hidden')) return;
+                const parentTop = scrollParent.getBoundingClientRect().top;
+                const anchorBottom = els.viewerToolbarAnchor.getBoundingClientRect().bottom;
+                setToolbarPinned(anchorBottom <= parentTop + 1);
+            }, { passive: true });
+            return;
+        }
+
+        const root = (scrollParent === document.body || scrollParent === document.documentElement)
+            ? null
+            : scrollParent;
+        toolbarPinObserver = new IntersectionObserver(function(entries) {
+            if (!els.viewer || els.viewer.classList.contains('hidden')) {
+                setToolbarPinned(false);
+                return;
+            }
+            const entry = entries[0];
+            if (!entry) return;
+            setToolbarPinned(!entry.isIntersecting);
+        }, { root: root, threshold: [0, 1] });
+        toolbarPinObserver.observe(els.viewerToolbarAnchor);
+    }
+
     // Auto-resize the iframe to its content so no inner scrollbar appears.
     window.addEventListener('message', function(e) {
         if (e.origin !== window.location.origin) return;
-        if (!e.data || e.data.type !== 'pb-report-height' || !els.iframe) return;
-        var h = parseInt(e.data.height, 10);
-        if (h > 0) els.iframe.style.height = h + 'px';
+        if (!e.data || !els.iframe) return;
+
+        if (e.data.type === 'pb-report-height') {
+            var h = parseInt(e.data.height, 10);
+            if (h > 0) els.iframe.style.height = h + 'px';
+            return;
+        }
+
+        if (e.data.type === 'pb-report-scroll') {
+            var offset = parseInt(e.data.offset, 10);
+            if (!Number.isFinite(offset)) return;
+            var padding = parseInt(e.data.padding, 10);
+            scrollToIframeOffset(offset, Number.isFinite(padding) ? padding : 16);
+        }
     });
     // ─────────────────────────────────────────────────────────────────────
 
@@ -820,6 +942,7 @@
         init: function() {
             setActiveVersionTab();
             bindEvents();
+            initToolbarPin();
             refreshAllStatuses().catch(function() {});
         },
     };
@@ -830,4 +953,3 @@
         window.PBProgress.init();
     }
 })();
-</script>

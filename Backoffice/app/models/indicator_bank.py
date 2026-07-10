@@ -168,7 +168,6 @@ class IndicatorBank(db.Model):
     archived = db.Column(db.Boolean, default=False, nullable=False)
     comments = db.Column(db.Text, nullable=True)
     emergency = db.Column(db.Boolean, default=False, nullable=False)
-    related_programs = db.Column(db.Text, nullable=True)  # Comma separated list
     _related_programs_list = db.Column("related_programs_list", JSONB, nullable=True)
 
     # JSON fields for Sector and Sub-Sector with Primary/Secondary/Tertiary levels
@@ -244,24 +243,13 @@ class IndicatorBank(db.Model):
     @property
     def related_programs_list(self):
         """Returns related programs as a list."""
-        if self._related_programs_list is not None:
-            return self._related_programs_list if isinstance(self._related_programs_list, list) else []
-        if not self.related_programs:
+        if self._related_programs_list is None:
             return []
-
-        # Cache the parsed list to avoid repeated string splitting
-        if not hasattr(self, '_cached_programs_list'):
-            self._cached_programs_list = [
-                program.strip()
-                for program in re.split(r"[,|]", self.related_programs)
-                if program.strip()
-            ]
-
-        return self._cached_programs_list
+        return self._related_programs_list if isinstance(self._related_programs_list, list) else []
 
     @related_programs_list.setter
     def related_programs_list(self, value):
-        """Store related programs in the JSONB column while keeping the legacy text fallback."""
+        """Store related programs in the JSONB column."""
         if value is None:
             self._related_programs_list = None
         elif isinstance(value, list):
@@ -272,12 +260,12 @@ class IndicatorBank(db.Model):
                 for program in re.split(r"[,|]", str(value))
                 if program.strip()
             ]
-        if hasattr(self, '_cached_programs_list'):
-            delattr(self, '_cached_programs_list')
+        if not self._related_programs_list:
+            self._related_programs_list = None
 
     @property
     def related_programs_list_resolved(self):
-        """Return related programs from JSONB, falling back to the legacy text column."""
+        """Return related programs from JSONB."""
         return self.related_programs_list
 
     # Helper methods for sector and sub-sector access

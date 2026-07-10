@@ -9,9 +9,9 @@ from werkzeug.exceptions import NotFound
 
 from flask_login import current_user
 
-from app.pb_progress import bp
-from app.pb_progress.service import PBProgressService
-from app.pb_progress.versions import validate_version
+from plugins.pb_progress import bp
+from plugins.pb_progress.service import PBProgressService
+from plugins.pb_progress.versions import validate_version
 from app.routes.admin.shared import permission_required, system_manager_required
 from app.services.authorization_service import AuthorizationService
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error

@@ -236,6 +236,23 @@ if __name__ == '__main__':
         "**/Visuals tool/**",
     ]
 
+    # Werkzeug's _stat_ignore_scan only covers sys.prefix / sys.base_prefix.
+    # On Windows with a system Python install, user site-packages lives under
+    # %APPDATA%\Python\... which is a *different* path prefix and therefore IS
+    # scanned and watched.  Packages like playwright write .pyc files on first
+    # import; on Windows NTFS that updates the parent directory mtime, which
+    # causes the reloader to detect a change and restart Flask mid-build.
+    # Add it explicitly so the pattern-based exclusion covers it even when the
+    # reloader is opt-in enabled via FLASK_USE_RELOADER=true.
+    try:
+        import site as _site
+        _user_site = _site.getusersitepackages()
+        if _user_site and os.path.isdir(_user_site):
+            # forward-slash form matches on all platforms via fnmatch
+            _exclude_patterns.append(_user_site.replace("\\", "/") + "/**")
+    except Exception:
+        pass
+
     if use_stat_reloader:
         app.run(
             debug=debug,

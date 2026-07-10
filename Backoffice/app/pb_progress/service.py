@@ -12,7 +12,7 @@ import sys
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import timezone
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -29,11 +29,9 @@ EXCEL_REL_PATH = "source/SG_Report.xlsx"
 STATUS_REL_PATH = "status.json"
 BUILD_LOG_REL_PATH = "build.log"
 OUTPUT_PREFIX = "output/"
-BACKOFFICE_DIR = Path(__file__).resolve().parents[2]
 OUTPUT_URL_PREFIX = "/admin/data-exploration/pb-progress/output/"
 
 HEARTBEAT_INTERVAL_SECONDS = 60
-BUILD_STALE_SECONDS = 300
 
 # Build defaults — baked in; no App Service variables required.
 PB_REPORT_YEAR = "2026"
@@ -88,70 +86,28 @@ class PBProgressService:
         "output_names": [],
     }
     _loaded_status: ClassVar[bool] = False
+    _build_thread: ClassVar[threading.Thread | None] = None
 
     @classmethod
     def _now_iso(cls) -> str:
         return utcnow().replace(tzinfo=timezone.utc).isoformat()
 
     @classmethod
-    def _parse_iso_timestamp(cls, value: str | None) -> datetime | None:
-        if not value:
-            return None
-        try:
-            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-            if parsed.tzinfo is None:
-                parsed = parsed.replace(tzinfo=timezone.utc)
-            return parsed
-        except ValueError:
-            return None
-
-    @classmethod
-    def _process_is_alive(cls, pid: Any) -> bool:
-        if pid is None:
-            return False
-        try:
-            os.kill(int(pid), 0)
-        except (OSError, ValueError, TypeError):
-            return False
-        return True
-
-    @classmethod
-    def _mark_run_interrupted(cls, message: str | None = None) -> None:
+    def _clear_orphaned_run(cls) -> None:
+        """After a server restart, status.json may still say 'running' but no thread exists."""
+        if cls._state.get("status") != "running":
+            return
+        if cls._build_thread is not None and cls._build_thread.is_alive():
+            return
         cls._state.update(
             {
                 "status": "failed",
                 "finished_at": cls._now_iso(),
-                "error": message or "Generation was interrupted or timed out.",
+                "error": "Generation was interrupted when the server restarted.",
                 "build_stage": None,
-                "build_pid": None,
             }
         )
         cls._persist_status()
-
-    @classmethod
-    def _reconcile_running_status(cls) -> None:
-        """Mark orphaned runs failed when the build process no longer exists."""
-        if cls._state.get("status") != "running":
-            return
-        build_pid = cls._state.get("build_pid")
-        if build_pid is not None and not cls._process_is_alive(build_pid):
-            cls._mark_run_interrupted(
-                "Generation was interrupted when the server restarted."
-            )
-            return
-        if cls._is_run_stale(cls._state):
-            cls._mark_run_interrupted()
-
-    @classmethod
-    def _is_run_stale(cls, data: dict[str, Any]) -> bool:
-        if data.get("status") != "running":
-            return False
-        reference = data.get("heartbeat") or data.get("started_at")
-        parsed = cls._parse_iso_timestamp(reference)
-        if not parsed:
-            return True
-        age = (utcnow().replace(tzinfo=timezone.utc) - parsed).total_seconds()
-        return age > BUILD_STALE_SECONDS
 
     @classmethod
     def _reload_status_from_storage(cls) -> dict[str, Any] | None:
@@ -166,29 +122,15 @@ class PBProgressService:
             return None
 
     @classmethod
-    def _is_run_active(cls, persisted: dict[str, Any]) -> bool:
-        if persisted.get("status") != "running":
-            return False
-        build_pid = persisted.get("build_pid")
-        if build_pid is not None and not cls._process_is_alive(build_pid):
-            return False
-        return not cls._is_run_stale(persisted)
-
-    @classmethod
-    def _detect_stale_run(cls) -> None:
-        cls._reconcile_running_status()
-
-    @classmethod
     def _ensure_status_loaded(cls) -> None:
         if cls._loaded_status:
-            cls._detect_stale_run()
+            cls._clear_orphaned_run()
             return
         cls._loaded_status = True
         persisted = cls._reload_status_from_storage()
-        if not persisted:
-            return
-        cls._state.update(persisted)
-        cls._detect_stale_run()
+        if persisted:
+            cls._state.update(persisted)
+        cls._clear_orphaned_run()
 
     @classmethod
     def _persist_status(cls, payload: dict[str, Any] | None = None) -> None:
@@ -383,9 +325,17 @@ class PBProgressService:
         else:
             logger.debug("P&B progress using Quarto at %s", quarto_exe)
 
+        # Use find_spec instead of a live import so that playwright's .pyc
+        # files are not written inside the Flask process.  A live
+        # `import playwright.sync_api` caused the Werkzeug stat reloader to
+        # detect the freshly-written __pycache__ entries (user site-packages is
+        # not covered by Werkzeug's _stat_ignore_scan on Windows) and restart
+        # Flask mid-build, emitting spurious [SCHED_SHUTDOWN] messages.
         try:
-            import playwright.sync_api  # noqa: F401
-        except ImportError:
+            import importlib.util
+            if importlib.util.find_spec("playwright") is None:
+                raise ImportError("playwright not found")
+        except (ImportError, ValueError):
             issues.append(
                 "Playwright is not installed. Run: pip install playwright "
                 "&& playwright install chromium"
@@ -584,12 +534,11 @@ class PBProgressService:
         cls._check_build_prerequisites()
         cls._ensure_status_loaded()
 
-        persisted = cls._reload_status_from_storage()
-        if persisted and cls._is_run_active(persisted):
+        if cls._build_thread is not None and cls._build_thread.is_alive():
             raise RuntimeError("A report generation is already in progress.")
 
         with cls._lock:
-            cls._reconcile_running_status()
+            cls._clear_orphaned_run()
             if cls._state.get("status") == "running":
                 raise RuntimeError("A report generation is already in progress.")
             if not storage_service.exists(STORAGE_CATEGORY, EXCEL_REL_PATH):
@@ -603,7 +552,6 @@ class PBProgressService:
                     "job_id": job_id,
                     "started_at": started_at,
                     "heartbeat": started_at,
-                    "build_pid": None,
                     "finished_at": None,
                     "error": None,
                     "build_stage": "preparing",
@@ -621,46 +569,15 @@ class PBProgressService:
             stage="preparing",
         )
 
-        runner_pid = cls._spawn_detached_runner(job_id, language or "all")
-        with cls._lock:
-            if cls._state.get("job_id") == job_id:
-                cls._state["build_pid"] = runner_pid
-                cls._persist_status()
-        return job_id
-
-    @classmethod
-    def _spawn_detached_runner(cls, job_id: str, language: str) -> int:
-        """Launch build in a separate process so Quarto/Chromium cannot take down Flask."""
-        env = os.environ.copy()
-        env["PYTHONUNBUFFERED"] = "1"
-        env["PYTHONDONTWRITEBYTECODE"] = "1"
-        env.setdefault("FLASK_CONFIG", current_app.config.get("ENV") or "development")
-
-        cmd = [sys.executable, "-m", "app.pb_progress.build_runner", job_id, language]
-        popen_kwargs: dict[str, Any] = {
-            "cwd": str(BACKOFFICE_DIR),
-            "env": env,
-            "stdin": subprocess.DEVNULL,
-            "stdout": subprocess.DEVNULL,
-            "stderr": subprocess.DEVNULL,
-        }
-        if sys.platform == "win32":
-            popen_kwargs["creationflags"] = (
-                subprocess.CREATE_NEW_PROCESS_GROUP
-                | subprocess.DETACHED_PROCESS
-                | subprocess.CREATE_NO_WINDOW
-            )
-        else:
-            popen_kwargs["start_new_session"] = True
-
-        proc = subprocess.Popen(cmd, **popen_kwargs)
-        logger.info(
-            "P&B progress build | ts=%s | job=%s | event=spawned | pid=%s",
-            cls._now_iso(),
-            job_id[:8],
-            proc.pid,
+        app = current_app._get_current_object()
+        cls._build_thread = threading.Thread(
+            target=cls._run_build,
+            args=(app, job_id, language or "all"),
+            name=f"pb-progress-build-{job_id[:8]}",
+            daemon=True,
         )
-        return proc.pid
+        cls._build_thread.start()
+        return job_id
 
     @classmethod
     def _build_log_path(cls) -> Path:
@@ -754,6 +671,7 @@ class PBProgressService:
                         stage=stage,
                         detail=sanitized or None,
                     )
+                    cls._state["heartbeat"] = cls._now_iso()
                     cls._persist_status()
                     last_heartbeat = now
                 elif now - last_heartbeat >= HEARTBEAT_INTERVAL_SECONDS:
@@ -786,55 +704,62 @@ class PBProgressService:
         return log_pos, chunk.splitlines()
 
     @classmethod
-    def execute_build(cls, job_id: str, language: str) -> None:
-        """Run the Visuals tool build and update status.json (detached runner entrypoint)."""
-        cls._ensure_status_loaded()
+    def _run_build(cls, app, job_id: str, language: str) -> None:
+        """Background thread: run build_report.py, tail its log, update status.json."""
         temp_excel: str | None = None
         last_heartbeat = time.time()
         build_started = time.monotonic()
         stage_started = build_started
         current_stage = "preparing"
 
-        try:
-            if not BUILD_SCRIPT.is_file():
-                raise FileNotFoundError(f"Build script not found: {BUILD_SCRIPT}")
-
-            excel_path = storage_service.get_absolute_path(STORAGE_CATEGORY, EXCEL_REL_PATH)
-            if cls._is_azure_storage():
-                temp_excel = excel_path
-
-            env = cls._build_env(excel_path, language)
-            cmd = [sys.executable, str(BUILD_SCRIPT), "--format", "html"]
-            cls._log_build_step(
-                job_id,
-                "started",
-                language=language,
-                stage=current_stage,
-                detail=f"workers={env.get('PB_BUILD_WORKERS', '')}",
-            )
-            with cls._lock:
-                if cls._state.get("job_id") == job_id:
-                    cls._set_build_stage(current_stage)
-                    cls._state["build_pid"] = os.getpid()
-                    cls._persist_status()
-
-            log_path = cls._build_log_path()
-            log_path.parent.mkdir(parents=True, exist_ok=True)
-            log_pos = 0
-            log_handle = open(log_path, "w", encoding="utf-8")
+        with app.app_context():
             try:
-                proc = subprocess.Popen(
-                    cmd,
-                    cwd=str(VISUALS_TOOL_DIR),
-                    env=env,
-                    stdout=log_handle,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                )
-            finally:
-                log_handle.close()
+                if not BUILD_SCRIPT.is_file():
+                    raise FileNotFoundError(f"Build script not found: {BUILD_SCRIPT}")
 
-            while proc.poll() is None:
+                excel_path = storage_service.get_absolute_path(STORAGE_CATEGORY, EXCEL_REL_PATH)
+                if cls._is_azure_storage():
+                    temp_excel = excel_path
+
+                env = cls._build_env(excel_path, language)
+                cmd = [sys.executable, str(BUILD_SCRIPT), "--format", "html"]
+                cls._log_build_step(
+                    job_id,
+                    "started",
+                    language=language,
+                    stage=current_stage,
+                    detail=f"workers={env.get('PB_BUILD_WORKERS', '')}",
+                )
+
+                log_path = cls._build_log_path()
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                log_pos = 0
+                log_handle = open(log_path, "w", encoding="utf-8")
+                try:
+                    proc = subprocess.Popen(
+                        cmd,
+                        cwd=str(VISUALS_TOOL_DIR),
+                        env=env,
+                        stdout=log_handle,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                    )
+                finally:
+                    log_handle.close()
+
+                while proc.poll() is None:
+                    log_pos, lines = cls._tail_build_log(log_path, log_pos)
+                    current_stage, stage_started, last_heartbeat = cls._consume_build_log_lines(
+                        job_id,
+                        language,
+                        lines,
+                        current_stage=current_stage,
+                        stage_started=stage_started,
+                        build_started=build_started,
+                        last_heartbeat=last_heartbeat,
+                    )
+                    time.sleep(0.5)
+
                 log_pos, lines = cls._tail_build_log(log_path, log_pos)
                 current_stage, stage_started, last_heartbeat = cls._consume_build_log_lines(
                     job_id,
@@ -845,110 +770,71 @@ class PBProgressService:
                     build_started=build_started,
                     last_heartbeat=last_heartbeat,
                 )
-                time.sleep(0.5)
+                if proc.wait() != 0:
+                    raise subprocess.CalledProcessError(proc.returncode, cmd)
 
-            log_pos, lines = cls._tail_build_log(log_path, log_pos)
-            current_stage, stage_started, last_heartbeat = cls._consume_build_log_lines(
-                job_id,
-                language,
-                lines,
-                current_stage=current_stage,
-                stage_started=stage_started,
-                build_started=build_started,
-                last_heartbeat=last_heartbeat,
-            )
-            return_code = proc.wait()
-            if return_code != 0:
-                raise subprocess.CalledProcessError(return_code, cmd)
+                current_stage = "saving"
+                with cls._lock:
+                    if cls._state.get("job_id") == job_id:
+                        cls._advance_build_stage(current_stage)
+                        cls._persist_status()
 
-            stage_duration = time.monotonic() - stage_started
-            cls._log_build_step(
-                job_id,
-                "stage_complete",
-                language=language,
-                stage=current_stage,
-                duration_s=stage_duration,
-            )
-            current_stage = "saving"
-            stage_started = time.monotonic()
-            with cls._lock:
-                if cls._state.get("job_id") == job_id:
-                    cls._advance_build_stage(current_stage)
+                copied = cls._copy_outputs_to_storage()
+                if not copied:
+                    raise RuntimeError("Build completed but no output files were produced.")
+
+                with cls._lock:
+                    if cls._state.get("job_id") != job_id:
+                        return
+                    cls._state["output_names"] = copied
+                    cls._state.update(
+                        {
+                            "status": "done",
+                            "finished_at": cls._now_iso(),
+                            "error": None,
+                            "build_stage": None,
+                            "outputs": cls._build_output_manifest(copied),
+                        }
+                    )
                     cls._persist_status()
-            cls._log_build_step(
-                job_id,
-                "stage_started",
-                language=language,
-                stage=current_stage,
-            )
-
-            copied = cls._copy_outputs_to_storage()
-            if not copied:
-                raise RuntimeError("Build completed but no output files were produced.")
-
-            cls._log_build_step(
-                job_id,
-                "stage_complete",
-                language=language,
-                stage=current_stage,
-                duration_s=time.monotonic() - stage_started,
-                detail=f"output_count={len(copied)}",
-            )
-
-            with cls._lock:
-                if cls._state.get("job_id") != job_id:
-                    return
-                cls._state["output_names"] = copied
-                cls._state.update(
-                    {
-                        "status": "done",
-                        "finished_at": cls._now_iso(),
-                        "error": None,
-                        "build_stage": None,
-                        "build_pid": None,
-                        "outputs": cls._build_output_manifest(copied),
-                    }
+                cls._log_build_step(
+                    job_id,
+                    "completed",
+                    language=language,
+                    duration_s=time.monotonic() - build_started,
+                    detail=f"output_count={len(copied)}",
                 )
-                cls._persist_status()
-            cls._log_build_step(
-                job_id,
-                "completed",
-                language=language,
-                duration_s=time.monotonic() - build_started,
-                detail=f"output_count={len(copied)}",
-            )
-        except BaseException as exc:
-            if isinstance(exc, KeyboardInterrupt):
-                raise
-            cls._log_build_step(
-                job_id,
-                "failed",
-                language=language,
-                stage=current_stage,
-                duration_s=time.monotonic() - build_started,
-                detail=f"{type(exc).__name__}: {exc}",
-                level=logging.ERROR,
-            )
-            logger.exception("P&B progress report generation failed (job %s)", job_id[:8])
-            with cls._lock:
-                if cls._state.get("job_id") != job_id:
-                    return
-                cls._state.update(
-                    {
-                        "status": "failed",
-                        "finished_at": cls._now_iso(),
-                        "error": cls._public_error_message(exc),
-                        "build_stage": None,
-                        "build_pid": None,
-                    }
+            except BaseException as exc:
+                if isinstance(exc, KeyboardInterrupt):
+                    raise
+                cls._log_build_step(
+                    job_id,
+                    "failed",
+                    language=language,
+                    stage=current_stage,
+                    duration_s=time.monotonic() - build_started,
+                    detail=f"{type(exc).__name__}: {exc}",
+                    level=logging.ERROR,
                 )
-                cls._persist_status()
-        finally:
-            if temp_excel and os.path.exists(temp_excel):
-                try:
-                    os.remove(temp_excel)
-                except OSError:
-                    pass
+                logger.exception("P&B progress report generation failed (job %s)", job_id[:8])
+                with cls._lock:
+                    if cls._state.get("job_id") != job_id:
+                        return
+                    cls._state.update(
+                        {
+                            "status": "failed",
+                            "finished_at": cls._now_iso(),
+                            "error": cls._public_error_message(exc),
+                            "build_stage": None,
+                        }
+                    )
+                    cls._persist_status()
+            finally:
+                if temp_excel and os.path.exists(temp_excel):
+                    try:
+                        os.remove(temp_excel)
+                    except OSError:
+                        pass
 
     @classmethod
     def serve_output(cls, filename: str):

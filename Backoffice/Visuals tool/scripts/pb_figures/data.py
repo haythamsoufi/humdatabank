@@ -229,3 +229,49 @@ def latest_merged_total_reported(model: pd.DataFrame) -> str | None:
     latest_year = tr["Year"].max()
     value = tr.loc[tr["Year"] == latest_year, "TotalReported"].iloc[0]
     return str(int(value)) if pd.notna(value) else None
+
+
+def reporting_source_totals(
+    excel_path: Path | str | None = None,
+    *,
+    year: str | int | None = None,
+) -> dict[str, str | int | None]:
+    """UPR/FDRS National Society counts from TotalReported for footnote substitution."""
+    import os
+
+    path = resolve_excel(excel_path)
+    df = pd.read_excel(path, sheet_name="TotalReported", keep_default_na=False)
+    if df.empty or not {"Source", "Year", "TotalReported"}.issubset(df.columns):
+        raise DataModelError(f"{path.name} → TotalReported sheet is missing required columns.")
+
+    df = df.copy()
+    df["Year"] = df["Year"].astype(str).str.strip()
+    df["Source"] = df["Source"].astype(str).str.strip()
+
+    available_years = sorted(df["Year"].unique())
+    if not available_years:
+        raise DataModelError(f"{path.name} → TotalReported sheet has no year rows.")
+
+    requested = str(year).strip() if year is not None else (os.environ.get("PB_REPORT_YEAR") or "").strip()
+    if requested and requested in available_years:
+        report_year = requested
+    elif requested:
+        prior = [value for value in available_years if value <= requested]
+        report_year = prior[-1] if prior else available_years[-1]
+    else:
+        report_year = available_years[-1]
+
+    subset = df[df["Year"] == report_year]
+
+    def _count(source: str) -> int | None:
+        rows = subset[subset["Source"] == source]
+        if rows.empty:
+            return None
+        value = rows["TotalReported"].iloc[0]
+        return int(value) if pd.notna(value) else None
+
+    return {
+        "year": report_year,
+        "upr_ns": _count("UPR"),
+        "fdrs_ns": _count("FDRS"),
+    }

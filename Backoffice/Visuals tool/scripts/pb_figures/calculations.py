@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+from functools import lru_cache
+from typing import Any
 
 import pandas as pd
 
@@ -96,9 +98,78 @@ def _ns_breakdown_label(role_code: str, language: str) -> str:
     return f"{prefix} {role}"
 
 
-def footnote_for_key(key: str, language: str) -> str:
+def _format_footnote_count(value: int | None) -> str:
+    return str(value) if value is not None else "—"
+
+
+@lru_cache(maxsize=8)
+def _cached_reporting_totals(excel_path_str: str, year: str | None) -> tuple[str, int | None, int | None]:
+    from .data import reporting_source_totals
+
+    totals = reporting_source_totals(excel_path_str, year=year or None)
+    return (
+        str(totals["year"]),
+        totals.get("upr_ns"),
+        totals.get("fdrs_ns"),
+    )
+
+
+def _resolve_footnote_totals(
+    *,
+    year: str | int | None = None,
+    upr_ns: int | None = None,
+    fdrs_ns: int | None = None,
+) -> dict[str, Any]:
+    if year is not None and upr_ns is not None and fdrs_ns is not None:
+        return {"year": str(year), "upr_ns": upr_ns, "fdrs_ns": fdrs_ns}
+
+    from .config import resolve_excel
+
+    excel_path = resolve_excel()
+    cached_year, cached_upr, cached_fdrs = _cached_reporting_totals(
+        str(excel_path),
+        str(year).strip() if year is not None else None,
+    )
+    return {
+        "year": str(year) if year is not None else cached_year,
+        "upr_ns": upr_ns if upr_ns is not None else cached_upr,
+        "fdrs_ns": fdrs_ns if fdrs_ns is not None else cached_fdrs,
+    }
+
+
+def _apply_footnote_placeholders(
+    template: str,
+    *,
+    year: str,
+    upr_ns: int | None,
+    fdrs_ns: int | None,
+) -> str:
+    if "{year}" not in template and "{upr_ns}" not in template and "{fdrs_ns}" not in template:
+        return template
+    return template.format(
+        year=year,
+        upr_ns=_format_footnote_count(upr_ns),
+        fdrs_ns=_format_footnote_count(fdrs_ns),
+    )
+
+
+def footnote_for_key(
+    key: str,
+    language: str,
+    *,
+    year: str | int | None = None,
+    upr_ns: int | None = None,
+    fdrs_ns: int | None = None,
+) -> str:
     code = _FOOTNOTES_BY_KEY.get(key, _FOOTNOTES_BY_KEY["default"])
-    return t(code, language)
+    template = t(code, language)
+    totals = _resolve_footnote_totals(year=year, upr_ns=upr_ns, fdrs_ns=fdrs_ns)
+    return _apply_footnote_placeholders(
+        template,
+        year=str(totals["year"]),
+        upr_ns=totals["upr_ns"],
+        fdrs_ns=totals["fdrs_ns"],
+    )
 
 
 def indicator_label(row: pd.Series, language: str = "English") -> str:
@@ -394,11 +465,24 @@ def footnote_2025(language: str = "English") -> str:
     return footnote_for_key("default", language)
 
 
-def section_footnote(section: str, language: str = "English") -> str:
+def section_footnote(
+    section: str,
+    language: str = "English",
+    *,
+    year: str | int | None = None,
+    upr_ns: int | None = None,
+    fdrs_ns: int | None = None,
+) -> str:
     from .layouts import SECTION_FOOTNOTE_KEYS
 
     key = SECTION_FOOTNOTE_KEYS.get(section, "default")
-    return footnote_for_key(key, language)
+    return footnote_for_key(
+        key,
+        language,
+        year=year,
+        upr_ns=upr_ns,
+        fdrs_ns=fdrs_ns,
+    )
 
 
 def not_applicable(language: str = "English") -> str:

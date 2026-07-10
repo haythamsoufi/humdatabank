@@ -43,7 +43,7 @@ def package_figures(
         if not png_files:
             continue
 
-        zip_path = output_dir / f"gb-report-figures-{_language_slug(language)}.zip"
+        zip_path = output_dir / f"pb-report-figures-{_language_slug(language)}.zip"
         with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             for png in png_files:
                 arcname = f"{language}/{png.name}"
@@ -53,7 +53,7 @@ def package_figures(
         print(f"[package_figures] {zip_path.name} ({len(png_files)} PNGs)", flush=True)
 
     if all_members:
-        all_zip = output_dir / "gb-report-figures-all.zip"
+        all_zip = output_dir / "pb-report-figures-all.zip"
         with zipfile.ZipFile(all_zip, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             for png, arcname in all_members:
                 zf.write(png, arcname=arcname)

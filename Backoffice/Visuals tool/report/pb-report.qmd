@@ -1,5 +1,5 @@
 ---
-title: "Governing Board Report — Figures"
+title: "Plan & Budget Report — Figures"
 subtitle: "July 2026"
 author: "IFRC — FDS Team"
 date: today

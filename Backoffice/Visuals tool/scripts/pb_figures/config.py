@@ -8,7 +8,7 @@ from .languages import INDICATOR_COLUMNS, LANG_COLUMNS, LANGUAGES, SP_LANG_COLUM
 
 
 
-# IFRC brand colours extracted from GB figures.twb
+# IFRC brand colours extracted from P&B figures.twb
 
 COLOR_VALUE = "#c22526"
 
@@ -31,13 +31,13 @@ LINE_CHART_EFFECTS = resolve_style(DEFAULT_STYLE)["line_chart_effects"]
 
 DASHBOARD_SIZES = {
 
-    "EF1": (827, 600),
+    "EF1": (827, 550),
 
-    "EF2": (827, 580),
+    "EF2": (827, 670),
 
-    "EF3": (827, 580),
+    "EF3": (827, 430),
 
-    "EF4": (827, 700),
+    "EF4": (827, 900),
 
     "SP1": (827, 800),
 
@@ -45,7 +45,7 @@ DASHBOARD_SIZES = {
 
     "SP3": (827, 800),
 
-    "SP4": (827, 800),
+    "SP4": (827, 1100),
 
     "SP5": (827, 800),
 
@@ -72,8 +72,8 @@ def resolve_excel(path: Path | str | None = None) -> Path:
     """Return a readable workbook path, copying if the source is locked in Excel."""
     if path is not None:
         src = Path(path)
-    elif os.environ.get("GB_REPORT_EXCEL"):
-        src = Path(os.environ["GB_REPORT_EXCEL"])
+    elif os.environ.get("PB_REPORT_EXCEL"):
+        src = Path(os.environ["PB_REPORT_EXCEL"])
     else:
         src = DEFAULT_EXCEL
 
@@ -94,13 +94,13 @@ def build_workers(count: int) -> int:
 
     Each worker launches its own Chromium instance via Playwright, so this is
     capped (not just set to os.cpu_count()) to avoid overloading the machine.
-    Override with the GB_BUILD_WORKERS environment variable, e.g. GB_BUILD_WORKERS=1
+    Override with the PB_BUILD_WORKERS environment variable, e.g. PB_BUILD_WORKERS=1
     to force fully sequential behaviour for debugging.
     """
     if count <= 1:
         return 1
 
-    env_value = os.environ.get("GB_BUILD_WORKERS")
+    env_value = os.environ.get("PB_BUILD_WORKERS")
     if env_value:
         try:
             cap = int(env_value)
@@ -115,18 +115,18 @@ def build_workers(count: int) -> int:
 def owns_excel_copy() -> bool:
     """True if this process is responsible for cleaning up the shared build copy.
 
-    A parent process (build_report.py or gb-report.bat) that pre-creates the
-    build copy signals this by exporting GB_REPORT_EXCEL before launching
+    A parent process (build_report.py or pb-report.bat) that pre-creates the
+    build copy signals this by exporting PB_REPORT_EXCEL before launching
     child scripts. Children must not delete a copy they don't own, or they
     will pull it out from under later steps in the same build.
     """
-    return not os.environ.get("GB_REPORT_EXCEL")
+    return not os.environ.get("PB_REPORT_EXCEL")
 
 
 def cleanup_build_copy(excel: Path | str | None = None, *, force: bool = False) -> None:
     """Delete the ._build temporary copy, if one was created by resolve_excel().
 
-    Skips deletion when GB_REPORT_EXCEL is set in the environment, since that
+    Skips deletion when PB_REPORT_EXCEL is set in the environment, since that
     means an outer process owns the copy's lifecycle (pass force=True to
     override, e.g. from the outermost process itself).
     """

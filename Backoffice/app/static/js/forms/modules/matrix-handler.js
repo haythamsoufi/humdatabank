@@ -4084,8 +4084,16 @@ class MatrixHandler {
                 entities = Array.from(entityMapById.values());
                 debugLog('matrix-handler', `[AUTO-LOAD] Merged ${entities.length} unique entities from ${variableConfigsByColumn.length} variable column(s)`);
             } else {
-                // For forward lookup (same, any, specific), call backend for EACH variable column and merge entities
+                // For forward lookup (same, any, specific), collect all sub-requests and
+                // send a single batch call instead of one call per variable column.
+                // This reduces N HTTP round-trips to 1, cutting thread-slot consumption
+                // on the server from N to 1 and eliminating N-1 network waits on the client.
                 const entityMapById = new Map();
+                const requireTickValue1 = tickColumnNames.length > 0;
+
+                // Build sub-requests for columns that have complete configs.
+                const subRequests = [];
+                const subRequestColumnNames = [];
                 for (const { variableName: colVarName, variableConfig: colVarConfig } of variableConfigsByColumn) {
                     const sourceTemplateId = colVarConfig.source_template_id;
                     const sourceAssignmentPeriod = colVarConfig.source_assignment_period;
@@ -4095,43 +4103,51 @@ class MatrixHandler {
                         debugLog('matrix-handler', `[AUTO-LOAD] Incomplete variable configuration for ${colVarName}, skipping`);
                         continue;
                     }
+                    subRequests.push({
+                        source_template_id: sourceTemplateId,
+                        source_assignment_period: sourceAssignmentPeriod,
+                        source_form_item_id: sourceFormItemId,
+                        assignment_entity_status_id: assignmentEntityStatusId,
+                        require_tick_value_1: requireTickValue1,
+                        tick_column_names: tickColumnNames
+                    });
+                    subRequestColumnNames.push(colVarName);
+                }
 
-                    const requireTickValue1 = tickColumnNames.length > 0;
-                    const response = await _mhFetch('/api/v1/matrix/auto-load-entities', {
+                if (subRequests.length > 0) {
+                    const batchResponse = await _mhFetch('/api/v1/matrix/auto-load-entities/batch', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'X-CSRFToken': this.getCsrfToken()
                         },
-                        body: JSON.stringify({
-                            source_template_id: sourceTemplateId,
-                            source_assignment_period: sourceAssignmentPeriod,
-                            source_form_item_id: sourceFormItemId,
-                            assignment_entity_status_id: assignmentEntityStatusId,
-                            require_tick_value_1: requireTickValue1,
-                            tick_column_names: tickColumnNames
-                        })
+                        body: JSON.stringify({ requests: subRequests })
                     });
 
-                    if (!response.ok) {
-                        debugWarn('matrix-handler', `[AUTO-LOAD] Failed to fetch auto-load entities for ${colVarName}: ${response.status}`);
-                        continue;
-                    }
-
-                    const data = await response.json();
-                    const colEntities = data.entities || [];
-                    if (data.entity_type && !entityType) entityType = data.entity_type;
-                    for (const ent of colEntities) {
-                        const eid = ent.entity_id != null ? ent.entity_id : ent.id;
-                        const etype = ent.entity_type || data.entity_type || entityType;
-                        if (eid != null && etype) {
-                            entityMapById.set(String(eid), { entity_id: eid, entity_type: etype });
+                    if (!batchResponse.ok) {
+                        debugWarn('matrix-handler', `[AUTO-LOAD] Batch request failed: ${batchResponse.status}`);
+                    } else {
+                        const batchData = await batchResponse.json();
+                        const results = batchData.results || [];
+                        for (let i = 0; i < results.length; i++) {
+                            const colVarName = subRequestColumnNames[i] || `col_${i}`;
+                            const result = results[i];
+                            const colEntities = result.entities || [];
+                            if (result.entity_type && !entityType) entityType = result.entity_type;
+                            for (const ent of colEntities) {
+                                const eid = ent.entity_id != null ? ent.entity_id : ent.id;
+                                const etype = ent.entity_type || result.entity_type || entityType;
+                                if (eid != null && etype) {
+                                    entityMapById.set(String(eid), { entity_id: eid, entity_type: etype });
+                                }
+                            }
+                            debugLog('matrix-handler', `[AUTO-LOAD] Got ${colEntities.length} entities from variable ${colVarName}`);
                         }
                     }
-                    debugLog('matrix-handler', `[AUTO-LOAD] Got ${colEntities.length} entities from variable ${colVarName}`);
                 }
+
                 entities = Array.from(entityMapById.values());
-                debugLog('matrix-handler', `[AUTO-LOAD] Merged ${entities.length} unique entities from ${variableConfigsByColumn.length} variable column(s) (forward lookup)`);
+                debugLog('matrix-handler', `[AUTO-LOAD] Merged ${entities.length} unique entities from ${subRequests.length} sub-request(s) via batch (forward lookup)`);
             }
 
             if (entities.length === 0) {

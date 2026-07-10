@@ -36,6 +36,53 @@ def _login(client, user_id):
         sess["_fresh"] = True
 
 
+def _grant_assignment_view_role(db_session, user):
+    from app.models.rbac import RbacPermission, RbacRole, RbacRolePermission, RbacUserRole
+
+    role = db_session.query(RbacRole).filter_by(code="assignment_viewer").first()
+    if not role:
+        role = RbacRole(code="assignment_viewer", name="Assignment Viewer")
+        db_session.add(role)
+        db_session.flush()
+
+    perm = db_session.query(RbacPermission).filter_by(code="assignment.view").first()
+    if not perm:
+        perm = RbacPermission(
+            code="assignment.view",
+            name="View assignments",
+            description="View assignments",
+        )
+        db_session.add(perm)
+        db_session.flush()
+
+    existing_role_perm = (
+        db_session.query(RbacRolePermission)
+        .filter_by(role_id=role.id, permission_id=perm.id)
+        .first()
+    )
+    if not existing_role_perm:
+        db_session.add(RbacRolePermission(role_id=role.id, permission_id=perm.id))
+
+    existing_user_role = (
+        db_session.query(RbacUserRole)
+        .filter_by(user_id=user.id, role_id=role.id)
+        .first()
+    )
+    if not existing_user_role:
+        db_session.add(RbacUserRole(user_id=user.id, role_id=role.id))
+
+    db_session.commit()
+
+
+@pytest.fixture(autouse=True)
+def _grant_assignment_dashboard_role_for_admin_dashboard_tests(request, db_session):
+    """Most legacy dashboard tests use the shared admin client as the actor."""
+    if "logged_in_client" not in request.fixturenames and "admin_user" not in request.fixturenames:
+        return
+    admin = request.getfixturevalue("admin_user")
+    _grant_assignment_view_role(db_session, admin)
+
+
 def _html(response):
     return response.data.decode("utf-8", errors="replace")
 
@@ -57,6 +104,41 @@ class TestDashboardUnauthenticated:
 # ---------------------------------------------------------------------------
 
 class TestDashboardNoEntities:
+    def test_admin_without_assignment_view_redirects_to_first_allowed_admin_page(self, client, db_session, app):
+        """Admin permissions alone must not trigger the all-entity dashboard fallback."""
+        from app.models.rbac import RbacPermission, RbacRole, RbacRolePermission, RbacUserRole
+
+        admin = create_test_user(
+            db_session,
+            email="dashboard_admin_without_assignment@example.com",
+            role="user",
+        )
+        country = create_test_country(db_session, name="Dashboard Leak Guard")
+
+        role = RbacRole(code="admin_data_explorer_test", name="Admin: Data Explorer Test")
+        permission = RbacPermission(
+            code="admin.data_explore.data_table",
+            name="Explore data table",
+            description="Explore data table",
+        )
+        db_session.add_all([role, permission])
+        db_session.flush()
+        RbacUserRole.query.filter_by(user_id=admin.id).delete()
+        db_session.add(RbacRolePermission(role_id=role.id, permission_id=permission.id))
+        db_session.add(RbacUserRole(user_id=admin.id, role_id=role.id))
+        db_session.commit()
+
+        _login(client, admin.id)
+
+        with patch("app.routes.main.dashboard.EntityService.get_entities_for_user", return_value=[country]) as mock_entities, \
+             patch("app.routes.main.dashboard.render_template", return_value="<html>dashboard</html>") as mock_rt:
+            resp = client.get("/", follow_redirects=False)
+
+        assert resp.status_code == 302
+        assert "/admin/data-exploration" in resp.headers.get("Location", "")
+        mock_entities.assert_not_called()
+        mock_rt.assert_not_called()
+
     def test_renders_dashboard_with_warning_flash(self, logged_in_client, db_session, app):
         """Admin user with no entity permissions sees warning."""
         with patch("app.routes.main.dashboard.UserEntityPermission") as mock_perm_cls, \

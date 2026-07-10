@@ -1,0 +1,687 @@
+{% from "macros/modal_shell.html" import modal_shell %}
+
+<div id="panel-pb-progress"
+     class="explore-panel{% if explore_first_tab != 'pb-progress' %} hidden{% endif %}"
+     role="tabpanel"
+     aria-labelledby="tab-pb-progress">
+    <div class="p-4 sm:p-6 space-y-5">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900">{{ _('P&B Progress') }}</h3>
+                <p class="text-sm text-gray-600 mt-1">
+                    {{ _('Browse the interactive report, charts, and downloadable documents for Plan and Budget progress.') }}
+                </p>
+            </div>
+            <p id="pb-progress-last-generated" class="text-sm text-gray-500 hidden"></p>
+        </div>
+
+        <div id="pb-progress-empty" class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
+            <i class="fas fa-chart-line text-2xl text-gray-400 mb-3"></i>
+            <p>{{ _('No report is available yet.') }}</p>
+        </div>
+
+        <div id="pb-progress-build" class="hidden rounded-lg border border-blue-200 bg-blue-50 px-4 py-4 space-y-3">
+            <div id="pb-progress-build-active">
+                <div class="flex items-center gap-3 text-sm text-blue-800 mb-2">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span id="pb-progress-progress-text">{{ _('Generating report...') }}</span>
+                </div>
+                <div class="w-full bg-blue-100 rounded-full h-2 overflow-hidden">
+                    <div id="pb-progress-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: 15%;"></div>
+                </div>
+                <ul id="pb-progress-stages" class="mt-3 space-y-2 text-sm hidden"></ul>
+            </div>
+            <p id="pb-progress-build-message" class="text-sm hidden"></p>
+        </div>
+
+        <div id="pb-progress-viewer" class="space-y-5 hidden">
+            <div class="bg-white border border-gray-200 rounded-lg p-4 sm:p-5 shadow-sm">
+                <h4 class="text-base font-semibold text-gray-900 mb-3">{{ _('Downloads') }}</h4>
+                <div id="pb-progress-downloads" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <div class="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between gap-3">
+                    <h4 class="text-base font-semibold text-gray-900">{{ _('Interactive report') }}</h4>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="pb-progress-print-btn"
+                                class="btn btn-secondary btn-sm hidden"
+                                title="{{ _('Print report') }}">
+                            <i class="fas fa-print mr-1.5"></i>{{ _('Print') }}
+                        </button>
+                        <a id="pb-progress-open-tab"
+                           class="btn btn-secondary btn-sm hidden"
+                           target="_blank" rel="noopener noreferrer"
+                           title="{{ _('Open in new tab') }}">
+                            <i class="fas fa-external-link-alt mr-1.5"></i>{{ _('Open') }}
+                        </a>
+                    </div>
+                </div>
+                <div class="relative">
+                    <div id="pb-progress-iframe-loading"
+                         class="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10"
+                         style="min-height: 300px;">
+                        <i class="fas fa-spinner fa-spin text-2xl text-gray-400 mb-2"></i>
+                        <p class="text-sm text-gray-500">{{ _('Loading report…') }}</p>
+                    </div>
+                    <iframe id="pb-progress-iframe"
+                            title="{{ _('P&B Progress preview') }}"
+                            class="w-full block"
+                            style="height: 720px; border: 0;"
+                            loading="lazy"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if can_manage_pb_progress %}
+{% call modal_shell('pb-progress-import-modal', _('Import and generate report'), max_width='max-w-2xl', close_id='pb-progress-import-modal-close', content_class='max-h-[80vh] overflow-y-auto') %}
+    <p class="text-sm text-gray-600 mb-4">{{ _('System managers only. Upload SG Report.xlsx and regenerate multilingual HTML, PDF, Word, and figure packages.') }}</p>
+
+    <div id="pb-progress-excel-badge" class="hidden inline-flex items-center gap-2 rounded-full bg-green-50 text-green-800 px-3 py-1 text-sm mb-4">
+        <i class="fas fa-file-excel"></i>
+        <span id="pb-progress-excel-badge-text"></span>
+    </div>
+
+    <div id="pb-progress-no-excel-notice" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 mb-4">
+        <i class="fas fa-info-circle mr-2"></i>{{ _('No workbook uploaded yet. Add SG Report.xlsx below.') }}
+    </div>
+
+    <div id="pb-progress-dropzone"
+         class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-colors hover:border-blue-400 hover:bg-blue-50/40">
+        <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-3"></i>
+        <p class="text-sm text-gray-700 mb-2">{{ _('Drag and drop an Excel file here, or choose a file') }}</p>
+        <input id="pb-progress-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden">
+        <button type="button" id="pb-progress-choose-file-btn" class="btn btn-secondary btn-sm">
+            <i class="fas fa-folder-open mr-2"></i>{{ _('Choose file') }}
+        </button>
+        <p id="pb-progress-selected-file" class="text-sm text-gray-600 mt-3 hidden"></p>
+    </div>
+
+    <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+            <input id="pb-progress-replace-existing" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
+            <span>{{ _('Replace existing workbook when uploading') }}</span>
+        </label>
+        <button type="button" id="pb-progress-upload-btn" class="btn btn-primary" disabled>
+            <i class="fas fa-upload mr-2"></i>{{ _('Upload Excel') }}
+        </button>
+    </div>
+    <p id="pb-progress-upload-message" class="text-sm mt-3 hidden"></p>
+
+    <div class="mt-6 pt-6 border-t border-gray-200">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+                <h4 class="text-base font-semibold text-gray-900">{{ _('Generate report') }}</h4>
+                <p class="text-sm text-gray-600 mt-1">{{ _('Rebuild all deliverables from the stored workbook.') }}</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <label for="pb-progress-language" class="text-sm font-medium text-gray-700">{{ _('Languages') }}</label>
+                <select id="pb-progress-language" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="all">{{ _('All languages') }}</option>
+                    <option value="English">{{ _('English') }}</option>
+                    <option value="French">{{ _('French') }}</option>
+                    <option value="Spanish">{{ _('Spanish') }}</option>
+                    <option value="Arabic">{{ _('Arabic') }}</option>
+                </select>
+            </div>
+        </div>
+
+        <button type="button" id="pb-progress-generate-btn" class="btn btn-primary" disabled>
+            <i class="fas fa-play mr-2"></i>{{ _('Generate Report') }}
+        </button>
+    </div>
+
+    <div class="mt-6 flex justify-end">
+        <button type="button" class="btn btn-secondary close-modal">{{ _('Close') }}</button>
+    </div>
+{% endcall %}
+{% endif %}
+
+<script nonce="{{ csp_nonce() }}">
+(function() {
+    const API_BASE = '/admin/data-exploration/pb-progress';
+    const CAN_MANAGE = {{ can_manage_pb_progress|tojson }};
+    let pollTimer = null;
+    let selectedFile = null;
+    let hasExcel = false;
+    let importModal = null;
+    let maxProgressPercent = 15;
+    let trackingBuild = false;
+
+    const els = {
+        empty: document.getElementById('pb-progress-empty'),
+        build: document.getElementById('pb-progress-build'),
+        buildActive: document.getElementById('pb-progress-build-active'),
+        buildMessage: document.getElementById('pb-progress-build-message'),
+        viewer: document.getElementById('pb-progress-viewer'),
+        lastGenerated: document.getElementById('pb-progress-last-generated'),
+        downloads: document.getElementById('pb-progress-downloads'),
+        iframe: document.getElementById('pb-progress-iframe'),
+        iframeLoading: document.getElementById('pb-progress-iframe-loading'),
+        printBtn: document.getElementById('pb-progress-print-btn'),
+        openTab: document.getElementById('pb-progress-open-tab'),
+        tab: document.getElementById('tab-pb-progress'),
+        openImportBtn: document.getElementById('pb-progress-open-import-btn'),
+        importModal: document.getElementById('pb-progress-import-modal'),
+        badge: document.getElementById('pb-progress-excel-badge'),
+        badgeText: document.getElementById('pb-progress-excel-badge-text'),
+        noExcelNotice: document.getElementById('pb-progress-no-excel-notice'),
+        dropzone: document.getElementById('pb-progress-dropzone'),
+        fileInput: document.getElementById('pb-progress-file-input'),
+        chooseFileBtn: document.getElementById('pb-progress-choose-file-btn'),
+        selectedFile: document.getElementById('pb-progress-selected-file'),
+        replaceExisting: document.getElementById('pb-progress-replace-existing'),
+        uploadBtn: document.getElementById('pb-progress-upload-btn'),
+        uploadMessage: document.getElementById('pb-progress-upload-message'),
+        generateBtn: document.getElementById('pb-progress-generate-btn'),
+        languageSelect: document.getElementById('pb-progress-language'),
+        progressText: document.getElementById('pb-progress-progress-text'),
+        progressBar: document.getElementById('pb-progress-progress-bar'),
+        stages: document.getElementById('pb-progress-stages'),
+    };
+
+    function setMessage(el, text, tone) {
+        if (!el) return;
+        el.textContent = text || '';
+        el.classList.remove('hidden', 'text-red-600', 'text-green-700', 'text-gray-600');
+        if (!text) {
+            el.classList.add('hidden');
+            return;
+        }
+        if (tone === 'error') el.classList.add('text-red-600');
+        else if (tone === 'success') el.classList.add('text-green-700');
+        else el.classList.add('text-gray-600');
+    }
+
+    function formatUploadedAt(value) {
+        if (!value) return '';
+        try {
+            return new Date(value).toLocaleString();
+        } catch (e) {
+            return value;
+        }
+    }
+
+    function createDownloadLink(output) {
+        const link = document.createElement('a');
+        link.href = output.url;
+        link.className = 'btn btn-secondary btn-sm';
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        const sizeSuffix = output.size_label ? ' (' + output.size_label + ')' : '';
+        link.innerHTML = '<i class="fas fa-download mr-2"></i>' + (output.label || output.name) + sizeSuffix;
+        return link;
+    }
+
+    function renderBuildStages(stageList) {
+        if (!els.stages) return;
+        if (!stageList || !stageList.length) {
+            els.stages.classList.add('hidden');
+            els.stages.innerHTML = '';
+            return;
+        }
+        els.stages.classList.remove('hidden');
+        els.stages.innerHTML = '';
+        stageList.forEach(function(stage) {
+            const item = document.createElement('li');
+            item.className = 'flex items-center gap-2';
+            let iconClass = 'far fa-circle text-gray-400';
+            let textClass = 'text-gray-500';
+            if (stage.state === 'done') {
+                iconClass = 'fas fa-check-circle text-green-600';
+                textClass = 'text-gray-700';
+            } else if (stage.state === 'active') {
+                iconClass = 'fas fa-spinner fa-spin text-blue-600';
+                textClass = 'text-blue-800 font-medium';
+            }
+            item.innerHTML = '<i class="' + iconClass + '" aria-hidden="true"></i><span class="' + textClass + '">' + stage.label + '</span>';
+            els.stages.appendChild(item);
+        });
+    }
+
+    function stageProgressPercent(stageList) {
+        if (!stageList || !stageList.length) return 15;
+        let completed = 0;
+        let hasActive = false;
+        stageList.forEach(function(stage) {
+            if (stage.state === 'done') completed += 1;
+            if (stage.state === 'active') hasActive = true;
+        });
+        const total = stageList.length;
+        const value = hasActive ? completed + 0.5 : completed;
+        return Math.min(95, Math.max(15, Math.round((value / total) * 100)));
+    }
+
+    const DOWNLOAD_LANG_ORDER = ['English', 'French', 'Spanish', 'Arabic'];
+    const ALL_FIGS_NAMES = ['pb-report-figures-all.zip', 'gb-report-figures-all.zip'];
+    const ALL_DOCX_NAMES = ['pb-report-docx-all.zip', 'gb-report-docx-all.zip'];
+    const ALL_PDF_NAMES = ['pb-report-pdf-all.zip', 'gb-report-pdf-all.zip'];
+
+    function findAllLanguagesOutput(outputs, names) {
+        var found = null;
+        outputs.forEach(function(o) { if (names.indexOf(o.name) !== -1) found = o; });
+        return found;
+    }
+
+    function buildTypeGroups(outputs) {
+        const REPORT_HTML = ['pb-report.html', 'gb-report.html'];
+        const skipNames = ALL_FIGS_NAMES.concat(ALL_DOCX_NAMES, ALL_PDF_NAMES);
+        const groups = { docx: [], pdf: [], zip: [] };
+        outputs.forEach(function(output) {
+            if (REPORT_HTML.indexOf(output.name) !== -1) return;
+            if (skipNames.indexOf(output.name) !== -1) return;
+            const name = (output.name || '').toLowerCase();
+            let lang = null;
+            DOWNLOAD_LANG_ORDER.forEach(function(l) { if (name.includes(l.toLowerCase())) lang = l; });
+            if (!lang) return;
+            if (name.endsWith('.docx'))      groups.docx.push({ lang: lang, output: output });
+            else if (name.endsWith('.pdf'))  groups.pdf.push({ lang: lang, output: output });
+            else if (name.endsWith('.zip'))  groups.zip.push({ lang: lang, output: output });
+        });
+        ['docx', 'pdf', 'zip'].forEach(function(t) {
+            groups[t].sort(function(a, b) {
+                return DOWNLOAD_LANG_ORDER.indexOf(a.lang) - DOWNLOAD_LANG_ORDER.indexOf(b.lang);
+            });
+        });
+        return groups;
+    }
+
+    function createTypeDropdown(label, icon, iconColor, items) {
+        if (!items.length) return null;
+
+        const wrap = document.createElement('div');
+        wrap.className = 'relative';
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-secondary btn-sm inline-flex items-center gap-1.5';
+        btn.innerHTML = '<i class="' + icon + ' ' + iconColor + ' mr-1 shrink-0"></i>' +
+            label + ' <i class="fas fa-chevron-down text-xs opacity-60"></i>';
+
+        const menu = document.createElement('div');
+        menu.className = 'pb-dl-menu absolute z-30 left-0 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden hidden';
+
+        items.forEach(function(item, idx) {
+            const row = document.createElement('a');
+            row.href = item.output.url;
+            row.target = '_blank';
+            row.rel = 'noopener noreferrer';
+            row.className = 'flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors' +
+                (idx > 0 ? ' border-t border-gray-100' : '');
+            row.innerHTML = '<span class="flex-1">' + item.lang + '</span>' +
+                (item.output.size_label ? '<span class="text-xs text-gray-400">' + item.output.size_label + '</span>' : '');
+            menu.appendChild(row);
+        });
+
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const wasOpen = !menu.classList.contains('hidden');
+            document.querySelectorAll('.pb-dl-menu').forEach(function(m) { m.classList.add('hidden'); });
+            if (!wasOpen) menu.classList.remove('hidden');
+        });
+
+        wrap.appendChild(btn);
+        wrap.appendChild(menu);
+        return wrap;
+    }
+
+    function renderDownloads(container, outputs) {
+        container.innerHTML = '';
+        if (!outputs.length) return;
+        let allDocxOutput = findAllLanguagesOutput(outputs, ALL_DOCX_NAMES);
+        let allPdfOutput = findAllLanguagesOutput(outputs, ALL_PDF_NAMES);
+        let allFigsOutput = findAllLanguagesOutput(outputs, ALL_FIGS_NAMES);
+        const groups = buildTypeGroups(outputs);
+        if (allDocxOutput) groups.docx.push({ lang: 'All languages', output: allDocxOutput });
+        if (allPdfOutput) groups.pdf.push({ lang: 'All languages', output: allPdfOutput });
+        if (allFigsOutput) groups.zip.push({ lang: 'All languages', output: allFigsOutput });
+        var configs = [
+            { key: 'docx', label: 'Word',    icon: 'fas fa-file-word', color: 'text-blue-700'  },
+            { key: 'pdf',  label: 'PDF',     icon: 'fas fa-file-pdf',  color: 'text-red-600'   },
+            { key: 'zip',  label: 'Figures', icon: 'fas fa-images',    color: 'text-green-600' },
+        ];
+        configs.forEach(function(cfg) {
+            const el = createTypeDropdown(cfg.label, cfg.icon, cfg.color, groups[cfg.key]);
+            if (el) container.appendChild(el);
+        });
+    }
+
+    function renderConsumerView(status) {
+        const outputs = status.outputs || [];
+        const REPORT_HTML_NAMES = ['pb-report.html', 'gb-report.html'];
+        const htmlOutput = outputs.find(function(item) { return REPORT_HTML_NAMES.indexOf(item.name) !== -1; });
+        const running = status.status === 'running';
+        const hasOutputs = outputs.length > 0;
+
+        if (els.empty) els.empty.classList.toggle('hidden', hasOutputs || running);
+        if (els.viewer) els.viewer.classList.toggle('hidden', !hasOutputs);
+
+        if (!hasOutputs) {
+            return;
+        }
+
+        if (els.downloads) renderDownloads(els.downloads, outputs);
+
+        if (htmlOutput && els.iframe) {
+            if (els.iframe.src !== htmlOutput.url) {
+                // Show loading skeleton before navigating.
+                if (els.iframeLoading) els.iframeLoading.classList.remove('hidden');
+                els.iframe.src = htmlOutput.url;
+            }
+            if (els.printBtn) els.printBtn.classList.remove('hidden');
+            if (els.openTab) {
+                els.openTab.href = htmlOutput.url;
+                els.openTab.classList.remove('hidden');
+            }
+        }
+        if (status.finished_at && els.lastGenerated) {
+            els.lastGenerated.textContent = '{{ _("Last updated:") }} ' + formatUploadedAt(status.finished_at);
+            els.lastGenerated.classList.remove('hidden');
+        }
+    }
+
+    function updateAdminUi(excel) {
+        if (!CAN_MANAGE) return;
+        hasExcel = !!excel;
+        if (els.generateBtn) els.generateBtn.disabled = !hasExcel;
+        if (!excel) {
+            if (els.badge) els.badge.classList.add('hidden');
+            if (els.noExcelNotice) els.noExcelNotice.classList.remove('hidden');
+            return;
+        }
+        const parts = [excel.filename || 'SG Report.xlsx'];
+        if (excel.size_label) parts.push(excel.size_label);
+        if (excel.uploaded_at) parts.push(formatUploadedAt(excel.uploaded_at));
+        if (els.badgeText) els.badgeText.textContent = parts.join(' · ');
+        if (els.badge) els.badge.classList.remove('hidden');
+        if (els.noExcelNotice) els.noExcelNotice.classList.add('hidden');
+    }
+
+    function updateBuildProgress(status) {
+        const running = status.status === 'running';
+        const failed = status.status === 'failed';
+        const done = status.status === 'done';
+        const stageList = status.build_stages || [];
+
+        if (running) trackingBuild = true;
+
+        const showCompletion = trackingBuild && (done || failed);
+        const showPanel = running || showCompletion;
+
+        if (els.build) els.build.classList.toggle('hidden', !showPanel);
+        if (els.buildActive) els.buildActive.classList.toggle('hidden', !running);
+
+        if (CAN_MANAGE && els.generateBtn) els.generateBtn.disabled = running || !hasExcel;
+
+        if (running && els.progressBar) {
+            const pct = stageProgressPercent(stageList);
+            maxProgressPercent = Math.max(maxProgressPercent, pct);
+            els.progressBar.style.width = maxProgressPercent + '%';
+        } else if (!running) {
+            maxProgressPercent = 15;
+        }
+
+        if (els.progressText) {
+            els.progressText.textContent = running && status.build_stage_label
+                ? status.build_stage_label
+                : '{{ _("Generating report...") }}';
+        }
+
+        renderBuildStages(running ? stageList : []);
+
+        if (showCompletion && failed) {
+            setMessage(els.buildMessage, status.error || '{{ _("Report generation failed.") }}', 'error');
+            trackingBuild = false;
+        } else if (showCompletion && done) {
+            setMessage(els.buildMessage, '{{ _("Report generated successfully.") }}', 'success');
+            trackingBuild = false;
+        } else if (running) {
+            setMessage(els.buildMessage, '', null);
+        } else if (!showPanel) {
+            setMessage(els.buildMessage, '', null);
+        }
+
+        if (CAN_MANAGE && status.excel) {
+            updateAdminUi(status.excel);
+        }
+    }
+
+    function getCsrfToken() {
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    }
+
+    async function fetchJson(url, options) {
+        const opts = Object.assign({ credentials: 'same-origin' }, options || {});
+        const method = (opts.method || 'GET').toUpperCase();
+        if (method !== 'GET' && method !== 'HEAD') {
+            const headers = Object.assign({}, opts.headers || {});
+            const token = getCsrfToken();
+            if (token) {
+                headers['X-CSRFToken'] = token;
+            }
+            opts.headers = headers;
+        }
+        const response = await fetch(url, opts);
+        const payload = await response.json().catch(function() { return {}; });
+        if (!response.ok) {
+            throw new Error(payload.message || payload.error || '{{ _("Request failed.") }}');
+        }
+        return payload;
+    }
+
+    async function loadExcelInfo() {
+        if (!CAN_MANAGE) return null;
+        const payload = await fetchJson(API_BASE + '/excel-info');
+        updateAdminUi(payload.excel || null);
+        return payload.excel || null;
+    }
+
+    async function refreshStatus() {
+        try {
+            const payload = await fetchJson(API_BASE + '/status');
+            const status = payload.status || {};
+            renderConsumerView(status);
+            updateBuildProgress(status);
+            if (status.status === 'running') {
+                if (!pollTimer) {
+                    pollTimer = window.setInterval(function() {
+                        refreshStatus().catch(function() {});
+                    }, 3000);
+                }
+            } else if (pollTimer) {
+                window.clearInterval(pollTimer);
+                pollTimer = null;
+            }
+            return status;
+        } catch (error) {
+            if (pollTimer) {
+                window.clearInterval(pollTimer);
+                pollTimer = null;
+            }
+            if (trackingBuild && els.build) {
+                els.build.classList.remove('hidden');
+                if (els.buildActive) els.buildActive.classList.add('hidden');
+                setMessage(
+                    els.buildMessage,
+                    '{{ _("Lost connection to the server while generating. Wait for the server to come back, then refresh this page.") }}',
+                    'error'
+                );
+            }
+            throw error;
+        }
+    }
+
+    function resetUploadForm() {
+        selectedFile = null;
+        if (els.fileInput) els.fileInput.value = '';
+        if (els.uploadBtn) els.uploadBtn.disabled = true;
+        if (els.selectedFile) els.selectedFile.classList.add('hidden');
+        setMessage(els.uploadMessage, '', null);
+    }
+
+    function setSelectedFile(file) {
+        selectedFile = file || null;
+        if (!els.uploadBtn) return;
+        els.uploadBtn.disabled = !selectedFile;
+        if (!selectedFile) {
+            if (els.selectedFile) els.selectedFile.classList.add('hidden');
+            return;
+        }
+        if (els.selectedFile) {
+            els.selectedFile.textContent = selectedFile.name + ' (' + Math.round(selectedFile.size / 1024) + ' KB)';
+            els.selectedFile.classList.remove('hidden');
+        }
+    }
+
+    async function uploadExcel() {
+        if (!selectedFile) return;
+        if (!hasExcel && els.replaceExisting && !els.replaceExisting.checked) {
+            setMessage(els.uploadMessage, '{{ _("Enable replace existing workbook or upload the first source file.") }}', 'error');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('excel', selectedFile);
+        setMessage(els.uploadMessage, '{{ _("Uploading...") }}', null);
+        try {
+            const payload = await fetchJson(API_BASE + '/upload', {
+                method: 'POST',
+                body: formData,
+            });
+            updateAdminUi(payload.excel || null);
+            setMessage(els.uploadMessage, '{{ _("Excel uploaded successfully.") }}', 'success');
+            setSelectedFile(null);
+            if (els.fileInput) els.fileInput.value = '';
+        } catch (error) {
+            setMessage(els.uploadMessage, error.message, 'error');
+        }
+    }
+
+    async function startGeneration() {
+        if (importModal) importModal.closeModal();
+        trackingBuild = true;
+        setMessage(els.buildMessage, '', null);
+        maxProgressPercent = 15;
+        if (els.progressBar) els.progressBar.style.width = '15%';
+        if (els.build) els.build.classList.remove('hidden');
+        if (els.buildActive) els.buildActive.classList.remove('hidden');
+        if (els.progressText) els.progressText.textContent = '{{ _("Generating report...") }}';
+        renderBuildStages([]);
+        try {
+            const payload = await fetchJson(API_BASE + '/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    language: els.languageSelect ? els.languageSelect.value : 'all',
+                }),
+            });
+            updateBuildProgress(payload.status || { status: 'running' });
+            renderConsumerView(payload.status || { status: 'running', outputs: [] });
+            if (!pollTimer) {
+                pollTimer = window.setInterval(function() {
+                    refreshStatus().catch(function() {});
+                }, 3000);
+            }
+        } catch (error) {
+            if (els.build) els.build.classList.remove('hidden');
+            if (els.buildActive) els.buildActive.classList.add('hidden');
+            setMessage(els.buildMessage, error.message, 'error');
+            trackingBuild = false;
+        }
+    }
+
+    function bindAdminEvents() {
+        if (!CAN_MANAGE) return;
+        if (window.ModalUtils && els.importModal) {
+            importModal = window.ModalUtils.makeModal(els.importModal, {
+                onOpen: function() {
+                    resetUploadForm();
+                    loadExcelInfo().catch(function() {});
+                    refreshStatus().catch(function() {});
+                },
+            });
+        }
+        if (els.openImportBtn && importModal) {
+            els.openImportBtn.addEventListener('click', function() {
+                importModal.openModal();
+            });
+        }
+        if (els.chooseFileBtn && els.fileInput) {
+            els.chooseFileBtn.addEventListener('click', function() { els.fileInput.click(); });
+            els.fileInput.addEventListener('change', function() {
+                setSelectedFile(els.fileInput.files && els.fileInput.files[0] ? els.fileInput.files[0] : null);
+            });
+        }
+        if (els.dropzone) {
+            ['dragenter', 'dragover'].forEach(function(eventName) {
+                els.dropzone.addEventListener(eventName, function(event) {
+                    event.preventDefault();
+                    els.dropzone.classList.add('border-blue-400', 'bg-blue-50/40');
+                });
+            });
+            ['dragleave', 'drop'].forEach(function(eventName) {
+                els.dropzone.addEventListener(eventName, function(event) {
+                    event.preventDefault();
+                    els.dropzone.classList.remove('border-blue-400', 'bg-blue-50/40');
+                });
+            });
+            els.dropzone.addEventListener('drop', function(event) {
+                const file = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files[0] : null;
+                setSelectedFile(file || null);
+            });
+        }
+        if (els.uploadBtn) els.uploadBtn.addEventListener('click', uploadExcel);
+        if (els.generateBtn) els.generateBtn.addEventListener('click', startGeneration);
+    }
+
+    function bindEvents() {
+        bindAdminEvents();
+        if (els.tab) {
+            els.tab.addEventListener('click', function() {
+                refreshStatus().catch(function() {});
+            });
+        }
+    }
+
+    // ── Iframe integration ────────────────────────────────────────────────
+    if (els.iframe) {
+        // Hide the loading skeleton once the report finishes loading.
+        els.iframe.addEventListener('load', function() {
+            if (els.iframeLoading) els.iframeLoading.classList.add('hidden');
+        });
+    }
+
+    if (els.printBtn) {
+        els.printBtn.addEventListener('click', function() {
+            try { els.iframe && els.iframe.contentWindow && els.iframe.contentWindow.print(); } catch(e) {}
+        });
+    }
+
+    // Auto-resize the iframe to its content so no inner scrollbar appears.
+    window.addEventListener('message', function(e) {
+        if (e.origin !== window.location.origin) return;
+        if (!e.data || e.data.type !== 'pb-report-height' || !els.iframe) return;
+        var h = parseInt(e.data.height, 10);
+        if (h > 0) els.iframe.style.height = h + 'px';
+    });
+    // ─────────────────────────────────────────────────────────────────────
+
+    document.addEventListener('click', function() {
+        document.querySelectorAll('.pb-dl-menu').forEach(function(m) { m.classList.add('hidden'); });
+    });
+
+    window.PBProgress = {
+        init: function() {
+            bindEvents();
+            refreshStatus().catch(function() {});
+        },
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { window.PBProgress.init(); });
+    } else {
+        window.PBProgress.init();
+    }
+})();
+</script>

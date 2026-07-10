@@ -13,11 +13,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from gb_figures.config import build_workers, resolve_excel, cleanup_build_copy
-from gb_figures.data import build_model, load_sg_report
-from gb_figures.languages import discover_languages, docx_filename
-from gb_figures.layouts import SECTION_CODES
-from gb_figures.render_docx import render_report_docx
+from pb_figures.config import build_workers, resolve_excel, cleanup_build_copy
+from pb_figures.data import build_model, load_sg_report
+from pb_figures.languages import discover_languages, docx_filename
+from pb_figures.layouts import SECTION_CODES
+from pb_figures.render_docx import render_report_docx
 
 OUTPUT_DIR = ROOT / "report" / "output"
 
@@ -39,14 +39,14 @@ def _resolve_languages(excel: Path, args: argparse.Namespace) -> list[str]:
         return [args.language]
     if args.all_languages:
         return list(discover_languages(load_sg_report(excel)["mapping"]))
-    env_lang = os.environ.get("GB_REPORT_LANGUAGE")
+    env_lang = os.environ.get("PB_REPORT_LANGUAGE")
     if env_lang and env_lang.lower() not in ("all", "*"):
         return [env_lang]
     return list(discover_languages(load_sg_report(excel)["mapping"]))
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate editable GB Report DOCX")
+    parser = argparse.ArgumentParser(description="Generate editable P&B Report DOCX")
     parser.add_argument("--language", choices=["English", "French", "Spanish", "Arabic"])
     parser.add_argument("--all-languages", action="store_true",
                         help="Generate one editable DOCX per Excel language")
@@ -89,7 +89,7 @@ def main() -> None:
                     _, output = future.result()
                     print(f"[generate_report_docx] wrote {output}")
 
-        default_copy = OUTPUT_DIR / "gb-report.docx"
+        default_copy = OUTPUT_DIR / "pb-report.docx"
         shutil.copy2(outputs[languages[0]], default_copy)
         print(f"[generate_report_docx] wrote {default_copy} (default)")
     finally:

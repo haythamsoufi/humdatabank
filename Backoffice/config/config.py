@@ -333,14 +333,15 @@ class Config:
     # (e.g. 50 for B1ms, 100 for B2s, 200 for GP-2vCore).
     # Default here: 3 workers × (5 + 10) = 45 connections — safe for most tiers.
     # Override via env vars to tune per environment.
+    # pool_timeout < GUNICORN_TIMEOUT (25 s) so waiting for a slot fails fast.
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
         # recycle connections periodically to avoid stale connections on some providers
         "pool_recycle": int(os.environ.get("SQLALCHEMY_POOL_RECYCLE", "300")),
         "pool_size": int(os.environ.get("SQLALCHEMY_POOL_SIZE", "5")),
         "max_overflow": int(os.environ.get("SQLALCHEMY_MAX_OVERFLOW", "10")),
-        # Connection timeout settings
-        "pool_timeout": int(os.environ.get("SQLALCHEMY_POOL_TIMEOUT", "30")),
+        # Stop waiting for a pool slot well before Gunicorn's 25 s kill timeout.
+        "pool_timeout": int(os.environ.get("SQLALCHEMY_POOL_TIMEOUT", "15")),
         "echo": False,
     }
     # List of supported language codes (order matters: first is fallback)
@@ -1169,14 +1170,18 @@ class ProductionConfig(Config):
     #
     # connect_timeout:   abort TCP handshake that hangs (e.g. private-endpoint warming up).
     # statement_timeout: kill runaway queries before they exhaust the pool and cause 504s.
+    #                    Must be < GUNICORN_TIMEOUT (25 s) so the worker releases its DB
+    #                    connection before being killed. Default 18 s.
     #                    Overridable via DB_STATEMENT_TIMEOUT_MS (0 = disabled).
-    _stmt_timeout_ms = int(os.environ.get("DB_STATEMENT_TIMEOUT_MS", "120000"))
+    # pool_timeout:      stop waiting for a free pool slot before Gunicorn kills the worker.
+    #                    Must be < GUNICORN_TIMEOUT (25 s). Default 15 s.
+    _stmt_timeout_ms = int(os.environ.get("DB_STATEMENT_TIMEOUT_MS", "18000"))
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
         "pool_recycle": int(os.environ.get("SQLALCHEMY_POOL_RECYCLE", "300")),
         "pool_size": int(os.environ.get("SQLALCHEMY_POOL_SIZE", "5")),
         "max_overflow": int(os.environ.get("SQLALCHEMY_MAX_OVERFLOW", "10")),
-        "pool_timeout": int(os.environ.get("SQLALCHEMY_POOL_TIMEOUT", "30")),
+        "pool_timeout": int(os.environ.get("SQLALCHEMY_POOL_TIMEOUT", "15")),
         "connect_args": {
             "connect_timeout": int(os.environ.get("DB_CONNECT_TIMEOUT", "10")),
             **({"options": f"-c statement_timeout={_stmt_timeout_ms}"} if _stmt_timeout_ms > 0 else {}),

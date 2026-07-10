@@ -32,7 +32,9 @@ class TranslationsError(RuntimeError):
 
 
 @lru_cache(maxsize=8)
-def _load_bundle(excel_path_str: str) -> tuple[dict[str, dict[str, str]], dict[str, list[str]]]:
+def _load_bundle(
+    excel_path_str: str,
+) -> tuple[dict[str, dict[str, str]], dict[str, list[str]], tuple[str, ...]]:
     path = Path(excel_path_str)
     if not path.exists():
         raise TranslationsError(f"Excel workbook not found: {path}")
@@ -73,19 +75,26 @@ def _load_bundle(excel_path_str: str) -> tuple[dict[str, dict[str, str]], dict[s
         )
 
     parsed: dict[str, list[tuple[int, str]]] = {}
+    part_min_order: dict[str, int] = {}
     for _, row in order_df.iterrows():
         part = str(row.get("part", "") or "").strip().lower()
         section = str(row.get("section", "") or "").strip()
         order = row.get("order")
         if not part or not section or pd.isna(order):
             continue
-        parsed.setdefault(part, []).append((int(order), section))
+        order_int = int(order)
+        parsed.setdefault(part, []).append((order_int, section))
+        part_min_order[part] = min(part_min_order.get(part, order_int), order_int)
 
     section_order = {part: [section for _, section in sorted(items)] for part, items in parsed.items()}
     if not section_order:
         raise TranslationsError(f"{path.name} → SectionOrder sheet has no usable rows")
 
-    return translations, section_order
+    parts_order = tuple(
+        sorted(part_min_order.keys(), key=lambda part_id: (part_min_order[part_id], part_id))
+    )
+
+    return translations, section_order, parts_order
 
 
 def clear_cache() -> None:
@@ -93,13 +102,19 @@ def clear_cache() -> None:
 
 
 def load_translations(excel_path: Path | str | None = None) -> dict[str, dict[str, str]]:
-    translations, _ = _load_bundle(str(resolve_excel(excel_path)))
+    translations, _, _ = _load_bundle(str(resolve_excel(excel_path)))
     return translations
 
 
 def load_section_order(excel_path: Path | str | None = None) -> dict[str, list[str]]:
-    _, section_order = _load_bundle(str(resolve_excel(excel_path)))
+    _, section_order, _ = _load_bundle(str(resolve_excel(excel_path)))
     return section_order
+
+
+def load_parts_order(excel_path: Path | str | None = None) -> tuple[str, ...]:
+    """Report part ids (e.g. cc, sp, ef) sorted by the lowest SectionOrder row per part."""
+    _, _, parts_order = _load_bundle(str(resolve_excel(excel_path)))
+    return parts_order
 
 
 def t(code: str, language: str, excel_path: Path | str | None = None) -> str:

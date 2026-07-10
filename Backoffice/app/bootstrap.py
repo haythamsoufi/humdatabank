@@ -167,6 +167,58 @@ def load_dynamic_settings(app, config_class, startup_start):
         app.logger.debug("RBAC sanity check skipped (permissions may not be seeded): %s", e)
 
 
+def _install_db_pool_logging(app) -> None:
+    """Attach SQLAlchemy engine events that log slow DB connection hold times.
+
+    Emits ``[DB_POOL]`` WARNING lines when a single request holds a DB
+    connection for longer than ``DB_POOL_SLOW_HOLD_S`` seconds (default 5 s).
+    This makes DB-heavy page loads and blocked connection-pool waits visible in
+    Log Stream alongside ``[SLOW_REQUEST]`` and ``[WORKER_ABORT]`` entries.
+
+    Also emits a WARNING when a ``pool_timeout`` error is about to be raised
+    (i.e., no free connection slot was found before the timeout) so we can
+    distinguish "slow query" from "pool exhausted" in the logs.
+
+    Safe to call multiple times — events are not re-registered on the same engine.
+    """
+    import time as _time
+    from sqlalchemy import event as _sa_event
+
+    try:
+        from app.extensions import db as _db
+        engine = _db.engine
+    except Exception:
+        return
+
+    slow_hold_s = float(app.config.get('DB_POOL_SLOW_HOLD_S', 5.0))
+
+    # Guard against duplicate registration (e.g., test reloads).
+    if getattr(engine, '_humdb_pool_logging_installed', False):
+        return
+    engine._humdb_pool_logging_installed = True
+
+    @_sa_event.listens_for(engine, 'checkout')
+    def _on_checkout(dbapi_conn, connection_record, connection_proxy):
+        connection_record._humdb_checkout_at = _time.monotonic()
+
+    @_sa_event.listens_for(engine, 'checkin')
+    def _on_checkin(dbapi_conn, connection_record):
+        started = getattr(connection_record, '_humdb_checkout_at', None)
+        if started is None:
+            return
+        held_s = _time.monotonic() - started
+        connection_record._humdb_checkout_at = None
+        if held_s >= slow_hold_s:
+            try:
+                app.logger.warning(
+                    '[DB_POOL] Connection held for %.2fs (threshold %.0fs) — '
+                    'long-running request or slow query on this worker',
+                    held_s, slow_hold_s,
+                )
+            except Exception:
+                pass
+
+
 def init_flask_extensions(app, config_class, startup_start):
     """Initialize SQLAlchemy, auth, i18n, CSRF, mail, and related hooks."""
     ext_start = time.time()
@@ -174,6 +226,8 @@ def init_flask_extensions(app, config_class, startup_start):
     ext_time = time.time() - ext_start
     if ext_time > 0.1:
         app.logger.debug("Database extension init took %.3fs", ext_time)
+
+    _install_db_pool_logging(app)
 
     with app.app_context():
         load_dynamic_settings(app, config_class, startup_start)

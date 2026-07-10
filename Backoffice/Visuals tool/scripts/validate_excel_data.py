@@ -9,8 +9,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from gb_figures.config import resolve_excel
-from gb_figures.data import DataModelError, build_model, load_sg_report
+from pb_figures.config import resolve_excel
+from pb_figures.data import DataModelError, build_model, load_sg_report
 
 
 def main() -> None:

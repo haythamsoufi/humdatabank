@@ -9,8 +9,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from gb_figures.config import resolve_excel  # noqa: E402
-from gb_figures.data import build_model  # noqa: E402
+from pb_figures.config import resolve_excel  # noqa: E402
+from pb_figures.data import build_model  # noqa: E402
 
 
 class DataModelIntegrationTests(unittest.TestCase):

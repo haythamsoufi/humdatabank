@@ -37,19 +37,6 @@ def _esc_multiline(text: str | None) -> str:
     return _esc(text).replace("\n", "<br>")
 
 
-def _format_ef_cell_html(cell: dict[str, Any]) -> str:
-    if not cell.get("value"):
-        return _esc(cell["text"])
-    main = cell.get("main", cell["text"])
-    suffix = cell.get("suffix", "")
-    if not suffix:
-        return f'<span class="value-main">{_esc(main)}</span>'
-    return (
-        f'<span class="value-main">{_esc(main)}</span>'
-        f'<span class="value-suffix">{_esc(suffix)}</span>'
-    )
-
-
 def _render_value_labels(
     item: dict[str, Any],
     chart_width: int,
@@ -171,6 +158,15 @@ def _render_metric_labels(labels: dict[str, str], *, show_ns_breakdown: bool = T
     return "".join(parts)
 
 
+def _render_unavailable_line_block(item: dict[str, Any]) -> str:
+    return (
+        '<div class="indicator-row indicator-unavailable">'
+        f'<div class="indicator-text">{_esc(item["label"])}</div>'
+        f'<div class="indicator-unavailable-message">{_esc(item.get("unavailable_label"))}</div>'
+        "</div>"
+    )
+
+
 def _render_line_block(
     item: dict[str, Any],
     *,
@@ -178,10 +174,15 @@ def _render_line_block(
     target_label: str,
     table_labels: dict[str, str],
     chart_width: int,
+    chart_id_prefix: str = "sp",
 ) -> str:
+    if item.get("unavailable"):
+        return _render_unavailable_line_block(item)
     year_only = not item.get("show_ns_breakdown", True)
     footer_class = "x-axis-footer year-only" if year_only else "x-axis-footer"
-    chart_svg = render_line_chart_svg(item, chart_width, chart_id=f"sp-line-{chart_index}")
+    chart_svg = render_line_chart_svg(
+        item, chart_width, chart_id=f"{chart_id_prefix}-line-{chart_index}",
+    )
     return (
         '<div class="indicator-row">'
         f'<div class="indicator-text">{_esc(item["label"])}</div>'
@@ -205,6 +206,13 @@ def _render_line_block(
 
 
 def _render_donut_block(item: dict[str, Any], *, donut_src: str) -> str:
+    if item.get("unavailable"):
+        return (
+            '<div class="donut-row indicator-unavailable">'
+            f'<div class="indicator-text">{_esc(item["label"])}</div>'
+            f'<div class="indicator-unavailable-message">{_esc(item.get("unavailable_label"))}</div>'
+            "</div>"
+        )
     label_lines = _esc(item["value_label"]).replace("\n", "<br>")
     target_html = ""
     if item.get("target_label"):
@@ -222,6 +230,13 @@ def _render_donut_block(item: dict[str, Any], *, donut_src: str) -> str:
 
 
 def _render_donut_pair_item(item: dict[str, Any], *, donut_src: str) -> str:
+    if item.get("unavailable"):
+        return (
+            '<div class="donut-pair-item indicator-unavailable">'
+            f'<div class="indicator-text">{_esc(item["label"])}</div>'
+            f'<div class="indicator-unavailable-message">{_esc(item.get("unavailable_label"))}</div>'
+            "</div>"
+        )
     label_lines = _esc(item["value_label"]).replace("\n", "<br>")
     return (
         '<div class="donut-pair-item">'
@@ -250,6 +265,7 @@ def _render_sp_html(
 ) -> str:
     chart_width = _chart_width()
     target_label = payload["headers"]["target"]
+    chart_id_prefix = payload["section"].lower()
     parts = [f'<div class="dash-title">{_esc(payload["title"])}</div>']
 
     for idx, item in enumerate(payload["cumulative"]):
@@ -260,68 +276,19 @@ def _render_sp_html(
                 target_label=target_label,
                 table_labels=payload["table_labels"],
                 chart_width=chart_width,
+                chart_id_prefix=chart_id_prefix,
             )
         )
 
-    if payload.get("donut_pair"):
+    for row_idx, pair in enumerate(payload.get("donut_pairs", [])):
         pair_parts = ['<div class="donut-pair">']
-        for idx, item in enumerate(payload["donut_pair"]):
-            donut_src = asset_refs[f"pair_{idx}_donut"]
+        for col_idx, item in enumerate(pair):
+            donut_src = asset_refs.get(f"pair_{row_idx}_{col_idx}_donut", "")
             pair_parts.append(_render_donut_pair_item(item, donut_src=donut_src))
         pair_parts.append("</div>")
         parts.append("".join(pair_parts))
 
-    for idx, item in enumerate(payload.get("donuts", [])):
-        donut_src = asset_refs[f"donut_{idx}_donut"]
-        parts.append(_render_donut_block(item, donut_src=donut_src))
-
     _append_section_tail(parts, payload["footnote"])
-    return "".join(parts)
-
-
-def _ef_colgroup(show_target: bool, n_years: int) -> str:
-    if n_years <= 0:
-        return ""
-    year_width = (60 if show_target else 55) / n_years
-    parts = ["<colgroup><col>"]
-    if show_target:
-        parts.append('<col style="width:120px">')
-    parts.extend(f'<col style="width:{year_width:.4f}%">' for _ in range(n_years))
-    parts.append("</colgroup>")
-    return "".join(parts)
-
-
-def _render_ef_html(payload: dict[str, Any]) -> str:
-    show_target = payload.get("show_target_column", True)
-    no_target_class = "" if show_target else " no-target"
-    n_years = len(payload["headers"]["years"])
-    parts = [
-        f'<div class="dash-title">{_esc(payload["title"])}</div>',
-        '<div class="section-tail">',
-        f'<table class="ef-table{no_target_class}">',
-        _ef_colgroup(show_target, n_years),
-        "<thead><tr>",
-        f'<th>{_esc(payload["headers"]["indicator"])}</th>',
-    ]
-    if show_target:
-        parts.append(f'<th>{_esc(payload["headers"]["target"])}</th>')
-    parts.extend(f"<th>{_esc(y)}</th>" for y in payload["headers"]["years"])
-    parts.append("</tr></thead><tbody>")
-    for row in payload["rows"]:
-        parts.append("<tr>")
-        parts.append(f"<td>{_esc(row['label'])}</td>")
-        if show_target:
-            parts.append(f"<td>{_esc(row['target'])}</td>")
-        parts.extend(
-            f'<td class="{"value-cell" if c["value"] else ""}">{_format_ef_cell_html(c)}</td>'
-            for c in row["years"]
-        )
-        parts.append("</tr>")
-    parts.extend([
-        "</tbody></table>",
-        f'<div class="footnote" markdown="0">{_esc_multiline(payload["footnote"])}</div>',
-        "</div>",
-    ])
     return "".join(parts)
 
 
@@ -330,8 +297,6 @@ def build_dashboard_html(
     asset_refs: dict[str, str],
 ) -> str:
     """Return inner HTML for a dashboard section (no wrapper)."""
-    if payload["type"] == "ef":
-        return _render_ef_html(payload)
     return _render_sp_html(payload, asset_refs)
 
 
@@ -350,20 +315,15 @@ def render_section_assets(
     if payload["type"] != "sp":
         return refs
 
-    if payload.get("donut_pair"):
-        for idx, item in enumerate(payload["donut_pair"]):
-            filename = f"pair_{idx}_donut.png"
+    for row_idx, pair in enumerate(payload.get("donut_pairs", [])):
+        for col_idx, item in enumerate(pair):
+            if item.get("unavailable"):
+                continue
+            filename = f"pair_{row_idx}_{col_idx}_donut.png"
             render_donut_asset(
                 item, assets_dir / filename, language=language, show_label=False, session=session,
             )
-            refs[f"pair_{idx}_donut"] = filename
-
-    for idx, item in enumerate(payload.get("donuts", [])):
-        filename = f"donut_{idx}_donut.png"
-        render_donut_asset(
-            item, assets_dir / filename, language=language, show_label=False, session=session,
-        )
-        refs[f"donut_{idx}_donut"] = filename
+            refs[f"pair_{row_idx}_{col_idx}_donut"] = filename
 
     return refs
 
@@ -374,12 +334,10 @@ def expected_asset_refs(payload: dict[str, Any]) -> dict[str, str]:
     if payload["type"] != "sp":
         return refs
 
-    if payload.get("donut_pair"):
-        for idx in range(len(payload["donut_pair"])):
-            refs[f"pair_{idx}_donut"] = f"pair_{idx}_donut.png"
-
-    for idx in range(len(payload.get("donuts", []))):
-        refs[f"donut_{idx}_donut"] = f"donut_{idx}_donut.png"
+    for row_idx, pair in enumerate(payload.get("donut_pairs", [])):
+        for col_idx, item in enumerate(pair):
+            if not item.get("unavailable"):
+                refs[f"pair_{row_idx}_{col_idx}_donut"] = f"pair_{row_idx}_{col_idx}_donut.png"
 
     return refs
 
@@ -393,9 +351,10 @@ def build_section_embed(
     asset_url_prefix: str,
     session=None,
     render_assets: bool = True,
+    mapping=None,
 ) -> str:
     """Build full embeddable dashboard HTML for one section."""
-    payload = build_payload(model, section, language)
+    payload = build_payload(model, section, language, mapping=mapping)
     if render_assets:
         local_refs = render_section_assets(payload, assets_dir, language=language, session=session)
     else:
@@ -403,4 +362,4 @@ def build_section_embed(
     url_refs = {key: f"{asset_url_prefix}/{filename}" for key, filename in local_refs.items()}
     inner = build_dashboard_html(payload, url_refs)
     direction = ' dir="rtl"' if language == "Arabic" else ""
-    return f'<div class="gb-dashboard"{direction}>{inner}</div>'
+    return f'<div class="pb-dashboard"{direction}>{inner}</div>'

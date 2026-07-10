@@ -523,6 +523,10 @@ function donutHasTarget(item) {
 
 function renderDonut(item) {
   const size = 64, cx = 32, cy = 32, r = 26, stroke = 10;
+  if (item.unavailable) {
+    const label = item.unavailable_label || item.value_label || "";
+    return `<div class="indicator-unavailable-message">${esc(label)}</div>`;
+  }
   if (!donutHasTarget(item)) {
     return `<svg class="donut-svg" viewBox="0 0 ${size} ${size}">
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${COLORS.value}" stroke-width="${stroke}"/>
@@ -607,9 +611,10 @@ function renderSP(data) {
   data.cumulative.forEach((item, idx) => {
     const yearOnly = item.show_ns_breakdown === false;
     const footerClass = yearOnly ? "x-axis-footer year-only" : "x-axis-footer";
+    const chartId = `${(data.section || "sp").toLowerCase()}-line-${idx}`;
     parts.push(`<div class="indicator-row">
       <div class="indicator-text">${esc(item.label)}</div>
-      <div class="line-chart-wrap"><div class="line-chart-inner" style="--chart-width:${chartWidth}">${renderLineChart(item, chartWidth, targetLabel, `sp-${idx}`, LINE_CHART_EFFECTS)}</div></div>
+      <div class="line-chart-wrap"><div class="line-chart-inner" style="--chart-width:${chartWidth}">${renderLineChart(item, chartWidth, targetLabel, chartId, LINE_CHART_EFFECTS)}</div></div>
       <div class="x-axis-divider-row">
         <div class="x-axis-divider-left"></div>
         <div class="x-axis-divider-right"></div>
@@ -621,23 +626,25 @@ function renderSP(data) {
     </div>`);
   });
 
-  if (data.donut_pair) {
+  (data.donut_pairs || []).forEach((pair) => {
     let pairHtml = `<div class="donut-pair">`;
-    data.donut_pair.forEach(item => {
-      pairHtml += `<div class="donut-pair-item">
+    pair.forEach((item, colIdx) => {
+      const unavailableClass = item.unavailable ? " indicator-unavailable" : "";
+      pairHtml += `<div class="donut-pair-item${unavailableClass}">
         <div class="indicator-text">${esc(item.label)}</div>
         ${renderDonut(item)}
       </div>`;
     });
     pairHtml += `</div>`;
     parts.push(pairHtml);
-  }
+  });
 
   data.donuts.forEach(item => {
     const targetHtml = item.target_label
       ? `<div class="donut-target">${esc(item.target_label)}</div>`
       : "";
-    parts.push(`<div class="donut-row">
+    const unavailableClass = item.unavailable ? " indicator-unavailable" : "";
+    parts.push(`<div class="donut-row${unavailableClass}">
       <div class="indicator-text">${esc(item.label)}</div>
       ${renderDonut(item)}
       ${targetHtml}
@@ -647,59 +654,7 @@ function renderSP(data) {
   root.innerHTML = appendSectionTail(parts, data.footnote);
 }
 
-function efColgroup(showTarget, nYears) {
-  if (nYears <= 0) return "";
-  const yearWidth = ((showTarget ? 60 : 55) / nYears).toFixed(4);
-  let html = "<colgroup><col>";
-  if (showTarget) html += '<col style="width:120px">';
-  for (let i = 0; i < nYears; i++) {
-    html += `<col style="width:${yearWidth}%">`;
-  }
-  return html + "</colgroup>";
-}
-
-function renderEfCell(cell) {
-  if (!cell.value) return esc(cell.text);
-  const main = cell.main ?? cell.text;
-  const suffix = cell.suffix ?? "";
-  if (!suffix) return `<span class="value-main">${esc(main)}</span>`;
-  return `<span class="value-main">${esc(main)}</span><span class="value-suffix">${esc(suffix)}</span>`;
-}
-
-function renderEF(data) {
-  const root = document.getElementById("dashboard");
-  if (data.language === "Arabic") root.setAttribute("dir", "rtl");
-  if (data.style) root.setAttribute("data-style", data.style);
-
-  const showTarget = data.show_target_column !== false;
-  const noTargetClass = showTarget ? "" : " no-target";
-
-  let html = `<div class="dash-title">${esc(data.title)}</div>`;
-  html += `<div class="section-tail"><table class="ef-table${noTargetClass}">${efColgroup(showTarget, data.headers.years.length)}<thead><tr>
-    <th>${esc(data.headers.indicator)}</th>`;
-  if (showTarget) {
-    html += `<th>${esc(data.headers.target)}</th>`;
-  }
-  html += `${data.headers.years.map(y => `<th>${esc(y)}</th>`).join("")}
-  </tr></thead><tbody>`;
-
-  data.rows.forEach(row => {
-    html += `<tr>
-      <td>${esc(row.label)}</td>`;
-    if (showTarget) {
-      html += `<td>${esc(row.target)}</td>`;
-    }
-    html += `${row.years.map(c => `<td class="${c.value ? "value-cell" : ""}">${renderEfCell(c)}</td>`).join("")}
-    </tr>`;
-  });
-
-  html += `</tbody></table>`;
-  html += `<div class="footnote">${esc(data.footnote)}</div></div>`;
-  root.innerHTML = html;
-}
-
-if (DATA.type === "ef") renderEF(DATA);
-else renderSP(DATA);
+renderSP(DATA);
 
 document.body.setAttribute("data-ready", "true");
 </script>

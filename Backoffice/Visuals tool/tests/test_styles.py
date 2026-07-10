@@ -11,10 +11,10 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from gb_figures.config import resolve_excel  # noqa: E402
-from gb_figures.data import build_model  # noqa: E402
-from gb_figures.payload import build_payload  # noqa: E402
-from gb_figures.styles import (  # noqa: E402
+from pb_figures.config import resolve_excel  # noqa: E402
+from pb_figures.data import build_model  # noqa: E402
+from pb_figures.payload import build_payload  # noqa: E402
+from pb_figures.styles import (  # noqa: E402
     DEFAULT_STYLE,
     ENV_VAR,
     resolve_style,

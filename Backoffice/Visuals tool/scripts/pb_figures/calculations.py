@@ -1,4 +1,4 @@
-"""Port of Tableau calculated fields from GB figures.twb."""
+"""Port of Tableau calculated fields from P&B figures.twb."""
 
 from __future__ import annotations
 
@@ -20,7 +20,15 @@ NS_REPORTING_HEADER = "ui.ns_reporting_header"
 NS_IMPLEMENTING_HEADER = "ui.ns_implementing_header"
 TABLE_REPORTING_ROW = "ui.table_reporting_row"
 TABLE_IMPLEMENTING_ROW = "ui.table_implementing_row"
+NATIONAL_SOCIETIES = "ui.national_societies"
 NS_REPORTED_SUFFIX = "ui.ns_reported_suffix"
+
+_NATIONAL_SOCIETIES_FALLBACK = {
+    "English": "National Societies",
+    "French": "Sociétés nationales",
+    "Spanish": "Sociedades Nacionales",
+    "Arabic": "الجمعيات الوطنية",
+}
 EFS_HEADER = "ui.part.ef"
 SP_PART_TITLE = "ui.part.sp"
 NOT_APPLICABLE = "ui.not_applicable"
@@ -44,9 +52,48 @@ INDICATOR_ALIASES: dict[str, str] = {
     "649": "**",
 }
 
+_MISSING_VALUE_TOKENS = frozenset({"", "n/a", "na", "-", "none", "null"})
+
+
+def chartable_value(raw: object) -> float | None:
+    """Return a numeric indicator Value when it can be plotted, else None."""
+    if raw is None or (isinstance(raw, float) and math.isnan(raw)):
+        return None
+    if isinstance(raw, str):
+        text = raw.strip().lower()
+        if text in _MISSING_VALUE_TOKENS:
+            return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(value) or value == 0:
+        return None
+    return value
+
 
 def label(code: str, language: str) -> str:
     return t(code, language)
+
+
+def national_societies_label(language: str = "English") -> str:
+    text = label(NATIONAL_SOCIETIES, language)
+    if text:
+        return text
+    return _NATIONAL_SOCIETIES_FALLBACK.get(language, _NATIONAL_SOCIETIES_FALLBACK["English"])
+
+
+def _ns_breakdown_label(role_code: str, language: str) -> str:
+    """Prefix reporting/implementing row labels with the National Societies label."""
+    role = label(role_code, language)
+    prefix = national_societies_label(language)
+    if not role:
+        return prefix
+    role_lower = role.casefold()
+    prefix_lower = prefix.casefold()
+    if role_lower.startswith(prefix_lower):
+        return role
+    return f"{prefix} {role}"
 
 
 def footnote_for_key(key: str, language: str) -> str:
@@ -124,6 +171,19 @@ def _format_millions_english(value: float) -> str:
     return f"{millions:g}M"
 
 
+def is_percentage_unit(unit: str | None) -> bool:
+    return str(unit or "").strip().lower() in {"percentage", "percent", "%"}
+
+
+def _format_percentage(value: float) -> str:
+    """Format percentage values stored as fractions (0.23) or whole percents (23)."""
+    if 0 < abs(value) <= 1:
+        pct = value * 100
+    else:
+        pct = value
+    return f"{round(pct):.0f}%"
+
+
 def _format_millions_arabic(value: float) -> str:
     """Tableau [Formatted] Arabic plural rules for values >= 1,000,000."""
     millions = round(value / 1_000_000, 1)
@@ -147,8 +207,8 @@ def format_value(value: float | int | None, unit: str | None, language: str = "E
         return None
     if value == 0:
         return None
-    if unit == "Percentage":
-        return f"{round(value * 100):.0f}%"
+    if is_percentage_unit(unit):
+        return _format_percentage(float(value))
     if value < 1_000_000:
         return _format_under_million(float(value))
     if language == "Arabic":
@@ -162,8 +222,8 @@ def format_donut_value(value: float | int | None, unit: str | None, language: st
         return None
     if value == 0:
         return None
-    if unit == "Percentage":
-        return f"{round(value * 100):.0f}%"
+    if is_percentage_unit(unit):
+        return _format_percentage(float(value))
     if value < 1_000_000:
         return _format_under_million(float(value))
     if language == "Arabic":
@@ -217,8 +277,8 @@ def _ef_target_display(row: pd.Series, language: str = "English") -> str:
     raw = row.get("Target")
     if raw is None or (isinstance(raw, float) and math.isnan(raw)):
         return ""
-    if unit == "Percentage":
-        return format_value(float(raw), "Percentage", language) or ""
+    if is_percentage_unit(unit):
+        return format_value(float(raw), unit, language) or ""
     formatted = format_value(float(raw), unit, language) if isinstance(raw, (int, float)) else None
     return formatted or _target_scalar(row)
 
@@ -228,8 +288,8 @@ def _format_ef_target_token(text: str, unit: str | None, language: str) -> str:
         return f"{text.lstrip('%').strip()}%"
     try:
         num = float(text.replace(",", ""))
-        if unit == "Percentage" and 0 <= num <= 1:
-            return format_value(num, "Percentage", language) or text
+        if is_percentage_unit(unit) and 0 <= num <= 1:
+            return format_value(num, unit, language) or text
         if num == int(num):
             return str(int(num))
     except ValueError:
@@ -297,23 +357,37 @@ def headers(language: str = "English") -> dict[str, str]:
         "year": label(YEAR_HEADER, language),
         "target": label(TARGET_HEADER, language),
         "annual_target": label(ANNUAL_TARGET_HEADER, language),
-        "ns_reporting": label(NS_REPORTING_HEADER, language),
-        "ns_implementing": label(NS_IMPLEMENTING_HEADER, language),
+        "ns_reporting": _ns_breakdown_label(NS_REPORTING_HEADER, language),
+        "ns_implementing": _ns_breakdown_label(NS_IMPLEMENTING_HEADER, language),
     }
 
 
 def table_row_labels(language: str = "English") -> dict[str, str]:
     return {
         "year": label(YEAR_HEADER, language),
-        "reporting": label(TABLE_REPORTING_ROW, language),
-        "implementing": label(TABLE_IMPLEMENTING_ROW, language),
+        "reporting": _ns_breakdown_label(TABLE_REPORTING_ROW, language),
+        "implementing": _ns_breakdown_label(TABLE_IMPLEMENTING_ROW, language),
     }
 
 
-def part_title(part_id: str, language: str = "English") -> str:
-    if part_id == "ef":
-        return label(EFS_HEADER, language)
-    return label(SP_PART_TITLE, language)
+def part_title(
+    part_id: str,
+    language: str = "English",
+    excel_path: Path | str | None = None,
+) -> str:
+    normalized = str(part_id or "").strip().lower()
+    title = t(f"ui.part.{normalized}", language, excel_path)
+    if title:
+        return title
+    if normalized == "ef":
+        legacy = label(EFS_HEADER, language)
+        if legacy:
+            return legacy
+    if normalized == "sp":
+        legacy = label(SP_PART_TITLE, language)
+        if legacy:
+            return legacy
+    return normalized.replace("-", " ").replace("_", " ").title()
 
 
 def footnote_2025(language: str = "English") -> str:

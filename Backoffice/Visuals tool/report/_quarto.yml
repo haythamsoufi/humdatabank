@@ -2,7 +2,7 @@ project:
   type: default
   output-dir: output
   render:
-    - gb-report.qmd
+    - pb-report.qmd
   pre-render:
     - python ../scripts/pre_render.py
 

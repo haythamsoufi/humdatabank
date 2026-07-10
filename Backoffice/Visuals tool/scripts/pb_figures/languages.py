@@ -114,8 +114,8 @@ def language_slug(language: str) -> str:
 
 
 def docx_filename(language: str) -> str:
-    return f"gb-report-{language_slug(language)}.docx"
+    return f"pb-report-{language_slug(language)}.docx"
 
 
 def pdf_filename(language: str) -> str:
-    return f"gb-report-{language_slug(language)}.pdf"
+    return f"pb-report-{language_slug(language)}.pdf"

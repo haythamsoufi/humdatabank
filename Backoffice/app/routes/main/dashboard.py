@@ -51,6 +51,71 @@ from app.routes.main.helpers import (
 )
 
 
+def _first_accessible_admin_url_for_user(user):
+    """Return the first admin page this non-assignment user can access."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return None
+
+    def can(permission_code):
+        return AuthorizationService.has_rbac_permission(user, permission_code)
+
+    def build(endpoint):
+        try:
+            if endpoint in current_app.view_functions:
+                return url_for(endpoint)
+        except Exception as e:
+            current_app.logger.debug("Could not build admin landing URL for %s: %s", endpoint, e)
+        return None
+
+    if AuthorizationService.is_system_manager(user):
+        return build("admin.admin_dashboard")
+
+    candidates = [
+        (("admin.documents.manage",), "content_management.manage_documents"),
+        (("admin.translations.manage",), "utilities.manage_translations"),
+        (("admin.plugins.manage",), "admin.plugin_management"),
+        (("admin.settings.manage",), "settings.manage_settings"),
+        (("admin.communication.manage",), "admin_communication.communication_center"),
+        (("admin.docs.view",), "admin_docs.index"),
+        (("admin.users.view",), "user_management.manage_users"),
+        (("admin.templates.view",), "form_builder.manage_templates"),
+        (("admin.assignments.view",), "assignment_management.manage_assignments"),
+        (
+            (
+                "admin.data_explore.data_table",
+                "admin.data_explore.analysis",
+                "admin.data_explore.compliance",
+                "admin.data_explore.pb_progress",
+            ),
+            "data_exploration.explore_data",
+        ),
+        (("admin.validation.dashboard",), "admin.validation_dashboard"),
+        (("admin.validation.questions",), "admin.validation_questions_admin"),
+        (("admin.resources.manage",), "content_management.manage_resources"),
+        (
+            (
+                "admin.organization.manage",
+                "admin.countries.view",
+            ),
+            "organization.index",
+        ),
+        (("admin.indicator_bank.view",), "system_admin.manage_indicator_bank"),
+        (("admin.analytics.view",), "analytics.analytics_dashboard"),
+        (("admin.audit.view",), "analytics.audit_trail"),
+        (("admin.security.view",), "security.security_dashboard"),
+        (("admin.governance.view",), "governance_dashboard.governance_dashboard"),
+        (("admin.api.manage",), "api_management.api_management"),
+        (("admin.ai.manage",), "ai_management.ai_dashboard"),
+    ]
+
+    for permissions, endpoint in candidates:
+        if any(can(permission) for permission in permissions):
+            target_url = build(endpoint)
+            if target_url:
+                return target_url
+    return None
+
+
 @bp.route("/", methods=["GET", "POST"])
 @login_required
 def dashboard():
@@ -65,39 +130,52 @@ def dashboard():
     user_entities = []
     user_countries = []
 
-    # RBAC-only: entities are derived from explicit entity permissions, with a fallback
-    # for users that have none configured yet (e.g. system managers).
-    entity_permissions = UserEntityPermission.query.filter_by(user_id=current_user.id).all()
-    if entity_permissions:
-        pairs = [(perm.entity_type, perm.entity_id) for perm in entity_permissions]
-        prefetched = EntityService.prefetch_entities(pairs, include_hierarchy=False)
-        for perm in entity_permissions:
-            entity = prefetched.get((perm.entity_type, perm.entity_id))
-            if entity:
-                user_entities.append({
-                    'entity_type': perm.entity_type,
-                    'entity_id': perm.entity_id,
-                    'entity': entity
-                })
-    else:
-        all_entities = EntityService.get_entities_for_user(current_user)
-        for entity in all_entities:
-            entity_type = None
-            if isinstance(entity, Country):
-                entity_type = EntityType.country.value
-            else:
-                for et, model_class in EntityService.ENTITY_MODEL_MAP.items():
-                    if isinstance(entity, model_class):
-                        entity_type = et
-                        break
-            if entity_type:
-                entity_id = getattr(entity, 'id', None)
-                if entity_id:
+    can_view_assignment_dashboard = AuthorizationService.has_rbac_permission(
+        current_user,
+        "assignment.view",
+    )
+    if not can_view_assignment_dashboard and AuthorizationService.is_admin(current_user):
+        admin_landing_url = _first_accessible_admin_url_for_user(current_user)
+        if admin_landing_url:
+            return redirect(admin_landing_url)
+
+    # RBAC-only: assignment dashboard entities are derived from explicit entity
+    # permissions, with a fallback for users that have none configured yet (for
+    # example, system managers). Admin permissions alone must not expose the
+    # focal-point assignment dashboard or its all-entity admin fallback.
+    entity_permissions = []
+    if can_view_assignment_dashboard:
+        entity_permissions = UserEntityPermission.query.filter_by(user_id=current_user.id).all()
+        if entity_permissions:
+            pairs = [(perm.entity_type, perm.entity_id) for perm in entity_permissions]
+            prefetched = EntityService.prefetch_entities(pairs, include_hierarchy=False)
+            for perm in entity_permissions:
+                entity = prefetched.get((perm.entity_type, perm.entity_id))
+                if entity:
                     user_entities.append({
-                        'entity_type': entity_type,
-                        'entity_id': entity_id,
+                        'entity_type': perm.entity_type,
+                        'entity_id': perm.entity_id,
                         'entity': entity
                     })
+        else:
+            all_entities = EntityService.get_entities_for_user(current_user)
+            for entity in all_entities:
+                entity_type = None
+                if isinstance(entity, Country):
+                    entity_type = EntityType.country.value
+                else:
+                    for et, model_class in EntityService.ENTITY_MODEL_MAP.items():
+                        if isinstance(entity, model_class):
+                            entity_type = et
+                            break
+                if entity_type:
+                    entity_id = getattr(entity, 'id', None)
+                    if entity_id:
+                        user_entities.append({
+                            'entity_type': entity_type,
+                            'entity_id': entity_id,
+                            'entity': entity
+                        })
 
     enabled_entity_groups = get_enabled_entity_groups()
     allowed_entity_types = get_allowed_entity_type_codes(enabled_entity_groups)
@@ -947,6 +1025,7 @@ def dashboard():
                        pending_access_requests=pending_access_requests,
                        all_access_requests=all_access_requests,
                        can_request_multiple_countries=can_request_multiple_countries,
+                       can_view_assignment_dashboard=can_view_assignment_dashboard,
                        is_delegation_user=is_organization_email(getattr(current_user, 'email', '')),
                        non_org_has_counting_request=non_org_has_counting_request,
                        enabled_entity_types=enabled_entity_groups,

@@ -99,6 +99,8 @@
 {% block content %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
+    {% set explore_first_tab = explore_first_tab|default('data-table' if can_access_data_table else ('disaggregation' if can_access_analysis else ('compliance' if can_access_compliance else 'pb-progress'))) %}
+
 {{ page_header(
     title=_('Explore Data'),
     icon='fas fa-database',
@@ -107,10 +109,21 @@
         {'name': _('Data Exploration')}
     ],
     info_tooltip=_('Explore and filter form data directly from the database. Use parameters on the Data Table tab to narrow down data by template and assignment period. Disaggregation Analysis uses the template selector in its sub-tabs bar (defaults to FDRS).') if (can_access_data_table or can_access_analysis) else _('View FDRS document compliance by country.'),
-    actions=[]
+    actions=[
+        {
+            'type': 'button',
+            'text': _('Import data'),
+            'icon': 'fas fa-file-import',
+            'classes': 'professional-action-btn professional-action-btn-blue' + (' hidden' if explore_first_tab != 'pb-progress' else ''),
+            'attributes': {
+                'id': 'pb-progress-open-import-btn',
+                'aria-haspopup': 'dialog',
+                'aria-controls': 'pb-progress-import-modal',
+                'title': _('Upload Excel and regenerate the P&B progress report')
+            }
+        }
+    ] if can_manage_pb_progress else []
 ) }}
-
-    {% set explore_first_tab = 'data-table' if can_access_data_table else ('disaggregation' if can_access_analysis else 'compliance') %}
 
     <div class="bg-white shadow-md border border-gray-200 mb-6">
         {# ── Tab navigation ─────────────────────────────────────────────────── #}
@@ -137,6 +150,14 @@
                     aria-selected="{{ 'true' if explore_first_tab == 'compliance' else 'false' }}"
                     class="settings-tab {{ admin_underline_tab_btn_classes(explore_first_tab == 'compliance') }}">
                 <i class="fas fa-clipboard-check mr-1.5"></i>{{ _('Compliance') }}
+            </button>
+            {% endif %}
+            {% if can_access_pb_progress %}
+            <button type="button" role="tab" id="tab-pb-progress"
+                    data-tab="pb-progress"
+                    aria-selected="{{ 'true' if explore_first_tab == 'pb-progress' else 'false' }}"
+                    class="settings-tab {{ admin_underline_tab_btn_classes(explore_first_tab == 'pb-progress') }}">
+                <i class="fas fa-chart-line mr-1.5"></i>{{ _('P&B Progress') }}
             </button>
             {% endif %}
         {% endcall %}
@@ -615,6 +636,8 @@
     {% endif %}
     <!-- End Tab panel: Compliance -->
 
+    {{ pb_progress_panel|default('', true)|safe }}
+
         </div>{# /p-4 sm:p-6 content wrapper #}
     </div>{# /bg-white card #}
 
@@ -636,6 +659,7 @@
     const CAN_ACCESS_DATA_TABLE = {{ can_access_data_table|tojson }};
     const CAN_ACCESS_ANALYSIS = {{ can_access_analysis|tojson }};
     const CAN_ACCESS_COMPLIANCE = {{ can_access_compliance|tojson }};
+    const CAN_ACCESS_PB_PROGRESS = {{ can_access_pb_progress|default(false)|tojson }};
     const CAN_USE_AI_VALIDATION = {{ user_has_ai_beta_access(current_user)|tojson }};
     const FDRS_TEMPLATE_ID = {{ fdrs_template_id|tojson }};
 
@@ -803,11 +827,12 @@
         window.history.replaceState({}, '', newUrl);
     }
 
-    // Get the currently active main tab id (data-table | disaggregation | compliance)
+    // Get the currently active main tab id (data-table | disaggregation | compliance | pb-progress)
     function getActiveMainTabId() {
         if (domCache.tabDataTable && domCache.tabDataTable.getAttribute('aria-selected') === 'true') return 'data-table';
         if (domCache.tabDisaggregation && domCache.tabDisaggregation.getAttribute('aria-selected') === 'true') return 'disaggregation';
         if (domCache.tabCompliance && domCache.tabCompliance.getAttribute('aria-selected') === 'true') return 'compliance';
+        if (domCache.tabPbProgress && domCache.tabPbProgress.getAttribute('aria-selected') === 'true') return 'pb-progress';
         return '';
     }
 
@@ -826,6 +851,7 @@
             if (tabId === 'data-table' && domCache.tabDataTable && CAN_ACCESS_DATA_TABLE) switchMainTabFn(domCache.tabDataTable);
             else if (tabId === 'disaggregation' && domCache.tabDisaggregation && CAN_ACCESS_ANALYSIS) switchMainTabFn(domCache.tabDisaggregation);
             else if (tabId === 'compliance' && domCache.tabCompliance && CAN_ACCESS_COMPLIANCE) switchMainTabFn(domCache.tabCompliance);
+            else if (tabId === 'pb-progress' && domCache.tabPbProgress && CAN_ACCESS_PB_PROGRESS) switchMainTabFn(domCache.tabPbProgress);
             const hasData = !!(urlParams[URL_PARAM_TEMPLATE] || urlParams[URL_PARAM_PERIOD] || urlParams[URL_PARAM_COUNTRY] || urlParams[URL_PARAM_ITEM]);
             if (hasData) {
                 if (tabId === 'disaggregation') {
@@ -1059,9 +1085,11 @@
         domCache.tabDataTable = document.getElementById('tab-data-table');
         domCache.tabDisaggregation = document.getElementById('tab-disaggregation');
         domCache.tabCompliance = document.getElementById('tab-compliance');
+        domCache.tabPbProgress = document.getElementById('tab-pb-progress');
         domCache.panelDataTable = document.getElementById('panel-data-table');
         domCache.panelDisaggregation = document.getElementById('panel-disaggregation');
         domCache.panelCompliance = document.getElementById('panel-compliance');
+        domCache.panelPbProgress = document.getElementById('panel-pb-progress');
         domCache.exploreParametersSection = document.getElementById('explore-parameters-section');
         domCache.disaggTemplateFilterWrap = document.getElementById('disagg-template-filter-wrap');
         domCache.disaggTemplateFilter = document.getElementById('disagg-template-filter');
@@ -3339,8 +3367,8 @@
             if (window.AdminUnderlineTabs) {
                 AdminUnderlineTabs.activateStripTab('#explore-data-tabs', tabId, { panelSelector: '.explore-panel' });
             } else {
-                const tabs = [domCache.tabDataTable, domCache.tabDisaggregation, domCache.tabCompliance];
-                const panels = [domCache.panelDataTable, domCache.panelDisaggregation, domCache.panelCompliance];
+                const tabs = [domCache.tabDataTable, domCache.tabDisaggregation, domCache.tabCompliance, domCache.tabPbProgress];
+                const panels = [domCache.panelDataTable, domCache.panelDisaggregation, domCache.panelCompliance, domCache.panelPbProgress];
                 tabs.forEach((tab, index) => {
                     if (!tab) return;
                     const isActive = tab === activeTab;
@@ -3350,6 +3378,10 @@
             }
             if (domCache.exploreParametersSection) {
                 domCache.exploreParametersSection.classList.toggle('hidden', tabId !== 'data-table');
+            }
+            const pbProgressImportBtn = document.getElementById('pb-progress-open-import-btn');
+            if (pbProgressImportBtn) {
+                pbProgressImportBtn.classList.toggle('hidden', tabId !== 'pb-progress');
             }
         }
 
@@ -3415,6 +3447,12 @@
                         complianceGridHelper.refresh();
                     });
                 }
+            });
+        }
+        if (domCache.tabPbProgress) {
+            domCache.tabPbProgress.addEventListener('click', function() {
+                switchMainTab(domCache.tabPbProgress);
+                applyParamsToUrl();
             });
         }
 

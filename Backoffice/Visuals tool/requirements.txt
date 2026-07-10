@@ -1,1 +1,1 @@
--r scripts/gb_figures/requirements.txt
+-r scripts/pb_figures/requirements.txt

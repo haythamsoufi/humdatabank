@@ -410,3 +410,252 @@ def get_matrix_auto_load_entities():
             extra={'endpoint': '/matrix/auto-load-entities', 'data': data if 'data' in locals() else None}
         )
         return api_error("Could not fetch matrix entities", 500, error_id, None)
+
+
+def _resolve_auto_load_entities_inner(
+    assignment_entity_status,
+    source_template_id,
+    source_assignment_period,
+    source_form_item_id,
+    require_tick_value_1=False,
+    tick_column_names=None,
+):
+    """Core logic shared between the single and batch auto-load-entities endpoints.
+
+    Assumes the caller has already verified access to ``assignment_entity_status``.
+    Returns a plain dict that maps to the JSON response payload.
+    """
+    from app.services import AssignmentService
+
+    tick_column_names = tick_column_names or []
+
+    source_assigned_form = AssignmentService.get_assigned_forms_by_template(source_template_id).filter_by(
+        period_name=source_assignment_period
+    ).first()
+
+    if not source_assigned_form:
+        return {
+            'entities': [],
+            'entity_type': None,
+            'reason': 'no_source_assignment',
+            'detail': (
+                f'No assignment found for template {source_template_id} and period '
+                f'"{source_assignment_period}". Verify the variable\'s source assignment '
+                'period exists and is spelled exactly as in the assignment.'
+            ),
+        }
+
+    current_entity_id = assignment_entity_status.entity_id
+    current_entity_type = assignment_entity_status.entity_type
+
+    matching_source_entity_statuses = [
+        aes for aes in source_assigned_form.entity_statuses
+        if aes.entity_id == current_entity_id and aes.entity_type == current_entity_type
+    ]
+
+    if not matching_source_entity_statuses:
+        return {
+            'entities': [],
+            'entity_type': None,
+            'reason': 'no_matching_entity_in_source',
+            'detail': (
+                f'This entity is not assigned in the source period "{source_assignment_period}". '
+                'Auto-load only uses data from the same entity in another assignment.'
+            ),
+        }
+
+    form_data_entries = FormData.query.filter(
+        FormData.assignment_entity_status_id.in_(
+            [aes.id for aes in matching_source_entity_statuses]
+        ),
+        FormData.form_item_id == source_form_item_id
+    ).all()
+
+    source_assignment_entity_status_ids = [aes.id for aes in matching_source_entity_statuses]
+
+    if not form_data_entries:
+        return {
+            'entities': [],
+            'entity_type': None,
+            'reason': 'no_form_data',
+            'detail': (
+                f'No saved data for the source matrix (field id {source_form_item_id}) in period '
+                f'"{source_assignment_period}" for this entity. Save the source matrix first.'
+            ),
+            'debug_info': {
+                'current_assignment_entity_status_id': assignment_entity_status.id,
+                'source_assignment_entity_status_ids_queried': source_assignment_entity_status_ids,
+                'source_template_id': source_template_id,
+                'source_assignment_period': source_assignment_period,
+                'source_form_item_id': source_form_item_id,
+            },
+        }
+
+    entity_type = None
+    entity_info = {}
+
+    for entry in form_data_entries:
+        if not entry.disagg_data or not isinstance(entry.disagg_data, dict):
+            continue
+
+        entry_entity_type = entry.disagg_data.get('_table')
+        if entry_entity_type and not entity_type:
+            entity_type = entry_entity_type
+
+        for key in entry.disagg_data.keys():
+            if key == '_table':
+                continue
+            if '_' in key:
+                entity_id_str = key.split('_')[0]
+                try:
+                    entity_id = int(entity_id_str)
+                    if entity_id not in entity_info:
+                        entity_info[entity_id] = {'entity_type': entry_entity_type, 'has_tick': False}
+                    if require_tick_value_1 and tick_column_names:
+                        column_name = '_'.join(key.split('_')[1:])
+                        if column_name in tick_column_names:
+                            cell_value = entry.disagg_data.get(key)
+                            if isinstance(cell_value, dict) and ('modified' in cell_value or 'original' in cell_value):
+                                cell_value = cell_value.get('modified') if cell_value.get('modified') is not None else cell_value.get('original')
+                            if cell_value == 1 or cell_value == '1' or cell_value is True:
+                                entity_info[entity_id]['has_tick'] = True
+                    elif not require_tick_value_1:
+                        entity_info[entity_id]['has_tick'] = True
+                except (ValueError, TypeError):
+                    continue
+
+    if entity_type is None and entity_info:
+        form_item = FormItem.query.get(source_form_item_id)
+        if form_item and form_item.config:
+            mc = form_item.config.get('matrix_config') or form_item.config
+            entity_type = mc.get('lookup_list_id') or getattr(form_item, 'lookup_list_id', None)
+
+    if not entity_info:
+        return {
+            'entities': [],
+            'entity_type': None,
+            'reason': 'no_entity_keys_in_data',
+            'detail': 'Source matrix data has no row keys. Ensure the source field is a matrix with entity rows and data has been saved.',
+        }
+
+    entity_set = set()
+    for entity_id, info in entity_info.items():
+        entity_type_for_entity = info['entity_type'] or entity_type
+        if not require_tick_value_1:
+            if entity_type_for_entity:
+                entity_set.add((entity_id, entity_type_for_entity))
+        else:
+            if info['has_tick'] and entity_type_for_entity:
+                entity_set.add((entity_id, entity_type_for_entity))
+
+    entities = [{'entity_id': eid, 'entity_type': etype} for eid, etype in entity_set]
+
+    payload = {'entities': entities, 'entity_type': entity_type}
+    if len(entities) == 0 and require_tick_value_1 and entity_info:
+        payload['reason'] = 'all_filtered_by_tick'
+        payload['detail'] = (
+            f'No rows had a tick in the required columns ({tick_column_names}). '
+            'Auto-load only includes rows where at least one of these tick columns is checked.'
+        )
+    return payload
+
+
+@api_bp.route('/matrix/auto-load-entities/batch', methods=['POST'])
+@login_required
+def get_matrix_auto_load_entities_batch():
+    """Batch version of /matrix/auto-load-entities.
+
+    Accepts a list of sub-requests and returns a list of results in the same
+    order.  The access check and AES lookup run **once** (all sub-requests must
+    share the same ``assignment_entity_status_id``), cutting 6 round-trips down
+    to 1 when a matrix page loads with multiple variable columns.
+
+    Request body::
+
+        {
+            "requests": [
+                {
+                    "source_template_id": int,
+                    "source_assignment_period": str,
+                    "source_form_item_id": int,
+                    "assignment_entity_status_id": int,
+                    "require_tick_value_1": bool,   (optional)
+                    "tick_column_names": [str, ...]  (optional)
+                },
+                ...
+            ]
+        }
+
+    Response::
+
+        {
+            "results": [
+                {"entities": [...], "entity_type": "...", "reason": null},
+                ...
+            ]
+        }
+    """
+    try:
+        csrf_error = enforce_csrf_json()
+        if csrf_error:
+            return csrf_error
+
+        data = get_json_safe()
+        requests_list = data.get('requests')
+        if not requests_list or not isinstance(requests_list, list):
+            return api_error('requests must be a non-empty list', 400)
+
+        if len(requests_list) > 50:
+            return api_error('requests list too long (max 50)', 400)
+
+        # All sub-requests must share the same assignment_entity_status_id so
+        # the access check and AES load happen exactly once.
+        first_aes_id = requests_list[0].get('assignment_entity_status_id')
+        if not first_aes_id:
+            return api_error('assignment_entity_status_id required in first request', 400)
+        try:
+            first_aes_id = int(first_aes_id)
+        except (TypeError, ValueError):
+            return api_error('assignment_entity_status_id must be an integer', 400)
+
+        from app.services import AssignmentService
+        assignment_entity_status = AssignmentService.get_assignment_entity_status_by_id(first_aes_id)
+        if not assignment_entity_status:
+            return api_error('Assignment entity status not found', 404)
+        if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
+            return api_error('Access denied', 403)
+
+        results = []
+        for req in requests_list:
+            try:
+                source_template_id = req.get('source_template_id')
+                source_assignment_period = req.get('source_assignment_period')
+                source_form_item_id = req.get('source_form_item_id')
+                if not all([source_template_id, source_assignment_period, source_form_item_id]):
+                    results.append({'entities': [], 'entity_type': None, 'reason': 'missing_required_fields'})
+                    continue
+
+                result = _resolve_auto_load_entities_inner(
+                    assignment_entity_status=assignment_entity_status,
+                    source_template_id=source_template_id,
+                    source_assignment_period=source_assignment_period,
+                    source_form_item_id=source_form_item_id,
+                    require_tick_value_1=bool(req.get('require_tick_value_1', False)),
+                    tick_column_names=req.get('tick_column_names') or [],
+                )
+                results.append(result)
+            except Exception as sub_exc:
+                error_id = str(uuid.uuid4())
+                current_app.logger.error(
+                    'batch auto-load sub-request error [%s]: %s', error_id, sub_exc, exc_info=True
+                )
+                results.append({'entities': [], 'entity_type': None, 'reason': 'error', 'error_id': error_id})
+
+        return json_response({'results': results})
+
+    except Exception as e:
+        error_id = str(uuid.uuid4())
+        current_app.logger.error(
+            'API Error [ID: %s] batch auto-load-entities: %s', error_id, e, exc_info=True
+        )
+        return api_error('Could not fetch matrix entities', 500, error_id, None)

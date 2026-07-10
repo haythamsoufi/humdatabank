@@ -25,6 +25,37 @@ def add_security_headers(response):
         if 'Cache-Control' not in response.headers:
             response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
 
+    # Quarto-generated HTML reports (pb-progress output) are self-contained files with inline
+    # scripts, data: script blobs, and data: stylesheets — incompatible with the app CSP.
+    # They are served at an authenticated route so a report-specific relaxed policy is safe.
+    _is_pb_report_html = (
+        getattr(request, 'endpoint', None) == 'pb_progress.serve_output'
+        and request.path.endswith('.html')
+    )
+    if _is_pb_report_html:
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        if request.is_secure:
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        response.headers['X-App-Origin'] = '1'
+        response.headers.pop('Server', None)
+        # Allow the Quarto report's inline scripts, data: blobs, and data: stylesheets.
+        # frame-ancestors 'self' permits the same-origin iframe preview.
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self' data:; "
+            "script-src 'self' 'unsafe-inline' data:; "
+            "style-src 'self' 'unsafe-inline' data: https://fonts.googleapis.com; "
+            "img-src 'self' data: blob:; "
+            "font-src 'self' data: https://fonts.gstatic.com; "
+            "connect-src 'self'; "
+            "frame-src 'none'; "
+            "frame-ancestors 'self'; "
+            "base-uri 'self'; "
+            "form-action 'none'"
+        )
+        return response
+
     # Prevent clickjacking
     response.headers['X-Frame-Options'] = 'DENY'
 

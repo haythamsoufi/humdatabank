@@ -87,15 +87,10 @@ def _build_html(payload: dict) -> str:
 
 def _dashboard_height(payload: dict) -> int:
     """Estimate pixel height for viewport sizing."""
-    if payload["type"] == "ef":
-        base = 120
-        return base + len(payload["rows"]) * 36 + 60
-
     base = 130  # title + headers + footnote
     for item in payload["cumulative"]:
         base += 119 if item.get("show_ns_breakdown") is False else 155
-    base += len(payload["donuts"]) * 90
-    if payload.get("donut_pair"):
+    for pair in payload.get("donut_pairs", []):
         base += 90
     return max(base, 400)
 
@@ -108,9 +103,10 @@ def render_dashboard_html(
     output_path: Path | None = None,
     scale: float = 2.0,
     session: PlaywrightScreenshotSession | None = None,
+    mapping=None,
 ) -> Path:
     """Render dashboard to PNG using HTML/SVG layout engine."""
-    payload = build_payload(model, section, language)
+    payload = build_payload(model, section, language, mapping=mapping)
     html = _build_html(payload)
     width = int(payload.get("width", 827))
     height = _dashboard_height(payload)

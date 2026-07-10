@@ -14,7 +14,7 @@ from docx.oxml.ns import qn
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from gb_figures.render_docx import (  # noqa: E402
+from pb_figures.render_docx import (  # noqa: E402
     _add_donut_pair_block,
     _set_table_inner_borders,
 )
@@ -55,8 +55,8 @@ class DonutPairTableTests(unittest.TestCase):
             def fake_render(item, output_path, **kwargs):
                 output_path.write_bytes(b"fake")
 
-            with patch("gb_figures.render_docx.render_donut_asset", side_effect=fake_render), patch(
-                "gb_figures.render_docx._add_donut_image_cell",
+            with patch("pb_figures.render_docx.render_donut_asset", side_effect=fake_render), patch(
+                "pb_figures.render_docx._add_donut_image_cell",
             ):
                 _add_donut_pair_block(doc, items, assets_dir, "SP4_pair")
 

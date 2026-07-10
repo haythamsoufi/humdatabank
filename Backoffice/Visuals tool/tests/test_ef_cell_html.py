@@ -1,4 +1,4 @@
-"""Tests for EF table value cell formatting."""
+"""Tests for EF dashboard line-chart rendering."""
 
 from __future__ import annotations
 
@@ -9,24 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from gb_figures.render_embed import _append_section_tail, _format_ef_cell_html, _render_sp_html  # noqa: E402
-
-
-class EfCellHtmlTests(unittest.TestCase):
-    def test_value_cell_splits_main_and_suffix(self) -> None:
-        html = _format_ef_cell_html({
-            "text": "85%/ 113",
-            "value": True,
-            "main": "85%",
-            "suffix": "/ 113",
-        })
-        self.assertIn('class="value-main">85%', html)
-        self.assertIn('class="value-suffix">/ 113', html)
-
-    def test_non_value_cell_is_plain_text(self) -> None:
-        html = _format_ef_cell_html({"text": "N/A", "value": False})
-        self.assertEqual(html, "N/A")
-        self.assertNotIn("value-main", html)
+from pb_figures.render_embed import _append_section_tail, _render_sp_html  # noqa: E402
 
 
 class SectionTailTests(unittest.TestCase):
@@ -46,6 +29,7 @@ class SectionTailTests(unittest.TestCase):
 
     def test_sp_footnote_wraps_only_last_block(self) -> None:
         payload = {
+            "section": "SP4",
             "title": "SP4",
             "headers": {"target": "Target"},
             "table_labels": {"year": "Year", "reporting": "Reporting", "implementing": "Implementing"},
@@ -58,17 +42,17 @@ class SectionTailTests(unittest.TestCase):
                 "implementing": ["1"],
                 "show_ns_breakdown": True,
             }],
-            "donut_pair": [{
+            "donut_pairs": [[{
                 "label": "Donut A",
                 "value": 44,
                 "value_label": "44",
                 "target": None,
                 "target_label": "",
-            }],
+            }]],
             "donuts": [],
             "footnote": "Footnote text",
         }
-        refs = {"pair_0_donut": "pair_0_donut.png"}
+        refs = {"pair_0_0_donut": "pair_0_0_donut.png"}
         html = _render_sp_html(payload, refs)
         self.assertIn('<div class="indicator-row">', html)
         self.assertIn('<div class="section-tail"><div class="donut-pair">', html)
@@ -77,6 +61,7 @@ class SectionTailTests(unittest.TestCase):
 
     def test_year_only_footer_omits_ns_breakdown_rows(self) -> None:
         payload = {
+            "section": "SP1",
             "title": "SP1",
             "headers": {"target": "Target"},
             "table_labels": {"year": "Year", "reporting": "Reporting", "implementing": "Implementing"},
@@ -98,6 +83,45 @@ class SectionTailTests(unittest.TestCase):
         self.assertIn('<svg class="line-chart-svg"', html)
         self.assertNotIn("Reporting", html)
         self.assertNotIn("Implementing", html)
+
+    def test_ef_section_renders_line_charts(self) -> None:
+        payload = {
+            "section": "EF1",
+            "title": "EF 1",
+            "headers": {"target": "Target"},
+            "table_labels": {"year": "Year", "reporting": "Reporting", "implementing": "Implementing"},
+            "cumulative": [
+                {
+                    "label": "Indicator A",
+                    "years": ["2023", "2024"],
+                    "values": [14.0, 14.0],
+                    "value_labels": ["14", "14"],
+                    "reporting": ["107", "106"],
+                    "implementing": ["14", "14"],
+                    "show_ns_breakdown": True,
+                },
+                {
+                    "label": "Indicator B",
+                    "years": ["2023"],
+                    "values": [50.0],
+                    "value_labels": ["50"],
+                    "reporting": ["107"],
+                    "implementing": ["50"],
+                    "show_ns_breakdown": True,
+                },
+            ],
+            "donuts": [],
+            "footnote": "EF footnote",
+        }
+        html = _render_sp_html(payload, {})
+        self.assertNotIn("ef-table", html)
+        self.assertEqual(html.count('<div class="indicator-row">'), 2)
+        self.assertEqual(html.count('<svg class="line-chart-svg"'), 2)
+        self.assertIn("50", html)
+        self.assertNotIn("50/ 107", html)
+        self.assertIn("Reporting", html)
+        self.assertIn("Implementing", html)
+        self.assertNotIn('class="x-axis-footer year-only"', html)
 
 
 if __name__ == "__main__":

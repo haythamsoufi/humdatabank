@@ -1,16 +1,39 @@
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-  const panelsRoot = document.getElementById("gb-language-panels");
+  const panelsRoot = document.getElementById("pb-language-panels");
   const main = document.getElementById("quarto-document-content");
   if (!panelsRoot) return;
 
-  const panels = Array.from(panelsRoot.querySelectorAll(".gb-lang-panel"));
+  const panels = Array.from(panelsRoot.querySelectorAll(".pb-lang-panel"));
   if (!panels.length) return;
 
+  // ── Embedded-mode helpers ────────────────────────────────────────────────
+  const isEmbedded = window.self !== window.top;
+  if (isEmbedded) {
+    // Hide the iframe's own scrollbar — the parent page handles all scrolling.
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+  }
+
+  function postHeightToParent() {
+    if (!isEmbedded) return;
+    requestAnimationFrame(function () {
+      try {
+        const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+        window.parent.postMessage({ type: "pb-report-height", height: h }, window.location.origin);
+      } catch (e) {}
+    });
+  }
+  // ────────────────────────────────────────────────────────────────────────
+
   const languages = panels.map((p) => p.dataset.lang).filter(Boolean);
-  const storageKey = "gb-report-language";
+  const storageKey = "pb-report-language";
   const defaultLang = panelsRoot.dataset.default || languages[0];
-  let activeLang = localStorage.getItem(storageKey) || defaultLang;
+  // Honour an explicit ?lang= query-string param (e.g. set by the backoffice iframe src).
+  const urlLang = new URLSearchParams(window.location.search).get("lang");
+  let activeLang = (urlLang && languages.includes(urlLang))
+    ? urlLang
+    : (localStorage.getItem(storageKey) || defaultLang);
   if (!languages.includes(activeLang)) activeLang = defaultLang;
 
   const marginSidebar = document.querySelector("#quarto-margin-sidebar");
@@ -18,10 +41,10 @@ document.addEventListener("DOMContentLoaded", function () {
   const chromeHost = marginSidebar || leftNav;
 
   const selector = document.createElement("div");
-  selector.className = "gb-language-selector";
+  selector.className = "pb-language-selector";
   selector.innerHTML =
-    '<label for="gb-language-select">Language</label>' +
-    '<select id="gb-language-select" aria-label="Report language"></select>';
+    '<label for="pb-language-select">Language</label>' +
+    '<select id="pb-language-select" aria-label="Report language"></select>';
 
   if (chromeHost) {
     chromeHost.insertBefore(selector, chromeHost.firstChild);
@@ -29,7 +52,7 @@ document.addEventListener("DOMContentLoaded", function () {
     panelsRoot.parentElement.insertBefore(selector, panelsRoot);
   }
 
-  const select = selector.querySelector("#gb-language-select");
+  const select = selector.querySelector("#pb-language-select");
   languages.forEach((lang) => {
     const opt = document.createElement("option");
     opt.value = lang;
@@ -43,7 +66,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function wordHref(lang) {
-    return "gb-report-" + slug(lang) + ".docx";
+    return "pb-report-" + slug(lang) + ".docx";
   }
 
   function clearAnchors() {
@@ -114,27 +137,27 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function updateWordLink(lang) {
     const href = wordHref(lang);
-    const link = document.getElementById("gb-download-word");
+    const link = document.getElementById("pb-download-word");
     if (link) link.setAttribute("href", href);
   }
 
-  let scrollHeaderBar = document.getElementById("gb-scroll-headers");
+  let scrollHeaderBar = document.getElementById("pb-scroll-headers");
   if (!scrollHeaderBar) {
     scrollHeaderBar = document.createElement("div");
-    scrollHeaderBar.id = "gb-scroll-headers";
+    scrollHeaderBar.id = "pb-scroll-headers";
     scrollHeaderBar.innerHTML =
-      '<div class="gb-sticky-bar-part"></div>' +
-      '<div class="gb-sticky-bar-section"></div>';
+      '<div class="pb-sticky-bar-part"></div>' +
+      '<div class="pb-sticky-bar-section"></div>';
     document.body.appendChild(scrollHeaderBar);
   }
-  const scrollHeaderPart = scrollHeaderBar.querySelector(".gb-sticky-bar-part");
-  const scrollHeaderSection = scrollHeaderBar.querySelector(".gb-sticky-bar-section");
+  const scrollHeaderPart = scrollHeaderBar.querySelector(".pb-sticky-bar-part");
+  const scrollHeaderSection = scrollHeaderBar.querySelector(".pb-sticky-bar-section");
 
   function updateScrollHeaderOffset() {
     const height = scrollHeaderBar.classList.contains("is-visible")
       ? Math.ceil(scrollHeaderBar.getBoundingClientRect().height)
       : 0;
-    document.documentElement.style.setProperty("--gb-sticky-bar-height", height + "px");
+    document.documentElement.style.setProperty("--pb-sticky-bar-height", height + "px");
   }
 
   function findActiveSection(panel) {
@@ -224,13 +247,14 @@ document.addEventListener("DOMContentLoaded", function () {
     const dir = activePanel.dataset.dir || "ltr";
     if (main) main.setAttribute("dir", dir);
     document.documentElement.setAttribute("lang", slug(lang).slice(0, 2));
-    document.documentElement.classList.toggle("gb-report-arabic", lang === "Arabic");
+    document.documentElement.classList.toggle("pb-report-arabic", lang === "Arabic");
 
-    const meta = document.getElementById("gb-active-language");
+    const meta = document.getElementById("pb-active-language");
     if (meta) meta.textContent = lang;
 
-    document.dispatchEvent(new CustomEvent("gb-language-changed", { detail: { lang } }));
+    document.dispatchEvent(new CustomEvent("pb-language-changed", { detail: { lang } }));
     updateScrollHeaders();
+    postHeightToParent();
   }
 
   window.addEventListener("scroll", updateScrollHeaders, { passive: true });
@@ -241,5 +265,13 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   setLanguage(activeLang);
+  // Post initial height after paint, and again on any resize.
+  postHeightToParent();
+  if (isEmbedded) {
+    window.addEventListener("resize", postHeightToParent);
+    if (typeof ResizeObserver !== "undefined") {
+      new ResizeObserver(postHeightToParent).observe(document.body);
+    }
+  }
 });
 </script>

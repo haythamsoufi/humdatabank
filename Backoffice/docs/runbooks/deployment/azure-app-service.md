@@ -80,6 +80,16 @@ Set these in Azure Portal → App Service → Configuration → Application sett
 
 If traffic passes through Application Gateway or Front Door before reaching App Service, set the **backend HTTP settings request timeout** ≥ 300s for AI chat/agent endpoints. The App Service front-end timeout (≈230s) still applies for requests that bypass the gateway.
 
+### 3c. P&B Progress report generation
+
+The P&B Progress tab generates multilingual HTML, PDF, Word, and figure packages via a background build (Quarto + Playwright). **No extra App Service settings are required** — defaults are baked into [`entrypoint.sh`](../../../entrypoint.sh) and [`app/pb_progress/service.py`](../../../app/pb_progress/service.py):
+
+- On Linux container start, `entrypoint.sh` installs Quarto 1.6.42 and Playwright Chromium under `/home/site/playwright-browsers` when missing.
+- On Azure (`azure_blob` storage), the build uses `PB_BUILD_WORKERS=1` (sequential per-language Chromium) and runs Word before PDF to stay within App Service memory limits. Local dev uses `PB_BUILD_WORKERS=2` with parallel Word/PDF when appropriate.
+- Build subprocess uses report year `2026` and blob-persisted outputs under `pb_progress/`.
+
+Report generation is CPU- and memory-intensive; expect **5–15 minutes** per full build on P1v3. The `/generate` endpoint returns immediately after starting a background thread. Build status and outputs persist to blob storage (`pb_progress/status.json`, `pb_progress/output/*`) and survive container restarts.
+
 ---
 
 ## 4. Deploy Sequence

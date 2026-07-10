@@ -1,4 +1,4 @@
-"""Visual style presets for GB figure dashboards."""
+"""Visual style presets for P&B figure dashboards."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ _BRAND_GAP = "#c1c1c1"
 
 STYLE_NAMES = ("classic", "modern", "professional")
 DEFAULT_STYLE = "classic"
-ENV_VAR = "GB_FIGURES_STYLE"
+ENV_VAR = "PB_FIGURES_STYLE"
 
 _STYLES: dict[str, StylePreset] = {
     "classic": {
@@ -103,7 +103,7 @@ _STYLES: dict[str, StylePreset] = {
 def resolve_style(name: str | None = None) -> StylePreset:
     """Return the active style preset.
 
-    Resolution order: explicit ``name`` argument, then ``GB_FIGURES_STYLE`` env var,
+    Resolution order: explicit ``name`` argument, then ``PB_FIGURES_STYLE`` env var,
     then ``DEFAULT_STYLE`` (classic).
     """
     chosen = (name or os.environ.get(ENV_VAR) or DEFAULT_STYLE).strip().lower()

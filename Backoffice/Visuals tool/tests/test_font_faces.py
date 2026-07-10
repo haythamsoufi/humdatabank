@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from gb_figures.font_faces import inject_tajawal_fonts, tajawal_face_css  # noqa: E402
+from pb_figures.font_faces import inject_tajawal_fonts, tajawal_face_css  # noqa: E402
 
 
 class FontFaceTests(unittest.TestCase):

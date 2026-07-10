@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from gb_figures.line_chart import (  # noqa: E402
+from pb_figures.line_chart import (  # noqa: E402
     _value_label_y_px,
     target_label_layout,
     value_label_above,

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 PDF_PREPARE_JS = """
 (lang) => {
-  document.querySelectorAll(".gb-lang-panel").forEach((panel) => {
+  document.querySelectorAll(".pb-lang-panel").forEach((panel) => {
     if (panel.dataset.lang === lang) {
       panel.removeAttribute("hidden");
     } else {
@@ -18,16 +18,16 @@ PDF_PREPARE_JS = """
     }
   });
 
-  const activePanel = document.querySelector(`.gb-lang-panel[data-lang="${lang}"]`);
+  const activePanel = document.querySelector(`.pb-lang-panel[data-lang="${lang}"]`);
   const isRtl = activePanel && activePanel.dataset.dir === "rtl";
-  document.documentElement.classList.toggle("gb-report-arabic", Boolean(isRtl));
+  document.documentElement.classList.toggle("pb-report-arabic", Boolean(isRtl));
   document.documentElement.setAttribute("dir", isRtl ? "rtl" : "ltr");
-  document.body.classList.add("gb-pdf-export");
+  document.body.classList.add("pb-pdf-export");
 
   [
-    ".gb-report-tools",
-    ".gb-language-selector",
-    "#gb-scroll-headers",
+    ".pb-report-tools",
+    ".pb-language-selector",
+    "#pb-scroll-headers",
     "#quarto-sidebar",
     "#quarto-margin-sidebar",
     "nav#TOC",
@@ -38,7 +38,7 @@ PDF_PREPARE_JS = """
     });
   });
 
-  document.querySelectorAll(".gb-dashboard").forEach((dashboard) => {
+  document.querySelectorAll(".pb-dashboard").forEach((dashboard) => {
     const footnote = dashboard.querySelector(":scope > .footnote");
     if (!footnote || footnote.closest(".section-tail")) return;
     const lastBlock = footnote.previousElementSibling;
@@ -52,24 +52,24 @@ PDF_PREPARE_JS = """
 
   const pdfStyle = document.createElement("style");
   pdfStyle.textContent = `
-    .report-figure .gb-dashboard .dash-title { display: none !important; }
+    .report-figure .pb-dashboard .dash-title { display: none !important; }
     .report-section { page-break-before: auto !important; break-before: auto !important; }
     .report-part + .report-part .report-part-title {
       page-break-before: always !important;
       break-before: page !important;
     }
     .report-figure { page-break-inside: auto !important; break-inside: auto !important; }
-    .gb-dashboard .indicator-row,
-    .gb-dashboard .donut-row,
-    .gb-dashboard .donut-pair {
+    .pb-dashboard .indicator-row,
+    .pb-dashboard .donut-row,
+    .pb-dashboard .donut-pair {
       page-break-inside: avoid !important;
       break-inside: avoid !important;
     }
-    .gb-dashboard .section-tail {
+    .pb-dashboard .section-tail {
       page-break-inside: auto !important;
       break-inside: auto !important;
     }
-    .gb-dashboard .footnote {
+    .pb-dashboard .footnote {
       page-break-before: avoid !important;
       break-before: avoid !important;
     }
@@ -78,12 +78,12 @@ PDF_PREPARE_JS = """
       break-after: avoid !important;
     }
     /* Trailing figure/dashboard margins can spill onto an extra blank page. */
-    .gb-lang-panel:not([hidden]) .report-figure:last-child,
-    .gb-lang-panel:not([hidden]) .report-section:last-child,
-    .gb-lang-panel:not([hidden]) .report-part:last-child {
+    .pb-lang-panel:not([hidden]) .report-figure:last-child,
+    .pb-lang-panel:not([hidden]) .report-section:last-child,
+    .pb-lang-panel:not([hidden]) .report-part:last-child {
       margin-bottom: 0 !important;
     }
-    .gb-lang-panel:not([hidden]) .gb-dashboard {
+    .pb-lang-panel:not([hidden]) .pb-dashboard {
       padding-bottom: 0 !important;
     }
     main, #quarto-document-content, .page-layout-full {

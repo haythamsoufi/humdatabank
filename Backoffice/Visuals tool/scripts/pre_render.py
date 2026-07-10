@@ -12,15 +12,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from gb_figures.config import DEFAULT_OUTPUT, build_workers, resolve_excel  # noqa: E402
-from gb_figures.charts import render_dashboard  # noqa: E402
-from gb_figures.data import build_model, load_sg_report  # noqa: E402
-from gb_figures.languages import discover_languages, is_rtl  # noqa: E402
-from gb_figures.layouts import SECTION_CODES  # noqa: E402
-from gb_figures.payload import build_payload  # noqa: E402
-from gb_figures.render_embed import build_section_embed, render_section_assets  # noqa: E402
-from gb_figures.render_html import PlaywrightScreenshotSession  # noqa: E402
-from gb_figures.report_meta import (  # noqa: E402
+from pb_figures.config import DEFAULT_OUTPUT, build_workers, resolve_excel  # noqa: E402
+from pb_figures.charts import render_dashboard  # noqa: E402
+from pb_figures.data import build_model, load_mapping, load_sg_report  # noqa: E402
+from pb_figures.languages import discover_languages, is_rtl  # noqa: E402
+from pb_figures.layouts import section_codes, section_has_indicators  # noqa: E402
+from pb_figures.payload import build_payload  # noqa: E402
+from pb_figures.render_embed import build_section_embed, render_section_assets  # noqa: E402
+from pb_figures.render_html import PlaywrightScreenshotSession  # noqa: E402
+from pb_figures.translations import clear_cache  # noqa: E402
+from pb_figures.report_meta import (  # noqa: E402
     load_model,
     report_parts,
     report_section_assets_dir,
@@ -30,7 +31,7 @@ from gb_figures.report_meta import (  # noqa: E402
 
 
 def _resolve_languages(excel: Path) -> tuple[str, ...]:
-    requested = os.environ.get("GB_REPORT_LANGUAGE")
+    requested = os.environ.get("PB_REPORT_LANGUAGE")
     if requested and requested.lower() not in ("all", "*"):
         return (requested,)
     return discover_languages(load_sg_report(excel)["mapping"])
@@ -40,6 +41,7 @@ def _render_language_assets(
     excel: Path,
     language: str,
     renderer: str,
+    mapping,
 ) -> tuple[str, int, int, list[str]]:
     """Render all chart + dashboard assets for one language.
 
@@ -51,9 +53,12 @@ def _render_language_assets(
     dashboard_total = 0
     log_lines = [f"  [{language}]"]
     with PlaywrightScreenshotSession() as session:
-        for section in SECTION_CODES:
+        for section in section_codes(excel):
+            if not section_has_indicators(mapping, section):
+                log_lines.append(f"    {section}/ (no indicators)")
+                continue
             assets_dir = report_section_assets_dir(ROOT, language, section)
-            payload = build_payload(model, section, language)
+            payload = build_payload(model, section, language, mapping=mapping)
             refs = render_section_assets(
                 payload, assets_dir, language=language, session=session,
             )
@@ -69,13 +74,14 @@ def _render_language_assets(
                 output_path=dash_path,
                 renderer=renderer,
                 session=session,
+                mapping=mapping,
             )
             dashboard_total += 1
     log_lines.append("")
     return language, chart_total, dashboard_total, log_lines
 
 
-def _generate_assets(excel: Path, languages: tuple[str, ...]) -> tuple[int, int]:
+def _generate_assets(excel: Path, languages: tuple[str, ...], mapping) -> tuple[int, int]:
     """Render chart assets for HTML embed and full dashboard PNGs under Figures/.
 
     Languages are independent of one another, so they are farmed out to a pool
@@ -84,12 +90,12 @@ def _generate_assets(excel: Path, languages: tuple[str, ...]) -> tuple[int, int]
     """
     chart_total = 0
     dashboard_total = 0
-    renderer = os.environ.get("GB_FIGURES_RENDERER", "html")
+    renderer = os.environ.get("PB_FIGURES_RENDERER", "html")
     max_workers = build_workers(len(languages))
 
     if max_workers <= 1:
         for language in languages:
-            _, charts, dashboards, log_lines = _render_language_assets(excel, language, renderer)
+            _, charts, dashboards, log_lines = _render_language_assets(excel, language, renderer, mapping)
             chart_total += charts
             dashboard_total += dashboards
             for line in log_lines:
@@ -104,7 +110,7 @@ def _generate_assets(excel: Path, languages: tuple[str, ...]) -> tuple[int, int]
     results: dict[str, tuple[str, int, int, list[str]]] = {}
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(_render_language_assets, excel, language, renderer): language
+            executor.submit(_render_language_assets, excel, language, renderer, mapping): language
             for language in languages
         }
         for future in as_completed(futures):
@@ -132,14 +138,15 @@ def _render_language_panel(
     language: str,
     model,
     excel: Path,
+    mapping,
     *,
     visible: bool = False,
 ) -> list[str]:
-    titles = section_titles(model, language)
+    titles = section_titles(model, language, excel)
     direction = "rtl" if is_rtl(language) else "ltr"
     hidden_attr = "" if visible else " hidden"
     lines = [
-        f'<div class="gb-lang-panel" data-lang="{html.escape(language)}" data-dir="{direction}"{hidden_attr}>',
+        f'<div class="pb-lang-panel" data-lang="{html.escape(language)}" data-dir="{direction}"{hidden_attr}>',
     ]
     for part in report_parts(excel):
         part_title = part["title"].get(language, part["title"]["English"])
@@ -164,6 +171,7 @@ def _render_language_panel(
                 assets_dir=assets_dir,
                 asset_url_prefix=asset_prefix,
                 render_assets=False,
+                mapping=mapping,
             )
             lines.extend(['<div class="report-figure">', dashboard_html, "</div>", "</section>"])
         lines.append("</section>")
@@ -171,17 +179,17 @@ def _render_language_panel(
     return lines
 
 
-def _generate_body(output: Path, model, languages: tuple[str, ...], excel: Path) -> None:
+def _generate_body(output: Path, model, languages: tuple[str, ...], excel: Path, mapping) -> None:
     """Write _body.qmd with embedded dashboard HTML for all languages."""
     default_language = languages[0]
     lines: list[str] = [
         "```{=html}",
-        f'<div id="gb-language-panels" data-default="{html.escape(default_language)}">',
+        f'<div id="pb-language-panels" data-default="{html.escape(default_language)}">',
     ]
     for language in languages:
         lines.extend(
             _render_language_panel(
-                language, model, excel, visible=language == default_language,
+                language, model, excel, mapping, visible=language == default_language,
             )
         )
     lines.extend([
@@ -196,20 +204,22 @@ def _generate_body(output: Path, model, languages: tuple[str, ...], excel: Path)
 
 
 def main() -> None:
+    clear_cache()
     excel = resolve_excel()
     languages = _resolve_languages(excel)
     model = build_model(excel)
+    mapping = load_mapping(excel)
 
     print(f"[pre_render] {excel.name} -> languages: {', '.join(languages)}", flush=True)
 
-    chart_total, dashboard_total = _generate_assets(excel, languages)
+    chart_total, dashboard_total = _generate_assets(excel, languages, mapping)
     print(
         f"[pre_render] assets done: {chart_total} chart assets, "
         f"{dashboard_total} dashboard PNGs -> {DEFAULT_OUTPUT.name}/",
         flush=True,
     )
 
-    _generate_body(ROOT / "report" / "_body.qmd", model, languages, excel)
+    _generate_body(ROOT / "report" / "_body.qmd", model, languages, excel, mapping)
 
 
 if __name__ == "__main__":

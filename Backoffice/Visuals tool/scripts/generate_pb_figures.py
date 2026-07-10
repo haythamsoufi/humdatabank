@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Generate GB Report figures from SG Report.xlsx without Tableau.
+Generate P&B Report figures from SG Report.xlsx without Tableau.
 Each SP/EF section produces one combined dashboard image.
 
 Usage:
-    python generate_gb_figures.py --language English --sections EF1 SP1
-    python generate_gb_figures.py --all
+    python generate_pb_figures.py --language English --sections EF1 SP1
+    python generate_pb_figures.py --all
 """
 
 from __future__ import annotations
@@ -16,11 +16,11 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-from gb_figures.charts import render_dashboard
-from gb_figures.config import DEFAULT_EXCEL, DEFAULT_OUTPUT, LANGUAGES
-from gb_figures.data import build_model
-from gb_figures.layouts import SECTION_CODES
-from gb_figures.styles import ENV_VAR, STYLE_NAMES
+from pb_figures.charts import render_dashboard
+from pb_figures.config import DEFAULT_EXCEL, DEFAULT_OUTPUT, LANGUAGES
+from pb_figures.data import build_model
+from pb_figures.layouts import SECTION_CODES
+from pb_figures.styles import ENV_VAR, STYLE_NAMES
 
 
 def generate_section(

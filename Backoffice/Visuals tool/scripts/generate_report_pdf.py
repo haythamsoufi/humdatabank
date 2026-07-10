@@ -13,14 +13,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from gb_figures.config import build_workers, cleanup_build_copy, resolve_excel
-from gb_figures.data import load_sg_report
-from gb_figures.languages import discover_languages, pdf_filename
-from gb_figures.render_html import PlaywrightScreenshotSession
-from gb_figures.render_pdf import render_report_pdf
+from pb_figures.config import build_workers, cleanup_build_copy, resolve_excel
+from pb_figures.data import load_sg_report
+from pb_figures.languages import discover_languages, pdf_filename
+from pb_figures.render_html import PlaywrightScreenshotSession
+from pb_figures.render_pdf import render_report_pdf
 
 OUTPUT_DIR = ROOT / "report" / "output"
-HTML_REPORT = OUTPUT_DIR / "gb-report.html"
+HTML_REPORT = OUTPUT_DIR / "pb-report.html"
 
 
 def _render_one(html_path: Path, output_path: Path, language: str) -> tuple[str, Path]:
@@ -35,14 +35,14 @@ def _resolve_languages(excel: Path, args: argparse.Namespace) -> list[str]:
         return [args.language]
     if args.all_languages:
         return list(discover_languages(load_sg_report(excel)["mapping"]))
-    env_lang = os.environ.get("GB_REPORT_LANGUAGE")
+    env_lang = os.environ.get("PB_REPORT_LANGUAGE")
     if env_lang and env_lang.lower() not in ("all", "*"):
         return [env_lang]
     return list(discover_languages(load_sg_report(excel)["mapping"]))
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate combined GB Report PDF")
+    parser = argparse.ArgumentParser(description="Generate combined P&B Report PDF")
     parser.add_argument("--language", choices=["English", "French", "Spanish", "Arabic"])
     parser.add_argument(
         "--all-languages",
@@ -94,7 +94,7 @@ def main() -> None:
                     _, output = future.result()
                     print(f"[generate_report_pdf] wrote {output}")
 
-        default_copy = OUTPUT_DIR / "gb-report.pdf"
+        default_copy = OUTPUT_DIR / "pb-report.pdf"
         shutil.copy2(outputs[languages[0]], default_copy)
         print(f"[generate_report_pdf] wrote {default_copy} (default)")
     finally:

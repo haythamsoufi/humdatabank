@@ -304,6 +304,38 @@ if [ "$#" -gt 0 ]; then
   exec "$@"
 fi
 
+# P&B Progress build dependencies (Quarto CLI + Playwright Chromium)
+# Values are hardcoded — no App Service variables required.
+if [ "$(uname -s)" = "Linux" ]; then
+  echo "=========================================="
+  echo "P&B Progress: ensuring build dependencies"
+  echo "=========================================="
+
+  export PLAYWRIGHT_BROWSERS_PATH="/home/site/playwright-browsers"
+  mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"
+
+  if ! python -m playwright install chromium 2>&1 | grep -qi "chromium"; then
+    echo "P&B: installing Playwright Chromium..."
+    python -m playwright install-deps chromium 2>&1 | tail -3 || true
+    python -m playwright install chromium 2>&1 | tail -3 \
+      || echo "WARN: Playwright Chromium install failed"
+  else
+    echo "✓ Playwright Chromium already available"
+  fi
+
+  if ! command -v quarto >/dev/null 2>&1; then
+    _qver="1.6.42"
+    echo "P&B: installing Quarto ${_qver}..."
+    curl -fsSL "https://github.com/quarto-dev/quarto-cli/releases/download/v${_qver}/quarto-${_qver}-linux-amd64.deb" \
+        -o /tmp/quarto.deb \
+      && dpkg -i /tmp/quarto.deb && rm -f /tmp/quarto.deb \
+      && echo "✓ Quarto $(quarto --version)" \
+      || echo "WARN: Quarto install failed"
+  else
+    echo "✓ Quarto already available"
+  fi
+fi
+
 PORT="${PORT:-5000}"
 echo "=========================================="
 echo "Starting Gunicorn WSGI server (default)"

@@ -4,7 +4,7 @@ Data Exploration Module - Explore form data with filters
 """
 
 from functools import wraps
-from flask import Blueprint, render_template, request, current_app, send_file, abort
+from flask import Blueprint, render_template, request, current_app, send_file, abort, redirect, url_for, flash
 from flask_login import current_user
 from sqlalchemy import distinct, func, and_, or_, tuple_
 from sqlalchemy.orm import joinedload
@@ -15,7 +15,9 @@ from app.models import (
     FormTemplate, AssignedForm, Country, FormItem, FormData, AIFormDataValidation,
     AssignmentEntityStatus, SubmittedDocument, FormSection, FormPage
 )
-from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
+from app.utils.api_responses import json_auth_required, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
+from app.utils.redirect_utils import get_current_relative_url
+from app.utils.request_utils import is_json_request
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.routes.admin.shared import admin_required, permission_required, permission_required_any
 from app.services.security.api_authentication import get_user_allowed_template_ids
@@ -44,6 +46,7 @@ DATA_EXPLORER_PERMISSIONS = [
     'admin.data_explore.data_table',
     'admin.data_explore.analysis',
     'admin.data_explore.compliance',
+    'admin.data_explore.pb_progress',
 ]
 
 
@@ -73,6 +76,41 @@ def has_any_data_explorer_permission(user) -> bool:
     return False
 
 
+def _explore_tab_access_flags(user) -> dict[str, bool]:
+    is_sm = AuthorizationService.is_system_manager(user)
+    return {
+        'can_access_data_table': is_sm or AuthorizationService.has_rbac_permission(user, 'admin.data_explore.data_table'),
+        'can_access_analysis': is_sm or AuthorizationService.has_rbac_permission(user, 'admin.data_explore.analysis'),
+        'can_access_compliance': is_sm or AuthorizationService.has_rbac_permission(user, 'admin.data_explore.compliance'),
+        'can_access_pb_progress': is_sm or AuthorizationService.has_rbac_permission(user, 'admin.data_explore.pb_progress'),
+        'can_manage_pb_progress': is_sm,
+    }
+
+
+def _explore_first_tab(flags: dict[str, bool]) -> str:
+    if flags.get('can_access_data_table'):
+        return 'data-table'
+    if flags.get('can_access_analysis'):
+        return 'disaggregation'
+    if flags.get('can_access_compliance'):
+        return 'compliance'
+    return 'pb-progress'
+
+
+def _render_pb_progress_panel(flags: dict[str, bool], first_tab: str) -> str:
+    if not flags.get('can_access_pb_progress'):
+        return ''
+    try:
+        return render_template(
+            'pb_progress/tab_panel.html',
+            explore_first_tab=first_tab,
+            can_manage_pb_progress=flags.get('can_manage_pb_progress', False),
+        )
+    except Exception as exc:
+        logger.error("Failed to render P&B progress panel: %s", exc, exc_info=True)
+        return ''
+
+
 def data_explorer_required(f):
     """
     Decorator that requires at least one Data Explorer permission.
@@ -81,7 +119,10 @@ def data_explorer_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
-            abort(401)
+            if is_json_request():
+                return json_auth_required()
+            flash("Access denied. Please log in.", "warning")
+            return redirect(url_for("auth.login", next=get_current_relative_url()))
         if not has_any_data_explorer_permission(current_user):
             abort(403)
         return f(*args, **kwargs)
@@ -101,13 +142,9 @@ def data_explorer_required(f):
 def explore_data():
     """Display data exploration page with filters for template and assignment."""
     try:
-        # Determine which tabs the user can access
-        can_access_data_table = AuthorizationService.is_system_manager(current_user) or \
-            AuthorizationService.has_rbac_permission(current_user, 'admin.data_explore.data_table')
-        can_access_analysis = AuthorizationService.is_system_manager(current_user) or \
-            AuthorizationService.has_rbac_permission(current_user, 'admin.data_explore.analysis')
-        can_access_compliance = AuthorizationService.is_system_manager(current_user) or \
-            AuthorizationService.has_rbac_permission(current_user, 'admin.data_explore.compliance')
+        tab_flags = _explore_tab_access_flags(current_user)
+        explore_first_tab = _explore_first_tab(tab_flags)
+        pb_progress_panel = _render_pb_progress_panel(tab_flags, explore_first_tab)
         # System managers can see all templates regardless of ownership and sharing
         # Use joinedload for published_version to avoid N+1 queries when accessing template.name
         if AuthorizationService.is_system_manager(current_user):
@@ -142,24 +179,27 @@ def explore_data():
                              templates=templates,
                              period_names=period_names,
                              countries=countries,
-                             can_access_data_table=can_access_data_table,
-                             can_access_analysis=can_access_analysis,
-                             can_access_compliance=can_access_compliance,
+                             explore_first_tab=explore_first_tab,
+                             pb_progress_panel=pb_progress_panel,
                              fdrs_template_id=FDRS_TEMPLATE_ID,
-                             title=_("Explore Data"))
+                             title=_("Explore Data"),
+                             **tab_flags)
     except Exception as e:
         logger.error(f"Error loading data exploration page: {str(e)}", exc_info=True)
         db.session.rollback()
+        tab_flags = _explore_tab_access_flags(current_user)
+        explore_first_tab = _explore_first_tab(tab_flags)
+        pb_progress_panel = _render_pb_progress_panel(tab_flags, explore_first_tab)
         return render_template("admin/data_exploration/explore_data.html",
                              templates=[],
                              period_names=[],
                              countries=[],
-                             can_access_data_table=True,
-                             can_access_analysis=True,
-                             can_access_compliance=True,
+                             explore_first_tab=explore_first_tab,
+                             pb_progress_panel=pb_progress_panel,
                              fdrs_template_id=FDRS_TEMPLATE_ID,
                              title=_("Explore Data"),
-                             error="Failed to load filter options. Please refresh the page.")
+                             error="Failed to load filter options. Please refresh the page.",
+                             **tab_flags)
 
 @bp.route("/data-exploration/form-items", methods=["GET"])
 @permission_required('admin.data_explore.data_table')

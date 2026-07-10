@@ -1,7 +1,7 @@
 """HTTP error handlers for the Flask application."""
 
 from contextlib import suppress
-from flask import render_template, request, session, current_app, url_for
+from flask import render_template, request, session, current_app, url_for, redirect
 from flask_login import current_user
 from flask_wtf.csrf import CSRFError
 
@@ -88,11 +88,10 @@ def register_error_handlers(app):
                 'Authentication required to access this resource.',
                 401, success=False, error='Unauthorized', error_code=401,
             )
-        return render_template('errors/error.html',
-                               error_code=401, error_title='Unauthorized',
-                               error_message='You need to be logged in to access this page. Please log in and try again.',
-                               error_details=str(error) if app.config.get('DEBUG') else None,
-                               current_user=current_user, style_nonce=get_style_nonce()), 401
+        # For browser requests, redirect to login so the user can continue
+        # their session rather than seeing a dead-end error page.
+        next_url = request.full_path.rstrip('?') or '/'
+        return redirect(url_for('auth.login', next=next_url))
 
     @app.errorhandler(403)
     def forbidden(error):

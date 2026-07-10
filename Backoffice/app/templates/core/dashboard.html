@@ -2497,6 +2497,7 @@
 
             <div class="dashboard-no-access-panel">
                 {% set no_access_flow_step = 2 if pending_access_requests else 1 %}
+                {% set can_use_assignment_dashboard = can_view_assignment_dashboard|default(true) %}
                 <div class="dashboard-no-access-panel-stage">
                     <p class="dashboard-no-access-step-here" hidden>
                         <span class="dashboard-no-access-step-here__text">{{ _("You're here") }}</span>
@@ -2515,7 +2516,9 @@
                             <i class="fas fa-globe-americas" aria-hidden="true"></i>
                         </div>
                         <h2 class="dashboard-no-access-card-title">
-                            {% if pending_access_requests %}
+                            {% if not can_use_assignment_dashboard %}
+                                {{ _('You do not have assignment dashboard access.') }}
+                            {% elif pending_access_requests %}
                                 {{ _('Your account is not linked to a country yet. You have pending request(s) under review.') }}
                             {% else %}
                                 {{ _('Your account is not linked to a country yet. Submit a request to unlock your dashboard.') }}
@@ -2524,6 +2527,17 @@
                     </div>
 
                     <div class="dashboard-no-access-card-body">
+                        {% if not can_use_assignment_dashboard %}
+                            <div class="dashboard-no-access-pending">
+                                <p class="dashboard-no-access-pending__title">
+                                    <i class="fas fa-lock mr-1.5" aria-hidden="true"></i>
+                                    {{ _('Assignment dashboard access requires one of the Assignment roles.') }}
+                                </p>
+                                <p class="dashboard-no-access-pending__text">
+                                    {{ _('Ask a System Manager to grant Assignment Viewer, Assignment Editor & Submitter, or Assignment Approver if this user should work with assignments.') }}
+                                </p>
+                            </div>
+                        {% else %}
                         {% if pending_access_requests %}
                             <div class="dashboard-no-access-pending">
                                 <p class="dashboard-no-access-pending__title">
@@ -2694,6 +2708,7 @@
                         </div>
                         {% endif %}
                         </div>
+                        {% endif %}
                     </div>
                 </div>
                 </div>

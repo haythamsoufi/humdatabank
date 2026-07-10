@@ -1,15 +1,20 @@
 {# Shared admin sidebar navigation categories (desktop sidebar + mobile admin menu). #}
 {% from "components/_svg_icons.html" import svg_icon %}
+{% set can_access_dashboard = is_system_manager or has_permission('assignment.view') %}
+{% set can_access_general = can_access_dashboard or is_system_manager or has_permission('admin.analytics.view') or has_permission('admin.documents.manage') or has_permission('admin.translations.manage') or has_permission('admin.plugins.manage') or has_permission('admin.settings.manage') or has_permission('admin.communication.manage') or has_permission('admin.docs.view') %}
+{% if can_access_general %}
 <div class="space-y-2" data-category="general">
     <div class="collapsable-category-title">
          <h3 class="sidebar-section-title">{{ _('General') }}</h3>
          {{ svg_icon('chevron-right', 'collapsable-icon w-4 h-4') }}
     </div>
     <div class="collapsable-content">
+        {% if can_access_dashboard %}
         <a href="{{ url_for('main.dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Dashboard') }}">
             {{ svg_icon('home', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Dashboard') }}</span>
         </a>
+        {% endif %}
         {# Admin Dashboard - requires admin.analytics.view #}
         {% if is_system_manager or has_permission('admin.analytics.view') %}
         <a href="{{ url_for('admin.admin_dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Admin Dashboard') }}">
@@ -61,6 +66,7 @@
         {% endif %}
     </div>
 </div>
+{% endif %}
 
 {# User Management Category - Only show if user has admin.users.view permission #}
 {% set can_view_users = is_system_manager or has_permission('admin.users.view') %}
@@ -85,7 +91,7 @@
 {% endif %}
 
 {# Form & Data Management Category - Only show if user has any form/data management permissions #}
-{% set can_access_data_explorer = is_system_manager or has_permission('admin.data_explore.data_table') or has_permission('admin.data_explore.analysis') or has_permission('admin.data_explore.compliance') %}
+{% set can_access_data_explorer = is_system_manager or has_permission('admin.data_explore.data_table') or has_permission('admin.data_explore.analysis') or has_permission('admin.data_explore.compliance') or has_permission('admin.data_explore.pb_progress') %}
 {% set can_access_validation_dashboard = is_system_manager or has_permission('admin.validation.dashboard') %}
 {% set can_access_validation_questions = is_system_manager or has_permission('admin.validation.questions') %}
 {% set can_access_validation = can_access_validation_dashboard or can_access_validation_questions %}

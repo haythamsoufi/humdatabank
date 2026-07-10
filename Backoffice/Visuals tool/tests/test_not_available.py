@@ -11,8 +11,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from gb_figures.calculations import not_applicable, not_available  # noqa: E402
-from gb_figures.translations import _translation_cell, clear_cache  # noqa: E402
+from pb_figures.calculations import not_applicable, not_available  # noqa: E402
+from pb_figures.translations import _translation_cell, clear_cache  # noqa: E402
 
 
 class TranslationCellTests(unittest.TestCase):

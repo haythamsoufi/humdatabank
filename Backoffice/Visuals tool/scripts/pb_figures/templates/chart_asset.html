@@ -128,6 +128,16 @@ function donutHasTarget(item) {
 
 function renderDonut(item, showLabel) {
 
+  if (item.unavailable) {
+
+    const size = 64, cx = 32, cy = 32;
+
+    const label = item.unavailable_label || item.value_label || "";
+
+    return `<svg viewBox="0 0 ${size} ${size}">${renderDonutLabel(cx, cy, label)}</svg>`;
+
+  }
+
   const size = 64, cx = 32, cy = 32, r = 26, stroke = 10;
 
   const labelSvg = showLabel !== false ? renderDonutLabel(cx, cy, item.value_label) : "";

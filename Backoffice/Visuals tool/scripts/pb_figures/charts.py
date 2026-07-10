@@ -1,4 +1,4 @@
-"""Chart builders that mirror Tableau worksheet types in GB figures.twb."""
+"""Chart builders that mirror Tableau worksheet types in P&B figures.twb."""
 
 from __future__ import annotations
 
@@ -299,16 +299,23 @@ def draw_cumulative_indicator(
     data: pd.DataFrame,
     *,
     language: str = "English",
+    ns_breakdown: bool | None = None,
+    reporting_field: str = "Count",
 ) -> None:
     """Draw one line-chart indicator panel onto existing axes."""
     years = data["Year"].tolist()
     values = [float(v) if pd.notna(v) else float("nan") for v in data["Value"].tolist()]
-    counts = data["Count"].tolist()
+    reporting = data[reporting_field].tolist() if reporting_field in data.columns else data["Count"].tolist()
     implementing = data["Implementing"].tolist()
     annual_target = annual_target_value(indicator)
     unit = indicator.get("Unit")
     label = _wrap_indicator_label(indicator_label(indicator, language))
     hdr = headers(language)
+    use_ns_breakdown = (
+        ns_breakdown
+        if ns_breakdown is not None
+        else indicator_show_ns_breakdown(indicator.get("Type"), indicator.get("Unit"))
+    )
 
     label_ax.axis("off")
     label_ax.text(0.02, 0.5, label, ha="left", va="center", fontsize=9,
@@ -372,10 +379,10 @@ def draw_cumulative_indicator(
     row_labels_dict = table_row_labels(language)
     row_labels = [row_labels_dict["year"]]
     table_rows = [[year_display(y) for y in years]]
-    if show_ns_breakdown(str(indicator["ID"])):
+    if use_ns_breakdown:
         row_labels.extend([row_labels_dict["reporting"], row_labels_dict["implementing"]])
         table_rows.extend([
-            [str(int(c)) if pd.notna(c) else not_applicable(language) for c in counts],
+            [str(int(c)) if pd.notna(c) else not_applicable(language) for c in reporting],
             [str(int(v)) if pd.notna(v) else not_applicable(language) for v in implementing],
         ])
     table_ax.axis("off")
@@ -405,10 +412,56 @@ import matplotlib.gridspec as gridspec  # noqa: E402 (grouped with other matplot
 from .calculations import section_footnote, section_title  # noqa: E402
 from .config import DASHBOARD_SIZES  # noqa: E402
 from .layouts import (  # noqa: E402
-    EF1_ID_ORDER, EF_ID_ORDERS, SP1_DISTINCT_IDS, SP1_ID_ORDER,
-    SP_LAYOUTS, show_ns_breakdown, visible_donut_rows, visible_indicator_ids,
+    build_section_layout,
+    indicator_has_values,
+    indicators_with_data,
+    mapping_from_model,
+    section_has_indicators,
+    show_ns_breakdown as indicator_show_ns_breakdown,
+    visible_donut_pairs,
+    visible_indicator_ids,
 )
-from .payload import _indicator_meta, _latest_value  # noqa: E402
+from .payload import (  # noqa: E402
+    _indicator_meta,
+    _indicator_meta_from_mapping,
+    _latest_chartable_value,
+    _section_meta_row,
+)
+
+
+def draw_unavailable_cumulative_indicator(
+    label_ax,
+    chart_ax,
+    table_ax,
+    indicator: pd.Series,
+    *,
+    language: str = "English",
+) -> None:
+    label_ax.axis("off")
+    label_ax.text(
+        0.02,
+        0.5,
+        _wrap_indicator_label(indicator_label(indicator, language)),
+        ha="left",
+        va="center",
+        fontsize=9,
+        fontfamily="sans-serif",
+        linespacing=1.25,
+        transform=label_ax.transAxes,
+    )
+    label_ax.axvline(0.98, color=_theme_color("divider", COLOR_DIVIDER), linewidth=0.8, ymin=0.08, ymax=0.92)
+    chart_ax.axis("off")
+    chart_ax.text(
+        0.5,
+        0.5,
+        not_available(language),
+        ha="center",
+        va="center",
+        fontsize=10,
+        color="#888888",
+        transform=chart_ax.transAxes,
+    )
+    table_ax.axis("off")
 
 
 def _section_subset(model: pd.DataFrame, section: str) -> pd.DataFrame:
@@ -431,15 +484,62 @@ def _draw_target_box(ax, text: str) -> None:
     ax.text(0.5, 0.5, text, ha="center", va="center", fontsize=8, linespacing=1.3)
 
 
-def _draw_donut_row(fig, gs, model, section: str, indicator_id: str, language: str) -> None:
+def _draw_donut_row(
+    fig,
+    gs,
+    model,
+    mapping: pd.DataFrame,
+    section: str,
+    indicator_id: str,
+    language: str,
+) -> None:
     inner = gs.subgridspec(1, 3, width_ratios=[0.38, 0.22, 0.18], wspace=0.06)
     label_ax = fig.add_subplot(inner[0, 0])
     donut_ax = fig.add_subplot(inner[0, 1])
     target_ax = fig.add_subplot(inner[0, 2])
 
+    if not indicator_has_values(model, section, indicator_id):
+        meta = _indicator_meta_from_mapping(mapping, section, indicator_id)
+        label_ax.axis("off")
+        label_ax.text(
+            0.02,
+            0.5,
+            _wrap_indicator_label(indicator_label(meta, language), width=32),
+            ha="left",
+            va="center",
+            fontsize=8,
+            linespacing=1.2,
+        )
+        donut_ax.axis("off")
+        donut_ax.text(
+            0.5,
+            0.5,
+            not_available(language),
+            ha="center",
+            va="center",
+            fontsize=9,
+            color="#888888",
+        )
+        target_ax.axis("off")
+        return
+
     meta = _indicator_meta(model, section, indicator_id)
-    value, _ = _latest_value(model, section, indicator_id)
-    target = float(meta["Target value"])
+    value, _ = _latest_chartable_value(model, section, indicator_id)
+    if value is None:
+        donut_ax.axis("off")
+        donut_ax.text(
+            0.5,
+            0.5,
+            not_available(language),
+            ha="center",
+            va="center",
+            fontsize=9,
+            color="#888888",
+        )
+        target_ax.axis("off")
+        return
+    target_raw = meta.get("Target value")
+    target = float(target_raw) if pd.notna(target_raw) else 0.0
 
     label_ax.axis("off")
     label_ax.text(
@@ -453,15 +553,59 @@ def _draw_donut_row(fig, gs, model, section: str, indicator_id: str, language: s
         _draw_target_box(target_ax, target_text)
 
 
-def _draw_donut_pair(fig, gs, model, section: str, indicator_ids: list[str], language: str) -> None:
+def _draw_donut_pair(
+    fig,
+    gs,
+    model,
+    mapping: pd.DataFrame,
+    section: str,
+    indicator_ids: list[str],
+    language: str,
+) -> None:
     inner = gs.subgridspec(1, 2, wspace=0.08)
     for col, indicator_id in enumerate(indicator_ids):
         cell = inner[0, col].subgridspec(1, 2, width_ratios=[0.58, 0.42], wspace=0.04)
         label_ax = fig.add_subplot(cell[0, 0])
         donut_ax = fig.add_subplot(cell[0, 1])
+        if not indicator_has_values(model, section, indicator_id):
+            meta = _indicator_meta_from_mapping(mapping, section, indicator_id)
+            label_ax.axis("off")
+            label_ax.text(
+                0,
+                0.5,
+                _wrap_indicator_label(indicator_label(meta, language), width=28),
+                ha="left",
+                va="center",
+                fontsize=7.5,
+                linespacing=1.15,
+            )
+            donut_ax.axis("off")
+            donut_ax.text(
+                0.5,
+                0.5,
+                not_available(language),
+                ha="center",
+                va="center",
+                fontsize=8,
+                color="#888888",
+            )
+            continue
         meta = _indicator_meta(model, section, indicator_id)
-        value, _ = _latest_value(model, section, indicator_id)
-        target = float(meta["Target value"])
+        value, _ = _latest_chartable_value(model, section, indicator_id)
+        if value is None:
+            donut_ax.axis("off")
+            donut_ax.text(
+                0.5,
+                0.5,
+                not_available(language),
+                ha="center",
+                va="center",
+                fontsize=8,
+                color="#888888",
+            )
+            continue
+        target_raw = meta.get("Target value")
+        target = float(target_raw) if pd.notna(target_raw) else 0.0
         label_ax.axis("off")
         label_ax.text(0, 0.5, _wrap_indicator_label(indicator_label(meta, language), width=28),
                       ha="left", va="center", fontsize=7.5, linespacing=1.15)
@@ -474,20 +618,26 @@ def render_sp_dashboard(
     *,
     language: str = "English",
     output_path=None,
+    mapping: pd.DataFrame | None = None,
 ) -> plt.Figure:
-    layout = SP_LAYOUTS[section]
-    cumulative_ids = visible_indicator_ids(section, layout["cumulative_ids"])
-    donut_rows = visible_donut_rows(section, layout.get("donut_rows", []))
-    subset = _section_subset(model, section)
-    if subset.empty:
-        raise ValueError(f"No data for {section}")
+    mapping = mapping if mapping is not None else mapping_from_model(model)
+    layout = build_section_layout(section, mapping)
+    cumulative_ids = indicators_with_data(
+        model,
+        section,
+        visible_indicator_ids(section, layout["cumulative_ids"]),
+    )
+    donut_pairs = [
+        indicators_with_data(model, section, pair_ids)
+        for pair_ids in visible_donut_pairs(section, layout.get("donut_pairs", []))
+    ]
+    if not section_has_indicators(mapping, section):
+        raise ValueError(f"No indicators configured for {section}")
 
-    meta0 = subset.groupby("ID").first().iloc[0]
+    subset = _section_subset(model, section)
+    meta0 = _section_meta_row(model, mapping, section)
     row_weights: list[float] = [0.30, 0.55, layout.get("cumulative_weight", len(cumulative_ids) * 1.1)]
-    if layout.get("donut_pair"):
-        row_weights.append(layout.get("donut_weight", 2.0))
-    else:
-        row_weights.extend([layout.get("donut_weight", 0.75)] * len(donut_rows))
+    row_weights.extend([layout.get("donut_weight", 0.75)] * len(donut_pairs))
     row_weights.append(0.14)
 
     height = DASHBOARD_SIZES.get(section, (827, 700))[1] / 100
@@ -505,23 +655,29 @@ def render_sp_dashboard(
 
     cum_gs = outer[row].subgridspec(len(cumulative_ids), 1, hspace=0.45)
     for i, indicator_id in enumerate(cumulative_ids):
-        indicator = _indicator_meta(model, section, indicator_id)
-        data = subset[subset["ID"] == indicator_id].sort_values("Year")
         panel = cum_gs[i].subgridspec(1, 2, width_ratios=[0.36, 0.64], wspace=0.06)
         content = panel[0, 1].subgridspec(2, 1, height_ratios=[0.68, 0.32], hspace=0.12)
+        if not indicator_has_values(model, section, indicator_id):
+            indicator = _indicator_meta_from_mapping(mapping, section, indicator_id)
+            draw_unavailable_cumulative_indicator(
+                fig.add_subplot(panel[0, 0]),
+                fig.add_subplot(content[0]),
+                fig.add_subplot(content[1]),
+                indicator,
+                language=language,
+            )
+            continue
+        indicator = _indicator_meta(model, section, indicator_id)
+        data = subset[subset["ID"] == indicator_id].sort_values("Year")
         draw_cumulative_indicator(
             fig.add_subplot(panel[0, 0]), fig.add_subplot(content[0]), fig.add_subplot(content[1]),
             indicator, data, language=language,
         )
     row += 1
 
-    if layout.get("donut_pair"):
-        _draw_donut_pair(fig, outer[row], model, section, layout["donut_pair"], language)
+    for pair in donut_pairs:
+        _draw_donut_pair(fig, outer[row], model, mapping, section, pair, language)
         row += 1
-    else:
-        for donut in donut_rows:
-            _draw_donut_row(fig, outer[row], model, section, donut["id"], language)
-            row += 1
 
     _draw_footnote(fig.add_subplot(outer[row]), section_footnote(section, language))
 
@@ -538,32 +694,58 @@ def render_ef_dashboard(
     *,
     language: str = "English",
     output_path=None,
+    mapping: pd.DataFrame | None = None,
 ) -> plt.Figure:
-    subset = _section_subset(model, section)
-    if subset.empty:
-        raise ValueError(f"No data for {section}")
+    mapping = mapping if mapping is not None else mapping_from_model(model)
+    if not section_has_indicators(mapping, section):
+        raise ValueError(f"No indicators configured for {section}")
 
-    meta0 = subset.groupby("ID").first().iloc[0]
-    id_order = EF_ID_ORDERS.get(section)
+    subset = _section_subset(model, section)
+    meta0 = _section_meta_row(model, mapping, section)
+    layout = build_section_layout(section, mapping)
+    cumulative_ids = indicators_with_data(
+        model,
+        section,
+        visible_indicator_ids(section, layout["cumulative_ids"]),
+    )
+
+    row_weights: list[float] = [0.30, 0.55, len(cumulative_ids) * 1.1, 0.14]
     height = DASHBOARD_SIZES.get(section, (827, 600))[1] / 100
     fig = plt.figure(figsize=(8.27, height))
-    outer = gridspec.GridSpec(4, 1, figure=fig, height_ratios=[0.06, 0.06, 0.78, 0.10],
-                              top=0.97, bottom=0.03, left=0.04, right=0.96, hspace=0.08)
+    outer = gridspec.GridSpec(
+        len(row_weights), 1, figure=fig, height_ratios=row_weights,
+        top=0.96, bottom=0.03, left=0.04, right=0.96, hspace=0.22,
+    )
 
-    _draw_title(fig.add_subplot(outer[0]), section_title(meta0, language))
+    row = 0
+    _draw_title(fig.add_subplot(outer[row]), section_title(meta0, language))
+    row += 1
+    draw_sp_column_headers(fig.add_subplot(outer[row]), language)
+    row += 1
 
-    from .calculations import headers as _headers
-    hdr = _headers(language)
-    hdr_ax = fig.add_subplot(outer[1])
-    hdr_ax.axis("off")
-    hdr_ax.text(0.0, 0.5, hdr["indicator"], fontsize=8, fontweight="bold", va="center")
+    cum_gs = outer[row].subgridspec(len(cumulative_ids), 1, hspace=0.45)
+    for i, indicator_id in enumerate(cumulative_ids):
+        panel = cum_gs[i].subgridspec(1, 2, width_ratios=[0.36, 0.64], wspace=0.06)
+        content = panel[0, 1].subgridspec(2, 1, height_ratios=[0.68, 0.32], hspace=0.12)
+        if not indicator_has_values(model, section, indicator_id):
+            indicator = _indicator_meta_from_mapping(mapping, section, indicator_id)
+            draw_unavailable_cumulative_indicator(
+                fig.add_subplot(panel[0, 0]),
+                fig.add_subplot(content[0]),
+                fig.add_subplot(content[1]),
+                indicator,
+                language=language,
+            )
+            continue
+        indicator = _indicator_meta(model, section, indicator_id)
+        data = subset[subset["ID"] == indicator_id].sort_values("Year")
+        draw_cumulative_indicator(
+            fig.add_subplot(panel[0, 0]), fig.add_subplot(content[0]), fig.add_subplot(content[1]),
+            indicator, data, language=language, ns_breakdown=True, reporting_field="TotalReported",
+        )
+    row += 1
 
-    table_ax = fig.add_subplot(outer[2])
-    show_target = draw_ef_data_table(table_ax, subset, language=language, id_order=id_order)
-    if show_target:
-        hdr_ax.text(0.42, 0.5, hdr["target"], fontsize=8, fontweight="bold", va="center")
-
-    _draw_footnote(fig.add_subplot(outer[3]), section_footnote(section, language))
+    _draw_footnote(fig.add_subplot(outer[row]), section_footnote(section, language))
 
     if output_path:
         from pathlib import Path as _Path
@@ -580,15 +762,25 @@ def render_dashboard(
     output_path=None,
     renderer: str | None = None,
     session=None,
+    mapping: pd.DataFrame | None = None,
 ) -> plt.Figure | Path:
     """Render a dashboard section. Default renderer is HTML/SVG (publication quality)."""
     import os
-    chosen = renderer or os.environ.get("GB_FIGURES_RENDERER", "html")
+    chosen = renderer or os.environ.get("PB_FIGURES_RENDERER", "html")
     if chosen == "html":
         from .render_html import render_dashboard_html
         return render_dashboard_html(
-            model, section, language=language, output_path=output_path, session=session,
+            model,
+            section,
+            language=language,
+            output_path=output_path,
+            session=session,
+            mapping=mapping,
         )
     if section.startswith("EF"):
-        return render_ef_dashboard(model, section, language=language, output_path=output_path)
-    return render_sp_dashboard(model, section, language=language, output_path=output_path)
+        return render_ef_dashboard(
+            model, section, language=language, output_path=output_path, mapping=mapping,
+        )
+    return render_sp_dashboard(
+        model, section, language=language, output_path=output_path, mapping=mapping,
+    )

@@ -15,6 +15,7 @@ from docx.shared import Inches, Pt, RGBColor
 
 from .font_faces import inject_tajawal_fonts
 from .languages import ARABIC_VISUAL_FONT, is_rtl
+from .calculations import not_available
 from .payload import build_payload
 from .line_chart import inject_line_chart_js
 from .styles import style_payload
@@ -214,30 +215,6 @@ def _set_table_inner_borders(table) -> None:
     tbl_pr.append(borders)
 
 
-def _set_ef_value_cell(
-    cell,
-    year_cell: dict[str, Any],
-    *,
-    language: str = "English",
-    size: int = 9,
-) -> None:
-    cell.text = ""
-    p = cell.paragraphs[0]
-    _apply_paragraph_language(p, language, alignment=WD_ALIGN_PARAGRAPH.CENTER)
-    if not year_cell.get("value"):
-        run = p.add_run(year_cell["text"])
-        _style_run(run, language, size=size)
-        return
-
-    main = year_cell.get("main", year_cell["text"])
-    suffix = year_cell.get("suffix", "")
-    run_main = p.add_run(main)
-    _style_run(run_main, language, bold=True, size=size, color=IFRC_RED)
-    if suffix:
-        run_suffix = p.add_run(suffix)
-        _style_run(run_suffix, language, bold=False, size=size)
-
-
 def _set_cell_text(
     cell,
     text: str,
@@ -301,6 +278,24 @@ def _add_cumulative_block(
     language: str = "English",
     session=None,
 ) -> None:
+    if item.get("unavailable"):
+        table = doc.add_table(rows=2, cols=2)
+        _set_table_inner_borders(table)
+        _set_column_widths(table, [2.05, 4.45])
+        _set_cell_text(table.cell(0, 0), item["label"], language=language, size=10)
+        merged = table.cell(0, 1)
+        merged.merge(table.cell(1, 1))
+        _set_cell_text(
+            merged,
+            item.get("unavailable_label") or not_available(language),
+            language=language,
+            size=10,
+            align_center=True,
+        )
+        table.cell(1, 0).text = ""
+        doc.add_paragraph("")
+        return
+
     chart_path = assets_dir / f"{block_id}_line.png"
     render_line_chart_asset(item, target_label, chart_path, language=language, session=session)
 
@@ -358,6 +353,21 @@ def _add_donut_block(
     language: str = "English",
     session=None,
 ) -> None:
+    if item.get("unavailable"):
+        table = doc.add_table(rows=1, cols=2)
+        _set_table_inner_borders(table)
+        _set_column_widths(table, [2.05, 4.45])
+        _set_cell_text(table.cell(0, 0), item["label"], language=language, size=10)
+        _set_cell_text(
+            table.cell(0, 1),
+            item.get("unavailable_label") or not_available(language),
+            language=language,
+            size=10,
+            align_center=True,
+        )
+        doc.add_paragraph("")
+        return
+
     donut_path = assets_dir / f"{block_id}_donut.png"
     render_donut_asset(item, donut_path, language=language, session=session)
 
@@ -386,10 +396,17 @@ def _add_donut_pair_block(
     session=None,
 ) -> None:
     left, right = items[0], items[1]
+    if left.get("unavailable") and right.get("unavailable"):
+        for idx, item in enumerate((left, right)):
+            _add_donut_block(doc, item, assets_dir, f"{block_id}_{idx}", language=language, session=session)
+        return
+
     left_path = assets_dir / f"{block_id}_left_donut.png"
     right_path = assets_dir / f"{block_id}_right_donut.png"
-    render_donut_asset(left, left_path, language=language, session=session)
-    render_donut_asset(right, right_path, language=language, session=session)
+    if not left.get("unavailable"):
+        render_donut_asset(left, left_path, language=language, session=session)
+    if not right.get("unavailable"):
+        render_donut_asset(right, right_path, language=language, session=session)
 
     table = doc.add_table(rows=1, cols=4)
     _set_table_inner_borders(table)
@@ -398,9 +415,27 @@ def _add_donut_pair_block(
     _set_row_cant_split(table.rows[0])
 
     _set_cell_text(table.cell(0, 0), left["label"], language=language, size=10)
-    _add_donut_image_cell(table.cell(0, 1), left_path, language=language)
+    if left.get("unavailable"):
+        _set_cell_text(
+            table.cell(0, 1),
+            left.get("unavailable_label") or not_available(language),
+            language=language,
+            size=10,
+            align_center=True,
+        )
+    else:
+        _add_donut_image_cell(table.cell(0, 1), left_path, language=language)
     _set_cell_text(table.cell(0, 2), right["label"], language=language, size=10)
-    _add_donut_image_cell(table.cell(0, 3), right_path, language=language)
+    if right.get("unavailable"):
+        _set_cell_text(
+            table.cell(0, 3),
+            right.get("unavailable_label") or not_available(language),
+            language=language,
+            size=10,
+            align_center=True,
+        )
+    else:
+        _add_donut_image_cell(table.cell(0, 3), right_path, language=language)
 
     doc.add_paragraph("")
 
@@ -419,65 +454,20 @@ def _add_sp_section(doc: Document, payload: dict[str, Any], assets_dir: Path, *,
             language=language, session=session,
         )
 
-    if payload.get("donut_pair"):
-        pair = payload["donut_pair"]
+    for row_idx, pair in enumerate(payload.get("donut_pairs", [])):
         if len(pair) >= 2:
             _add_donut_pair_block(
-                doc, pair[:2], assets_dir, f'{payload["section"]}_pair',
+                doc, pair[:2], assets_dir, f'{payload["section"]}_pair_{row_idx}',
                 language=language, session=session,
             )
-        else:
-            for idx, item in enumerate(pair):
-                _add_donut_block(
-                    doc, item, assets_dir, f'{payload["section"]}_pair_{idx}',
-                    language=language, session=session,
-                )
-    for idx, item in enumerate(payload.get("donuts", [])):
-        _add_donut_block(
-            doc, item, assets_dir, f'{payload["section"]}_donut_{idx}',
-            language=language, session=session,
-        )
-
-    foot = doc.add_paragraph(payload["footnote"])
-    _style_body_paragraph(foot, language, size=8)
-
-
-def _add_ef_section(doc: Document, payload: dict[str, Any]) -> None:
-    language = payload.get("language", "English")
-    title = doc.add_paragraph(payload["title"])
-    _style_heading_paragraph(title, language, size=12, color=IFRC_RED)
-
-    show_target = payload.get("show_target_column", True)
-    n_years = len(payload["headers"]["years"])
-    n_cols = n_years + (2 if show_target else 1)
-    table = doc.add_table(rows=len(payload["rows"]) + 1, cols=n_cols)
-    _set_table_inner_borders(table)
-    widths = ([2.2, 1.0] if show_target else [2.2]) + [0.65] * n_years
-    _set_column_widths(table, widths)
-
-    _set_cell_text(table.cell(0, 0), payload["headers"]["indicator"], language=language, bold=True)
-    year_col_start = 1
-    if show_target:
-        _set_cell_text(table.cell(0, 1), payload["headers"]["target"], language=language, bold=True)
-        year_col_start = 2
-    for col, year in enumerate(payload["headers"]["years"], start=year_col_start):
-        _set_cell_text(table.cell(0, col), year, language=language, bold=True, align_center=True)
-
-    for row_idx, row in enumerate(payload["rows"], start=1):
-        _set_cell_text(table.cell(row_idx, 0), row["label"], language=language, size=9)
-        if show_target:
-            _set_cell_text(table.cell(row_idx, 1), row["target"], language=language, size=9)
-        for col, cell in enumerate(row["years"], start=year_col_start):
-            _set_ef_value_cell(
-                table.cell(row_idx, col),
-                cell,
-                language=language,
-                size=9,
+        elif pair:
+            _add_donut_block(
+                doc, pair[0], assets_dir, f'{payload["section"]}_pair_{row_idx}_0',
+                language=language, session=session,
             )
 
     foot = doc.add_paragraph(payload["footnote"])
     _style_body_paragraph(foot, language, size=8)
-    doc.add_paragraph("")
 
 
 def render_report_docx(
@@ -498,7 +488,7 @@ def render_report_docx(
     _style_heading_paragraph(heading, language, size=16, color=IFRC_RED)
     doc.add_paragraph("")
 
-    with tempfile.TemporaryDirectory(prefix="gb_assets_") as tmp:
+    with tempfile.TemporaryDirectory(prefix="pb_assets_") as tmp:
         assets_dir = Path(tmp)
         from .render_html import PlaywrightScreenshotSession
 
@@ -512,10 +502,7 @@ def render_report_docx(
                     if section not in section_order:
                         continue
                     payload = build_payload(model, section, language)
-                    if payload["type"] == "ef":
-                        _add_ef_section(doc, payload)
-                    else:
-                        _add_sp_section(doc, payload, assets_dir, session=session)
+                    _add_sp_section(doc, payload, assets_dir, session=session)
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)

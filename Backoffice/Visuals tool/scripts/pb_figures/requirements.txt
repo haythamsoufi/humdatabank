@@ -1,4 +1,4 @@
-# Production uses Playwright HTML/SVG (GB_FIGURES_RENDERER=html).
+# Production uses Playwright HTML/SVG (PB_FIGURES_RENDERER=html).
 # Matplotlib is a legacy fallback for debugging only.
 pandas>=2.0
 openpyxl>=3.1

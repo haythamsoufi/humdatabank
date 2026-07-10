@@ -34,6 +34,7 @@ Files are organised by category as blob prefixes (or subdirectories on local dis
 | `resources` | `resources/` | Resource and publication files (multilingual) |
 | `submissions` | `submissions/` | Form submission document uploads |
 | `system` | `system/sectors/` | Sector logos |
+| `pb_progress` | `pb_progress/` | P&B Progress Excel source, build status, and generated report outputs |
 
 When `STATIC_CDN_URL` is set and uploads use Azure Blob, sector logos are also mirrored into the public static blob container at `system/sectors/` so browsers load them from the CDN instead of the Flask app. After enabling CDN on an existing deployment, run `flask sync-sector-logos-cdn` once to backfill logos uploaded before mirroring was enabled.
 | `ai_documents` | `ai_documents/` | AI Knowledge Base uploaded files |

@@ -1,12 +1,12 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-rem GB Report - interactive build menu
+rem P&B Report - interactive build menu
 set "ROOT=%~dp0"
 set "ROOT=%ROOT:~0,-1%"
 set "SCRIPTS=%ROOT%\scripts"
 set "REPORT_OUT=%ROOT%\report\output"
-set "HTML=%REPORT_OUT%\gb-report.html"
+set "HTML=%REPORT_OUT%\pb-report.html"
 set "EXCEL=%ROOT%\SG Report.xlsx"
 set "EXCEL_COPY=%ROOT%\SG Report._build.xlsx"
 set "PYTHON=python"
@@ -18,11 +18,11 @@ cd /d "%ROOT%"
 cls
 echo.
 echo  ========================================================
-echo   GB Report Builder - July 2026
+echo   P&B Report Builder - July 2026
 echo  ========================================================
 echo.
 echo   Data:  SG Report.xlsx
-echo   HTML:  report\output\gb-report.html
+echo   HTML:  report\output\pb-report.html
 echo   Style: %FIGURE_STYLE%
 echo.
 echo   1. Build full report      (figures + HTML)
@@ -58,18 +58,18 @@ if errorlevel 1 (
 goto :eof
 
 :prepare_excel
-set "GB_REPORT_EXCEL="
+set "PB_REPORT_EXCEL="
 if exist "%EXCEL%" (
     rem Try to create a fresh copy for the build (avoids Excel lock errors)
     powershell -NoProfile -Command "Copy-Item -LiteralPath '%EXCEL%' -Destination '%EXCEL_COPY%' -Force" >nul 2>&1
     if not errorlevel 1 (
-        set "GB_REPORT_EXCEL=%EXCEL_COPY%"
+        set "PB_REPORT_EXCEL=%EXCEL_COPY%"
     )
 )
 goto :eof
 
 :cleanup_excel
-set "GB_REPORT_EXCEL="
+set "PB_REPORT_EXCEL="
 if exist "%EXCEL_COPY%" del /f /q "%EXCEL_COPY%" >nul 2>&1
 goto :eof
 
@@ -100,7 +100,7 @@ echo Building full report (style: %FIGURE_STYLE%)...
 call :prepare_excel
 set "PYTHONIOENCODING=utf-8"
 set "PYTHONUNBUFFERED=1"
-set "GB_FIGURES_STYLE=%FIGURE_STYLE%"
+set "PB_FIGURES_STYLE=%FIGURE_STYLE%"
 cd /d "%SCRIPTS%"
 %PYTHON% build_report.py --format html --style %FIGURE_STYLE%
 set "ERR=!errorlevel!"
@@ -108,11 +108,12 @@ cd /d "%ROOT%"
 call :cleanup_excel
 echo.
 if !ERR! neq 0 (
-    echo Build failed. Close SG Report.xlsx in Excel and try again.
+    echo Build failed. Check the Python/Quarto error above for the cause.
+    echo If the workbook is locked, close SG Report.xlsx in Excel and try again.
 ) else (
-    echo Done. HTML report: report\output\gb-report.html
-    echo Word documents: report\output\gb-report-*.docx
-    echo PDF documents:  report\output\gb-report-*.pdf
+    echo Done. HTML report: report\output\pb-report.html
+    echo Word documents: report\output\pb-report-*.docx
+    echo PDF documents:  report\output\pb-report-*.pdf
     echo Dashboard PNGs: Figures\
 )
 pause
@@ -125,14 +126,14 @@ echo Regenerating figures (style: %FIGURE_STYLE%)...
 call :prepare_excel
 set "PYTHONIOENCODING=utf-8"
 set "PYTHONUNBUFFERED=1"
-set "GB_FIGURES_STYLE=%FIGURE_STYLE%"
+set "PB_FIGURES_STYLE=%FIGURE_STYLE%"
 cd /d "%SCRIPTS%"
 %PYTHON% build_report.py --figures-only --style %FIGURE_STYLE%
 set "ERR=!errorlevel!"
 cd /d "%ROOT%"
 call :cleanup_excel
 echo.
-if !ERR! neq 0 (echo Figure generation failed.) else (echo Figures written to Figures\ and report\figures\)
+if !ERR! neq 0 (echo Figure generation failed. Check the error above.) else (echo Figures written to Figures\ and report\figures\)
 pause
 goto menu
 
@@ -143,14 +144,14 @@ echo Building Word documents (style: %FIGURE_STYLE%)...
 call :prepare_excel
 set "PYTHONIOENCODING=utf-8"
 set "PYTHONUNBUFFERED=1"
-set "GB_FIGURES_STYLE=%FIGURE_STYLE%"
+set "PB_FIGURES_STYLE=%FIGURE_STYLE%"
 cd /d "%SCRIPTS%"
 %PYTHON% generate_report_docx.py --all-languages
 set "ERR=!errorlevel!"
 cd /d "%ROOT%"
 call :cleanup_excel
 echo.
-if !ERR! neq 0 (echo Word build failed.) else (echo DOCX files written to report\output\)
+if !ERR! neq 0 (echo Word build failed. Check the error above.) else (echo DOCX files written to report\output\)
 pause
 goto menu
 

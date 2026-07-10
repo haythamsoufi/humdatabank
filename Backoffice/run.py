@@ -144,6 +144,19 @@ if __name__ == '__main__':
 
     threaded = _parse_bool_env(os.environ.get("FLASK_THREADED"), default=True)
 
+    def _use_dev_reloader(enabled_debug: bool) -> bool:
+        """Whether to enable Werkzeug's stat reloader in the Flask dev server."""
+        if not enabled_debug:
+            return False
+        env = os.environ.get("FLASK_USE_RELOADER")
+        if env is not None:
+            return _parse_bool_env(env, default=False)
+        # Windows: off by default — long-running subprocess builds (P&B report) can
+        # trigger spurious reloads even with exclude_patterns.
+        return os.name != "nt"
+
+    use_reloader = _use_dev_reloader(debug)
+
     if os.environ.get("FLASK_CONFIG", "").lower() == "production":
         app.logger.warning("FLASK_CONFIG=production but running via `python run.py`.")
         app.logger.warning("For production/Azure, prefer Gunicorn (see `config/gunicorn.conf.py` and `entrypoint.sh`).")
@@ -198,7 +211,15 @@ if __name__ == '__main__':
     #
     # We pass exclude_patterns to the reloader to skip these noisy paths.
     use_stat_reloader = os.name == "nt"
-    app.logger.debug(f"Starting Flask dev server on {host}:{port} (debug={debug}, threaded={threaded})")
+    if debug and not use_reloader:
+        app.logger.info(
+            "Flask auto-reloader disabled (set FLASK_USE_RELOADER=true to enable). "
+            "Recommended on Windows while running P&B report builds."
+        )
+    app.logger.debug(
+        f"Starting Flask dev server on {host}:{port} "
+        f"(debug={debug}, threaded={threaded}, use_reloader={use_reloader})"
+    )
 
     # Paths to exclude from the stat/watchdog reloader so they don't trigger
     # spurious restarts (relative glob patterns understood by Werkzeug reloader).
@@ -209,6 +230,10 @@ if __name__ == '__main__':
         "**/.pytest_cache/**",
         "**/.coverage",
         "**/*.log",
+        # P&B report build writes heavily here; exclude to avoid dev-server reload mid-build.
+        "**/Visuals tool/report/**",
+        "**/Visuals tool/Figures/**",
+        "**/Visuals tool/**",
     ]
 
     if use_stat_reloader:
@@ -216,7 +241,7 @@ if __name__ == '__main__':
             debug=debug,
             host=host,
             port=port,
-            use_reloader=debug,
+            use_reloader=use_reloader,
             reloader_type="stat",
             threaded=threaded,
             exclude_patterns=_exclude_patterns,
@@ -226,7 +251,7 @@ if __name__ == '__main__':
             debug=debug,
             host=host,
             port=port,
-            use_reloader=debug,
+            use_reloader=use_reloader,
             threaded=threaded,
             exclude_patterns=_exclude_patterns,
         )

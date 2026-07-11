@@ -150,6 +150,32 @@ class SectionTailTests(unittest.TestCase):
         self.assertIn(">40<", html)
         self.assertIn(">45<", html)
 
+    def test_cumulative_ns_table_hides_implementing_row(self) -> None:
+        labels = table_row_labels("English")
+        payload = {
+            "section": "EF2",
+            "title": "EF2",
+            "headers": {"target": "Target"},
+            "table_labels": labels,
+            "cumulative": [{
+                "label": "Number of staff and volunteers trained on the Fundamental Principles",
+                "years": ["2024", "2025"],
+                "values": [100.0, 110.0],
+                "value_labels": ["100", "110"],
+                "reporting": ["120", "125"],
+                "implementing": ["100", "110"],
+                "ns_table_mode": "ns_unit",
+                "show_ns_breakdown": True,
+            }],
+            "donuts": [],
+            "footnote": "Footnote text",
+        }
+        html = _render_sp_html(payload, {})
+        self.assertIn(labels["reporting"], html)
+        self.assertNotIn(labels["implementing"], html)
+        self.assertIn(">120<", html)
+        self.assertIn(">125<", html)
+
 
 if __name__ == "__main__":
     unittest.main()

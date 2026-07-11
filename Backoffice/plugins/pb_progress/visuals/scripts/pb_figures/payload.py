@@ -13,6 +13,7 @@ from .calculations import (
     format_donut_value,
     format_value,
     headers,
+    indicator_format_unit,
     indicator_label,
     not_applicable,
     not_available,
@@ -141,8 +142,9 @@ def _build_ef_cumulative_payload(
         return payload
     indicator = _indicator_meta(model, section, indicator_id)
     rows = model[(model["section"] == section) & (model["ID"] == indicator_id)].sort_values("Year")
-    unit = indicator.get("Unit")
+    unit = indicator_format_unit(indicator)
     annual_target = annual_target_value(indicator)
+    table_mode = ns_table_mode(indicator.get("Type"), indicator.get("Unit"))
 
     years: list[str] = []
     values: list[float | None] = []
@@ -165,10 +167,14 @@ def _build_ef_cumulative_payload(
 
         total_reported = row.get("TotalReported")
         impl = row.get("Implementing")
-        reporting.append(
+        impl_text = str(int(impl)) if pd.notna(impl) else not_applicable(language)
+        total_reported_text = (
             str(int(total_reported)) if pd.notna(total_reported) else not_applicable(language)
         )
-        implementing.append(str(int(impl)) if pd.notna(impl) else not_applicable(language))
+        implementing.append(impl_text)
+        reporting.append(
+            impl_text if table_mode == NS_TABLE_IMPLEMENTING_COUNT else total_reported_text
+        )
 
     if not any(value is not None for value in values):
         payload = _build_unavailable_cumulative_payload(mapping, section, indicator_id, language)
@@ -184,7 +190,8 @@ def _build_ef_cumulative_payload(
         "value_labels": value_labels,
         "reporting": reporting,
         "implementing": implementing,
-        "show_ns_breakdown": True,
+        "ns_table_mode": table_mode,
+        "show_ns_breakdown": show_ns_breakdown(indicator.get("Type"), indicator.get("Unit")),
     }
 
 
@@ -199,7 +206,7 @@ def _build_cumulative_payload(
         return _build_unavailable_cumulative_payload(mapping, section, indicator_id, language)
     indicator = _indicator_meta(model, section, indicator_id)
     rows = model[(model["section"] == section) & (model["ID"] == indicator_id)].sort_values("Year")
-    unit = indicator.get("Unit")
+    unit = indicator_format_unit(indicator)
     annual_target = annual_target_value(indicator)
     table_mode = ns_table_mode(indicator.get("Type"), indicator.get("Unit"))
 
@@ -254,7 +261,7 @@ def _build_donut_payload(
         return _build_unavailable_donut_payload(mapping, section, indicator_id, language)
     target_raw = indicator.get("Target value")
     target = float(target_raw) if pd.notna(target_raw) else 0.0
-    unit = indicator.get("Unit")
+    unit = indicator_format_unit(indicator)
     if indicator_id == "Katya01":
         value_label = format_donut_value(value, unit, language) or not_available(language)
     else:

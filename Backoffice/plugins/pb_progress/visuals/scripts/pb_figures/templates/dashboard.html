@@ -604,7 +604,8 @@ function renderTableVlines(count, chartWidth) {
 function renderDataTable(item, chartWidth) {
   const n = item.years.length;
   const showReporting = item.show_ns_breakdown !== false;
-  const showImplementing = showReporting && item.ns_table_mode !== "implementing_count";
+  const hideImplementing = item.ns_table_mode === "implementing_count" || item.ns_table_mode === "ns_unit";
+  const showImplementing = showReporting && !hideImplementing;
   let html = `<div class="table-data">
     ${renderTableVlines(n, chartWidth)}
     ${renderPositionedRow(item.years, n, chartWidth, "year-cell")}`;
@@ -621,7 +622,8 @@ function renderDataTable(item, chartWidth) {
 
 function renderMetricLabels(labels, item) {
   const showReporting = item.show_ns_breakdown !== false;
-  const showImplementing = showReporting && item.ns_table_mode !== "implementing_count";
+  const hideImplementing = item.ns_table_mode === "implementing_count" || item.ns_table_mode === "ns_unit";
+  const showImplementing = showReporting && !hideImplementing;
   let html = `<div class="metric-labels">
     <span class="year-label">${esc(labels.year)}</span>`;
   if (showReporting) {

@@ -274,9 +274,29 @@ def _parse_target_number(text: str) -> float | None:
         return None
 
 
+def indicator_format_unit(row: pd.Series | dict[str, Any]) -> str | None:
+    """typeOfMeasurement from Indicator bank — used for value/target formatting."""
+    if isinstance(row, dict):
+        raw = row.get("typeOfMeasurement")
+        fallback = row.get("Unit")
+    else:
+        raw = row.get("typeOfMeasurement")
+        fallback = row.get("Unit")
+    if raw is not None and not (isinstance(raw, float) and math.isnan(raw)):
+        text = str(raw).strip()
+        if text:
+            if text.lower() in {"percentage", "percent", "%"}:
+                return "Percentage"
+            return text
+    if fallback is None or (isinstance(fallback, float) and math.isnan(fallback)):
+        return None
+    text = str(fallback).strip()
+    return text or None
+
+
 def annual_target_label(row: pd.Series, language: str = "English") -> str | None:
     """Display label on annual target line — Excel Annual Target / Annual Target AR."""
-    unit = row.get("Unit")
+    unit = indicator_format_unit(row)
     text = excel_text(row, language, "annual_target")
     if text:
         num = _parse_target_number(text)
@@ -382,7 +402,7 @@ def out_of_suffix(
     """Tableau [Out of] / [NSs Reported] calculations."""
     if value is None or (isinstance(value, float) and math.isnan(value)):
         return None
-    if unit == "Platforms" and count is not None and not math.isnan(count):
+    if unit in {"Platforms", "Metrics"} and count is not None and not math.isnan(count):
         return f"/{int(count)}{label(NS_REPORTED_SUFFIX, language)}"
     if total_reported:
         return f"/ {total_reported}"
@@ -391,7 +411,7 @@ def out_of_suffix(
 
 def _ef_target_display(row: pd.Series, language: str = "English") -> str:
     """Format EF target text before appending the year suffix."""
-    unit = row.get("Unit")
+    unit = indicator_format_unit(row)
     excel_target = excel_text(row, language, "target")
     if excel_target:
         return _format_ef_target_token(excel_target, unit, language)

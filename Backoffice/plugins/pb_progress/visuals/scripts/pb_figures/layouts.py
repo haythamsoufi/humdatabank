@@ -81,12 +81,17 @@ def mapping_indicator_rows(mapping: pd.DataFrame, section: str) -> pd.DataFrame:
 
 NS_TABLE_STANDARD = "standard"
 NS_TABLE_IMPLEMENTING_COUNT = "implementing_count"
+NS_TABLE_NS_UNIT = "ns_unit"
+
+
+def is_ns_unit(unit: str | None) -> bool:
+    """True when the indicator unit is National Societies (NS / NSs)."""
+    return str(unit or "").strip().lower() in {"ns", "nss"}
 
 
 def is_distinct_ns_count_indicator(indicator_type: str | None, unit: str | None) -> bool:
     type_text = str(indicator_type or "").strip()
-    unit_text = str(unit or "").strip()
-    return type_text == "Distinct" and unit_text == "NSs"
+    return type_text == "Distinct" and is_ns_unit(unit)
 
 
 def ns_table_mode(indicator_type: str | None, unit: str | None) -> str:
@@ -94,9 +99,12 @@ def ns_table_mode(indicator_type: str | None, unit: str | None) -> str:
 
     standard: year + reporting (Count) + implementing (Implementing)
     implementing_count: year + reporting row labelled as reporting but showing Implementing
+    ns_unit: year + reporting only (hide implementing row for other NS-unit indicators)
     """
     if is_distinct_ns_count_indicator(indicator_type, unit):
         return NS_TABLE_IMPLEMENTING_COUNT
+    if is_ns_unit(unit):
+        return NS_TABLE_NS_UNIT
     return NS_TABLE_STANDARD
 
 
@@ -104,7 +112,7 @@ def cumulative_table_rows(item: dict) -> tuple[bool, bool]:
     """Return (show_reporting_row, show_implementing_row) for a cumulative payload item."""
     if not item.get("show_ns_breakdown", True):
         return False, False
-    if item.get("ns_table_mode") == NS_TABLE_IMPLEMENTING_COUNT:
+    if item.get("ns_table_mode") in {NS_TABLE_IMPLEMENTING_COUNT, NS_TABLE_NS_UNIT}:
         return True, False
     return True, True
 
@@ -116,20 +124,18 @@ def show_ns_breakdown(indicator_type: str | None, unit: str | None) -> bool:
 
 def _is_line_indicator(indicator_type: str | None, unit: str | None, *, ef_section: bool) -> bool:
     type_text = str(indicator_type or "").strip()
-    unit_text = str(unit or "").strip()
     if not type_text or type_text.lower() == "nan":
         return False
     if ef_section:
         return True
     if type_text == "Cumulative":
         return True
-    return type_text == "Distinct" and unit_text == "NSs"
+    return type_text == "Distinct" and is_ns_unit(unit)
 
 
 def _is_donut_indicator(indicator_type: str | None, unit: str | None) -> bool:
     type_text = str(indicator_type or "").strip()
-    unit_text = str(unit or "").strip()
-    return type_text == "Distinct" and unit_text != "NSs"
+    return type_text == "Distinct" and not is_ns_unit(unit)
 
 
 def _chunk_indicator_pairs(ids: list[str]) -> list[list[str]]:
@@ -198,7 +204,7 @@ def visible_donut_pair(section: str, ids: list[str] | None) -> list[str] | None:
 def mapping_from_model(model: pd.DataFrame) -> pd.DataFrame:
     """One Mapping row per indicator, preserving Excel row order when available."""
     section_col = _section_column_name(model)
-    cols = ["ID", "Type", "Unit", "_mapping_order", section_col]
+    cols = ["ID", "Type", "Unit", "typeOfMeasurement", "_mapping_order", section_col]
     available = [col for col in cols if col in model.columns]
     meta = model.groupby("ID", as_index=False).first()[available]
     if section_col != SECTION_COLUMN:

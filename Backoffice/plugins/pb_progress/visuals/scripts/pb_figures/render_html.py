@@ -91,7 +91,7 @@ def _dashboard_height(payload: dict) -> int:
     for item in payload["cumulative"]:
         if item.get("unavailable"):
             base += 96
-        elif item.get("ns_table_mode") == "implementing_count":
+        elif item.get("ns_table_mode") in {"implementing_count", "ns_unit"}:
             base += 130
         elif item.get("show_ns_breakdown") is False:
             base += 119

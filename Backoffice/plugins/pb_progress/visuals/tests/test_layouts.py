@@ -13,8 +13,11 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from pb_figures.layouts import (  # noqa: E402
     NS_TABLE_IMPLEMENTING_COUNT,
+    NS_TABLE_NS_UNIT,
     TEMPORARILY_HIDDEN,
     build_section_layout,
+    cumulative_table_rows,
+    is_ns_unit,
     mapping_indicator_rows,
     ns_table_mode,
     show_ns_breakdown,
@@ -68,10 +71,17 @@ class DynamicLayoutTests(unittest.TestCase):
         self.assertEqual(layout["donut_pairs"], [])
 
     def test_distinct_ns_indicators_use_implementing_count_table(self) -> None:
-        self.assertEqual(ns_table_mode("Distinct", "NSs"), NS_TABLE_IMPLEMENTING_COUNT)
+        self.assertEqual(ns_table_mode("Distinct", "NS"), NS_TABLE_IMPLEMENTING_COUNT)
         self.assertTrue(show_ns_breakdown("Distinct", "NSs"))
         self.assertTrue(show_ns_breakdown("Cumulative", None))
         self.assertEqual(ns_table_mode("Distinct", "Platforms"), "standard")
+
+    def test_cumulative_ns_indicators_hide_implementing_row(self) -> None:
+        self.assertTrue(is_ns_unit("NSs"))
+        self.assertTrue(is_ns_unit("NS"))
+        self.assertEqual(ns_table_mode("Cumulative", "NS"), NS_TABLE_NS_UNIT)
+        item = {"show_ns_breakdown": True, "ns_table_mode": NS_TABLE_NS_UNIT}
+        self.assertEqual(cumulative_table_rows(item), (True, False))
 
     def test_distinct_ns_payload_uses_implementing_values_in_reporting_row(self) -> None:
         mapping = pd.DataFrame(

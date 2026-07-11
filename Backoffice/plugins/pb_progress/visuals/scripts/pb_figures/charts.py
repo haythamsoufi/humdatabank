@@ -18,6 +18,7 @@ from .calculations import (
     format_value,
     gap_value,
     headers,
+    indicator_format_unit,
     indicator_label,
     not_applicable,
     not_available,
@@ -238,7 +239,7 @@ def draw_ef_data_table(
                 year_cells.append(not_applicable(language))
                 continue
             val = row["Value"].sum()
-            formatted = format_value(val, indicator.get("Unit"), language)
+            formatted = format_value(val, indicator_format_unit(indicator), language)
             suffix = out_of_suffix(
                 val, indicator.get("Unit"),
                 row["Count"].iloc[0] if "Count" in row else None,
@@ -308,14 +309,14 @@ def draw_cumulative_indicator(
     reporting = data[reporting_field].tolist() if reporting_field in data.columns else data["Count"].tolist()
     implementing = data["Implementing"].tolist()
     annual_target = annual_target_value(indicator)
-    unit = indicator.get("Unit")
+    unit = indicator_format_unit(indicator)
     label = _wrap_indicator_label(indicator_label(indicator, language))
     hdr = headers(language)
     table_mode = ns_table_mode(indicator.get("Type"), indicator.get("Unit"))
     if ns_breakdown is False:
         show_reporting_row = False
         show_implementing_row = False
-    elif table_mode == NS_TABLE_IMPLEMENTING_COUNT:
+    elif table_mode in {NS_TABLE_IMPLEMENTING_COUNT, NS_TABLE_NS_UNIT}:
         show_reporting_row = True
         show_implementing_row = False
     else:
@@ -424,6 +425,7 @@ from .calculations import section_footnote, section_title  # noqa: E402
 from .config import DASHBOARD_SIZES  # noqa: E402
 from .layouts import (  # noqa: E402
     NS_TABLE_IMPLEMENTING_COUNT,
+    NS_TABLE_NS_UNIT,
     build_section_layout,
     indicator_has_values,
     indicators_with_data,
@@ -558,7 +560,7 @@ def _draw_donut_row(
         ha="left", va="center", fontsize=8, linespacing=1.2,
     )
     label_ax.axvline(0.98, color=_theme_color("divider", COLOR_DIVIDER), linewidth=0.8, ymin=0.1, ymax=0.9)
-    draw_donut_on_ax(donut_ax, value, target, language=language, indicator_id=indicator_id, unit=meta.get("Unit"))
+    draw_donut_on_ax(donut_ax, value, target, language=language, indicator_id=indicator_id, unit=indicator_format_unit(meta))
     target_text = target_label_sp(meta, language)
     if target_text:
         _draw_target_box(target_ax, target_text)
@@ -620,7 +622,7 @@ def _draw_donut_pair(
         label_ax.axis("off")
         label_ax.text(0, 0.5, _wrap_indicator_label(indicator_label(meta, language), width=28),
                       ha="left", va="center", fontsize=7.5, linespacing=1.15)
-        draw_donut_on_ax(donut_ax, value, target, language=language, indicator_id=indicator_id, unit=meta.get("Unit"))
+        draw_donut_on_ax(donut_ax, value, target, language=language, indicator_id=indicator_id, unit=indicator_format_unit(meta))
 
 
 def render_sp_dashboard(

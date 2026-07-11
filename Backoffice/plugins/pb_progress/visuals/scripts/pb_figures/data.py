@@ -88,16 +88,41 @@ def _validate_mapping(mapping: pd.DataFrame, excel_name: str) -> None:
         raise DataModelError(f"{excel_name} → Mapping sheet is missing an ID column.")
 
 
-_MEASUREMENT_COLUMN_ALIASES = (
+_TYPE_OF_MEASUREMENT_ALIASES = (
     "typeOfMeasurement",
     "Type of measurement",
     "TypeOfMeasurement",
 )
+_UNIT_OF_MEASUREMENT_ALIASES = (
+    "unitOfMeasurement",
+    "Unit of measurement",
+    "UnitOfMeasurement",
+)
 _BANK_SHEET_NAMES = ("Indicator bank", "Indicator Bank")
+_BANK_MAPPING_ID_COLUMNS = (
+    "indicatorId",
+    "indicator_id",
+)
 _BANK_ID_COLUMNS = ("ID", "id", "indicator_bank_id")
 
 
-def _normalize_unit(value: object) -> str | None:
+def chart_type_from_measurement(value: object) -> str | None:
+    """Map Indicator bank typeOfMeasurement to report chart Type."""
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    key = text.lower().replace(" ", "")
+    if key == "yesno":
+        return "Distinct"
+    if key == "number":
+        return "Cumulative"
+    return "Cumulative"
+
+
+def normalize_type_of_measurement(value: object) -> str | None:
+    """Normalize bank typeOfMeasurement for value formatting."""
     if value is None or (isinstance(value, float) and math.isnan(value)):
         return None
     text = str(value).strip()
@@ -108,49 +133,82 @@ def _normalize_unit(value: object) -> str | None:
     return text
 
 
-def _measurement_lookup(df: pd.DataFrame) -> pd.Series | None:
-    measure_col = next((col for col in _MEASUREMENT_COLUMN_ALIASES if col in df.columns), None)
-    id_col = next((col for col in _BANK_ID_COLUMNS if col in df.columns), None)
-    if not measure_col or not id_col:
+def normalize_unit_of_measurement(value: object) -> str | None:
+    """Normalize bank unitOfMeasurement for layout rules."""
+    if value is None or (isinstance(value, float) and math.isnan(value)):
         return None
+    text = str(value).strip()
+    return text or None
+
+
+def _bank_id_column(df: pd.DataFrame, *, prefer_mapping_ids: bool) -> str | None:
+    if prefer_mapping_ids:
+        id_columns = (*_BANK_MAPPING_ID_COLUMNS, *_BANK_ID_COLUMNS)
+    else:
+        id_columns = _BANK_ID_COLUMNS
+    return next((col for col in id_columns if col in df.columns), None)
+
+
+def _bank_metadata_lookup(
+    df: pd.DataFrame,
+    *,
+    prefer_mapping_ids: bool = False,
+) -> pd.DataFrame | None:
+    type_col = next((col for col in _TYPE_OF_MEASUREMENT_ALIASES if col in df.columns), None)
+    unit_col = next((col for col in _UNIT_OF_MEASUREMENT_ALIASES if col in df.columns), None)
+    id_col = _bank_id_column(df, prefer_mapping_ids=prefer_mapping_ids)
+    if not id_col or (not type_col and not unit_col):
+        return None
+
     bank = df.copy()
     bank[id_col] = bank[id_col].astype(str).str.strip()
-    bank = bank[bank[id_col].ne("") & bank[measure_col].notna()]
+    bank = bank[bank[id_col].ne("")]
     if bank.empty:
         return None
-    return (
-        bank.drop_duplicates(subset=[id_col], keep="first")
-        .set_index(id_col)[measure_col]
-        .map(_normalize_unit)
-    )
+
+    bank = bank.drop_duplicates(subset=[id_col], keep="first").set_index(id_col)
+    meta = pd.DataFrame(index=bank.index)
+    if type_col:
+        meta["typeOfMeasurement"] = bank[type_col].map(normalize_type_of_measurement)
+        meta["Type"] = bank[type_col].map(chart_type_from_measurement)
+    if unit_col:
+        meta["Unit"] = bank[unit_col].map(normalize_unit_of_measurement)
+    return meta
 
 
-def _apply_unit_lookup(mapping: pd.DataFrame, lookup: pd.Series) -> pd.DataFrame:
-    if lookup is None or lookup.empty:
+def _apply_bank_metadata(mapping: pd.DataFrame, bank_meta: pd.DataFrame | None) -> pd.DataFrame:
+    if bank_meta is None or bank_meta.empty:
         return mapping
-    if "Unit" not in mapping.columns:
-        mapping["Unit"] = mapping["ID"].map(lookup)
-        return mapping
-    empty = mapping["Unit"].isna() | mapping["Unit"].astype(str).str.strip().eq("")
-    mapping.loc[empty, "Unit"] = mapping.loc[empty, "ID"].map(lookup)
+    for column in ("Type", "typeOfMeasurement", "Unit"):
+        if column not in bank_meta.columns:
+            continue
+        mapped = mapping["ID"].map(bank_meta[column])
+        has_bank_value = mapped.notna() & mapped.astype(str).str.strip().ne("")
+        mapping.loc[has_bank_value, column] = mapped[has_bank_value]
     return mapping
 
 
-def _enrich_mapping_units(mapping: pd.DataFrame, excel_path: Path) -> pd.DataFrame:
-    """Populate Mapping.Unit from typeOfMeasurement columns and Indicator bank sheet."""
+def _enrich_mapping_from_bank(mapping: pd.DataFrame, excel_path: Path) -> pd.DataFrame:
+    """Populate Type/Unit from Indicator bank (bank is authoritative)."""
     mapping = mapping.copy()
-    mapping = _apply_unit_lookup(mapping, _measurement_lookup(mapping))
+    for column in ("Type", "typeOfMeasurement", "Unit"):
+        if column not in mapping.columns:
+            mapping[column] = None
 
     for sheet_name in _BANK_SHEET_NAMES:
         try:
             bank = pd.read_excel(excel_path, sheet_name=sheet_name)
         except (ValueError, FileNotFoundError):
             continue
-        mapping = _apply_unit_lookup(mapping, _measurement_lookup(bank))
-
-    if "Unit" in mapping.columns:
-        mapping["Unit"] = mapping["Unit"].map(_normalize_unit)
+        mapping = _apply_bank_metadata(
+            mapping,
+            _bank_metadata_lookup(bank, prefer_mapping_ids=True),
+        )
     return mapping
+
+
+# Backwards-compatible alias used in tests.
+_enrich_mapping_units = _enrich_mapping_from_bank
 
 
 def _validate_join(model: pd.DataFrame, excel_name: str) -> None:
@@ -168,11 +226,11 @@ def _validate_join(model: pd.DataFrame, excel_name: str) -> None:
 
 
 def load_mapping(excel_path: Path | str | None = None) -> pd.DataFrame:
-    """Normalized Mapping sheet with units enriched from typeOfMeasurement / Indicator bank."""
+    """Normalized Mapping sheet with Type/Unit enriched from Indicator bank."""
     path = resolve_excel(excel_path)
     mapping = load_sg_report(path)["mapping"].copy()
     mapping["ID"] = mapping["ID"].astype(str).str.strip()
-    mapping = _enrich_mapping_units(mapping, path)
+    mapping = _enrich_mapping_from_bank(mapping, path)
     mapping["_mapping_order"] = range(len(mapping))
     return mapping.drop_duplicates(subset=["ID"], keep="first")
 

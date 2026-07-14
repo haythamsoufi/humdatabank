@@ -50,7 +50,7 @@ const MODULE_METHODS = {
         '_loadFormBuilderAiConfig', '_ensureFormBuilderAiIntegration', '_syncFormBuilderAiPanelFab',
         '_openFormBuilderChat', '_clearFormBuilderWelcomeBubble', 'updateFormBuilderVersionId',
         '_fbAiLabels', '_parseTemplateEditLink', '_findTemplateEditLink',
-        '_appendFormBuilderOpenTemplateButton', '_handleFormBuilderResult',
+        '_handleFormBuilderResult',
         '_stripFormBuilderEditAnswerHtml', '_appendFormBuilderApplyActions',
         '_fbAiRestoreStructureUrl', '_syncFormBuilderAiUndoRedoButtons',
         '_formBuilderAiRestoreSnapshot', '_formBuilderAiUndo', '_formBuilderAiRedo',

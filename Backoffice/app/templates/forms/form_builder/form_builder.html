@@ -15,6 +15,7 @@
 
 {% block content %}
 
+{% set can_use_ai_assistant = user_has_ai_beta_access(current_user) %}
 {% set actions = [
     {
         'type': 'link',
@@ -45,15 +46,17 @@
         'icon': 'fas fa-magic',
         'classes': 'professional-action-btn professional-action-btn-orange',
         'attributes': {'id': 'auto-translate-all-btn', 'title': _('Auto-translate all blank template names, section names, questions, document fields, and page names to all languages')}
-    },
-    {
-        'type': 'button',
-        'text': _('AI Assistant'),
-        'icon': 'fas fa-wand-magic-sparkles',
-        'classes': 'professional-action-btn professional-action-btn-purple',
-        'attributes': {'id': 'ai-assistant-btn', 'title': _('Create or edit this template with the AI assistant (changes go to a draft)')}
     }
 ] %}
+{% if can_use_ai_assistant %}
+{% set actions = actions + [{
+    'type': 'button',
+    'text': _('AI Assistant'),
+    'icon': 'fas fa-wand-magic-sparkles',
+    'classes': 'professional-action-btn professional-action-btn-purple',
+    'attributes': {'id': 'ai-assistant-btn', 'title': _('Create or edit this template with the AI assistant (changes go to a draft)')}
+}] %}
+{% endif %}
 
 {# Build title with version button inline #}
 {% if active_version_number %}
@@ -78,10 +81,12 @@
     actions=actions
 ) }}
 
+{% if can_use_ai_assistant %}
 {# Form builder AI config for chatbot.js (early in page so chatbot can read it on init) #}
 {% with fb_ai_template_id = template.id, fb_ai_version_id = active_version_id %}
     {% include "components/_fb_ai_config.html" with context %}
 {% endwith %}
+{% endif %}
 
 <script nonce="{{ csp_nonce() }}">
     (function(){ try { document.documentElement.classList.add('form-builder-loading'); } catch(e) {} })();

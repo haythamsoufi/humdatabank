@@ -5,6 +5,7 @@
 {% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
 {% set current_is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}
 {% set can_duplicate_template = current_is_system_manager or has_permission('admin.templates.duplicate') %}
+{% set can_use_ai_assistant = user_has_ai_beta_access(current_user) %}
 
 {% from "components/_page_header.html" import page_header %}
 {% block title %}Create New Template{% endblock %}
@@ -27,7 +28,7 @@
         {'name': _('Template Management'), 'url': url_for('form_builder.manage_templates')},
         {'name': _('Create New Template')}
     ],
-    info_tooltip=_('Start from a blank template, clone an existing one, describe your form to the AI assistant, or import structure from Kobo XLSForm or Excel.')
+    info_tooltip=_('Start from a blank template, clone an existing one, or import structure from Kobo XLSForm or Excel.') if not can_use_ai_assistant else _('Start from a blank template, clone an existing one, describe your form to the AI assistant, or import structure from Kobo XLSForm or Excel.')
 ) }}
 
 <div class="nt-page">
@@ -49,6 +50,7 @@
                 <span class="nt-method-card__cta">{{ _('Fill in details') }} <i class="fas fa-arrow-down" aria-hidden="true"></i></span>
             </button>
 
+            {% if can_use_ai_assistant %}
             <button type="button"
                     id="ai-assistant-btn"
                     class="nt-method-card nt-method-card--ai"
@@ -58,6 +60,7 @@
                 <span class="nt-method-card__desc">{{ _('Describe your form or attach a questionnaire. The assistant drafts sections and questions for you to review.') }}</span>
                 <span class="nt-method-card__cta">{{ _('Open assistant') }} <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
             </button>
+            {% endif %}
 
             {% if can_duplicate_template %}
             <button type="button"
@@ -415,10 +418,12 @@
 
 </div>
 
+{% if can_use_ai_assistant %}
 {# Form builder AI config for chatbot.js (create-new mode: no template context) #}
 {% with fb_ai_template_id = none, fb_ai_version_id = none %}
     {% include "components/_fb_ai_config.html" with context %}
 {% endwith %}
+{% endif %}
 
 {# Template Name Translations Modal #}
 {{ translation_modal(

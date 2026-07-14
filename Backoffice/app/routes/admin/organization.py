@@ -105,6 +105,7 @@ def enforce_organization_rbac():
         "organization.new_country",
         "organization.edit_country",
         "organization.delete_country",
+        "organization.import_countries",
     }
     if endpoint in country_mutation_endpoints:
         if (
@@ -115,8 +116,13 @@ def enforce_organization_rbac():
         flash("Access denied. Country edit permission required.", "warning")
         return redirect(url_for("main.dashboard"))
 
-    # Country export/template: allow view or edit
-    country_read_endpoints = {"organization.export_countries", "organization.countries_template"}
+    # Country / NS export & templates: allow view or edit
+    country_read_endpoints = {
+        "organization.export_countries",
+        "organization.countries_template",
+        "organization.export_national_societies",
+        "organization.national_societies_template",
+    }
     if endpoint in country_read_endpoints:
         if (
             AuthorizationService.has_rbac_permission(current_user, "admin.countries.view")
@@ -127,8 +133,37 @@ def enforce_organization_rbac():
         flash("Access denied.", "warning")
         return redirect(url_for("main.dashboard"))
 
+    # Intentionally public selector APIs (no auth on decorator; do not block logged-in viewers)
+    public_api_endpoints = {
+        "organization.api_get_branches_by_country_public",
+        "organization.api_get_subbranches_by_branch_public",
+        "organization.api_get_subbranches_by_country_public",
+    }
+    if endpoint in public_api_endpoints:
+        return None
+
+    # Read-only APIs used by the organization index for country viewers
+    # (must stay aligned with the route-level @admin_permission_required_any decorators)
+    country_viewer_read_apis = {
+        "organization.api_get_part_of_programs",
+    }
+    if endpoint in country_viewer_read_apis:
+        if (
+            AuthorizationService.has_rbac_permission(current_user, "admin.countries.view")
+            or AuthorizationService.has_rbac_permission(current_user, "admin.countries.edit")
+            or AuthorizationService.has_rbac_permission(current_user, "admin.organization.manage")
+        ):
+            return None
+        if request.path.startswith("/admin/organization/api/"):
+            return json_error("Access denied.", status=403)
+        flash("Access denied.", "warning")
+        return redirect(url_for("main.dashboard"))
+
     # Everything else here is organization structure management
     if not AuthorizationService.has_rbac_permission(current_user, "admin.organization.manage"):
+        # Prefer JSON 403 for API calls so clients don't try to parse an HTML redirect
+        if request.path.startswith("/admin/organization/api/"):
+            return json_error("Access denied. Organization management permission required.", status=403)
         flash("Access denied. Organization management permission required.", "warning")
         return redirect(url_for("main.dashboard"))
 
@@ -2867,7 +2902,7 @@ def api_update_ns_part_of(ns_id):
 
 
 @bp.route('/api/part-of-programs', methods=['GET'])
-@admin_permission_required_any('admin.organization.manage', 'admin.countries.view')
+@admin_permission_required_any('admin.organization.manage', 'admin.countries.view', 'admin.countries.edit')
 def api_get_part_of_programs():
     """API endpoint to get the list of available categories for part_of columns."""
     try:

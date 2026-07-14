@@ -165,31 +165,9 @@ export const FormBuilderAiMixin = {
         return null;
     },
 
-    _appendFormBuilderOpenTemplateButton(label, url) {
-        if (!this.elements.messages || !url) return;
-        const existing = this.elements.messages.querySelector('.fb-ai-open-template-action');
-        if (existing) existing.remove();
-        const wrap = document.createElement('div');
-        wrap.className = 'fb-ai-open-template-action chat-message bot';
-        const inner = document.createElement('div');
-        inner.className = 'flex items-start gap-2';
-        const content = document.createElement('div');
-        content.className = 'chat-message-content';
-        const btn = document.createElement('a');
-        btn.href = url;
-        btn.className = 'btn btn-primary btn-sm inline-flex items-center mt-2';
-        btn.textContent = label || 'Open the template in the form builder';
-        content.appendChild(btn);
-        inner.appendChild(content);
-        wrap.appendChild(inner);
-        this.elements.messages.appendChild(wrap);
-        this.scrollToBottom();
-    },
-
     _handleFormBuilderResult(formBuilderResult, answerHtml = '', contentElement = null) {
         if (!this._fbAiConfig || !formBuilderResult) return;
 
-        const labels = this._fbAiLabels();
         let link = this._findTemplateEditLink(answerHtml);
         if (!link && formBuilderResult.edit_url) {
             const href = String(formBuilderResult.edit_url);
@@ -251,10 +229,6 @@ export const FormBuilderAiMixin = {
 
         if (!configTemplateId) {
             this._fbAiConfig.templateId = link.templateId;
-            this._appendFormBuilderOpenTemplateButton(
-                labels.openTemplate || 'Open the template in the form builder',
-                link.url
-            );
         }
     },
 

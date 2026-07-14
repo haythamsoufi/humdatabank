@@ -18,9 +18,27 @@ from flask_login import current_user
 
 from app.routes.admin.shared import permission_required_any
 from app.utils.advanced_validation import validate_upload_extension_and_mime
-from app.utils.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.api_responses import json_bad_request, json_forbidden, json_ok, json_server_error
 
 from . import bp
+
+
+def _ai_beta_denied_response():
+    """Return a JSON denial when AI beta access blocks this user."""
+    try:
+        from app.services.app_settings_service import is_ai_beta_restricted, user_has_ai_beta_access
+
+        if not is_ai_beta_restricted():
+            return None
+        if not getattr(current_user, "is_authenticated", False):
+            return json_forbidden("AI beta access is limited to selected users.")
+        if not user_has_ai_beta_access(current_user):
+            return json_forbidden("AI beta access is limited to selected users.")
+    except Exception as exc:
+        current_app.logger.debug(
+            "form_builder AI beta gate check failed: %s", exc, exc_info=True
+        )
+    return None
 
 # Formats the AI panel accepts for questionnaire import (Excel/Kobo files have
 # dedicated import routes in the builder and are intentionally excluded here).
@@ -126,6 +144,10 @@ def _guess_sections_from_text(text: str) -> list:
 @permission_required_any("admin.templates.create", "admin.templates.edit")
 def ai_extract_document():
     """Extract text + section structure from an uploaded questionnaire document."""
+    denied = _ai_beta_denied_response()
+    if denied is not None:
+        return denied
+
     file = request.files.get("file")
     if not file or not file.filename:
         return json_bad_request("No file provided.")
@@ -200,6 +222,10 @@ def ai_extract_document():
 @permission_required_any("admin.templates.create", "admin.templates.edit")
 def ai_extract_image():
     """Extract form structure from a pasted or uploaded image via vision."""
+    denied = _ai_beta_denied_response()
+    if denied is not None:
+        return denied
+
     file = request.files.get("file")
     if not file or not file.filename:
         return json_bad_request("No image provided.")
@@ -250,6 +276,10 @@ def ai_extract_image():
 @permission_required_any("admin.templates.edit")
 def ai_restore_structure(template_id):
     """Restore the template draft from a structure snapshot (AI undo/redo)."""
+    denied = _ai_beta_denied_response()
+    if denied is not None:
+        return denied
+
     from app.services.form_template_ai_service import FormTemplateAIError, FormTemplateAIService
 
     payload = request.get_json(silent=True) or {}

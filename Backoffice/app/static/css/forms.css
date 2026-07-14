@@ -362,11 +362,16 @@ body.overflow-hidden { overflow: hidden; }
     display: none !important;
 }
 
-/* Modal scrollbar styling */
+/* Modal scrollbar styling.
+   scrollbar-gutter: stable reserves the scrollbar track width even when
+   content does not overflow, so appearing/disappearing scrollbars (common
+   on Windows when focusing a contenteditable or opening a dropdown) do not
+   shift modal contents sideways. */
 .modal-scrollable {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 #f1f5f9;
   overflow-x: hidden !important;
+  scrollbar-gutter: stable;
 }
 
 .modal-scrollable::-webkit-scrollbar {
@@ -1494,4 +1499,36 @@ a.btn.entry-form-doc-library-btn {
   #chatbot-ai-hover-menu .chatbot-ai-hover-row {
     transform: none !important;
   }
+}
+
+/* ── Blank/Note body text: style inline HTML produced by the rich-text editor ── */
+[data-item-type="blank"] p a,
+.blank-body-rendered a {
+    color: #2563eb;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+[data-item-type="blank"] p a:hover,
+.blank-body-rendered a:hover {
+    color: #1d4ed8;
+}
+
+/* ── Image display blocks ── */
+.entry-image-block {
+    width: 100%;
+}
+.entry-image-block--left {
+    align-items: flex-start;
+}
+.entry-image-block--center {
+    align-items: center;
+}
+.entry-image-block--right {
+    align-items: flex-end;
+}
+.entry-image-block__img {
+    height: auto;
+    width: auto;
+    max-width: 100%;
+    border-radius: 0.375rem;
 }

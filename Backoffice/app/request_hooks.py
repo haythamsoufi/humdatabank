@@ -3,7 +3,7 @@
 from flask import current_app, redirect, request, session, url_for
 from flask_login import current_user
 
-from app.i18n import update_session_activity
+from app.i18n import persist_queued_language_cookie, update_session_activity
 from app.utils.activity_logging_skip import should_skip_activity_endpoint, should_skip_activity_path
 from app.utils.api_responses import json_ok
 from app.utils.datetime_helpers import utcnow
@@ -121,6 +121,10 @@ def register_request_hooks(app):
         except Exception as e:
             current_app.logger.debug("persist_mobile_app_embed_cookie failed: %s", e)
             return response
+
+    @app.after_request
+    def _persist_ui_language_cookie(response):
+        return persist_queued_language_cookie(response)
 
     @app.before_request
     def _jwt_auth_from_bearer():

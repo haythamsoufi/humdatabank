@@ -121,4 +121,4 @@ def get_translation_value(translations_dict, language_key, default=''):
 
 
 # Register route sub-modules (import triggers @bp.route decorators)
-from . import templates, kobo, sections, items, versions, ai_assist  # noqa: E402, F401
+from . import templates, kobo, sections, items, versions, ai_assist, image_assets  # noqa: E402, F401

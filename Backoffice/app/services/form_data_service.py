@@ -3146,6 +3146,9 @@ class FormDataService:
                     # Field was hidden by relevance on the client; do not enforce required on submit.
                     continue
 
+                if getattr(field, 'is_image', False):
+                    continue
+
                 if field.is_required_for_js:
                     field_validation = cls._validate_required_field(field, assignment_entity_status)
                     if not field_validation['is_valid']:

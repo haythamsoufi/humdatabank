@@ -322,3 +322,199 @@
 .fb-ai-status-bubble.fb-ai-status-error .chat-message-content {
     color: #b91c1c;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Item modal: fill the main content area (below top nav, beside sidebar)     */
+/* -------------------------------------------------------------------------- */
+#item-modal.item-modal--fill-content {
+    top: 3.5rem; /* #appTopNav h-14 */
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: auto;
+    width: auto;
+    padding: 0 !important; /* override px-4 */
+    align-items: stretch !important; /* override items-center */
+    justify-content: stretch !important; /* override justify-center */
+    overflow: hidden;
+    z-index: 35; /* below sidebar (40), above page content / sticky topnav (30) */
+    background-color: #fff; /* solid fill — no dimmed gap around the panel */
+}
+
+body:has(#mainContent.content-with-sidebar) #item-modal.item-modal--fill-content {
+    left: 240px;
+}
+
+body:has(#mainContent.content-with-collapsed-sidebar) #item-modal.item-modal--fill-content,
+html.sidebar-initially-collapsed body:has(#mainContent.content-with-sidebar) #item-modal.item-modal--fill-content {
+    left: 72px;
+}
+
+body.has-staging-banner #item-modal.item-modal--fill-content {
+    top: calc(3.5rem + var(--staging-banner-height, 2.25rem));
+}
+
+html[dir="rtl"] body:has(#mainContent.content-with-sidebar) #item-modal.item-modal--fill-content {
+    left: 0;
+    right: 270px;
+}
+
+html[dir="rtl"] body:has(#mainContent.content-with-collapsed-sidebar) #item-modal.item-modal--fill-content,
+html[dir="rtl"].sidebar-initially-collapsed body:has(#mainContent.content-with-sidebar) #item-modal.item-modal--fill-content {
+    left: 0;
+    right: 80px;
+}
+
+@media (max-width: 768px) {
+    #item-modal.item-modal--fill-content,
+    html[dir="rtl"] #item-modal.item-modal--fill-content {
+        left: 0 !important;
+        right: 0 !important;
+    }
+}
+
+#item-modal.item-modal--fill-content > .item-modal-panel {
+    max-width: none !important;
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 0 !important; /* override rounded-lg */
+    border: none;
+    box-shadow: none;
+}
+
+#item-modal.item-modal--fill-content #item-modal-form {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#item-modal.item-modal--fill-content .modal-grid-container {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+#item-modal.item-modal--fill-content .item-modal-actions {
+    flex-shrink: 0;
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* Fill-content mode: the existing left/right grid (.modal-grid-container /
+   .modal-right-half, toggled by ItemModal.syncRightPanel via the Tailwind
+   md:grid-cols-2 class) already produces two equal-width columns once the
+   right pane has visible content. For matrix items, ItemModal.syncMatrixConfigPanel
+   moves the Column Codes section into the right column so it naturally
+   triggers that two-column layout instead of stretching a single column. */
+.item-modal--fill-content .modal-grid-container {
+    align-items: start;
+}
+
+.item-modal--fill-content .modal-right-half {
+    align-self: start;
+}
+
+#matrix-columns-section.matrix-columns-in-right-panel {
+    margin-top: 0;
+}
+
+/* Properties section: use more of the available width with additional columns
+   instead of a fixed 2-column grid. */
+@media (min-width: 900px) {
+    .item-modal--fill-content #item-properties-content {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+}
+
+#item-modal .item-modal-header-actions {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    z-index: 1;
+}
+
+html[dir="rtl"] #item-modal .item-modal-header-actions {
+    right: auto;
+    left: 0.75rem;
+}
+
+#item-modal #item-modal-fill-toggle .fa-compress,
+#item-modal.item-modal--fill-content #item-modal-fill-toggle .fa-expand {
+    display: none;
+}
+
+#item-modal.item-modal--fill-content #item-modal-fill-toggle .fa-compress {
+    display: inline-block;
+}
+
+/* ── Blank/Note rich-text body editor ──────────────────────────────────── */
+
+/* Translation-modal editors (BlankTranslationEditor) — height constraints are
+   set here in CSS (not via Tailwind JIT classes) so they survive the purge step. */
+.blank-trans-editor {
+    min-height: 3.5rem;
+    max-height: 8rem;
+    overflow-y: auto;
+}
+
+.blank-body-editor:focus {
+    outline: none;
+    box-shadow: 0 0 0 1px #16a34a;
+    border-color: #16a34a;
+}
+
+/* ── Image item modal ── */
+#item-image-fields #item-image-preview {
+    object-fit: contain;
+}
+#item-image-locale-tabs .image-locale-tab {
+    cursor: pointer;
+}
+.item-image-paste-zone {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+.item-image-paste-zone.opacity-60 {
+    pointer-events: none;
+}
+
+/* Placeholder via ::before when the editor is empty */
+.blank-body-editor:empty::before {
+    content: attr(data-blank-placeholder);
+    color: #9ca3af;
+    cursor: text;
+    display: block;
+    pointer-events: none;
+}
+
+/* Preserve bold/italic inside the editor */
+.blank-body-editor strong { font-weight: 700; }
+.blank-body-editor em     { font-style: italic; }
+
+/* Active state for toolbar format buttons */
+.body-fmt-btn.ring-2 {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+/* Hyperlinks inside the contenteditable editor */
+.blank-body-editor a {
+    color: #2563eb;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: text; /* keep as text cursor so editing still works */
+}

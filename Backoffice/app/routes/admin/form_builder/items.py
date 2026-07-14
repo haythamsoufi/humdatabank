@@ -20,7 +20,7 @@ from app.utils.api_responses import (json_forbidden, json_bad_request, json_ok,
     json_server_error, json_form_errors)
 from app.services.item_duplication_service import ItemDuplicationService
 from .helpers import (_create_form_item, _update_indicator_fields, _update_question_fields,
-    _update_document_field_fields, _update_matrix_fields, _update_plugin_fields,
+    _update_document_field_fields, _update_matrix_fields, _update_image_fields, _update_plugin_fields,
     _update_item_config, _update_version_timestamp, _ensure_template_access_or_redirect,
     is_conditions_meaningful)
 import json
@@ -195,7 +195,7 @@ def edit_item(item_id):
             None,
         )
     submitted_item_type = (str(_item_type_raw or '')).strip() or form_item.item_type
-    if submitted_item_type not in ('indicator', 'question', 'document_field', 'matrix') and not (submitted_item_type and submitted_item_type.startswith('plugin_')):
+    if submitted_item_type not in ('indicator', 'question', 'document_field', 'matrix', 'image') and not (submitted_item_type and submitted_item_type.startswith('plugin_')):
         submitted_item_type = form_item.item_type
 
     if submitted_item_type == 'indicator':
@@ -222,6 +222,10 @@ def edit_item(item_id):
     elif submitted_item_type == 'matrix':
         from app.forms.form_builder import MatrixForm
         form_class = MatrixForm
+        form_kwargs = {}
+    elif submitted_item_type == 'image':
+        from app.forms.form_builder import ImageForm
+        form_class = ImageForm
         form_kwargs = {}
     elif submitted_item_type and submitted_item_type.startswith('plugin_'):
         from app.forms.form_builder import PluginItemForm
@@ -322,6 +326,15 @@ def edit_item(item_id):
             form.matrix_config.data = data['config']
         elif 'matrix_config' in data:
             form.matrix_config.data = data['matrix_config']
+    elif submitted_item_type == 'image':
+        if 'label' in data:
+            form.label.data = data['label']
+        if 'description' in data:
+            form.description.data = data.get('description', '')
+        if 'image_config' in data:
+            form.image_config.data = data['image_config']
+        elif 'config' in data:
+            form.image_config.data = data['config']
 
     if form.validate_on_submit():
         current_app.logger.info(f"Edit {form_item.item_type.title()} Form validated. Processed form data: {form.data}")
@@ -356,18 +369,37 @@ def edit_item(item_id):
                 _update_document_field_fields(form_item, form, data)
             elif submitted_item_type == 'matrix':
                 _update_matrix_fields(form_item, form, data)
+            elif submitted_item_type == 'image':
+                _update_image_fields(form_item, form, data)
             elif submitted_item_type and submitted_item_type.startswith('plugin_'):
                 _update_plugin_fields(form_item, form, data)
 
             _update_item_config(form_item, form, data)
+
+            if isinstance(form_item.config, dict):
+                if submitted_item_type == 'image':
+                    form_item.config['is_required'] = False
+                elif submitted_item_type == 'question' and getattr(form_item, 'type', None) == 'blank':
+                    form_item.config['is_required'] = False
+                    form_item.config['allow_data_not_available'] = False
+                    form_item.config['allow_not_applicable'] = False
 
             rel_json = data.get('relevance_condition')
             val_json = data.get('validation_condition')
             val_msg = data.get('validation_message')
 
             form_item.relevance_condition = rel_json if is_conditions_meaningful(rel_json) else None
-            form_item.validation_condition = val_json if is_conditions_meaningful(val_json) else None
-            form_item.validation_message = val_msg if val_msg else None
+
+            is_display_only = (
+                submitted_item_type == 'image'
+                or (submitted_item_type == 'question' and getattr(form_item, 'type', None) == 'blank')
+            )
+            if is_display_only:
+                form_item.validation_condition = None
+                form_item.validation_message = None
+            else:
+                form_item.validation_condition = val_json if is_conditions_meaningful(val_json) else None
+                form_item.validation_message = val_msg if val_msg else None
 
             from sqlalchemy.orm.attributes import flag_modified
             flag_modified(form_item, 'config')
@@ -480,6 +512,9 @@ def delete_item(item_id):
             db.session.flush()
         else:
             # Actually delete the item
+            if form_item.item_type == 'image':
+                from app.utils.template_image_assets import delete_all_image_sources_from_config
+                delete_all_image_sources_from_config(form_item.config)
             db.session.delete(form_item)
             _update_version_timestamp(version_id)
             db.session.flush()

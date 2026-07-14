@@ -599,7 +599,8 @@
             archived: {{ indicator.archived|tojson|safe }},
             emergency: {{ indicator.emergency|tojson|safe }},
             comments: {{ (indicator.comments or '')|tojson|safe }},
-            usage_count: {{ indicator.usage_count|default(0)|tojson|safe }},
+            template_count: {{ indicator.template_count|default(0)|tojson|safe }},
+            data_value_count: {{ indicator.data_value_count|default(0)|tojson|safe }},
             view_url: "{{ url_for('system_admin.view_indicator_bank', id=indicator.id) }}",
             edit_url: "{{ url_for('system_admin.edit_indicator_bank', id=indicator.id) if can_edit_indicators else '' }}",
             delete_url: "{{ url_for('system_admin.delete_indicator_bank', id=indicator.id) if can_edit_indicators else '' }}",
@@ -985,8 +986,19 @@
             cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
         },
         {
-            field: 'usage_count',
-            headerName: {{ _("Usage Count")|js }},
+            field: 'template_count',
+            headerName: {{ _("Templates")|js }},
+            width: 130,
+            minWidth: 110,
+            maxWidth: 160,
+            filter: 'agNumberColumnFilter',
+            sortable: true,
+            cellRenderer: AgGridRenderers.usageCount,
+            cellStyle: { 'text-align': 'center', 'white-space': 'nowrap' }
+        },
+        {
+            field: 'data_value_count',
+            headerName: {{ _("Data Values")|js }},
             width: 140,
             minWidth: 120,
             maxWidth: 180,
@@ -1046,7 +1058,7 @@
             .concat(nameColumns)
             .concat(['definition'])
             .concat(definitionColumns)
-            .concat(['type', 'unit', 'fdrs_kpi_code', 'related_programs_list', 'sector', 'subsector', 'archived', 'emergency', 'comments', 'usage_count', 'actions']);
+            .concat(['type', 'unit', 'fdrs_kpi_code', 'related_programs_list', 'sector', 'subsector', 'archived', 'emergency', 'comments', 'template_count', 'data_value_count', 'actions']);
 
         var result = AgGridHelper.create('indicatorBankGrid', 'indicator-bank', columnDefs, indicatorsData, {
             columnVisibility: { buttonPlaceholderId: 'indicatorBankGrid-colvis' },

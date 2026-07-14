@@ -125,6 +125,14 @@ class TestCreateFormItem:
         assert item is not None
         assert item.item_type == 'matrix'
 
+    def test_dispatches_to_image(self, app, mock_db, mock_fi_query, mock_fs):
+        template = _mock_template()
+        section = _mock_section()
+        item = _create_form_item(template, section, ImmutableMultiDict([]), 'image')
+        assert item is not None
+        assert item.item_type == 'image'
+        assert item.config.get('is_required') is False
+
     def test_dispatches_to_plugin(self, app, mock_db, mock_fi_query):
         template = _mock_template()
         section = _mock_section()

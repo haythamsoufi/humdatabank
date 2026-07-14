@@ -4,6 +4,7 @@
 import { DataManager } from '../data-manager.js';
 import { SelectHelper, RuleHelper } from './shared.js';
 import { appendRuleToFormData } from '../rules/form-serialization.js';
+import { BlankBodyEditor } from './blank.js';
 
 export const QuestionItem = {
     setup(modalElement) {
@@ -357,6 +358,14 @@ export const QuestionItem = {
         const definitionInput = modalElement.querySelector('#item-question-definition');
         if (unitInput && itemData.unit) unitInput.value = itemData.unit;
         if (definitionInput && itemData.definition) definitionInput.value = itemData.definition;
+
+        // If this is a blank/note item, also populate the rich-text editor
+        if (itemData.question_type === 'blank') {
+            try {
+                BlankBodyEditor.init(modalElement);
+                BlankBodyEditor.populate(itemData.definition || '');
+            } catch (_e) {}
+        }
 
         if (typeSelect && itemData.question_type) {
             const optionExists = Array.from(typeSelect.options).some(opt => opt.value === itemData.question_type);

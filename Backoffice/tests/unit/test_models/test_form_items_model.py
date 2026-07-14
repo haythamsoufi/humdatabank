@@ -97,6 +97,14 @@ class TestFormItemTypeProperties:
         item = _make_item(item_type="indicator")
         assert item.is_matrix is False
 
+    def test_is_image_true(self):
+        item = _make_item(item_type="image")
+        assert item.is_image is True
+
+    def test_is_image_false(self):
+        item = _make_item(item_type="question")
+        assert item.is_image is False
+
     def test_is_plugin_true(self):
         item = _make_item(item_type="plugin_custom")
         assert item.is_plugin is True
@@ -671,6 +679,10 @@ class TestFieldTypeForJs:
     def test_question_blank_type(self):
         item = _make_item(item_type="question", type="blank")
         assert item.field_type_for_js == "blank"
+
+    def test_image_item(self):
+        item = _make_item(item_type="image")
+        assert item.field_type_for_js == "image"
 
     def test_question_no_type(self):
         item = _make_item(item_type="question", type=None)

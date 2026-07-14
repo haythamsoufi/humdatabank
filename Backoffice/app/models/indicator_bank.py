@@ -361,15 +361,36 @@ class IndicatorBank(db.Model):
         return FormItem.query.filter_by(indicator_bank_id=self.id)
 
     @property
+    def template_count(self):
+        """Distinct form templates that reference this indicator."""
+        if hasattr(self, '_cached_template_count'):
+            return self._cached_template_count
+        from sqlalchemy import func
+        from app.extensions import db
+        return (
+            db.session.query(func.count(func.distinct(FormItem.template_id)))
+            .filter(
+                FormItem.indicator_bank_id == self.id,
+                FormItem.template_id.isnot(None),
+            )
+            .scalar()
+            or 0
+        )
+
+    @property
+    def data_value_count(self):
+        """Content-bearing submission rows for this indicator across all data tables."""
+        if hasattr(self, '_cached_data_value_count'):
+            return self._cached_data_value_count
+        from app.services.indicator_bank_service import get_indicator_data_value_count
+        return get_indicator_data_value_count(self.id)
+
+    @property
     def usage_count(self):
-        """Calculate the number of times this indicator is used in templates.
-        This is calculated dynamically at runtime by counting FormItem references.
-        Uses cached value if available (from prefetching) to avoid N+1 queries.
-        """
-        # Use cached value if available (set during bulk prefetching)
+        """Backward-compatible alias for distinct template count."""
         if hasattr(self, '_cached_usage_count'):
             return self._cached_usage_count
-        return self.template_instances.count()
+        return self.template_count
 
     # Translation helper methods for JSONB fields
     def get_name_translation(self, language):

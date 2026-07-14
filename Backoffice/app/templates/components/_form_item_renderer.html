@@ -30,7 +30,7 @@
             <p class="text-gray-800 text-sm font-semibold whitespace-pre-wrap text-left">{{ field_display_label }}</p>
         {% endif %}
         {% if blank_has_definition %}
-            <p class="text-gray-700 text-sm whitespace-pre-wrap text-left{% if blank_has_label %} mt-1{% endif %}">{{ field_display_definition }}</p>
+            <p class="text-gray-700 text-sm text-left{% if blank_has_label %} mt-1{% endif %}">{{ field_display_definition | safe }}</p>
         {% endif %}
     </div>
 {% else %}

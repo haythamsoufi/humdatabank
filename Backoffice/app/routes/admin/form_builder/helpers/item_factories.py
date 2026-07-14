@@ -6,7 +6,7 @@ from app import db
 from app.models import FormItem, FormSection, QuestionType, LookupList, IndicatorBank
 from app.utils.transactions import request_transaction_rollback
 from config.config import Config
-from .item_updaters import is_conditions_meaningful
+from .item_updaters import is_conditions_meaningful, sanitize_blank_body_html
 import json
 
 
@@ -24,6 +24,8 @@ def _create_form_item(template, section, form_data, item_type):
         return _create_document_field_form_item(template, section, form_data, order)
     elif item_type == 'matrix':
         return _create_matrix_form_item(template, section, form_data, order)
+    elif item_type == 'image':
+        return _create_image_form_item(template, section, form_data, order)
     elif item_type.startswith('plugin_'):
         return _create_plugin_form_item(template, section, form_data, item_type, order)
     else:
@@ -236,6 +238,10 @@ def _create_question_form_item(template, section, form_data, default_order):
     if not question_label and question_type.value != 'blank':
         question_label = 'Question'  # Only provide default for non-blank questions
 
+    _raw_def = get_field_value('definition', '') or ''
+    _definition = (
+        sanitize_blank_body_html(_raw_def) if question_type.value == 'blank' else _raw_def
+    )
     form_item = FormItem(
         item_type='question',
         section_id=section.id,
@@ -244,7 +250,7 @@ def _create_question_form_item(template, section, form_data, default_order):
         label=question_label or '',  # Allow empty label for blank questions
         type=question_type.value,  # Use 'type' field instead of 'question_type' property
         order=order,
-        definition=get_field_value('definition', '') or ''
+        definition=_definition
     )
 
     # Initialize config with default values
@@ -281,6 +287,11 @@ def _create_question_form_item(template, section, form_data, default_order):
                     config['allow_over_100'] = bool(config_json['allow_over_100'])
             except (json.JSONDecodeError, TypeError):
                 pass
+
+    if question_type.value == 'blank':
+        config['is_required'] = False
+        config['allow_data_not_available'] = False
+        config['allow_not_applicable'] = False
 
     # Set the consolidated config
     form_item.config = config
@@ -366,11 +377,52 @@ def _create_question_form_item(template, section, form_data, default_order):
 
     # Handle conditions (save only if meaningful)
     _rel = get_field_value('relevance_condition', '') or ''
-    _val = get_field_value('validation_condition', '') or ''
-    _msg = get_field_value('validation_message', '') or ''
     form_item.relevance_condition = _rel if is_conditions_meaningful(_rel) else None
-    form_item.validation_condition = _val if is_conditions_meaningful(_val) else None
-    form_item.validation_message = _msg if _msg else None
+    if question_type.value == 'blank':
+        form_item.validation_condition = None
+        form_item.validation_message = None
+    else:
+        _val = get_field_value('validation_condition', '') or ''
+        _msg = get_field_value('validation_message', '') or ''
+        form_item.validation_condition = _val if is_conditions_meaningful(_val) else None
+        form_item.validation_message = _msg if _msg else None
+
+    # Persist label and definition translations submitted with the creation form
+    supported_codes = current_app.config.get('SUPPORTED_LANGUAGES', getattr(Config, 'LANGUAGES', ['en']))
+
+    label_translations_raw = get_field_value('label_translations', '')
+    if label_translations_raw:
+        try:
+            lt = json.loads(label_translations_raw)
+            if isinstance(lt, dict):
+                filtered = {}
+                for k, v in lt.items():
+                    if not (isinstance(k, str) and isinstance(v, str) and v.strip()):
+                        continue
+                    code = k.strip().lower().split('_', 1)[0]
+                    if code in supported_codes:
+                        filtered[code] = v.strip()
+                form_item.label_translations = filtered or None
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    definition_translations_raw = get_field_value('definition_translations', '')
+    if definition_translations_raw:
+        try:
+            dt = json.loads(definition_translations_raw)
+            is_blank = question_type.value == 'blank'
+            if isinstance(dt, dict):
+                filtered = {}
+                for k, v in dt.items():
+                    if not (isinstance(k, str) and isinstance(v, str) and v.strip()):
+                        continue
+                    code = k.strip().lower().split('_', 1)[0]
+                    if code in supported_codes:
+                        value = v.strip()
+                        filtered[code] = sanitize_blank_body_html(value) if is_blank else value
+                form_item.definition_translations = filtered or None
+        except (json.JSONDecodeError, TypeError):
+            pass
 
     db.session.add(form_item)
     db.session.flush()
@@ -570,6 +622,103 @@ def _create_matrix_form_item(template, section, form_data, default_order):
     db.session.add(form_item)
     db.session.flush()
 
+    return form_item
+
+
+def _create_image_form_item(template, section, form_data, default_order):
+    """Create a new image display form item."""
+    order = default_order
+
+    def get_field_value(field_name, prefix=''):
+        if prefix:
+            prefixed_name = f"{prefix}{field_name}"
+            value = form_data.get(prefixed_name)
+            if value:
+                return value
+        return form_data.get(field_name)
+
+    form_section_id = get_field_value('section_id')
+    target_section_id = int(form_section_id) if form_section_id else section.id
+    target_section = FormSection.query.get(target_section_id)
+
+    order_value = get_field_value('order')
+    if order_value and str(order_value).strip():
+        with suppress(ValueError, TypeError):
+            order = float(order_value)
+
+    form_item = FormItem(
+        item_type='image',
+        section_id=target_section_id,
+        template_id=template.id,
+        version_id=target_section.version_id if target_section else section.version_id,
+        label=get_field_value('label') or '',
+        order=order,
+        description=get_field_value('description') or '',
+    )
+
+    config_raw = get_field_value('image_config') or get_field_value('config')
+    image_config = {}
+    if config_raw:
+        try:
+            parsed = json.loads(config_raw) if isinstance(config_raw, str) else config_raw
+            from app.utils.template_image_assets import normalize_image_config
+            image_config = normalize_image_config(parsed)
+        except (json.JSONDecodeError, TypeError):
+            image_config = {'image': {'alignment': 'center', 'max_width': '100%', 'sources': {}}}
+
+    config = {
+        'is_required': False,
+        'layout_column_width': int(get_field_value('layout_column_width') or '12'),
+        'layout_break_after': bool(get_field_value('layout_break_after')),
+        **image_config,
+        'allowed_disaggregation_options': ['total'],
+        'age_groups_config': None,
+        'allow_data_not_available': False,
+        'allow_not_applicable': False,
+        'indirect_reach': False,
+        'privacy': (get_field_value('privacy') or 'ifrc_network'),
+    }
+    form_item.config = config
+
+    _rel = get_field_value('relevance_condition') or ''
+    form_item.relevance_condition = _rel if is_conditions_meaningful(_rel) else None
+
+    supported_codes = current_app.config.get('SUPPORTED_LANGUAGES', getattr(Config, 'LANGUAGES', ['en']))
+
+    label_translations_raw = get_field_value('label_translations', '')
+    if label_translations_raw:
+        try:
+            lt = json.loads(label_translations_raw)
+            if isinstance(lt, dict):
+                filtered = {}
+                for k, v in lt.items():
+                    if not (isinstance(k, str) and isinstance(v, str) and v.strip()):
+                        continue
+                    code = k.strip().lower().split('_', 1)[0]
+                    if code in supported_codes:
+                        filtered[code] = v.strip()
+                form_item.label_translations = filtered or None
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    description_translations_raw = get_field_value('description_translations', '')
+    if description_translations_raw:
+        try:
+            dt = json.loads(description_translations_raw)
+            if isinstance(dt, dict):
+                filtered = {}
+                for k, v in dt.items():
+                    if not (isinstance(k, str) and isinstance(v, str) and v.strip()):
+                        continue
+                    code = k.strip().lower().split('_', 1)[0]
+                    if code in supported_codes:
+                        filtered[code] = v.strip()
+                form_item.description_translations = filtered or None
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    db.session.add(form_item)
+    db.session.flush()
     return form_item
 
 

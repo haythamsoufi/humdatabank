@@ -1,9 +1,11 @@
 import { DataManager } from '../data-manager.js';
 import { MatrixItem } from '../items/matrix.js';
+import { ImageItem } from '../items/image.js';
 import { QuestionItem } from '../items/question.js';
 import { IndicatorItem } from '../items/indicator.js';
 import { DocumentItem } from '../items/document.js';
 import { PluginItem } from '../items/plugin.js';
+import { BlankBodyEditor, BlankTranslationEditor } from '../items/blank.js';
 
 export const ItemTypeUIMixin = {
     switchItemType: function(itemType, optionalQuestionType) {
@@ -84,12 +86,15 @@ export const ItemTypeUIMixin = {
 
         try { (window.__clientLog || console.debug)('[ItemModal:Privacy] calling ensurePrivacyField()'); } catch (e) {}
         this.ensurePrivacyField();
+        this.ensureDisplayOnlyPropertyFields(itemType);
         this.ensureAllowOver100Field(itemType);
         this.ensureUniqueOptionsInSectionField(itemType);
         this.ensureUseAsRepeatEntryTitleField(itemType);
         this.updateSubmitButton(itemType);
 
         try { this.enforceHiddenControlsDisabled(this.modalElement); } catch (_e) {}
+        this._fillModeManual = null;
+        try { this.syncFillContentMode(); } catch (_e) {}
         try { this.syncRightPanel(); } catch (_e) {}
 
         if (!this._scrollRafQueued) {
@@ -106,6 +111,7 @@ export const ItemTypeUIMixin = {
         const questionFields = Utils.getElementById('item-question-fields');
         const documentFields = Utils.getElementById('item-document-fields');
         const matrixFields = Utils.getElementById('item-matrix-fields');
+        const imageFields = Utils.getElementById('item-image-fields');
         const pluginFieldsContainer = Utils.getElementById('item-plugin-fields-container');
 
         const setContainerDisabled = (container, disabled) => {
@@ -120,16 +126,22 @@ export const ItemTypeUIMixin = {
         Utils.hideElement(questionFields);
         Utils.hideElement(documentFields);
         Utils.hideElement(matrixFields);
+        Utils.hideElement(imageFields);
         Utils.hideElement(pluginFieldsContainer);
         setContainerDisabled(indicatorFields, true);
         setContainerDisabled(questionFields, true);
         setContainerDisabled(documentFields, true);
         setContainerDisabled(matrixFields, true);
+        setContainerDisabled(imageFields, true);
         setContainerDisabled(pluginFieldsContainer, true);
 
         if (itemType !== 'question') {
             try { QuestionItem.resetOptionsState(this.modalElement); } catch (e) {}
             try { QuestionItem.teardown(this.modalElement); } catch (e) {}
+        }
+
+        if (itemType !== 'image') {
+            try { ImageItem.teardown(this.modalElement); } catch (e) {}
         }
 
         const pluginFields = document.getElementById('item-plugin-fields');
@@ -155,6 +167,11 @@ export const ItemTypeUIMixin = {
         }
         if (matrixFields) {
             matrixFields.querySelectorAll('[required]').forEach(field => {
+                field.removeAttribute('required');
+            });
+        }
+        if (imageFields) {
+            imageFields.querySelectorAll('[required]').forEach(field => {
                 field.removeAttribute('required');
             });
         }
@@ -215,6 +232,15 @@ export const ItemTypeUIMixin = {
             if (typeof window.attachMatrixRowHeadersModalLazy === 'function') {
                 window.attachMatrixRowHeadersModalLazy();
             }
+        } else if (itemType === 'image') {
+            try { MatrixItem.teardown(this.modalElement); } catch (e) {}
+            try { QuestionItem.teardown(this.modalElement); } catch (e) {}
+            try { IndicatorItem.teardown(this.modalElement); } catch (e) {}
+            try { PluginItem.teardown(this.modalElement); } catch (e) {}
+            try { ImageItem.teardown(this.modalElement); } catch (e) {}
+            Utils.showElement(imageFields);
+            setContainerDisabled(imageFields, false);
+            this.setupImageFields();
         } else if (itemType.startsWith('plugin_')) {
             try { MatrixItem.teardown(this.modalElement); } catch (e) {}
             try { QuestionItem.teardown(this.modalElement); } catch (e) {}
@@ -228,11 +254,18 @@ export const ItemTypeUIMixin = {
         }
 
         const validationRuleToggle = Utils.getElementById('validation-rule-toggle-section');
-        if (itemType === 'document_field') {
+        const hideValidation = itemType === 'document_field'
+            || this.isDisplayOnlyItemType(itemType, this.currentQuestionType);
+        if (hideValidation) {
             Utils.hideElement(validationRuleToggle);
         } else {
             Utils.showElement(validationRuleToggle);
         }
+    },
+
+    setupImageFields: function() {
+        ImageItem.setup(this.modalElement);
+        this.updateItemTranslationTabLabels('image');
     },
 
     setupIndicatorFields: function() {
@@ -340,8 +373,46 @@ export const ItemTypeUIMixin = {
         applyPlaceholder(labelInput);
         applyPlaceholder(definitionInput);
 
+        // Toggle rich-text editor for Blank/Note
+        try {
+            BlankBodyEditor.init(this.modalElement);
+            if (isBlank) {
+                BlankBodyEditor.show();
+            } else {
+                BlankBodyEditor.hide();
+            }
+        } catch (_e) {}
+
+        // Toggle rich-text editors in the translation modal's definitions tab
+        try {
+            if (isBlank) {
+                BlankTranslationEditor.enable();
+                // Attach a one-time listener to the translations button so that
+                // activate() runs after TranslationUtils.populateFields has already
+                // populated the textareas (synchronous, fires before our callback).
+                const translBtn = this.modalElement.querySelector('#question-translations-btn');
+                if (translBtn && !translBtn._blankTransListenerAdded) {
+                    translBtn.addEventListener('click', () => {
+                        if (BlankTranslationEditor.enabled) {
+                            // Use setTimeout(0) to run after the existing click handler
+                            // (which calls populateFields) has completed.
+                            setTimeout(() => BlankTranslationEditor.activate(), 0);
+                        }
+                    });
+                    translBtn._blankTransListenerAdded = true;
+                }
+            } else {
+                BlankTranslationEditor.disable();
+            }
+        } catch (_e) {}
+
+        this.currentQuestionType = questionType || null;
         this.updateQuestionLabelRequired(questionType);
         this.updateItemTranslationTabLabels('question', questionType);
+        this.ensureDisplayOnlyPropertyFields('question');
+        if (questionType !== 'blank') {
+            this.ensurePrivacyField();
+        }
     },
 
     updateItemTranslationTabLabels: function(itemContext, questionType) {
@@ -387,6 +458,8 @@ export const ItemTypeUIMixin = {
                 return 'fas fa-file-upload w-6 h-6 mr-2 text-blue-600';
             case 'matrix':
                 return 'fas fa-table w-6 h-6 mr-2 text-orange-600';
+            case 'image':
+                return 'fas fa-image w-6 h-6 mr-2 text-teal-600';
             default:
                 return 'fas fa-plus-circle w-6 h-6 mr-2 text-gray-600';
         }
@@ -423,7 +496,8 @@ export const ItemTypeUIMixin = {
         const map = {
             indicator: { wrapper: 'bg-purple-100 text-purple-600', icon: 'fas fa-chart-line text-lg' },
             document_field: { wrapper: 'bg-blue-100 text-blue-600', icon: 'fas fa-file-upload text-lg' },
-            matrix: { wrapper: 'bg-amber-100 text-amber-600', icon: 'fas fa-table text-lg' }
+            matrix: { wrapper: 'bg-amber-100 text-amber-600', icon: 'fas fa-table text-lg' },
+            image: { wrapper: 'bg-teal-100 text-teal-600', icon: 'fas fa-image text-lg' }
         };
         return map[itemType] || { wrapper: 'bg-gray-100 text-gray-600', icon: 'fas fa-plus-circle text-lg' };
     },
@@ -477,6 +551,8 @@ export const ItemTypeUIMixin = {
                 return 'Document Field';
             case 'matrix':
                 return 'Matrix Table';
+            case 'image':
+                return 'Image';
             default:
                 return 'Item';
         }

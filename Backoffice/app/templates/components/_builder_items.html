@@ -21,7 +21,11 @@
 {%- endmacro %}
 
 {% macro item_label_content(item_type, item_instance) %}
-  {{ item_instance.label }}
+  {% if item_type == 'image' and not item_instance.label %}
+    {{ _('Image') }}
+  {% else %}
+    {{ item_instance.label }}
+  {% endif %}
   {% if item_type == 'matrix' %}
     {% set _matrix_col_labels = matrix_column_labels_text(item_instance) %}
     {% if _matrix_col_labels %}

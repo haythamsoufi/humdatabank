@@ -42,6 +42,8 @@ def register_template_context(app, config_class):
     # Globals
     app.jinja_env.globals['hasattr'] = hasattr
     app.jinja_env.globals['isinstance'] = isinstance
+    from app.i18n import get_locale as current_ui_language
+    app.jinja_env.globals['current_ui_language'] = current_ui_language
     try:
         from app.routes.admin.shared import user_has_permission
         app.jinja_env.globals['user_has_permission'] = user_has_permission

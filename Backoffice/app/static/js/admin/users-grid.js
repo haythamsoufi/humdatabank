@@ -74,6 +74,27 @@
         return parts.length ? parts.join('; ') : '-';
     }
 
+    /** Export every assigned country by name while retaining non-country entity counts. */
+    function getEntitiesExportText(user) {
+        if (!user) return '';
+        if (user.is_system_manager) {
+            return t.global_f2a89e71 || 'Global';
+        }
+        var parts = [];
+        var countries = user.countries || [];
+        if (countries.length) {
+            parts.push(countries.join(', '));
+        }
+        if (user.branch_count > 0) parts.push(user.branch_count + ' ' + (t.branches_7cddf5f4 || 'branches'));
+        if (user.subbranch_count > 0) parts.push(user.subbranch_count + ' ' + (t.sub_branches_2d3b75e2 || 'sub-branches'));
+        if (user.localunit_count > 0) parts.push(user.localunit_count + ' ' + (t.local_units_4a0dc5ea || 'local units'));
+        if (user.division_count > 0) parts.push(user.division_count + ' ' + (t.divisions_8b9c5a88 || 'divisions'));
+        if (user.department_count > 0) parts.push(user.department_count + ' ' + (t.departments_6a7e3c44 || 'departments'));
+        if (user.regional_count > 0) parts.push(user.regional_count + ' ' + (t.regional_offices_a5bf1c32 || 'regional offices'));
+        if (user.cluster_count > 0) parts.push(user.cluster_count + ' ' + (t.clusters_f8d4c77a || 'clusters'));
+        return parts.length ? parts.join('; ') : '-';
+    }
+
     /**
      * Filter checklist values: real entity names (Global, regions, countries, entity types),
      * never summary counts like "3 countries".
@@ -173,15 +194,16 @@
         user.status_label = user.active
             ? (t.active_4d3d769b || 'Active')
             : (t.inactive_3cab7a0a || 'Inactive');
-        user.fds_member_label = user.is_fds_member
-            ? (t.yes_93cba074 || 'Yes')
-            : (t.no_bafd7328 || 'No');
-        if (!user.fds_member_countries) {
-            user.fds_member_countries = [];
-        }
-        user.fds_member_countries_text = user.fds_member_countries.length
-            ? user.fds_member_countries.join('; ')
-            : '';
+        user.fds_members = user.fds_members || [];
+        user.fds_member_names = user.fds_members.map(function (member) {
+            return member.name || member.email || '';
+        }).filter(Boolean);
+        user.fds_member_names_text = user.fds_member_names.join(', ');
+        user.fds_member_export_text = user.fds_members.map(function (member) {
+            var name = member.name || member.email || '';
+            var countries = member.countries || [];
+            return countries.length ? name + ' (' + countries.join(', ') + ')' : name;
+        }).filter(Boolean).join('; ');
     });
 
     var columnDefs = [
@@ -259,42 +281,34 @@
             cellStyle: { 'white-space': 'nowrap' }
         },
         {
-            field: 'is_fds_member',
+            field: 'fds_member_names_text',
             headerName: t.fds_member_7a2c91e4,
-            width: 140, minWidth: 120, maxWidth: 180,
+            width: 220, minWidth: 160, maxWidth: 320,
             hide: true,
             filter: 'customSetFilter', sortable: true,
             filterValueGetter: function (params) {
-                return params.data ? params.data.fds_member_label : '';
+                return params.data && params.data.fds_member_names.length
+                    ? params.data.fds_member_names
+                    : ['-'];
             },
             valueGetter: function (params) {
-                return params.data ? params.data.fds_member_label : '';
+                return params.data ? params.data.fds_member_names_text : '';
             },
             exportValueGetter: function (params) {
-                if (!params.data) return '';
-                if (!params.data.is_fds_member) return params.data.fds_member_label || (t.no_bafd7328 || 'No');
-                var countries = params.data.fds_member_countries_text;
-                return countries
-                    ? (params.data.fds_member_label + ' (' + countries + ')')
-                    : params.data.fds_member_label;
+                return params.data ? params.data.fds_member_export_text : '';
             },
             cellRenderer: function (params) {
-                if (!params.data || !params.data.is_fds_member) {
+                if (!params.data || !params.data.fds_members.length) {
                     return '<span class="text-gray-400">-</span>';
                 }
-                var label = escapeHtml(t.yes_93cba074 || 'Yes');
-                var countries = params.data.fds_member_countries || [];
-                if (!countries.length) {
-                    return '<span class="font-medium text-green-700">' + label + '</span>';
-                }
-                var title = escapeHtmlAttr(countries.join(', '));
-                var countLabel = countries.length === 1
-                    ? escapeHtml(countries[0])
-                    : (countries.length + ' ' + escapeHtml(t.countries_790d59ef || 'countries'));
-                return '<div class="leading-tight">'
-                    + '<span class="font-medium text-green-700">' + label + '</span>'
-                    + '<div class="text-gray-500 text-xs cursor-help" title="' + title + '">' + countLabel + '</div>'
-                    + '</div>';
+                var coverage = params.data.fds_members.map(function (member) {
+                    var name = member.name || member.email || '';
+                    var countries = member.countries || [];
+                    return name + (countries.length ? ': ' + countries.join(', ') : '');
+                }).join('; ');
+                return '<span class="cursor-help" title="' + escapeHtmlAttr(coverage) + '">'
+                    + escapeHtml(params.data.fds_member_names_text)
+                    + '</span>';
             },
             cellStyle: { 'white-space': 'normal', 'line-height': '1.3' }
         },
@@ -311,7 +325,7 @@
                 return params.data ? (params.data.entities_filter_items || []) : [];
             },
             exportValueGetter: function (params) {
-                return params.data ? (params.data.entities || '') : '';
+                return getEntitiesExportText(params.data);
             },
             cellRenderer: function (params) { return renderEntities(params.data); },
             cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' }
@@ -362,8 +376,8 @@
                     if (colId === 'active') {
                         return params.node.data.status_label || '';
                     }
-                    if (colId === 'is_fds_member') {
-                        return params.node.data.fds_member_label || '';
+                    if (colId === 'fds_member_names_text') {
+                        return params.node.data.fds_member_export_text || '';
                     }
                     return params.value != null ? params.value : '';
                 }

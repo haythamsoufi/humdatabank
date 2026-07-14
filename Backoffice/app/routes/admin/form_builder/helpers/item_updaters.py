@@ -1,11 +1,96 @@
 """Item field update helpers for the form_builder package."""
 
+import copy
 from contextlib import suppress
 from flask import flash, current_app
 from app import db
 from app.models import IndicatorBank, LookupList
 from config.config import Config
 import json
+
+
+def sanitize_blank_body_html(html: str) -> str:
+    """
+    Sanitize HTML produced by the Blank/Note rich-text body editor.
+    Allows bold, italic, colour spans, and hyperlinks (http/https/mailto only).
+    Normalizes Excel/contenteditable line breaks (\n, <div>, <p>) into <br>.
+    """
+    if not html or not isinstance(html, str):
+        return html or ''
+
+    import re
+
+    html = html.replace('\r\n', '\n').replace('\r', '\n')
+
+    # Plain text only (e.g. Excel) — convert newlines to <br>.
+    if '<' not in html:
+        return html.replace('\n', '<br>')
+
+    # Word soft-wraps often put *only* a newline between inline tags
+    # (</span>\n<span>). That must become a space, not be deleted — otherwise
+    # "are</span>\n<span>included" saves as "areincluded".
+    # Always keep a single space for any inter-tag whitespace.
+    html = re.sub(r'>[\s\u00a0]+<', '> <', html)
+
+    # Contenteditable wraps lines in <div>/<p>; turn those into <br>.
+    html = re.sub(r'(?i)<div[^>]*>', '', html)
+    html = re.sub(r'(?i)</div>', '<br>', html)
+    html = re.sub(r'(?i)<p[^>]*>', '', html)
+    html = re.sub(r'(?i)</p>', '<br>', html)
+
+    # Any leftover newlines inside text are also word separators.
+    html = html.replace('\n', ' ')
+    html = re.sub(r' {2,}', ' ', html)
+
+    # Soft-break at end of a block + block→br yields <br><br>. Collapse runs so
+    # spacing matches what the user saw in the editor (single line breaks).
+    html = re.sub(r'(?i)(?:<br\s*/?>\s*){2,}', '<br>', html)
+    html = re.sub(r'(?:<br\s*/?>)+\s*$', '', html)
+
+    try:
+        import bleach
+        from bleach.css_sanitizer import CSSSanitizer
+        from urllib.parse import urlparse
+
+        SAFE_SCHEMES = {'http', 'https', 'mailto', ''}
+
+        def _allowed_attrs(tag, name, value):
+            if tag == 'a':
+                if name == 'href':
+                    try:
+                        return urlparse(value).scheme.lower() in SAFE_SCHEMES
+                    except Exception:
+                        return False
+                return name in ('target', 'rel')
+            if tag == 'span':
+                return name == 'style'
+            if tag == 'font':
+                return name == 'color'
+            return False
+
+        css_sanitizer = CSSSanitizer(allowed_css_properties=['color'])
+        cleaned = bleach.clean(
+            html,
+            tags=['strong', 'b', 'em', 'i', 'span', 'br', 'font', 'a'],
+            attributes=_allowed_attrs,
+            css_sanitizer=css_sanitizer,
+            strip=True,
+        )
+
+        def _force_link(m):
+            tag = m.group(0)
+            if 'target=' not in tag:
+                tag = tag[:-1] + ' target="_blank">'
+            if 'rel=' not in tag:
+                tag = tag[:-1] + ' rel="noopener noreferrer">'
+            return tag
+
+        cleaned = re.sub(r'<a\b[^>]*>', _force_link, cleaned)
+        cleaned = re.sub(r'(?i)(?:<br\s*/?>\s*){2,}', '<br>', cleaned)
+        cleaned = re.sub(r'(?:<br\s*/?>)+\s*$', '', cleaned)
+        return cleaned
+    except Exception:
+        return re.sub(r'<[^>]+>', '', html)
 
 
 def is_conditions_meaningful(conditions_json):
@@ -171,7 +256,12 @@ def _update_indicator_fields(indicator, form, request_form):
 
 def _update_question_fields(question, form, request_form):
     """Update question-specific fields"""
-    question.definition = form.definition.data
+    raw_definition = form.definition.data or ''
+    # Sanitize rich-text HTML for blank/note items; leave plain text as-is for others
+    if form.question_type.data == 'blank':
+        question.definition = sanitize_blank_body_html(raw_definition)
+    else:
+        question.definition = raw_definition
 
     # For blank/note questions, allow empty label; for others, provide default
     question_label = form.label.data
@@ -295,6 +385,7 @@ def _update_question_fields(question, form, request_form):
         try:
             dt = json.loads(definition_translations_raw)
             supported_codes = current_app.config.get('SUPPORTED_LANGUAGES', getattr(Config, 'LANGUAGES', ['en']))
+            is_blank = form.question_type.data == 'blank'
             filtered_translations = {}
             if isinstance(dt, dict):
                 for k, v in dt.items():
@@ -302,7 +393,9 @@ def _update_question_fields(question, form, request_form):
                         continue
                     code = k.strip().lower().split('_', 1)[0]
                     if code in supported_codes:
-                        filtered_translations[code] = str(v).strip()
+                        value = str(v).strip()
+                        # Sanitize rich-text HTML for blank/note items
+                        filtered_translations[code] = sanitize_blank_body_html(value) if is_blank else value
             question.definition_translations = filtered_translations if filtered_translations else None
         except (json.JSONDecodeError, AttributeError, TypeError):
             current_app.logger.warning('Invalid definition_translations JSON; skipping')
@@ -513,6 +606,62 @@ def _update_matrix_fields(matrix_item, form, request_form):
         matrix_item.allow_not_applicable = form.allow_not_applicable.data
     if hasattr(form, 'indirect_reach') and hasattr(form.indirect_reach, 'data'):
         matrix_item.indirect_reach = form.indirect_reach.data
+
+
+def _update_image_fields(image_item, form, request_form):
+    """Update image-specific fields."""
+    image_item.label = form.label.data or ''
+    image_item.description = form.description.data or ''
+
+    previous_config = copy.deepcopy(image_item.config) if isinstance(image_item.config, dict) else {}
+
+    if hasattr(form, 'image_config') and form.image_config.data:
+        try:
+            from app.utils.template_image_assets import normalize_image_config, collect_orphan_paths_after_update
+            parsed = json.loads(form.image_config.data)
+            normalized = normalize_image_config(parsed, previous_config=previous_config)
+            if image_item.config is None:
+                image_item.config = {}
+            image_item.config.update(normalized)
+            collect_orphan_paths_after_update(previous_config, image_item.config)
+        except (json.JSONDecodeError, TypeError):
+            current_app.logger.warning("Invalid image config JSON: %s", form.image_config.data)
+
+    if image_item.config is None:
+        image_item.config = {}
+    image_item.config['is_required'] = False
+
+    if 'label_translations' in request_form and request_form['label_translations']:
+        try:
+            parsed_translations = json.loads(request_form['label_translations'])
+            supported_codes = current_app.config.get('SUPPORTED_LANGUAGES', getattr(Config, 'LANGUAGES', ['en']))
+            filtered_translations = {}
+            if isinstance(parsed_translations, dict):
+                for k, v in parsed_translations.items():
+                    if not (isinstance(k, str) and isinstance(v, str) and str(v).strip()):
+                        continue
+                    code = k.strip().lower().split('_', 1)[0]
+                    if code in supported_codes:
+                        filtered_translations[code] = str(v).strip()
+            image_item.label_translations = filtered_translations if filtered_translations else None
+        except (json.JSONDecodeError, TypeError):
+            image_item.label_translations = None
+
+    if 'description_translations' in request_form and request_form['description_translations']:
+        try:
+            parsed_translations = json.loads(request_form['description_translations'])
+            supported_codes = current_app.config.get('SUPPORTED_LANGUAGES', getattr(Config, 'LANGUAGES', ['en']))
+            filtered_translations = {}
+            if isinstance(parsed_translations, dict):
+                for k, v in parsed_translations.items():
+                    if not (isinstance(k, str) and isinstance(v, str) and str(v).strip()):
+                        continue
+                    code = k.strip().lower().split('_', 1)[0]
+                    if code in supported_codes:
+                        filtered_translations[code] = str(v).strip()
+            image_item.description_translations = filtered_translations if filtered_translations else None
+        except (json.JSONDecodeError, TypeError):
+            image_item.description_translations = None
 
 
 def _update_item_config(form_item, form, request_form):

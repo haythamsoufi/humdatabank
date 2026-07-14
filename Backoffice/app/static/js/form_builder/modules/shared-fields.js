@@ -27,6 +27,7 @@ export const SharedFields = {
 			if (t === 'question') return root.querySelector('#item-question-label');
 			if (t === 'document_field') return root.querySelector('#item-document-label');
 			if (t === 'matrix') return root.querySelector('#item-matrix-label');
+			if (t === 'image') return root.querySelector('#item-image-caption');
 			if (t && String(t).startsWith('plugin_')) return root.querySelector('#item-plugin-label');
 			return root.querySelector(`[data-field-type="label"]:not(.hidden)`);
 		};
@@ -34,6 +35,7 @@ export const SharedFields = {
 			const t = (window.ItemModal && window.ItemModal.currentItemType) ? window.ItemModal.currentItemType : null;
 			if (t === 'document_field') return root.querySelector('#item-document-description');
 			if (t === 'matrix') return root.querySelector('#item-matrix-description');
+			if (t === 'image') return root.querySelector('#item-image-alt');
 			if (t && String(t).startsWith('plugin_')) return root.querySelector('#item-plugin-description');
 			// Indicator/question "description" is represented by other specific fields (definition etc),
 			// so only sync generic description fields when present.
@@ -73,6 +75,7 @@ export const SharedFields = {
 			if (t === 'question') return root.querySelector('#item-question-label:not([disabled])');
 			if (t === 'document_field') return root.querySelector('#item-document-label:not([disabled])');
 			if (t === 'matrix') return root.querySelector('#item-matrix-label:not([disabled])');
+			if (t === 'image') return root.querySelector('#item-image-caption:not([disabled])');
 			if (t && String(t).startsWith('plugin_')) return root.querySelector('#item-plugin-label:not([disabled])');
 			return root.querySelector(`[data-field-type="label"]:not(.hidden):not([disabled])`);
 		};
@@ -80,13 +83,28 @@ export const SharedFields = {
 			const t = (window.ItemModal && window.ItemModal.currentItemType) ? window.ItemModal.currentItemType : null;
 			if (t === 'document_field') return root.querySelector('#item-document-description:not([disabled])');
 			if (t === 'matrix') return root.querySelector('#item-matrix-description:not([disabled])');
+			if (t === 'image') return root.querySelector('#item-image-alt:not([disabled])');
 			if (t && String(t).startsWith('plugin_')) return root.querySelector('#item-plugin-description:not([disabled])');
 			return root.querySelector(`[data-field-type="description"]:not(.hidden):not([disabled])`);
 		};
 		const resolveActiveDefinitionField = () => {
 			const t = (window.ItemModal && window.ItemModal.currentItemType) ? window.ItemModal.currentItemType : null;
 			if (t === 'indicator') return root.querySelector('#item-indicator-definition:not([disabled])');
-			if (t === 'question') return root.querySelector('#item-question-definition:not([disabled])');
+			if (t === 'question') {
+				// Prefer the visible rich-text editor for Blank/Note; keep the
+				// carrier textarea in sync even if it was marked disabled.
+				const editor = root.querySelector('#item-question-definition-editor');
+				const ta = root.querySelector('#item-question-definition');
+				if (editor && ta && !editor.classList.contains('hidden')) {
+					const raw = editor.innerHTML;
+					ta.value = (raw === '<br>' || raw === '') ? '' : raw;
+					if (ta.disabled && ta.dataset && ta.dataset.fbDisabledByHidden === '1') {
+						ta.disabled = false;
+						delete ta.dataset.fbDisabledByHidden;
+					}
+				}
+				return ta;
+			}
 			return null;
 		};
 

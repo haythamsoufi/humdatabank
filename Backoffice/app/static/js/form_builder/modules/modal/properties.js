@@ -3,8 +3,84 @@ import { DataManager } from '../data-manager.js';
 export const PropertiesMixin = {
     _isPercentageCache: null,
 
+    isDisplayOnlyItemType: function(itemType, questionType) {
+        if (itemType === 'image') return true;
+        if (itemType !== 'question') return false;
+        const qt = questionType !== undefined && questionType !== null
+            ? questionType
+            : (this.currentQuestionType || '');
+        const resolved = qt || (this.modalElement?.querySelector('#item-question-type-select')?.value) || '';
+        return resolved === 'blank';
+    },
+
+    ensureDisplayOnlyPropertyFields: function(itemType) {
+        if (!this.modalElement) return;
+        const hide = this.isDisplayOnlyItemType(itemType, this.currentQuestionType);
+
+        const privacyField = this.modalElement.querySelector('#item-privacy-field');
+        const requiredRow = this.modalElement.querySelector('#item-required')?.closest('.item-properties-cell');
+        const dnaRow = this.modalElement.querySelector('#item-allow-data-not-available')?.closest('.item-properties-cell');
+        const naRow = this.modalElement.querySelector('#item-allow-not-applicable')?.closest('.item-properties-cell');
+
+        [privacyField, requiredRow, dnaRow, naRow].forEach((el) => {
+            if (!el) return;
+            el.style.display = hide ? 'none' : '';
+        });
+
+        const requiredCheckbox = this.modalElement.querySelector('#item-required');
+        const dnaCheckbox = this.modalElement.querySelector('#item-allow-data-not-available');
+        const naCheckbox = this.modalElement.querySelector('#item-allow-not-applicable');
+        const privacySelect = this.modalElement.querySelector('#item-privacy-select');
+
+        [requiredCheckbox, dnaCheckbox, naCheckbox].forEach((el) => {
+            if (!el) return;
+            if (hide) {
+                el.checked = false;
+                el.disabled = true;
+            } else {
+                el.disabled = false;
+            }
+        });
+
+        if (privacySelect) {
+            if (hide) {
+                privacySelect.disabled = true;
+            } else {
+                privacySelect.disabled = false;
+            }
+        }
+
+        const validationRuleToggle = this.modalElement.querySelector('#validation-rule-toggle-section');
+        const validationSection = this.modalElement.querySelector('#item-validation-rule-section');
+        const validationBuilder = this.modalElement.querySelector('#item-validation-rule-builder');
+        const validationConditionInput = this.modalElement.querySelector('#item-validation-condition');
+        const validationMessageInput = this.modalElement.querySelector('#item-validation-message');
+
+        if (validationRuleToggle) {
+            validationRuleToggle.style.display = hide ? 'none' : '';
+        }
+
+        if (hide) {
+            if (validationSection) Utils.hideElement(validationSection);
+            if (validationBuilder) {
+                validationBuilder.removeAttribute('data-rule-json');
+                validationBuilder.replaceChildren();
+            }
+            if (validationConditionInput) validationConditionInput.value = '';
+            if (validationMessageInput) validationMessageInput.value = '';
+            const validationButton = this.modalElement.querySelector('[data-target="#item-validation-rule-section"]');
+            if (validationButton && typeof this.renderRuleToggleButton === 'function') {
+                this.renderRuleToggleButton(validationButton, 'add');
+            }
+            try { this.syncRightPanel && this.syncRightPanel(); } catch (_e) {}
+        }
+
+        try { this.enforceHiddenControlsDisabled(this.modalElement); } catch (_e) {}
+    },
+
     ensurePrivacyField: function() {
         if (!this.modalElement) return;
+        if (this.isDisplayOnlyItemType(this.currentItemType, this.currentQuestionType)) return;
         const propertiesSection = this.modalElement.querySelector('#item-properties-section') || this.modalElement.querySelector('.mb-3.border-t.border-gray-200.pt-4');
         if (!propertiesSection) return;
         const propertiesContent = propertiesSection.querySelector('#item-properties-content') || propertiesSection.querySelector('.grid.grid-cols-2.gap-6.items-center');

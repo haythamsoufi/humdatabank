@@ -1,8 +1,18 @@
 {# Item Modal Partial - Handles adding/editing all item types (Indicator, Question, Document, Matrix, Plugin) #}
 <div id="item-modal" role="dialog" aria-modal="true" aria-labelledby="item-modal-title" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center px-4">
-    <div class="relative p-6 border w-full max-w-xl shadow-xl rounded-lg bg-white">
-        <button type="button" class="absolute top-3 right-3 btn btn-close-icon close-modal" aria-label="Close modal"><i class="fas fa-times w-6 h-6" aria-hidden="true"></i></button>
-        <h3 id="item-modal-title" class="text-xl font-semibold mb-5 text-gray-800 flex items-center modal-title">
+    <div class="item-modal-panel relative p-6 border w-full max-w-xl shadow-xl rounded-lg bg-white">
+        <div class="item-modal-header-actions">
+            <button type="button" id="item-modal-fill-toggle" class="btn btn-close-icon" aria-pressed="false"
+                    data-label-expand="{{ _('Expand to fill content area') }}"
+                    data-label-compress="{{ _('Exit fill content area') }}"
+                    title="{{ _('Expand to fill content area') }}"
+                    aria-label="{{ _('Expand to fill content area') }}">
+                <i class="fas fa-expand w-5 h-5" aria-hidden="true"></i>
+                <i class="fas fa-compress w-5 h-5" aria-hidden="true"></i>
+            </button>
+            <button type="button" class="btn btn-close-icon close-modal" aria-label="{{ _('Close modal') }}"><i class="fas fa-times w-6 h-6" aria-hidden="true"></i></button>
+        </div>
+        <h3 id="item-modal-title" class="text-xl font-semibold mb-5 text-gray-800 flex items-center modal-title pr-20">
             <i class="fas fa-plus-circle w-6 h-6 mr-2 text-green-600"></i>
             {{ _('Add Item to') }} <span id="item-modal-section-name" class="font-bold ml-1">{{ _('Section') }}</span>
         </h3>
@@ -166,6 +176,98 @@
                                    class="block text-gray-700 text-sm font-semibold mb-2"
                                    data-default-text="{{ _('Definition') }}"
                                    data-blank-text="{{ _('Body text') }}">{{ _('Definition') }}</label>
+
+                            {# Rich-text toolbar – shown only when question_type == blank #}
+                            <div id="blank-body-toolbar"
+                                 class="hidden flex flex-wrap items-center gap-1 mb-1.5 px-1.5 py-1 border border-gray-200 rounded-md bg-gray-50"
+                                 aria-label="{{ _('Formatting toolbar') }}">
+                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 font-bold text-sm text-gray-700 transition-colors" data-cmd="bold" title="{{ _('Bold') }}" aria-label="{{ _('Bold') }}">B</button>
+                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 italic text-sm text-gray-700 transition-colors" data-cmd="italic" title="{{ _('Italic') }}" aria-label="{{ _('Italic') }}">I</button>
+                                <span class="h-4 border-l border-gray-300 mx-0.5" aria-hidden="true"></span>
+                                {# Colour split-button (Word-style): left half applies current colour, right half opens picker #}
+                                <div class="relative flex rounded overflow-visible" id="blank-body-color-wrapper">
+                                    {# Left: apply current colour immediately #}
+                                    <button type="button"
+                                            id="blank-body-color-apply"
+                                            class="body-fmt-btn flex flex-col items-center justify-center px-1.5 h-7 rounded-l hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 text-sm font-bold text-gray-700 transition-colors"
+                                            title="{{ _('Apply colour') }}"
+                                            aria-label="{{ _('Apply text colour') }}">
+                                        <span id="blank-body-color-letter" class="leading-none select-none" style="color:#374151">A</span>
+                                        <span id="blank-body-color-bar" class="block w-4 h-[3px] rounded-sm mt-0.5" style="background:#374151"></span>
+                                    </button>
+                                    {# Right: open colour picker #}
+                                    <button type="button"
+                                            id="blank-body-color-trigger"
+                                            class="body-fmt-btn flex items-center justify-center w-4 h-7 rounded-r hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 transition-colors"
+                                            title="{{ _('Choose text colour') }}"
+                                            aria-label="{{ _('Choose text colour') }}"
+                                            aria-haspopup="true"
+                                            aria-expanded="false">
+                                        <i class="fas fa-chevron-down text-[9px] text-gray-400" aria-hidden="true"></i>
+                                    </button>
+                                    {# Dropdown panel #}
+                                    <div id="blank-body-color-dropdown"
+                                         class="hidden absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-2"
+                                         role="menu"
+                                         aria-label="{{ _('Choose text colour') }}">
+                                        {% set _colors = [
+                                            ('#374151', _('Dark (default)')),
+                                            ('#dc2626', _('Red')),
+                                            ('#f97316', _('Orange')),
+                                            ('#ca8a04', _('Yellow')),
+                                            ('#16a34a', _('Green')),
+                                            ('#2563eb', _('Blue')),
+                                            ('#7c3aed', _('Purple')),
+                                            ('#6b7280', _('Grey')),
+                                        ] %}
+                                        <div class="grid grid-cols-4 gap-1.5">
+                                            {% for color, label in _colors %}
+                                            <button type="button"
+                                                    class="body-fmt-color-btn w-6 h-6 rounded-full border-2 border-white ring-1 ring-gray-300 hover:ring-2 hover:ring-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+                                                    style="background:{{ color }}"
+                                                    data-color="{{ color }}"
+                                                    title="{{ label }}"
+                                                    aria-label="{{ label }}"
+                                                    role="menuitem"></button>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="h-4 border-l border-gray-300 mx-0.5" aria-hidden="true"></span>
+                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 text-gray-500 transition-colors" data-cmd="createLink" title="{{ _('Insert link') }}" aria-label="{{ _('Insert link') }}">
+                                    <i class="fas fa-link text-xs" aria-hidden="true"></i>
+                                </button>
+                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 text-gray-500 transition-colors" data-cmd="removeFormat" title="{{ _('Clear formatting') }}" aria-label="{{ _('Clear formatting') }}">
+                                    <i class="fas fa-eraser text-xs" aria-hidden="true"></i>
+                                </button>
+                            </div>
+
+                            {# Link URL input panel – revealed by the link button #}
+                            <div id="blank-body-link-panel" class="hidden flex items-center gap-2 mt-1 px-2 py-1.5 bg-blue-50 border border-blue-200 rounded-md">
+                                <i class="fas fa-link text-blue-400 text-xs shrink-0" aria-hidden="true"></i>
+                                <input type="url"
+                                       id="blank-body-link-url"
+                                       class="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 min-w-0"
+                                       placeholder="https://example.com">
+                                <button type="button" id="blank-body-link-apply"
+                                        class="shrink-0 text-xs bg-blue-500 hover:bg-blue-600 text-white px-2.5 py-1 rounded transition-colors">{{ _('Apply') }}</button>
+                                <button type="button" id="blank-body-link-remove"
+                                        class="shrink-0 hidden text-xs bg-red-500 hover:bg-red-600 text-white px-2.5 py-1 rounded transition-colors">{{ _('Remove') }}</button>
+                                <button type="button" id="blank-body-link-cancel"
+                                        class="shrink-0 text-xs text-gray-500 hover:bg-gray-100 px-2 py-1 rounded transition-colors">{{ _('Cancel') }}</button>
+                            </div>
+
+                            {# Contenteditable rich-text editor – shown only for Blank/Note #}
+                            <div id="item-question-definition-editor"
+                                 class="hidden shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 block w-full sm:text-sm border border-gray-300 rounded-md px-2.5 py-2 min-h-[4.5rem] blank-body-editor"
+                                 contenteditable="true"
+                                 spellcheck="true"
+                                 data-blank-placeholder="{{ _('Text shown below the heading') }}"
+                                 aria-label="{{ _('Body text') }}"
+                                 aria-multiline="true"
+                                 role="textbox"></div>
+
+                            {# Plain textarea – visible for non-blank types; hidden (sr-only) as the value carrier for blank #}
                             <textarea id="item-question-definition"
                                       class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
                                       rows="3"
@@ -520,8 +622,10 @@
                             <textarea data-field-type="description" id="item-matrix-description" class="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Description (Optional)') }}"></textarea>
                         </div>
 
-                        {# Matrix Configuration Section #}
-                        <div class="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                        {# Matrix Configuration — Row setup + Display Options. Stays in the
+                           left column when the modal is split into two columns; the Column
+                           Codes section below is what moves to the right column. #}
+                        <div id="matrix-config-rows-section" class="mb-4 border-t border-gray-200 pt-4">
                             <h4 class="text-sm font-semibold text-gray-700 mb-4">{{ _('Matrix Configuration') }}</h4>
 
                             {# Row Mode Selection #}
@@ -624,29 +728,10 @@
                                 <div id="matrix-plugin-config-container" class="mt-4"></div>
                             </div>
 
-                            {# Column Headers #}
-                            <div class="mb-4">
-                                <div class="flex items-center gap-2 flex-wrap mb-2">
-                                    <label class="text-gray-700 text-sm font-semibold">{{ _('Column Codes') }}</label>
-                                    <button type="button" id="matrix-column-headers-translations-matrix-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Manage column header translations') }}" aria-label="{{ _('Translations') }}">
-                                        <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
-                                    </button>
-                                </div>
-                                <p class="text-xs text-gray-500 mb-2">{{ _('Enter a stable code for each column') }} (e.g. <code class="bg-gray-100 px-1 rounded">total_beneficiaries</code>). {{ _('Use the translations button to set display labels in English and other languages.') }}</p>
-                                <div id="matrix-columns-container" class="space-y-2">
-                                    <!-- Column headers will be added here dynamically -->
-                                </div>
-                                <div class="flex items-center gap-4 mt-2">
-                                    <button type="button" id="add-matrix-column-btn" class="text-sm font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center">
-                                        <i class="fas fa-plus w-3 h-3 mr-1"></i>
-                                        {{ _('Add Column') }}
-                                    </button>
-                                    <button type="button" id="add-matrix-group-btn" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 focus:outline-none focus:underline inline-flex items-center">
-                                        <i class="fas fa-layer-group w-3 h-3 mr-1"></i>
-                                        {{ _('Add Group') }}
-                                    </button>
-                                </div>
-                            </div>
+                            {# Anchor marking where the Column Codes section lives when not
+                               moved into the right column (fill-content mode). Kept even when
+                               the section is relocated so it can be moved back reliably. #}
+                            <div id="matrix-columns-anchor" class="hidden" aria-hidden="true"></div>
 
                             {# Matrix Display Options #}
                             <div class="mb-4">
@@ -693,6 +778,31 @@
 
                         </div>
 
+                        {# Column Codes — moved into the right column when the modal is
+                           split into two (fill-content mode + Matrix item). #}
+                        <div id="matrix-columns-section" class="mb-4">
+                            <div class="flex items-center gap-2 flex-wrap mb-2">
+                                <label class="text-gray-700 text-sm font-semibold">{{ _('Column Codes') }}</label>
+                                <button type="button" id="matrix-column-headers-translations-matrix-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Manage column header translations') }}" aria-label="{{ _('Translations') }}">
+                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 mb-2">{{ _('Enter a stable code for each column') }} (e.g. <code class="bg-gray-100 px-1 rounded">total_beneficiaries</code>). {{ _('Use the translations button to set display labels in English and other languages.') }}</p>
+                            <div id="matrix-columns-container" class="space-y-2">
+                                <!-- Column headers will be added here dynamically -->
+                            </div>
+                            <div class="flex items-center gap-4 mt-2">
+                                <button type="button" id="add-matrix-column-btn" class="text-sm font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center">
+                                    <i class="fas fa-plus w-3 h-3 mr-1"></i>
+                                    {{ _('Add Column') }}
+                                </button>
+                                <button type="button" id="add-matrix-group-btn" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 focus:outline-none focus:underline inline-flex items-center">
+                                    <i class="fas fa-layer-group w-3 h-3 mr-1"></i>
+                                    {{ _('Add Group') }}
+                                </button>
+                            </div>
+                        </div>
+
                         {# Hidden inputs for matrix configuration #}
                         <input type="hidden" name="config" id="item-matrix-config" value="{}">
                         {# Translation fields handled by shared fields above #}
@@ -717,40 +827,41 @@
                         {# Hidden template for matrix column #}
                         <template id="matrix-column-template">
                             <div class="matrix-column">
-                                <div class="flex items-center space-x-2">
+                                <div class="flex items-center gap-2 flex-wrap">
                                     <span class="matrix-drag-handle inline-flex items-center justify-center p-1 text-gray-300 hover:text-gray-500 shrink-0 select-none" style="cursor:grab;" title="{{ _('Drag to reorder') }}" draggable="false">
                                         <i class="fas fa-grip-vertical"></i>
                                     </span>
-                                    <input type="text" class="column-text shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g. total_beneficiaries') }}">
+                                    <input type="text" class="column-text shadow-sm focus:ring-orange-500 focus:border-orange-500 flex-1 min-w-[120px] sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g. total_beneficiaries') }}">
                                     <input type="hidden" class="column-name-translations" value="{}">
-                                    <select class="column-type shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-32 sm:text-sm border-gray-300 rounded-md">
+                                    <select class="column-type shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-28 shrink-0 sm:text-sm border-gray-300 rounded-md">
                                         <option value="number">{{ _('Number') }}</option>
                                         <option value="tick">{{ _('Tick (✓)') }}</option>
                                     </select>
-                                    <select class="column-variable-select shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-40 sm:text-sm border-gray-300 rounded-md" style="display: none;">
+                                    <select class="column-variable-select shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-36 shrink-0 sm:text-sm border-gray-300 rounded-md" style="display: none;">
                                         <option value="">{{ _('Select Variable...') }}</option>
                                     </select>
-                                    <button type="button" class="remove-column-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Column') }}">
+                                    {# Kept inline next to the column code field instead of on its own row #}
+                                    <div class="column-variable-options flex items-center gap-3 flex-wrap shrink-0">
+                                        <label class="flex items-center text-xs text-gray-600 whitespace-nowrap">
+                                            <input type="checkbox" class="column-is-variable mr-1">
+                                            <span>{{ _('Is Variable') }}</span>
+                                        </label>
+                                        <label class="flex items-center text-xs text-gray-600 whitespace-nowrap column-variable-save-value-label" style="display: none;">
+                                            <input type="checkbox" class="column-variable-save-value mr-1" checked>
+                                            <span>{{ _('Save value') }}</span>
+                                            <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help') }}">
+                                                <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
+                                                <span class="tooltip-text">{{ _('When checked, the variable column value is saved with the form and restored when the form is reopened. When unchecked, the value is always resolved fresh from the variable (e.g. template variable) and not stored.') }}</span>
+                                            </span>
+                                        </label>
+                                        <label class="flex items-center text-xs text-gray-600 whitespace-nowrap column-variable-readonly-label" style="display: none;">
+                                            <input type="checkbox" class="column-variable-readonly mr-1" checked>
+                                            <span>{{ _('Read-only') }}</span>
+                                        </label>
+                                    </div>
+                                    <button type="button" class="remove-column-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300 shrink-0 ml-auto" title="{{ _('Remove Column') }}">
                                         <i class="fas fa-trash w-4 h-4"></i>
                                     </button>
-                                </div>
-                                <div class="column-variable-options flex items-center gap-4 mt-2 ml-0">
-                                    <label class="flex items-center text-xs text-gray-600">
-                                        <input type="checkbox" class="column-is-variable mr-1">
-                                        <span>{{ _('Is Variable') }}</span>
-                                    </label>
-                                    <label class="flex items-center text-xs text-gray-600 column-variable-save-value-label" style="display: none;">
-                                        <input type="checkbox" class="column-variable-save-value mr-1" checked>
-                                        <span>{{ _('Save value') }}</span>
-                                        <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help') }}">
-                                            <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
-                                            <span class="tooltip-text">{{ _('When checked, the variable column value is saved with the form and restored when the form is reopened. When unchecked, the value is always resolved fresh from the variable (e.g. template variable) and not stored.') }}</span>
-                                        </span>
-                                    </label>
-                                    <label class="flex items-center text-xs text-gray-600 column-variable-readonly-label" style="display: none;">
-                                        <input type="checkbox" class="column-variable-readonly mr-1" checked>
-                                        <span>{{ _('Read-only') }}</span>
-                                    </label>
                                 </div>
                             </div>
                         </template>
@@ -780,6 +891,78 @@
                                 </div>
                             </div>
                         </template>
+                    </div>
+
+                    {# Image Fields (Initially Hidden) #}
+                    <div id="item-image-fields" class="hidden">
+                        <input type="hidden" id="item-image-config" name="image_config" value="{}">
+                        <div class="mb-4">
+                            <div class="flex items-center gap-2 flex-wrap mb-2">
+                                <label for="item-image-caption" class="text-gray-700 text-sm font-semibold">{{ _('Caption (optional)') }}</label>
+                                <button type="button" id="image-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations') }}" aria-label="{{ _('Add translations') }}">
+                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <input type="text" data-field-type="label" id="item-image-caption" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Caption shown below the image') }}">
+                        </div>
+                        <div class="mb-4">
+                            <label for="item-image-alt" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Alt text (optional)') }}</label>
+                            <textarea data-field-type="description" id="item-image-alt" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="2" placeholder="{{ _('Describe the image for screen readers') }}"></textarea>
+                        </div>
+                        <div class="mb-4 grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="item-image-alignment" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Alignment') }}</label>
+                                <select id="item-image-alignment" class="block w-full sm:text-sm border-gray-300 rounded-md">
+                                    <option value="left">{{ _('Left') }}</option>
+                                    <option value="center" selected>{{ _('Center') }}</option>
+                                    <option value="right">{{ _('Right') }}</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="item-image-max-width" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Max width') }}</label>
+                                <select id="item-image-max-width" class="block w-full sm:text-sm border-gray-300 rounded-md">
+                                    <option value="100%" selected>{{ _('Full width') }}</option>
+                                    <option value="75%">{{ _('75%') }}</option>
+                                    <option value="50%">{{ _('50%') }}</option>
+                                    <option value="auto">{{ _('Auto') }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <p class="text-gray-700 text-sm font-semibold mb-2">{{ _('Image source by language') }}</p>
+                            <div id="item-image-locale-tabs" class="flex flex-wrap gap-2 mb-3"></div>
+                            <div class="border border-gray-200 rounded-md p-4 bg-gray-50">
+                                <div class="flex items-center gap-4 mb-3">
+                                    <label class="inline-flex items-center text-sm">
+                                        <input type="radio" name="image_source_type" value="upload" class="image-source-type-radio form-radio h-4 w-4 text-teal-600" checked>
+                                        <span class="ml-2">{{ _('Upload') }}</span>
+                                    </label>
+                                    <label class="inline-flex items-center text-sm">
+                                        <input type="radio" name="image_source_type" value="url" class="image-source-type-radio form-radio h-4 w-4 text-teal-600">
+                                        <span class="ml-2">{{ _('URL / path') }}</span>
+                                    </label>
+                                </div>
+                                <div id="item-image-upload-block">
+                                    <button type="button" id="item-image-paste-zone" class="item-image-paste-zone inline-flex items-center gap-1.5 px-3 py-1.5 mb-3 text-sm font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-md hover:bg-teal-100 focus:outline-none focus:ring-2 focus:ring-teal-400" title="{{ _('Paste a screenshot from the clipboard (Ctrl+V)') }}" aria-label="{{ _('Paste image') }}">
+                                        <i class="fas fa-paste w-4 h-4" aria-hidden="true"></i>
+                                        <span>{{ _('Paste') }}</span>
+                                    </button>
+                                    <label class="block text-sm text-gray-700 mb-1">{{ _('Image file') }}</label>
+                                    <input type="file" id="item-image-file-input" accept="image/png,image/jpeg,image/webp,image/gif" class="block w-full text-sm text-gray-600">
+                                    <p id="item-image-file-name" class="mt-1 text-xs text-gray-500"></p>
+                                </div>
+                                <div id="item-image-url-block" class="hidden">
+                                    <label for="item-image-url-input" class="block text-sm text-gray-700 mb-1">{{ _('Image URL or site path') }}</label>
+                                    <div class="flex gap-2">
+                                        <input type="url" id="item-image-url-input" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="https://... or /static/...">
+                                        <button type="button" id="item-image-apply-url-btn" class="px-3 py-2 text-sm bg-teal-600 text-white rounded-md hover:bg-teal-700">{{ _('Preview') }}</button>
+                                    </div>
+                                </div>
+                                <div class="mt-4">
+                                    <img id="item-image-preview" alt="" class="hidden max-h-48 rounded border border-gray-200 bg-white">
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {# Plugin Field Configuration - Dynamically loaded from plugin templates #}
@@ -955,7 +1138,7 @@
             </div>
             {# --- END: Grid Container for Two Halves --- #}
 
-            <div class="flex justify-end space-x-3 mt-4">
+            <div class="item-modal-actions flex justify-end space-x-3 mt-4">
                 <button type="button" class="btn btn-secondary close-modal">{{ _('Cancel') }}</button>
                 <button type="submit" id="item-modal-submit-btn" name="submit" class="btn btn-success">{{ _('Add Item') }}</button>
             </div>

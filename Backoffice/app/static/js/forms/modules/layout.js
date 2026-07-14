@@ -358,14 +358,14 @@ function createFlexibleLayoutContainer(fieldGroups) {
             const percentWidth = (width / 12) * 100;
             debugLog('layout', `Adding field ${fieldIndex + 1} to row ${groupIndex + 1} with width ${width} (${percentWidth}%)`);
 
-            // Detect blank spacer blocks
             const isBlank = field.getAttribute('data-item-type') === 'blank';
+            const isImage = field.getAttribute('data-item-type') === 'image';
 
             // Create a wrapper div with percentage-based width
             const wrapper = document.createElement('div');
             // Add padding and set both class-based and inline width for better browser support
             // Use a smaller bottom margin to reduce vertical spacing between form items
-            wrapper.className = `px-3 ${isBlank ? '' : 'mb-0'} min-w-0 flex-shrink-0`;
+            wrapper.className = `px-3 ${(isBlank || isImage) ? '' : 'mb-0'} min-w-0 flex-shrink-0`;
             wrapper.style.width = `${percentWidth}%`;
             wrapper.style.flexBasis = `${percentWidth}%`;
             wrapper.style.maxWidth = `${percentWidth}%`; // Add max-width to prevent flex-grow

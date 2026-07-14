@@ -19,25 +19,32 @@ export const RuleUIMixin = {
         if (!this.modalElement) return;
         const rightHalf = this.modalElement.querySelector('.modal-right-half');
         const gridContainer = this.modalElement.querySelector('.modal-grid-container');
-        const modalContent = this.modalElement.querySelector('.relative.p-6');
+        const modalContent = this.getModalPanel
+            ? this.getModalPanel()
+            : this.modalElement.querySelector('.item-modal-panel') || this.modalElement.querySelector('.relative.p-6');
         if (!rightHalf || !gridContainer || !modalContent) return;
 
         const hasVisible = Array.from(rightHalf.children).some((ch) =>
             !ch.classList.contains('hidden') && ch.style.display !== 'none'
         );
+        const fillMode = typeof this.isFillContentMode === 'function' && this.isFillContentMode();
 
         if (hasVisible) {
             Utils.showElement(rightHalf);
             gridContainer.classList.add('md:grid-cols-2');
             gridContainer.classList.remove('grid-cols-1');
-            modalContent.classList.remove('max-w-xl', 'max-w-lg', 'max-w-4xl');
-            modalContent.classList.add('max-w-6xl');
+            if (!fillMode) {
+                modalContent.classList.remove('max-w-xl', 'max-w-lg', 'max-w-4xl');
+                modalContent.classList.add('max-w-6xl');
+            }
         } else {
             Utils.hideElement(rightHalf);
             gridContainer.classList.remove('md:grid-cols-2');
             gridContainer.classList.add('grid-cols-1');
-            modalContent.classList.remove('max-w-6xl', 'max-w-4xl', 'max-w-lg');
-            modalContent.classList.add('max-w-xl');
+            if (!fillMode) {
+                modalContent.classList.remove('max-w-6xl', 'max-w-4xl', 'max-w-lg');
+                modalContent.classList.add('max-w-xl');
+            }
         }
 
         if (!this._scrollRafQueued) {
@@ -77,7 +84,9 @@ export const RuleUIMixin = {
 
         const rightHalf = this.modalElement.querySelector('.modal-right-half');
         const gridContainer = this.modalElement.querySelector('.modal-grid-container');
-        const modalContent = this.modalElement.querySelector('.relative.p-6');
+        const modalContent = this.getModalPanel
+            ? this.getModalPanel()
+            : this.modalElement.querySelector('.item-modal-panel') || this.modalElement.querySelector('.relative.p-6');
 
         const relevanceSection = this.modalElement.querySelector('#item-relevance-rule-section');
         const validationSection = this.modalElement.querySelector('#item-validation-rule-section');
@@ -94,7 +103,7 @@ export const RuleUIMixin = {
             gridContainer.classList.remove('md:grid-cols-2');
             gridContainer.classList.add('grid-cols-1');
         }
-        if (modalContent) {
+        if (modalContent && !(typeof this.isFillContentMode === 'function' && this.isFillContentMode())) {
             modalContent.classList.remove('max-w-6xl');
             modalContent.classList.remove('max-w-4xl');
             modalContent.classList.add('max-w-xl');
@@ -175,8 +184,23 @@ export const RuleUIMixin = {
             }
         }
 
-        // Handle validation rules
-        if (validationRuleBuilder && hasRuleData(itemData.validation_condition)) {
+        // Handle validation rules (skipped for display-only items)
+        const isDisplayOnly = this.isDisplayOnlyItemType && this.isDisplayOnlyItemType(
+            this.currentItemType,
+            this.currentQuestionType || (this.modalElement?.querySelector('#item-question-type-select')?.value)
+        );
+
+        if (isDisplayOnly) {
+            if (validationSection) Utils.hideElement(validationSection);
+            if (validationRuleBuilder) {
+                validationRuleBuilder.removeAttribute('data-rule-json');
+                validationRuleBuilder.replaceChildren();
+            }
+            const validationButton = this.modalElement.querySelector('[data-target="#item-validation-rule-section"]');
+            if (validationButton && typeof this.renderRuleToggleButton === 'function') {
+                this.renderRuleToggleButton(validationButton, 'add');
+            }
+        } else if (validationRuleBuilder && hasRuleData(itemData.validation_condition)) {
 
 
             // Show the validation section

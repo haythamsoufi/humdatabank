@@ -1196,7 +1196,7 @@
                                             {{ assignment_status_pipeline_badge(
                                                 item.status,
                                                 item.item_object.assigned_form.is_effectively_closed,
-                                                session.get('language', 'en'),
+                                                _ui_language,
                                                 item.item_object
                                             ) }}
                                             {# Inline: "by: <user> at: <time>" for the current status actor #}
@@ -1276,7 +1276,7 @@
 
                                 </div>
                                 {# Bottom corner elements - RTL aware positioning #}
-                                {% set current_lang = session.get('language', 'en') %}
+                                {% set current_lang = _ui_language %}
                                 <!-- Debug: Current language is {{ current_lang }} -->
                                 <div class="absolute bottom-2 flex items-center space-x-2 {% if current_lang == 'ar' %}left-2{% else %}right-2{% endif %}">
                                     {# "Self-Reported" label #}
@@ -1673,7 +1673,7 @@
                                                     {{ assignment_status_pipeline_badge(
                                                         item.status,
                                                         item.item_object.assigned_form.is_effectively_closed,
-                                                        session.get('language', 'en'),
+                                                        _ui_language,
                                                         item.item_object
                                                     ) }}
                                                 {% else %}

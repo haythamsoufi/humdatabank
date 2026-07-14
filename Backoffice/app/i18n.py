@@ -2,10 +2,12 @@
 
 from datetime import datetime, timezone
 
-from flask import current_app, request, session
+from flask import current_app, g, request, session
 from flask_login import current_user
 
 from config import Config
+
+LANGUAGE_COOKIE_NAME = "ui_language"
 
 
 def resolve_supported_language(language, supported=None):
@@ -63,19 +65,53 @@ def seed_session_language_from_user(user):
     if resolved:
         session["language"] = resolved
         session.permanent = True
+        queue_language_cookie(resolved)
+
+
+def queue_language_cookie(language_code):
+    """Queue the dedicated language cache cookie for this response."""
+    resolved = resolve_supported_language(language_code)
+    if resolved:
+        g.language_cookie_to_set = resolved
+
+
+def persist_queued_language_cookie(response):
+    """Write a queued language cookie without touching it on ordinary requests."""
+    language_code = getattr(g, "language_cookie_to_set", None)
+    if not language_code:
+        return response
+    lifetime = current_app.permanent_session_lifetime
+    response.set_cookie(
+        LANGUAGE_COOKIE_NAME,
+        language_code,
+        max_age=int(lifetime.total_seconds()),
+        secure=bool(current_app.config.get("SESSION_COOKIE_SECURE", False)),
+        httponly=True,
+        samesite=current_app.config.get("SESSION_COOKIE_SAMESITE", "Lax"),
+        path="/",
+    )
+    return response
 
 
 def get_locale():
-    """Determine the active locale from session, user preference, or Accept-Language."""
+    """Determine locale from the dedicated cache, seeding it once when needed."""
     supported_langs = current_app.config.get('SUPPORTED_LANGUAGES', Config.LANGUAGES)
-    if 'language' in session:
-        return session['language']
+    cached = request.cookies.get(LANGUAGE_COOKIE_NAME)
+    if cached:
+        resolved = resolve_supported_language(cached, supported_langs)
+        if resolved:
+            return resolved
     if current_user.is_authenticated:
         stored = getattr(current_user, 'preferred_language', None)
         if stored:
             resolved = resolve_supported_language(stored, supported_langs)
             if resolved:
+                queue_language_cookie(resolved)
                 return resolved
+    if 'language' in session:
+        resolved = resolve_supported_language(session['language'], supported_langs)
+        if resolved:
+            return resolved
     return request.accept_languages.best_match(supported_langs) or supported_langs[0]
 
 

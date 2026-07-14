@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from flask import current_app
 from flask_babel import force_locale
 
+from sqlalchemy import and_, func, or_
+
 from app import db
 from app.models import IndicatorBank, IndicatorBankType, IndicatorBankUnit, Sector, SubSector
 from app.utils.form_localization import get_localized_indicator_type, get_localized_indicator_unit
@@ -370,3 +372,122 @@ def get_indicator_list(
     indicators = query.all()
     items = serialize_indicator_list(indicators)
     return items, len(items), None, None
+
+
+def data_entry_has_content_criterion(model):
+    """True when a submission row carries any scalar or disaggregated payload."""
+    non_empty_value = and_(
+        model.value.isnot(None),
+        func.trim(model.value) != '',
+    )
+    return or_(
+        non_empty_value,
+        model.disagg_data.isnot(None),
+        model.prefilled_value.isnot(None),
+        model.prefilled_disagg_data.isnot(None),
+        model.imputed_value.isnot(None),
+        model.imputed_disagg_data.isnot(None),
+    )
+
+
+def batch_template_counts(indicator_ids: Sequence[int]) -> Dict[int, int]:
+    """Distinct form templates that reference each indicator via FormItem."""
+    ids = [int(i) for i in indicator_ids if i is not None]
+    if not ids:
+        return {}
+
+    from app.models.form_items import FormItem
+
+    rows = (
+        db.session.query(
+            FormItem.indicator_bank_id,
+            func.count(func.distinct(FormItem.template_id)).label('count'),
+        )
+        .filter(
+            FormItem.indicator_bank_id.in_(ids),
+            FormItem.template_id.isnot(None),
+        )
+        .group_by(FormItem.indicator_bank_id)
+        .all()
+    )
+    return {row.indicator_bank_id: int(row.count) for row in rows}
+
+
+def batch_data_value_counts(indicator_ids: Sequence[int]) -> Dict[int, int]:
+    """Content-bearing submission rows per indicator across all data tables."""
+    ids = [int(i) for i in indicator_ids if i is not None]
+    if not ids:
+        return {}
+
+    from app.models.form_items import FormItem
+    from app.models.forms import DynamicIndicatorData, FormData, RepeatGroupData
+
+    counts: Dict[int, int] = {iid: 0 for iid in ids}
+
+    def _merge(rows):
+        for row in rows:
+            counts[row.indicator_bank_id] = counts.get(row.indicator_bank_id, 0) + int(row.count)
+
+    form_data_rows = (
+        db.session.query(
+            FormItem.indicator_bank_id,
+            func.count(FormData.id).label('count'),
+        )
+        .join(FormData, FormData.form_item_id == FormItem.id)
+        .filter(
+            FormItem.indicator_bank_id.in_(ids),
+            data_entry_has_content_criterion(FormData),
+        )
+        .group_by(FormItem.indicator_bank_id)
+        .all()
+    )
+    _merge(form_data_rows)
+
+    repeat_data_rows = (
+        db.session.query(
+            FormItem.indicator_bank_id,
+            func.count(RepeatGroupData.id).label('count'),
+        )
+        .join(RepeatGroupData, RepeatGroupData.form_item_id == FormItem.id)
+        .filter(
+            FormItem.indicator_bank_id.in_(ids),
+            data_entry_has_content_criterion(RepeatGroupData),
+        )
+        .group_by(FormItem.indicator_bank_id)
+        .all()
+    )
+    _merge(repeat_data_rows)
+
+    dynamic_rows = (
+        db.session.query(
+            DynamicIndicatorData.indicator_bank_id,
+            func.count(DynamicIndicatorData.id).label('count'),
+        )
+        .filter(
+            DynamicIndicatorData.indicator_bank_id.in_(ids),
+            data_entry_has_content_criterion(DynamicIndicatorData),
+        )
+        .group_by(DynamicIndicatorData.indicator_bank_id)
+        .all()
+    )
+    _merge(dynamic_rows)
+
+    return counts
+
+
+def get_indicator_data_value_count(indicator_bank_id: int) -> int:
+    """Live count of content-bearing submission rows for one indicator."""
+    return batch_data_value_counts([indicator_bank_id]).get(int(indicator_bank_id), 0)
+
+
+def attach_indicator_usage_cache(indicators: Sequence[IndicatorBank]) -> None:
+    """Prefetch template and data-value counts onto indicator ORM instances."""
+    indicator_ids = [ind.id for ind in indicators if ind and ind.id is not None]
+    template_counts = batch_template_counts(indicator_ids)
+    data_value_counts = batch_data_value_counts(indicator_ids)
+
+    for indicator in indicators:
+        template_count = template_counts.get(indicator.id, 0)
+        indicator._cached_template_count = template_count
+        indicator._cached_data_value_count = data_value_counts.get(indicator.id, 0)
+        indicator._cached_usage_count = template_count

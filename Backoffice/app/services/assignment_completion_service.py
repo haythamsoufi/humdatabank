@@ -141,7 +141,7 @@ class AssignmentCompletionService:
         non_document_count, document_count = (
             db.session.query(
                 func.coalesce(
-                    func.sum(case((FormItem.item_type != 'document_field', 1), else_=0)),
+                    func.sum(case((FormItem.item_type.notin_(['document_field', 'image']), 1), else_=0)),
                     0,
                 ),
                 func.coalesce(

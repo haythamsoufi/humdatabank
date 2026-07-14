@@ -108,6 +108,7 @@ class TestSetLanguage:
         with patch("app.utils.redirect_utils.is_safe_redirect_url", return_value=False):
             resp = client.get("/language/fr")
         assert resp.status_code == 302
+        assert "ui_language=fr" in resp.headers.get("Set-Cookie", "")
         # After redirect, language should be in session
         with client.session_transaction() as sess:
             assert sess.get("language") == "fr"

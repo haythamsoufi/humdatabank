@@ -93,6 +93,8 @@ class FormItemProcessor:
             cls._setup_document_properties(form_item)
         elif form_item.is_matrix:
             cls._setup_matrix_properties(form_item)
+        elif form_item.is_image:
+            cls._setup_image_properties(form_item)
         elif form_item.item_type and form_item.item_type.startswith('plugin_'):
             cls._setup_plugin_properties(form_item)
 
@@ -211,6 +213,36 @@ class FormItemProcessor:
         form_item.display_label = form_item.label
 
     @classmethod
+    def _setup_image_properties(cls, form_item: FormItem):
+        """Set up image display item properties for entry-form rendering."""
+        from app.utils.form_localization import get_translation_key
+        from app.utils.template_image_assets import resolve_display_url, resolve_locale_image_source
+
+        form_item.display_label = form_item.label or ''
+        form_item.is_required_for_js = False
+
+        locale = get_translation_key()
+        source = resolve_locale_image_source(form_item.config, locale, fallback_locales=['en'])
+        form_item._display_image_url = resolve_display_url(
+            source,
+            template_id=form_item.template_id,
+            item_id=form_item.id,
+            language=locale,
+            for_entry=True,
+        ) if source else ''
+
+        image_cfg = (form_item.config or {}).get('image') if isinstance(form_item.config, dict) else {}
+        if isinstance(image_cfg, dict):
+            form_item._display_image_alignment = image_cfg.get('alignment') or 'center'
+            form_item._display_image_max_width = image_cfg.get('max_width') or '100%'
+        else:
+            form_item._display_image_alignment = 'center'
+            form_item._display_image_max_width = '100%'
+
+        alt = form_item.description or ''
+        form_item._display_alt = alt
+
+    @classmethod
     def _setup_plugin_properties(cls, form_item: FormItem):
         """Set up plugin-specific properties"""
         form_item.display_label = form_item.label
@@ -284,33 +316,51 @@ class FormItemProcessor:
                 if translated_label and translated_label.strip():
                     form_item.display_label = translated_label
 
-            # Apply custom definition translation if available
+            # Apply custom definition translation if available (display only — never mutate ORM)
             if form_item.definition_translations:
                 definitions_map = _parse_translations_map(form_item.definition_translations)
                 translated_definition = _first_translation(definitions_map, preferred_keys)
                 if translated_definition and translated_definition.strip():
-                    form_item.definition = translated_definition
+                    form_item._display_definition = translated_definition
 
-        # Add translation support for questions, document fields, and matrix items
-        if (form_item.is_question or form_item.is_document_field or getattr(form_item, 'item_type', None) == 'matrix') and form_item.label_translations:
+        # Add translation support for questions, document fields, matrix, and image items
+        if (form_item.is_question or form_item.is_document_field or getattr(form_item, 'item_type', None) == 'matrix' or form_item.is_image) and form_item.label_translations:
             translations_map = _parse_translations_map(form_item.label_translations)
             translated_label = _first_translation(translations_map, preferred_keys)
             if translated_label and translated_label.strip():
                 form_item.display_label = translated_label
 
-            # Add definition translation for questions
-            if form_item.is_question and form_item.definition_translations:
-                definitions_map = _parse_translations_map(form_item.definition_translations)
-                translated_definition = _first_translation(definitions_map, preferred_keys)
-                if translated_definition and translated_definition.strip():
-                    form_item.definition = translated_definition
-
-            # Add description translation for document fields
+            # Add description translation for document fields and image alt text
             if form_item.is_document_field and form_item.description_translations:
                 descriptions_map = _parse_translations_map(form_item.description_translations)
                 translated_description = _first_translation(descriptions_map, preferred_keys)
                 if translated_description and translated_description.strip():
                     form_item.description = translated_description
+
+        # Question definition translations apply even when label_translations is empty
+        # (common for Blank/Note items with optional headings).
+        if form_item.is_question and form_item.definition_translations:
+            definitions_map = _parse_translations_map(form_item.definition_translations)
+            translated_definition = _first_translation(definitions_map, preferred_keys)
+            if translated_definition and translated_definition.strip():
+                form_item._display_definition = translated_definition
+
+        if form_item.is_image and form_item.description_translations:
+            descriptions_map = _parse_translations_map(form_item.description_translations)
+            translated_alt = _first_translation(descriptions_map, preferred_keys)
+            if translated_alt and translated_alt.strip():
+                form_item._display_alt = translated_alt
+
+        if form_item.is_image:
+            from app.utils.template_image_assets import resolve_display_url, resolve_locale_image_source
+            source = resolve_locale_image_source(form_item.config, translation_key, fallback_locales=['en'])
+            form_item._display_image_url = resolve_display_url(
+                source,
+                template_id=form_item.template_id,
+                item_id=form_item.id,
+                language=translation_key,
+                for_entry=True,
+            ) if source else getattr(form_item, '_display_image_url', '')
 
         # Add options translation support for questions
         if form_item.is_question and form_item.options_translations:

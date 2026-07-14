@@ -503,11 +503,27 @@ class TestIndicatorBank:
             assert isinstance(count, int)
 
     def test_usage_count_with_cache(self, db_session, app):
-        """Test usage_count returns cached value."""
+        """Test usage_count returns cached template count."""
         with app.app_context():
             ind = self._create_indicator(db_session)
+            ind._cached_template_count = 42
             ind._cached_usage_count = 42
             assert ind.usage_count == 42
+            assert ind.template_count == 42
+
+    def test_template_count_with_cache(self, db_session, app):
+        """Test template_count returns cached value."""
+        with app.app_context():
+            ind = self._create_indicator(db_session)
+            ind._cached_template_count = 3
+            assert ind.template_count == 3
+
+    def test_data_value_count_with_cache(self, db_session, app):
+        """Test data_value_count returns cached value."""
+        with app.app_context():
+            ind = self._create_indicator(db_session)
+            ind._cached_data_value_count = 17
+            assert ind.data_value_count == 17
 
     def test_get_name_translation(self, db_session, app):
         """Test get_name_translation."""

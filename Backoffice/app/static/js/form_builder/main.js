@@ -984,6 +984,28 @@ function initializeItemManagement() {
                 };
                 ItemModal.showEditModal(dataset.matrixItemId, 'matrix', itemData);
             }
+
+            const imageBtn = e.target.closest('.edit-image-item-btn');
+            if (imageBtn) {
+                e.preventDefault();
+                const dataset = imageBtn.dataset;
+                const itemData = {
+                    id: dataset.imageItemId,
+                    label: dataset.imageItemLabel,
+                    description: dataset.imageItemDescription,
+                    section_id: dataset.currentSectionId || null,
+                    order: dataset.imageItemOrder,
+                    is_required: false,
+                    relevance_condition: dataset.relevanceCondition,
+                    layout_column_width: dataset.layoutColumnWidth,
+                    layout_break_after: dataset.layoutBreakAfter === 'true',
+                    privacy: dataset.privacy,
+                    label_translations: JSON.parse(dataset.labelTranslations || '{}'),
+                    description_translations: JSON.parse(dataset.descriptionTranslations || '{}'),
+                    config: dataset.imageConfig ? JSON.parse(dataset.imageConfig) : {}
+                };
+                ItemModal.showEditModal(dataset.imageItemId, 'image', itemData);
+            }
         });
     }
 

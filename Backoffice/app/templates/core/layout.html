@@ -1,7 +1,8 @@
 {% from "components/_svg_icons.html" import svg_icon %}
 {% from "components/_profile_icon.html" import profile_icon, profile_icon_button, profile_icon_tooltip %}
+{% set _ui_language = current_ui_language() %}
 <!DOCTYPE html>
-<html lang="en"{% if mobile_app_embedded|default(false) %} data-mobile-app="true" class="mobile-app mobile-app-embedded"{% endif %}>
+<html lang="{{ _ui_language }}"{% if mobile_app_embedded|default(false) %} data-mobile-app="true" class="mobile-app mobile-app-embedded"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -90,7 +91,7 @@
             }
 
             // Set RTL direction immediately for Arabic (before CSS applies)
-            const currentLanguage = '{{ session.get('language', 'en') }}';
+            const currentLanguage = {{ _ui_language | tojson }};
             if (currentLanguage === 'ar') {
                 document.documentElement.setAttribute('dir', 'rtl');
             } else {
@@ -162,7 +163,7 @@
 {% set nav_documentation_active = request.endpoint and request.endpoint.startswith('help_docs.') %}
 {# Use centralized is_admin_user helper from AuthorizationService #}
 {% set is_admin_user = is_admin_user() %}
-<body class="bg-gray-100 font-sans {% if is_focal_point %}focal-point{% endif %}{% if show_staging_banner %} has-staging-banner{% endif %}" data-language="{{ session.get('language', 'en') }}">
+<body class="bg-gray-100 font-sans {% if is_focal_point %}focal-point{% endif %}{% if show_staging_banner %} has-staging-banner{% endif %}" data-language="{{ _ui_language }}">
     {% include 'components/_staging_environment_banner.html' %}
     <div class="flex h-screen staging-app-shell">
         {% if is_admin_user %}
@@ -225,9 +226,7 @@
                         <div class="language-selector-container hidden sm:block">
                             <button id="language-selector-button" class="language-selector-button {% if SHOW_LANGUAGE_FLAGS %}flags-only{% endif %}" aria-label="{{ _('Language') }}" aria-expanded="false" aria-haspopup="true">
                                 <div class="current-language">
-                                    {% set current_lang_raw = session.get('language', 'en') %}
-                                    {% set current_lang_norm = (current_lang_raw|string|lower|replace('-', '_')) %}
-                                    {% set current_lang = (current_lang_norm.split('_')[0] if current_lang_norm else 'en') %}
+                                    {% set current_lang = _ui_language %}
                                     {% if SHOW_LANGUAGE_FLAGS %}
                                     <img src="{{ url_for('main.language_flag_svg', language=current_lang) }}" alt="" class="inline-block w-5 h-5 mr-2 align-text-bottom" loading="lazy" decoding="async">
                                     {% endif %}
@@ -385,12 +384,10 @@
                          {{ svg_icon('chevron-right', 'collapsable-icon w-4 h-4') }}
                     </div>
                     <div class="collapsable-content">
-                        {% set session_lang_norm = (session.get('language', 'en')|string|lower|replace('-', '_')) %}
-                        {% set session_lang_base = (session_lang_norm.split('_')[0] if session_lang_norm else 'en') %}
                         {% for code in SUPPORTED_LANGUAGES %}
                             {% set code_norm = (code|string|lower|replace('-', '_')) %}
                             {% set code_base = (code_norm.split('_')[0] if code_norm else code) %}
-                            <a href="{{ url_for('main.set_language', language=code_base) }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white {% if session_lang_base == code_base %}active{% endif %}" title="{{ (language_native_name(code_base) or LANGUAGE_DISPLAY_NAMES.get(code_base) or ALL_LANGUAGES_DISPLAY_NAMES.get(code_base) or code_base.upper()) }}">
+                            <a href="{{ url_for('main.set_language', language=code_base) }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white {% if _ui_language == code_base %}active{% endif %}" title="{{ (language_native_name(code_base) or LANGUAGE_DISPLAY_NAMES.get(code_base) or ALL_LANGUAGES_DISPLAY_NAMES.get(code_base) or code_base.upper()) }}">
                                 {% if SHOW_LANGUAGE_FLAGS %}
                                 <img src="{{ url_for('main.language_flag_svg', language=code_base) }}" alt="" class="inline-block w-6 h-6 mr-3 align-text-bottom" loading="lazy" decoding="async">
                                 {% endif %}
@@ -433,12 +430,10 @@
                          {{ svg_icon('chevron-right', 'collapsable-icon w-4 h-4') }}
                     </div>
                     <div class="collapsable-content">
-                        {% set session_lang_norm = (session.get('language', 'en')|string|lower|replace('-', '_')) %}
-                        {% set session_lang_base = (session_lang_norm.split('_')[0] if session_lang_norm else 'en') %}
                         {% for code in SUPPORTED_LANGUAGES %}
                             {% set code_norm = (code|string|lower|replace('-', '_')) %}
                             {% set code_base = (code_norm.split('_')[0] if code_norm else code) %}
-                            <a href="{{ url_for('main.set_language', language=code_base) }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white {% if session_lang_base == code_base %}active{% endif %}" title="{{ (language_native_name(code_base) or LANGUAGE_DISPLAY_NAMES.get(code_base) or ALL_LANGUAGES_DISPLAY_NAMES.get(code_base) or code_base.upper()) }}">
+                            <a href="{{ url_for('main.set_language', language=code_base) }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white {% if _ui_language == code_base %}active{% endif %}" title="{{ (language_native_name(code_base) or LANGUAGE_DISPLAY_NAMES.get(code_base) or ALL_LANGUAGES_DISPLAY_NAMES.get(code_base) or code_base.upper()) }}">
                                 {% if SHOW_LANGUAGE_FLAGS %}
                                 <img src="{{ url_for('main.language_flag_svg', language=code_base) }}" alt="" class="inline-block w-6 h-6 mr-3 align-text-bottom" loading="lazy" decoding="async">
                                 {% endif %}

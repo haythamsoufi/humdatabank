@@ -395,7 +395,9 @@ def calculate_section_completion_status(all_sections, existing_data_processed, e
         filled_items_count = 0
         if hasattr(section, 'fields_ordered'):
             for field in section.fields_ordered:
-                if hasattr(field, 'field_type_for_js') and field.field_type_for_js.lower() == 'blank':
+                if hasattr(field, 'field_type_for_js') and field.field_type_for_js.lower() in ('blank', 'image'):
+                    continue
+                if getattr(field, 'is_image', False):
                     continue
 
                 total_items_in_section +=1

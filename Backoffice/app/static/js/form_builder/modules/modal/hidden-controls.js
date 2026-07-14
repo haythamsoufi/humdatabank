@@ -29,6 +29,11 @@ export const HiddenControlsMixin = {
             if (!el) return;
             if (el.tagName.toLowerCase() === 'input' && el.type === 'hidden') return;
             if (el.type === 'submit') return;
+            // Screen-reader-only value carriers (e.g. blank/note definition textarea
+            // synced from a contenteditable editor) must stay enabled so syncUIToShared
+            // and FormData can still read them. Tailwind sr-only uses position:absolute
+            // which makes offsetParent null and would otherwise disable them.
+            if (el.classList && el.classList.contains('sr-only')) return;
 
             const hidden = isActuallyHidden(el);
             if (hidden) {

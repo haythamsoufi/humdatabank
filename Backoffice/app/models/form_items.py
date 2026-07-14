@@ -148,6 +148,10 @@ class FormItem(db.Model):
         return self.item_type == 'matrix'
 
     @property
+    def is_image(self):
+        return self.item_type == 'image'
+
+    @property
     def is_plugin(self):
         """Returns True if this is a plugin field type."""
         return self.item_type.startswith('plugin_')
@@ -892,6 +896,10 @@ class FormItem(db.Model):
                     return 'blank'
                 return type_lower
             return 'text'  # Default fallback
+        elif self.is_matrix:
+            return 'matrix'
+        elif self.is_image:
+            return 'image'
         elif self.item_type and self.item_type.startswith('plugin_'):
             # For plugin items, return PLUGIN_{PLUGIN_TYPE}
             plugin_type = self.item_type.replace('plugin_', '')

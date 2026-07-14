@@ -73,7 +73,7 @@ def _remap_item_ref(raw_ref, id_map):
         return ref
 
     # Legacy prefixed ids that should resolve to numeric ids at runtime
-    m = re.match(r'^(question_|indicator_|document_field_|matrix_|form_item_)(\d+)$', ref)
+    m = re.match(r'^(question_|indicator_|document_field_|matrix_|image_|form_item_)(\d+)$', ref)
     if m:
         old = int(m.group(2))
         return str(id_map.get(old, old))

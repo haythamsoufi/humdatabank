@@ -115,25 +115,40 @@ export const TranslationUtils = (() => {
     });
   }
 
-  // Populate translation inputs within a modal for a given cssPrefix
+  // Populate translation inputs within a modal for a given cssPrefix.
+  // Also updates a sibling rich-text editor div (id = fieldId + '-editor') when
+  // BlankTranslationEditor has been activated for the definitions tab.
   function populateFields(cssPrefix, translations, baseEnglishText = '', fieldSuffix = '') {
     const suffix = fieldSuffix ? `-${fieldSuffix}` : '';
     supportedLanguages.forEach(langCode => {
       if (langCode === 'en') return;
       const fieldId = `${cssPrefix}-translation${suffix}-${langCode}`;
+      const value = (translations && translations[langCode]) || '';
       const field = document.getElementById(fieldId);
-      if (field) field.value = (translations && translations[langCode]) || '';
+      if (field) field.value = value;
+      // Also refresh rich-text editor if present (BlankTranslationEditor)
+      const editor = document.getElementById(fieldId + '-editor');
+      if (editor) editor.innerHTML = value;
     });
   }
 
+  // Collect translation values.  Prefers the rich-text editor's HTML when one
+  // is present and visible (activated by BlankTranslationEditor); falls back to
+  // the plain textarea value otherwise.
   function collectFields(cssPrefix, fieldSuffix = '') {
     const translations = {};
     const suffix = fieldSuffix ? `-${fieldSuffix}` : '';
     supportedLanguages.forEach(langCode => {
       if (langCode === 'en') return;
       const fieldId = `${cssPrefix}-translation${suffix}-${langCode}`;
-      const field = document.getElementById(fieldId);
-      if (field) translations[langCode] = field.value || '';
+      const editor = document.getElementById(fieldId + '-editor');
+      if (editor && !editor.classList.contains('hidden')) {
+        const raw = editor.innerHTML;
+        translations[langCode] = (raw === '<br>' || raw === '') ? '' : raw;
+      } else {
+        const field = document.getElementById(fieldId);
+        if (field) translations[langCode] = field.value || '';
+      }
     });
     return translations;
   }
@@ -145,6 +160,8 @@ export const TranslationUtils = (() => {
       const fieldId = `${cssPrefix}-translation${suffix}-${langCode}`;
       const field = document.getElementById(fieldId);
       if (field) field.value = '';
+      const editor = document.getElementById(fieldId + '-editor');
+      if (editor) editor.innerHTML = '';
     });
   }
 

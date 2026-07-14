@@ -673,6 +673,21 @@
     auto_translate_permission_code='admin.templates.edit'
 ) }}
 
+{# Image Item Translation Modal #}
+{{ translation_modal(
+    modal_id='image-translation-modal',
+    modal_title=_('Image Item Translations'),
+    context='form_item',
+    tabs=[
+        {'id': 'labels', 'name': _('Captions')},
+        {'id': 'descriptions', 'name': _('Alt text')}
+    ],
+    show_auto_translate=true,
+    css_prefix='image',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
 {# Dynamic Section: Indicator Note Translation Modal (shared across all dynamic sections) #}
 {{ translation_modal(
     modal_id='indicator-note-translation-modal',

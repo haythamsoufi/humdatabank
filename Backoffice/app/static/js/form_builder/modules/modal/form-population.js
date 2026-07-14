@@ -1,5 +1,6 @@
 import { attachRuleData } from '../rules/rule-builder-helpers.js';
 import { MatrixItem } from '../items/matrix.js';
+import { ImageItem } from '../items/image.js';
 import { QuestionItem } from '../items/question.js';
 import { IndicatorItem } from '../items/indicator.js';
 import { DocumentItem } from '../items/document.js';
@@ -42,6 +43,9 @@ export const FormPopulationMixin = {
                     break;
                 case 'matrix':
                     this.populateMatrixForm(itemData);
+                    break;
+                case 'image':
+                    this.populateImageForm(itemData);
                     break;
             }
         }
@@ -194,6 +198,27 @@ export const FormPopulationMixin = {
         this.autoShowRuleSections(itemData);
     },
 
+    populateImageForm: function(itemData) {
+        const sharedLabel = document.querySelector(this.sharedFields.label);
+        const sharedDescription = document.querySelector(this.sharedFields.description);
+        const sharedLabelTranslations = document.querySelector(this.sharedFields.label_translations);
+        const sharedDescriptionTranslations = document.querySelector(this.sharedFields.description_translations);
+
+        if (sharedLabel) sharedLabel.value = itemData.label || '';
+        if (sharedDescription) sharedDescription.value = itemData.description || '';
+        if (sharedLabelTranslations && itemData.label_translations) {
+            sharedLabelTranslations.value = JSON.stringify(itemData.label_translations);
+        }
+        if (sharedDescriptionTranslations && itemData.description_translations) {
+            sharedDescriptionTranslations.value = JSON.stringify(itemData.description_translations);
+        }
+
+        this.syncSharedToUI();
+        ImageItem.populateForm(this.modalElement, itemData);
+        this.populateCommonFields(itemData);
+        this.ensureDisplayOnlyPropertyFields('image');
+    },
+
     populatePluginBasicFields: function(itemData) {
         const labelInput = document.getElementById('item-plugin-label');
         const descriptionInput = document.getElementById('item-plugin-description');
@@ -221,6 +246,10 @@ export const FormPopulationMixin = {
     },
 
     populateCommonFields: function(itemData) {
+        const isDisplayOnly = this.isDisplayOnlyItemType && this.isDisplayOnlyItemType(
+            this.currentItemType,
+            this.currentQuestionType || (this.modalElement?.querySelector('#item-question-type-select')?.value)
+        );
         const requiredCheckbox = this.modalElement.querySelector('#item-required');
         const orderInput = this.modalElement.querySelector('#item-order');
         const dataNotAvailableCheckbox = this.modalElement.querySelector('#item-allow-data-not-available');
@@ -231,7 +260,7 @@ export const FormPopulationMixin = {
         const breakAfterCheckbox = this.modalElement.querySelector('#item-layout-break-after');
         const privacySelect = this.modalElement.querySelector('#item-privacy-select');
 
-        if (requiredCheckbox) {
+        if (requiredCheckbox && !isDisplayOnly) {
             requiredCheckbox.checked = parseBool(itemData.is_required);
         }
 
@@ -239,11 +268,11 @@ export const FormPopulationMixin = {
             orderInput.value = itemData.order;
         }
 
-        if (dataNotAvailableCheckbox) {
+        if (dataNotAvailableCheckbox && !isDisplayOnly) {
             dataNotAvailableCheckbox.checked = parseBool(itemData.allow_data_not_available);
         }
 
-        if (notApplicableCheckbox) {
+        if (notApplicableCheckbox && !isDisplayOnly) {
             notApplicableCheckbox.checked = parseBool(itemData.allow_not_applicable);
         }
 
@@ -295,7 +324,7 @@ export const FormPopulationMixin = {
             breakAfterCheckbox.checked = parseBool(itemData.layout_break_after);
         }
 
-        if (privacySelect) {
+        if (privacySelect && !isDisplayOnly) {
             let privacyValue = 'ifrc_network';
             try {
                 if (itemData) {

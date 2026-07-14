@@ -78,6 +78,11 @@
                     <span class="flex items-center justify-center w-12 h-12 rounded-xl bg-amber-100 text-amber-600 mb-2 group-hover:scale-110 transition-transform"><i class="fas fa-table text-xl"></i></span>
                     <span class="text-sm font-semibold text-gray-800 text-center leading-snug">{{ _('Matrix Table') }}</span>
                 </button>
+                <button type="button" class="{{ tile_base }} bg-gradient-to-br from-teal-50 to-white hover:border-teal-400 hover:shadow-teal-100 focus:ring-teal-500" data-item-type="image">
+                    <span class="item-type-tooltip-copy" aria-hidden="true">{{ _('Display an image with optional caption and alt text. Supports per-language images.') }}</span>
+                    <span class="flex items-center justify-center w-12 h-12 rounded-xl bg-teal-100 text-teal-600 mb-2 group-hover:scale-110 transition-transform"><i class="fas fa-image text-xl"></i></span>
+                    <span class="text-sm font-semibold text-gray-800 text-center leading-snug">{{ _('Image') }}</span>
+                </button>
                 {% for field_type in custom_field_types %}
                 <button type="button" class="{{ tile_base }} bg-gradient-to-br from-orange-50 to-white hover:border-orange-400 hover:shadow-orange-100 focus:ring-orange-500" data-item-type="plugin_{{ field_type.type_id }}">
                     <span class="item-type-tooltip-copy" aria-hidden="true">{{ field_type.description or _('Custom field type from a plugin.') }}</span>

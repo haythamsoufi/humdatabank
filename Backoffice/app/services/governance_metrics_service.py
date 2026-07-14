@@ -12,6 +12,7 @@ from datetime import timedelta
 from typing import Any, Dict, List
 
 from sqlalchemy import distinct, func, and_, or_, text
+from sqlalchemy.orm import joinedload
 
 from app import db
 from app.models import (
@@ -200,17 +201,142 @@ def _calculate_health_score(sections: Dict[str, Any]) -> Dict[str, Any]:
 def _get_ownership_metrics() -> Dict[str, Any]:
     """Focal point / data owner coverage."""
     from app.models.indicator_bank import IndicatorBank
+    from app.utils.organization_helpers import is_org_email
 
-    total_countries = Country.query.count()
-    countries_with_perm = (
-        db.session.query(UserEntityPermission.entity_id)
-        .filter(UserEntityPermission.entity_type == "country")
+    countries = (
+        Country.query
+        .options(joinedload(Country.fds_member_user))
+        .order_by(Country.name)
+        .all()
+    )
+    total_countries = len(countries)
+
+    focal_point_rows = (
+        db.session.query(
+            User.id,
+            User.name,
+            User.email,
+            UserEntityPermission.entity_id,
+        )
+        .join(UserEntityPermission, User.id == UserEntityPermission.user_id)
+        .join(RbacUserRole, User.id == RbacUserRole.user_id)
+        .join(RbacRole, RbacUserRole.role_id == RbacRole.id)
+        .filter(
+            RbacRole.code == "assignment_editor_submitter",
+            UserEntityPermission.entity_type == "country",
+        )
         .distinct()
         .all()
     )
-    country_ids_with_focal = {r[0] for r in countries_with_perm}
+
+    admin_role_user_ids = {
+        user_id
+        for (user_id,) in (
+            db.session.query(RbacUserRole.user_id)
+            .join(RbacRole, RbacUserRole.role_id == RbacRole.id)
+            .filter(
+                or_(
+                    RbacRole.code == "system_manager",
+                    RbacRole.code.like("admin_%"),
+                )
+            )
+            .all()
+        )
+    }
+
+    org_focal_ids_by_country: Dict[int, set] = {}
+    non_org_focal_ids_by_country: Dict[int, set] = {}
+    # {country_id: {user_id: {"name": ..., "email": ...}}}
+    org_focal_users_by_country: Dict[int, Dict[int, dict]] = {}
+    non_org_focal_users_by_country: Dict[int, Dict[int, dict]] = {}
+    for user_id, user_name, email, country_id in focal_point_rows:
+        display = (user_name or "").strip() or email or f"User {user_id}"
+        info = {"name": display, "email": email or ""}
+        if is_org_email(email):
+            # Organization administrators are not focal points merely because
+            # they also retain the editor/submitter role.
+            if user_id not in admin_role_user_ids:
+                org_focal_ids_by_country.setdefault(country_id, set()).add(user_id)
+                org_focal_users_by_country.setdefault(country_id, {})[user_id] = info
+        else:
+            non_org_focal_ids_by_country.setdefault(country_id, set()).add(user_id)
+            non_org_focal_users_by_country.setdefault(country_id, {})[user_id] = info
+
+    from app.models import NationalSociety
+    from app.services.country_service import fds_member_user_display_name
+
+    # NS "part of" programmes/categories, aggregated per country (union across NSs).
+    ns_part_of_by_country: Dict[int, set] = {}
+    ns_part_of_categories: set = set()
+    for ns in NationalSociety.query.filter(NationalSociety.part_of.isnot(None)).all():
+        if not isinstance(ns.part_of, list):
+            continue
+        country_bucket = ns_part_of_by_country.setdefault(ns.country_id, set())
+        for item in ns.part_of:
+            if item and isinstance(item, str):
+                label = item.strip()
+                if label:
+                    country_bucket.add(label)
+                    ns_part_of_categories.add(label)
+    ns_part_of_categories_list = sorted(ns_part_of_categories)
+
+    country_focal_point_coverage = []
+    for country in countries:
+        org_count = len(org_focal_ids_by_country.get(country.id, set()))
+        non_org_count = len(non_org_focal_ids_by_country.get(country.id, set()))
+        fds_user = country.fds_member_user
+        fds_name = fds_member_user_display_name(fds_user) if fds_user else None
+        fds_email = (fds_user.email or "").strip() if fds_user else None
+        country_focal_point_coverage.append(
+            {
+                "id": country.id,
+                "name": country.name,
+                "iso3": getattr(country, "iso3", None),
+                "org_focal_points": org_count,
+                "non_org_focal_points": non_org_count,
+                "total_focal_points": org_count + non_org_count,
+                "org_focal_point_names": sorted(
+                    org_focal_users_by_country.get(country.id, {}).values(),
+                    key=lambda u: (u["name"] or "").casefold(),
+                ),
+                "non_org_focal_point_names": sorted(
+                    non_org_focal_users_by_country.get(country.id, {}).values(),
+                    key=lambda u: (u["name"] or "").casefold(),
+                ),
+                "fds_member_name": fds_name,
+                "fds_member_email": fds_email,
+                "ns_part_of": sorted(ns_part_of_by_country.get(country.id, set())),
+            }
+        )
+    country_focal_point_coverage.sort(
+        key=lambda country: (
+            country["total_focal_points"] > 0,
+            country["org_focal_points"] > 0
+            and country["non_org_focal_points"] > 0,
+            country["name"],
+        )
+    )
+
+    country_ids_with_focal = {
+        country["id"]
+        for country in country_focal_point_coverage
+        if country["total_focal_points"] > 0
+    }
     countries_with_focal_point = len(country_ids_with_focal)
     countries_without_focal_point = total_countries - countries_with_focal_point
+    countries_without_org_focal_point = sum(
+        1 for country in country_focal_point_coverage
+        if country["org_focal_points"] == 0
+    )
+    countries_without_non_org_focal_point = sum(
+        1 for country in country_focal_point_coverage
+        if country["non_org_focal_points"] == 0
+    )
+    countries_with_both_focal_point_types = sum(
+        1 for country in country_focal_point_coverage
+        if country["org_focal_points"] > 0
+        and country["non_org_focal_points"] > 0
+    )
 
     total_users = User.query.count()
     users_with_entities = (
@@ -218,12 +344,10 @@ def _get_ownership_metrics() -> Dict[str, Any]:
     )
     users_without_entities = max(0, total_users - users_with_entities)
 
-    # Flags: countries without focal point
-    all_country_ids = {c.id for c in Country.query.with_entities(Country.id).all()}
-    ids_without_focal = all_country_ids - country_ids_with_focal
     countries_without_focal_point_list = [
-        {"id": c.id, "name": c.name}
-        for c in Country.query.filter(Country.id.in_(ids_without_focal)).order_by(Country.name).all()
+        country
+        for country in country_focal_point_coverage
+        if country["total_focal_points"] == 0
     ]
 
     # Users assigned to many countries (>threshold)
@@ -314,6 +438,11 @@ def _get_ownership_metrics() -> Dict[str, Any]:
         "total_countries": total_countries,
         "countries_with_focal_point": countries_with_focal_point,
         "countries_without_focal_point": countries_without_focal_point,
+        "countries_without_org_focal_point": countries_without_org_focal_point,
+        "countries_without_non_org_focal_point": countries_without_non_org_focal_point,
+        "countries_with_both_focal_point_types": countries_with_both_focal_point_types,
+        "country_focal_point_coverage": country_focal_point_coverage,
+        "ns_part_of_categories": ns_part_of_categories_list,
         "users_without_entities": users_without_entities,
         "templates_without_owner": templates_without_owner,
         "total_active_assignments": total_active_assignments,
@@ -324,6 +453,16 @@ def _get_ownership_metrics() -> Dict[str, Any]:
         "users_with_entities_no_role": users_with_entities_no_role,
         "flags": {
             "countries_without_focal_point": countries_without_focal_point_list,
+            "countries_without_org_focal_point": [
+                country
+                for country in country_focal_point_coverage
+                if country["org_focal_points"] == 0
+            ],
+            "countries_without_non_org_focal_point": [
+                country
+                for country in country_focal_point_coverage
+                if country["non_org_focal_points"] == 0
+            ],
             "users_with_many_countries": users_with_many_countries,
             "active_assignments_no_owner": active_assignments_no_owner_list,
             "countries_missing_language": countries_missing_language_list,
@@ -951,6 +1090,11 @@ def _empty_metrics() -> Dict[str, Any]:
             "total_countries": 0,
             "countries_with_focal_point": 0,
             "countries_without_focal_point": 0,
+            "countries_without_org_focal_point": 0,
+            "countries_without_non_org_focal_point": 0,
+            "countries_with_both_focal_point_types": 0,
+            "country_focal_point_coverage": [],
+            "ns_part_of_categories": [],
             "users_without_entities": 0,
             "templates_without_owner": 0,
             "total_active_assignments": 0,
@@ -961,6 +1105,8 @@ def _empty_metrics() -> Dict[str, Any]:
             "users_with_entities_no_role": 0,
             "flags": {
                 "countries_without_focal_point": [],
+                "countries_without_org_focal_point": [],
+                "countries_without_non_org_focal_point": [],
                 "users_with_many_countries": [],
                 "active_assignments_no_owner": [],
                 "countries_missing_language": [],

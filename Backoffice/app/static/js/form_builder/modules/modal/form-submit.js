@@ -1,5 +1,6 @@
 import { setHiddenRuleField, setMultiHiddenFields } from '../rules/form-serialization.js';
 import { MatrixItem } from '../items/matrix.js';
+import { ImageItem } from '../items/image.js';
 import { DocumentItem } from '../items/document.js';
 import { PluginItem } from '../items/plugin.js';
 
@@ -76,7 +77,16 @@ export const FormSubmitMixin = {
                 const relevanceBuilder = this.modalElement.querySelector('#item-relevance-rule-builder');
                 const validationBuilder = this.modalElement.querySelector('#item-validation-rule-builder');
                 setHiddenRuleField(form, 'relevance_condition', relevanceBuilder);
-                setHiddenRuleField(form, 'validation_condition', validationBuilder);
+                const isDisplayOnly = this.isDisplayOnlyItemType
+                    && this.isDisplayOnlyItemType(this.currentItemType, this.currentQuestionType);
+                if (isDisplayOnly) {
+                    const validationCondition = form.querySelector('[name="validation_condition"]');
+                    const validationMessage = form.querySelector('[name="validation_message"]');
+                    if (validationCondition) validationCondition.value = '';
+                    if (validationMessage) validationMessage.value = '';
+                } else {
+                    setHiddenRuleField(form, 'validation_condition', validationBuilder);
+                }
             }
         } catch (_e) {}
 
@@ -92,6 +102,12 @@ export const FormSubmitMixin = {
         try {
             if (this.currentItemType === 'matrix') {
                 MatrixItem.updateConfig(this.modalElement);
+            }
+        } catch (_e) {}
+
+        try {
+            if (this.currentItemType === 'image') {
+                ImageItem.updateConfig(this.modalElement);
             }
         } catch (_e) {}
 
@@ -173,10 +189,19 @@ export const FormSubmitMixin = {
         setHiddenRuleField(form, 'relevance_condition', relevanceBuilder);
 
         const validationBuilder = this.modalElement.querySelector('#item-validation-rule-builder');
-        setHiddenRuleField(form, 'validation_condition', validationBuilder);
+        const isDisplayOnly = this.isDisplayOnlyItemType
+            && this.isDisplayOnlyItemType(this.currentItemType, this.currentQuestionType);
+        if (isDisplayOnly) {
+            const validationCondition = form.querySelector('[name="validation_condition"]');
+            const validationMessage = form.querySelector('[name="validation_message"]');
+            if (validationCondition) validationCondition.value = '';
+            if (validationMessage) validationMessage.value = '';
+        } else {
+            setHiddenRuleField(form, 'validation_condition', validationBuilder);
+        }
 
         const validationMessageInput = this.modalElement.querySelector('#item-validation-message');
-        if (validationMessageInput) {
+        if (validationMessageInput && !isDisplayOnly) {
             let validationMessageField = form.querySelector('input[name="validation_message"]');
             if (!validationMessageField) {
                 validationMessageField = document.createElement('input');

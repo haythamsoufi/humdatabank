@@ -3,6 +3,9 @@
 Covers: app/routes/admin/user_management/crud.py
 """
 
+import json
+import re
+
 import pytest
 from unittest.mock import patch, MagicMock
 from tests.factories import create_test_user, create_test_country
@@ -118,19 +121,55 @@ class TestManageUsers:
         assert "edit_denied_message" in resp.text
         assert "Only a System Manager can modify an admin user." in resp.text
 
-    def test_manage_users_includes_fds_member_data(self, logged_in_client, db_session):
-        """Users assigned as country FDS members appear with is_fds_member in grid JSON."""
+    def test_manage_users_maps_users_to_fds_members_by_country(
+        self, logged_in_client, db_session
+    ):
+        """A user's country entities identify the FDS members covering that user."""
         country = create_test_country(db_session, name="FDS Testland")
         fds_user = create_test_user(db_session, email="fds_list@example.com", role="admin")
+        covered_user = create_test_user(db_session, email="covered_user@example.com")
+        covered_admin = create_test_user(
+            db_session, email="covered_admin@example.com", role="admin"
+        )
         country.fds_member_user_id = fds_user.id
+        from app.models.core import UserEntityPermission
+        db_session.add_all(
+            [
+                UserEntityPermission(
+                    user_id=covered_user.id,
+                    entity_type="country",
+                    entity_id=country.id,
+                ),
+                UserEntityPermission(
+                    user_id=covered_admin.id,
+                    entity_type="country",
+                    entity_id=country.id,
+                ),
+            ]
+        )
         db_session.commit()
 
         resp = logged_in_client.get("/admin/users")
         assert resp.status_code == 200
-        assert "is_fds_member" in resp.text
-        assert "fds_member_countries" in resp.text
-        assert "FDS Member" in resp.text
-        assert "FDS Testland" in resp.text
+        match = re.search(
+            r'<script type="application/json" id="users-grid-data">(.*?)</script>',
+            resp.text,
+            re.DOTALL,
+        )
+        assert match is not None
+        rows = json.loads(match.group(1))
+        covered_row = next(row for row in rows if row["id"] == covered_user.id)
+        covered_admin_row = next(row for row in rows if row["id"] == covered_admin.id)
+        assert covered_row["fds_members"] == [
+            {
+                "active": True,
+                "countries": ["FDS Testland"],
+                "email": "fds_list@example.com",
+                "id": fds_user.id,
+                "name": fds_user.name or fds_user.email,
+            }
+        ]
+        assert covered_admin_row["fds_members"] == []
 
 
 # ---------------------------------------------------------------------------

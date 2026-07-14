@@ -60,5 +60,8 @@ handle_excel_import = _import_excel_impl
 from .matrix_api import register_matrix_api_routes  # noqa: E402
 register_matrix_api_routes(bp)
 
+from .template_images import register_template_image_routes  # noqa: E402
+register_template_image_routes(bp)
+
 # Make preview_template importable at package level (used by tests)
 preview_template = _preview_template_impl

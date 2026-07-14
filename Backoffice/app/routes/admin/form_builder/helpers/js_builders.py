@@ -290,6 +290,14 @@ def _build_section_items_for_template(section_obj, all_sections, all_template_it
                 'form': edit_form_instance
             })
 
+        elif form_item_obj.is_image:
+            from app.forms.form_builder import ImageForm
+            edit_form_instance = ImageForm(obj=form_item_obj, prefix=f"edit_item_{form_item_obj.id}")
+            edit_form_instance.section_id.choices = [(s.id, s.name) for s in all_sections]
+            edit_form_instance.section_id.data = section_obj.id
+            if form_item_obj.config:
+                edit_form_instance.image_config.data = json.dumps(form_item_obj.config)
+
         elif form_item_obj.is_plugin:
             # Plugin items don't need edit forms in the same way
             # They use the unified modal system
@@ -318,6 +326,10 @@ def _build_section_items_for_template(section_obj, all_sections, all_template_it
             item_id = f'matrix_{form_item_obj.id}'
             item_label = f'Matrix: {form_item_obj.label}'
             item_model = 'matrix'
+        elif form_item_obj.is_image:
+            item_id = f'image_{form_item_obj.id}'
+            item_label = f'Image: {form_item_obj.label or "Image"}'
+            item_model = 'image'
         elif form_item_obj.is_plugin:
             plugin_type = form_item_obj.item_type.replace('plugin_', '')
             item_id = f'plugin_{form_item_obj.id}'
@@ -387,6 +399,8 @@ def _build_section_items_for_template(section_obj, all_sections, all_template_it
             combined.append({'type': 'plugin', 'item': x['form_item'], 'form': x['form']})
         elif x['form_item'].item_type == 'matrix':
             combined.append({'type': 'matrix', 'item': x['form_item'], 'form': x['form']})
+        elif x['form_item'].item_type == 'image':
+            combined.append({'type': 'image', 'item': x['form_item'], 'form': x['form']})
 
     combined_sorted = sorted(combined, key=lambda y: getattr(y['item'], 'order', 0))
 

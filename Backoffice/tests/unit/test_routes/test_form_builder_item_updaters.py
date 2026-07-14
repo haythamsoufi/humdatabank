@@ -17,6 +17,7 @@ from app.routes.admin.form_builder.helpers.item_updaters import (
     _update_question_fields,
     _update_document_field_fields,
     _update_matrix_fields,
+    _update_image_fields,
     _update_item_config,
     _update_plugin_fields,
 )
@@ -951,3 +952,48 @@ class TestUpdatePluginFields:
         del form.layout_column_width
         _update_plugin_fields(plugin, form, {'layout_column_width': '8'})
         assert plugin.config['layout_column_width'] == 8
+
+
+def _make_image_item():
+    from app.models import FormItem
+    return FormItem(
+        item_type='image',
+        label='Caption',
+        description='Alt',
+        config={'image': {'alignment': 'center', 'max_width': '100%', 'sources': {}}},
+    )
+
+
+def _make_image_form(label='Caption', description='Alt', image_config_data=None):
+    form = MagicMock()
+    form.label.data = label
+    form.description.data = description
+    form.image_config = MagicMock()
+    form.image_config.data = image_config_data
+    return form
+
+
+class TestUpdateImageFields:
+    def test_updates_label_description_and_config(self, app):
+        image = _make_image_item()
+        cfg = {
+            'image': {
+                'alignment': 'right',
+                'max_width': '75%',
+                'sources': {'en': {'source_type': 'url', 'url': 'https://example.org/a.png'}},
+            }
+        }
+        form = _make_image_form(image_config_data=json.dumps(cfg))
+        app.config['SUPPORTED_LANGUAGES'] = ['en']
+        _update_image_fields(image, form, {})
+        assert image.label == 'Caption'
+        assert image.description == 'Alt'
+        assert image.config['image']['sources']['en']['url'] == 'https://example.org/a.png'
+        assert image.config['is_required'] is False
+
+    def test_label_translations_stored(self, app):
+        image = _make_image_item()
+        form = _make_image_form()
+        app.config['SUPPORTED_LANGUAGES'] = ['en', 'fr']
+        _update_image_fields(image, form, {'label_translations': json.dumps({'fr': 'Légende'})})
+        assert image.label_translations == {'fr': 'Légende'}

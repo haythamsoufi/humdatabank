@@ -1033,8 +1033,10 @@ nav .relative {
 }
 
 .select2-container--default .select2-selection--single .select2-selection__rendered {
+    flex: 1 1 auto;
+    min-width: 0;
     line-height: inherit;
-    padding: 0;
+    padding: 0 1.5rem 0 0;
     color: inherit;
 }
 

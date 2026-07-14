@@ -3215,7 +3215,7 @@
         }
 
         const exportCols = this.config.columnDefs
-            .filter(function(col) { return col.field && !col.hide; });
+            .filter(function(col) { return col.field && (col.hide !== true || col.exportAlways === true); });
         const headers = exportCols.map(function(col) { return col.headerName || col.field; });
 
         const rows = selectedRows.map(function(row) {
@@ -3264,7 +3264,8 @@
                         if (!field || field === 'ag-Grid-SelectionColumn' || field === 'ag-Grid-AutoColumn') {
                             return false;
                         }
-                        return visible;
+                        // Include visible columns, plus any marked exportAlways (even if hidden)
+                        return visible || def.exportAlways === true;
                     })
                     .map(function(col) {
                         var def = col.getColDef ? col.getColDef() : (col.colDef || {});
@@ -3282,7 +3283,9 @@
         if (!visibleCols.length) {
             var columnDefs = this.config.columnDefs || [];
             visibleCols = columnDefs
-                .filter(function(col) { return col.field && col.hide !== true; })
+                .filter(function(col) {
+                    return col.field && (col.hide !== true || col.exportAlways === true);
+                })
                 .map(function(col) {
                     return {
                         field: col.field,

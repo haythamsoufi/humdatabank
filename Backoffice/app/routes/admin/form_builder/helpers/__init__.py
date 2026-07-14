@@ -17,6 +17,7 @@ from .item_updaters import (
     _update_question_fields,
     _update_document_field_fields,
     _update_matrix_fields,
+    _update_image_fields,
     _update_item_config,
     _update_plugin_fields,
 )
@@ -27,6 +28,7 @@ from .item_factories import (
     _create_question_form_item,
     _create_document_field_form_item,
     _create_matrix_form_item,
+    _create_image_form_item,
     _create_plugin_form_item,
 )
 
@@ -70,6 +72,7 @@ __all__ = [
     '_update_question_fields',
     '_update_document_field_fields',
     '_update_matrix_fields',
+    '_update_image_fields',
     '_update_item_config',
     '_update_plugin_fields',
     # item_factories
@@ -78,6 +81,7 @@ __all__ = [
     '_create_question_form_item',
     '_create_document_field_form_item',
     '_create_matrix_form_item',
+    '_create_image_form_item',
     '_create_plugin_form_item',
     # cloning
     '_deep_copy_json_value',

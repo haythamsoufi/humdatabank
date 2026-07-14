@@ -61,15 +61,27 @@
         <form id="{{ css_prefix }}-translation-form">
             {% if has_tabs %}
                 {% for tab in tabs %}
+                {#
+                    The panel itself has no height — it is a flex column anchor.
+                    A child scroll-area caps the language field grid at 55 vh so the
+                    tab bar and footer buttons stay visible regardless of content length.
+                    For Blank/Note items, BlankTranslationEditor injects its toolbar as
+                    the first child of this panel (outside the scroll area) so it stays
+                    pinned while the fields scroll.
+                #}
                 <div id="{{ css_prefix }}-{{ tab.id }}-tab-content"
                      role="tabpanel"
                      aria-labelledby="{{ css_prefix }}-tab-{{ tab.id }}"
-                     class="space-y-4 {% if not loop.first %}hidden{% endif %}">
-                    {{ _render_translation_fields(css_prefix, tab.id) }}
+                     class="{% if not loop.first %}hidden{% endif %}">
+                    <div style="overflow-y:auto;max-height:45vh;" class="pr-2">
+                        {{ _render_translation_fields(css_prefix, tab.id) }}
+                    </div>
                 </div>
                 {% endfor %}
             {% else %}
-                {{ _render_translation_fields(css_prefix) }}
+                <div style="overflow-y:auto;max-height:45vh;" class="pr-2">
+                    {{ _render_translation_fields(css_prefix) }}
+                </div>
             {% endif %}
 
             <div class="flex {% if show_auto_translate %}justify-between{% else %}justify-end{% endif %} items-center gap-3 mt-6">
@@ -113,7 +125,7 @@
                 name="{{ code }}"
                 id="{{ css_prefix }}-translation{{ field_id_suffix }}-{{ code }}"
                 rows="3"
-                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md"
+                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md resize-none"
                 placeholder="{{ (language_endonym(code) or LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }} translation"
                 {% if code in ['ar','fa','he','ur'] %}dir="rtl" style="font-family: 'Tajawal', Arial, sans-serif;"{% endif %}></textarea>
         </div>

@@ -35,6 +35,7 @@ SUBMISSIONS = "submissions"
 ENTITY_REPO_ROOT = ""
 SYSTEM = "system"
 AI_DOCUMENTS = "ai_documents"
+TEMPLATE_ASSETS = "template_assets"
 TEMP = "temp"
 
 # Files larger than this (5 MB) are streamed in chunks from Azure Blob

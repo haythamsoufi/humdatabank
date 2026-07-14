@@ -50,11 +50,11 @@
                             <input type="hidden" name="version_id" value="{{ preview_version_id }}">
                         {% endif %}
 
-                        <div class="flex flex-col">
+                        <div class="flex flex-col min-w-[320px]">
                             <label for="preview-view-as" class="block text-xs font-medium text-blue-900 mb-1">{{ _('View as') }}</label>
                             <select id="preview-view-as"
                                     name="view_as"
-                                    class="min-w-[320px] px-3 py-2 border border-blue-200 rounded-md bg-white text-sm select2-enable">
+                                    class="w-full py-2 pl-3 pr-8 border border-blue-200 rounded-md bg-white text-sm select2-enable">
                                 <option value="" {% if not preview_selected_view_as %}selected{% endif %}>{{ _('Preview placeholders') }}</option>
                                 {% for opt in preview_view_as_options %}
                                     <option value="{{ opt.value }}" {% if opt.value == preview_selected_view_as %}selected{% endif %}>{{ opt.label }}</option>
@@ -786,6 +786,7 @@
                                                 {% endif %}
 
                                                 {% set is_blank_block = field.field_type_for_js|lower == 'blank' %}
+                                                {% set is_image_block = field.field_type_for_js|lower == 'image' %}
 
                                                 {% if is_blank_block %}
                                                     {# Blank/Note: Question Text (label) in bold, Definition as normal text below #}
@@ -802,7 +803,30 @@
                                                             <p class="text-gray-800 text-sm font-semibold whitespace-pre-wrap text-left">{{ field_display_label }}</p>
                                                         {% endif %}
                                                         {% if blank_has_definition %}
-                                                            <p class="text-gray-700 text-sm whitespace-pre-wrap text-left{% if blank_has_label %} mt-1{% endif %}">{{ field_display_definition }}</p>
+                                                            <p class="text-gray-700 text-sm text-left{% if blank_has_label %} mt-1{% endif %}">{{ field_display_definition | safe }}</p>
+                                                        {% endif %}
+                                                    </div>
+                                                {% elif is_image_block %}
+                                                    {% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
+                                                    {% set field_display_alt = field._display_alt if hasattr(field, '_display_alt') and field._display_alt else field.description %}
+                                                    {% set image_url = field._display_image_url if hasattr(field, '_display_image_url') else '' %}
+                                                    {% set image_align = field._display_image_alignment if hasattr(field, '_display_image_alignment') else 'center' %}
+                                                    {% set image_max_width = field._display_image_max_width if hasattr(field, '_display_image_max_width') else '100%' %}
+                                                    {% set image_has_caption = field_display_label and field_display_label|trim %}
+                                                    <div class="form-item-block px-2 flex flex-col min-h-[2rem] entry-image-block entry-image-block--{{ image_align }}"
+                                                         data-item-id="{{ field.id }}"
+                                                         data-item-type="image"
+                                                         data-layout-width="{{ field.layout_column_width or 12 }}"
+                                                         data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}">
+                                                        {% if image_url %}
+                                                            <img src="{{ image_url }}"
+                                                                 alt="{{ field_display_alt or field_display_label or '' }}"
+                                                                 class="entry-image-block__img"
+                                                                 style="max-width: {{ image_max_width }};"
+                                                                 loading="lazy">
+                                                        {% endif %}
+                                                        {% if image_has_caption %}
+                                                            <p class="text-gray-700 text-sm text-center mt-2">{{ field_display_label }}</p>
                                                         {% endif %}
                                                     </div>
                                                 {% elif field.item_type and field.item_type.startswith('plugin_') %}

@@ -155,23 +155,12 @@ def manage_indicator_bank():
         subsectors = SubSector.query.filter(SubSector.id.in_(subsector_ids)).all()
         subsectors_dict = {subsector.id: subsector for subsector in subsectors}
 
-    from sqlalchemy import func, select
-    from app.models.form_items import FormItem
-    indicator_ids = [ind.id for ind in indicators]
-    usage_counts = {}
-    if indicator_ids:
-        usage_subquery = db.session.query(
-            FormItem.indicator_bank_id,
-            func.count(FormItem.id).label('count')
-        ).filter(
-            FormItem.indicator_bank_id.in_(indicator_ids)
-        ).group_by(FormItem.indicator_bank_id).all()
-        usage_counts = {row.indicator_bank_id: row.count for row in usage_subquery}
+    from app.services.indicator_bank_service import attach_indicator_usage_cache
+    attach_indicator_usage_cache(indicators)
 
     for indicator in indicators:
         indicator._cached_sectors = {}
         indicator._cached_subsectors = {}
-        indicator._cached_usage_count = usage_counts.get(indicator.id, 0)
 
         if indicator.sector:
             for level in ['primary', 'secondary', 'tertiary']:
@@ -219,7 +208,9 @@ def manage_indicator_bank():
                 'area': getattr(indicator, 'area', None),
                 'area_label': getattr(indicator, 'area_label', None),
                 'spef_label': getattr(indicator, 'area_label', None),
-                'usage_count': usage_counts.get(indicator.id, 0),
+                'template_count': indicator.template_count,
+                'data_value_count': indicator.data_value_count,
+                'usage_count': indicator.template_count,
             })
         return json_ok(indicators=indicators_data, count=len(indicators_data), total_count=total_count)
 

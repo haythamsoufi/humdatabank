@@ -1,7 +1,6 @@
 {# Shown when the UI language is not English. Dismissal is persisted in localStorage. #}
-{% set session_lang_norm = (session.get('language', 'en')|string|lower|replace('-', '_')) %}
-{% set session_lang_base = (session_lang_norm.split('_')[0] if session_lang_norm else 'en') %}
-{% if session_lang_base != 'en' %}
+{% set current_lang = _ui_language if _ui_language is defined else 'en' %}
+{% if current_lang != 'en' %}
 <div id="autoTranslationNoticeBanner"
      class="auto-translation-notice-banner"
      role="dialog"

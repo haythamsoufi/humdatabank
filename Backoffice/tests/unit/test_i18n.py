@@ -70,6 +70,34 @@ class TestGetLocale:
                     from app.i18n import get_locale
                     assert get_locale() == 'fr'
 
+    def test_authenticated_user_preference_overrides_stale_session(self, app):
+        """The database preference seeds the cache when the language cookie is absent."""
+        with app.test_request_context('/'):
+            mock_user = MagicMock()
+            mock_user.is_authenticated = True
+            mock_user.preferred_language = 'en'
+
+            with patch('app.i18n.session', {'language': 'fr'}):
+                with patch('app.i18n.current_user', mock_user):
+                    app.config['SUPPORTED_LANGUAGES'] = ['en', 'fr']
+                    from app.i18n import get_locale
+                    assert get_locale() == 'en'
+
+    def test_language_cookie_avoids_rechecking_user_preference(self, app):
+        """A valid language cache is authoritative between login and explicit changes."""
+        with app.test_request_context('/', headers={'Cookie': 'ui_language=fr'}):
+            class CachedUser:
+                is_authenticated = True
+
+                @property
+                def preferred_language(self):
+                    raise AssertionError("cached language should avoid reading the user preference")
+
+            with patch('app.i18n.current_user', CachedUser()):
+                app.config['SUPPORTED_LANGUAGES'] = ['en', 'fr']
+                from app.i18n import get_locale
+                assert get_locale() == 'fr'
+
 
 class TestResolveSupportedLanguage:
     def test_exact_match(self, app):

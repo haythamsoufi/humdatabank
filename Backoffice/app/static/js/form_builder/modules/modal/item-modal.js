@@ -1,5 +1,6 @@
 // Utils is available globally from utils.js
 import { MatrixItem } from '../items/matrix.js';
+import { ImageItem } from '../items/image.js';
 import { QuestionItem } from '../items/question.js';
 import { IndicatorItem } from '../items/indicator.js';
 import { DocumentItem } from '../items/document.js';
@@ -18,12 +19,16 @@ import { ValidationMixin } from './validation.js';
 
 export const ItemModal = {
     currentMode: 'add', // 'add' or 'edit'
-    currentItemType: 'indicator', // 'indicator', 'question', 'document_field', 'matrix', or 'plugin_*'
+    currentItemType: 'indicator', // 'indicator', 'question', 'document_field', 'matrix', 'image', or 'plugin_*'
     currentQuestionType: null, // when currentItemType === 'question', e.g. 'text', 'number'
     currentItemId: null,
     currentSectionId: null,
     modalElement: null,
     formElement: null,
+    /** Types that open in fill-content mode by default */
+    fillContentItemTypes: ['matrix'],
+    /** null = follow item-type default; true/false = user override via toggle */
+    _fillModeManual: null,
 
     sharedFields: {
         label: '#item-modal-shared-label',
@@ -52,6 +57,90 @@ export const ItemModal = {
         Utils.setSanitizedHtml(container, html);
     },
 
+    getModalPanel: function() {
+        if (!this.modalElement) return null;
+        return this.modalElement.querySelector('.item-modal-panel')
+            || this.modalElement.querySelector('.relative.p-6');
+    },
+
+    isFillContentMode: function() {
+        return !!(this.modalElement && this.modalElement.classList.contains('item-modal--fill-content'));
+    },
+
+    shouldAutoFillContent: function(itemType) {
+        const type = itemType || this.currentItemType;
+        return Array.isArray(this.fillContentItemTypes) && this.fillContentItemTypes.indexOf(type) !== -1;
+    },
+
+    setFillContentMode: function(enabled) {
+        if (!this.modalElement) {
+            this.modalElement = Utils.getElementById('item-modal');
+        }
+        if (!this.modalElement) return;
+
+        const on = !!enabled;
+        this.modalElement.classList.toggle('item-modal--fill-content', on);
+
+        const toggleBtn = this.modalElement.querySelector('#item-modal-fill-toggle');
+        if (toggleBtn) {
+            toggleBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            const expandLabel = toggleBtn.getAttribute('data-label-expand') || 'Expand to fill content area';
+            const compressLabel = toggleBtn.getAttribute('data-label-compress') || 'Exit fill content area';
+            const label = on ? compressLabel : expandLabel;
+            toggleBtn.setAttribute('title', label);
+            toggleBtn.setAttribute('aria-label', label);
+        }
+
+        try { this.syncMatrixConfigPanel(); } catch (_e) {}
+        this.checkModalScroll();
+    },
+
+    syncFillContentMode: function() {
+        const enabled = this._fillModeManual != null
+            ? this._fillModeManual
+            : this.shouldAutoFillContent(this.currentItemType);
+        this.setFillContentMode(enabled);
+    },
+
+    toggleFillContentMode: function() {
+        const next = !this.isFillContentMode();
+        this._fillModeManual = next;
+        this.setFillContentMode(next);
+        try { this.syncRightPanel(); } catch (_e) {}
+    },
+
+    /**
+     * In fill-content mode, matrix items split the modal into two main
+     * columns: the left column keeps the row configuration (row mode, row
+     * headers, display options) while the right column holds just the
+     * "Column Codes" section. Outside of fill mode (or for other item
+     * types) that section stays in its normal place, right after
+     * #matrix-columns-anchor.
+     */
+    syncMatrixConfigPanel: function() {
+        if (!this.modalElement) return;
+        const columnsSection = this.modalElement.querySelector('#matrix-columns-section');
+        const anchor = this.modalElement.querySelector('#matrix-columns-anchor');
+        const rightHalf = this.modalElement.querySelector('.modal-right-half');
+        if (!columnsSection || !anchor || !rightHalf) return;
+
+        const shouldMoveToRight = this.isFillContentMode() && this.currentItemType === 'matrix';
+
+        if (shouldMoveToRight) {
+            if (rightHalf.firstElementChild !== columnsSection) {
+                rightHalf.insertBefore(columnsSection, rightHalf.firstChild);
+            }
+            columnsSection.classList.add('matrix-columns-in-right-panel');
+        } else {
+            if (columnsSection.previousElementSibling !== anchor) {
+                anchor.insertAdjacentElement('afterend', columnsSection);
+            }
+            columnsSection.classList.remove('matrix-columns-in-right-panel');
+        }
+
+        try { this.syncRightPanel(); } catch (_e) {}
+    },
+
     init: function() {
         if (this._initialized) return;
         this._initialized = true;
@@ -72,6 +161,7 @@ export const ItemModal = {
         this.currentItemType = itemType;
         this.currentSectionId = sectionId;
         this.currentItemId = null;
+        this._fillModeManual = null;
 
         this.modalElement = Utils.getElementById('item-modal');
         this.formElement = Utils.getElementById('item-modal-form');
@@ -147,6 +237,7 @@ export const ItemModal = {
         this.currentItemType = itemType;
         this.currentItemId = itemId;
         this.currentSectionId = itemData.section_id;
+        this._fillModeManual = null;
 
         this.modalElement = Utils.getElementById('item-modal');
         this.formElement = Utils.getElementById('item-modal-form');
@@ -240,6 +331,12 @@ export const ItemModal = {
     setupModalEvents: function() {
         document.addEventListener('click', (e) => {
             if (!this.modalElement) return;
+            const fillToggle = e.target.closest('#item-modal-fill-toggle');
+            if (fillToggle && this.modalElement.contains(fillToggle)) {
+                e.preventDefault();
+                this.toggleFillContentMode();
+                return;
+            }
             if ((e.target.classList.contains('close-modal') || e.target.closest('.close-modal')) &&
                 this.modalElement &&
                 this.modalElement.contains(e.target)) {
@@ -258,8 +355,16 @@ export const ItemModal = {
     checkModalScroll: function() {
         if (!this.modalElement) return;
 
-        const modalContent = this.modalElement.querySelector('.relative.p-6');
+        const modalContent = this.getModalPanel();
         if (!modalContent) return;
+
+        if (this.isFillContentMode()) {
+            modalContent.style.maxHeight = '';
+            modalContent.style.overflowY = '';
+            modalContent.style.overflowX = '';
+            modalContent.classList.remove('modal-scrollable');
+            return;
+        }
 
         const viewportHeight = window.innerHeight;
         const modalHeight = this.modalElement.offsetHeight;
@@ -267,7 +372,10 @@ export const ItemModal = {
 
         if (modalHeight > maxHeight) {
             modalContent.style.maxHeight = maxHeight + 'px';
-            modalContent.style.overflowY = 'auto';
+            // Use 'scroll' (not 'auto') so the scrollbar track is always present
+            // while the modal is capped — avoids left/right content jumps when
+            // focus, toolbars, or dropdowns momentarily tip overflow on/off.
+            modalContent.style.overflowY = 'scroll';
             modalContent.style.overflowX = 'hidden';
             modalContent.classList.add('modal-scrollable');
         } else {
@@ -300,12 +408,14 @@ export const ItemModal = {
             try { IndicatorItem.teardown(this.modalElement); } catch (e) {}
             try { DocumentItem.teardown(this.modalElement); } catch (e) {}
             try { PluginItem.teardown(this.modalElement); } catch (e) {}
+            this.setFillContentMode(false);
+            this._fillModeManual = null;
             Utils.hideElement(this.modalElement);
             this.resetRuleUIState();
             this.resetForm();
             this.pendingPluginData = null;
 
-            const modalContent = this.modalElement.querySelector('.relative.p-6');
+            const modalContent = this.getModalPanel();
             if (modalContent) {
                 modalContent.style.maxHeight = '';
                 modalContent.style.overflowY = '';

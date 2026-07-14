@@ -319,6 +319,28 @@ class MatrixForm(BaseForm, LayoutFieldsMixin, DataAvailabilityMixin, SkipLogicMi
         self.section_id.choices = []  # Sections will be populated dynamically in the route
 
 
+class ImageForm(BaseForm, LayoutFieldsMixin, SkipLogicMixin):
+    """Form for adding or editing an Image display item within a Form Template."""
+
+    section_id = SelectField("Section", coerce=int_or_none, validators=[DataRequired(message="Please select a section.")])
+    label = StringField("Caption", validators=[Optional(), Length(max=255)])
+    order = FloatField("Order in Section (e.g., 1, 1.1, 1.2 for sub-items)", validators=[Optional()], default=0)
+    description = TextAreaField("Alt Text", validators=[Optional(), Length(max=500)])
+
+    image_config = HiddenField("Image Configuration")
+
+    label_translations = HiddenField("Label Translations")
+    description_translations = HiddenField("Description Translations")
+
+    submit = SubmitField("Save Image")
+
+    def __init__(self, *args, **kwargs):
+        super(ImageForm, self).__init__(*args, **kwargs)
+        self.add_layout_fields()
+        self.add_skip_logic_fields()
+        self.section_id.choices = []
+
+
 class PluginItemForm(BaseForm, LayoutFieldsMixin, DataAvailabilityMixin, SkipLogicMixin):
     """Form for adding or editing Plugin Items within a Form Template."""
 

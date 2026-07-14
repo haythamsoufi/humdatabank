@@ -308,6 +308,7 @@ def draw_cumulative_indicator(
     values = [float(v) if pd.notna(v) else float("nan") for v in data["Value"].tolist()]
     reporting = data[reporting_field].tolist() if reporting_field in data.columns else data["Count"].tolist()
     implementing = data["Implementing"].tolist()
+    total_reported = data["TotalReported"].tolist() if "TotalReported" in data.columns else reporting
     annual_target = annual_target_value(indicator)
     unit = indicator_format_unit(indicator)
     label = _wrap_indicator_label(indicator_label(indicator, language))
@@ -326,7 +327,11 @@ def draw_cumulative_indicator(
     row_labels_dict = table_row_labels(language)
     row_labels = [row_labels_dict["year"]]
     table_rows = [[year_display(y) for y in years]]
-    reporting_values = implementing if table_mode == NS_TABLE_IMPLEMENTING_COUNT else reporting
+    # NS-unit indicators: the charted value already is the "implementing" count,
+    # so the one visible row shows the total NSs in this reporting round instead.
+    reporting_values = (
+        total_reported if table_mode in {NS_TABLE_IMPLEMENTING_COUNT, NS_TABLE_NS_UNIT} else reporting
+    )
     if show_reporting_row:
         row_labels.append(row_labels_dict["reporting"])
         table_rows.append([
@@ -752,7 +757,7 @@ def render_ef_dashboard(
         data = subset[subset["ID"] == indicator_id].sort_values("Year")
         draw_cumulative_indicator(
             fig.add_subplot(panel[0, 0]), fig.add_subplot(content[0]), fig.add_subplot(content[1]),
-            indicator, data, language=language, ns_breakdown=True, reporting_field="TotalReported",
+            indicator, data, language=language, ns_breakdown=True,
         )
     row += 1
 

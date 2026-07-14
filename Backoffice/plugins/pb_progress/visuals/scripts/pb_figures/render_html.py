@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .font_faces import inject_tajawal_fonts
+from .font_faces import inject_chart_fonts
 from .payload import build_payload
 from .line_chart import inject_line_chart_js
 
@@ -81,7 +81,7 @@ def _build_html(payload: dict) -> str:
         raise ValueError(f"Template missing placeholder {_PLACEHOLDER}")
     data_json = json.dumps(payload, ensure_ascii=False)
     html = template.replace(_PLACEHOLDER, data_json)
-    html = inject_tajawal_fonts(html)
+    html = inject_chart_fonts(html)
     return inject_line_chart_js(html)
 
 

@@ -83,7 +83,7 @@ class DynamicLayoutTests(unittest.TestCase):
         item = {"show_ns_breakdown": True, "ns_table_mode": NS_TABLE_NS_UNIT}
         self.assertEqual(cumulative_table_rows(item), (True, False))
 
-    def test_distinct_ns_payload_uses_implementing_values_in_reporting_row(self) -> None:
+    def test_distinct_ns_payload_uses_total_reported_in_reporting_row(self) -> None:
         mapping = pd.DataFrame(
             {
                 "Strategic Priority / Enabling Function": ["SP1"],
@@ -101,8 +101,9 @@ class DynamicLayoutTests(unittest.TestCase):
                 "ID": ["615"] * 3,
                 "Year": ["2023", "2024", "2025"],
                 "Value": [40.0, 45.0, 50.0],
-                "Count": [100, 105, 110],
-                "Implementing": [40, 45, 50],
+                "Count": [40, 45, 50],
+                "Implementing": [98, 102, 108],
+                "TotalReported": [100, 105, 110],
                 "Type": ["Distinct"] * 3,
                 "Unit": ["NSs"] * 3,
                 "English": ["Number of National Societies implementing nature-based solutions"] * 3,
@@ -113,9 +114,11 @@ class DynamicLayoutTests(unittest.TestCase):
         payload = build_sp_payload(model, "SP1", mapping=mapping)
         item = payload["cumulative"][0]
         self.assertEqual(item.get("ns_table_mode"), NS_TABLE_IMPLEMENTING_COUNT)
-        self.assertEqual(item["reporting"], ["40", "45", "50"])
-        self.assertEqual(item["implementing"], ["40", "45", "50"])
-        self.assertNotEqual(item["reporting"], ["100", "105", "110"])
+        # Value already is the "implementing" count (40/45/50); the one visible row
+        # shows the total NSs participating in this reporting round instead.
+        self.assertEqual(item["reporting"], ["100", "105", "110"])
+        self.assertEqual(item["implementing"], ["98", "102", "108"])
+        self.assertNotEqual(item["reporting"], ["40", "45", "50"])
 
 
 class LayoutVisibilityTests(unittest.TestCase):

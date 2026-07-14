@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <style>
 __TAJAWAL_FONT_CSS__
+__OPEN_SANS_FONT_CSS__
   :root {
     --value: #c22526;
     --target: #f28e2b;
@@ -12,7 +13,7 @@ __TAJAWAL_FONT_CSS__
     --muted: #666;
     --divider: #d8d8d8;
     --bg: #ffffff;
-    --font: "Segoe UI", "Open Sans", system-ui, -apple-system, sans-serif;
+    --font: "Open Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
     --label-col: 290px;
     --donut-size: 64px;
   }
@@ -504,7 +505,7 @@ const DEFAULT_COLORS = { value: "#c22526", target: "#f28e2b", gap: "#c1c1c1", te
 const COLORS = { ...DEFAULT_COLORS, ...(DATA.colors || {}) };
 const FONT = DATA.language === "Arabic"
   ? '"Tajawal", "Segoe UI", sans-serif'
-  : '"Segoe UI", "Open Sans", system-ui, -apple-system, sans-serif';
+  : '"Open Sans", "Segoe UI", system-ui, -apple-system, sans-serif';
 
 function applyTheme() {
   document.documentElement.style.setProperty("--value", COLORS.value);

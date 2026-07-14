@@ -1,5 +1,3 @@
-{% from "macros/modal_shell.html" import modal_shell %}
-
 <style nonce="{{ csp_nonce() }}">
 #pb-progress-viewer-toolbar.is-pinned {
     border-radius: 0.5rem;
@@ -25,8 +23,6 @@
      role="tabpanel"
      aria-labelledby="tab-pb-progress">
     <div class="p-4 sm:p-6 space-y-5">
-        <p id="pb-progress-last-generated" class="text-sm text-gray-500 hidden"></p>
-
         <div class="border-b border-gray-200">
             <nav id="pb-progress-version-tabs" class="flex flex-wrap gap-1 -mb-px" role="tablist" aria-label="{{ _('P&B report versions') }}">
                 {% for version_id in pb_report_version_order %}
@@ -35,17 +31,26 @@
                         role="tab"
                         id="tab-pb-version-{{ version_id }}"
                         data-pb-version="{{ version_id }}"
-                        aria-selected="{{ 'true' if version_id == pb_default_version else 'false' }}"
-                        class="px-4 py-2 text-sm font-medium border-b-2 transition-colors {{ 'border-blue-600 text-blue-700' if version_id == pb_default_version else 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300' }}">
+                        aria-selected="{{ 'true' if version_id == pb_active_version else 'false' }}"
+                        class="px-4 py-2 text-sm font-medium border-b-2 transition-colors {{ 'border-blue-600 text-blue-700' if version_id == pb_active_version else 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300' }}">
                     {{ _(version.label) }}
                 </button>
                 {% endfor %}
             </nav>
         </div>
 
+        <p id="pb-progress-last-generated" class="text-sm text-gray-500 hidden"></p>
+
         <div id="pb-progress-empty" class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
             <i class="fas fa-chart-line text-2xl text-gray-400 mb-3"></i>
             <p>{{ _('No report is available yet.') }}</p>
+            {% if can_manage_pb_progress %}
+            <p class="mt-3">
+                <a href="{{ url_for('pb_progress.manage_page') }}" class="text-blue-700 hover:text-blue-900 font-medium">
+                    <i class="fas fa-cogs mr-1"></i>{{ _('Manage report data and build') }}
+                </a>
+            </p>
+            {% endif %}
         </div>
 
         <div id="pb-progress-build" class="hidden rounded-lg border border-blue-200 bg-blue-50 px-4 py-4 space-y-3">
@@ -67,12 +72,12 @@
             <div id="pb-progress-viewer-toolbar-wrap">
                 <div id="pb-progress-viewer-toolbar"
                      class="px-4 py-3 border border-gray-200 bg-gray-50 shadow-sm flex flex-wrap items-center justify-between gap-3 rounded-t-lg">
-                    <h4 class="text-base font-semibold text-gray-900 shrink-0">{{ _('Interactive report') }}</h4>
+                    <h4 id="pb-progress-viewer-toolbar-title" class="text-base font-semibold text-gray-900 shrink-0"></h4>
                     <div class="flex flex-wrap items-center justify-end gap-2">
                         <div id="pb-progress-report-language-wrap" class="hidden items-center gap-2">
                             <label for="pb-progress-report-language" class="text-sm font-medium text-gray-700 shrink-0">{{ _('Language') }}</label>
                             <select id="pb-progress-report-language"
-                                    class="px-3 py-1.5 border border-gray-300 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    class="pl-3 pr-9 py-1.5 border border-gray-300 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                                 <option value="English">{{ _('English') }}</option>
                                 <option value="French">{{ _('French') }}</option>
                                 <option value="Spanish">{{ _('Spanish') }}</option>
@@ -96,105 +101,36 @@
             </div>
             <div id="pb-progress-viewer-toolbar-spacer" class="hidden" aria-hidden="true"></div>
             <div class="bg-white border border-gray-200 border-t-0 rounded-b-lg shadow-sm relative">
-                    <div id="pb-progress-iframe-loading"
-                         class="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10"
-                         style="min-height: 300px;">
-                        <i class="fas fa-spinner fa-spin text-2xl text-gray-400 mb-2"></i>
-                        <p class="text-sm text-gray-500">{{ _('Loading report…') }}</p>
-                    </div>
-                    <iframe id="pb-progress-iframe"
-                            title="{{ _('P&B visuals preview') }}"
-                            class="w-full block"
-                            style="height: 720px; border: 0;"
-                            loading="lazy"></iframe>
+                <div id="pb-progress-iframe-loading"
+                     class="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10"
+                     style="min-height: 300px;">
+                    <i class="fas fa-spinner fa-spin text-2xl text-gray-400 mb-2"></i>
+                    <p class="text-sm text-gray-500">{{ _('Loading report…') }}</p>
+                </div>
+                <iframe id="pb-progress-iframe"
+                        title="{{ _('P&B visuals preview') }}"
+                        class="w-full block"
+                        style="height: 720px; border: 0;"
+                        loading="lazy"></iframe>
             </div>
         </div>
     </div>
 </div>
 
-{% if can_manage_pb_progress %}
-{% call modal_shell('pb-progress-import-modal', _('Import and generate report'), max_width='max-w-2xl', close_id='pb-progress-import-modal-close', content_class='max-h-[80vh] overflow-y-auto') %}
-    <p class="text-sm text-gray-600 mb-2">{{ _('System managers only. Upload SG Report.xlsx and regenerate multilingual HTML, PDF, Word, and figure packages.') }}</p>
-    <p id="pb-progress-import-version-label" class="inline-flex items-center gap-2 rounded-full bg-blue-50 text-blue-900 px-3 py-1 text-sm font-medium mb-4"></p>
-
-    <div id="pb-progress-excel-badge" class="hidden inline-flex items-center gap-2 rounded-full bg-green-50 text-green-800 px-3 py-1 text-sm mb-4">
-        <i class="fas fa-file-excel"></i>
-        <span id="pb-progress-excel-badge-text"></span>
-    </div>
-
-    <div id="pb-progress-no-excel-notice" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 mb-4">
-        <i class="fas fa-info-circle mr-2"></i>{{ _('No workbook uploaded yet. Add SG Report.xlsx below.') }}
-    </div>
-
-    <div id="pb-progress-dropzone"
-         class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-colors hover:border-blue-400 hover:bg-blue-50/40">
-        <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-3"></i>
-        <p class="text-sm text-gray-700 mb-2">{{ _('Drag and drop an Excel file here, or choose a file') }}</p>
-        <input id="pb-progress-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden">
-        <button type="button" id="pb-progress-choose-file-btn" class="btn btn-secondary btn-sm">
-            <i class="fas fa-folder-open mr-2"></i>{{ _('Choose file') }}
-        </button>
-        <p id="pb-progress-selected-file" class="text-sm text-gray-600 mt-3 hidden"></p>
-    </div>
-
-    <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-            <input id="pb-progress-replace-existing" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
-            <span>{{ _('Replace existing workbook when uploading') }}</span>
-        </label>
-        <button type="button" id="pb-progress-upload-btn" class="btn btn-primary" disabled>
-            <i class="fas fa-upload mr-2"></i>{{ _('Upload Excel') }}
-        </button>
-    </div>
-    <p id="pb-progress-upload-message" class="text-sm mt-3 hidden"></p>
-
-    <div class="mt-6 pt-6 border-t border-gray-200">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <div>
-                <h4 class="text-base font-semibold text-gray-900">{{ _('Generate report') }}</h4>
-                <p class="text-sm text-gray-600 mt-1">{{ _('Rebuild all deliverables from the stored workbook.') }}</p>
-            </div>
-            <div class="flex items-center gap-2">
-                <label for="pb-progress-language" class="text-sm font-medium text-gray-700">{{ _('Languages') }}</label>
-                <select id="pb-progress-language" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option value="all">{{ _('All languages') }}</option>
-                    <option value="English">{{ _('English') }}</option>
-                    <option value="French">{{ _('French') }}</option>
-                    <option value="Spanish">{{ _('Spanish') }}</option>
-                    <option value="Arabic">{{ _('Arabic') }}</option>
-                </select>
-            </div>
-        </div>
-
-        <button type="button" id="pb-progress-generate-btn" class="btn btn-primary" disabled>
-            <i class="fas fa-play mr-2"></i>{{ _('Generate Report') }}
-        </button>
-    </div>
-
-    <div class="mt-6 flex justify-end">
-        <button type="button" class="btn btn-secondary close-modal">{{ _('Close') }}</button>
-    </div>
-{% endcall %}
-{% endif %}
-
 <script nonce="{{ csp_nonce() }}">
 window.PBProgressConfig = {
+    pageMode: 'viewer',
     apiBase: '/admin/data-exploration/pb-progress',
-    canManage: {{ can_manage_pb_progress|tojson }},
     versions: {{ pb_report_versions|tojson }},
     versionOrder: {{ pb_report_version_order|tojson }},
-    defaultVersion: {{ pb_default_version|tojson }},
+    defaultVersion: {{ pb_active_version|tojson }},
     i18n: {
-        versionLabel: {{ _('Version:')|tojson }},
         lastUpdated: {{ _('Last updated:')|tojson }},
         generatingReport: {{ _('Generating report...')|tojson }},
         reportGenerationFailed: {{ _('Report generation failed.')|tojson }},
         reportGeneratedSuccessfully: {{ _('Report generated successfully.')|tojson }},
         requestFailed: {{ _('Request failed.')|tojson }},
         lostConnection: {{ _('Lost connection to the server while generating. Wait for the server to come back, then refresh this page.')|tojson }},
-        enableReplaceWorkbook: {{ _('Enable replace existing workbook or upload the first source file.')|tojson }},
-        uploading: {{ _('Uploading...')|tojson }},
-        excelUploadedSuccessfully: {{ _('Excel uploaded successfully.')|tojson }},
     },
 };
 </script>

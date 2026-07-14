@@ -1058,7 +1058,7 @@ export default function IndicatorDetailPage() {
                       value={suggestForm.suggestion_type}
                       onChange={handleSuggestFormChange}
                       required
-                      className="w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
+                      className="w-full pl-3 pr-8 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red"
                     >
                       <option value="correction">{t('indicatorDetail.suggestModal.suggestionTypes.correction')}</option>
                       <option value="improvement">{t('indicatorDetail.suggestModal.suggestionTypes.improvement')}</option>

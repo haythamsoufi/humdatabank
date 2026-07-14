@@ -1,13 +1,11 @@
 (function() {
     const cfg = window.PBProgressConfig || {};
     const API_BASE = cfg.apiBase || '/admin/data-exploration/pb-progress';
-    const CAN_MANAGE = !!cfg.canManage;
     const VERSIONS = cfg.versions || {};
     const VERSION_ORDER = cfg.versionOrder || [];
-    let activeVersion = cfg.defaultVersion || "";
+    const URL_PARAM_PB_VERSION = 'pb_version';
+    let activeVersion = cfg.defaultVersion || '';
     let pollTimer = null;
-    let selectedFile = null;
-    let importModal = null;
     const versionUi = {};
 
     function apiUrl(path, versionId) {
@@ -18,7 +16,6 @@
     function initVersionUi() {
         VERSION_ORDER.forEach(function(versionId) {
             versionUi[versionId] = {
-                hasExcel: false,
                 maxProgressPercent: 15,
                 trackingBuild: false,
                 statusCache: null,
@@ -34,6 +31,7 @@
         buildMessage: document.getElementById('pb-progress-build-message'),
         viewer: document.getElementById('pb-progress-viewer'),
         viewerToolbar: document.getElementById('pb-progress-viewer-toolbar'),
+        viewerToolbarTitle: document.getElementById('pb-progress-viewer-toolbar-title'),
         viewerToolbarAnchor: document.getElementById('pb-progress-viewer-toolbar-anchor'),
         viewerToolbarWrap: document.getElementById('pb-progress-viewer-toolbar-wrap'),
         viewerToolbarSpacer: document.getElementById('pb-progress-viewer-toolbar-spacer'),
@@ -47,32 +45,50 @@
         openTab: document.getElementById('pb-progress-open-tab'),
         tab: document.getElementById('tab-pb-progress'),
         versionTabs: document.getElementById('pb-progress-version-tabs'),
-        openImportBtn: document.getElementById('pb-progress-open-import-btn'),
-        importModal: document.getElementById('pb-progress-import-modal'),
-        importVersionLabel: document.getElementById('pb-progress-import-version-label'),
-        badge: document.getElementById('pb-progress-excel-badge'),
-        badgeText: document.getElementById('pb-progress-excel-badge-text'),
-        noExcelNotice: document.getElementById('pb-progress-no-excel-notice'),
-        dropzone: document.getElementById('pb-progress-dropzone'),
-        fileInput: document.getElementById('pb-progress-file-input'),
-        chooseFileBtn: document.getElementById('pb-progress-choose-file-btn'),
-        selectedFile: document.getElementById('pb-progress-selected-file'),
-        replaceExisting: document.getElementById('pb-progress-replace-existing'),
-        uploadBtn: document.getElementById('pb-progress-upload-btn'),
-        uploadMessage: document.getElementById('pb-progress-upload-message'),
-        generateBtn: document.getElementById('pb-progress-generate-btn'),
-        languageSelect: document.getElementById('pb-progress-language'),
         progressText: document.getElementById('pb-progress-progress-text'),
         progressBar: document.getElementById('pb-progress-progress-bar'),
         stages: document.getElementById('pb-progress-stages'),
     };
 
+    function getVersionFromUrl() {
+        try {
+            return new URLSearchParams(window.location.search).get(URL_PARAM_PB_VERSION) || '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function resolveInitialVersion() {
+        const fromUrl = getVersionFromUrl();
+        if (fromUrl && VERSIONS[fromUrl]) {
+            activeVersion = fromUrl;
+        }
+    }
+
+    function syncVersionToUrl(versionId) {
+        if (typeof window.applyExploreParamsToUrl === 'function') {
+            window.applyExploreParamsToUrl({
+                tab: 'pb-progress',
+                pb_version: versionId || '',
+            });
+            return;
+        }
+        const usp = new URLSearchParams(window.location.search);
+        usp.set('tab', 'pb-progress');
+        if (versionId) usp.set(URL_PARAM_PB_VERSION, versionId);
+        else usp.delete(URL_PARAM_PB_VERSION);
+        const query = usp.toString();
+        window.history.replaceState({}, '', query ? (window.location.pathname + '?' + query) : window.location.pathname);
+    }
+
     function currentUi() {
         return versionUi[activeVersion];
     }
 
-    function versionMeta(versionId) {
-        return VERSIONS[versionId] || { label: versionId };
+    function updateViewerToolbarTitle() {
+        if (!els.viewerToolbarTitle) return;
+        const version = VERSIONS[activeVersion];
+        els.viewerToolbarTitle.textContent = version && version.label ? version.label : '';
     }
 
     function setActiveVersionTab() {
@@ -85,9 +101,7 @@
             btn.classList.toggle('border-transparent', !selected);
             btn.classList.toggle('text-gray-600', !selected);
         });
-        if (els.importVersionLabel) {
-            els.importVersionLabel.textContent = (cfg.i18n && cfg.i18n.versionLabel ? cfg.i18n.versionLabel + ' ' : '') + (versionMeta(activeVersion).label || activeVersion);
-        }
+        updateViewerToolbarTitle();
     }
 
     function setMessage(el, text, tone) {
@@ -110,17 +124,6 @@
         } catch (e) {
             return value;
         }
-    }
-
-    function createDownloadLink(output) {
-        const link = document.createElement('a');
-        link.href = output.url;
-        link.className = 'btn btn-secondary btn-sm';
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        const sizeSuffix = output.size_label ? ' (' + output.size_label + ')' : '';
-        link.innerHTML = '<i class="fas fa-download mr-2"></i>' + (output.label || output.name) + sizeSuffix;
-        return link;
     }
 
     function renderBuildStages(stageList) {
@@ -250,8 +253,8 @@
             { key: 'pdf',  label: 'PDF',     icon: 'fas fa-file-pdf',  color: 'text-red-600'   },
             { key: 'zip',  label: 'Figures', icon: 'fas fa-images',    color: 'text-green-600' },
         ];
-        configs.forEach(function(cfg) {
-            const el = createTypeDropdown(cfg.label, cfg.icon, cfg.color, groups[cfg.key]);
+        configs.forEach(function(item) {
+            const el = createTypeDropdown(item.label, item.icon, item.color, groups[item.key]);
             if (el) container.appendChild(el);
         });
     }
@@ -278,7 +281,9 @@
             'html.pb-report-embedded #quarto-margin-sidebar .pb-language-selector,' +
             'html.pb-report-embedded #quarto-sidebar .pb-language-selector,' +
             '#quarto-margin-sidebar .pb-language-selector,' +
-            '#quarto-sidebar .pb-language-selector { display: none !important; }';
+            '#quarto-sidebar .pb-language-selector,' +
+            '.quarto-alternate-formats,' +
+            '#title-block-header .subtitle { display: none !important; }';
         (doc.head || doc.documentElement).appendChild(style);
         if (doc.documentElement) {
             doc.documentElement.classList.add('pb-report-embedded');
@@ -398,24 +403,6 @@
         }
     }
 
-    function updateAdminUi(excel) {
-        if (!CAN_MANAGE) return;
-        const ui = currentUi();
-        ui.hasExcel = !!excel;
-        if (els.generateBtn) els.generateBtn.disabled = !ui.hasExcel;
-        if (!excel) {
-            if (els.badge) els.badge.classList.add('hidden');
-            if (els.noExcelNotice) els.noExcelNotice.classList.remove('hidden');
-            return;
-        }
-        const parts = [excel.filename || 'SG Report.xlsx'];
-        if (excel.size_label) parts.push(excel.size_label);
-        if (excel.uploaded_at) parts.push(formatUploadedAt(excel.uploaded_at));
-        if (els.badgeText) els.badgeText.textContent = parts.join(' · ');
-        if (els.badge) els.badge.classList.remove('hidden');
-        if (els.noExcelNotice) els.noExcelNotice.classList.add('hidden');
-    }
-
     function updateBuildProgress(status) {
         const ui = currentUi();
         const running = status.status === 'running';
@@ -430,8 +417,6 @@
 
         if (els.build) els.build.classList.toggle('hidden', !showPanel);
         if (els.buildActive) els.buildActive.classList.toggle('hidden', !running);
-
-        if (CAN_MANAGE && els.generateBtn) els.generateBtn.disabled = running || !ui.hasExcel;
 
         if (running && els.progressBar) {
             const pct = stageProgressPercent(stageList);
@@ -460,20 +445,11 @@
         } else if (!showPanel) {
             setMessage(els.buildMessage, '', null);
         }
-
-        if (CAN_MANAGE && status.excel) {
-            updateAdminUi(status.excel);
-        }
     }
 
     function applyStatusToUi(status) {
         renderConsumerView(status);
         updateBuildProgress(status);
-        if (CAN_MANAGE && status.excel) {
-            updateAdminUi(status.excel);
-        } else if (CAN_MANAGE && !status.excel) {
-            updateAdminUi(null);
-        }
     }
 
     function renderActiveVersionFromCache() {
@@ -485,21 +461,8 @@
         }
     }
 
-    function getCsrfToken() {
-        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-    }
-
     async function fetchJson(url, options) {
         const opts = Object.assign({ credentials: 'same-origin' }, options || {});
-        const method = (opts.method || 'GET').toUpperCase();
-        if (method !== 'GET' && method !== 'HEAD') {
-            const headers = Object.assign({}, opts.headers || {});
-            const token = getCsrfToken();
-            if (token) {
-                headers['X-CSRFToken'] = token;
-            }
-            opts.headers = headers;
-        }
         const response = await fetch(url, opts);
         const payload = await response.json().catch(function() { return {}; });
         if (!response.ok) {
@@ -513,13 +476,6 @@
             const cached = versionUi[versionId].statusCache;
             return cached && cached.status === 'running';
         });
-    }
-
-    async function loadExcelInfo() {
-        if (!CAN_MANAGE) return null;
-        const payload = await fetchJson(apiUrl('/excel-info'));
-        updateAdminUi(payload.excel || null);
-        return payload.excel || null;
     }
 
     async function refreshAllStatuses() {
@@ -589,92 +545,12 @@
         }
     }
 
-    function resetUploadForm() {
-        selectedFile = null;
-        if (els.fileInput) els.fileInput.value = '';
-        if (els.uploadBtn) els.uploadBtn.disabled = true;
-        if (els.selectedFile) els.selectedFile.classList.add('hidden');
-        setMessage(els.uploadMessage, '', null);
-    }
-
-    function setSelectedFile(file) {
-        selectedFile = file || null;
-        if (!els.uploadBtn) return;
-        els.uploadBtn.disabled = !selectedFile;
-        if (!selectedFile) {
-            if (els.selectedFile) els.selectedFile.classList.add('hidden');
-            return;
-        }
-        if (els.selectedFile) {
-            els.selectedFile.textContent = selectedFile.name + ' (' + Math.round(selectedFile.size / 1024) + ' KB)';
-            els.selectedFile.classList.remove('hidden');
-        }
-    }
-
-    async function uploadExcel() {
-        if (!selectedFile) return;
-        const ui = currentUi();
-        if (!ui.hasExcel && els.replaceExisting && !els.replaceExisting.checked) {
-            setMessage(els.uploadMessage, (cfg.i18n && cfg.i18n.enableReplaceWorkbook) || '', 'error');
-            return;
-        }
-        const formData = new FormData();
-        formData.append('excel', selectedFile);
-        setMessage(els.uploadMessage, (cfg.i18n && cfg.i18n.uploading) || 'Uploading...', null);
-        try {
-            const payload = await fetchJson(apiUrl('/upload'), {
-                method: 'POST',
-                body: formData,
-            });
-            updateAdminUi(payload.excel || null);
-            setMessage(els.uploadMessage, (cfg.i18n && cfg.i18n.excelUploadedSuccessfully) || 'Excel uploaded successfully.', 'success');
-            setSelectedFile(null);
-            if (els.fileInput) els.fileInput.value = '';
-        } catch (error) {
-            setMessage(els.uploadMessage, error.message, 'error');
-        }
-    }
-
-    async function startGeneration() {
-        if (importModal) importModal.closeModal();
-        const ui = currentUi();
-        ui.trackingBuild = true;
-        setMessage(els.buildMessage, '', null);
-        ui.maxProgressPercent = 15;
-        if (els.progressBar) els.progressBar.style.width = '15%';
-        if (els.build) els.build.classList.remove('hidden');
-        if (els.buildActive) els.buildActive.classList.remove('hidden');
-        if (els.progressText) els.progressText.textContent = (cfg.i18n && cfg.i18n.generatingReport) || 'Generating report...';
-        renderBuildStages([]);
-        try {
-            const payload = await fetchJson(apiUrl('/generate'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    language: els.languageSelect ? els.languageSelect.value : 'all',
-                }),
-            });
-            const status = payload.status || { status: 'running' };
-            versionUi[activeVersion].statusCache = status;
-            applyStatusToUi(status);
-            if (!pollTimer) {
-                pollTimer = window.setInterval(function() {
-                    refreshAllStatuses().catch(function() {});
-                }, 3000);
-            }
-        } catch (error) {
-            if (els.build) els.build.classList.remove('hidden');
-            if (els.buildActive) els.buildActive.classList.add('hidden');
-            setMessage(els.buildMessage, error.message, 'error');
-            ui.trackingBuild = false;
-        }
-    }
-
     function switchVersion(versionId) {
         if (!VERSIONS[versionId] || versionId === activeVersion) return;
         activeVersion = versionId;
         setActiveVersionTab();
         renderActiveVersionFromCache();
+        syncVersionToUrl(versionId);
         refreshStatus().catch(function() {});
     }
 
@@ -687,54 +563,8 @@
         });
     }
 
-    function bindAdminEvents() {
-        if (!CAN_MANAGE) return;
-        if (window.ModalUtils && els.importModal) {
-            importModal = window.ModalUtils.makeModal(els.importModal, {
-                onOpen: function() {
-                    resetUploadForm();
-                    setActiveVersionTab();
-                    loadExcelInfo().catch(function() {});
-                    refreshStatus().catch(function() {});
-                },
-            });
-        }
-        if (els.openImportBtn && importModal) {
-            els.openImportBtn.addEventListener('click', function() {
-                importModal.openModal();
-            });
-        }
-        if (els.chooseFileBtn && els.fileInput) {
-            els.chooseFileBtn.addEventListener('click', function() { els.fileInput.click(); });
-            els.fileInput.addEventListener('change', function() {
-                setSelectedFile(els.fileInput.files && els.fileInput.files[0] ? els.fileInput.files[0] : null);
-            });
-        }
-        if (els.dropzone) {
-            ['dragenter', 'dragover'].forEach(function(eventName) {
-                els.dropzone.addEventListener(eventName, function(event) {
-                    event.preventDefault();
-                    els.dropzone.classList.add('border-blue-400', 'bg-blue-50/40');
-                });
-            });
-            ['dragleave', 'drop'].forEach(function(eventName) {
-                els.dropzone.addEventListener(eventName, function(event) {
-                    event.preventDefault();
-                    els.dropzone.classList.remove('border-blue-400', 'bg-blue-50/40');
-                });
-            });
-            els.dropzone.addEventListener('drop', function(event) {
-                const file = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files[0] : null;
-                setSelectedFile(file || null);
-            });
-        }
-        if (els.uploadBtn) els.uploadBtn.addEventListener('click', uploadExcel);
-        if (els.generateBtn) els.generateBtn.addEventListener('click', startGeneration);
-    }
-
     function bindEvents() {
         bindVersionTabs();
-        bindAdminEvents();
         if (els.tab) {
             els.tab.addEventListener('click', function() {
                 refreshAllStatuses().catch(function() {});
@@ -742,58 +572,11 @@
         }
     }
 
-    function scrollToIframeOffset(offset, extraPadding) {
-        if (!els.iframe || !Number.isFinite(offset)) return;
-        var padding = Number.isFinite(extraPadding) ? extraPadding : 16;
-        if (els.viewerToolbar) padding += els.viewerToolbar.offsetHeight;
-        var scrollParent = findScrollParent(els.iframe);
-        var iframeRect = els.iframe.getBoundingClientRect();
-        var parentRect = scrollParent.getBoundingClientRect();
-        var top = scrollParent.scrollTop + (iframeRect.top - parentRect.top) + offset - padding;
-        scrollParent.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-    }
-
-    function elementDocumentTop(doc, el) {
-        var rect = el.getBoundingClientRect();
-        var rootRect = doc.documentElement.getBoundingClientRect();
-        return rect.top - rootRect.top;
-    }
-
-    function bindIframeTocNavigation() {
-        if (!els.iframe) return;
-        var bind = function() {
-            try {
-                var doc = els.iframe.contentDocument
-                    || (els.iframe.contentWindow && els.iframe.contentWindow.document);
-                if (!doc || doc.documentElement.dataset.pbTocScrollBound === '1') return;
-                doc.documentElement.dataset.pbTocScrollBound = '1';
-                doc.addEventListener('click', function(event) {
-                    var link = event.target.closest(
-                        '#toc a[href^="#"], #quarto-sidebar a[href^="#"], #quarto-margin-sidebar a[href^="#"]'
-                    );
-                    if (!link) return;
-                    var hash = link.hash || link.getAttribute('href') || '';
-                    if (!hash || hash === '#') return;
-                    event.preventDefault();
-                    event.stopPropagation();
-                    var id = hash.charAt(0) === '#' ? hash.slice(1) : hash;
-                    var target = doc.getElementById(id);
-                    if (!target) return;
-                    scrollToIframeOffset(elementDocumentTop(doc, target), 16);
-                }, true);
-            } catch (err) {}
-        };
-        els.iframe.addEventListener('load', bind);
-        bind();
-    }
-
-    // ── Iframe integration ────────────────────────────────────────────────
     if (els.iframe) {
         els.iframe.addEventListener('load', function() {
             if (els.iframeLoading) els.iframeLoading.classList.add('hidden');
             initializeEmbeddedReportLanguage();
         });
-        bindIframeTocNavigation();
     }
 
     if (els.reportLanguageSelect) {
@@ -805,11 +588,21 @@
 
     window.addEventListener('message', function(event) {
         if (event.origin !== window.location.origin) return;
-        if (!event.data || event.data.type !== 'pb-report-language') return;
-        if (!els.reportLanguageSelect || !DOWNLOAD_LANG_ORDER.includes(event.data.lang)) return;
-        syncingReportLanguage = true;
-        els.reportLanguageSelect.value = event.data.lang;
-        syncingReportLanguage = false;
+        if (!event.data) return;
+
+        if (event.data.type === 'pb-report-language') {
+            if (!els.reportLanguageSelect || !DOWNLOAD_LANG_ORDER.includes(event.data.lang)) return;
+            syncingReportLanguage = true;
+            els.reportLanguageSelect.value = event.data.lang;
+            syncingReportLanguage = false;
+            return;
+        }
+
+        if (event.data.type === 'pb-report-height' && els.iframe) {
+            var h = parseInt(event.data.height, 10);
+            if (h > 0) els.iframe.style.height = h + 'px';
+            return;
+        }
     });
 
     if (els.printBtn) {
@@ -914,36 +707,32 @@
         toolbarPinObserver.observe(els.viewerToolbarAnchor);
     }
 
-    // Auto-resize the iframe to its content so no inner scrollbar appears.
-    window.addEventListener('message', function(e) {
-        if (e.origin !== window.location.origin) return;
-        if (!e.data || !els.iframe) return;
-
-        if (e.data.type === 'pb-report-height') {
-            var h = parseInt(e.data.height, 10);
-            if (h > 0) els.iframe.style.height = h + 'px';
-            return;
-        }
-
-        if (e.data.type === 'pb-report-scroll') {
-            var offset = parseInt(e.data.offset, 10);
-            if (!Number.isFinite(offset)) return;
-            var padding = parseInt(e.data.padding, 10);
-            scrollToIframeOffset(offset, Number.isFinite(padding) ? padding : 16);
-        }
-    });
-    // ─────────────────────────────────────────────────────────────────────
-
     document.addEventListener('click', function() {
         document.querySelectorAll('.pb-dl-menu').forEach(function(m) { m.classList.add('hidden'); });
     });
 
     window.PBProgress = {
         init: function() {
+            resolveInitialVersion();
             setActiveVersionTab();
             bindEvents();
             initToolbarPin();
             refreshAllStatuses().catch(function() {});
+            if (els.tab && els.tab.getAttribute('aria-selected') === 'true') {
+                syncVersionToUrl(activeVersion);
+            }
+        },
+        getActiveVersion: function() {
+            return activeVersion;
+        },
+        setActiveVersion: function(versionId) {
+            if (!VERSIONS[versionId]) return;
+            if (versionId === activeVersion) return;
+            activeVersion = versionId;
+            setActiveVersionTab();
+            renderActiveVersionFromCache();
+            syncVersionToUrl(versionId);
+            refreshStatus().catch(function() {});
         },
     };
 

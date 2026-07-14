@@ -300,7 +300,7 @@ export const CalculatedLists = {
         row.className = 'flex items-center space-x-2';
 
         const fieldSelect = document.createElement('select');
-        fieldSelect.className = 'filter-field-select flex-1 text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500';
+        fieldSelect.className = 'filter-field-select flex-1 text-sm border border-gray-300 rounded-md pl-2 pr-7 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500';
         fieldSelect.style.minWidth = '140px';
         this._setSelectPlaceholder(fieldSelect, 'Select Field');
         (columns || []).forEach((col) => {
@@ -313,7 +313,7 @@ export const CalculatedLists = {
         });
 
         const operatorSelect = document.createElement('select');
-        operatorSelect.className = 'filter-operator-select flex-1 text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500';
+        operatorSelect.className = 'filter-operator-select flex-1 text-sm border border-gray-300 rounded-md pl-2 pr-7 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500';
         operatorSelect.style.minWidth = '120px';
         [
             ['eq', 'Equals'],
@@ -332,7 +332,7 @@ export const CalculatedLists = {
         });
 
         const valueSelect = document.createElement('select');
-        valueSelect.className = 'filter-value-select flex-1 text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500';
+        valueSelect.className = 'filter-value-select flex-1 text-sm border border-gray-300 rounded-md pl-2 pr-7 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500';
         valueSelect.title = 'Select value source';
         valueSelect.style.minWidth = '140px';
         this._setSelectPlaceholder(valueSelect, 'Custom value');

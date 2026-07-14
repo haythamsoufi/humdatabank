@@ -19,7 +19,7 @@
     {% endfor %}
     {% set _ns.q_single_is_other = not _ns2.found %}
 {% endif %}
-{% set select_classes = "mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" %}
+{% set select_classes = "mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" %}
 {% if is_prefilled %}
     {% set select_classes = select_classes ~ " bg-yellow-100 border-yellow-300" %}
 {% elif is_imputed %}

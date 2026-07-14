@@ -79,7 +79,7 @@
                    class="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
         </div>
         <div>
-            <select name="status" id="status-filter" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+            <select name="status" id="status-filter" class="pl-4 pr-9 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                 <option value="all" {% if status_filter == 'all' %}selected{% endif %}>{{ _('All Keys') }}</option>
                 <option value="active" {% if status_filter == 'active' %}selected{% endif %}>{{ _('Active Only') }}</option>
                 <option value="revoked" {% if status_filter == 'revoked' %}selected{% endif %}>{{ _('Revoked Only') }}</option>

@@ -886,7 +886,7 @@ export default function IndicatorBankPage() {
                         id="type-filter"
                         value={selectedType}
                         onChange={(e) => setSelectedType(e.target.value)}
-                        className={`w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
+                        className={`w-full pl-3 pr-8 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
                       >
                         <option value="">{t('indicatorBank.filters.type.all')}</option>
                         {types.map(type => (
@@ -906,7 +906,7 @@ export default function IndicatorBankPage() {
                           setSelectedSector(e.target.value);
                           if (e.target.value !== selectedSector) setSelectedSubSector(''); // Clear subsector when sector changes
                         }}
-                        className={`w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
+                        className={`w-full pl-3 pr-8 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
                       >
                         <option value="">{t('indicatorBank.filters.sector.all')}</option>
                         {sectors.map(sector => (
@@ -923,7 +923,7 @@ export default function IndicatorBankPage() {
                         id="subsector-filter"
                         value={selectedSubSector}
                         onChange={(e) => setSelectedSubSector(e.target.value)}
-                        className={`w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
+                        className={`w-full pl-3 pr-8 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
                       >
                         <option value="">{t('indicatorBank.filters.subsector.all')}</option>
                         {subsectors
@@ -942,7 +942,7 @@ export default function IndicatorBankPage() {
                         id="archived-filter"
                         value={selectedArchived || 'false'}
                         onChange={(e) => setSelectedArchived(e.target.value === 'false' ? null : e.target.value)}
-                        className={`w-full px-3 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
+                        className={`w-full pl-3 pr-8 py-2 border border-humdb-gray-300 rounded-md focus:ring-2 focus:ring-humdb-red focus:border-humdb-red ${isRTL ? 'text-right' : 'text-left'}`}
                       >
                         <option value="false">{t('indicatorBank.filters.status.activeOnly')}</option>
                         <option value="">{t('indicatorBank.filters.status.all')}</option>

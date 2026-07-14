@@ -41,8 +41,8 @@ except ImportError:
         import logging
         logger = logging.getLogger(__name__)
         logger.warning(f"Interactive Map Plugin: Could not load config, using fallback: {e}")
-        from app.plugins.base_config import BasePluginConfig
-        plugin_config = BasePluginConfig("interactive_map", {})
+        from app.plugins.db_config import DbPluginConfig
+        plugin_config = DbPluginConfig("interactive_map", {})
 
 
 def create_blueprint():

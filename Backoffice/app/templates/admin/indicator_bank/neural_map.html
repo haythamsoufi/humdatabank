@@ -56,9 +56,12 @@
     }
     .emb-toolbar label { font-weight: 600; font-size: 0.75rem; color: var(--emb-text); white-space: nowrap; }
     .emb-toolbar select, .emb-toolbar input[type=text] {
-        padding: 0.25rem 0.5rem; border: 1px solid var(--emb-border); border-radius: 6px; font-size: 0.75rem; background: var(--emb-surface2);
+        border: 1px solid var(--emb-border); border-radius: 6px; font-size: 0.75rem; background: var(--emb-surface2);
     }
-    .emb-toolbar input[type=text] { width: 160px; }
+    .emb-toolbar input[type=text] { padding: 0.25rem 0.5rem; width: 160px; }
+    /* Extra right padding keeps text clear of the native <select> arrow icon
+       drawn by the @tailwindcss/forms plugin. */
+    .emb-toolbar select { padding: 0.25rem 1.75rem 0.25rem 0.5rem; }
     .emb-sep { width: 1px; height: 22px; background: var(--emb-border); margin: 0 0.15rem; }
     .emb-btn { padding: 0.3rem 0.7rem; border: none; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.3rem; }
     .emb-btn-primary { background: #dc2626; color: #fff; }

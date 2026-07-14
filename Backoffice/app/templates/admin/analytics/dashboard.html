@@ -58,7 +58,7 @@
         <form method="GET" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div class="flex items-center gap-2">
                 <label for="days" class="text-sm font-medium text-gray-700">{{ _('Time Range:') }}</label>
-                <select name="days" id="days" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2 px-3">
+                <select name="days" id="days" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2 pl-3 pr-8">
                     <option value="7" {% if selected_days == 7 %}selected{% endif %}>{{ _('Last 7 days') }}</option>
                     <option value="30" {% if selected_days == 30 %}selected{% endif %}>{{ _('Last 30 days') }}</option>
                     <option value="90" {% if selected_days == 90 %}selected{% endif %}>{{ _('Last 90 days') }}</option>

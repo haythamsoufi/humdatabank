@@ -13,10 +13,10 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 
-from .font_faces import inject_tajawal_fonts
-from .languages import ARABIC_VISUAL_FONT, is_rtl
+from .font_faces import inject_chart_fonts
+from .languages import ARABIC_VISUAL_FONT, LATIN_DOCX_FONT, is_rtl
 from .calculations import not_available
-from .layouts import cumulative_table_rows
+from .layouts import cumulative_table_rows, mapping_from_model, section_has_indicators
 from .line_chart import inject_line_chart_js
 from .payload import build_payload
 from .styles import style_payload
@@ -37,11 +37,14 @@ def _set_rfonts(r_pr, font_name: str) -> None:
         r_fonts.set(qn(attr), font_name)
 
 
+def _docx_font(language: str) -> str:
+    return ARABIC_VISUAL_FONT if is_rtl(language) else LATIN_DOCX_FONT
+
+
 def _apply_run_font(run, language: str) -> None:
-    if not is_rtl(language):
-        return
-    run.font.name = ARABIC_VISUAL_FONT
-    _set_rfonts(run._element.get_or_add_rPr(), ARABIC_VISUAL_FONT)
+    font_name = _docx_font(language)
+    run.font.name = font_name
+    _set_rfonts(run._element.get_or_add_rPr(), font_name)
 
 
 def _apply_paragraph_language(
@@ -80,16 +83,14 @@ def _style_run(
 
 
 def _configure_document(doc: Document, language: str) -> None:
-    if not is_rtl(language):
-        return
-
+    font_name = _docx_font(language)
     for style_name in _DOCX_STYLES:
         try:
             style = doc.styles[style_name]
         except KeyError:
             continue
-        style.font.name = ARABIC_VISUAL_FONT
-        _set_rfonts(style.element.get_or_add_rPr(), ARABIC_VISUAL_FONT)
+        style.font.name = font_name
+        _set_rfonts(style.element.get_or_add_rPr(), font_name)
 
 
 def _style_heading_paragraph(paragraph, language: str, *, size: int, color: RGBColor | None = None) -> None:
@@ -117,7 +118,7 @@ def _build_asset_html(asset_type: str, data: dict, width: int = CHART_WIDTH_PX) 
         .replace("__WIDTH__", str(width))
         .replace("__DASHBOARD_JSON__", json.dumps(data, ensure_ascii=False))
     )
-    html = inject_tajawal_fonts(html)
+    html = inject_chart_fonts(html)
     return inject_line_chart_js(html)
 
 
@@ -480,11 +481,13 @@ def render_report_docx(
     language: str = "English",
     output_path: Path,
     sections: list[str] | None = None,
+    mapping=None,
 ) -> Path:
     titles = report_titles()
     report_title = titles.get(language, titles["English"])
     parts = report_parts()
     section_order = sections or [s for part in parts for s in part["sections"]]
+    full_mapping = mapping if mapping is not None else mapping_from_model(model)
 
     doc = Document()
     _configure_document(doc, language)
@@ -505,7 +508,9 @@ def render_report_docx(
                 for section in part["sections"]:
                     if section not in section_order:
                         continue
-                    payload = build_payload(model, section, language)
+                    if not section_has_indicators(full_mapping, section):
+                        continue
+                    payload = build_payload(model, section, language, mapping=full_mapping)
                     _add_sp_section(doc, payload, assets_dir, session=session)
 
     output_path = Path(output_path)

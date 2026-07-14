@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 from app.routes.api import api_bp
 
 # Import models
-from app.models import FormData, PublicSubmission, Country, FormItem, FormTemplate, FormTemplateVersion
+from app.models import FormData, PublicSubmission, FormItem, FormTemplate, FormTemplateVersion
 from app.models.assignments import AssignmentEntityStatus
 from app.utils.auth import require_api_key
 from app.utils.rate_limiting import api_rate_limit
@@ -973,9 +973,10 @@ def get_data_tables():
         - sort: Sort field (default: 'submitted_at', options: 'submitted_at', 'template_id', 'country_id', 'period_name')
         - order: Sort order (default: 'desc', options: 'asc', 'desc')
         - page, per_page: pagination for data rows (only used with API key auth)
-        - related: scope of related tables ('page' or 'all'); default 'page'.
-                   'page' returns form_items and countries referenced by the current page of data.
-                   'all' returns form_items and countries for the full filtered dataset (not paginated).
+        - related: scope of related form_items ('page' or 'all'); default 'page'.
+                   'page' returns form_items referenced by the current page of data.
+                   'all' returns form_items for the full filtered dataset (not paginated).
+                   countries[] always includes the full country dimension (all countries).
         - layout: response shape — ``flat`` (default, backward compatible) or ``star``
                   (dimensional tables: fact_form_values, dim_*, bridge_disagg_values).
         - include_dynamic: Include DynamicIndicatorData rows (true/false). Adds ``dynamic_data`` array
@@ -1321,31 +1322,21 @@ def get_data_tables():
         # Initialize data_rows early to ensure it's always defined
         data_rows = []
         form_item_ids = set()
-        country_ids = set()
 
-        # Pre-fetch all form items and countries to avoid N+1 queries
-        # Collect all IDs first - use entity_id directly for assigned to avoid property access
+        # Collect form_item IDs from the current page for the related form_items table.
+        # countries[] is always the full dimension (loaded later), so country_ids are not tracked here.
         for row in page_rows:
             if row.submission_type == 'assigned':
                 data_item = assigned_map.get(row.id)
-                if data_item:
-                    if data_item.form_item_id:
-                        form_item_ids.add(data_item.form_item_id)
-                    status_info = data_item.assignment_entity_status
-                    # Use entity_id directly instead of country property to avoid queries
-                    if status_info and status_info.entity_type == 'country':
-                        country_ids.add(status_info.entity_id)
+                if data_item and data_item.form_item_id:
+                    form_item_ids.add(data_item.form_item_id)
             else:
                 data_item = public_map.get(row.id)
-                if data_item:
-                    if data_item.form_item_id:
-                        form_item_ids.add(data_item.form_item_id)
-                    submission = data_item.public_submission
-                    if submission and submission.country_id:
-                        country_ids.add(submission.country_id)
+                if data_item and data_item.form_item_id:
+                    form_item_ids.add(data_item.form_item_id)
 
         # Now process rows (optimized: inline formatting to avoid function call overhead)
-        # Note: form_items and countries are loaded later when building related tables,
+        # Note: form_items are loaded later when building related tables,
         # which allows for related_scope='all' expansion if needed
         for row in page_rows:
             if row.submission_type == 'assigned':
@@ -1585,8 +1576,6 @@ def get_data_tables():
 
                     aes_ids = [int(aes.id) for (aes, _af) in aes_list if aes and aes.id]
                     if aes_ids:
-                        # Ensure related country table includes the selected country even when all rows are virtual/missing.
-                        country_ids.add(int(country_id))
                         existing_pairs = (
                             FormData.query
                             .filter(FormData.assignment_entity_status_id.in_(aes_ids))
@@ -1669,36 +1658,6 @@ def get_data_tables():
                         if fid is not None
                     ]
                     form_item_ids.update(all_fi_ids_public)
-
-                # Collect all unique country_ids across filtered assigned/public queries (optimized)
-                if assigned_form_data_query is not None:
-                    # Avoid .join(AssignmentEntityStatus) here: the assigned query may already
-                    # include AES (template/country/period path), and a second join makes
-                    # SQLAlchemy pick between multiple FK paths (FormData vs AssignedForm).
-                    aes_id_rows = assigned_form_data_query.with_entities(
-                        FormData.assignment_entity_status_id
-                    ).distinct().all()
-                    aes_ids = {int(r[0]) for r in aes_id_rows if r[0] is not None}
-                    assigned_country_ids = []
-                    if aes_ids:
-                        assigned_country_ids = [
-                            cid for (cid,) in AssignmentEntityStatus.query.filter(
-                                AssignmentEntityStatus.id.in_(aes_ids),
-                                AssignmentEntityStatus.entity_type == 'country',
-                            ).with_entities(AssignmentEntityStatus.entity_id).distinct().all()
-                            if cid is not None
-                        ]
-                    country_ids.update(assigned_country_ids)
-                if public_form_data_query is not None:
-                    # Public query already has PublicSubmission join
-                    public_country_ids = [
-                        cid for (cid,) in public_form_data_query
-                        .with_entities(PublicSubmission.country_id)
-                        .distinct()
-                        .all()
-                        if cid is not None
-                    ]
-                    country_ids.update(public_country_ids)
             except Exception as _e:
                 # If any of the above expansions fail, log error and return partial result
                 error_id = str(uuid.uuid4())
@@ -1710,7 +1669,7 @@ def get_data_tables():
                 expansion_failed = True
 
         # Optionally fetch dynamic indicator and repeat section data, folding their
-        # form_item_ids and country_ids into the related-tables sets.
+        # form_item_ids into the related form_items table.
         include_dynamic, include_repeat = _parse_include_flags(request.args)
         extended = _fetch_extended_data(
             template_id=template_id,
@@ -1729,18 +1688,12 @@ def get_data_tables():
             date_to=date_to,
         ) if (include_dynamic or include_repeat) else {'dynamic_data': [], 'repeat_data': []}
 
-        # Collect form_item_ids and country_ids referenced by extended rows so they appear
-        # in the related form_items / countries tables.
-        for drow in extended.get('dynamic_data', []):
-            if drow.get('country_id'):
-                country_ids.add(drow['country_id'])
+        # Collect form_item_ids referenced by extended rows so they appear in form_items[].
         for rrow in extended.get('repeat_data', []):
             if rrow.get('form_item_id'):
                 form_item_ids.add(rrow['form_item_id'])
-            if rrow.get('country_id'):
-                country_ids.add(rrow['country_id'])
 
-        # Build related tables from the collected id sets (optimized with eager loading)
+        # Build related form_items from the collected id set (optimized with eager loading)
         form_items_table = []
         if form_item_ids:
             # Use eager loading to reduce N+1 queries
@@ -1768,18 +1721,13 @@ def get_data_tables():
         else:
             matrix_entity_labels = {}
 
-        countries_table = []
-        if country_ids:
-            # Note: primary_national_society is a property, not a relationship, so we can't eager load it
-            countries = query_filter_in_batches(
-                Country.query,
-                Country.id,
-                list(country_ids),
-            )
-            # Sort in Python after loading
-            countries_sorted = sorted(countries, key=lambda c: c.name or '')
-            for country in countries_sorted:
-                countries_table.append(format_country_info(country))
+        # Always return the full country dimension (same coverage as /countrymap).
+        # Eager-load national_societies so format_country_info avoids N+1 NS lookups.
+        from app.services import CountryService
+        countries_table = [
+            format_country_info(country)
+            for country in CountryService.get_all_with_national_societies(ordered=True).all()
+        ]
 
         extra_keys = {}
         if include_dynamic:

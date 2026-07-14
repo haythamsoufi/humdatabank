@@ -6,7 +6,11 @@
             <i id="section-modal-icon" class="fas w-6 h-6 mr-2"></i>
             <span id="section-modal-text">Section</span>
         </h3>
-        <form id="section-form" method="POST" action="" data-fb-no-ajax="1">
+        {# no-submit-guard: JS submit handler in main.js manages its own button loading state
+           (disable/spinner/restore); the global FormSubmitGuard would otherwise mutate the button
+           before the handler captures its "original" content, causing it to get stuck on the
+           loading state if the save fails. #}
+        <form id="section-form" class="no-submit-guard" method="POST" action="" data-fb-no-ajax="1">
             {{ section_form.hidden_tag() }} {# For CSRF from section_form #}
             <input type="hidden" name="version_id" value="{{ active_version_id }}">
             <div class="mb-4">

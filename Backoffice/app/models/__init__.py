@@ -118,6 +118,10 @@ from .ai_chat import (
     AIMessage,
 )
 
+from .plugin_data import (
+    PluginData,
+)
+
 from .rbac import (
     RbacPermission,
     RbacRole,
@@ -295,6 +299,9 @@ __all__ = [
     # AI Chat models
     'AIConversation',
     'AIMessage',
+
+    # Plugin data
+    'PluginData',
 
     # AI Embeddings models
     'AIDocument',

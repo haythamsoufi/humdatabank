@@ -156,7 +156,7 @@
             <!-- Division Filter - Pushed to right edge (only show if divisions available) -->
             {% if divisions %}
             <div class="ml-auto">
-                <select id="divisionFilter" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md min-w-40 py-1.5 px-2">
+                <select id="divisionFilter" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md min-w-40 py-1.5 pl-2 pr-8">
                     <option value="">{{ _('All Divisions') }}</option>
                     {% for division in divisions %}
                     <option value="{{ division.id }}">{{ division.name }}</option>

@@ -591,7 +591,7 @@ export default function ApiBuilder() {
                               <select
                                 value={parameters[key].value}
                                 onChange={(e) => handleParameterChange(key, 'value', e.target.value)}
-                                className="w-full px-3 py-2 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
+                                className="w-full pl-3 pr-8 py-2 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-humdb-red text-sm"
                               >
                                 <option value="">{t('common.select')}</option>
                                 {def.options.map(option => (

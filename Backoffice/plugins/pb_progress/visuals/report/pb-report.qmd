@@ -11,8 +11,7 @@ execute:
 format:
   html:
     code-fold: true
-  docx:
-    toc: false
+    format-links: false
 ---
 
 {{< include _body.qmd >}}

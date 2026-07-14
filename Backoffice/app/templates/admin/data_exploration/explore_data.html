@@ -110,17 +110,16 @@
         {'name': _('Data Exploration')}
     ],
     info_tooltip=_('Explore and filter form data directly from the database. Use parameters on the Data Table tab to narrow down data by template and assignment period. Disaggregation Analysis uses the template selector in its sub-tabs bar (defaults to FDRS).') if (can_access_data_table or can_access_analysis) else _('View FDRS document compliance by country.'),
-    actions=[
+        actions=[
         {
-            'type': 'button',
-            'text': _('Import data'),
-            'icon': 'fas fa-file-import',
+            'type': 'link',
+            'text': _('Manage report'),
+            'url': url_for('pb_progress.manage_page'),
+            'icon': 'fas fa-cogs',
             'classes': 'professional-action-btn professional-action-btn-blue' + (' hidden' if explore_first_tab != 'pb-progress' else ''),
             'attributes': {
                 'id': 'pb-progress-open-import-btn',
-                'aria-haspopup': 'dialog',
-                'aria-controls': 'pb-progress-import-modal',
-                'title': _('Upload Excel and regenerate the P&B visuals report')
+                'title': _('Open P&B report management (system managers only)')
             }
         }
     ] if pb_manage_tab else []
@@ -171,7 +170,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 <div class="space-y-2">
                     <label for="template-filter" class="block text-sm font-medium text-gray-700">{{ _('Template') }}</label>
-                    <select id="template-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <select id="template-filter" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         <option value="">{{ _('All Templates') }}</option>
                         {% for template in templates %}
                         <option value="{{ template.id }}">{{ template.name }}</option>
@@ -181,7 +180,7 @@
 
                 <div class="space-y-2">
                     <label for="form-item-filter" class="block text-sm font-medium text-gray-700">{{ _('Form Item') }}</label>
-                    <select id="form-item-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled>
+                    <select id="form-item-filter" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled>
                         <option value="">{{ _('All Form Items') }}</option>
                     </select>
                     <p class="text-xs text-gray-500 mt-1">{{ _('Select a template first to load form items') }}</p>
@@ -189,7 +188,7 @@
 
                 <div class="space-y-2">
                     <label for="assignment-filter" class="block text-sm font-medium text-gray-700">{{ _('Assignment Period') }}</label>
-                    <select id="assignment-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled>
+                    <select id="assignment-filter" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled>
                         <option value="">{{ _('All Periods') }}</option>
                     </select>
                     <p class="text-xs text-gray-500 mt-1" id="assignment-filter-help">{{ _('Select a template first to load periods') }}</p>
@@ -197,7 +196,7 @@
 
                 <div class="space-y-2">
                     <label for="country-filter" class="block text-sm font-medium text-gray-700">{{ _('Country') }}</label>
-                    <select id="country-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled>
+                    <select id="country-filter" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" disabled>
                         <option value="">{{ _('All Countries') }}</option>
                     </select>
                     <p class="text-xs text-gray-500 mt-1" id="country-filter-help">{{ _('Select a template first to load countries') }}</p>
@@ -323,7 +322,7 @@
                     <div id="disagg-template-filter-wrap" class="flex items-center gap-2 shrink-0 py-1.5">
                         <label for="disagg-template-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ _('Template') }}</label>
                         <select id="disagg-template-filter"
-                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md w-28 max-w-[7rem] py-1.5 pl-2 pr-7 text-gray-700">
+                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md w-28 max-w-[7rem] py-1.5 pl-2 pr-8 text-gray-700">
                             {% for template in templates %}
                             <option value="{{ template.id }}"{% if template.id == fdrs_template_id %} selected{% endif %}>{{ template.name }}</option>
                             {% endfor %}
@@ -332,7 +331,7 @@
                     <div id="disagg-year-filter-wrap" class="flex items-center gap-2 shrink-0 py-1.5">
                         <label for="disagg-year-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ _('Year') }}</label>
                         <select id="disagg-year-filter"
-                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md w-20 max-w-[5rem] py-1.5 pl-2 pr-7 text-gray-700"
+                                class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md w-20 max-w-[5rem] py-1.5 pl-2 pr-8 text-gray-700"
                                 disabled>
                             <option value="">{{ _('Loading...') }}</option>
                         </select>
@@ -552,7 +551,7 @@
                 <div class="flex gap-2 items-center flex-wrap">
                     <div class="flex items-center gap-2">
                         <label for="compliance-year-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap">{{ _('As of Year:') }}</label>
-                        <select id="compliance-year-filter" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <select id="compliance-year-filter" class="pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                             <option value="">{{ _('Latest') }}</option>
                         </select>
                     </div>
@@ -605,8 +604,8 @@
                 <span class="font-medium text-gray-700">{{ _('Document status:') }}</span>
                 <span class="inline-flex items-center gap-1"><i class="fas fa-check-circle text-green-500"></i>{{ _('Approved') }}</span>
                 <span class="inline-flex items-center gap-1"><i class="fas fa-clock text-amber-500"></i>{{ _('Pending validation') }}</span>
-                <span class="inline-flex items-center gap-1"><i class="fas fa-ban text-red-500"></i>{{ _('Rejected') }}</span>
-                <span class="inline-flex items-center gap-1"><i class="fas fa-times-circle text-red-400"></i>{{ _('Missing') }}</span>
+                <span class="inline-flex items-center gap-1"><i class="fas fa-times-circle text-red-500"></i>{{ _('Rejected') }}</span>
+                <span class="inline-flex items-center gap-1"><i class="fas fa-times-circle text-gray-400"></i>{{ _('Missing') }}</span>
             </div>
 
             <div id="compliance-pending-validation-notice" class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" style="display: none;" role="status" aria-live="polite">
@@ -672,6 +671,7 @@
     const URL_PARAM_COUNTRY = 'country_id';
     const URL_PARAM_ITEM = 'item_id';
     const URL_PARAM_TAB = 'tab';
+    const URL_PARAM_PB_VERSION = 'pb_version';
     const URL_PARAM_INCLUDE_NON_REPORTED = 'include_non_reported';
 
     // Read current parameters from the page URL
@@ -690,6 +690,8 @@
         if (i) params[URL_PARAM_ITEM] = i;
         const tab = usp.get(URL_PARAM_TAB);
         if (tab) params[URL_PARAM_TAB] = tab;
+        const pbVersion = usp.get(URL_PARAM_PB_VERSION);
+        if (pbVersion) params[URL_PARAM_PB_VERSION] = pbVersion;
         const inc = usp.get(URL_PARAM_INCLUDE_NON_REPORTED);
         if (inc) params[URL_PARAM_INCLUDE_NON_REPORTED] = inc;
         return params;
@@ -791,12 +793,23 @@
         }
     }
 
+    function getActivePbVersion() {
+        if (window.PBProgress && typeof window.PBProgress.getActiveVersion === 'function') {
+            return window.PBProgress.getActiveVersion() || '';
+        }
+        const tabs = document.getElementById('pb-progress-version-tabs');
+        if (!tabs) return '';
+        const active = tabs.querySelector('[data-pb-version][aria-selected="true"]');
+        return active ? (active.getAttribute('data-pb-version') || '') : '';
+    }
+
     // Update the browser URL with current form parameters (and optional tab) without reload
     function applyParamsToUrl(paramOverrides) {
         const tab = paramOverrides && paramOverrides[URL_PARAM_TAB] !== undefined
             ? paramOverrides[URL_PARAM_TAB]
             : getActiveMainTabId();
         const disaggTab = tab === 'disaggregation';
+        const pbProgressTab = tab === 'pb-progress';
         const templateId = paramOverrides && paramOverrides[URL_PARAM_TEMPLATE] !== undefined
             ? paramOverrides[URL_PARAM_TEMPLATE]
             : (disaggTab ? getDisaggTemplateId() : (domCache.templateFilter && domCache.templateFilter.value) || '');
@@ -816,6 +829,11 @@
         const includeNonReported = disaggTab ? '' : (paramOverrides && paramOverrides[URL_PARAM_INCLUDE_NON_REPORTED] !== undefined
             ? paramOverrides[URL_PARAM_INCLUDE_NON_REPORTED]
             : ((domCache.includeNonReportedCheckbox && domCache.includeNonReportedCheckbox.checked) ? '1' : ''));
+        const pbVersion = pbProgressTab
+            ? (paramOverrides && paramOverrides[URL_PARAM_PB_VERSION] !== undefined
+                ? paramOverrides[URL_PARAM_PB_VERSION]
+                : getActivePbVersion())
+            : '';
 
         const usp = new URLSearchParams();
         if (templateId) usp.set(URL_PARAM_TEMPLATE, templateId);
@@ -823,12 +841,14 @@
         if (countryId) usp.set(URL_PARAM_COUNTRY, countryId);
         if (itemId) usp.set(URL_PARAM_ITEM, itemId);
         if (tab) usp.set(URL_PARAM_TAB, tab);
+        if (pbProgressTab && pbVersion) usp.set(URL_PARAM_PB_VERSION, pbVersion);
         if (includeNonReported) usp.set(URL_PARAM_INCLUDE_NON_REPORTED, includeNonReported);
 
         const query = usp.toString();
         const newUrl = query ? (window.location.pathname + '?' + query) : window.location.pathname;
         window.history.replaceState({}, '', newUrl);
     }
+    window.applyExploreParamsToUrl = applyParamsToUrl;
 
     // Get the currently active main tab id (data-table | disaggregation | compliance | pb-progress)
     function getActiveMainTabId() {
@@ -849,12 +869,31 @@
             domCache.includeNonReportedCheckbox.checked = !!(urlParams[URL_PARAM_INCLUDE_NON_REPORTED] && String(urlParams[URL_PARAM_INCLUDE_NON_REPORTED]).trim() !== '0');
         }
 
+        function restorePbVersionFromUrl() {
+            const versionId = urlParams[URL_PARAM_PB_VERSION];
+            if (!versionId) return;
+            if (window.PBProgress && typeof window.PBProgress.setActiveVersion === 'function') {
+                window.PBProgress.setActiveVersion(versionId);
+                return;
+            }
+            const tabs = document.getElementById('pb-progress-version-tabs');
+            if (!tabs) return;
+            const btn = tabs.querySelector('[data-pb-version="' + CSS.escape(versionId) + '"]');
+            if (btn) btn.click();
+        }
+
         function doRestore() {
             const tabId = urlParams[URL_PARAM_TAB];
-            if (tabId === 'data-table' && domCache.tabDataTable && CAN_ACCESS_DATA_TABLE) switchMainTabFn(domCache.tabDataTable);
-            else if (tabId === 'disaggregation' && domCache.tabDisaggregation && CAN_ACCESS_ANALYSIS) switchMainTabFn(domCache.tabDisaggregation);
-            else if (tabId === 'compliance' && domCache.tabCompliance && CAN_ACCESS_COMPLIANCE) switchMainTabFn(domCache.tabCompliance);
-            else if (tabId === 'pb-progress' && domCache.tabPbProgress && CAN_ACCESS_PB_PROGRESS) switchMainTabFn(domCache.tabPbProgress);
+            if (tabId && tabId !== getActiveMainTabId()) {
+                if (tabId === 'data-table' && domCache.tabDataTable && CAN_ACCESS_DATA_TABLE) switchMainTabFn(domCache.tabDataTable);
+                else if (tabId === 'disaggregation' && domCache.tabDisaggregation && CAN_ACCESS_ANALYSIS) switchMainTabFn(domCache.tabDisaggregation);
+                else if (tabId === 'compliance' && domCache.tabCompliance && CAN_ACCESS_COMPLIANCE) switchMainTabFn(domCache.tabCompliance);
+                else if (tabId === 'pb-progress' && domCache.tabPbProgress && CAN_ACCESS_PB_PROGRESS) switchMainTabFn(domCache.tabPbProgress);
+            }
+            const activeTabId = tabId || getActiveMainTabId();
+            if (activeTabId === 'pb-progress') {
+                restorePbVersionFromUrl();
+            }
             const hasData = !!(urlParams[URL_PARAM_TEMPLATE] || urlParams[URL_PARAM_PERIOD] || urlParams[URL_PARAM_COUNTRY] || urlParams[URL_PARAM_ITEM]);
             if (hasData) {
                 if (tabId === 'disaggregation') {
@@ -2855,9 +2894,9 @@
             return `<i class="fas fa-check-circle text-green-500 text-lg" title="${escapeHtml(COMPLIANCE_DOC_STATUS_LABELS.approved)}"></i>`;
         }
         if (value === 'rejected') {
-            return `<i class="fas fa-ban text-red-500 text-lg" title="${escapeHtml(COMPLIANCE_DOC_STATUS_LABELS.rejected)}"></i>`;
+            return `<i class="fas fa-times-circle text-red-500 text-lg" title="${escapeHtml(COMPLIANCE_DOC_STATUS_LABELS.rejected)}"></i>`;
         }
-        return `<i class="fas fa-times-circle text-red-400 text-lg" title="${escapeHtml(COMPLIANCE_DOC_STATUS_LABELS.missing)}"></i>`;
+        return `<i class="fas fa-times-circle text-gray-400 text-lg" title="${escapeHtml(COMPLIANCE_DOC_STATUS_LABELS.missing)}"></i>`;
     }
 
     // Render compliance status badge

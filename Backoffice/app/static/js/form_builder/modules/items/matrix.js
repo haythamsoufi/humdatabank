@@ -1286,7 +1286,7 @@ export const MatrixItem = {
         const filterDiv = document.createElement('div');
         filterDiv.className = 'matrix-filter-row flex items-center space-x-2 p-2 bg-gray-50 rounded border';
         const columnSelect = document.createElement('select');
-        columnSelect.className = 'filter-column block w-1/3 py-1 px-2 border border-gray-300 bg-white rounded text-sm';
+        columnSelect.className = 'filter-column block w-1/3 py-1 pl-2 pr-7 border border-gray-300 bg-white rounded text-sm';
         columnSelect.replaceChildren();
         {
             const placeholder = document.createElement('option');
@@ -1309,7 +1309,7 @@ export const MatrixItem = {
             }
         }
         const operatorSelect = document.createElement('select');
-        operatorSelect.className = 'filter-operator block w-1/4 py-1 px-2 border border-gray-300 bg-white rounded text-sm';
+        operatorSelect.className = 'filter-operator block w-1/4 py-1 pl-2 pr-7 border border-gray-300 bg-white rounded text-sm';
         operatorSelect.replaceChildren();
         [
             ['equals', 'Equals'],

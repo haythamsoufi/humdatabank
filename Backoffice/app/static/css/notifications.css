@@ -607,13 +607,22 @@
 /* Form Elements */
 .form-select,
 .form-input {
-    padding: 0.5rem;
     border: 1px solid #d1d5db;
     border-radius: 0.375rem;
     font-size: 0.875rem;
     color: #374151;
     background-color: white;
     transition: border-color 0.2s;
+}
+
+.form-input {
+    padding: 0.5rem;
+}
+
+/* Extra right padding keeps text clear of the native <select> arrow icon
+   drawn by the @tailwindcss/forms plugin (positioned ~0.5rem-2rem from the right edge). */
+.form-select {
+    padding: 0.5rem 2.25rem 0.5rem 0.75rem;
 }
 
 .form-select:focus,

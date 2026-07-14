@@ -68,7 +68,8 @@ def is_rtl(language: str) -> bool:
 
 
 ARABIC_VISUAL_FONT = "Tajawal"
-DEFAULT_VISUAL_FONT = '"Segoe UI", "Open Sans", system-ui, -apple-system, sans-serif'
+LATIN_DOCX_FONT = "Open Sans"
+DEFAULT_VISUAL_FONT = '"Open Sans", "Segoe UI", system-ui, -apple-system, sans-serif'
 
 
 def visual_font_css(language: str) -> str:

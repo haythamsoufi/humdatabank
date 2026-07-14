@@ -58,7 +58,7 @@ export const DynamicSections = {
         // Field select
         const fieldSelect = document.createElement('select');
         fieldSelect.name = `filter_field_${sectionId}[]`;
-        fieldSelect.className = 'filter-field-select bg-white border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-28';
+        fieldSelect.className = 'filter-field-select bg-white border border-gray-300 rounded-md pl-2 pr-7 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-28';
 
         const defaultOption = document.createElement('option');
         defaultOption.value = '';

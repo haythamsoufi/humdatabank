@@ -1,0 +1,168 @@
+=== anas.alnajjar@ifrc.org lines 798-878 ===
+L798:[2026-07-12 13:49:12 CEST] INFO in app: Extracted from ID token - email: anas.alnajjar@ifrc.org
+L799:[2026-07-12 13:49:12 CEST] INFO in app: Processing Azure login for email: anas.alnajjar@ifrc.org
+L800:[2026-07-12 13:49:12 CEST] INFO in app: Creating new user account for: anas.alnajjar@ifrc.org
+L801:[2026-07-12 13:49:12 CEST] INFO in app: Successfully created user 125
+L802:[2026-07-12 13:49:13 CEST] INFO in app: email_api outbound | method=POST | redacted_url=https://microservices.ifrc.org/Email/api/Email?apiKey=%2A%2A%2AREDACTED%2A%2A%2A | scheme=https netloc=microservices.ifrc.org path=/Email/api/Email query_param_names=['apiKey'] | api_key_already_in_EMAIL_API_URL=False api_key_appended_by_app=True | request_headers=Content-Type:application/json | json_body_utf8_approx_bytes=5762 payload_keys=['BccAsBase64', 'BodyAsBase64', 'CcAsBase64', 'FromAsBase64', 'IsBodyHtml', 'SubjectAsBase64', 'TemplateLanguage', 'TemplateName', 'ToAsBase64'] | BodyAsBase64_chars=5468 html_utf8_bytes=4101 envelope_single_logical_to=True | path_note=HTTPS_TLS_from_this_process_via_requests_library_no_app_HTTP_proxy egress_IP_is_Azure_subnet_NSG_NAT_or_peer_route_VNet_rules_apply_outside_app
+L803:[2026-07-12 13:49:26 CEST] WARNING in app: [STUCK_REQUEST] Request still in progress after 15.0s | pid=21532 method=GET path=/auth/azure/callback query='state=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfc3RhdGUiOiJQNndoNUNBNWs2R0tjOEJkOXlULUtBIiwidmVyaWZpZXIiOiJBbnR6Rk44eVFhRVJ5bWRmdnFtUlYtVlJHenRVejlmN2VGUFVkbjlRbHJkUVpFRDl5aUZndjVkaHNpQWhIU2EzQUlxUUhnR' endpoint=auth.azure_callback | db_pool_out=1/5
+L804:[2026-07-12 13:49:28 CEST] ERROR in app: Email API request failed (no HTTP response) | redacted_url=https://microservices.ifrc.org/Email/api/Email?apiKey=%2A%2A%2AREDACTED%2A%2A%2A | error=HTTPSConnectionPool(host='microservices.ifrc.org', port=443): Read timed out. (read timeout=15)
+L805:Traceback (most recent call last):
+L806:  File "/usr/local/lib/python3.11/site-packages/urllib3/connectionpool.py", line 534, in _make_request
+L807:    response = conn.getresponse()
+L808:               ^^^^^^^^^^^^^^^^^^
+L809:  File "/usr/local/lib/python3.11/site-packages/urllib3/connection.py", line 571, in getresponse
+L810:    httplib_response = super().getresponse()
+L811:                       ^^^^^^^^^^^^^^^^^^^^^
+L812:  File "/usr/local/lib/python3.11/http/client.py", line 1415, in getresponse
+L813:    response.begin()
+L814:  File "/usr/local/lib/python3.11/http/client.py", line 330, in begin
+L815:    version, status, reason = self._read_status()
+L816:                              ^^^^^^^^^^^^^^^^^^^
+L817:  File "/usr/local/lib/python3.11/http/client.py", line 291, in _read_status
+L818:    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+L819:               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L820:  File "/usr/local/lib/python3.11/socket.py", line 718, in readinto
+L821:    return self._sock.recv_into(b)
+L822:           ^^^^^^^^^^^^^^^^^^^^^^^
+L823:  File "/usr/local/lib/python3.11/ssl.py", line 1314, in recv_into
+L824:    return self.read(nbytes, buffer)
+L825:           ^^^^^^^^^^^^^^^^^^^^^^^^^
+L826:  File "/usr/local/lib/python3.11/ssl.py", line 1166, in read
+L827:    return self._sslobj.read(len, buffer)
+L828:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L829:TimeoutError: The read operation timed out
+L830:
+L831:The above exception was the direct cause of the following exception:
+L832:
+L833:Traceback (most recent call last):
+L834:  File "/usr/local/lib/python3.11/site-packages/requests/adapters.py", line 645, in send
+L835:    resp = conn.urlopen(
+L836:           ^^^^^^^^^^^^^
+L837:  File "/usr/local/lib/python3.11/site-packages/urllib3/connectionpool.py", line 842, in urlopen
+L838:    retries = retries.increment(
+L839:              ^^^^^^^^^^^^^^^^^^
+L840:  File "/usr/local/lib/python3.11/site-packages/urllib3/util/retry.py", line 498, in increment
+L841:    raise reraise(type(error), error, _stacktrace)
+L842:          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L843:  File "/usr/local/lib/python3.11/site-packages/urllib3/util/util.py", line 39, in reraise
+L844:    raise value
+L845:  File "/usr/local/lib/python3.11/site-packages/urllib3/connectionpool.py", line 788, in urlopen
+L846:    response = self._make_request(
+L847:               ^^^^^^^^^^^^^^^^^^^
+L848:  File "/usr/local/lib/python3.11/site-packages/urllib3/connectionpool.py", line 536, in _make_request
+L849:    self._raise_timeout(err=e, url=url, timeout_value=read_timeout)
+L850:  File "/usr/local/lib/python3.11/site-packages/urllib3/connectionpool.py", line 367, in _raise_timeout
+L851:    raise ReadTimeoutError(
+L852:urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='microservices.ifrc.org', port=443): Read timed out. (read timeout=15)
+L853:
+L854:During handling of the above exception, another exception occurred:
+L855:
+L856:Traceback (most recent call last):
+L857:  File "/app/app/services/email/client.py", line 557, in _send_via_ifrc
+L858:    resp = requests.post(effective_url, headers=headers, json=payload, timeout=15)
+L859:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L860:  File "/usr/local/lib/python3.11/site-packages/requests/api.py", line 115, in post
+L861:    return request("post", url, data=data, json=json, **kwargs)
+L862:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L863:  File "/usr/local/lib/python3.11/site-packages/requests/api.py", line 59, in request
+L864:    return session.request(method=method, url=url, **kwargs)
+L865:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L866:  File "/usr/local/lib/python3.11/site-packages/requests/sessions.py", line 592, in request
+L867:    resp = self.send(prep, **send_kwargs)
+L868:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L869:  File "/usr/local/lib/python3.11/site-packages/requests/sessions.py", line 706, in send
+L870:    r = adapter.send(request, **kwargs)
+L871:        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L872:  File "/usr/local/lib/python3.11/site-packages/requests/adapters.py", line 691, in send
+L873:    raise ReadTimeout(e, request=request)
+L874:requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='microservices.ifrc.org', port=443): Read timed out. (read timeout=15)
+L875:[2026-07-12 13:49:28 CEST] ERROR in app: Failed to send welcome email to anas.alnajjar@ifrc.org
+L876:[2026-07-12 13:49:28 CEST] WARNING in app: [SLOW_REQUEST] Completed in 16.47s (threshold=10s) | pid=21532 method=GET path=/auth/azure/callback query='state=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfc3RhdGUiOiJQNndoNUNBNWs2R0tjOEJkOXlULUtBIiwidmVyaWZpZXIiOiJBbnR6Rk44eVFhRVJ5bWRmdnFtUlYtVlJHenRVejlmN2VGUFVkbjlRbHJkUVpFRDl5aUZndjVkaHNpQWhIU2EzQUlxUUhnR' endpoint=auth.azure_callback | db_pool_out=0/5
+L877:[2026-07-12 13:49:28 CEST] WARNING in app: User anas.alnajjar@ifrc.org has no enabled entities assigned.
+L878:[2026-07-12 13:50:07 CEST] INFO in app: User anas.alnajjar@ifrc.org requested access to 3 countries: [79, 84, 190]
+=== youssouf.fofana@croix-rouge.ml lines 948-1032 ===
+L948:[2026-07-13 01:01:02 CEST] INFO in app: Scheduler skipped: lock held by live worker (master pid=1, this pid=24985)
+L949:[2026-07-13 01:43:09 CEST] INFO in app: Azure B2C ID Token Claims: ['exp', 'nbf', 'ver', 'iss', 'sub', 'aud', 'acr', 'nonce', 'iat', 'auth_time', 'given_name', 'family_name', 'country', 'department', 'email', 'name', 'tid']
+L950:[2026-07-13 01:43:09 CEST] INFO in app: Extracted from ID token - email: youssouf.fofana@croix-rouge.ml
+L951:[2026-07-13 01:43:09 CEST] INFO in app: Processing Azure login for email: youssouf.fofana@croix-rouge.ml
+L952:[2026-07-13 01:43:09 CEST] INFO in app: Creating new user account for: youssouf.fofana@croix-rouge.ml
+L953:[2026-07-13 01:43:09 CEST] INFO in app: Successfully created user 126
+L954:[2026-07-13 01:43:09 CEST] INFO in app: email_api outbound | method=POST | redacted_url=https://microservices.ifrc.org/Email/api/Email?apiKey=%2A%2A%2AREDACTED%2A%2A%2A | scheme=https netloc=microservices.ifrc.org path=/Email/api/Email query_param_names=['apiKey'] | api_key_already_in_EMAIL_API_URL=False api_key_appended_by_app=True | request_headers=Content-Type:application/json | json_body_utf8_approx_bytes=5926 payload_keys=['BccAsBase64', 'BodyAsBase64', 'CcAsBase64', 'FromAsBase64', 'IsBodyHtml', 'SubjectAsBase64', 'TemplateLanguage', 'TemplateName', 'ToAsBase64'] | BodyAsBase64_chars=5600 html_utf8_bytes=4198 envelope_single_logical_to=True | path_note=HTTPS_TLS_from_this_process_via_requests_library_no_app_HTTP_proxy egress_IP_is_Azure_subnet_NSG_NAT_or_peer_route_VNet_rules_apply_outside_app
+L955:[2026-07-13 01:43:23 CEST] WARNING in app: [STUCK_REQUEST] Request still in progress after 15.0s | pid=24955 method=GET path=/auth/azure/callback query='state=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfc3RhdGUiOiJzQWo3TmRFX2J6SFEwdWEya0JUQndBIiwidmVyaWZpZXIiOiJMaFpiLXVlWnN1ZHN5QVN1VzE4MWE2Q3EzRDJSYUN0cXJwMGFnMTg4MTk2WlJSMGV0Vk00aWdRNjQ0bjlmOEJITC1pVE5jV' endpoint=auth.azure_callback | db_pool_out=1/5
+L956:[2026-07-13 01:43:25 CEST] ERROR in app: Email API request failed (no HTTP response) | redacted_url=https://microservices.ifrc.org/Email/api/Email?apiKey=%2A%2A%2AREDACTED%2A%2A%2A | error=HTTPSConnectionPool(host='microservices.ifrc.org', port=443): Read timed out. (read timeout=15)
+L957:Traceback (most recent call last):
+L958:  File "/usr/local/lib/python3.11/site-packages/urllib3/connectionpool.py", line 534, in _make_request
+L959:    response = conn.getresponse()
+L960:               ^^^^^^^^^^^^^^^^^^
+L961:  File "/usr/local/lib/python3.11/site-packages/urllib3/connection.py", line 571, in getresponse
+L962:    httplib_response = super().getresponse()
+L963:                       ^^^^^^^^^^^^^^^^^^^^^
+L964:  File "/usr/local/lib/python3.11/http/client.py", line 1415, in getresponse
+L965:    response.begin()
+L966:  File "/usr/local/lib/python3.11/http/client.py", line 330, in begin
+L967:    version, status, reason = self._read_status()
+L968:                              ^^^^^^^^^^^^^^^^^^^
+L969:  File "/usr/local/lib/python3.11/http/client.py", line 291, in _read_status
+L970:    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+L971:               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L972:  File "/usr/local/lib/python3.11/socket.py", line 718, in readinto
+L973:    return self._sock.recv_into(b)
+L974:           ^^^^^^^^^^^^^^^^^^^^^^^
+L975:  File "/usr/local/lib/python3.11/ssl.py", line 1314, in recv_into
+L976:    return self.read(nbytes, buffer)
+L977:           ^^^^^^^^^^^^^^^^^^^^^^^^^
+L978:  File "/usr/local/lib/python3.11/ssl.py", line 1166, in read
+L979:    return self._sslobj.read(len, buffer)
+L980:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L981:TimeoutError: The read operation timed out
+L982:
+L983:The above exception was the direct cause of the following exception:
+L984:
+L985:Traceback (most recent call last):
+L986:  File "/usr/local/lib/python3.11/site-packages/requests/adapters.py", line 645, in send
+L987:    resp = conn.urlopen(
+L988:           ^^^^^^^^^^^^^
+L989:  File "/usr/local/lib/python3.11/site-packages/urllib3/connectionpool.py", line 842, in urlopen
+L990:    retries = retries.increment(
+L991:              ^^^^^^^^^^^^^^^^^^
+L992:  File "/usr/local/lib/python3.11/site-packages/urllib3/util/retry.py", line 498, in increment
+L993:    raise reraise(type(error), error, _stacktrace)
+L994:          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L995:  File "/usr/local/lib/python3.11/site-packages/urllib3/util/util.py", line 39, in reraise
+L996:    raise value
+L997:  File "/usr/local/lib/python3.11/site-packages/urllib3/connectionpool.py", line 788, in urlopen
+L998:    response = self._make_request(
+L999:               ^^^^^^^^^^^^^^^^^^^
+L1000:  File "/usr/local/lib/python3.11/site-packages/urllib3/connectionpool.py", line 536, in _make_request
+L1001:    self._raise_timeout(err=e, url=url, timeout_value=read_timeout)
+L1002:  File "/usr/local/lib/python3.11/site-packages/urllib3/connectionpool.py", line 367, in _raise_timeout
+L1003:    raise ReadTimeoutError(
+L1004:urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='microservices.ifrc.org', port=443): Read timed out. (read timeout=15)
+L1005:
+L1006:During handling of the above exception, another exception occurred:
+L1007:
+L1008:Traceback (most recent call last):
+L1009:  File "/app/app/services/email/client.py", line 557, in _send_via_ifrc
+L1010:    resp = requests.post(effective_url, headers=headers, json=payload, timeout=15)
+L1011:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L1012:  File "/usr/local/lib/python3.11/site-packages/requests/api.py", line 115, in post
+L1013:    return request("post", url, data=data, json=json, **kwargs)
+L1014:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L1015:  File "/usr/local/lib/python3.11/site-packages/requests/api.py", line 59, in request
+L1016:    return session.request(method=method, url=url, **kwargs)
+L1017:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L1018:  File "/usr/local/lib/python3.11/site-packages/requests/sessions.py", line 592, in request
+L1019:    resp = self.send(prep, **send_kwargs)
+L1020:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L1021:  File "/usr/local/lib/python3.11/site-packages/requests/sessions.py", line 706, in send
+L1022:    r = adapter.send(request, **kwargs)
+L1023:        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+L1024:  File "/usr/local/lib/python3.11/site-packages/requests/adapters.py", line 691, in send
+L1025:    raise ReadTimeout(e, request=request)
+L1026:requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='microservices.ifrc.org', port=443): Read timed out. (read timeout=15)
+L1027:[2026-07-13 01:43:25 CEST] ERROR in app: Failed to send welcome email to youssouf.fofana@croix-rouge.ml
+L1028:[2026-07-13 01:43:25 CEST] WARNING in app: [SLOW_REQUEST] Completed in 16.77s (threshold=10s) | pid=24955 method=GET path=/auth/azure/callback query='state=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfc3RhdGUiOiJzQWo3TmRFX2J6SFEwdWEya0JUQndBIiwidmVyaWZpZXIiOiJMaFpiLXVlWnN1ZHN5QVN1VzE4MWE2Q3EzRDJSYUN0cXJwMGFnMTg4MTk2WlJSMGV0Vk00aWdRNjQ0bjlmOEJITC1pVE5jV' endpoint=auth.azure_callback | db_pool_out=0/5
+L1029:[2026-07-13 01:43:26 CEST] WARNING in app: User youssouf.fofana@croix-rouge.ml has no enabled entities assigned.
+L1030:[2026-07-13 01:46:02 CEST] INFO in app: User youssouf.fofana@croix-rouge.ml requested access to 1 countries: [106]
+L1031:[2026-07-13 01:46:03 CEST] WARNING in app: User youssouf.fofana@croix-rouge.ml has no enabled entities assigned.
+L1032:[2026-07-13 02:50:45 CEST] INFO in app: Cleaned up 1 inactive/expired sessions (0 inactivity+duration, 1 inactivity, 0 max-duration)

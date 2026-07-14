@@ -28,6 +28,7 @@ from .config import DASHBOARD_SIZES
 from .styles import style_payload
 from .layouts import (
     NS_TABLE_IMPLEMENTING_COUNT,
+    NS_TABLE_NS_UNIT,
     build_section_layout,
     indicator_has_values,
     indicators_with_data,
@@ -38,6 +39,8 @@ from .layouts import (
     visible_donut_pairs,
     visible_indicator_ids,
 )
+
+_NS_UNIT_TABLE_MODES = (NS_TABLE_IMPLEMENTING_COUNT, NS_TABLE_NS_UNIT)
 
 
 def _indicator_meta_from_mapping(
@@ -165,16 +168,21 @@ def _build_ef_cumulative_payload(
             values.append(val)
             value_labels.append(formatted)
 
-        total_reported = row.get("TotalReported")
+        count = row.get("Count")
         impl = row.get("Implementing")
+        total_reported = row.get("TotalReported")
         impl_text = str(int(impl)) if pd.notna(impl) else not_applicable(language)
+        count_text = str(int(count)) if pd.notna(count) else not_applicable(language)
         total_reported_text = (
             str(int(total_reported)) if pd.notna(total_reported) else not_applicable(language)
         )
         implementing.append(impl_text)
-        reporting.append(
-            impl_text if table_mode == NS_TABLE_IMPLEMENTING_COUNT else total_reported_text
-        )
+        if table_mode in _NS_UNIT_TABLE_MODES:
+            # NS-unit: chart value is the implementing count; show round total as reporting.
+            reporting.append(total_reported_text)
+        else:
+            # Non-NS: reporting = NSs with a value > 0; implementing = broader per-indicator pool.
+            reporting.append(count_text)
 
     if not any(value is not None for value in values):
         payload = _build_unavailable_cumulative_payload(mapping, section, indicator_id, language)
@@ -224,10 +232,16 @@ def _build_cumulative_payload(
         value_labels.append(format_value(val, unit, language) if val is not None else "")
         count = row.get("Count")
         impl = row.get("Implementing")
+        total_reported = row.get("TotalReported")
         impl_text = str(int(impl)) if pd.notna(impl) else not_applicable(language)
         count_text = str(int(count)) if pd.notna(count) else not_applicable(language)
+        total_reported_text = (
+            str(int(total_reported)) if pd.notna(total_reported) else not_applicable(language)
+        )
         implementing.append(impl_text)
-        reporting.append(impl_text if table_mode == NS_TABLE_IMPLEMENTING_COUNT else count_text)
+        # NS-unit indicators: the charted value already is the "implementing" count,
+        # so the one visible row shows the total NSs in this reporting round instead.
+        reporting.append(total_reported_text if table_mode in _NS_UNIT_TABLE_MODES else count_text)
 
     if not any(value is not None for value in values):
         return _build_unavailable_cumulative_payload(mapping, section, indicator_id, language)

@@ -6,6 +6,7 @@ export const SharedFields = {
 		this.sharedFields = {
 			label: '#item-modal-shared-label',
 			description: '#item-modal-shared-description',
+			definition: '#item-modal-definition',
 			label_translations: '#item-modal-shared-label-translations',
 			description_translations: '#item-modal-shared-description-translations'
 		};
@@ -16,6 +17,7 @@ export const SharedFields = {
 		const root = this.modalElement || document;
 		const sharedLabel = root.querySelector(this.sharedFields.label);
 		const sharedDescription = root.querySelector(this.sharedFields.description);
+		const sharedDefinition = root.querySelector(this.sharedFields.definition);
 
 		// Prefer item-type-specific fields to avoid accidentally syncing to the wrong
 		// `data-field-type="label"` input (e.g. matrix row headers) when multiple exist.
@@ -37,6 +39,12 @@ export const SharedFields = {
 			// so only sync generic description fields when present.
 			return root.querySelector(`[data-field-type="description"]:not(.hidden)`);
 		};
+		const resolveActiveDefinitionField = () => {
+			const t = (window.ItemModal && window.ItemModal.currentItemType) ? window.ItemModal.currentItemType : null;
+			if (t === 'indicator') return root.querySelector('#item-indicator-definition');
+			if (t === 'question') return root.querySelector('#item-question-definition');
+			return null;
+		};
 
 		const labelField = resolveActiveLabelField();
 		if (labelField && sharedLabel) {
@@ -46,6 +54,10 @@ export const SharedFields = {
 		if (descField && sharedDescription) {
 			descField.value = sharedDescription.value;
 		}
+		const defField = resolveActiveDefinitionField();
+		if (defField && sharedDefinition) {
+			defField.value = sharedDefinition.value;
+		}
 	},
 
 	syncUIToShared() {
@@ -53,6 +65,7 @@ export const SharedFields = {
 		const root = this.modalElement || document;
 		const sharedLabel = root.querySelector(this.sharedFields.label);
 		const sharedDescription = root.querySelector(this.sharedFields.description);
+		const sharedDefinition = root.querySelector(this.sharedFields.definition);
 
 		const resolveActiveLabelField = () => {
 			const t = (window.ItemModal && window.ItemModal.currentItemType) ? window.ItemModal.currentItemType : null;
@@ -69,6 +82,12 @@ export const SharedFields = {
 			if (t === 'matrix') return root.querySelector('#item-matrix-description:not([disabled])');
 			if (t && String(t).startsWith('plugin_')) return root.querySelector('#item-plugin-description:not([disabled])');
 			return root.querySelector(`[data-field-type="description"]:not(.hidden):not([disabled])`);
+		};
+		const resolveActiveDefinitionField = () => {
+			const t = (window.ItemModal && window.ItemModal.currentItemType) ? window.ItemModal.currentItemType : null;
+			if (t === 'indicator') return root.querySelector('#item-indicator-definition:not([disabled])');
+			if (t === 'question') return root.querySelector('#item-question-definition:not([disabled])');
+			return null;
 		};
 
 		const activeLabelField = resolveActiveLabelField();
@@ -91,6 +110,10 @@ export const SharedFields = {
 		const activeDescriptionField = resolveActiveDescriptionField();
 		if (activeDescriptionField && sharedDescription) {
 			sharedDescription.value = activeDescriptionField.value;
+		}
+		const activeDefinitionField = resolveActiveDefinitionField();
+		if (sharedDefinition) {
+			sharedDefinition.value = activeDefinitionField ? activeDefinitionField.value : '';
 		}
 	},
 

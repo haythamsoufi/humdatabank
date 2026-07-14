@@ -188,7 +188,13 @@ def edit_item(item_id):
     except Exception as e:
         current_app.logger.debug("edit_item: debug log failed: %s", e)
 
-    submitted_item_type = (data.get('item_type') or '').strip() or form_item.item_type
+    _item_type_raw = data.get('item_type')
+    if isinstance(_item_type_raw, list):
+        _item_type_raw = next(
+            (v for v in reversed(_item_type_raw) if v and str(v).strip()),
+            None,
+        )
+    submitted_item_type = (str(_item_type_raw or '')).strip() or form_item.item_type
     if submitted_item_type not in ('indicator', 'question', 'document_field', 'matrix') and not (submitted_item_type and submitted_item_type.startswith('plugin_')):
         submitted_item_type = form_item.item_type
 

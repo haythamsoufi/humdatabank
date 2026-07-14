@@ -103,7 +103,10 @@
 {% from "macros/modal_shell.html" import modal_shell %}
 {% call modal_shell('editModal', _('Edit Common Word'), max_width='max-w-4xl', close_id='close-edit-modal-btn') %}
     <p id="modalSubtitle" class="text-sm text-gray-600 mb-4">{{ _('Editing') }}: <span id="editTermDisplay" class="font-medium"></span></p>
-    <form id="editForm" method="POST">
+    {# no-submit-guard: JS submit handler manages its own button loading state (disable/spinner/restore);
+       the global FormSubmitGuard would otherwise mutate the button before the handler captures its
+       "original" content, causing it to get stuck on the loading state on error. #}
+    <form id="editForm" class="no-submit-guard" method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" id="edit_id" name="id">
 

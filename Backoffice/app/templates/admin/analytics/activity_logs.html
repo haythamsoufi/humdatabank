@@ -38,7 +38,7 @@
             </div>
             <div>
                 <label for="activity_type" class="block text-sm font-medium text-gray-700 mb-1">Activity Type</label>
-                <select class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" id="activity_type" name="activity_type">
+                <select class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-2 pl-2 pr-8" id="activity_type" name="activity_type">
                     <option value="">All Types</option>
                     {% for activity_type in activity_types %}
                     <option value="{{ activity_type }}" {% if filters.activity_type == activity_type %}selected{% endif %}>{{ activity_type|title }}</option>

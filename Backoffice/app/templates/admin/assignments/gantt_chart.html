@@ -105,7 +105,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div class="space-y-2">
                     <label class="block text-sm font-medium text-gray-700" for="status-filter">{{ _('Status') }}</label>
-                    <select id="status-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <select id="status-filter" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         <option value="">{{ _('All Statuses') }}</option>
                         <option value="active">{{ _('Active Public') }}</option>
                         <option value="inactive">{{ _('Inactive Public') }}</option>
@@ -115,7 +115,7 @@
 
                 <div class="space-y-2">
                     <label class="block text-sm font-medium text-gray-700" for="template-filter">{{ _('Template') }}</label>
-                    <select id="template-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <select id="template-filter" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         <option value="">{{ _('All Templates') }}</option>
                         {% for group in grouped_assignments %}
                         <option value="{{ group.template_name }}">{{ group.template_name }}</option>
@@ -126,8 +126,8 @@
                 <div class="space-y-2">
                     <label class="block text-sm font-medium text-gray-700" for="date-from">{{ _('From Date') }}</label>
                     <div class="grid grid-cols-2 gap-2">
-                        <select id="date-from-year" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></select>
-                        <select id="date-from-month" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <select id="date-from-year" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></select>
+                        <select id="date-from-month" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                             <option value="">{{ _('All Months') }}</option>
                             <option value="1">Jan</option>
                             <option value="2">Feb</option>
@@ -149,8 +149,8 @@
                 <div class="space-y-2">
                     <label class="block text-sm font-medium text-gray-700" for="date-to">{{ _('To Date') }}</label>
                     <div class="grid grid-cols-2 gap-2">
-                        <select id="date-to-year" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></select>
-                        <select id="date-to-month" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <select id="date-to-year" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></select>
+                        <select id="date-to-month" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                             <option value="">{{ _('All Months') }}</option>
                             <option value="1">Jan</option>
                             <option value="2">Feb</option>
@@ -237,7 +237,7 @@
 <div class="space-y-4">
     <div>
         <label class="block text-sm font-medium text-gray-700 mb-2" for="export-format">{{ _('Format') }}</label>
-        <select id="export-format" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        <select id="export-format" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
             <option value="png">{{ _('PNG Image') }}</option>
             <option value="pdf">{{ _('PDF Document') }}</option>
         </select>

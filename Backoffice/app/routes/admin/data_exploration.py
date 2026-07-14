@@ -25,9 +25,9 @@ from app.utils.datetime_helpers import utcnow
 from app.services.authorization_service import AuthorizationService
 from app.plugins.data_explorer import (
     CORE_DATA_EXPLORER_PERMISSIONS,
-    explore_first_tab,
     explore_tab_access_flags,
     manage_flag_key,
+    resolve_explore_tab,
     tab_flag_key,
 )
 from app.plugins.manager import PluginManager
@@ -103,17 +103,24 @@ def _explore_tab_access_flags(user) -> dict[str, bool]:
         }
 
 
-def _explore_first_tab(flags: dict[str, bool]) -> str:
+def _explore_active_tab(flags: dict[str, bool], requested_tab: str | None = None) -> str:
     try:
-        return explore_first_tab(flags, _plugin_manager())
+        return resolve_explore_tab(flags, _plugin_manager(), requested_tab)
     except Exception as exc:
         logger.debug("Extension first-tab fallback: %s", exc)
+        accessible = []
         if flags.get('can_access_data_table'):
-            return 'data-table'
+            accessible.append('data-table')
         if flags.get('can_access_analysis'):
-            return 'disaggregation'
+            accessible.append('disaggregation')
         if flags.get('can_access_compliance'):
-            return 'compliance'
+            accessible.append('compliance')
+        if flags.get('can_access_pb_progress'):
+            accessible.append('pb-progress')
+        if requested_tab and requested_tab in accessible:
+            return requested_tab
+        if accessible:
+            return accessible[0]
         return 'data-table'
 
 
@@ -201,7 +208,8 @@ def explore_data():
     """Display data exploration page with filters for template and assignment."""
     try:
         tab_flags = _explore_tab_access_flags(current_user)
-        explore_first_tab = _explore_first_tab(tab_flags)
+        requested_tab = request.args.get('tab')
+        explore_first_tab = _explore_active_tab(tab_flags, requested_tab)
         extension_panels = _render_extension_panels(tab_flags, explore_first_tab)
         explorer_extension_tabs_render = _explorer_extension_tabs_render(
             tab_flags, explore_first_tab, extension_panels
@@ -250,7 +258,8 @@ def explore_data():
         logger.error(f"Error loading data exploration page: {str(e)}", exc_info=True)
         db.session.rollback()
         tab_flags = _explore_tab_access_flags(current_user)
-        explore_first_tab = _explore_first_tab(tab_flags)
+        requested_tab = request.args.get('tab')
+        explore_first_tab = _explore_active_tab(tab_flags, requested_tab)
         extension_panels = _render_extension_panels(tab_flags, explore_first_tab)
         explorer_extension_tabs_render = _explorer_extension_tabs_render(
             tab_flags, explore_first_tab, extension_panels
@@ -972,6 +981,8 @@ def get_compliance_data():
             # Default: get the last 3 periods
             periods = all_periods[:3]
 
+        periods = list(reversed(periods))
+
         if not periods:
             return json_ok(
                 success=True,
@@ -1180,6 +1191,8 @@ def download_compliance_excel():
         else:
             # Default: get the last 3 periods
             periods = all_periods[:3]
+
+        periods = list(reversed(periods))
 
         # Active countries only (country map status=Active)
         countries = active_country_map_query().all()

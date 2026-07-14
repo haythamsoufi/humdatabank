@@ -4,8 +4,30 @@ document.addEventListener("DOMContentLoaded", function () {
   const main = document.getElementById("quarto-document-content");
   if (!panelsRoot) return;
 
+  const PB_TOC_DEBUG =
+    new URLSearchParams(window.location.search).get("pb_debug_toc") === "1" ||
+    localStorage.getItem("pb-debug-toc") === "1";
+  let tocHostCache = null;
+
+  function tocLog(msg, data) {
+    const entry = { msg: msg, data: data || null, t: Date.now() };
+    window.__pbReportTocDebug = window.__pbReportTocDebug || [];
+    window.__pbReportTocDebug.push(entry);
+    if (PB_TOC_DEBUG) {
+      console.log("[pb-report-toc]", msg, data || "");
+    }
+  }
+
+  function tocWarn(msg, data) {
+    tocLog(msg, data);
+    console.warn("[pb-report-toc]", msg, data || "");
+  }
+
   const panels = Array.from(panelsRoot.querySelectorAll(".pb-lang-panel"));
-  if (!panels.length) return;
+  if (!panels.length) {
+    tocWarn("no language panels found");
+    return;
+  }
 
   // ── Embedded-mode helpers ────────────────────────────────────────────────
   const isEmbedded = window.self !== window.top;
@@ -69,59 +91,6 @@ document.addEventListener("DOMContentLoaded", function () {
   });
   select.value = activeLang;
 
-  function elementDocumentTop(el) {
-    let top = 0;
-    let node = el;
-    while (node) {
-      top += node.offsetTop || 0;
-      node = node.offsetParent;
-    }
-    return top;
-  }
-
-  function scrollToReportAnchor(hash) {
-    const id = (hash || "").replace(/^#/, "");
-    if (!id) return;
-    const target = document.getElementById(id);
-    if (!target) return;
-
-    if (isEmbedded) {
-      const stickyBarH = parseInt(
-        getComputedStyle(document.documentElement).getPropertyValue("--pb-sticky-bar-height"),
-        10
-      ) || 0;
-      try {
-        window.parent.postMessage(
-          {
-            type: "pb-report-scroll",
-            offset: elementDocumentTop(target),
-            padding: stickyBarH + 16,
-          },
-          window.location.origin
-        );
-      } catch (e) {}
-      return;
-    }
-
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  function bindEmbeddedTocScroll() {
-    if (!isEmbedded) return;
-    document.addEventListener("click", function (event) {
-      const link = event.target.closest(
-        "#toc a[href^='#'], #quarto-sidebar a[href^='#'], #quarto-margin-sidebar a[href^='#']"
-      );
-      if (!link) return;
-      const href = link.getAttribute("href");
-      if (!href || href === "#") return;
-      event.preventDefault();
-      scrollToReportAnchor(href);
-    });
-  }
-
-  bindEmbeddedTocScroll();
-
   function slug(lang) {
     return lang.toLowerCase().replace(/\s+/g, "-");
   }
@@ -142,11 +111,64 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  function rebuildToc(panel) {
-    const host = leftNav || marginSidebar;
-    if (!host) return;
+  function tocHostElement() {
+    if (marginSidebar) {
+      tocLog("using quarto margin sidebar host");
+      return marginSidebar;
+    }
+    if (leftNav) {
+      tocLog("using quarto sidebar nav host");
+      return leftNav;
+    }
+    const quartoSidebar = document.getElementById("quarto-sidebar");
+    if (quartoSidebar) {
+      tocLog("using quarto sidebar host");
+      return quartoSidebar;
+    }
+    if (!tocHostCache) {
+      tocHostCache = document.getElementById("pb-report-toc-host");
+      if (!tocHostCache) {
+        tocHostCache = document.createElement("div");
+        tocHostCache.id = "pb-report-toc-host";
+        document.body.appendChild(tocHostCache);
+        tocWarn("no quarto sidebar in page-layout-full; created fallback toc host");
+      }
+    }
+    return tocHostCache;
+  }
 
-    let toc = host.querySelector("#toc");
+  function pinTocBelowToolbar() {
+    const toc = document.getElementById("toc");
+    if (!toc) {
+      tocWarn("pin skipped — #toc not found");
+      return;
+    }
+
+    document.querySelectorAll("#pb-toc-sidebar-spacer").forEach(function (node) {
+      node.remove();
+    });
+    document.querySelectorAll("#quarto-margin-sidebar.pb-report-toc-pinned, #quarto-sidebar.pb-report-toc-pinned").forEach(function (node) {
+      node.classList.remove("pb-report-toc-pinned");
+    });
+
+    toc.classList.add("pb-report-toc-pinned");
+    toc.style.removeProperty("--pb-toc-right");
+    toc.style.removeProperty("--pb-toc-width");
+
+    const toolbarHeight = getComputedStyle(document.documentElement)
+      .getPropertyValue("--pb-report-toolbar-height")
+      .trim();
+    tocLog("pinned toc", { toolbarHeight: toolbarHeight });
+  }
+
+  function rebuildToc(panel) {
+    const host = tocHostElement();
+    if (!host) {
+      tocWarn("rebuild aborted — no toc host");
+      return;
+    }
+
+    let toc = host.querySelector("#toc") || document.getElementById("toc");
     if (!toc) {
       const tocNav = document.createElement("nav");
       tocNav.id = "toc";
@@ -162,130 +184,53 @@ document.addEventListener("DOMContentLoaded", function () {
         host.appendChild(tocNav);
       }
       toc = tocNav;
+      tocLog("created toc nav", { hostId: host.id || host.tagName });
     }
 
     const list = toc.querySelector(".toc-list") || toc.querySelector("ul");
-    if (!list) return;
+    if (!list) {
+      tocWarn("rebuild aborted — toc list element missing");
+      return;
+    }
     list.innerHTML = "";
 
+    let partCount = 0;
+    let sectionCount = 0;
     panel.querySelectorAll(".report-part").forEach((partEl) => {
       const h2 = partEl.querySelector("h2[data-anchor]");
       if (!h2) return;
+      partCount += 1;
 
       const partItem = document.createElement("li");
-      const partLink = document.createElement("a");
-      partLink.href = "#" + h2.dataset.anchor;
-      partLink.textContent = h2.textContent.trim();
-      partLink.className = "nav-link";
-      partLink.dataset.scrollTarget = "#" + h2.dataset.anchor;
-      partItem.appendChild(partLink);
+      const partLabel = document.createElement("span");
+      partLabel.className = "nav-link pb-toc-label";
+      partLabel.textContent = h2.textContent.trim();
+      partItem.appendChild(partLabel);
 
       const childList = document.createElement("ul");
       partEl.querySelectorAll(".report-section-title[data-anchor]").forEach((h3) => {
+        sectionCount += 1;
         const childItem = document.createElement("li");
-        const childLink = document.createElement("a");
-        childLink.href = "#" + h3.dataset.anchor;
-        childLink.textContent = h3.textContent.trim();
-        childLink.className = "nav-link";
-        childLink.dataset.scrollTarget = "#" + h3.dataset.anchor;
-        childItem.appendChild(childLink);
+        const childLabel = document.createElement("span");
+        childLabel.className = "nav-link pb-toc-label";
+        childLabel.textContent = h3.textContent.trim();
+        childItem.appendChild(childLabel);
         childList.appendChild(childItem);
       });
       if (childList.children.length) partItem.appendChild(childList);
       list.appendChild(partItem);
     });
+    tocLog("rebuilt toc", { parts: partCount, sections: sectionCount, items: list.children.length });
+    if (!partCount) {
+      tocWarn("toc is empty — no .report-part h2[data-anchor] in active panel");
+    }
+    pinTocBelowToolbar();
   }
 
   function updateWordLink(lang) {
     const href = wordHref(lang);
     const link = document.getElementById("pb-download-word");
     if (link) link.setAttribute("href", href);
-  }
-
-  let scrollHeaderBar = document.getElementById("pb-scroll-headers");
-  if (!scrollHeaderBar) {
-    scrollHeaderBar = document.createElement("div");
-    scrollHeaderBar.id = "pb-scroll-headers";
-    scrollHeaderBar.innerHTML =
-      '<div class="pb-sticky-bar-part"></div>' +
-      '<div class="pb-sticky-bar-section"></div>';
-    document.body.appendChild(scrollHeaderBar);
-  }
-  const scrollHeaderPart = scrollHeaderBar.querySelector(".pb-sticky-bar-part");
-  const scrollHeaderSection = scrollHeaderBar.querySelector(".pb-sticky-bar-section");
-
-  function updateScrollHeaderOffset() {
-    const height = scrollHeaderBar.classList.contains("is-visible")
-      ? Math.ceil(scrollHeaderBar.getBoundingClientRect().height)
-      : 0;
-    document.documentElement.style.setProperty("--pb-sticky-bar-height", height + "px");
-  }
-
-  function findActiveSection(panel) {
-    const sections = Array.from(panel.querySelectorAll(".report-section"));
-    if (!sections.length) return null;
-
-    const anchorY = (scrollHeaderBar.offsetHeight || 96) + 24;
-    let best = null;
-    let bestOverlap = 0;
-
-    sections.forEach((section) => {
-      const rect = section.getBoundingClientRect();
-      const overlapTop = Math.max(rect.top, anchorY);
-      const overlapBottom = Math.min(rect.bottom, window.innerHeight);
-      const overlap = Math.max(0, overlapBottom - overlapTop);
-      if (overlap > bestOverlap) {
-        bestOverlap = overlap;
-        best = section;
-      }
-    });
-
-    if (best) return best;
-
-    for (let i = sections.length - 1; i >= 0; i -= 1) {
-      if (sections[i].getBoundingClientRect().top <= anchorY) {
-        return sections[i];
-      }
-    }
-
-    return sections[0];
-  }
-
-  function updateScrollHeaders() {
-    const activePanel = panels.find((p) => !p.hidden);
-    if (!activePanel || !scrollHeaderPart || !scrollHeaderSection) return;
-
-    const panelsTop = panelsRoot.getBoundingClientRect().top;
-    const activeSection = findActiveSection(activePanel);
-    if (!activeSection || panelsTop > 8) {
-      scrollHeaderBar.classList.remove("is-visible");
-      updateScrollHeaderOffset();
-      return;
-    }
-
-    const partTitle = activeSection
-      .closest(".report-part")
-      ?.querySelector(".report-part-title");
-    const sectionTitle = activeSection.querySelector(".report-section-title");
-    if (!partTitle || !sectionTitle) {
-      scrollHeaderBar.classList.remove("is-visible");
-      updateScrollHeaderOffset();
-      return;
-    }
-
-    const partTop = partTitle.getBoundingClientRect().top;
-    const showBar = partTop <= 0;
-    if (!showBar) {
-      scrollHeaderBar.classList.remove("is-visible");
-      updateScrollHeaderOffset();
-      return;
-    }
-
-    scrollHeaderPart.textContent = partTitle.textContent.trim();
-    scrollHeaderSection.textContent = sectionTitle.textContent.trim();
-    scrollHeaderBar.setAttribute("dir", activePanel.dataset.dir || "ltr");
-    scrollHeaderBar.classList.add("is-visible");
-    updateScrollHeaderOffset();
   }
 
   function setLanguage(lang) {
@@ -325,12 +270,11 @@ document.addEventListener("DOMContentLoaded", function () {
       window.updatePbReportToolbarOffset();
     }
 
-    updateScrollHeaders();
+    pinTocBelowToolbar();
     postHeightToParent();
   }
 
-  window.addEventListener("scroll", updateScrollHeaders, { passive: true });
-  window.addEventListener("resize", updateScrollHeaders);
+  window.addEventListener("pb-report-toolbar-resize", pinTocBelowToolbar);
 
   select.addEventListener("change", function () {
     setLanguage(select.value);
@@ -346,6 +290,14 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   setLanguage(activeLang);
+  tocLog("init complete", {
+    embedded: isEmbedded,
+    activeLang: activeLang,
+    hasMarginSidebar: !!marginSidebar,
+    hasQuartoSidebar: !!document.getElementById("quarto-sidebar"),
+    hasToc: !!document.getElementById("toc"),
+    debug: PB_TOC_DEBUG ? "verbose (?pb_debug_toc=1)" : "warnings only — add ?pb_debug_toc=1 for verbose",
+  });
   // Post initial height after paint, and again on any resize.
   postHeightToParent();
   if (isEmbedded) {

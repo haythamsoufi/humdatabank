@@ -145,7 +145,7 @@
         </div>
         <div>
           <label class="block text-xs text-gray-500 mb-0.5">{{ _('Default priority') }}</label>
-          <select class="campaign-template-metadata-priority w-full text-sm rounded border-gray-300 px-2 py-1" data-tpl-key="{{ template.key }}">
+          <select class="campaign-template-metadata-priority w-full text-sm rounded border-gray-300 pl-2 pr-7 py-1" data-tpl-key="{{ template.key }}">
             <option value="normal" {% if (meta.priority or 'normal') != 'high' %}selected{% endif %}>{{ _('Normal') }}</option>
             <option value="high" {% if meta.priority == 'high' %}selected{% endif %}>{{ _('High') }}</option>
           </select>

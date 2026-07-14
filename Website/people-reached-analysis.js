@@ -310,7 +310,7 @@ export default function PeopleReachedAnalysisPage() {
                           Period
                         </label>
                         <select
-                          className="w-full p-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
+                          className="w-full pl-3 pr-8 py-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                           value={filters.selectedPeriod}
                           onChange={(e) => setFilters(prev => ({ ...prev, selectedPeriod: e.target.value }))}
                         >
@@ -327,7 +327,7 @@ export default function PeopleReachedAnalysisPage() {
                           Indicator
                         </label>
                         <select
-                          className="w-full p-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
+                          className="w-full pl-3 pr-8 py-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                           value={filters.selectedIndicator}
                           onChange={(e) => setFilters(prev => ({ ...prev, selectedIndicator: e.target.value }))}
                         >
@@ -344,7 +344,7 @@ export default function PeopleReachedAnalysisPage() {
                           Chart Type
                         </label>
                         <select
-                          className="w-full p-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
+                          className="w-full pl-3 pr-8 py-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                           value={chartType}
                           onChange={(e) => setChartType(e.target.value)}
                         >

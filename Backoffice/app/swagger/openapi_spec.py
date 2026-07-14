@@ -745,7 +745,7 @@ def get_api_paths():
                     {
                         "name": "related",
                         "in": "query",
-                        "description": "Related table scope: page or all",
+                        "description": "Related form_items scope: page (current page) or all (full filtered dataset). countries[] always returns all countries.",
                         "required": False,
                         "schema": {"type": "string", "enum": ["page", "all"], "default": "page"}
                     },

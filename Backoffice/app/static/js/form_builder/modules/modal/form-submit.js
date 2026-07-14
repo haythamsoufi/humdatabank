@@ -60,10 +60,11 @@ export const FormSubmitMixin = {
         } catch (_e) {}
 
         try {
-            let itemTypeInput = form.querySelector('input[name="item_type"]');
+            let itemTypeInput = form.querySelector('#item-modal-type') || form.querySelector('input[name="item_type"]');
             if (!itemTypeInput) {
                 itemTypeInput = document.createElement('input');
                 itemTypeInput.type = 'hidden';
+                itemTypeInput.id = 'item-modal-type';
                 itemTypeInput.name = 'item_type';
                 form.appendChild(itemTypeInput);
             }
@@ -285,9 +286,11 @@ export const FormSubmitMixin = {
                 label: '#item-modal-shared-label',
                 indicator_label_override: '#item-modal-indicator-label-override',
                 description: '#item-modal-shared-description',
+                definition: '#item-modal-definition',
                 label_translations: '#item-modal-shared-label-translations',
                 description_translations: '#item-modal-shared-description-translations',
-                definition_translations: '#item-modal-definition-translations'
+                definition_translations: '#item-modal-definition-translations',
+                item_type: '#item-modal-type',
             };
 
             Object.entries(canonical).forEach(([name, selector]) => {

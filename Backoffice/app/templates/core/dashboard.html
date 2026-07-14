@@ -1977,7 +1977,7 @@
                                         <label for="activity-user-filter" class="block text-xs font-medium text-gray-700 mb-1">
                                             {{ _('Filter by User') }}
                                         </label>
-                                        <select id="activity-user-filter" class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                        <select id="activity-user-filter" class="block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                             <option value="">{{ _('All Users') }}</option>
                                             {% for user in unique_users|sort(attribute='name') %}
                                                 <option value="{{ user.id }}">{{ user.name or user.email.split('@')[0] }}</option>
@@ -1992,7 +1992,7 @@
                                         <label for="activity-template-filter" class="block text-xs font-medium text-gray-700 mb-1">
                                             {{ _('Filter by Template - Period') }}
                                         </label>
-                                        <select id="activity-template-filter" class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                        <select id="activity-template-filter" class="block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                             <option value="">{{ _('All Templates') }}</option>
                                             {% for template_period in unique_template_periods|sort %}
                                                 <option value="{{ template_period }}">{{ template_period }}</option>

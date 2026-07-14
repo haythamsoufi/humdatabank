@@ -602,7 +602,7 @@ const AllIndicatorsSection = ({ allIndicators, t }) => {
             <select
               value={selectedPeriod}
               onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="px-4 py-2 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
+              className="pl-4 pr-8 py-2 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
             >
               <option value="all">{t('countryProfile.allPeriods')}</option>
               {periods.map(period => (

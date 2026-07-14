@@ -1,0 +1,275 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+
+{% block title %}{{ _('P&B report management') }}{% endblock %}
+
+{% block content %}
+<style nonce="{{ csp_nonce() }}">
+.pb-admin-panel { display: none; }
+.pb-admin-panel.is-active { display: block; }
+.pb-mapping-table-wrap { max-height: min(70vh, 720px); }
+.pb-compact-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+.pb-mode-panel.hidden,
+[data-pb-system-only].hidden { display: none !important; }
+</style>
+
+{{ page_header(
+    title=_('P&B report management'),
+    icon='fas fa-cogs',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Data Exploration'), 'url': url_for('data_exploration.explore_data')},
+        {'name': _('P&B report management')}
+    ],
+    info_tooltip=_('System managers only. Upload workbooks, configure system-sourced data, and generate P&B report deliverables.'),
+    actions=[
+        {
+            'type': 'link',
+            'text': _('View report'),
+            'url': explore_report_url,
+            'icon': 'fas fa-chart-line',
+            'classes': 'professional-action-btn',
+        }
+    ]
+) }}
+
+<div class="max-w-7xl mx-auto px-4 py-4">
+    <div class="bg-white shadow-md border border-gray-200">
+        <div class="px-3 sm:px-4 py-3 border-b border-gray-200">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <nav id="pb-progress-version-tabs" class="flex flex-wrap gap-1 -mb-px border-b border-gray-200 flex-1 min-w-0" role="tablist" aria-label="{{ _('P&B report versions') }}">
+                    {% for version_id in pb_report_version_order %}
+                    {% set version = pb_report_versions[version_id] %}
+                    <button type="button"
+                            role="tab"
+                            data-pb-version="{{ version_id }}"
+                            aria-selected="{{ 'true' if version_id == pb_default_version else 'false' }}"
+                            class="px-4 py-2 text-sm font-medium border-b-2 transition-colors {{ 'border-blue-600 text-blue-700' if version_id == pb_default_version else 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300' }}">
+                        {{ _(version.label) }}
+                    </button>
+                    {% endfor %}
+                </nav>
+                <div class="flex flex-col items-end shrink-0 self-center">
+                    <div class="inline-flex rounded-lg border border-gray-300 overflow-hidden" role="group" aria-label="{{ _('Data source') }}">
+                        <button type="button" id="pb-progress-source-excel" data-source="excel" class="px-3 py-1.5 text-sm font-medium {{ 'bg-blue-600 text-white' if pb_initial_data_source == 'excel' else 'bg-white text-gray-700' }}">{{ _('Excel upload') }}</button>
+                        <button type="button" id="pb-progress-source-system" data-source="system" class="px-3 py-1.5 text-sm font-medium border-l border-gray-300 {{ 'bg-blue-600 text-white' if pb_initial_data_source == 'system' else 'bg-white text-gray-700' }}">{{ _('System (DB)') }}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% call scroll_tab_bar(inner_id='pb-progress-subtabs', border_bottom=True, aria_label=_('P&B management sections')) %}
+            <button type="button" role="tab" data-pb-subtab="build" aria-selected="{{ 'true' if pb_initial_subtab == 'build' else 'false' }}"
+                    class="{{ admin_underline_tab_btn_classes(pb_initial_subtab == 'build') }}">
+                <i class="fas fa-play-circle mr-1.5"></i>{{ _('Build') }}
+            </button>
+            <button type="button" role="tab" data-pb-subtab="mapping" data-pb-system-only="true" aria-selected="{{ 'true' if pb_initial_subtab == 'mapping' else 'false' }}"
+                    class="{{ admin_underline_tab_btn_classes(pb_initial_subtab == 'mapping') }} {{ 'hidden' if pb_initial_data_source != 'system' else '' }}">
+                <i class="fas fa-sitemap mr-1.5"></i>{{ _('Mapping') }}
+            </button>
+            <button type="button" role="tab" data-pb-subtab="translations" data-pb-system-only="true" aria-selected="{{ 'true' if pb_initial_subtab == 'translations' else 'false' }}"
+                    class="{{ admin_underline_tab_btn_classes(pb_initial_subtab == 'translations') }} {{ 'hidden' if pb_initial_data_source != 'system' else '' }}">
+                <i class="fas fa-language mr-1.5"></i>{{ _('Translations') }}
+            </button>
+            <button type="button" role="tab" data-pb-subtab="section-order" data-pb-system-only="true" aria-selected="{{ 'true' if pb_initial_subtab == 'section-order' else 'false' }}"
+                    class="{{ admin_underline_tab_btn_classes(pb_initial_subtab == 'section-order') }} {{ 'hidden' if pb_initial_data_source != 'system' else '' }}">
+                <i class="fas fa-list-ol mr-1.5"></i>{{ _('Section order') }}
+            </button>
+        {% endcall %}
+
+        <div class="px-3 sm:px-4 py-3 space-y-3">
+            <div id="pb-progress-build" class="hidden rounded-md border border-blue-200 bg-blue-50 px-3 py-2 space-y-2">
+                <div id="pb-progress-build-active">
+                    <div class="flex items-center gap-2 text-sm text-blue-800">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span id="pb-progress-progress-text">{{ _('Generating report...') }}</span>
+                    </div>
+                    <div class="w-full bg-blue-100 rounded-full h-1.5 overflow-hidden mt-1.5">
+                        <div id="pb-progress-progress-bar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-500" style="width: 15%;"></div>
+                    </div>
+                    <ul id="pb-progress-stages" class="mt-2 space-y-1 text-xs hidden"></ul>
+                </div>
+                <p id="pb-progress-build-message" class="text-xs hidden"></p>
+            </div>
+
+            <div id="pb-progress-panel-build" class="pb-admin-panel {{ 'is-active' if pb_initial_subtab == 'build' else '' }} space-y-3" role="tabpanel">
+                <div id="pb-progress-excel-workflow" data-pb-excel-only="true" class="pb-mode-panel {{ 'hidden' if pb_initial_data_source == 'system' else '' }}">
+                    <div class="pb-compact-toolbar">
+                        <div id="pb-progress-excel-badge" class="hidden inline-flex items-center gap-1.5 rounded-full bg-green-50 text-green-800 px-2.5 py-0.5 text-xs">
+                            <i class="fas fa-file-excel"></i>
+                            <span id="pb-progress-excel-badge-text"></span>
+                        </div>
+                        <span id="pb-progress-no-excel-notice" class="text-xs text-amber-800">{{ _('No workbook uploaded.') }}</span>
+                        <input id="pb-progress-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden">
+                        <button type="button" id="pb-progress-upload-btn" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-upload mr-1.5"></i>{{ _('Upload workbook') }}
+                        </button>
+                        <label id="pb-progress-replace-existing-wrap" class="inline-flex items-center gap-1.5 text-xs text-gray-600">
+                            <input id="pb-progress-replace-existing" type="checkbox" class="h-3.5 w-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
+                            <span>{{ _('Replace existing') }}</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="pb-progress-system-workflow" data-pb-system-only="true" class="pb-mode-panel {{ '' if pb_initial_data_source == 'system' else 'hidden' }}">
+                    <div class="pb-compact-toolbar">
+                        <span id="pb-progress-system-dataset-badge" class="hidden inline-flex items-center gap-1 rounded-full bg-green-50 text-green-800 px-2 py-0.5 text-xs">
+                            <i class="fas fa-check"></i>{{ _('Dataset ready') }}
+                        </span>
+                        <button type="button" id="pb-progress-generate-system-btn" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-database mr-1.5"></i>{{ _('Generate dataset') }}
+                        </button>
+                        <button type="button" id="pb-progress-compare-system-btn" class="btn btn-secondary btn-sm hidden">
+                            <i class="fas fa-not-equal mr-1.5"></i>{{ _('Compare with workbook') }}
+                        </button>
+                        <a id="pb-progress-download-system-link" class="btn btn-secondary btn-sm hidden" target="_blank" rel="noopener noreferrer">
+                            <i class="fas fa-download mr-1.5"></i>{{ _('Download dataset') }}
+                        </a>
+                    </div>
+                    <div id="pb-progress-compare-summary" class="hidden rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs space-y-1"></div>
+                    <div id="pb-progress-years-section" class="space-y-1.5 max-w-md">
+                        <label for="pb-progress-years-multiselect" class="block text-sm font-medium text-gray-700">{{ _('Report years') }}</label>
+                        <p class="text-xs text-gray-500">{{ _('Only selected years are included when you generate the system dataset and report.') }}</p>
+                        <div id="pb-progress-years-multiselect"></div>
+                    </div>
+                </div>
+
+                <div id="pb-progress-build-actions" class="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
+                    <button type="button" id="pb-progress-generate-btn" class="btn btn-primary btn-sm" disabled>
+                        <i class="fas fa-play mr-1.5"></i>{{ _('Generate report') }}
+                    </button>
+                    <label for="pb-progress-language" class="sr-only">{{ _('Languages') }}</label>
+                    <select id="pb-progress-language" class="pl-2 pr-8 py-1.5 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="all">{{ _('All languages') }}</option>
+                        <option value="English">{{ _('English') }}</option>
+                        <option value="French">{{ _('French') }}</option>
+                        <option value="Spanish">{{ _('Spanish') }}</option>
+                        <option value="Arabic">{{ _('Arabic') }}</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="pb-progress-panel-mapping" data-pb-system-only="true" class="pb-admin-panel {{ 'is-active' if pb_initial_subtab == 'mapping' else '' }} space-y-2" role="tabpanel">
+                <div class="pb-compact-toolbar justify-between">
+                    <input type="search" id="pb-progress-mapping-filter" placeholder="{{ _('Filter indicators…') }}"
+                           class="w-full min-w-[10rem] max-w-xs px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <p id="pb-progress-mapping-count" class="text-xs text-gray-500 shrink-0"></p>
+                    <div class="flex flex-wrap gap-1.5 ml-auto">
+                        <button type="button" id="pb-progress-sync-mapping-btn" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-sync mr-1"></i>{{ _('Sync') }}
+                        </button>
+                        <button type="button" id="pb-progress-import-config-btn" class="btn btn-secondary btn-sm hidden">
+                            <i class="fas fa-file-import mr-1"></i>{{ _('Import workbook') }}
+                        </button>
+                        <button type="button" id="pb-progress-save-mapping-btn" class="btn btn-primary btn-sm">
+                            <i class="fas fa-save mr-1"></i>{{ _('Save') }}
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto border border-gray-200 rounded-lg pb-mapping-table-wrap">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-3 py-2 text-left font-medium text-gray-700">{{ _('ID') }}</th>
+                                <th class="px-3 py-2 text-left font-medium text-gray-700">{{ _('Section') }}</th>
+                                <th class="px-3 py-2 text-left font-medium text-gray-700">{{ _('Source') }}</th>
+                                <th class="px-3 py-2 text-left font-medium text-gray-700">{{ _('Label override') }}</th>
+                                <th class="px-3 py-2 text-left font-medium text-gray-700">{{ _('Status') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pb-progress-mapping-body" class="divide-y divide-gray-100 bg-white"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="pb-progress-panel-translations" data-pb-system-only="true" class="pb-admin-panel {{ 'is-active' if pb_initial_subtab == 'translations' else '' }} space-y-2" role="tabpanel">
+                <div class="pb-compact-toolbar justify-end">
+                    <button type="button" id="pb-progress-save-translations-btn" class="btn btn-primary btn-sm">
+                        <i class="fas fa-save mr-1"></i>{{ _('Save') }}
+                    </button>
+                </div>
+                <div class="overflow-x-auto border border-gray-200 rounded-lg max-h-[min(70vh,640px)]">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-3 py-2 text-left font-medium text-gray-700 w-48">{{ _('Key') }}</th>
+                                <th class="px-3 py-2 text-left font-medium text-gray-700">EN</th>
+                                <th class="px-3 py-2 text-left font-medium text-gray-700">FR</th>
+                                <th class="px-3 py-2 text-left font-medium text-gray-700">SP</th>
+                                <th class="px-3 py-2 text-left font-medium text-gray-700">AR</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pb-progress-translations-body" class="divide-y divide-gray-100 bg-white"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="pb-progress-panel-section-order" data-pb-system-only="true" class="pb-admin-panel {{ 'is-active' if pb_initial_subtab == 'section-order' else '' }} space-y-2" role="tabpanel">
+                <div class="pb-compact-toolbar justify-end">
+                    <button type="button" id="pb-progress-save-section-order-btn" class="btn btn-primary btn-sm">
+                        <i class="fas fa-save mr-1"></i>{{ _('Save') }}
+                    </button>
+                </div>
+                <div class="overflow-x-auto border border-gray-200 rounded-lg max-h-[min(70vh,480px)]">
+                    <table class="min-w-full text-sm max-w-2xl">
+                        <thead class="bg-gray-50 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-3 py-2 text-left font-medium text-gray-700">{{ _('Part') }}</th>
+                                <th class="px-3 py-2 text-left font-medium text-gray-700">{{ _('Section') }}</th>
+                                <th class="px-3 py-2 text-left font-medium text-gray-700 w-28">{{ _('Order') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pb-progress-section-order-body" class="divide-y divide-gray-100 bg-white"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+window.PBProgressConfig = {
+    pageMode: 'admin',
+    apiBase: '/admin/data-exploration/pb-progress',
+    versions: {{ pb_report_versions|tojson }},
+    versionOrder: {{ pb_report_version_order|tojson }},
+    defaultVersion: {{ pb_default_version|tojson }},
+    initialSubtab: {{ pb_initial_subtab|tojson }},
+    initialDataSource: {{ pb_initial_data_source|tojson }},
+    i18n: {
+        generatingReport: {{ _('Generating report...')|tojson }},
+        preparingReport: {{ _('Preparing dataset and report...')|tojson }},
+        reportGenerationFailed: {{ _('Report generation failed.')|tojson }},
+        reportGeneratedSuccessfully: {{ _('Report generated successfully.')|tojson }},
+        requestFailed: {{ _('Request failed.')|tojson }},
+        lostConnection: {{ _('Lost connection to the server while generating. Wait for the server to come back, then refresh this page.')|tojson }},
+        enableReplaceWorkbook: {{ _('Enable replace existing workbook or upload the first source file.')|tojson }},
+        uploading: {{ _('Uploading...')|tojson }},
+        excelUploadedSuccessfully: {{ _('Excel uploaded successfully.')|tojson }},
+        dataSourceUpdated: {{ _('Data source updated.')|tojson }},
+        mappingSaved: {{ _('Mapping saved.')|tojson }},
+        translationsSaved: {{ _('Translations saved.')|tojson }},
+        sectionOrderSaved: {{ _('Section order saved.')|tojson }},
+        systemDatasetGenerated: {{ _('System dataset generated.')|tojson }},
+        syncCompleted: {{ _('Indicator Bank sync completed.')|tojson }},
+        configImported: {{ _('Configuration imported from Excel.')|tojson }},
+        indicatorsLabel: {{ _('indicators')|tojson }},
+        compareIntro: {{ _('Comparison')|tojson }},
+        compareMismatchesLabel: {{ _('mismatches of')|tojson }},
+        compareExcelRowsLabel: {{ _('Excel rows')|tojson }},
+        compareSystemRowsLabel: {{ _('System rows')|tojson }},
+        compareComplete: {{ _('Comparison complete.')|tojson }},
+        yearsUpdated: {{ _('Report years updated.')|tojson }},
+        yearsPlaceholder: {{ _('Select years…')|tojson }},
+        yearsSearchPlaceholder: {{ _('Search years…')|tojson }},
+        yearsSelectAtLeastOne: {{ _('Select at least one year.')|tojson }},
+        tagMissing: {{ _('Tag removed')|tojson }},
+        sourceWarning: {{ _('Source unavailable')|tojson }},
+        noMappingRows: {{ _('No mapping rows yet. Sync from Indicator Bank or import from Excel.')|tojson }},
+    },
+};
+</script>
+<script src="{{ static_url('js/components/multiselect-dropdown.js') }}" nonce="{{ csp_nonce() }}"></script>
+<script src="{{ url_for('pb_progress.static', filename='js/pb-progress-admin.js') }}" nonce="{{ csp_nonce() }}"></script>
+{% endblock %}

@@ -162,7 +162,7 @@ the same response. Supports a star-schema layout for BI consumers.
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `related` | string | Scope of related tables: `"page"` (default, current-page rows only) or `"all"` (full filtered dataset) |
+| `related` | string | Scope of `form_items[]`: `"page"` (default, current-page rows only) or `"all"` (full filtered dataset). `countries[]` always returns all countries. |
 | `layout` | string | Response shape: `"flat"` (default) or `"star"` |
 | `indicator_bank_ids` | string | Comma-separated indicator bank IDs (e.g. `"42,17,98"`) for multi-indicator fetches |
 | `include_non_reported` | bool | Include virtual `"missing"` rows for unreported items (requires `template_id`, `country_id`, `period_name`, `submission_type=assigned`) |

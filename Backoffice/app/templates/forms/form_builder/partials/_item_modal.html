@@ -26,6 +26,8 @@
             <input type="hidden" name="label_translations" id="item-modal-shared-label-translations" value="{}">
             <input type="hidden" name="description_translations" id="item-modal-shared-description-translations" value="{}">
             <input type="hidden" name="definition_translations" id="item-modal-definition-translations" value="{}">
+            {# Canonical definition field - JS syncs the active type's definition textarea here before submit #}
+            <input type="hidden" name="definition" id="item-modal-definition" value="">
 
             {# --- START: Grid Container for Two Halves - Initially single column, becomes two on md screens --- #}
             <div class="grid grid-cols-1 gap-6 modal-grid-container">
@@ -48,14 +50,14 @@
                          <div class="grid grid-cols-2 gap-4 mb-4">
                              <div>
                                  <label for="item-indicator-type-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Indicator Type') }}</label>
-                                 <select name="indicator_type_filter" id="item-indicator-type-select" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm">
+                                 <select name="indicator_type_filter" id="item-indicator-type-select" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm">
                                      <option value="">{{ _('All Types') }}</option>
                                      {# Options will be populated by JS #}
                                  </select>
                              </div>
                              <div>
                                  <label for="item-indicator-unit-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Indicator Unit') }}</label>
-                                 <select name="indicator_unit_filter" id="item-indicator-unit-select" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm">
+                                 <select name="indicator_unit_filter" id="item-indicator-unit-select" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm">
                                      <option value="">{{ _('All Units') }}</option>
                                      {# Options will be populated by JS #}
                                  </select>
@@ -123,7 +125,7 @@
                         <div class="grid grid-cols-1 gap-4 mb-4">
                             <div class="hidden" aria-hidden="true">
                                 <label for="item-question-type-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Question Type') }}</label>
-                                <select id="item-question-type-select" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                <select id="item-question-type-select" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
                                     <option value="">{{ _('Select Question Type...') }}</option>
                                     {% for value, label in question_type_choices_for_js %}
                                         <option value="{{ value }}">{{ label }}</option>
@@ -231,7 +233,7 @@
                             <div class="grid grid-cols-2 gap-6">
                                 <div>
                                     <label for="item-calculated-list-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Select List') }}</label>
-                                    <select id="item-calculated-list-select" name="lookup_list_id" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                    <select id="item-calculated-list-select" name="lookup_list_id" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
                                         <option value="">{{ _('Select List...') }}</option>
                                         {% for lst in lookup_lists_for_js %}
                                             <option value="{{ lst.id }}"
@@ -245,7 +247,7 @@
                                 <!-- Display Column Select -->
                                 <div id="item-calculated-display-column-wrapper" class="hidden">
                                     <label for="item-calculated-list-display-column" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Display Column') }}</label>
-                                    <select id="item-calculated-list-display-column" name="list_display_column" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                    <select id="item-calculated-list-display-column" name="list_display_column" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
                                         <option value="">{{ _('Select Column...') }}</option>
                                     </select>
                                     <p class="mt-1 text-xs text-gray-500">{{ _('Values from this column will appear as dropdown options. Fields marked as [Multilingual] will display in the user\'s selected language.') }}</p>
@@ -299,7 +301,7 @@
                         <!-- Optional Document Type -->
                         <div class="mb-4">
                             <label for="item-document-type" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Document Type (Optional)') }}</label>
-                            <select id="item-document-type" name="document_type" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <select id="item-document-type" name="document_type" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                                 <option value="">{{ _('Select document type...') }}</option>
                                 {% for doc_type in config.DOCUMENT_TYPES %}
                                     <option value="{{ doc_type }}">{{ doc_type }}</option>
@@ -560,7 +562,7 @@
                                 <div class="grid grid-cols-2 gap-6">
                                     <div>
                                         <label for="matrix-list-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Select List for Rows') }}</label>
-                                        <select id="matrix-list-select" name="matrix_lookup_list_id" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                                        <select id="matrix-list-select" name="matrix_lookup_list_id" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
                                             <option value="">{{ _('Select List...') }}</option>
                                             {% for lst in lookup_lists_for_js %}
                                                 <option value="{{ lst.id }}"
@@ -573,7 +575,7 @@
                                     </div>
                                     <div id="matrix-display-column-wrapper" class="hidden">
                                         <label for="matrix-list-display-column" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Row Label Column') }}</label>
-                                        <select id="matrix-list-display-column" name="matrix_list_display_column" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                                        <select id="matrix-list-display-column" name="matrix_list_display_column" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
                                             <option value="">{{ _('Select Column...') }}</option>
                                         </select>
                                         <p class="mt-1 text-xs text-gray-500">{{ _("Values from this column will appear as row headers. Fields marked as [Multilingual] will display in the user's selected language.") }}</p>
@@ -581,7 +583,7 @@
                                 </div>
                                 <div id="matrix-group-by-wrapper" class="mt-4 hidden">
                                     <label for="matrix-group-by-column" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Group Rows By Column') }} <span class="text-gray-400 font-normal">{{ _('(optional)') }}</span></label>
-                                    <select id="matrix-group-by-column" name="matrix_group_by_column" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                                    <select id="matrix-group-by-column" name="matrix_group_by_column" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
                                         <option value="">{{ _('No grouping') }}</option>
                                     </select>
                                     <p class="mt-1 text-xs text-gray-500">{{ _("Rows will be grouped under collapsible headers based on this column's values (e.g. group countries by region).") }}</p>
@@ -801,7 +803,7 @@
                             {# Column Width — right column; label and dropdown on one line #}
                             <div class="flex items-center gap-2 min-w-0">
                                 <label for="item-layout-column-width" class="shrink-0 w-20 text-sm font-semibold text-gray-700">{{ _('Width') }}</label>
-                                <select name="layout_column_width" id="item-layout-column-width" class="flex-1 min-w-0 py-1.5 px-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <select name="layout_column_width" id="item-layout-column-width" class="flex-1 min-w-0 py-1.5 pl-2 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                                     <option value="12">{{ _('Full (12/12)') }}</option>
                                     <option value="6">{{ _('Half (6/12)') }}</option>
                                     <option value="4">{{ _('Third (4/12)') }}</option>

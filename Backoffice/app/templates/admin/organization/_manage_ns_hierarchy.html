@@ -28,7 +28,7 @@
         <!-- Country Filter - Pushed to right edge (only show if countries available) -->
         {% if countries %}
         <div class="ml-auto">
-            <select id="countryFilter" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md min-w-40 py-1.5 px-2">
+            <select id="countryFilter" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm border-gray-300 rounded-md min-w-40 py-1.5 pl-2 pr-8">
                 <option value="">{{ _('All Countries') }}</option>
                 {% for country in countries %}
                 <option value="{{ country.name }}">{{ country.name }}</option>

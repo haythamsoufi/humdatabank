@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from pb_figures.config import build_workers, resolve_excel, cleanup_build_copy
-from pb_figures.data import build_model, load_sg_report
+from pb_figures.data import build_model, load_mapping, load_sg_report
 from pb_figures.languages import discover_languages, docx_filename
 from pb_figures.layouts import SECTION_CODES
 from pb_figures.render_docx import render_report_docx
@@ -30,7 +30,14 @@ def _render_one(
 ) -> tuple[str, Path]:
     """Worker: build the model and render one language's DOCX standalone."""
     model = build_model(excel)
-    render_report_docx(model, language=language, output_path=output_path, sections=sections)
+    mapping = load_mapping(excel)
+    render_report_docx(
+        model,
+        language=language,
+        output_path=output_path,
+        sections=sections,
+        mapping=mapping,
+    )
     return language, output_path
 
 

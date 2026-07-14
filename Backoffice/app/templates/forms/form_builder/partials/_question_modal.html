@@ -16,7 +16,7 @@
                 <div class="modal-left-half">
                     <div class="mb-4">
                         <label for="edit_question_modal_section_id_select" class="block text-gray-700 text-sm font-semibold mb-2">Section</label>
-                        <select name="section_id" id="edit_question_modal_section_id_select" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" required></select>
+                        <select name="section_id" id="edit_question_modal_section_id_select" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" required></select>
                     </div>
 
                     <div class="mb-4">
@@ -27,7 +27,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
                             <label for="edit_question_modal_question_type_select" class="block text-gray-700 text-sm font-semibold mb-2">Question Type</label>
-                            <select name="question_type" id="edit_question_modal_question_type_select" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                            <select name="question_type" id="edit_question_modal_question_type_select" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
                                 <option value="">Select Question Type...</option>
                                 {% for value, label in question_type_choices_for_js %}
                                     <option value="{{ value }}">{{ label }}</option>
@@ -90,7 +90,7 @@
                                     </label>
                                 </div>
                                 <div>
-                                    <select name="layout_column_width" id="edit_question_layout_column_width" class="block w-40 py-1 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                    <select name="layout_column_width" id="edit_question_layout_column_width" class="block w-40 py-1 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
                                         <option value="12">Full Width (12/12)</option>
                                         <option value="6">Half Width (6/12)</option>
                                         <option value="4">One Third (4/12)</option>

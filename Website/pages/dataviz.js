@@ -929,7 +929,7 @@ export default function ExploreDataPage() {
                         value={selectedSector}
                         onChange={(e) => setSelectedSector(e.target.value)}
                         disabled={isLoadingData}
-                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent disabled:bg-humdb-gray-100"
+                        className="w-full pl-3 pr-8 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent disabled:bg-humdb-gray-100"
                       >
                         <option value="">{t('exploreData.configure.allSectors')}</option>
                         {sectors.map(sector => (
@@ -949,7 +949,7 @@ export default function ExploreDataPage() {
                         value={selectedIndicator}
                         onChange={(e) => setSelectedIndicator(e.target.value)}
                         disabled={isLoadingData || filteredIndicators.length === 0}
-                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent disabled:bg-humdb-gray-100"
+                        className="w-full pl-3 pr-8 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent disabled:bg-humdb-gray-100"
                       >
                         <option value="">
                           {isLoadingData ? t('exploreData.configure.loading') : filteredIndicators.length === 0 ? t('exploreData.configure.noIndicatorsAvailable') : t('exploreData.configure.chooseIndicator')}
@@ -1060,7 +1060,7 @@ export default function ExploreDataPage() {
                       <select
                         value={selectedChartType}
                         onChange={(e) => setSelectedChartType(e.target.value)}
-                        className="w-full px-3 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent"
+                        className="w-full pl-3 pr-8 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                       >
                         {chartTypes.map(type => (
                           <option key={type.id} value={type.id}>
@@ -1110,7 +1110,7 @@ export default function ExploreDataPage() {
                           value={selectedSingleYear || ''}
                           onChange={(e) => setSelectedSingleYear(parseInt(e.target.value))}
                           disabled={isLoadingData || availablePeriods.length === 0}
-                          className="w-full px-3 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent disabled:bg-humdb-gray-100"
+                          className="w-full pl-3 pr-8 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent disabled:bg-humdb-gray-100"
                         >
                           <option value="">
                             {isLoadingData ? t('exploreData.configure.loadingPeriods') : t('exploreData.configure.selectYear')}
@@ -1139,7 +1139,7 @@ export default function ExploreDataPage() {
                                 value={selectedFromYear || ''}
                                 onChange={(e) => setSelectedFromYear(parseInt(e.target.value))}
                                 disabled={isLoadingData || availablePeriods.length === 0}
-                                className="w-full px-3 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent disabled:bg-humdb-gray-100 text-sm"
+                                className="w-full pl-3 pr-8 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent disabled:bg-humdb-gray-100 text-sm"
                               >
                                 <option value="">
                                   {isLoadingData ? t('exploreData.configure.loading') : t('exploreData.configure.from')}
@@ -1163,7 +1163,7 @@ export default function ExploreDataPage() {
                                 value={selectedToYear || ''}
                                 onChange={(e) => setSelectedToYear(parseInt(e.target.value))}
                                 disabled={isLoadingData || availablePeriods.length === 0}
-                                className="w-full px-3 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent disabled:bg-humdb-gray-100 text-sm"
+                                className="w-full pl-3 pr-8 py-2 border border-humdb-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-humdb-red focus:border-transparent disabled:bg-humdb-gray-100 text-sm"
                               >
                                 <option value="">
                                   {isLoadingData ? t('exploreData.configure.loading') : t('exploreData.configure.to')}

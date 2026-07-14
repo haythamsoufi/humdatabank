@@ -48,6 +48,10 @@ export const FormPopulationMixin = {
     },
 
     populateIndicatorForm: function(itemData) {
+        const sharedDefinitionInd = document.querySelector(this.sharedFields.definition);
+        if (sharedDefinitionInd) {
+            sharedDefinitionInd.value = itemData.definition || '';
+        }
         IndicatorItem.populateForm(this.modalElement, itemData);
         this.ensureAllowOver100Field('indicator');
         this.populateCommonFields(itemData);
@@ -70,6 +74,10 @@ export const FormPopulationMixin = {
         const sharedLabel = document.querySelector(this.sharedFields.label);
         if (sharedLabel) {
             sharedLabel.value = itemData.label || '';
+        }
+        const sharedDefinitionQ = document.querySelector(this.sharedFields.definition);
+        if (sharedDefinitionQ) {
+            sharedDefinitionQ.value = itemData.definition || '';
         }
         this.syncSharedToUI();
         QuestionItem.populateForm(this.modalElement, itemData);

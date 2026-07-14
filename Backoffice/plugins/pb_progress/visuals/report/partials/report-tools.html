@@ -1,26 +1,33 @@
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+<link rel="stylesheet" href="/static/libs/fontawesome-6.5.0.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600&display=swap">
 <style>
 #pb-report-toolbar {
   position: sticky;
   top: 0;
-  z-index: 1000;
+  z-index: 1001;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin: 0 0 1.25rem;
-  padding: 0.75rem 1rem;
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  margin-bottom: 1.25rem;
+  padding: 0.75rem max(1rem, calc((100vw - 100%) / 2 + 1rem));
   border: 1px solid #e5e7eb;
-  border-radius: 0.5rem 0.5rem 0 0;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
   background-color: #f9fafb;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  box-sizing: border-box;
   font-family: "Montserrat", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 #pb-report-toolbar.is-pinned {
-  border-radius: 0.5rem;
+  border-radius: 0;
 }
 
 #pb-report-toolbar-title {
@@ -139,6 +146,11 @@
 #pb-report-toolbar .text-blue-700 { color: #1d4ed8; }
 #pb-report-toolbar .text-red-600 { color: #dc2626; }
 #pb-report-toolbar .text-green-600 { color: #16a34a; }
+#pb-report-toolbar .fa,
+#pb-report-toolbar .fas,
+#pb-report-toolbar .fa-solid {
+  font-weight: 900;
+}
 #pb-report-toolbar .text-xs { font-size: 0.75rem; line-height: 1rem; }
 #pb-report-toolbar .opacity-60 { opacity: 0.6; }
 #pb-report-toolbar .mr-1 { margin-right: 0.25rem; }
@@ -190,16 +202,23 @@
   flex: 1 1 0%;
 }
 
+#title-block-header .subtitle.lead {
+  display: none !important;
+}
+
 @media print {
   #pb-report-toolbar,
-  .pb-language-selector,
-  .quarto-alternate-formats {
+  .pb-language-selector {
     display: none !important;
   }
 }
 </style>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll(".quarto-alternate-formats, .pb-report-tools").forEach(function (node) {
+    node.remove();
+  });
+
   if (window.self !== window.top) return;
 
   const panelsRoot = document.getElementById("pb-language-panels");
@@ -210,6 +229,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function slug(lang) {
     return lang.toLowerCase().replace(/\s+/g, "-");
+  }
+
+  function reportVersionLabel() {
+    const subtitle = document.querySelector("#title-block-header .subtitle");
+    if (subtitle) {
+      const text = subtitle.textContent.replace(/^[\s"']+|[\s"']+$/g, "").trim();
+      if (text) return text;
+    }
+    const match = window.location.pathname.match(/\/pb-progress\/([^/]+)\/output\//);
+    if (match) return "P&B " + match[1];
+    return "Interactive report";
   }
 
   function closeMenus() {
@@ -228,9 +258,9 @@ document.addEventListener("DOMContentLoaded", function () {
     btn.type = "button";
     btn.className = "btn btn-secondary btn-sm";
     btn.innerHTML =
-      '<i class="' + icon + " " + iconColor + ' mr-1 shrink-0" aria-hidden="true"></i>' +
+      '<i class="fa ' + icon + " " + iconColor + ' mr-1 shrink-0" aria-hidden="true"></i>' +
       label +
-      ' <i class="fas fa-chevron-down text-xs opacity-60" aria-hidden="true"></i>';
+      ' <i class="fa fas fa-chevron-down text-xs opacity-60" aria-hidden="true"></i>';
 
     const menu = document.createElement("div");
     menu.className = "pb-dl-menu hidden";
@@ -280,7 +310,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const title = document.createElement("h4");
   title.id = "pb-report-toolbar-title";
-  title.textContent = "Interactive report";
+  title.textContent = reportVersionLabel();
 
   const actions = document.createElement("div");
   actions.id = "pb-report-toolbar-actions";
@@ -306,7 +336,7 @@ document.addEventListener("DOMContentLoaded", function () {
   printBtn.type = "button";
   printBtn.className = "btn btn-secondary btn-sm";
   printBtn.title = "Print report";
-  printBtn.innerHTML = '<i class="fas fa-print mr-1.5" aria-hidden="true"></i>Print';
+  printBtn.innerHTML = '<i class="fa fas fa-print mr-1.5" aria-hidden="true"></i>Print';
   printBtn.addEventListener("click", function () {
     window.print();
   });
@@ -324,16 +354,10 @@ document.addEventListener("DOMContentLoaded", function () {
     main.insertBefore(toolbar, panelsRoot);
   }
 
-  document.querySelectorAll(".quarto-alternate-formats").forEach(function (node) {
-    node.remove();
-  });
-  document.querySelectorAll(".pb-report-tools").forEach(function (node) {
-    node.remove();
-  });
-
   function updateToolbarOffset() {
     const height = Math.ceil(toolbar.getBoundingClientRect().height);
     document.documentElement.style.setProperty("--pb-report-toolbar-height", height + "px");
+    window.dispatchEvent(new CustomEvent("pb-report-toolbar-resize"));
   }
   window.updatePbReportToolbarOffset = updateToolbarOffset;
 
@@ -342,6 +366,7 @@ document.addEventListener("DOMContentLoaded", function () {
       function (entries) {
         entries.forEach(function (entry) {
           toolbar.classList.toggle("is-pinned", !entry.isIntersecting);
+          updateToolbarOffset();
         });
       },
       { threshold: [1] }

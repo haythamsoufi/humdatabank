@@ -11,7 +11,7 @@ from app.plugins.base import (
     SeedPermission,
     SeedRole,
 )
-from plugins.pb_progress.versions import DEFAULT_VERSION, REPORT_VERSIONS, VERSION_ORDER
+from plugins.pb_progress.versions import DEFAULT_VERSION, REPORT_VERSIONS, VERSION_ORDER, resolve_requested_version
 
 _PB_REPORT_CSP = (
     "default-src 'self' data:; "
@@ -89,10 +89,17 @@ class PBProgressPlugin(BasePlugin):
         ]
 
     def get_panel_render_context(self, flags: dict[str, bool], first_tab: str) -> dict[str, Any]:
+        from flask import request
+
+        pb_active_version = resolve_requested_version(
+            request.args.get("pb_version"),
+            active_tab=first_tab,
+        )
         return {
             "explore_first_tab": first_tab,
             "can_manage_pb_progress": flags.get("can_manage_pb_progress", False),
             "pb_report_versions": REPORT_VERSIONS,
             "pb_report_version_order": VERSION_ORDER,
             "pb_default_version": DEFAULT_VERSION,
+            "pb_active_version": pb_active_version,
         }

@@ -778,6 +778,27 @@ class CommunicationsGridManager {
         }
     }
 
+    /**
+     * Replace grid row data in place (no page reload).
+     * @param {Array} rowData
+     */
+    setRowData(rowData) {
+        const rows = Array.isArray(rowData) ? rowData : [];
+        this.data = rows;
+        window.notificationsData = rows;
+        const helper = this.gridHelper || window.notificationsGridHelper;
+        if (helper && typeof helper.setRowData === 'function') {
+            helper.setRowData(rows);
+            return;
+        }
+        const api = this.gridApi || window.notificationsGridApi;
+        if (api && typeof api.setGridOption === 'function') {
+            api.setGridOption('rowData', rows);
+        } else if (api && typeof api.setRowData === 'function') {
+            api.setRowData(rows);
+        }
+    }
+
     initializeGrid() {
         this._gridInit.initializeGrid();
     }

@@ -278,7 +278,8 @@
     <!-- Add/Edit Common Word Modal -->
     {% call modal_shell('editModal', 'Edit Common Word', max_width='max-w-4xl', close_id='close-edit-modal-btn') %}
                     <p id="modalSubtitle" class="text-sm text-gray-600 mb-4">Editing: <span id="editTermDisplay" class="font-medium"></span></p>
-                    <form id="editForm" method="POST">
+                    {# no-submit-guard: see _panel_common_words_body.html for rationale. #}
+                    <form id="editForm" class="no-submit-guard" method="POST">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" id="edit_id" name="id">
 

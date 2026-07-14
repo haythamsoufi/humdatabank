@@ -26,8 +26,8 @@ except ImportError:
         plugin_config = config_module.plugin_config
     else:
         # Final fallback - create a minimal config
-        from app.plugins.base_config import BasePluginConfig
-        plugin_config = BasePluginConfig("emergency_operations", {})
+        from app.plugins.db_config import DbPluginConfig
+        plugin_config = DbPluginConfig("emergency_operations", {})
         from .data_store import get_data_store, trigger_background_refresh
 
 

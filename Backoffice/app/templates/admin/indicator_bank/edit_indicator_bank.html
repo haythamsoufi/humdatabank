@@ -67,7 +67,7 @@
         </div>
         {% endif %}
 
-        <form id="edit-indicator-form" method="POST" action="{{ url_for('system_admin.edit_indicator_bank', id=indicator.id) }}">
+        <form id="edit-indicator-form" class="no-submit-guard" method="POST" action="{{ url_for('system_admin.edit_indicator_bank', id=indicator.id) }}">
             {{ form.hidden_tag() }}
 
             <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8">

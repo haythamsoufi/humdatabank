@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from app.plugins.base_config import BasePluginConfig
+from app.plugins.db_config import DbPluginConfig
 
 
 # Default configuration for Emergency Operations Plugin
@@ -35,7 +35,7 @@ DEFAULT_CONFIG = {
 }
 
 
-class EmergencyOperationsConfig(BasePluginConfig):
+class EmergencyOperationsConfig(DbPluginConfig):
     """Configuration manager for Emergency Operations plugin."""
 
     def __init__(self):

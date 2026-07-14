@@ -140,7 +140,7 @@ bank details) that has data for that template and period.
 | `sort` | string | `submitted_at` (default), `template_id`, `country_id`, `period_name` |
 | `order` | string | `desc` (default) or `asc` |
 | `page` / `per_page` | int | Pagination (API key auth only; default 20, max 100 000) |
-| `related` | string | `/data/tables` only: `"page"` (default) or `"all"` |
+| `related` | string | `/data/tables` only: `"page"` (default) or `"all"` — scopes `form_items[]`. `countries[]` always returns all countries. |
 | `layout` | string | `/data/tables` only: `"flat"` (default) or `"star"` |
 
 ---
@@ -160,7 +160,7 @@ bank details) that has data for that template and period.
 
 - Always filter by at least one of `indicator_bank_id`, `template_id`, `country_id`, or `period_name` to keep responses manageable.
 - Use `country_iso2` / `country_iso3` instead of `country_id` when you only know the ISO code.
-- `/data/tables?related=all` returns form items and countries for the **entire filtered dataset**, not just the current page — ideal for building a complete context.
+- `/data/tables?related=all` returns form items for the **entire filtered dataset**, not just the current page. `countries[]` always includes the full country dimension.
 - `include_full_info=true` embeds `form_item_info` (label, section, unit, indicator bank details) directly in each row, avoiding a second call.
 - `indicator_bank_ids` (comma-separated) on `/data/tables` lets you fetch multiple indicators in one request.
 - Disaggregation keys under `disaggregation_data.values` vary by indicator configuration. The `mode` field (`"standard"`, `"matrix"`, or `"flat"`) describes the structure.

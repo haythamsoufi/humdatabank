@@ -72,14 +72,42 @@ def explore_tab_access_flags(user, plugin_manager: "PluginManager") -> dict[str,
     return flags
 
 
-def explore_first_tab(flags: dict[str, bool], plugin_manager: "PluginManager") -> str:
-    candidates: list[tuple[int, str]] = []
+def _accessible_explore_tab_ids(
+    flags: dict[str, bool], plugin_manager: "PluginManager"
+) -> list[str]:
+    tab_ids: list[str] = []
     for core_tab in CORE_DATA_EXPLORER_TABS:
         if flags.get(core_tab["flag_key"]):
-            candidates.append((core_tab["priority"], core_tab["tab_id"]))
+            tab_ids.append(core_tab["tab_id"])
     for tab in plugin_manager.get_data_explorer_tabs():
         if flags.get(tab_flag_key(tab.tab_id)):
-            candidates.append((tab.priority, tab.tab_id))
-    if not candidates:
+            tab_ids.append(tab.tab_id)
+    return tab_ids
+
+
+def explore_first_tab(flags: dict[str, bool], plugin_manager: "PluginManager") -> str:
+    accessible = _accessible_explore_tab_ids(flags, plugin_manager)
+    if not accessible:
         return CORE_DATA_EXPLORER_TABS[0]["tab_id"]
+    candidates: list[tuple[int, str]] = []
+    for core_tab in CORE_DATA_EXPLORER_TABS:
+        if core_tab["tab_id"] in accessible:
+            candidates.append((core_tab["priority"], core_tab["tab_id"]))
+    for tab in plugin_manager.get_data_explorer_tabs():
+        if tab.tab_id in accessible:
+            candidates.append((tab.priority, tab.tab_id))
     return min(candidates, key=lambda item: item[0])[1]
+
+
+def resolve_explore_tab(
+    flags: dict[str, bool],
+    plugin_manager: "PluginManager",
+    requested_tab: str | None,
+) -> str:
+    """Return the active tab, honoring ?tab= when the user may access it."""
+    default_tab = explore_first_tab(flags, plugin_manager)
+    if not requested_tab:
+        return default_tab
+    if requested_tab in _accessible_explore_tab_ids(flags, plugin_manager):
+        return requested_tab
+    return default_tab

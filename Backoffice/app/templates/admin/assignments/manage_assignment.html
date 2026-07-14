@@ -108,7 +108,7 @@
                     <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Start Period') }}</label>
                     <div class="period-month-row">
                         {{ year_picker('start-month-year') }}
-                        <select id="start-month" class="period-month-select shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3">
+                        <select id="start-month" class="period-month-select shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 pl-3 pr-8">
                             <option value="01">{{ _('Jan') }}</option>
                             <option value="02">{{ _('Feb') }}</option>
                             <option value="03">{{ _('Mar') }}</option>
@@ -128,7 +128,7 @@
                     <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('End Period') }}</label>
                     <div class="period-month-row">
                         {{ year_picker('end-month-year') }}
-                        <select id="end-month" class="period-month-select shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3">
+                        <select id="end-month" class="period-month-select shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 pl-3 pr-8">
                             <option value="01">{{ _('Jan') }}</option>
                             <option value="02">{{ _('Feb') }}</option>
                             <option value="03">{{ _('Mar') }}</option>
@@ -784,7 +784,7 @@
             <div class="mb-4">
                  {{ edit_aes_form.status.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
                  <select name="status" id="status"
-                         class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                         class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                      {% for value, label in assignment_entity_status_choices %}
                      <option value="{{ value }}">{{ _(label) }}</option>
                      {% endfor %}
@@ -815,7 +815,7 @@
 <form id="bulk-status-form">
     <div class="mb-4">
         <label for="bulk-status-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('New status') }}</label>
-        <select id="bulk-status-select" name="status" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+        <select id="bulk-status-select" name="status" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
             <option value="">{{ _('Select status') }}</option>
             {% for value, label in assignment_entity_status_choices %}
             <option value="{{ value }}">{{ _(label) }}</option>

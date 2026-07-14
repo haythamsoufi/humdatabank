@@ -81,7 +81,7 @@
             <p>{{ _('Create a new standard indicator for the') }} {{ ORG_NAME }}. {{ _('This indicator will be available for use in form templates.') }}</p>
         </div>
 
-        <form id="add-indicator-form" method="POST" action="{{ url_for('system_admin.add_indicator_bank') }}">
+        <form id="add-indicator-form" class="no-submit-guard" method="POST" action="{{ url_for('system_admin.add_indicator_bank') }}">
             {{ form.hidden_tag() }}
 
             {# Basic Information Section #}

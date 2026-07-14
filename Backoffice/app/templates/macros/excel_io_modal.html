@@ -105,7 +105,11 @@
             {% elif import_body %}{{ import_body|safe }}
             {% elif import_enabled %}
             {% if import_intro_html %}<div class="excel-io-modal__panel-intro">{{ import_intro_html|safe }}</div>{% endif %}
-            <form method="{{ import_method }}" {% if import_form_id %}id="{{ import_form_id }}"{% endif %} {% if import_action %}action="{{ import_action }}"{% endif %} enctype="multipart/form-data" class="space-y-4 excel-io-modal__import-form">
+            {# no-submit-guard (when import_form_id is set): the page-specific JS bound to that id manages its
+               own submit-button loading state (disable/spinner/restore); the global FormSubmitGuard would
+               otherwise mutate the button before that JS captures its "original" content, leaving it stuck
+               on the loading state. #}
+            <form method="{{ import_method }}" {% if import_form_id %}id="{{ import_form_id }}"{% endif %} {% if import_action %}action="{{ import_action }}"{% endif %} enctype="multipart/form-data" class="space-y-4 excel-io-modal__import-form{% if import_form_id %} no-submit-guard{% endif %}">
                 {% if import_alert %}{{ import_alert|safe }}{% endif %}
                 {% if import_hidden_fields %}{{ import_hidden_fields|safe }}{% endif %}
                 {% call excel_import_dropzone(_dz_id, input_id=dropzone_input_id, input_name=dropzone_input_name, variant=dropzone_variant, accept=dropzone_accept, title=dropzone_title, hint=dropzone_hint, validate_url=validate_url, file_field_name=dropzone_input_name, auto_submit=dropzone_auto_submit, max_size_bytes=dropzone_max_size_bytes, form_id=import_form_id) %}{% endcall %}
@@ -163,7 +167,8 @@
             {% elif import_body %}{{ import_body|safe }}
             {% elif import_enabled %}
             {% if import_intro_html %}<div class="excel-io-modal__panel-intro">{{ import_intro_html|safe }}</div>{% endif %}
-            <form method="{{ import_method }}" {% if import_form_id %}id="{{ import_form_id }}"{% endif %} {% if import_action %}action="{{ import_action }}"{% endif %} enctype="multipart/form-data" class="space-y-4 excel-io-modal__import-form">
+            {# no-submit-guard (when import_form_id is set): see rationale in the guide-split branch above. #}
+            <form method="{{ import_method }}" {% if import_form_id %}id="{{ import_form_id }}"{% endif %} {% if import_action %}action="{{ import_action }}"{% endif %} enctype="multipart/form-data" class="space-y-4 excel-io-modal__import-form{% if import_form_id %} no-submit-guard{% endif %}">
                 {% if import_alert %}{{ import_alert|safe }}{% endif %}
                 {% if import_hidden_fields %}{{ import_hidden_fields|safe }}{% endif %}
                 {% call excel_import_dropzone(_dz_id, input_id=dropzone_input_id, input_name=dropzone_input_name, variant=dropzone_variant, accept=dropzone_accept, title=dropzone_title, hint=dropzone_hint, validate_url=validate_url, file_field_name=dropzone_input_name, auto_submit=dropzone_auto_submit, max_size_bytes=dropzone_max_size_bytes, form_id=import_form_id) %}{% endcall %}
@@ -200,7 +205,8 @@
             <h4 class="excel-io-modal__section-title">{{ _('Import') }}</h4>
             {% if import_body %}{{ import_body|safe }}
             {% elif import_enabled %}
-            <form method="{{ import_method }}" {% if import_form_id %}id="{{ import_form_id }}"{% endif %} {% if import_action %}action="{{ import_action }}"{% endif %} enctype="multipart/form-data" class="space-y-4 excel-io-modal__import-form">
+            {# no-submit-guard (when import_form_id is set): see rationale in the guide-split branch above. #}
+            <form method="{{ import_method }}" {% if import_form_id %}id="{{ import_form_id }}"{% endif %} {% if import_action %}action="{{ import_action }}"{% endif %} enctype="multipart/form-data" class="space-y-4 excel-io-modal__import-form{% if import_form_id %} no-submit-guard{% endif %}">
                 {% if import_alert %}{{ import_alert|safe }}{% endif %}
                 {% if import_hidden_fields %}{{ import_hidden_fields|safe }}{% endif %}
                 {% call excel_import_dropzone(_dz_id, input_id=dropzone_input_id, input_name=dropzone_input_name, variant=dropzone_variant, accept=dropzone_accept, title=dropzone_title, hint=dropzone_hint, validate_url=validate_url, file_field_name=dropzone_input_name, auto_submit=dropzone_auto_submit, max_size_bytes=dropzone_max_size_bytes) %}{% endcall %}
@@ -230,7 +236,8 @@
         <div>
             {% if import_body %}{{ import_body|safe }}
             {% elif import_enabled %}
-            <form method="{{ import_method }}" {% if import_form_id %}id="{{ import_form_id }}"{% endif %} {% if import_action %}action="{{ import_action }}"{% endif %} enctype="multipart/form-data" class="flex flex-col space-y-3 excel-io-modal__import-form">
+            {# no-submit-guard (when import_form_id is set): see rationale in the guide-split branch above. #}
+            <form method="{{ import_method }}" {% if import_form_id %}id="{{ import_form_id }}"{% endif %} {% if import_action %}action="{{ import_action }}"{% endif %} enctype="multipart/form-data" class="flex flex-col space-y-3 excel-io-modal__import-form{% if import_form_id %} no-submit-guard{% endif %}">
                 {% if import_alert %}{{ import_alert|safe }}{% endif %}
                 {% if import_hidden_fields %}{{ import_hidden_fields|safe }}{% endif %}
                 {{ caller() if caller else '' }}

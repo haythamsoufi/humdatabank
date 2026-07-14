@@ -11,7 +11,7 @@ from flask import current_app
 import json
 from pathlib import Path
 
-from app.plugins.base_config import BasePluginConfig
+from app.plugins.db_config import DbPluginConfig
 
 
 # Default plugin configuration
@@ -60,7 +60,7 @@ DEFAULT_PLUGIN_CONFIG = {
     }
 }
 
-class InteractiveMapConfig(BasePluginConfig):
+class InteractiveMapConfig(DbPluginConfig):
     """Manages configuration for the Interactive Map Plugin."""
 
     def __init__(self):
@@ -68,7 +68,7 @@ class InteractiveMapConfig(BasePluginConfig):
 
     def get_api_key(self, provider: str) -> Optional[str]:
         """Get API key for a specific map provider."""
-        return self.config.get("api_keys", {}).get(provider, "")
+        return self.get_setting("api_keys", provider, "")
 
     def set_api_key(self, provider: str, api_key: str) -> bool:
         """Set API key for a specific map provider."""
@@ -76,7 +76,7 @@ class InteractiveMapConfig(BasePluginConfig):
 
     def get_provider_config(self, provider: str) -> Dict[str, Any]:
         """Get configuration for a specific map provider."""
-        return self.config.get("map_providers", {}).get(provider, {})
+        return self.get_section("map_providers").get(provider, {})
 
     def is_provider_enabled(self, provider: str) -> bool:
         """Check if a map provider is enabled."""

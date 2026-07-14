@@ -2275,7 +2275,7 @@ export default function DisaggregationAnalysisPage() {
                           {t('disaggregationAnalysis.filters.period')}
                         </label>
                         <select
-                          className="w-full p-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
+                          className="w-full pl-3 pr-8 py-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                           value={filters.selectedPeriod}
                           onChange={(e) => setFilters(prev => ({ ...prev, selectedPeriod: e.target.value }))}
                         >
@@ -2292,7 +2292,7 @@ export default function DisaggregationAnalysisPage() {
                           {t('disaggregationAnalysis.filters.indicator')}
                         </label>
                         <select
-                          className="w-full p-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
+                          className="w-full pl-3 pr-8 py-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                           value={filters.selectedIndicator}
                           onChange={(e) => setFilters(prev => ({ ...prev, selectedIndicator: e.target.value }))}
                         >
@@ -2309,7 +2309,7 @@ export default function DisaggregationAnalysisPage() {
                           {t('disaggregationAnalysis.filters.chartType')}
                         </label>
                         <select
-                          className="w-full p-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
+                          className="w-full pl-3 pr-8 py-3 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                           value={chartType}
                           onChange={(e) => setChartType(e.target.value)}
                         >
@@ -2421,7 +2421,7 @@ export default function DisaggregationAnalysisPage() {
                         </h3>
                         {processedData.availableYears && processedData.availableYears.length > 0 && (
                           <select
-                            className="px-3 py-2 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent text-sm"
+                            className="pl-3 pr-8 py-2 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent text-sm"
                             value={selectedYear || ''}
                             onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value) : null)}
                           >

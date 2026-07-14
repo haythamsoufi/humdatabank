@@ -29,7 +29,6 @@ PDF_PREPARE_JS = """
     ".pb-report-toolbar",
     ".pb-report-tools",
     ".pb-language-selector",
-    "#pb-scroll-headers",
     "#quarto-sidebar",
     "#quarto-margin-sidebar",
     "nav#TOC",

@@ -112,7 +112,10 @@
                 </p>
             </div>
 
-            <form id="admin-notification-form" class="space-y-6">
+            {# no-submit-guard: JS submit handler manages its own button loading state (disable/spinner/restore);
+               the global FormSubmitGuard would otherwise mutate the button before the handler captures its
+               "original" content, causing it to get stuck on the loading state after the async request finishes. #}
+            <form id="admin-notification-form" class="space-y-6 no-submit-guard">
                 <!-- Recipients Section -->
                 <div class="border border-gray-200 rounded-lg p-6">
                     <h3 class="text-lg font-semibold text-gray-900 mb-4">
@@ -1277,7 +1280,8 @@
             </button>
         </div>
 
-        <form id="campaign-form" class="space-y-4">
+        {# no-submit-guard: see admin-notification-form above for rationale. #}
+        <form id="campaign-form" class="space-y-4 no-submit-guard">
             <div>
                 <label for="campaign-modal-name" class="block text-sm font-medium text-gray-700 mb-2">
                     {{ _('Campaign Name') }} <span class="text-red-500">*</span>

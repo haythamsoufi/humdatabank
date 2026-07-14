@@ -333,7 +333,7 @@ export class TemplateVariablesManager {
                                     <span class="tooltip-text">Choose whether this variable looks up data from other forms or returns metadata about the current form/entity.</span>
                                 </span>
                             </label>
-                            <select name="variable_type" required class="w-full px-3 py-2 border border-gray-300 rounded-md" id="variable-type-select">
+                            <select name="variable_type" required class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md" id="variable-type-select">
                                 <option value="lookup" ${existingVar?.variable_type === 'lookup' || !existingVar?.variable_type ? 'selected' : ''}>Lookup (from other form submissions)</option>
                                 <option value="metadata" ${existingVar?.variable_type === 'metadata' ? 'selected' : ''}>Metadata (entity name, template name, etc.)</option>
                             </select>
@@ -348,7 +348,7 @@ export class TemplateVariablesManager {
                                         <span class="tooltip-text">Select what metadata this variable should return.</span>
                                     </span>
                                 </label>
-                                <select name="metadata_type" class="w-full px-3 py-2 border border-gray-300 rounded-md" id="metadata-type-select">
+                                <select name="metadata_type" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md" id="metadata-type-select">
                                     <option value="">Select metadata type...</option>
                                     <option value="entity_name" ${existingVar?.metadata_type === 'entity_name' ? 'selected' : ''}>Entity Name</option>
                                     <option value="entity_name_hierarchy" ${existingVar?.metadata_type === 'entity_name_hierarchy' ? 'selected' : ''}>Entity Name (with hierarchy)</option>
@@ -365,7 +365,7 @@ export class TemplateVariablesManager {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Source Template *</label>
-                                <select name="source_template_id" class="w-full px-3 py-2 border border-gray-300 rounded-md" id="source-template-select">
+                                <select name="source_template_id" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md" id="source-template-select">
                                     <option value="">Select template...</option>
                                     ${this.allTemplates.map(t => `<option value="${escAttr(t.id)}" ${existingVar?.source_template_id == t.id ? 'selected' : ''}>${escAttr(t.name)}</option>`).join('')}
                                 </select>
@@ -379,7 +379,7 @@ export class TemplateVariablesManager {
                                         <span class="tooltip-text">Choose a dynamic option that is resolved at form-fill time, or pick a specific fixed period from the source template's existing assignments.</span>
                                     </span>
                                 </label>
-                                <select name="source_assignment_period" class="w-full px-3 py-2 border border-gray-300 rounded-md" id="source-assignment-select">
+                                <select name="source_assignment_period" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md" id="source-assignment-select">
                                     <option value="">Select assignment period...</option>
                                     <optgroup label="Dynamic — resolved at form-fill time">
                                         <option value="__current__" ${existingVar?.source_assignment_period === '__current__' ? 'selected' : ''}>Same period as current assignment</option>
@@ -394,7 +394,7 @@ export class TemplateVariablesManager {
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Source Form Item *</label>
-                            <select name="source_form_item_id" class="w-full px-3 py-2 border border-gray-300 rounded-md" id="source-form-item-select">
+                            <select name="source_form_item_id" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md" id="source-form-item-select">
                                 <option value="">Select form item...</option>
                             </select>
                             <label class="flex items-center mt-2 text-sm text-gray-700">
@@ -426,7 +426,7 @@ export class TemplateVariablesManager {
                                     <span class="tooltip-text">Standard Lookup: Lookup a value from a specific form item in another submission. Find Entities That Reference This Entity: Find all entities whose matrix data mentions/references the current assignment's entity ID. Only works with matrix form items. Returns a list of matching entities.</span>
                                 </span>
                             </label>
-                            <select name="lookup_type" class="w-full px-3 py-2 border border-gray-300 rounded-md" id="lookup-type-select">
+                            <select name="lookup_type" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md" id="lookup-type-select">
                                 <option value="standard" ${existingVar?.entity_scope !== 'entities_containing' ? 'selected' : ''}>Standard Lookup</option>
                                 <option value="reverse" ${existingVar?.entity_scope === 'entities_containing' ? 'selected' : ''}>Find Entities That Reference This Entity</option>
                             </select>
@@ -441,7 +441,7 @@ export class TemplateVariablesManager {
                                     <span class="tooltip-text">Same Entity: Use data from the same entity as the current form (e.g., if filling a form for Country A, use Country A's previous submission). Most common for standard lookups. Any Entity: Use data from any entity's submission. The system will use the most recent submission from any entity. Useful for aggregated/central data. Specific Entity: Use data from a specific entity's submission (e.g., always use Country B's data regardless of current form). Useful for cross-entity lookups.</span>
                                 </span>
                             </label>
-                            <select name="entity_scope" class="w-full px-3 py-2 border border-gray-300 rounded-md" id="entity-scope-select">
+                            <select name="entity_scope" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md" id="entity-scope-select">
                                 <option value="same" ${existingVar?.entity_scope === 'same' ? 'selected' : ''}>Same Entity</option>
                                 <option value="any" ${existingVar?.entity_scope === 'any' ? 'selected' : ''}>Any Entity</option>
                                 <option value="specific" ${existingVar?.entity_scope === 'specific' ? 'selected' : ''}>Specific Entity</option>
@@ -495,7 +495,7 @@ export class TemplateVariablesManager {
                                         </span>
                                     </label>
                                     <select name="specific_entity_type" id="specific-entity-type-select"
-                                           class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                                           class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md">
                                         <option value="">Select entity type...</option>
                                         <option value="country" ${existingVar?.specific_entity_type === 'country' ? 'selected' : ''}>Country</option>
                                         <option value="ns_branch" ${existingVar?.specific_entity_type === 'ns_branch' ? 'selected' : ''}>NS Branch</option>
@@ -535,7 +535,7 @@ export class TemplateVariablesManager {
                                     </span>
                                 </label>
                                 <select name="return_format" id="return-format-select"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                                       class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md">
                                     <option value="auto_load_format" ${existingVar?.return_format === 'auto_load_format' || !existingVar?.return_format ? 'selected' : ''}>Auto-load Format (JSON for matrix auto-load)</option>
                                     <option value="names_comma" ${existingVar?.return_format === 'names_comma' ? 'selected' : ''}>Comma-separated names (e.g., "France, Germany, Italy")</option>
                                 </select>
@@ -556,7 +556,7 @@ export class TemplateVariablesManager {
 
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Decimal Places</label>
-                                    <select name="format_decimal_places" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                                    <select name="format_decimal_places" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md">
                                         <option value="auto" ${existingVar?.format_decimal_places === 'auto' || !existingVar?.format_decimal_places ? 'selected' : ''}>Auto (keep original decimals)</option>
                                         <option value="whole" ${existingVar?.format_decimal_places === 'whole' ? 'selected' : ''}>Whole number (round, no decimals)</option>
                                         <option value="0" ${existingVar?.format_decimal_places === '0' || existingVar?.format_decimal_places === 0 ? 'selected' : ''}>0 decimal places</option>

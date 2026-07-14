@@ -122,7 +122,7 @@ export default function CountriesListPage({ countries: initialCountries, error: 
                 <select
                   value={selectedRegion}
                   onChange={(e) => setSelectedRegion(e.target.value)}
-                  className="w-full px-4 py-2 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
+                  className="w-full pl-4 pr-8 py-2 border border-humdb-gray-300 rounded-lg focus:ring-2 focus:ring-humdb-red focus:border-transparent"
                 >
                   <option value="all">{t('countriesList.allRegions', { default: 'All Regions' })}</option>
                   {regions.filter(r => r !== 'all').map(region => (

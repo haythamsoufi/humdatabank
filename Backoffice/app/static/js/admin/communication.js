@@ -4602,6 +4602,40 @@ class AdminNotifications {
         }
     }
 
+    /**
+     * Reload notifications grid data from the API and update the table + failed-email notice.
+     * @returns {Promise<boolean>}
+     */
+    async refreshNotificationsGrid() {
+        try {
+            const data = await _anFetch('/admin/api/notifications/all');
+            if (!data || !data.success || !Array.isArray(data.notifications)) {
+                return false;
+            }
+            const rows = data.notifications;
+            window.notificationsData = rows;
+            if (window.communicationPageConfig) {
+                window.communicationPageConfig.failedEmailDeliveryCount =
+                    data.failed_email_delivery_count ?? countFailedEmailsInNotificationsData(rows);
+            }
+            const manager = window.communicationsGridManager || window.notificationsGridManager;
+            if (manager && typeof manager.setRowData === 'function') {
+                manager.setRowData(rows);
+            } else {
+                const helper = window.notificationsGridHelper;
+                if (helper && typeof helper.setRowData === 'function') {
+                    helper.setRowData(rows);
+                }
+            }
+            updateFailedEmailNotice(rows);
+            this.clearGridEmailSelection();
+            return true;
+        } catch (error) {
+            console.error('Failed to refresh notifications grid:', error);
+            return false;
+        }
+    }
+
     async retryEmailDelivery(logId, triggerButton) {
         const t = window.COMMUNICATION_TRANSLATIONS || {};
         const btn = triggerButton;
@@ -4616,12 +4650,12 @@ class AdminNotifications {
             });
             if (data.success) {
                 if (window.showAlert) {
-                    window.showAlert(data.message || 'Email sent successfully', 'success');
+                    window.showAlert(data.message || t.emailSent || 'Email sent successfully', 'success');
                 }
-                window.location.reload();
             } else if (window.showAlert) {
                 window.showAlert(data.error || data.message || 'Email retry failed', 'error');
             }
+            await this.refreshNotificationsGrid();
         } catch (error) {
             console.error('Email retry failed:', error);
             if (window.showAlert) {
@@ -4685,10 +4719,10 @@ class AdminNotifications {
                 if (window.showAlert) {
                     window.showAlert(data.message || t.dismissedEmail || 'Email failure dismissed', 'success');
                 }
-                window.location.reload();
             } else if (window.showAlert) {
                 window.showAlert(data.error || data.message || 'Could not dismiss email failure', 'error');
             }
+            await this.refreshNotificationsGrid();
         } catch (error) {
             console.error('Email dismiss failed:', error);
             if (window.showAlert) {
@@ -4723,7 +4757,7 @@ class AdminNotifications {
             if (window.showAlert) {
                 window.showAlert(data.message || t.dismissedEmail || 'Dismissed', data.success ? 'success' : 'warning');
             }
-            window.location.reload();
+            await this.refreshNotificationsGrid();
         } catch (error) {
             console.error('Bulk email dismiss failed:', error);
             if (window.showAlert) {
@@ -4782,7 +4816,7 @@ class AdminNotifications {
             if (window.showAlert) {
                 window.showAlert(data.message || 'Done', data.success ? 'success' : 'warning');
             }
-            window.location.reload();
+            await this.refreshNotificationsGrid();
         } catch (error) {
             console.error(`Bulk email ${action} failed:`, error);
             if (window.showAlert) {
@@ -4813,7 +4847,7 @@ class AdminNotifications {
             if (window.showAlert) {
                 window.showAlert(data.message || 'Retry completed', data.success ? 'success' : 'warning');
             }
-            window.location.reload();
+            await this.refreshNotificationsGrid();
         } catch (error) {
             console.error('Bulk email retry failed:', error);
             if (window.showAlert) {

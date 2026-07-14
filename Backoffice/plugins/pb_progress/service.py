@@ -16,14 +16,18 @@ from datetime import timezone
 from pathlib import Path
 from typing import Any, ClassVar
 
-from flask import current_app, url_for
+from flask import Response, current_app, url_for
 from werkzeug.datastructures import FileStorage
+from werkzeug.exceptions import NotFound
 
+from plugins.pb_progress.plugin_data_store import (
+    PBProgressDataStore,
+    SYSTEM_GENERATED_NAME,
+)
 from plugins.pb_progress.versions import (
     DEFAULT_VERSION,
     LEGACY_EXCEL_REL_PATH,
     LEGACY_OUTPUT_PREFIX,
-    LEGACY_STATUS_REL_PATH,
     REPORT_VERSIONS,
     validate_version,
     version_storage_prefix,
@@ -38,6 +42,123 @@ EXCEL_NAME = "source/SG_Report.xlsx"
 STATUS_NAME = "status.json"
 BUILD_LOG_NAME = "build.log"
 OUTPUT_DIR_NAME = "output/"
+_PB_REPORT_FA_FIX = (
+    '<link rel="stylesheet" href="/static/libs/fontawesome-6.5.0.min.css">'
+    '<style id="pb-toolbar-fa-fix">'
+    "#pb-report-toolbar .fa,#pb-report-toolbar .fas,#pb-report-toolbar .fa-solid"
+    "{font-weight:900!important;font-family:'Font Awesome 6 Free'!important;}"
+    "</style>"
+)
+_PB_REPORT_TOC_PIN_FIX = (
+    '<style id="pb-report-toc-pin-fix-v4">'
+    "#pb-scroll-headers{display:none!important;}"
+    "#toc.pb-report-toc-pinned,#quarto-margin-sidebar #toc.pb-report-toc-pinned,"
+    "#quarto-sidebar #toc.pb-report-toc-pinned{"
+    "position:fixed!important;top:var(--pb-report-toolbar-height,0px)!important;"
+    "right:1.25rem!important;left:auto!important;width:12.5rem!important;"
+    "max-width:12.5rem!important;min-width:0!important;"
+    "max-height:calc(100vh - var(--pb-report-toolbar-height,0px) - 1rem)!important;"
+    "overflow-x:hidden!important;overflow-y:auto!important;z-index:998!important;"
+    "margin:0!important;padding:0.5rem 0.65rem 0.75rem!important;"
+    "box-sizing:border-box!important;background:#fff!important;border:1px solid #e8e8e8!important;"
+    "border-radius:0.25rem!important;box-shadow:0 1px 3px rgba(0,0,0,.06)!important;"
+    "display:block!important;visibility:visible!important;font-size:0.78rem!important;line-height:1.35!important;color:#444!important;}"
+    "#toc.pb-report-toc-pinned #toc-title{margin:0 0 0.45rem!important;padding:0!important;"
+    "font-size:0.65rem!important;font-weight:700!important;letter-spacing:0.05em!important;"
+    "text-transform:uppercase!important;color:#777!important;border:0!important;}"
+    "#toc.pb-report-toc-pinned .toc-list,#toc.pb-report-toc-pinned>ul{margin:0!important;padding:0!important;list-style:none!important;}"
+    "#toc.pb-report-toc-pinned li{margin:0.12rem 0!important;}"
+    "#toc.pb-report-toc-pinned ul ul{margin:0.1rem 0 0.2rem!important;padding-left:0.65rem!important;"
+    "font-size:0.72rem!important;color:#666!important;}"
+    "#toc.pb-report-toc-pinned .pb-toc-label,#toc.pb-report-toc-pinned .nav-link{display:block!important;"
+    "padding:0.1rem 0!important;font-size:inherit!important;line-height:1.35!important;font-weight:500!important;}"
+    "#pb-report-toc-host{display:contents!important;}"
+    "#quarto-margin-sidebar #toc.pb-report-toc-pinned a,"
+    "#quarto-sidebar #toc.pb-report-toc-pinned a,"
+    "#toc.pb-report-toc-pinned a,"
+    "#quarto-margin-sidebar #toc.pb-report-toc-pinned .nav-link,"
+    "#quarto-sidebar #toc.pb-report-toc-pinned .nav-link,"
+    "#toc.pb-report-toc-pinned .nav-link,"
+    ".pb-toc-label{pointer-events:none!important;cursor:default!important;text-decoration:none!important;color:inherit!important;}"
+    "</style>"
+    '<script id="pb-report-toc-pin-script-v4">'
+    "document.addEventListener('DOMContentLoaded',function(){"
+    "function pin(){var toc=document.getElementById('toc');if(!toc)return;"
+    "toc.classList.add('pb-report-toc-pinned');"
+    "toc.style.removeProperty('--pb-toc-right');toc.style.removeProperty('--pb-toc-width');}"
+    "window.addEventListener('pb-report-toolbar-resize',pin);"
+    "setTimeout(pin,0);"
+    "});</script>"
+)
+_PB_REPORT_TOC_HOST_FIX = (
+    '<script id="pb-report-toc-host-fix">'
+    "document.addEventListener('DOMContentLoaded',function(){"
+    "function L(m,d){window.__pbReportTocDebug=window.__pbReportTocDebug||[];"
+    "var e={msg:m,data:d||null,t:Date.now()};window.__pbReportTocDebug.push(e);"
+    "console.log('[pb-report-toc]',m,d||'');}"
+    "function W(m,d){L(m,d);console.warn('[pb-report-toc]',m,d||'');}"
+    "function host(){return document.getElementById('quarto-margin-sidebar')"
+    "||document.getElementById('quarto-sidebar')||document.getElementById('pb-report-toc-host');}"
+    "function ensureHost(){var h=host();if(h)return h;"
+    "h=document.createElement('div');h.id='pb-report-toc-host';document.body.appendChild(h);"
+    "W('created fallback toc host (page-layout-full has no quarto sidebar)');return h;}"
+    "function rebuild(){var panel=document.querySelector('.pb-lang-panel:not([hidden])')"
+    "||document.querySelector('.pb-lang-panel');if(!panel){W('no active language panel');return;}"
+    "var h=ensureHost(),toc=document.getElementById('toc');"
+    "if(!toc){toc=document.createElement('nav');toc.id='toc';toc.setAttribute('role','doc-toc');"
+    "toc.className='toc-active';toc.innerHTML='<h2 id=\"toc-title\">Table of contents</h2><ul class=\"toc-list\"></ul>';"
+    "h.appendChild(toc);L('created #toc');}"
+    "var list=toc.querySelector('.toc-list')||toc.querySelector('ul');if(!list){W('toc list missing');return;}"
+    "list.innerHTML='';var parts=0,sections=0;"
+    "panel.querySelectorAll('.report-part').forEach(function(part){"
+    "var h2=part.querySelector('h2[data-anchor]');if(!h2)return;parts++;"
+    "var li=document.createElement('li'),lbl=document.createElement('span');"
+    "lbl.className='nav-link pb-toc-label';lbl.textContent=h2.textContent.trim();li.appendChild(lbl);"
+    "var ul=document.createElement('ul');"
+    "part.querySelectorAll('.report-section-title[data-anchor]').forEach(function(h3){sections++;"
+    "var cli=document.createElement('li'),clbl=document.createElement('span');"
+    "clbl.className='nav-link pb-toc-label';clbl.textContent=h3.textContent.trim();"
+    "cli.appendChild(clbl);ul.appendChild(cli);});"
+    "if(ul.children.length)li.appendChild(ul);list.appendChild(li);});"
+    "L('rebuilt toc',{parts:parts,sections:sections,items:list.children.length});"
+    "if(!parts)W('toc empty — no report parts in active panel');"
+    "toc.classList.add('pb-report-toc-pinned');"
+    "toc.style.removeProperty('--pb-toc-right');toc.style.removeProperty('--pb-toc-width');}"
+    "setTimeout(function(){"
+    "L('serve_output toc check',{hasToc:!!document.getElementById('toc'),"
+    "hasMarginSidebar:!!document.getElementById('quarto-margin-sidebar'),"
+    "hasQuartoSidebar:!!document.getElementById('quarto-sidebar'),"
+    "layout:!!document.querySelector('.page-layout-full')});"
+    "if(!document.getElementById('toc'))rebuild();"
+    "else{var t=document.getElementById('toc');t.classList.add('pb-report-toc-pinned');"
+    "t.style.removeProperty('--pb-toc-right');t.style.removeProperty('--pb-toc-width');"
+    "L('toc already present — reapplied pin class');}"
+    "},100);"
+    "});</script>"
+)
+_PB_REPORT_TOOLBAR_WIDTH_FIX = (
+    '<style id="pb-toolbar-full-width-fix">'
+    "#pb-report-toolbar{width:100vw!important;max-width:100vw!important;"
+    "margin-left:calc(50% - 50vw)!important;margin-right:calc(50% - 50vw)!important;"
+    "padding-left:max(1rem,calc((100vw - 100%) / 2 + 1rem))!important;"
+    "padding-right:max(1rem,calc((100vw - 100%) / 2 + 1rem))!important;"
+    "border-radius:0!important;border-left:none!important;border-right:none!important;"
+    "box-sizing:border-box!important;}"
+    "</style>"
+)
+_PB_REPORT_TOOLBAR_TITLE_FIX = (
+    '<style id="pb-toolbar-title-fix">'
+    "#title-block-header .subtitle{display:none!important;}"
+    "</style>"
+    '<script id="pb-toolbar-title-script">'
+    "document.addEventListener('DOMContentLoaded',function(){"
+    "var sub=document.querySelector('#title-block-header .subtitle');"
+    "var title=document.getElementById('pb-report-toolbar-title');"
+    "if(!title)return;"
+    "if(sub){var t=sub.textContent.replace(/^[\\s\"']+|[\\s\"']+$/g,'').trim();"
+    "if(t)title.textContent=t;}"
+    "});</script>"
+)
 
 HEARTBEAT_INTERVAL_SECONDS = 60
 
@@ -129,7 +250,15 @@ class PBProgressService:
 
     @classmethod
     def _status_rel(cls, version: str) -> str:
+        """Legacy path — only used when importing old status.json into plugin_data."""
         return cls._version_rel(version, STATUS_NAME)
+
+    @classmethod
+    def _excel_rel_for_source(cls, version: str) -> str:
+        source = PBProgressDataStore.get_data_source(version)
+        if source == "system":
+            return cls._version_rel(version, SYSTEM_GENERATED_NAME)
+        return cls._excel_rel(version)
 
     @classmethod
     def _output_rel(cls, version: str, filename: str) -> str:
@@ -144,34 +273,27 @@ class PBProgressService:
 
     @classmethod
     def _migrate_legacy_storage(cls) -> None:
-        """Move pre-versioning files into the 2026-inclusive slot once."""
+        PBProgressDataStore.migrate_legacy_storage_if_needed()
         if cls._legacy_migrated:
             return
         cls._legacy_migrated = True
         target = DEFAULT_VERSION
-        if storage_service.exists(STORAGE_CATEGORY, cls._status_rel(target)):
-            return
-        if not storage_service.exists(STORAGE_CATEGORY, LEGACY_STATUS_REL_PATH):
-            return
         try:
-            status_raw = storage_service.download(STORAGE_CATEGORY, LEGACY_STATUS_REL_PATH)
-            storage_service.upload(STORAGE_CATEGORY, cls._status_rel(target), status_raw)
+            if storage_service.exists(STORAGE_CATEGORY, cls._excel_rel(target)):
+                return
             if storage_service.exists(STORAGE_CATEGORY, LEGACY_EXCEL_REL_PATH):
                 excel_raw = storage_service.download(STORAGE_CATEGORY, LEGACY_EXCEL_REL_PATH)
                 storage_service.upload(STORAGE_CATEGORY, cls._excel_rel(target), excel_raw)
-            try:
-                legacy_status = json.loads(status_raw.decode("utf-8"))
-            except (UnicodeDecodeError, json.JSONDecodeError):
-                legacy_status = {}
-            output_names = legacy_status.get("output_names") or []
+            bucket = PBProgressDataStore.get_version_bucket(target)
+            output_names = (bucket.get("status") or {}).get("output_names") or []
             for name in output_names:
                 legacy_rel = f"{LEGACY_OUTPUT_PREFIX}{name}"
                 if storage_service.exists(STORAGE_CATEGORY, legacy_rel):
                     blob = storage_service.download(STORAGE_CATEGORY, legacy_rel)
                     storage_service.upload(STORAGE_CATEGORY, cls._output_rel(target, name), blob)
-            logger.info("Migrated legacy P&B progress storage to version %s", target)
+            logger.info("Migrated legacy P&B progress binary storage to version %s", target)
         except Exception as exc:
-            logger.warning("Legacy P&B progress migration skipped: %s", exc)
+            logger.warning("Legacy P&B progress binary migration skipped: %s", exc)
 
     @classmethod
     def _now_iso(cls) -> str:
@@ -201,15 +323,11 @@ class PBProgressService:
 
     @classmethod
     def _reload_status_from_storage(cls, version: str) -> dict[str, Any] | None:
-        rel_path = cls._status_rel(version)
-        if not storage_service.exists(STORAGE_CATEGORY, rel_path):
-            return None
         try:
-            raw = storage_service.download(STORAGE_CATEGORY, rel_path)
-            persisted = json.loads(raw.decode("utf-8"))
-            return persisted if isinstance(persisted, dict) else None
+            status = PBProgressDataStore.get_version_status(version)
+            return status if isinstance(status, dict) else None
         except Exception as exc:
-            logger.warning("Failed to reload P&B progress status from storage: %s", exc)
+            logger.warning("Failed to reload P&B progress status from plugin_data: %s", exc)
             return None
 
     @classmethod
@@ -229,11 +347,7 @@ class PBProgressService:
     def _persist_status(cls, version: str, payload: dict[str, Any] | None = None) -> None:
         data = dict(payload or cls._state_for(version))
         data.pop("log_tail", None)
-        storage_service.upload(
-            STORAGE_CATEGORY,
-            cls._status_rel(version),
-            json.dumps(data, indent=2).encode("utf-8"),
-        )
+        PBProgressDataStore.save_version_status(version, data)
 
     @classmethod
     def _sanitize_build_line(cls, line: str) -> str:
@@ -611,7 +725,35 @@ class PBProgressService:
             state["status"] = "idle"
             state["error"] = None
         cls._persist_status(version)
-        return excel_info
+        return cls._import_system_config_after_excel_upload(version, excel_info)
+
+    @classmethod
+    def _import_system_config_after_excel_upload(
+        cls,
+        version: str,
+        excel_info: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Load mapping, translations, and section order from the uploaded workbook."""
+        result: dict[str, Any] = {"excel": excel_info}
+        try:
+            from plugins.pb_progress.db_source import DbSourceError, import_config_from_excel
+
+            summary = import_config_from_excel(version)
+            result["config_import"] = summary
+            result["mapping"] = PBProgressDataStore.get_mapping_config(version)
+            result["translations"] = PBProgressDataStore.get_translations_config(version)
+            result["section_order"] = PBProgressDataStore.get_section_order_config(version)
+        except DbSourceError as exc:
+            logger.warning(
+                "P&B Excel uploaded for %s but system config import failed: %s",
+                version,
+                exc,
+            )
+            result["config_import_error"] = str(exc)
+        except Exception as exc:
+            logger.exception("P&B Excel uploaded for %s but system config import failed", version)
+            result["config_import_error"] = str(exc)
+        return result
 
     @classmethod
     def get_status(cls, version: str) -> dict[str, Any]:
@@ -620,7 +762,14 @@ class PBProgressService:
         state = cls._state_for(version)
         status = dict(state)
         status["version"] = version
+        status["data_source"] = PBProgressDataStore.get_data_source(version)
+        status["system_dataset_available"] = storage_service.exists(
+            STORAGE_CATEGORY,
+            cls._version_rel(version, SYSTEM_GENERATED_NAME),
+        )
         status["excel"] = cls.get_excel_info(version)
+        if status.get("data_source") == "system":
+            status["mapping_ready"] = bool(PBProgressDataStore.get_mapping_config(version))
         if status.get("status") == "done":
             status["outputs"] = cls._build_output_manifest(version)
         else:
@@ -658,7 +807,16 @@ class PBProgressService:
             state = cls._state_for(version)
             if state.get("status") == "running":
                 raise RuntimeError("A report generation is already in progress.")
-            if not storage_service.exists(STORAGE_CATEGORY, cls._excel_rel(version)):
+
+            source = PBProgressDataStore.get_data_source(version)
+            if source == "system":
+                from plugins.pb_progress.db_source import DbSourceError, generate_system_dataset as _generate_system_dataset
+
+                try:
+                    _generate_system_dataset(version)
+                except DbSourceError as exc:
+                    raise RuntimeError(str(exc)) from exc
+            elif not storage_service.exists(STORAGE_CATEGORY, cls._excel_rel(version)):
                 raise RuntimeError("Upload an Excel file before generating the report.")
 
             job_id = str(uuid.uuid4())
@@ -847,7 +1005,7 @@ class PBProgressService:
 
                 excel_path = storage_service.get_absolute_path(
                     STORAGE_CATEGORY,
-                    cls._excel_rel(version),
+                    cls._excel_rel_for_source(version),
                 )
                 if cls._is_azure_storage():
                     temp_excel = excel_path
@@ -972,6 +1130,37 @@ class PBProgressService:
                         pass
 
     @classmethod
+    def set_data_source(cls, version: str, source: str) -> str:
+        version = validate_version(version)
+        PBProgressDataStore.set_data_source(version, source)
+        return PBProgressDataStore.get_data_source(version)
+
+    @classmethod
+    def generate_system_dataset(cls, version: str) -> dict[str, Any]:
+        from plugins.pb_progress.db_source import generate_system_dataset as _generate
+
+        version = validate_version(version)
+        return _generate(version)
+
+    @classmethod
+    def compare_system_dataset(cls, version: str) -> dict[str, Any]:
+        from plugins.pb_progress.db_source import compare_final_with_uploaded
+
+        version = validate_version(version)
+        return compare_final_with_uploaded(version)
+
+    @classmethod
+    def serve_system_dataset(cls, version: str):
+        from flask import send_file
+
+        version = validate_version(version)
+        rel = cls._version_rel(version, SYSTEM_GENERATED_NAME)
+        if not storage_service.exists(STORAGE_CATEGORY, rel):
+            raise NotFound()
+        path = storage_service.get_absolute_path(STORAGE_CATEGORY, rel)
+        return send_file(path, as_attachment=True, download_name="system_generated.xlsx")
+
+    @classmethod
     def serve_output(cls, version: str, filename: str):
         version = validate_version(version)
         safe_name = Path(filename).name
@@ -994,6 +1183,67 @@ class PBProgressService:
             mimetype = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         elif ext == ".zip":
             mimetype = "application/zip"
+
+        if inline:
+            html = storage_service.download(STORAGE_CATEGORY, rel_path).decode("utf-8", errors="replace")
+            for old_toc_fix in (
+                "pb-report-toc-pin-fix-v2",
+                "pb-report-toc-pin-fix-v3",
+                "pb-report-toc-pin-script-v2",
+                "pb-report-toc-pin-script-v3",
+            ):
+                html = re.sub(
+                    rf'<style id="{old_toc_fix}"[^>]*>.*?</style>',
+                    "",
+                    html,
+                    count=1,
+                    flags=re.DOTALL,
+                )
+                html = re.sub(
+                    rf'<script id="{old_toc_fix}"[^>]*>.*?</script>',
+                    "",
+                    html,
+                    count=1,
+                    flags=re.DOTALL,
+                )
+            if ("pb-report-toolbar" in html or "report-tools" in html) and 'id="pb-toolbar-fa-fix"' not in html:
+                if "</head>" in html:
+                    html = html.replace("</head>", _PB_REPORT_FA_FIX + "</head>", 1)
+                else:
+                    html = _PB_REPORT_FA_FIX + html
+            if 'id="pb-report-toc-pin-fix-v4"' not in html and (
+                "pb-language-panels" in html or "rebuildToc" in html
+            ):
+                if "</head>" in html:
+                    html = html.replace("</head>", _PB_REPORT_TOC_PIN_FIX + "</head>", 1)
+                else:
+                    html = _PB_REPORT_TOC_PIN_FIX + html
+            if 'id="pb-report-toc-host-fix"' not in html and (
+                "pb-language-panels" in html or "rebuildToc" in html
+            ):
+                if "</body>" in html:
+                    html = html.replace("</body>", _PB_REPORT_TOC_HOST_FIX + "</body>", 1)
+                else:
+                    html = html + _PB_REPORT_TOC_HOST_FIX
+            if "pb-report-toolbar" in html and 'id="pb-toolbar-full-width-fix"' not in html:
+                if "</head>" in html:
+                    html = html.replace("</head>", _PB_REPORT_TOOLBAR_WIDTH_FIX + "</head>", 1)
+                else:
+                    html = _PB_REPORT_TOOLBAR_WIDTH_FIX + html
+            if (
+                "pb-report-toolbar" in html
+                and 'id="pb-toolbar-title-fix"' not in html
+                and "Interactive report" in html
+            ):
+                if "</head>" in html:
+                    html = html.replace("</head>", _PB_REPORT_TOOLBAR_TITLE_FIX + "</head>", 1)
+                else:
+                    html = _PB_REPORT_TOOLBAR_TITLE_FIX + html
+            response = Response(html, mimetype="text/html")
+            response.cache_control.private = True
+            response.cache_control.max_age = 300
+            response.cache_control.no_transform = True
+            return response
 
         response = storage_service.stream_response(
             STORAGE_CATEGORY,

@@ -1351,7 +1351,9 @@ def render_activity_summary(activity):
         'activity.self_report_created': babel_("Self-report created: %(template)s"),
         'activity.audit_user_activity': babel_("User %(action)s"),
         'activity.audit_admin_action': babel_("Admin %(action)s %(target)s"),
-        'activity.legacy_removed': babel_("Activity")
+        'activity.legacy_removed': babel_("Activity"),
+        'activity.excel_import': babel_("Excel imported: %(count)s values loaded"),
+        'activity.upr_excel_import': babel_("UPR Country Reporting Excel imported: %(count)s values staged"),
     }
 
     if key in messages:

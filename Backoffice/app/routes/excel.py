@@ -13,6 +13,8 @@ from app.services.upr_country_reporting_excel_service import (
     UprCountryReportingExcelService,
 )
 from app.services.authorization_service import AuthorizationService
+from app.services.user_analytics_service import log_user_activity
+from app.services.notification.core import log_entity_activity
 from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
 from app.utils.request_utils import is_json_request
 
@@ -70,6 +72,21 @@ def export_assignment_excel(aes_id):
             "user_id": getattr(current_user, "id", None),
             "export_filename": filename,
             "elapsed_ms": elapsed_ms,
+        },
+    )
+    try:
+        template_name = aes.assigned_form.template.name if aes.assigned_form and aes.assigned_form.template else ""
+    except Exception:
+        template_name = ""
+    log_user_activity(
+        activity_type="data_export",
+        description=f"Exported Assignment Excel{': ' + template_name if template_name else ''}",
+        context_data={
+            "aes_id": aes_id,
+            "filename": filename,
+            "entity_type": getattr(aes, "entity_type", None),
+            "entity_id": getattr(aes, "entity_id", None),
+            "template": template_name,
         },
     )
     resp = send_file(
@@ -163,6 +180,21 @@ def import_assignment_excel(aes_id):
     result = ExcelService.import_assignment_data(aes, wb)
 
     if result['success']:
+        try:
+            template_name = aes.assigned_form.template.name if aes.assigned_form and aes.assigned_form.template else ""
+        except Exception:
+            template_name = ""
+        log_entity_activity(
+            aes.entity_type,
+            aes.entity_id,
+            "excel_import",
+            f"Imported Excel data: {result['updated_count']} values loaded into {template_name}",
+            summary_key="activity.excel_import",
+            summary_params={"template": template_name, "count": result['updated_count']},
+            assignment_id=aes_id,
+            activity_category="form",
+            icon="fas fa-file-excel",
+        )
         if result['errors']:
             error_msg = f"Excel import completed with {result['updated_count']} values saved. Errors: {', '.join(result['errors'][:5])}"
             if len(result['errors']) > 5:
@@ -289,6 +321,22 @@ def export_upr_country_reporting_template(aes_id):
             return json_bad_request(error_msg)
         return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
 
+    try:
+        template_name = aes.assigned_form.template.name if aes.assigned_form and aes.assigned_form.template else ""
+    except Exception:
+        template_name = ""
+    log_user_activity(
+        activity_type="data_export",
+        description=f"Exported {UPR_COUNTRY_REPORTING_LABEL} Excel{': ' + template_name if template_name else ''}",
+        context_data={
+            "aes_id": aes_id,
+            "filename": filename,
+            "entity_type": getattr(aes, "entity_type", None),
+            "entity_id": getattr(aes, "entity_id", None),
+            "template": template_name,
+            "export_type": "upr_country_reporting",
+        },
+    )
     resp = send_file(
         output,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -347,6 +395,21 @@ def import_upr_country_reporting_template(aes_id):
         success_msg = (
             f"{UPR_COUNTRY_REPORTING_LABEL} loaded {updated_count} values into the form. "
             "Review your data and click Save to persist."
+        )
+        try:
+            template_name = aes.assigned_form.template.name if aes.assigned_form and aes.assigned_form.template else ""
+        except Exception:
+            template_name = ""
+        log_entity_activity(
+            aes.entity_type,
+            aes.entity_id,
+            "excel_import",
+            f"Imported {UPR_COUNTRY_REPORTING_LABEL} Excel: {updated_count} values staged for {template_name}",
+            summary_key="activity.upr_excel_import",
+            summary_params={"template": template_name, "count": updated_count},
+            assignment_id=aes_id,
+            activity_category="form",
+            icon="fas fa-file-excel",
         )
         if warnings:
             flash(success_msg, "warning")

@@ -44,7 +44,6 @@ python -m flask workflows generate-static || echo "WARN: workflow tour generatio
 # Start application with Gunicorn
 echo "=========================================="
 echo "Starting Gunicorn WSGI server..."
-echo "Workers: 4, Threads: 2, Timeout: 120s"
 echo "=========================================="
 
 # Use config file if it exists, otherwise use command-line args
@@ -52,11 +51,11 @@ if [ -f "config/gunicorn.conf.py" ]; then
     echo "Using config/gunicorn.conf.py for configuration"
     exec gunicorn --config config/gunicorn.conf.py run:app
 else
-    # Fallback to command-line configuration
+    # Fallback to command-line configuration (keep defaults in sync with config/gunicorn.conf.py)
     WORKERS=${GUNICORN_WORKERS:-3}
-    THREADS=${GUNICORN_THREADS:-4}
+    THREADS=${GUNICORN_THREADS:-8}
     WORKER_CLASS=${GUNICORN_WORKER_CLASS:-gthread}
-    TIMEOUT=${GUNICORN_TIMEOUT:-25}
+    TIMEOUT=${GUNICORN_TIMEOUT:-60}
     echo "Workers: ${WORKERS}, Threads: ${THREADS}, Worker Class: ${WORKER_CLASS}, Timeout: ${TIMEOUT}s"
 
     exec gunicorn --bind=0.0.0.0:${PORT:-5000} \
@@ -64,7 +63,7 @@ else
       --threads=${THREADS} \
       --worker-class=${WORKER_CLASS} \
       --timeout=${TIMEOUT} \
-      --keep-alive=5 \
+      --keep-alive=75 \
       --max-requests=1000 \
       --max-requests-jitter=100 \
       --access-logfile='-' \

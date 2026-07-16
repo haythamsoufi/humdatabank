@@ -102,24 +102,30 @@
 
                         // If switching to Focal Point, clear ALL admin roles (including Full/Core/System Manager presets).
                         // This keeps the submitted form aligned with what the UI is showing.
-                        if (isFocalPoint && adminGroup) {
-                          const adminInputs = Array.from(
-                            adminGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]')
-                          );
-                          for (const input of adminInputs) {
-                            setLocked(input, false);
-                            input.checked = false;
-                            input.dataset.userWanted = '0';
-                            input.dataset.userTouched = '1';
-                            delete input.dataset.manualOverride;
-                            try { markAutoChecked(input, false); } catch (e) {}
-                          }
+                        if (isFocalPoint) {
+                          clearAdminRolesForFocalPoint();
+                          ensureMinimumFocalPointAssignmentRoles();
                         }
 
-                        // Uncheck Approver when switching to Focal Point (approver is admin-only in the UI).
-                        if (isFocalPoint && assignmentGroup) {
+                        try { recomputeLocks(); } catch (e) {}
+                      }
+
+                      function clearAdminRolesForFocalPoint() {
+                        const adminInputs = adminGroup
+                          ? Array.from(adminGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]'))
+                          : [];
+                        for (const input of adminInputs) {
+                          setLocked(input, false);
+                          input.checked = false;
+                          input.dataset.userWanted = '0';
+                          input.dataset.userTouched = '1';
+                          delete input.dataset.manualOverride;
+                          try { markAutoChecked(input, false); } catch (e) {}
+                        }
+                        // Approver is admin-only in the UI: clear it too (independent of adminGroup).
+                        if (assignmentGroup) {
                           const approverRoles = assignmentGroup.querySelectorAll('.assignment-approver-role');
-                          approverRoles.forEach(function(role) {
+                          approverRoles.forEach(function (role) {
                             const checkbox = role.querySelector('input[type="checkbox"]');
                             if (checkbox) {
                               checkbox.checked = false;
@@ -127,12 +133,6 @@
                             }
                           });
                         }
-
-                        if (isFocalPoint) {
-                          ensureMinimumFocalPointAssignmentRoles();
-                        }
-
-                        try { recomputeLocks(); } catch (e) {}
                       }
 
                       // Add event listener to role type dropdown
@@ -638,6 +638,13 @@
 
                         const isFocalPointSubmit = roleTypeSelect && roleTypeSelect.value === 'focal_point';
 
+                        // Belt-and-suspenders: hidden admin sections can still submit checked boxes.
+                        // Always strip admin (+ approver) roles when saving as Focal Point.
+                        if (isFocalPointSubmit) {
+                          clearAdminRolesForFocalPoint();
+                          ensureMinimumFocalPointAssignmentRoles();
+                        }
+
                         // Clean previous hidden mirrors
                         for (const el of Array.from(form.querySelectorAll('input[type="hidden"][data-implied-rbac="1"]'))) {
                           el.remove();
@@ -686,6 +693,12 @@
                       }
 
                       applyRoleHighlights();
+                      // After helpers exist: if Focal Point is selected (including after a failed
+                      // save), strip any leftover checked admin roles that are only hidden in the UI.
+                      if (roleTypeSelect && roleTypeSelect.value === 'focal_point') {
+                        clearAdminRolesForFocalPoint();
+                        ensureMinimumFocalPointAssignmentRoles();
+                      }
                       recomputeLocks();
                       initTranslatorLanguagePanel();
                     })();

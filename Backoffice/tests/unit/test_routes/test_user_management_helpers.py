@@ -140,6 +140,28 @@ class TestComputeRoleTypeForUserId:
                 result = _compute_role_type_for_user_id(999999)
             assert result == "admin"
 
+    def test_approver_only_returns_admin(self, app, db_session):
+        """Approver is admin-only in the UI, so approver-only users must load in Admin mode."""
+        with app.app_context():
+            from app.routes.admin.user_management.helpers import (
+                _compute_role_type_for_user_id,
+            )
+            from app.models.rbac import RbacRole, RbacUserRole
+            user = create_test_user(
+                db_session, email="crt_approver@example.com", role="focal_point"
+            )
+            approver = db_session.query(RbacRole).filter_by(
+                code="assignment_approver"
+            ).first()
+            if not approver:
+                approver = RbacRole(code="assignment_approver", name="Assignment Approver")
+                db_session.add(approver)
+                db_session.flush()
+            db_session.add(RbacUserRole(user_id=user.id, role_id=approver.id))
+            db_session.commit()
+            result = _compute_role_type_for_user_id(user.id)
+            assert result == "admin"
+
 
 # ---------------------------------------------------------------------------
 # _get_countries_by_region
@@ -458,6 +480,34 @@ class TestApplyRoleTypeAndImplications:
                 [admin_role.id], role_type="focal_point"
             )
             assert admin_role.id not in result
+
+    def test_focal_point_strips_approver_role(self, app, db_session):
+        """Approver is admin-only in the UI; saving as Focal Point must drop it."""
+        with app.app_context():
+            from app.routes.admin.user_management.helpers import (
+                _apply_role_type_and_implications,
+            )
+            from app.models.rbac import RbacRole
+            approver = db_session.query(RbacRole).filter_by(
+                code="assignment_approver"
+            ).first()
+            if not approver:
+                approver = RbacRole(code="assignment_approver", name="Assignment Approver")
+                db_session.add(approver)
+                db_session.flush()
+            editor = db_session.query(RbacRole).filter_by(
+                code="assignment_editor_submitter"
+            ).first()
+            if not editor:
+                editor = RbacRole(code="assignment_editor_submitter", name="AES")
+                db_session.add(editor)
+                db_session.flush()
+            db_session.commit()
+            result = _apply_role_type_and_implications(
+                [approver.id, editor.id], role_type="focal_point"
+            )
+            assert approver.id not in result
+            assert editor.id in result
 
     def test_focal_point_adds_viewer_when_no_assignment_roles(self, app, db_session):
         with app.app_context():

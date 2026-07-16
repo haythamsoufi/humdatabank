@@ -8,7 +8,11 @@ from flask import g
 
 from app.services.monitoring import slow_requests
 
-_GUNICORN_TIMEOUT = 25  # matches gunicorn.conf.py default
+# Stuck-request warnings must appear before the App Gateway 504s the client
+# (~30s backend timeout). GUNICORN_TIMEOUT (60s) is only a heartbeat/dead-worker
+# check under gthread and never fires for stuck requests, so the gateway
+# cut-off is the deadline that matters for log visibility.
+_GATEWAY_TIMEOUT = 30
 
 
 @pytest.fixture(autouse=True)
@@ -23,24 +27,25 @@ def enable_slow_request_logging(app):
 
 
 class TestSlowRequestConfigDefaults:
-    """Verify that production config defaults fire before GUNICORN_TIMEOUT kills the worker."""
+    """Verify that production config defaults fire before the gateway 504s the client."""
 
-    def test_stuck_timers_default_before_gunicorn_timeout(self, app):
-        """SLOW_REQUEST_STUCK_WARNING/CRITICAL must both be < GUNICORN_TIMEOUT so
-        [STUCK_REQUEST] lines appear in the log before Gunicorn SIGKILLs the worker."""
+    def test_stuck_timers_default_before_gateway_timeout(self, app):
+        """SLOW_REQUEST_STUCK_WARNING/CRITICAL must both be < the App Gateway
+        backend timeout so [STUCK_REQUEST] lines appear while the request is
+        still observable end-to-end."""
         from config.config import Config
 
         warning_s = Config.SLOW_REQUEST_STUCK_WARNING_SECONDS
         critical_s = Config.SLOW_REQUEST_STUCK_CRITICAL_SECONDS
 
-        assert warning_s < _GUNICORN_TIMEOUT, (
+        assert warning_s < _GATEWAY_TIMEOUT, (
             f"SLOW_REQUEST_STUCK_WARNING_SECONDS ({warning_s}) must be < "
-            f"GUNICORN_TIMEOUT ({_GUNICORN_TIMEOUT}); "
-            "otherwise [STUCK_REQUEST] never fires before the worker is killed"
+            f"the App Gateway backend timeout ({_GATEWAY_TIMEOUT}); "
+            "otherwise [STUCK_REQUEST] never fires before the client gets a 504"
         )
-        assert critical_s < _GUNICORN_TIMEOUT, (
+        assert critical_s < _GATEWAY_TIMEOUT, (
             f"SLOW_REQUEST_STUCK_CRITICAL_SECONDS ({critical_s}) must be < "
-            f"GUNICORN_TIMEOUT ({_GUNICORN_TIMEOUT})"
+            f"the App Gateway backend timeout ({_GATEWAY_TIMEOUT})"
         )
         assert warning_s < critical_s, (
             f"Warning ({warning_s}s) must fire before critical ({critical_s}s)"

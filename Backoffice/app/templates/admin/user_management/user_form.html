@@ -267,8 +267,16 @@
                             {% endif %}
                         {% endfor %}
 
-                        {# New users default to Focal Point; existing users use the backend-computed value #}
-                        {% set default_role_type = computed_role_type if (computed_role_type is defined and computed_role_type) else ('focal_point' if not (user is defined and user) else 'admin') %}
+                        {# Prefer submitted role_type after a failed POST so the UI doesn't snap back to Admin. #}
+                        {% set default_role_type = (
+                            selected_role_type
+                            if (selected_role_type is defined and selected_role_type)
+                            else (
+                                computed_role_type
+                                if (computed_role_type is defined and computed_role_type)
+                                else ('focal_point' if not (user is defined and user) else 'admin')
+                            )
+                        ) %}
                         {% set show_admin_sections = default_role_type != 'focal_point' %}
 
                         <div class="space-y-4">

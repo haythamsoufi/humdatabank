@@ -42,10 +42,14 @@ def refresh_csrf_token_get():
     'admin.settings.manage',
 )
 def api_translation_services():
-    """Get available translation services status"""
-    try:
-        from app.services.translation.auto_translator import get_auto_translator
+    """Get available translation services status.
 
+    check_service_status() never probes on the request thread (it serves
+    cached/optimistic results and refreshes in the background), so this route
+    is bounded — inline probing pinned workers for 15-339s in the 2026-07-16
+    gateway-504 incident.
+    """
+    try:
         auto_translator = get_auto_translator()
         available_services = auto_translator.get_available_services()
         default_service = auto_translator.get_default_service()

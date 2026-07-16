@@ -1,9 +1,23 @@
 ---
-description: Playwright browser testing conventions - always hard refresh after code changes
+description: Playwright browser testing conventions - quick test logins and hard refresh after code changes
 alwaysApply: true
 ---
 
 # Playwright Browser Testing
+
+## Logging In (Local Dev)
+
+The Backoffice runs at `http://localhost:5000`. In development config, the login page (`/login`) shows a yellow **"Quick login for testers"** box with three one-click buttons (no credentials needed — they auto-submit the login form with seeded test accounts):
+
+| Button id | Logs in as |
+|---|---|
+| `#quickSystemManagerLogin` | System Manager (`test_sys@<org-domain>`) |
+| `#quickAdminLogin` | Admin (`test_admin@<org-domain>`) |
+| `#quickFocalLogin` | Focal Point (`test_focal@<org-domain>`) |
+
+Use these buttons whenever a test session is needed — never ask the user for credentials. To switch roles, navigate to `/logout` first, then click a different quick-login button.
+
+## Hard Refresh After Code Changes
 
 After making code changes to static files (JS, CSS, HTML templates), always perform a **hard refresh** before testing in the browser via Playwright MCP.
 

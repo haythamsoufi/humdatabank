@@ -504,10 +504,13 @@ Key env vars to set in **Azure Portal → App Service → Configuration → Appl
 
 | Variable | Value | Purpose |
 |----------|-------|---------|
-| `GUNICORN_TIMEOUT` | `120` | Must stay below Azure front-end's ~230s cut-off |
+| `GUNICORN_TIMEOUT` | `60` (default) | Heartbeat murder threshold, **not** a request timeout: gthread workers heartbeat from the accept loop, so stuck requests never trip it (App Gateway 504s clients at ~30s). Must exceed `GUNICORN_GRACEFUL_TIMEOUT` (15) + scheduler shutdown wait (10) with margin, or recycles get SIGKILLed mid-teardown (2026-07-16 incident) |
 | `GUNICORN_WORKERS` | `3` or `4` (explicit) | Prevents RAM exhaustion on smaller SKUs |
+| `GUNICORN_THREADS` | `8` (default) | Request slots per worker; also drives the per-worker WebSocket budget (threads − 2). The effective value is written back to the env so `ws_manager` always sees it |
+| `GUNICORN_KEEPALIVE` | `75` (default) | Backend keepalive must outlive App Gateway connection reuse to avoid idle-close 502 races |
 | `GUNICORN_MAX_REQUESTS` | `500` | Workers recycle before OOM; jitter prevents mass recycling |
 | `GUNICORN_MAX_REQUESTS_JITTER` | `100` | Spreads recycling across workers |
+| `SCHEDULER_LOCK_FAIL_OPEN` | unset (default: fail closed) | On scheduler-lock filesystem errors the worker skips starting the scheduler; set `true` to start it anyway (risk: duplicate schedulers → duplicate digest emails) |
 | `DB_STATEMENT_TIMEOUT_MS` | `120000` | Kills runaway queries so pool connections are released |
 | `DB_CONNECT_TIMEOUT` | `10` | Aborts stale TCP handshakes to PostgreSQL |
 | `REDIS_URL` | `redis://…` | Cross-worker rate limiting; eliminates ARR Affinity dependency |

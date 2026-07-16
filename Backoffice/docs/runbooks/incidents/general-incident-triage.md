@@ -80,11 +80,12 @@ A newly deployed admin route missing its guard can cause unexpected permission b
 
 These errors indicate the Azure front-end is not getting a response from a gunicorn worker in time. Work through each cause in order.
 
-#### F1. Azure gateway timeout < gunicorn timeout (most common 504 source)
+#### F1. Gateway timeout vs gunicorn timeout (most common 504 source)
 
-Azure App Service's front-end load balancer cuts HTTP connections after **230 seconds**. Gunicorn's `GUNICORN_TIMEOUT` defaults to 600s, so long requests (AI agent, Excel export) are killed by Azure before gunicorn gives up — users see 504 but the worker keeps running and holds the pool connection.
+The Application Gateway 504s clients after its **~30s backend timeout** (Azure's front-end cuts at ~230s when no AGW is in front). Gunicorn's `GUNICORN_TIMEOUT` (default **60s**) does **not** abort long requests under the `gthread` worker class — the worker's main loop keeps heartbeating while requests run on pool threads — so a slow request 504s at the gateway while the worker thread keeps running and holds its DB connection. `[STUCK_REQUEST]` log lines (warning at 15s, critical at 23s) are the visibility for this, not `WORKER TIMEOUT`.
 
-- Set `GUNICORN_TIMEOUT=120` in Azure App Service → Configuration → Application settings.
+- Don't raise `GUNICORN_TIMEOUT` to "fix" slow requests — it only delays replacement of genuinely dead workers. Fix or bound the slow endpoint instead.
+- Keep `GUNICORN_TIMEOUT` (60) well above `GUNICORN_GRACEFUL_TIMEOUT` (15) + scheduler shutdown wait (10), or recycling workers get SIGKILLed mid-teardown (2026-07-16 incident).
 - For AI streaming (SSE), ensure the Application Gateway backend timeout ≥ 300s, or reduce `AI_SSE_IDLE_TIMEOUT_SECONDS` ≤ 200.
 - `AI_AGENT_TIMEOUT_SECONDS` should be ≤ 100 if no Application Gateway is in front.
 

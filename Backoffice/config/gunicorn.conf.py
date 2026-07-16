@@ -2,12 +2,23 @@
 Gunicorn configuration file for production deployment.
 
 This configuration optimizes for WebSocket support and prevents blocking.
+
+The hooks below import only the top-level ``scheduler_lock`` and
+``org_logging`` modules (stdlib-only) — never ``app.*`` — so the master
+process stays light and no Flask/SQLAlchemy import graph is loaded outside
+the workers.
 """
 
 import multiprocessing
 import os
 import sys
 import logging
+
+# Make the repository root importable regardless of how gunicorn was launched
+# (the hooks import the top-level scheduler_lock / org_logging modules).
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 # Server socket
 bind = f"0.0.0.0:{os.environ.get('PORT', '5000')}"
@@ -28,26 +39,47 @@ workers = (
 # gthread provides threading support needed for non-blocking WebSocket operations
 worker_class = os.environ.get('GUNICORN_WORKER_CLASS', 'gthread')
 
-# Threads per worker
-# Each worker can handle multiple concurrent requests
-# Recommended: 2-4 threads per worker for I/O-bound applications
-threads = int(os.environ.get('GUNICORN_THREADS', '4'))
+# Threads per worker (this app is I/O-bound: DB, external APIs, WebSockets).
+# Total concurrent request slots = workers x threads (3 x 8 = 24). WebSocket
+# connections pin a thread each for their whole lifetime; ws_manager budgets
+# them as GUNICORN_THREADS - WS_RESERVED_HTTP_THREADS (8 - 2 = 6 per worker).
+# DB pool math per worker: pool_size 5 + max_overflow 10 = 15 connections vs
+# 8 request threads + up to 6 concurrent scheduler jobs (scheduler-owner
+# worker only) — jobs release their connection when each run's app context
+# exits, so the pool covers the practical worst case.
+threads = int(os.environ.get('GUNICORN_THREADS', '8'))
+
+# ws_manager derives its per-worker WebSocket budget from GUNICORN_THREADS.
+# Write the *effective* value back so workers always see the real thread
+# count (previously an unset env var silently meant "assume 100").
+os.environ['GUNICORN_THREADS'] = str(threads)
 
 # Worker connections
-# Maximum number of simultaneous clients per worker
+# Maximum number of simultaneous clients per worker (for gthread this caps
+# accepted/keepalive sockets held in the poller, not the thread pool).
 worker_connections = int(os.environ.get('GUNICORN_WORKER_CONNECTIONS', '1000'))
 
-# Timeout
-# Workers silent for more than this many seconds are killed and restarted.
-# Production uses Azure Application Gateway with a 30s backend timeout. Default 25s
-# so Gunicorn recycles stuck workers (and releases DB connections) before the gateway
-# returns an opaque 504 while the worker is still busy.
-# Override via GUNICORN_TIMEOUT (e.g. 120) only when a longer upstream timeout is configured.
-timeout = int(os.environ.get('GUNICORN_TIMEOUT', '25'))
+# Timeout (heartbeat murder threshold — NOT a request timeout under gthread).
+# gthread workers heartbeat from the main accept loop while requests run in
+# the thread pool, so a stuck/slow REQUEST never trips this: slow requests are
+# the App Gateway's problem (it 504s clients at ~30s) and are surfaced by the
+# [SLOW_REQUEST]/[STUCK_REQUEST] monitors. What this timeout really catches is
+# a worker whose main loop stopped (recycle teardown, GIL-hogging C call), so
+# it must comfortably exceed the worst-case recycle teardown:
+#   graceful_timeout (15s) + SCHEDULER_SHUTDOWN_WAIT_SECONDS (10s) = 25s.
+# The old default of 25s made that exact case a coin-flip and produced the
+# WORKER TIMEOUT bursts of the 2026-07-16 incident (workers SIGKILLed while
+# draining a stuck translation_services request during recycle).
+timeout = int(os.environ.get('GUNICORN_TIMEOUT', '60'))
 
 # Keep-alive
-# Seconds to wait for requests on a Keep-Alive connection
-keepalive = int(os.environ.get('GUNICORN_KEEPALIVE', '5'))
+# Seconds to keep idle Keep-Alive connections open. Behind Azure Application
+# Gateway the backend keepalive should outlive the gateway's connection reuse,
+# otherwise gunicorn closes an idle connection just as the gateway sends a new
+# request on it (sporadic 502s). Idle keepalive sockets sit in the gthread
+# poller (bounded by worker_connections), not on worker threads, so a long
+# value costs nothing.
+keepalive = int(os.environ.get('GUNICORN_KEEPALIVE', '75'))
 
 # Logging
 # Configure logging to route by level:
@@ -89,8 +121,17 @@ preload_app = os.environ.get('GUNICORN_PRELOAD', 'false').lower() == 'true'
 max_requests = int(os.environ.get('GUNICORN_MAX_REQUESTS', '500'))
 max_requests_jitter = int(os.environ.get('GUNICORN_MAX_REQUESTS_JITTER', '100'))
 
-# Graceful timeout for worker shutdown
-graceful_timeout = int(os.environ.get('GUNICORN_GRACEFUL_TIMEOUT', '30'))
+# Graceful timeout for worker shutdown.
+# Invariant: graceful_timeout + SCHEDULER_SHUTDOWN_WAIT_SECONDS (10s) must
+# stay comfortably below `timeout` (60s). During a max_requests recycle the
+# worker stops heartbeating while it waits (up to graceful_timeout) for
+# in-flight work — long-lived WebSocket connections, stuck requests — and
+# then shuts down the scheduler (bounded at 10s). With the pre-incident
+# default (30s > timeout 25s) the master's heartbeat check always fired
+# first, so every recycle with lingering work ended in WORKER TIMEOUT +
+# SIGKILL ("Perhaps out of memory?") instead of a clean exit — observed
+# repeatedly in prod on 2026-07-16.
+graceful_timeout = int(os.environ.get('GUNICORN_GRACEFUL_TIMEOUT', '15'))
 
 # Enable statsd (if configured)
 # statsd_host = None
@@ -98,7 +139,8 @@ graceful_timeout = int(os.environ.get('GUNICORN_GRACEFUL_TIMEOUT', '30'))
 
 def on_starting(server):
     """Called just before the master process is initialized."""
-    from app.utils.logging_handlers import configure_process_org_timezone, create_app_log_formatter
+    # Top-level module (stdlib-only) — keeps Flask/SQLAlchemy out of the master.
+    from org_logging import configure_process_org_timezone, create_app_log_formatter
 
     configure_process_org_timezone()
 
@@ -134,10 +176,12 @@ def on_starting(server):
 def when_ready(server):
     """Called just after the server is started."""
     try:
-        from app.scheduler_lock import clear_stale_scheduler_locks_for_master
-        if clear_stale_scheduler_locks_for_master(server.pid):
+        from scheduler_lock import sweep_stale_scheduler_locks
+        removed = sweep_stale_scheduler_locks(current_master_pid=server.pid)
+        if removed:
             server.log.warning(
-                "Removed stale scheduler lock on master start (master pid=%s)",
+                "Removed %s stale scheduler lock file(s) from dead masters (master pid=%s)",
+                removed,
                 server.pid,
             )
     except Exception:
@@ -149,14 +193,19 @@ def on_exit(server):
     server.log.info("Shutting down Gunicorn server...")
 
 def worker_int(worker):
-    """Called when a worker receives INT or QUIT signal."""
+    """Called when a worker receives INT or QUIT signal.
+
+    This fires for every worker on every graceful restart/deploy, so keep it
+    at INFO; only the scheduler-owner worker is interesting enough to WARN.
+    """
     is_scheduler_worker = False
     try:
-        from app.scheduler_lock import scheduler_lock_path, read_lock_owner
+        from scheduler_lock import scheduler_lock_path, read_lock_owner
         is_scheduler_worker = read_lock_owner(scheduler_lock_path(os.getppid())) == worker.pid
     except Exception:
         pass
-    worker.log.warning(
+    log = worker.log.warning if is_scheduler_worker else worker.log.info
+    log(
         "[WORKER_INT] pid=%s scheduler_owner=%s — INT/QUIT received; in-flight requests may be interrupted",
         worker.pid, is_scheduler_worker,
     )
@@ -183,7 +232,10 @@ def pre_exec(server):
     server.log.info("Forking new master process")
 
 def worker_exit(server, worker):
-    """Called (in the master process) when a worker exits.
+    """Called when a worker exits — in the *worker* process for graceful exits
+    (max_requests recycle, SIGTERM) and in the *master* when reaping a dead
+    worker (SIGKILL). shutdown_worker_scheduler handles both: in the master,
+    worker.wsgi is None and the flock was already released by the kernel.
 
     Distinguishes voluntary recycle (max_requests) from other exits and times
     the scheduler-shutdown + lock-release so slow teardown is visible in logs.
@@ -198,7 +250,7 @@ def worker_exit(server, worker):
     # Check whether this worker owned the scheduler lock BEFORE releasing it.
     is_scheduler_worker = False
     try:
-        from app.scheduler_lock import scheduler_lock_path, read_lock_owner
+        from scheduler_lock import scheduler_lock_path, read_lock_owner
         lock_path = scheduler_lock_path(server.pid)
         is_scheduler_worker = read_lock_owner(lock_path) == worker.pid
     except Exception:
@@ -210,9 +262,16 @@ def worker_exit(server, worker):
     )
 
     try:
-        from app.scheduler_lock import shutdown_worker_scheduler
+        from scheduler_lock import shutdown_worker_scheduler
+        # hard_exit_on_timeout: if a scheduler job is still stuck when the
+        # bounded shutdown wait expires, os._exit(0) instead of returning —
+        # the interpreter would otherwise join the stuck non-daemon executor
+        # thread unboundedly during finalization and the master would SIGKILL
+        # this worker after WORKER TIMEOUT. Only takes effect in the exiting
+        # worker's own call (this hook also runs in the master when reaping).
         shutdown_worker_scheduler(
             getattr(worker, "wsgi", None), server.pid, worker.pid,
+            hard_exit_on_timeout=True,
             log_fn=lambda msg: server.log.info(msg),
         )
     except Exception as exc:
@@ -238,13 +297,20 @@ def worker_abort(worker):
     _t0 = _wtime.monotonic()
 
     # worker.alive is False when the worker was already in recycle (max_requests) when killed.
+    # A blocked recycle has two possible culprits: in-flight requests draining in
+    # futures.wait(graceful_timeout) — e.g. a stuck request, the actual cause in the
+    # 2026-07-16 incident — or the scheduler shutdown wait. Don't presume the scheduler.
     is_recycle = not getattr(worker, 'alive', True)
-    recycle_hint = ' [was in recycle — scheduler shutdown likely blocked]' if is_recycle else ''
+    recycle_hint = (
+        ' [was in recycle — blocked by in-flight request drain or scheduler shutdown;'
+        ' check [STUCK_REQUEST] and [SCHED_SHUTDOWN] lines]'
+        if is_recycle else ''
+    )
 
     # Check whether this worker owned the scheduler lock.
     is_scheduler_worker = False
     try:
-        from app.scheduler_lock import scheduler_lock_path, read_lock_owner
+        from scheduler_lock import scheduler_lock_path, read_lock_owner
         lock_path = scheduler_lock_path(os.getppid())
         is_scheduler_worker = read_lock_owner(lock_path) == worker.pid
     except Exception:
@@ -272,7 +338,7 @@ def worker_abort(worker):
 
     # Shut down scheduler without waiting — process is about to be SIGKILLed anyway.
     try:
-        from app.scheduler_lock import shutdown_worker_scheduler
+        from scheduler_lock import shutdown_worker_scheduler
         shutdown_worker_scheduler(
             getattr(worker, "wsgi", None), os.getppid(), worker.pid,
             wait=False,

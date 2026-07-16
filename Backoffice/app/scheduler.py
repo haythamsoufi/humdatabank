@@ -8,28 +8,40 @@ import time as _time
 from app.scheduler_lock import (
     SchedulerLockResult,
     release_scheduler_lock,
+    shutdown_scheduler_bounded,
     try_acquire_scheduler_lock,
 )
 
 
 def _graceful_shutdown(scheduler, app):
-    """Shut down APScheduler before the thread-pool executor is torn down.
+    """Shut down APScheduler cleanly at interpreter exit (atexit).
 
-    Registered via atexit so it runs ahead of concurrent.futures' own
-    atexit handler (LIFO order), preventing the
-    'cannot schedule new futures after shutdown' RuntimeError that occurs
-    when Gunicorn recycles workers (max_requests) or during normal exit.
+    Stopping the scheduler before its executor is torn down prevents the
+    'cannot schedule new futures after shutdown' RuntimeError seen when the
+    scheduler loop submits a job while the pool is closing.
 
-    wait=True: shutdown must not return until the scheduler thread and its
-    executor are fully stopped. wait=False was racing: the default pool can be
-    closed while the scheduler loop is still calling submit() for the next job.
+    Note on ordering (Python >= 3.9): concurrent.futures no longer uses the
+    atexit module — its executor threads are non-daemon and are joined by
+    ``threading._shutdown()`` *before* atexit callbacks run. So under
+    Gunicorn this handler is usually a no-op backstop: the worker_exit hook
+    (config/gunicorn.conf.py -> shutdown_worker_scheduler) has already shut
+    the scheduler down while the process was still fully alive. This path
+    matters for the plain dev server (`python run.py`).
+
+    The wait for running jobs is bounded (shutdown_scheduler_bounded): an
+    unbounded shutdown(wait=True) here blocked recycling workers past
+    GUNICORN_TIMEOUT, so the master SIGKILLed them mid-recycle (WORKER
+    TIMEOUT bursts observed in prod on 2026-07-16).
     """
     pid = os.getpid()
     t0 = _time.monotonic()
     try:
         app.logger.info("[SCHED_SHUTDOWN] pid=%s graceful scheduler shutdown starting", pid)
         if scheduler.running:
-            scheduler.shutdown(wait=True)
+            shutdown_scheduler_bounded(
+                scheduler,
+                log_fn=lambda msg: app.logger.warning(msg),
+            )
         elapsed = _time.monotonic() - t0
         level = 'warning' if elapsed > 5 else 'info'
         getattr(app.logger, level)(
@@ -46,44 +58,6 @@ def _graceful_shutdown(scheduler, app):
         except Exception:
             pass
         release_scheduler_lock(os.getppid(), os.getpid())
-
-
-def _is_scheduler_worker() -> bool:
-    """Return True if this worker process should run the background scheduler.
-
-    In a multi-worker gunicorn deployment every forked worker process calls
-    init_scheduler independently (preload_app=False).  Running APScheduler in
-    *every* worker means the same maintenance jobs (email retry, session
-    cleanup, notification dispatch) fire N times per interval — once per
-    worker — causing redundant DB writes, duplicate emails, and unnecessary
-    connection-pool pressure that contributes to 502/504 errors.
-
-    Strategy (lowest-ops-overhead):
-      1. If SCHEDULER_WORKER_ONLY_PID is set (injected by a pre_exec/post_fork
-         hook or the startup script), only the matching PID runs the scheduler.
-      2. Otherwise, only one worker per Gunicorn master runs it, detected by a
-         lock file keyed on the master PID.  Stale locks (dead owner PID) are
-         reclaimed automatically.
-      3. SCHEDULER_DISABLE_ALL_WORKERS=true disables in every worker (use when
-         jobs are handled by an external Azure Function / Container Job).
-    """
-    if os.environ.get('SCHEDULER_DISABLE_ALL_WORKERS', '').strip().lower() in ('1', 'true', 'yes'):
-        return False
-
-    only_pid_env = os.environ.get('SCHEDULER_WORKER_ONLY_PID', '').strip()
-    if only_pid_env:
-        try:
-            return os.getpid() == int(only_pid_env)
-        except ValueError:
-            pass
-
-    master_pid = os.getppid()
-    result = try_acquire_scheduler_lock(master_pid)
-    return result in (
-        SchedulerLockResult.ACQUIRED,
-        SchedulerLockResult.RECLAIMED_STALE,
-        SchedulerLockResult.FILESYSTEM_FALLBACK,
-    )
 
 
 def _log_scheduler_lock_outcome(app, result: SchedulerLockResult) -> None:
@@ -159,6 +133,13 @@ def _run_scheduled_job(app, label: str, fn) -> None:
     Note: job bodies (fn) must manage their own transactions. They should NOT
     be wrapped in atomic() externally — that would commit an already-committed
     session and, for email jobs, hold the connection open during HTTP sends.
+
+    Job bodies must also bound every external call with an explicit timeout: a
+    hanging job blocks the bounded scheduler shutdown during worker recycle and
+    forces the hard-exit path. Audited 2026-07: all email sends go through
+    app/services/email/client.py (requests timeout=15), push notifications
+    through app/services/notification/push.py (timeout=10); the cleanup jobs
+    are DB/in-memory only.
     """
     t0 = _time.monotonic()
     app.logger.debug("[SCHED_JOB] pid=%s '%s' starting", os.getpid(), label)
@@ -192,7 +173,13 @@ def init_scheduler(app, is_reloader):
     lock_result = _evaluate_scheduler_worker(app)
     if lock_result is None:
         return
-    if lock_result is SchedulerLockResult.HELD_BY_LIVE_OWNER:
+    # Allow-list rather than deny-list so any future lock outcome defaults to
+    # "no scheduler in this worker" (duplicate schedulers send duplicate emails).
+    if lock_result not in (
+        SchedulerLockResult.ACQUIRED,
+        SchedulerLockResult.RECLAIMED_STALE,
+        SchedulerLockResult.FILESYSTEM_FALLBACK,
+    ):
         return
 
     if hasattr(app, 'scheduler') and app.scheduler is not None:

@@ -6,12 +6,18 @@ the organization timezone — Geneva (Europe/Zurich, CET/CEST).
 """
 from __future__ import annotations
 
-import os
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
-# IFRC HQ — Geneva shares the Europe/Zurich IANA zone (CET/CEST).
-ORG_TIMEZONE_NAME = (os.environ.get("APP_TIMEZONE") or "Europe/Zurich").strip() or "Europe/Zurich"
+# Timezone constants/helpers live in the top-level org_logging module so the
+# Gunicorn master can use them without importing the app package; re-exported
+# here for application code.
+from org_logging import (  # noqa: F401
+    ORG_TIMEZONE_NAME,
+    get_org_timezone,
+    get_timezone,
+)
+
 ORG_TIMEZONE_LABEL = "Geneva"
 
 
@@ -39,28 +45,6 @@ def ensure_utc(dt):
         return dt.replace(tzinfo=timezone.utc)
     # Already timezone-aware - convert to UTC
     return dt.astimezone(timezone.utc)
-
-
-def get_timezone(tz_name: str) -> Any:
-    """Return a tzinfo for an IANA timezone name, falling back to UTC."""
-    if not tz_name:
-        return timezone.utc
-    try:
-        from zoneinfo import ZoneInfo
-
-        return ZoneInfo(tz_name)
-    except Exception:
-        try:
-            import pytz
-
-            return pytz.timezone(tz_name)
-        except Exception:
-            return timezone.utc
-
-
-def get_org_timezone() -> Any:
-    """Return tzinfo for the organization timezone (Geneva / Europe/Zurich)."""
-    return get_timezone(ORG_TIMEZONE_NAME)
 
 
 def now_in_org_timezone() -> datetime:

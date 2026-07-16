@@ -30,7 +30,7 @@ Evidence from **2026-06-30** and **2026-07-09** shows:
 ```text
 Browser  →  Application Gateway / Azure front-end  →  Gunicorn (N workers × M threads)  →  PostgreSQL
                     │                                        │
-                    │  ~30 s backend timeout (AGW)           │  GUNICORN_TIMEOUT=25 s
+                    │  ~30 s backend timeout (AGW)           │  GUNICORN_TIMEOUT=60 s (heartbeat, not request timeout)
                     │  ~230 s App Service limit (bypass AGW) │  max_requests recycle
                     └─ Returns 504 if no response in time ───┘
 ```
@@ -140,7 +140,7 @@ Actions are grouped by where they apply. Prioritize **P0** before the next repor
 | P1 | **Matrix auto-load**: batch or lazy-load | Six parallel `POST /api/v1/matrix/auto-load-entities` on every form open |
 | P2 | **Homepage / admin pages** (`GET /`, `/admin/users`) | 0.5–0.6 s; reduce template work where possible |
 | P2 | **Help docs** (`/help/docs/*`) | Served by app; consider static CDN-only for docs HTML |
-| P2 | Ensure **`SLOW_REQUEST_LOG_ENABLED=true`** in production and that stuck-warning thresholds fire before `GUNICORN_TIMEOUT` | Default `SLOW_REQUEST_STUCK_WARNING_SECONDS=15`, `SLOW_REQUEST_STUCK_CRITICAL_SECONDS=23` (< `GUNICORN_TIMEOUT=25`); old defaults of 60/100 meant `[STUCK_REQUEST]` never appeared before the kill |
+| P2 | Ensure **`SLOW_REQUEST_LOG_ENABLED=true`** in production and that stuck-warning thresholds fire before the AGW 30 s cut-off | Default `SLOW_REQUEST_STUCK_WARNING_SECONDS=15`, `SLOW_REQUEST_STUCK_CRITICAL_SECONDS=23` — both before the gateway 504s the client at ~30 s. Note `GUNICORN_TIMEOUT` (60 s) is a *heartbeat* check under gthread and never fires for stuck requests; `[STUCK_REQUEST]` lines are the only visibility |
 | P3 | **Externalize scheduler** (email, cleanup, notifications) | Azure Container Job / Function — web workers serve HTTP only |
 
 Presence `/sync` needs **no functional change** for correctness; optional **client-only** resilience below.
@@ -230,7 +230,7 @@ AppServiceConsoleLogs
 
 ## 9. References
 
-- Gunicorn config: `Backoffice/config/gunicorn.conf.py` (`GUNICORN_TIMEOUT` default **25 s**)
+- Gunicorn config: `Backoffice/config/gunicorn.conf.py` (`GUNICORN_TIMEOUT` default **60 s** — heartbeat/dead-worker detector under gthread, not a request timeout; raised from 25 s after the 2026-07-16 incident where recycle teardown could exceed it)
 - Presence API: `Backoffice/app/routes/forms_api.py` (`/presence/assignment/<id>/sync`)
 - Platform-error reporter: `Backoffice/app/static/js/lib/platform-error-reporter.js`
 - Diagnostics: `Backoffice/app/services/monitoring/platform_error_diagnostics.py`, `request_pressure.py`

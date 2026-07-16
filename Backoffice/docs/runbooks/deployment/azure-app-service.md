@@ -63,10 +63,13 @@ Set these in Azure Portal → App Service → Configuration → Application sett
 
 | Setting | Recommended value | Why |
 |---------|------------------|-----|
-| `GUNICORN_TIMEOUT` | `120` | Azure's front-end load balancer cuts at ~230s; 120s gives headroom for gunicorn to respond gracefully before Azure gives up |
+| `GUNICORN_TIMEOUT` | `60` (config default) | Under the `gthread` worker class this is a **dead-worker detector, not a request timeout** — the main loop heartbeats while requests run on pool threads, so a stuck request never trips it (App Gateway 504s the client at ~30s regardless). It must comfortably exceed worst-case recycle teardown: `GUNICORN_GRACEFUL_TIMEOUT` (15s) + scheduler shutdown wait (10s). The former 25s default made recycles a coin-flip and caused the 2026-07-16 `WORKER TIMEOUT` bursts; values like 120 just delay dead-worker replacement |
 | `GUNICORN_WORKERS` | `3` or `4` (explicit) | Prevents auto-detection from over-provisioning workers that exhaust RAM; scale App Service plan instead |
+| `GUNICORN_THREADS` | `8` (config default) | Concurrent request slots per worker (I/O-bound app). Also drives the per-worker WebSocket budget (`threads − WS_RESERVED_HTTP_THREADS`); the gunicorn config writes the effective value back into the env so `ws_manager` sees it |
+| `GUNICORN_KEEPALIVE` | `75` (config default) | Backend keepalive should outlive App Gateway's connection reuse so gunicorn never closes an idle connection the gateway is about to reuse (sporadic 502s). Idle sockets sit in the poller, not on threads |
 | `GUNICORN_MAX_REQUESTS` | `500` | Workers recycle more often but with smaller per-worker memory footprint; jitter spreads restarts |
 | `GUNICORN_MAX_REQUESTS_JITTER` | `100` | Prevents all workers from recycling simultaneously |
+| `SCHEDULER_LOCK_FAIL_OPEN` | unset | Scheduler-lock filesystem errors **fail closed** (worker skips starting the scheduler) because duplicate schedulers have sent duplicate digest emails before. Set `true` only as a temporary escape hatch if lock-file I/O is broken and the scheduler must run |
 | `DB_STATEMENT_TIMEOUT_MS` | `120000` | Kills runaway DB queries (2 min) so pool connections aren't held indefinitely |
 | `DB_CONNECT_TIMEOUT` | `10` | Aborts stalled PostgreSQL TCP handshakes (e.g. private-endpoint cold start) |
 | `REDIS_URL` | `redis://<host>:6379/0` | Enables cross-worker rate limiting; removes ARR Affinity dependency |

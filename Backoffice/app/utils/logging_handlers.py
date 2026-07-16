@@ -1,40 +1,19 @@
 """Windows-safe rotating file handlers and org-timezone log formatters."""
 
-import logging
 import os
 import shutil
-import time
-from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 
-from app.utils.datetime_helpers import ORG_TIMEZONE_NAME, get_org_timezone
-
-DEFAULT_LOG_DATEFMT = "%Y-%m-%d %H:%M:%S %Z"
-
-
-class OrgTimezoneFormatter(logging.Formatter):
-    """Format log timestamps in the organization timezone (Geneva / Europe/Zurich)."""
-
-    def formatTime(self, record, datefmt=None):
-        dt = datetime.fromtimestamp(record.created, tz=timezone.utc).astimezone(get_org_timezone())
-        fmt = datefmt or DEFAULT_LOG_DATEFMT
-        return dt.strftime(fmt)
-
-
-def configure_process_org_timezone() -> str:
-    """Set process TZ so localtime-based logs (e.g. gunicorn access) use org timezone."""
-    os.environ["TZ"] = ORG_TIMEZONE_NAME
-    if hasattr(time, "tzset"):
-        time.tzset()
-    return ORG_TIMEZONE_NAME
-
-
-def create_app_log_formatter(
-    fmt: str,
-    datefmt: str = DEFAULT_LOG_DATEFMT,
-) -> OrgTimezoneFormatter:
-    """Standard application log formatter (Geneva timestamps)."""
-    return OrgTimezoneFormatter(fmt, datefmt=datefmt)
+# The timezone formatter helpers live in the top-level org_logging module so
+# the Gunicorn master can use them without importing the app package;
+# re-exported here for application code.
+from org_logging import (  # noqa: F401
+    DEFAULT_LOG_DATEFMT,
+    ORG_TIMEZONE_NAME,
+    OrgTimezoneFormatter,
+    configure_process_org_timezone,
+    create_app_log_formatter,
+)
 
 
 class SafeRotatingFileHandler(RotatingFileHandler):

@@ -84,14 +84,23 @@ def _apply_role_type_and_implications(
     _log.debug("[_apply_role_type] normalized_role_type=%s", normalized_role_type)
 
     _FOCAL_POINT_ASSIGNMENT_CODES = frozenset(
-        {"assignment_viewer", "assignment_editor_submitter", "assignment_approver"}
+        {"assignment_viewer", "assignment_editor_submitter"}
     )
 
     required_codes: list[str] = []
     if normalized_role_type == "focal_point":
         # IMPORTANT: Role Type is mutually exclusive between "Admin" and "Focal Point".
         # If the user is saved as a focal point, strip all admin roles regardless of what the form submitted
-        # (UI may hide admin sections but not uncheck them).
+        # (UI may hide admin sections but not uncheck them). Approver is admin-only in the
+        # UI, so it is stripped here too — otherwise a stale Approver tick would survive
+        # the demotion and grant approval rights to a "focal point".
+        def _dropped_for_focal(code: str) -> bool:
+            return (
+                code.startswith("admin_")
+                or code == "system_manager"
+                or code == "assignment_approver"
+            )
+
         code_by_id: dict[int, str] = {}
         try:
             cleaned_rows = (
@@ -100,11 +109,7 @@ def _apply_role_type_and_implications(
                 .all()
             )
             code_by_id = {int(rid): str(code) for rid, code in cleaned_rows if rid and code}
-            cleaned = [
-                rid
-                for rid in cleaned
-                if not (code_by_id.get(int(rid), "").startswith("admin_") or code_by_id.get(int(rid), "") == "system_manager")
-            ]
+            cleaned = [rid for rid in cleaned if not _dropped_for_focal(code_by_id.get(int(rid), ""))]
             has_assignment_role = any(
                 code_by_id.get(int(rid), "") in _FOCAL_POINT_ASSIGNMENT_CODES for rid in cleaned
             )
@@ -143,6 +148,32 @@ def _apply_role_type_and_implications(
     return cleaned
 
 
+def _selected_role_type_for_rerender(form) -> str | None:
+    """
+    Role type to re-select when re-rendering the user form after a failed POST.
+
+    Returns the submitted role_type ('admin' / 'focal_point') so the template does
+    not snap back to the DB-computed type while checkboxes still reflect the POST.
+    As a side effect, when 'focal_point' was submitted, scrubs admin roles from
+    form.rbac_roles.data so stale (hidden) admin ticks are not re-rendered checked.
+
+    Returns None for GET requests or when no valid role_type was submitted
+    (e.g. the selector was disabled/read-only).
+    """
+    if request.method != "POST":
+        return None
+    raw = (request.form.get("role_type") or "").strip().lower()
+    if raw not in ("admin", "focal_point"):
+        return None
+    if raw == "focal_point" and getattr(form, "rbac_roles", None) is not None:
+        form.rbac_roles.data = _apply_role_type_and_implications(
+            list(form.rbac_roles.data or []),
+            role_type="focal_point",
+            drop_role_codes={"assignment_documents_uploader"},
+        )
+    return raw
+
+
 def _get_allowed_non_country_entity_types():
     """Entity type codes for enabled groups excluding 'countries'."""
     groups = [g for g in get_enabled_entity_groups() if g != 'countries']
@@ -167,8 +198,12 @@ def _normalize_user_email_for_comparison(value) -> str:
 
 def _compute_role_type_for_user_id(user_id: int) -> str:
     """
-    Align with user_form.html role type selector: users with any admin_* or system_manager
-    role are treated as Admin; otherwise Focal Point.
+    Align with user_form.html role type selector: users with any admin_* role,
+    system_manager, or assignment_approver are treated as Admin; otherwise Focal Point.
+
+    Approver counts as Admin because the UI only exposes (and preserves) the Approver
+    checkbox in Admin mode; rendering an approver-only user as Focal Point would hide
+    the role and strip it on the next save.
     """
     try:
         from app.models.rbac import RbacUserRole, RbacRole
@@ -182,7 +217,10 @@ def _compute_role_type_for_user_id(user_id: int) -> str:
                 .all()
             )
         }
-        has_admin_roles = any(c.startswith("admin_") or c == "system_manager" for c in user_role_codes)
+        has_admin_roles = any(
+            c.startswith("admin_") or c in ("system_manager", "assignment_approver")
+            for c in user_role_codes
+        )
         return "admin" if has_admin_roles else "focal_point"
     except Exception as e:
         current_app.logger.debug("computed_role_type check failed: %s", e)

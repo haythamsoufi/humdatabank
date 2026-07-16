@@ -362,16 +362,16 @@ if [ -f "config/gunicorn.conf.py" ]; then
     echo "Using config/gunicorn.conf.py for configuration"
     exec gunicorn --config config/gunicorn.conf.py run:app
 else
-    # Fallback to command-line configuration
+    # Fallback to command-line configuration (keep defaults in sync with config/gunicorn.conf.py)
     WORKERS=${GUNICORN_WORKERS:-3}
     THREADS=${GUNICORN_THREADS:-8}
     WORKER_CLASS=${GUNICORN_WORKER_CLASS:-gthread}
-    TIMEOUT=${GUNICORN_TIMEOUT:-120}
+    TIMEOUT=${GUNICORN_TIMEOUT:-60}
     echo "Workers: ${WORKERS}, Threads: ${THREADS}, Worker Class: ${WORKER_CLASS}, Timeout: ${TIMEOUT}s"
 
     exec gunicorn --workers ${WORKERS} --threads ${THREADS} --worker-class ${WORKER_CLASS} \
       --max-requests 1000 --max-requests-jitter 100 \
-      --timeout ${TIMEOUT} --keep-alive 10 \
+      --timeout ${TIMEOUT} --keep-alive 75 \
       --bind "0.0.0.0:${PORT}" \
       --access-logfile - --error-logfile - --log-level info \
       --access-logformat '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"' \

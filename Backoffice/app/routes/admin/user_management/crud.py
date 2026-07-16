@@ -32,6 +32,7 @@ from app.utils.azure_b2c_config import is_azure_b2c_configured
 from . import bp
 from .helpers import (
     _apply_role_type_and_implications,
+    _selected_role_type_for_rerender,
     _get_allowed_non_country_entity_types,
     _is_azure_sso_enabled,
     _normalize_user_email_for_comparison,
@@ -818,6 +819,7 @@ def new_user():
                            get_localized_country_name=get_localized_country_name,
                            enabled_entity_types=enabled_entity_groups,
                            azure_sso_enabled=azure_sso_enabled,
+                           selected_role_type=_selected_role_type_for_rerender(form),
                            profile_palette_hexes=PROFILE_COLORS,
                            **_get_translator_form_context())
 
@@ -904,46 +906,20 @@ def edit_user(user_id):
             form.rbac_roles.choices = _filter_role_choices_for_actor(form.rbac_roles.choices, current_user)
 
     if form.validate_on_submit():
-        # Enforce RBAC restrictions around System Manager role
+        # Enforce RBAC restrictions around System Manager / Plugins roles.
+        # Redirect (rather than re-render) so the page always has full template
+        # context (preferences, devices, role-type state, ...).
         if user_is_sys_mgr and not current_is_sys_mgr:
             flash("Only a System Manager can modify a System Manager user.", "danger")
-            countries_by_region = _get_countries_by_region()
-            return render_template("admin/user_management/user_form.html",
-                                   form=form,
-                                   user=user,
-                                   title=f"Edit User: {user.email}",
-                                   countries_by_region=countries_by_region,
-                                   get_localized_country_name=get_localized_country_name,
-                                   enabled_entity_types=enabled_entity_groups,
-                                   azure_sso_enabled=azure_sso_enabled,
-                                   profile_palette_hexes=PROFILE_COLORS)
+            return redirect(url_for("user_management.edit_user", user_id=user.id))
         if sys_role and (sys_role.id in (form.rbac_roles.data or [])) and not current_is_sys_mgr:
             flash("Only a System Manager can assign the System Manager role.", "danger")
-            countries_by_region = _get_countries_by_region()
-            return render_template("admin/user_management/user_form.html",
-                                   form=form,
-                                   user=user,
-                                   title=f"Edit User: {user.email}",
-                                   countries_by_region=countries_by_region,
-                                   get_localized_country_name=get_localized_country_name,
-                                   enabled_entity_types=enabled_entity_groups,
-                                   azure_sso_enabled=azure_sso_enabled,
-                                   profile_palette_hexes=PROFILE_COLORS)
+            return redirect(url_for("user_management.edit_user", user_id=user.id))
 
-        # Enforce RBAC restrictions around Plugins role
         plugins_role = RbacRole.query.filter_by(code="admin_plugins_manager").first()
         if plugins_role and (plugins_role.id in (form.rbac_roles.data or [])) and not current_is_sys_mgr:
             flash("Only a System Manager can assign the Plugins role.", "danger")
-            countries_by_region = _get_countries_by_region()
-            return render_template("admin/user_management/user_form.html",
-                                   form=form,
-                                   user=user,
-                                   title=f"Edit User: {user.email}",
-                                   countries_by_region=countries_by_region,
-                                   get_localized_country_name=get_localized_country_name,
-                                   enabled_entity_types=enabled_entity_groups,
-                                   azure_sso_enabled=azure_sso_enabled,
-                                   profile_palette_hexes=PROFILE_COLORS)
+            return redirect(url_for("user_management.edit_user", user_id=user.id))
 
         skip_save = False
         if azure_sso_enabled:
@@ -1232,6 +1208,7 @@ def edit_user(user_id):
         .all()
 
     computed_role_type = _compute_role_type_for_user_id(user.id)
+    selected_role_type = _selected_role_type_for_rerender(form)
 
     return render_template("admin/user_management/user_form.html",
                            form=form,
@@ -1246,6 +1223,7 @@ def edit_user(user_id):
                            notification_types_info=notification_types_info,
                            registered_devices=registered_devices,
                            computed_role_type=computed_role_type,
+                           selected_role_type=selected_role_type,
                            profile_palette_hexes=PROFILE_COLORS,
                            **_get_translator_form_context(user))
 

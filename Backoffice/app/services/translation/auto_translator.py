@@ -12,6 +12,7 @@ import json
 import logging
 import requests
 import re
+import threading
 import urllib.parse
 from typing import Dict, List, Optional, Union, Tuple
 from flask import current_app
@@ -204,6 +205,13 @@ def _debug_translation_enabled() -> bool:
         logger.debug("AUTO_TRANSLATE_DEBUG env check failed: %s", e)
         return False
 
+# Hard budget for availability probes. Status checks must never issue real
+# translation calls (10-30s timeouts, retries): concurrent inline probes via
+# /admin/api/translation_services pinned Gunicorn worker threads for 15-339s
+# in prod (2026-07-16 gateway-504 incident).
+STATUS_PROBE_TIMEOUT_SECONDS = 3.0
+
+
 class TranslationService:
     """Base class for translation services"""
 
@@ -218,6 +226,14 @@ class TranslationService:
     def translate_batch(self, texts: List[str], target_language: str, source_language: str = 'en') -> List[Optional[str]]:
         """Translate multiple texts to target language"""
         raise NotImplementedError
+
+    def check_health(self) -> bool:
+        """Cheap availability probe, bounded by STATUS_PROBE_TIMEOUT_SECONDS.
+
+        Subclasses override with a minimal HTTP call (never a full translation
+        with production timeouts/retries).
+        """
+        return True
 
 class GoogleTranslateService(TranslationService):
     """Google Translate API service"""
@@ -281,6 +297,19 @@ class GoogleTranslateService(TranslationService):
             logger.error(f"Google Translate API batch error: {e}")
 
         return [None] * len(texts)
+
+    def check_health(self) -> bool:
+        """Probe the (free) languages endpoint instead of running a translation."""
+        if not self.api_key:
+            return False
+        response = requests.get(
+            f"{self.base_url}/languages",
+            params={'key': self.api_key, 'target': 'en'},
+            timeout=STATUS_PROBE_TIMEOUT_SECONDS,
+        )
+        # 429 = reachable but rate-limited: the service itself is up.
+        return response.status_code in (200, 429)
+
 
 class LibreTranslateService(TranslationService):
     """LibreTranslate service (free, self-hosted option)"""
@@ -475,6 +504,20 @@ class LibreTranslateService(TranslationService):
             logger.debug(f"LibreTranslate error for '{text[:50]}...': {e}")
             return None
 
+    def check_health(self) -> bool:
+        """Probe /languages instead of running a translation (which retries 3x15s)."""
+        if self._is_localhost() or self._is_circuit_open():
+            return False
+        try:
+            response = requests.get(
+                f"{self.base_url}/languages",
+                timeout=STATUS_PROBE_TIMEOUT_SECONDS,
+            )
+        except requests.exceptions.ConnectionError:
+            self._trip_circuit()
+            return False
+        return response.status_code in (200, 429)
+
     def translate_batch(self, texts: List[str], target_language: str, source_language: str = 'en') -> List[Optional[str]]:
         """Translate multiple texts using LibreTranslate"""
         results = []
@@ -577,14 +620,36 @@ class IFRCTranslationService(TranslationService):
 
         return results
 
+    def check_health(self) -> bool:
+        """Minimal one-word translate with a tight timeout (API has no status endpoint).
+
+        The production `translate_text` path uses timeout=30 — the call that pinned
+        worker threads when used as a status probe. This one is bounded at
+        STATUS_PROBE_TIMEOUT_SECONDS and never retries.
+        """
+        response = requests.post(
+            self.api_endpoint,
+            headers=self.headers,
+            data=json.dumps({"Text": "ping", "From": "en", "To": "fr"}),
+            timeout=STATUS_PROBE_TIMEOUT_SECONDS,
+        )
+        # 429 = reachable but rate-limited: the service itself is up.
+        return response.status_code in (200, 429)
+
 
 
 class AutoTranslator:
     """Main automatic translation class"""
 
+    # Service-status results are cached; refreshes run on a single background
+    # thread using the cheap check_health probes (never real translation calls).
+    _STATUS_CACHE_TTL_SECONDS = 300
+
     def __init__(self, service_name: str = None, api_key: str = None):
         self.services = {}
         self.default_service = None
+        self._status_cache: Optional[Tuple[float, Dict[str, bool]]] = None
+        self._status_probe_lock = threading.Lock()
 
         # Initialize available services
         self._init_services(service_name, api_key)
@@ -1411,31 +1476,97 @@ class AutoTranslator:
         """Get the default translation service name"""
         return self.default_service or 'mock'
 
-    def check_service_status(self, service_name: str = None) -> Dict[str, bool]:
-        """Check the status of translation services"""
+    def check_service_status(self, service_name: str = None, *, use_cache: bool = True) -> Dict[str, bool]:
+        """Check the status of translation services without ever blocking the caller.
+
+        Full-status results are cached for _STATUS_CACHE_TTL_SECONDS. On a cache
+        miss (or stale cache) the caller gets the last-known result — or an
+        optimistic default when nothing was ever probed — immediately, and the
+        actual probing happens on a single background thread. Inline probing
+        used to pin Gunicorn worker threads for 15-339s per request via
+        /admin/api/translation_services (prod gateway-504 incident, 2026-07-16).
+
+        ``use_cache=False`` forces a synchronous refresh; it is for tooling and
+        tests only and must not be used on a request path.
+        """
         status = {}
 
         if service_name:
-            # Check specific service
+            # Check specific service (synchronous, but bounded by the cheap probe)
             service = self._get_service(service_name)
             if service:
                 status[service_name] = self._test_service(service)
             return status
 
-        # Check all services
-        for name, service in self.services.items():
-            status[name] = self._test_service(service)
+        now = time.monotonic()
+        cached = self._status_cache
+        if use_cache and cached is not None and now - cached[0] < self._STATUS_CACHE_TTL_SECONDS:
+            return dict(cached[1])
 
+        if not use_cache:
+            refreshed = self._refresh_status_blocking()
+            if refreshed is not None:
+                return refreshed
+            cached = self._status_cache  # another thread just finished probing
+            if cached is not None:
+                return dict(cached[1])
+            return {name: True for name in self.services}
+
+        # Stale or empty cache: refresh in the background and answer now.
+        self._start_status_refresh_in_background()
+        if cached is not None:
+            return dict(cached[1])
+        return {name: True for name in self.services}
+
+    def _refresh_status_blocking(self) -> Optional[Dict[str, bool]]:
+        """Probe all services now; returns None when a probe is already in flight."""
+        if not self._status_probe_lock.acquire(blocking=False):
+            return None
+        try:
+            return self._probe_all_services()
+        finally:
+            self._status_probe_lock.release()
+
+    def _start_status_refresh_in_background(self) -> None:
+        """Kick off a single background probe run; no-op when one is in flight."""
+        if not self._status_probe_lock.acquire(blocking=False):
+            return
+
+        def _run() -> None:
+            try:
+                self._probe_all_services()
+            except Exception as exc:
+                logger.warning("[TRANSLATION_STATUS_PROBE] background refresh failed: %s", exc)
+            finally:
+                self._status_probe_lock.release()
+
+        started = False
+        try:
+            threading.Thread(
+                target=_run, name='translation-status-probe', daemon=True
+            ).start()
+            started = True
+        finally:
+            if not started:
+                self._status_probe_lock.release()
+
+    def _probe_all_services(self) -> Dict[str, bool]:
+        """Run the cheap health probes and update the cache. Callers hold the probe lock."""
+        status = {name: self._test_service(service) for name, service in self.services.items()}
+        self._status_cache = (time.monotonic(), dict(status))
+        logger.info("[TRANSLATION_STATUS_PROBE] refreshed: %s", status)
         return status
 
     def _test_service(self, service: TranslationService) -> bool:
-        """Test if a service is available by making a simple translation request"""
+        """Cheap availability probe, bounded by STATUS_PROBE_TIMEOUT_SECONDS.
+
+        Never issues a real translation (production timeouts are 10-30s with
+        retries); see TranslationService.check_health implementations.
+        """
         try:
-            # Try to translate a simple test word
-            result = service.translate_text("test", "fr", "en")
-            return result is not None and len(result.strip()) > 0
+            return bool(service.check_health())
         except Exception as e:
-            logger.debug(f"Service {service.service_name} test failed: {e}")
+            logger.debug(f"Service {service.service_name} health check failed: {e}")
             return False
 
 # Global instance

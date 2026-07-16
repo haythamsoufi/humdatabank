@@ -255,7 +255,7 @@ class TestApiTranslationServices:
             resp = logged_in_client.get("/admin/api/translation_services")
 
         data = _json(resp)
-        assert data["status"] == "ok"
+        assert data["success"] is True
         by_value = {s["value"]: s for s in data["services"]}
         assert by_value["ifrc"]["label"] == "Hosted translation API"
         assert by_value["libre"]["label"] == "LibreTranslate AI"

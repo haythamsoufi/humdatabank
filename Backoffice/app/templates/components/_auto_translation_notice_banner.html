@@ -1,6 +1,6 @@
 {# Shown when the UI language is not English. Dismissal is persisted in localStorage. #}
 {% set current_lang = _ui_language if _ui_language is defined else 'en' %}
-{% if current_lang != 'en' %}
+{% if current_lang != 'en' and not translation_review_active %}
 <div id="autoTranslationNoticeBanner"
      class="auto-translation-notice-banner"
      role="dialog"

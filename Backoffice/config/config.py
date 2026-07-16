@@ -709,6 +709,7 @@ class Config:
     COPILOT_API_ENDPOINT = os.environ.get('COPILOT_API_ENDPOINT')
     COPILOT_MODEL = os.environ.get('COPILOT_MODEL')
     CHATBOT_ENABLED = _parse_bool(os.environ.get('CHATBOT_ENABLED'), default=True)
+    TRANSLATION_REVIEW_ENABLED = _parse_bool(os.environ.get('TRANSLATION_REVIEW_ENABLED'), default=True)
     CHATBOT_MAX_HISTORY = int(os.environ.get('CHATBOT_MAX_HISTORY', '10'))
 
     # ==================== AI/RAG System Configuration ====================

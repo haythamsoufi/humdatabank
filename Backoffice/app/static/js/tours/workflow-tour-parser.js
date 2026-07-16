@@ -31,10 +31,13 @@ function _encodeWorkflowId(id) {
 class WorkflowTourParser {
     constructor() {
         this.registeredWorkflows = new Set();
-        // Cache tours by "workflowId:language" key for multi-language support
+        // Cache tours by "workflowId:language" key for multi-language support (in-memory, per page load)
         this.tourCache = {};
         // Debug logging flag - can be controlled via localStorage or global variable
         this._debugEnabled = this._getDebugFlag();
+        // Persisted (localStorage) cache TTL - tour content only changes on deploy,
+        // so a generous TTL is safe; ASSET_VERSION in the cache key invalidates it anyway.
+        this._PERSIST_TTL_MS = 24 * 60 * 60 * 1000;
     }
 
     /**
@@ -165,7 +168,101 @@ class WorkflowTourParser {
     }
 
     /**
-     * Fetch workflow tour configuration from the API.
+     * Build the localStorage key for a persisted tour, scoped to the current
+     * app version so a deploy (ASSET_VERSION bump) automatically invalidates it.
+     *
+     * @param {string} workflowId
+     * @param {string} language
+     * @returns {string}
+     */
+    _persistKey(workflowId, language) {
+        const version = (typeof window !== 'undefined' && window.ASSET_VERSION) || 'v1';
+        return `humdb:tour:${version}:${workflowId}:${language}`;
+    }
+
+    /**
+     * Read a previously persisted tour from localStorage, honoring the TTL.
+     *
+     * @param {string} workflowId
+     * @param {string} language
+     * @returns {Object|null}
+     */
+    _readPersistedTour(workflowId, language) {
+        try {
+            const raw = localStorage.getItem(this._persistKey(workflowId, language));
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed || !parsed.data || !parsed.ts) return null;
+            if (Date.now() - parsed.ts > this._PERSIST_TTL_MS) {
+                localStorage.removeItem(this._persistKey(workflowId, language));
+                return null;
+            }
+            return parsed.data;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    /**
+     * Store a fetched tour in both the in-memory cache and localStorage.
+     *
+     * @param {string} workflowId
+     * @param {string} language
+     * @param {Object} tourData
+     */
+    _cacheTour(workflowId, language, tourData) {
+        this.tourCache[this.getCacheKey(workflowId, language)] = tourData;
+        try {
+            localStorage.setItem(
+                this._persistKey(workflowId, language),
+                JSON.stringify({ data: tourData, ts: Date.now() })
+            );
+        } catch (_) {
+            // localStorage full/unavailable - in-memory cache still works for this page load
+        }
+    }
+
+    /**
+     * Try to fetch a pre-generated tour JSON file from static/CDN storage.
+     *
+     * These files are produced by `flask workflows generate-static` (run on every
+     * deploy) and served via the same STATIC_CDN_URL / ASSET_VERSION mechanism as
+     * other static assets, so a hit here never touches a Gunicorn worker.
+     *
+     * @param {string} workflowId
+     * @param {string} language
+     * @returns {Promise<Object|null>}
+     */
+    async _fetchStaticTourConfig(workflowId, language) {
+        try {
+            if (typeof window.getStaticUrl !== 'function') return null;
+            const url = window.getStaticUrl(`generated/tours/${workflowId}.${language}.json`);
+            const fn = (window.getFetch && window.getFetch()) || fetch;
+            const response = await fn(url, { method: 'GET', credentials: 'omit' });
+            if (!response.ok) return null;
+
+            const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
+            const text = await response.text();
+            if (!contentType.includes('json') && !text.trim().startsWith('{')) return null;
+
+            const data = JSON.parse(text);
+            if (data && Array.isArray(data.steps) && data.steps.length) {
+                this._log(`[WorkflowTourParser] Loaded ${workflowId} (${language}) from static/CDN`);
+                return data;
+            }
+            return null;
+        } catch (error) {
+            this._log(`[WorkflowTourParser] Static tour fetch failed for ${workflowId}:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Fetch workflow tour configuration.
+     *
+     * Resolution order: in-memory cache -> localStorage cache -> pre-generated
+     * static/CDN file -> dynamic API (source of truth; also covers local dev
+     * without generated files, and brand-new workflows not yet regenerated).
      *
      * @param {string} workflowId - The workflow identifier
      * @returns {Promise<Object|null>} - Tour configuration or null
@@ -176,16 +273,28 @@ class WorkflowTourParser {
 
         this._log(`[WorkflowTourParser] Fetching tour config for: ${workflowId} (lang: ${language})`);
 
-        // Check cache first (language-aware)
         if (this.tourCache[cacheKey]) {
-            this._log(`[WorkflowTourParser] Found in cache for ${language}`);
+            this._log(`[WorkflowTourParser] Found in memory cache for ${language}`);
             return this.tourCache[cacheKey];
+        }
+
+        const persisted = this._readPersistedTour(workflowId, language);
+        if (persisted) {
+            this._log(`[WorkflowTourParser] Found in localStorage cache for ${language}`);
+            this.tourCache[cacheKey] = persisted;
+            return persisted;
+        }
+
+        const staticTour = await this._fetchStaticTourConfig(workflowId, language);
+        if (staticTour) {
+            this._cacheTour(workflowId, language, staticTour);
+            return staticTour;
         }
 
         try {
             // Include language parameter in the API request
             const url = `/api/ai/documents/workflows/${_encodeWorkflowId(workflowId)}/tour?lang=${encodeURIComponent(language)}`;
-            this._log(`[WorkflowTourParser] Fetching from: ${url}`);
+            this._log(`[WorkflowTourParser] Static file unavailable; fetching from: ${url}`);
 
             const fn = (window.getFetch && window.getFetch()) || fetch;
             const response = await fn(url, {
@@ -220,13 +329,11 @@ class WorkflowTourParser {
             this._log(`[WorkflowTourParser] Response data (lang: ${actualLanguage}):`, data);
 
             if (data.success && data.tour) {
-                // Cache with the actual language returned (may differ if translation not available)
-                const actualCacheKey = this.getCacheKey(workflowId, actualLanguage);
-                this.tourCache[actualCacheKey] = data.tour;
-
-                // Also cache with requested language if different (to avoid refetching)
+                // Cache (memory + localStorage) with the actual language returned
+                // (may differ from requested if a translation wasn't available)
+                this._cacheTour(workflowId, actualLanguage, data.tour);
                 if (actualLanguage !== language) {
-                    this.tourCache[cacheKey] = data.tour;
+                    this._cacheTour(workflowId, language, data.tour);
                 }
 
                 return data.tour;

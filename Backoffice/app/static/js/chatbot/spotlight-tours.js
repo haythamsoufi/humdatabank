@@ -4,41 +4,58 @@
  */
 
 export const SpotlightToursMixin = {
-    _registerChatbotTours() {
+    _preloadCommonWorkflowToursOnce() {
         /**
-         * Initialize chatbot tour system with dynamic tour registration.
-         * Tours are now loaded from workflow documentation via WorkflowTourParser.
+         * Lazily warm the InteractiveTour cache for a few common workflows.
          *
-         * This method preloads common workflows for better UX, but tours can also
-         * be registered on-demand when triggered from chatbot responses.
+         * Previously this ran unconditionally whenever the AI chat FAB was present
+         * on the page (i.e. on every admin page navigation for AI-beta users), firing
+         * 3 background API calls each time regardless of whether the chatbot was ever
+         * opened. Most sessions never open it, so this was pure waste and a source of
+         * avoidable load on Gunicorn workers.
+         *
+         * Now it only runs the first time the chat widget is actually opened
+         * (see widget-ui.js#toggleChat), and only once per browser tab via a
+         * sessionStorage flag. workflow-tour-parser.js further caches the fetched
+         * tour JSON in localStorage, so repeat visits skip the network entirely
+         * until the app is redeployed (ASSET_VERSION bump) or the cache expires.
          */
-        // The FAB is only rendered by the server when the user has AI beta access.
-        // Skip prefetch entirely when the widget is absent — it would only produce
-        // 403s and unnecessary DB rollbacks for users without access.
-        if (!document.getElementById('aiChatbotFAB')) {
-            return;
+        if (this._toursPreloadTriggered) return;
+        this._toursPreloadTriggered = true;
+
+        let alreadyPreloaded = false;
+        try {
+            alreadyPreloaded = sessionStorage.getItem('humdb:chatTours:preloaded') === '1';
+        } catch (_) {
+            // sessionStorage unavailable (private mode, etc.) - fall through and preload anyway
         }
+        if (alreadyPreloaded) return;
 
         if (typeof window.InteractiveTour === 'undefined' || !window.InteractiveTour.registerTour) {
             // InteractiveTour not loaded yet, wait for it
+            const retry = () => {
+                this._toursPreloadTriggered = false;
+                this._preloadCommonWorkflowToursOnce();
+            };
             if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', () => this._registerChatbotTours());
+                document.addEventListener('DOMContentLoaded', retry);
             } else {
-                setTimeout(() => this._registerChatbotTours(), 100);
+                setTimeout(retry, 100);
             }
             return;
         }
 
-        // Use WorkflowTourParser for dynamic tour registration
-        // Tours are fetched from workflow documentation on-demand
-        if (window.WorkflowTourParser) {
-            // Optionally preload common workflows for faster access
-            // This runs in background and doesn't block the UI
-            const commonWorkflows = ['add-user', 'submit-data', 'view-assignments'];
-            window.WorkflowTourParser.preloadWorkflows(commonWorkflows).catch(e => {
+        if (!window.WorkflowTourParser) return;
+
+        // Tours are fetched from workflow documentation (static/CDN first, API fallback)
+        const commonWorkflows = ['add-user', 'submit-data', 'view-assignments'];
+        window.WorkflowTourParser.preloadWorkflows(commonWorkflows)
+            .then(() => {
+                try { sessionStorage.setItem('humdb:chatTours:preloaded', '1'); } catch (_) {}
+            })
+            .catch(e => {
                 console.debug('Failed to preload workflows:', e);
             });
-        }
     },
 
     _getSpotlightTooltipPosition(tourId) {

@@ -132,6 +132,20 @@
                 </div>
                 {% endif %}
 
+                <!-- Translation Review Tool Toggle (only for users with manage-level permission) -->
+                {% if translation_review_toggle_visible %}
+                <div class="mb-6">
+                    <div class="flex items-center">
+                        {{ form.translation_review_tool_enabled(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-3") }}
+                        {{ form.translation_review_tool_enabled.label(class="block text-gray-700 text-sm font-semibold") }}
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">Shows a floating "Translate" button on non-English pages so you can review and edit UI strings inline. Off by default to avoid clutter.</p>
+                    {% for error in form.translation_review_tool_enabled.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
                 <!-- Submit Button -->
                 <div class="flex items-center justify-between">
                     {{ form.submit(class="btn btn-success") }}

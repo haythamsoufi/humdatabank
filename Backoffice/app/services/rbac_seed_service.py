@@ -93,6 +93,7 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         ("admin.documents.manage", "Manage documents", "Manage documents"),
         ("admin.communication.manage", "Manage communication", "Manage admin Communication Center (view all communications and send)"),
         ("admin.translations.manage", "Manage translations", "Manage translation strings and compilation"),
+        ("translations.review.use", "Use inline translation review", "Use the in-context translation review tool on live UI pages"),
 
         # Analytics / Audit / Security
         ("admin.analytics.view", "View analytics", "View analytics"),
@@ -335,6 +336,12 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
             "name": "Admin: Translations (Manage)",
             "description": "Manage translations (edit/add strings, compile, and reload translations).",
             "permission_codes": ["admin.translations.manage"],
+        },
+        {
+            "code": "translator",
+            "name": "Translator",
+            "description": "Review and edit assigned UI translations via the inline translation tool. Language access is granted per locale via scoped RBAC grants.",
+            "permission_codes": [],
         },
         {
             "code": "admin_docs_viewer",

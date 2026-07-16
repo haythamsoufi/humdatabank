@@ -4,7 +4,7 @@ Data API endpoints.
 Part of the /api/v1 blueprint.
 """
 
-from flask import request, current_app, g
+from flask import request, current_app, g, redirect
 from sqlalchemy import desc, literal, or_
 import uuid
 from contextlib import suppress
@@ -25,7 +25,11 @@ from app.utils.api_helpers import json_response, json_data_response, api_error, 
 from app.utils.api_serialization import (
     format_country_info,
     format_form_item_info,
+    format_national_society_info,
     build_star_schema_tables,
+    build_matrix_cells_from_data_rows,
+    enrich_matrix_cells,
+    strip_matrix_values_from_data_rows,
     STAR_SCHEMA_VERSION,
     STAR_SCHEMA_GRAIN,
     serialize_dynamic_data_item,
@@ -44,7 +48,6 @@ from app.utils.api_pagination import (
     build_paginated_response, query_filter_in_batches,
     MAX_USER_AUTH_ROWS,
 )
-from app.utils.form_localization import get_translation_key
 from app.utils.api_formatting import format_answer_value, format_form_data_response, serialize_form_data_item
 from app.utils.api_serialization import _wrap_disagg_dict as _normalize_disagg_payload_util
 from app.utils.sql_utils import safe_ilike_pattern
@@ -63,11 +66,215 @@ from app.services.data_retrieval_shared import (
 )
 
 
+_DATA_ARRAY_CATALOG = {
+    'data': {
+        'title': 'Static field values',
+        'description': (
+            'Submitted answers for static form items (FormData). One row per saved value. '
+            'Join to form_items via form_item_id and to countries via country_id. '
+            'Matrix cell values are normalized in matrix_cells[] (not duplicated here).'
+        ),
+        'grain': 'submission × static form_item',
+        'key_fields': [
+            'id', 'form_item_id', 'country_id', 'submission_id', 'submission_type',
+            'template_id', 'period_name', 'value', 'num_value', 'data_status',
+        ],
+    },
+    'dynamic_data': {
+        'title': 'Dynamic indicator values',
+        'description': (
+            'Values for dynamic indicators (not tied to a fixed form_item_id). '
+            'Keyed by indicator_bank_id and section_id; emergency appeals also use '
+            'repeat_instance_number / repeat_instance_id. Join to indicator_bank via indicator_bank_id.'
+        ),
+        'grain': 'submission × section × indicator_bank (+ repeat slot when applicable)',
+        'key_fields': [
+            'id', 'indicator_bank_id', 'section_id', 'country_id', 'submission_id',
+            'repeat_instance_number', 'repeat_instance_id', 'value', 'custom_label',
+        ],
+    },
+    'repeat_data': {
+        'title': 'Repeat-group field values',
+        'description': (
+            'Answers inside repeat groups (e.g. emergency appeal rows). '
+            'Join to form_items via form_item_id and to dynamic_context via repeat_instance_id '
+            'when resolving appeal metadata.'
+        ),
+        'grain': 'submission × repeat instance × form_item',
+        'key_fields': [
+            'id', 'form_item_id', 'repeat_instance_id', 'section_id', 'country_id',
+            'submission_id', 'value', 'num_value',
+        ],
+    },
+    'dynamic_context': {
+        'title': 'Dynamic section bindings',
+        'description': (
+            'Metadata linking dynamic sections to repeat instances (e.g. appeal code and label '
+            'for each emergency slot). Join to dynamic_data / repeat_data via repeat_instance_id.'
+        ),
+        'grain': 'submission × section × repeat instance',
+        'key_fields': [
+            'id', 'section_id', 'repeat_instance_id', 'label_snapshot', 'context_data',
+            'submission_id', 'submission_type',
+        ],
+    },
+    'form_items': {
+        'title': 'Form item definitions',
+        'description': (
+            'Labels and config for form fields referenced by fact rows. Scope controlled by '
+            'related=page (current page only) or related=all (full filtered dataset).'
+        ),
+        'grain': 'form_item',
+        'key_fields': ['id', 'stable_key', 'label', 'type', 'section', 'bank_details', 'matrix_config'],
+    },
+    'countries': {
+        'title': 'Country dimension',
+        'description': 'Full country reference table (~192 rows). Always included. Join via country_id.',
+        'grain': 'country',
+        'key_fields': ['id', 'name', 'iso2', 'iso3', 'national_society_name', 'region'],
+    },
+    'indicator_bank': {
+        'title': 'Indicator bank dimension',
+        'description': (
+            'Full indicator catalog (~466 rows). Always included. Provides name, definition, '
+            'sector, and unit. Join via indicator_bank_id on dynamic_data or bank_details.id on form_items.'
+        ),
+        'grain': 'indicator',
+        'key_fields': ['id', 'name', 'definition', 'type', 'unit', 'sector', 'sub_sector'],
+    },
+    'national_societies': {
+        'title': 'National Society dimension',
+        'description': (
+            'Full National Society reference table. Always included. '
+            'Join matrix_cells.row_entity_id when join_dimension=national_societies.'
+        ),
+        'grain': 'national_society',
+        'key_fields': ['id', 'name', 'code', 'country_id', 'country_name', 'country_iso2', 'country_iso3'],
+    },
+    'matrix_cells': {
+        'title': 'Matrix cell values',
+        'description': (
+            'Normalized matrix disaggregation rows parsed from data[]. One row per cell. '
+            'Matrix-specific fields are grouped under matrix (row, column, entity).'
+        ),
+        'grain': 'form_data × matrix row entity × column × source',
+        'key_fields': [
+            'form_data_id', 'form_item_id', 'form_item_label', 'value',
+            'matrix.parent_form_data_id', 'matrix.source',
+            'matrix.row.entity_id', 'matrix.row.label',
+            'matrix.column.key', 'matrix.column.label',
+            'matrix.entity.id', 'matrix.entity.name',
+        ],
+    },
+}
+
+
+def _build_data_array_catalog(*, include_dynamic: bool, include_repeat: bool) -> dict:
+    """Return catalog entries for arrays present in this response."""
+    catalog = {
+        'data': {**_DATA_ARRAY_CATALOG['data'], 'included': True},
+        'form_items': {**_DATA_ARRAY_CATALOG['form_items'], 'included': True},
+        'countries': {**_DATA_ARRAY_CATALOG['countries'], 'included': True},
+        'national_societies': {**_DATA_ARRAY_CATALOG['national_societies'], 'included': True},
+        'indicator_bank': {**_DATA_ARRAY_CATALOG['indicator_bank'], 'included': True},
+        'matrix_cells': {**_DATA_ARRAY_CATALOG['matrix_cells'], 'included': True},
+    }
+    if include_dynamic:
+        catalog['dynamic_data'] = {**_DATA_ARRAY_CATALOG['dynamic_data'], 'included': True}
+        catalog['dynamic_context'] = {**_DATA_ARRAY_CATALOG['dynamic_context'], 'included': True}
+    if include_repeat:
+        catalog['repeat_data'] = {**_DATA_ARRAY_CATALOG['repeat_data'], 'included': True}
+    return catalog
+
+
 def _merge_scope_into_response(response_data, scope_meta):
     """Attach ``scope`` metadata when template-scoped filters were used."""
     if scope_meta:
         response_data['scope'] = scope_meta
     return response_data
+
+
+def _assemble_flat_data_payload(
+    *,
+    data_rows,
+    form_items_table,
+    countries_table,
+    national_societies_table,
+    indicator_bank_table,
+    matrix_cells,
+    total_items,
+    total_pages,
+    current_page,
+    per_page,
+    dynamic_data=None,
+    repeat_data=None,
+    dynamic_context=None,
+    warning=None,
+    partial=None,
+    scope_meta=None,
+    array_catalog=None,
+):
+    """
+    Build a flat /data response dict with a stable, export-friendly key order.
+
+    Grouping: scope → arrays (catalog) → pagination → facts → dimensions → status flags.
+    """
+    payload = {}
+    if scope_meta:
+        payload['scope'] = scope_meta
+    if array_catalog is not None:
+        payload['arrays'] = array_catalog
+    payload['total_items'] = total_items
+    payload['total_pages'] = total_pages
+    payload['current_page'] = current_page
+    payload['per_page'] = per_page
+    payload['data'] = data_rows
+    if dynamic_data is not None:
+        payload['dynamic_data'] = dynamic_data
+    if repeat_data is not None:
+        payload['repeat_data'] = repeat_data
+    if dynamic_context is not None:
+        payload['dynamic_context'] = dynamic_context
+    payload['matrix_cells'] = matrix_cells
+    payload['form_items'] = form_items_table
+    payload['countries'] = countries_table
+    payload['national_societies'] = national_societies_table
+    payload['indicator_bank'] = indicator_bank_table
+    if warning:
+        payload['warning'] = warning
+    if partial:
+        payload['partial'] = partial
+    return payload
+
+
+def _load_full_indicator_bank_table():
+    """Return the full indicator bank dimension (~466 rows, stable size)."""
+    from app.services.indicator_bank_service import IndicatorBankFilters, get_indicator_list
+    indicators, _total, _page, _per_page = get_indicator_list(IndicatorBankFilters())
+    return indicators
+
+
+def _load_full_countries_table():
+    """Return the full country dimension (same coverage as /countrymap)."""
+    from app.services import CountryService
+    return [
+        format_country_info(country)
+        for country in CountryService.get_all_with_national_societies(ordered=True).all()
+    ]
+
+
+def _load_full_national_societies_table():
+    """Return the full National Society dimension table."""
+    from app.models.organization import NationalSociety
+    from sqlalchemy.orm import joinedload
+    societies = (
+        NationalSociety.query
+        .options(joinedload(NationalSociety.country))
+        .filter(NationalSociety.is_active == True)  # noqa: E712
+        .order_by(NationalSociety.display_order, NationalSociety.name)
+        .all()
+    )
+    return [format_national_society_info(ns) for ns in societies]
 
 
 def _normalize_disagg_payload(disagg_data):
@@ -84,120 +291,23 @@ def _normalize_disagg_payload(disagg_data):
     return result
 
 
-def _resolve_matrix_entity_labels(form_item_id_to_prefix_ids, form_items_orm_list):
-    """
-    Resolve matrix row prefixes (entity IDs) to display names using each form item's
-    matrix config (lookup_list_id / row_mode). Returns dict: form_item_id -> { prefix: display_name }.
-    """
-    result = {}
-    if not form_item_id_to_prefix_ids or not form_items_orm_list:
-        return result
-
-    form_items_by_id = {fi.id: fi for fi in form_items_orm_list if fi}
-    current_locale = get_translation_key()
-
-    for form_item_id, prefix_ids in form_item_id_to_prefix_ids.items():
-        form_item = form_items_by_id.get(form_item_id)
-        if not form_item or getattr(form_item, 'item_type', None) != 'matrix':
-            continue
-        config = getattr(form_item, 'config', None) or {}
-        matrix_config = config.get('matrix_config') if isinstance(config, dict) else config
-        if not isinstance(matrix_config, dict):
-            continue
-        row_mode = str(matrix_config.get('row_mode') or '').strip().lower()
-        if row_mode != 'list_library':
-            continue
-        lookup_raw = matrix_config.get('lookup_list_id') or matrix_config.get('_table') or ''
-        lookup_list_id = str(lookup_raw).strip() if lookup_raw not in (None, '') else ''
-        display_raw = matrix_config.get('list_display_column') or matrix_config.get('display_column') or 'name'
-        display_column = str(display_raw).strip() or 'name'
-        labels = _resolve_entity_ids_for_lookup(lookup_list_id, display_column, prefix_ids, current_locale)
-        if labels:
-            result[form_item_id] = labels
-    return result
-
-
-def _resolve_entity_ids_for_lookup(lookup_list_id, display_column, prefix_ids, current_locale='en'):
-    """Resolve a set of prefix IDs (row entity IDs) to display names for a given lookup_list_id."""
-    labels = {}
-    prefix_ids = set(prefix_ids)
-    if not prefix_ids or not lookup_list_id:
-        return labels
-
-    if lookup_list_id == 'national_society':
-        from app.models.organization import NationalSociety
-        for rid in prefix_ids:
-            try:
-                rid_int = int(rid)
-            except (TypeError, ValueError):
-                labels[str(rid)] = str(rid)
-                continue
-            obj = NationalSociety.query.get(rid_int)
-            if obj:
-                name = None
-                get_tr = getattr(obj, 'get_name_translation', None)
-                if get_tr and callable(get_tr):
-                    try:
-                        tr = get_tr(current_locale)
-                        if isinstance(tr, str) and tr.strip():
-                            name = tr.strip()
-                    except Exception as e:
-                        current_app.logger.debug("get_name_translation failed for national_society %s: %s", rid, e)
-                labels[str(rid)] = name or getattr(obj, 'name', None) or str(rid)
-            else:
-                labels[str(rid)] = str(rid)
-        return labels
-
-    if lookup_list_id == 'country_map':
-        from app.models.core import Country
-        from app.utils.form_localization import get_localized_country_name
-        for rid in prefix_ids:
-            try:
-                rid_int = int(rid)
-            except (TypeError, ValueError):
-                labels[str(rid)] = str(rid)
-                continue
-            obj = Country.query.get(rid_int)
-            labels[str(rid)] = get_localized_country_name(obj) if obj else str(rid)
-        return labels
-
-    if lookup_list_id == 'indicator_bank':
-        from app.models.indicator_bank import IndicatorBank
-        for rid in prefix_ids:
-            try:
-                rid_int = int(rid)
-            except (TypeError, ValueError):
-                labels[str(rid)] = str(rid)
-                continue
-            obj = IndicatorBank.query.get(rid_int)
-            labels[str(rid)] = obj.name if obj else str(rid)
-        return labels
-
-    if str(lookup_list_id).isdigit():
-        from app.models import LookupListRow
-        for rid in prefix_ids:
-            try:
-                rid_int = int(rid)
-            except (TypeError, ValueError):
-                labels[str(rid)] = str(rid)
-                continue
-            row_obj = LookupListRow.query.get(rid_int)
-            if row_obj and isinstance(getattr(row_obj, 'data', None), dict):
-                data = row_obj.data
-                name = data.get(display_column) or data.get('name') or str(rid)
-                labels[str(rid)] = str(name)
-            else:
-                labels[str(rid)] = str(rid)
-        return labels
-
-    return labels
-
-
 def _parse_include_flags(args):
-    """Return (include_dynamic, include_repeat) booleans from query-string args."""
-    def _truthy(v):
-        return str(v or '').strip().lower() in ('1', 'true', 'yes', 'y')
-    return _truthy(args.get('include_dynamic')), _truthy(args.get('include_repeat'))
+    """Return (include_dynamic, include_repeat) booleans from query-string args.
+
+    Both default to True. Pass ``include_dynamic=false`` or ``include_repeat=false`` to exclude.
+    """
+    def _falsy(v):
+        return str(v or '').strip().lower() in ('0', 'false', 'no', 'n')
+
+    def _parse_flag(key):
+        raw = args.get(key)
+        if raw is None or str(raw).strip() == '':
+            return True
+        if _falsy(raw):
+            return False
+        return True
+
+    return _parse_flag('include_dynamic'), _parse_flag('include_repeat')
 
 
 def _fetch_extended_data(
@@ -212,8 +322,9 @@ def _fetch_extended_data(
     """
     Fetch DynamicIndicatorData and/or RepeatGroupData rows for the current request filters.
 
-    Returns a dict ``{'dynamic_data': [...], 'repeat_data': [...]}``.
-    Both keys are always present; the lists are empty when the corresponding flag is False.
+    Returns a dict ``{'dynamic_data': [...], 'repeat_data': [...], 'dynamic_context': [...]}``.
+    ``dynamic_context`` lists DynamicSectionContext bindings (e.g. emergency appeal codes).
+    All keys are always present; lists are empty when the corresponding flag is False.
 
     RBAC:
     - API-key (elevated_access): no template restriction, fetch all matching rows.
@@ -232,6 +343,8 @@ def _fetch_extended_data(
 
     dynamic_rows = []
     repeat_rows = []
+    dynamic_context_rows = []
+    dynamic_orm_rows = []
 
     def _apply_user_scoping(q_dict, needs_af_join):
         """Apply user-level template + country RBAC to a dynamic/repeat query dict."""
@@ -295,20 +408,29 @@ def _fetch_extended_data(
                 if date_to:
                     from app.models.forms import DynamicIndicatorData
                     q = q.filter(DynamicIndicatorData.submitted_at <= date_to)
-                rows = q.all()
+                dynamic_orm_rows.extend(q.all())
+
+            if dynamic_orm_rows:
+                from app.utils.api_serialization import (
+                    batch_countries_for_aes_list,
+                    build_dynamic_serialization_context,
+                    fetch_dynamic_section_contexts,
+                )
                 assigned_aes = [
                     row.assignment_entity_status
-                    for row in rows
+                    for row in dynamic_orm_rows
                     if getattr(row, 'assignment_entity_status', None)
                 ]
-                from app.utils.api_serialization import batch_countries_for_aes_list
                 aes_countries = batch_countries_for_aes_list(assigned_aes)
-                for row in rows:
+                dynamic_serialization_context = build_dynamic_serialization_context(dynamic_orm_rows)
+                dynamic_context_rows = fetch_dynamic_section_contexts(dynamic_orm_rows)
+                for row in dynamic_orm_rows:
                     dynamic_rows.append(
                         serialize_dynamic_data_item(
                             row,
                             minimal_country_info=minimal_country_info,
                             aes_countries=aes_countries,
+                            dynamic_context=dynamic_serialization_context,
                         )
                     )
         except Exception as e:
@@ -357,7 +479,7 @@ def _fetch_extended_data(
         except Exception as e:
             current_app.logger.warning("_fetch_extended_data: repeat query failed: %s", e, exc_info=True)
 
-    return {'dynamic_data': dynamic_rows, 'repeat_data': repeat_rows}
+    return {'dynamic_data': dynamic_rows, 'repeat_data': repeat_rows, 'dynamic_context': dynamic_context_rows}
 
 
 @api_bp.route('/templates/<int:template_id>/data', methods=['GET'])
@@ -475,398 +597,21 @@ def get_data_by_country(country_id):
     return api_error("page and per_page query parameters are required", 400)
 
 
-@api_bp.route('/data', methods=['GET'])
-@api_rate_limit()
-def get_all_data():
-    """
-    API endpoint to retrieve form data with optional filtering.
-    Authentication (one of):
-      - Authorization: Bearer YOUR_API_KEY (full access, paginated response)
-      - HTTP Basic auth or session (user-scoped access, no pagination)
-    Query Parameters:
-        - template_id: Filter by template ID
-        - submission_id: Filter by submission ID
-        - item_id: Filter by form item ID (published-version row when version_scope=published)
-        - stable_key: Filter by logical field UUID (requires template_id; resolves to published item when version_scope=published)
-        - version_scope: ``published`` (default) or ``all`` — limits facts to published version rows when template_id is set
-        - item_type: Filter by item type ('indicator', 'question', 'document_field')
-        - country_id: Filter by country ID
-        - submission_type: Filter by submission type ('assigned' or 'public')
-        - period_name: Filter by period name (e.g., FY2023, Q1 2024)
-        - indicator_bank_id: Filter by indicator bank ID
-        - include_full_info: Include detailed form item info (true/false, default: false for performance)
-        - include_dynamic: Include DynamicIndicatorData rows (true/false). Adds ``dynamic_data`` array.
-        - include_repeat: Include RepeatGroupData rows (true/false). Adds ``repeat_data`` array.
-        - page: Page number (default: 1, only used with API key auth)
-        - per_page: Items per page (default: 20, max 100000, only used with API key auth)
-
-    Response format:
-        - API key auth: Returns paginated response with total_pages, current_page, per_page
-        - User auth: Returns all accessible data with total_pages=None, current_page=None, per_page=None
-        - ``dynamic_data`` array (only present when include_dynamic=true): DynamicIndicatorData rows.
-          Each row has data_type="dynamic", section_id, indicator_bank_id, custom_label.
-        - ``repeat_data`` array (only present when include_repeat=true): RepeatGroupData rows.
-          Each row has data_type="repeat", section_id, repeat_instance_id, instance_number, instance_label.
-    """
-    try:
-        # Authenticate request
-        auth_result = authenticate_api_request()
-        # Check if it's an error response (has status_code attribute)
-        if hasattr(auth_result, 'status_code'):
-            return auth_result  # Return error response
-        elevated_access, auth_user, api_key_record = auth_result
-
-        # Get and validate query parameters
-        # SECURITY: All parameters are validated to prevent injection and DoS attacks
-        try:
-            template_id = request.args.get('template_id', type=int)
-            if template_id is not None and template_id < 1:
-                template_id = None
-        except (ValueError, TypeError):
-            template_id = None
-
-        try:
-            submission_id = request.args.get('submission_id', type=int)
-            if submission_id is not None and submission_id < 1:
-                submission_id = None
-        except (ValueError, TypeError):
-            submission_id = None
-
-        try:
-            item_id = request.args.get('item_id', type=int)
-            if item_id is not None and item_id < 1:
-                item_id = None
-        except (ValueError, TypeError):
-            item_id = None
-
-        item_id, stable_key_filter, version_scope, filter_error = parse_data_item_filters(
-            request.args,
-            template_id=template_id,
-            item_id=item_id,
-        )
-        if filter_error:
-            return api_error(filter_error['message'], filter_error['status'])
-
-        published_version_id = resolve_template_published_version_id(template_id)
-        scope_meta = build_data_api_scope_meta(
-            template_id=template_id,
-            published_version_id=published_version_id,
-            version_scope=version_scope,
-            stable_key=stable_key_filter,
-        )
-
-        # Validate item_type against whitelist
-        item_type = request.args.get('item_type', type=str)
-        if item_type:
-            item_type = item_type.strip().lower()
-            valid_item_types = ['indicator', 'question', 'document_field']
-            if item_type not in valid_item_types:
-                item_type = None
-
-        try:
-            country_id = request.args.get('country_id', type=int)
-            if country_id is not None and country_id < 1:
-                country_id = None
-        except (ValueError, TypeError):
-            country_id = None
-
-        # Validate ISO codes (alphanumeric, max 3 chars)
-        country_iso2 = request.args.get('country_iso2', type=str)
-        if country_iso2:
-            country_iso2 = country_iso2.strip().upper()[:2]
-            if not country_iso2.isalpha():
-                country_iso2 = None
-
-        country_iso3 = request.args.get('country_iso3', type=str)
-        if country_iso3:
-            country_iso3 = country_iso3.strip().upper()[:3]
-            if not country_iso3.isalpha():
-                country_iso3 = None
-
-        # Validate submission_type against whitelist
-        submission_type = request.args.get('submission_type')
-        if submission_type:
-            submission_type = submission_type.strip().lower()
-            if submission_type not in ['assigned', 'public']:
-                submission_type = None
-
-        # Validate period_name (sanitize length)
-        period_name = request.args.get('period_name', type=str)
-        if period_name:
-            period_name = period_name.strip()[:100]  # Limit length
-            if not period_name:
-                period_name = None
-
-        try:
-            indicator_bank_id = request.args.get('indicator_bank_id', type=int)
-            if indicator_bank_id is not None and indicator_bank_id < 1:
-                indicator_bank_id = None
-        except (ValueError, TypeError):
-            indicator_bank_id = None
-
-        # Parse date range filtering
-        date_from, date_to = parse_date_range(request.args)
-
-        # Parse sorting parameters
-        sort_field, sort_order, _ = get_sort_params(request.args)
-
-        # Resolve iso2/iso3 to country_id if provided (do this BEFORE building queries)
-        if (country_iso2 or country_iso3) and not country_id:
-            from app.utils.country_utils import resolve_country_from_iso
-            resolved_id, error = resolve_country_from_iso(iso2=country_iso2, iso3=country_iso3)
-            if error:
-                # Determine status code based on error type
-                status_code = 400 if 'Invalid' in error else 404
-                return api_error(error, status_code)
-            if resolved_id:
-                country_id = resolved_id
-
-        # Determine pagination mode and include_full_info early so we can skip
-        # unused joinedloads in the query builder below.
-        should_paginate = elevated_access
-        if should_paginate:
-            validated_params = validate_data_endpoint_params(request.args)
-            page = validated_params['page']
-            per_page = validated_params['per_page']
-            include_full_info = validated_params['include_full_info']
-        else:
-            full_info_param = request.args.get('include_full_info', default=None, type=str)
-            include_full_info = False
-            if full_info_param is not None:
-                include_full_info = str(full_info_param).strip().lower() in ['1', 'true', 'yes', 'y']
-            page = 1
-            per_page = None
-
-        # Build queries via service layer for consistency.
-        # Only eager-load form_item relations when include_full_info is requested;
-        # this avoids 2–3 extra JOINs per query on the common case where form_item_info
-        # is not needed (default: false).
-        queries = query_form_data(
-            template_id=template_id,
-            submission_id=submission_id,
-            item_id=item_id,
-            item_type=item_type,
-            country_id=country_id,
-            period_name=period_name,
-            indicator_bank_id=indicator_bank_id,
-            submission_type=submission_type,
-            preload=True,
-            full_preload=include_full_info,
-        )
-        assigned_form_data_query, public_form_data_query = get_form_data_queries(queries)
-
-        # Apply date range filtering
-        if date_from:
-            # Ensure joins exist for assigned query
-            if assigned_form_data_query is not None:
-                # Check if joins already exist
-                if template_id is None and country_id is None and period_name is None:
-                    assigned_form_data_query = assigned_form_data_query.join(AssignmentEntityStatus)
-                assigned_form_data_query = assigned_form_data_query.filter(FormData.submitted_at >= date_from)
-
-            # Public query already has joins
-            if public_form_data_query is not None:
-                public_form_data_query = public_form_data_query.filter(FormData.submitted_at >= date_from)
-
-        if date_to:
-            # Ensure joins exist for assigned query
-            if assigned_form_data_query is not None:
-                # Check if joins already exist
-                if template_id is None and country_id is None and period_name is None and date_from is None:
-                    assigned_form_data_query = assigned_form_data_query.join(AssignmentEntityStatus)
-                assigned_form_data_query = assigned_form_data_query.filter(FormData.submitted_at <= date_to)
-
-            # Public query already has joins
-            if public_form_data_query is not None:
-                public_form_data_query = public_form_data_query.filter(FormData.submitted_at <= date_to)
-
-        # ---------- RBAC: if user-authenticated, restrict to templates the user owns or that are shared with them ----------
-        if not elevated_access and auth_user is not None:
-            # System managers have access to all templates
-            from app.services.authorization_service import AuthorizationService
-            is_system_mgr = AuthorizationService.is_system_manager(auth_user)
-
-            # Check if specific template is requested and user has access
-            if template_id is not None and not is_system_mgr:
-                allowed_template_ids = get_user_allowed_template_ids(auth_user.id)
-                if template_id not in allowed_template_ids:
-                    return api_error('Forbidden: no access to requested template', 403)
-
-            # Apply template scoping to queries
-            scoped_queries = apply_user_template_scoping(queries, auth_user, template_id, country_id, period_name)
-            assigned_form_data_query, public_form_data_query = get_form_data_queries(scoped_queries)
-
-            # If user has no access, return empty result
-            if assigned_form_data_query is not None:
-                # Check if query is empty (1=0 filter)
-                with suppress(Exception):
-                    test_count = assigned_form_data_query.limit(1).count()
-                    if test_count == 0 and (public_form_data_query is None or public_form_data_query.limit(1).count() == 0):
-                        return json_response(_merge_scope_into_response({
-                            'data': [],
-                            'total_items': 0,
-                            'total_pages': 0 if should_paginate else None,
-                            'current_page': page if should_paginate else None,
-                            'per_page': per_page if should_paginate else None
-                        }, scope_meta))
-
-        api_key_scope = getattr(g, 'api_key_data_scope', None)
-        if not elevated_access and api_key_record is not None and api_key_scope:
-            scoped_queries = apply_api_key_data_scoping(
-                queries, api_key_scope, template_id, country_id, period_name
-            )
-            assigned_form_data_query, public_form_data_query = get_form_data_queries(scoped_queries)
-
-        assigned_form_data_query, public_form_data_query = apply_form_data_version_scoping(
-            assigned_form_data_query,
-            public_form_data_query,
-            template_id=template_id,
-            published_version_id=published_version_id,
-            version_scope=version_scope,
-            stable_key=stable_key_filter,
-        )
-
-        # (Filters already applied by the service and optional RBAC scoping)
-
-        # Build pagination queries using helper
-        assigned_ids_q, public_ids_q = build_pagination_queries(
-            assigned_form_data_query,
-            public_form_data_query,
-            submission_type
-        )
-
-        # Get data IDs (paginated for API key, capped for user auth) with sorting.
-        # MAX_USER_AUTH_ROWS prevents runaway unbounded fetches on the session path.
-        page_rows, total_items = get_paginated_data_ids(
-            assigned_ids_q,
-            public_ids_q,
-            page if should_paginate else 1,
-            per_page if should_paginate else None,
-            paginate=should_paginate,
-            sort_field=sort_field,
-            sort_order=sort_order,
-            max_rows=None if should_paginate else MAX_USER_AUTH_ROWS,
-        )
-
-        # Fetch full ORM rows for the current page
-        assigned_map, public_map = fetch_paginated_rows(
-            assigned_form_data_query,
-            public_form_data_query,
-            page_rows
-        )
-
-        # Use minimal country info for large datasets to avoid N+1 queries
-        # Threshold: use minimal info when per_page > 1000 or when returning all data (user auth)
-        use_minimal_country_info = (per_page and per_page > 1000) or (not should_paginate)
-
-        # Serialize in the exact DB order using helper functions
-        from app.utils.api_serialization import (
-            batch_countries_for_aes_list,
-            serialize_assigned_data_item,
-            serialize_public_data_item,
-        )
-        assigned_aes = [
-            assigned_map[row.id].assignment_entity_status
-            for row in page_rows
-            if row.submission_type == 'assigned' and assigned_map.get(row.id)
-        ]
-        aes_countries = batch_countries_for_aes_list(
-            [aes for aes in assigned_aes if aes]
-        )
-        paginated_data = []
-        for row in page_rows:
-            if row.submission_type == 'assigned':
-                data_item = assigned_map.get(row.id)
-                if not data_item:
-                    continue
-                item_payload = serialize_assigned_data_item(
-                    data_item,
-                    include_full_info=include_full_info,
-                    minimal_country_info=use_minimal_country_info,
-                    aes_countries=aes_countries,
-                )
-                paginated_data.append(item_payload)
-            else:
-                data_item = public_map.get(row.id)
-                if not data_item:
-                    continue
-                item_payload = serialize_public_data_item(
-                    data_item,
-                    include_full_info=include_full_info,
-                    minimal_country_info=use_minimal_country_info
-                )
-                paginated_data.append(item_payload)
-
-        # Optionally fetch dynamic indicator and repeat section data
-        include_dynamic, include_repeat = _parse_include_flags(request.args)
-        extended = _fetch_extended_data(
-            template_id=template_id,
-            submission_id=submission_id,
-            item_id=item_id,
-            country_id=country_id,
-            period_name=period_name,
-            indicator_bank_id=indicator_bank_id,
-            submission_type=submission_type,
-            include_dynamic=include_dynamic,
-            include_repeat=include_repeat,
-            minimal_country_info=use_minimal_country_info,
-            elevated_access=elevated_access,
-            auth_user=auth_user,
-            date_from=date_from,
-            date_to=date_to,
-        ) if (include_dynamic or include_repeat) else {'dynamic_data': [], 'repeat_data': []}
-
-        # Build response based on authentication type
-        if should_paginate:
-            # API key auth: return paginated response
-            total_pages = (total_items + per_page - 1) // per_page if per_page > 0 else 1
-            response_body = {
-                'data': paginated_data,
-                'total_items': total_items,
-                'total_pages': total_pages,
-                'current_page': page,
-                'per_page': per_page,
-            }
-        else:
-            # User auth: return all accessible data (no pagination)
-            response_body = {
-                'data': paginated_data,
-                'total_items': total_items,
-                'total_pages': None,
-                'current_page': None,
-                'per_page': None,
-            }
-
-        if include_dynamic:
-            response_body['dynamic_data'] = extended['dynamic_data']
-        if include_repeat:
-            response_body['repeat_data'] = extended['repeat_data']
-
-        return json_response(_merge_scope_into_response(response_body, scope_meta))
-
-    except Exception as e:
-        error_id = str(uuid.uuid4())
-        current_app.logger.error(
-            f"API Error [ID: {error_id}] fetching all data: {e}",
-            exc_info=True,
-            extra={'endpoint': '/data', 'params': dict(request.args)}
-        )
-        return api_error("Could not fetch data", 500, error_id, None)
-
-
 def _parse_tables_layout_param():
-    """Return ``flat`` (default) or ``star`` for /data/tables response shape."""
+    """Return ``flat`` (default) or ``star`` for /data response shape."""
     layout = str(request.args.get('layout', 'flat') or 'flat').strip().lower()
     if layout not in ('flat', 'star'):
         layout = 'flat'
     return layout
 
 
-def _build_flat_tables_response(
+def _build_flat_data_response(
     data_rows,
     form_items_table,
     countries_table,
-    matrix_entity_labels,
+    national_societies_table,
+    indicator_bank_table,
+    matrix_cells,
     *,
     should_paginate,
     total_items,
@@ -875,43 +620,62 @@ def _build_flat_tables_response(
     expansion_failed=False,
     extra=None,
     scope_meta=None,
+    array_catalog=None,
 ):
-    """Legacy multi-table bundle (backward compatible)."""
+    """Multi-table submission data bundle (facts + dimensions)."""
     if should_paginate:
         total_pages = (total_items + per_page - 1) // per_page if per_page > 0 else 1
-        response_data = {
-            'data': data_rows,
-            'form_items': form_items_table,
-            'countries': countries_table,
-            'matrix_entity_labels': matrix_entity_labels,
-            'total_items': total_items,
-            'total_pages': total_pages,
-            'current_page': page,
-            'per_page': per_page,
-        }
+        resp_page = page
+        resp_per_page = per_page
     else:
-        response_data = {
-            'data': data_rows,
-            'form_items': form_items_table,
-            'countries': countries_table,
-            'matrix_entity_labels': matrix_entity_labels,
-            'total_items': total_items,
-            'total_pages': None,
-            'current_page': None,
-            'per_page': None,
-        }
+        total_pages = None
+        resp_page = None
+        resp_per_page = None
+
+    warning = None
+    partial = None
     if expansion_failed:
-        response_data['warning'] = 'Related tables expansion failed, showing page-scoped results only'
-        response_data['partial'] = True
+        warning = 'Related tables expansion failed, showing page-scoped results only'
+        partial = True
+
+    dynamic_data = repeat_data = dynamic_context = None
     if extra:
-        response_data.update(extra)
-    return json_response(_merge_scope_into_response(response_data, scope_meta))
+        dynamic_data = extra.get('dynamic_data')
+        repeat_data = extra.get('repeat_data')
+        dynamic_context = extra.get('dynamic_context')
+
+    response_data = _assemble_flat_data_payload(
+        data_rows=data_rows,
+        form_items_table=form_items_table,
+        countries_table=countries_table,
+        national_societies_table=national_societies_table,
+        indicator_bank_table=indicator_bank_table,
+        matrix_cells=matrix_cells,
+        total_items=total_items,
+        total_pages=total_pages,
+        current_page=resp_page,
+        per_page=resp_per_page,
+        dynamic_data=dynamic_data,
+        repeat_data=repeat_data,
+        dynamic_context=dynamic_context,
+        warning=warning,
+        partial=partial,
+        scope_meta=scope_meta,
+        array_catalog=array_catalog,
+    )
+    return json_response(response_data)
 
 
-def _build_star_tables_response(
+_build_flat_tables_response = _build_flat_data_response
+
+
+def _build_star_data_response(
     data_rows,
     form_items_table,
     countries_table,
+    national_societies_table,
+    indicator_bank_table,
+    matrix_cells,
     *,
     should_paginate,
     total_items,
@@ -920,12 +684,24 @@ def _build_star_tables_response(
     expansion_failed=False,
     extra=None,
     scope_meta=None,
+    array_catalog=None,
 ):
     """Star-schema dimensional tables for BI / integrator consumers."""
+    dynamic_data = repeat_data = dynamic_context = None
+    if extra:
+        dynamic_data = extra.get('dynamic_data')
+        repeat_data = extra.get('repeat_data')
+        dynamic_context = extra.get('dynamic_context')
     tables = build_star_schema_tables(
         data_rows,
         form_items_table,
         countries_table,
+        dynamic_data=dynamic_data,
+        repeat_data=repeat_data,
+        matrix_cells=matrix_cells,
+        national_societies_table=national_societies_table,
+        indicator_bank_table=indicator_bank_table,
+        dynamic_context=dynamic_context,
     )
     if should_paginate:
         total_pages = (total_items + per_page - 1) // per_page if per_page > 0 else 1
@@ -947,44 +723,40 @@ def _build_star_tables_response(
         meta['partial'] = True
     if scope_meta:
         meta['scope'] = scope_meta
+    if array_catalog is not None:
+        meta['arrays'] = array_catalog
     body = {
         'schema_version': STAR_SCHEMA_VERSION,
         'grain': STAR_SCHEMA_GRAIN,
         'tables': tables,
     }
-    if extra:
-        body.update(extra)
     return json_data_response(body, meta=meta)
 
 
-@api_bp.route('/data/tables', methods=['GET'])
-def get_data_tables():
+_build_star_tables_response = _build_star_data_response
+
+
+@api_bp.route('/data', methods=['GET'])
+@api_rate_limit()
+def get_all_data():
     """
-    API endpoint to retrieve data rows along with related form item and country tables.
+    API endpoint to retrieve submission data with related dimension tables.
+
+    Returns fact arrays (``data``, ``dynamic_data``, ``repeat_data``, ``dynamic_context``,
+    ``matrix_cells``) plus full dimension tables (``form_items``, ``countries``,
+    ``national_societies``, ``indicator_bank``).
+
     Authentication (one of):
       - Authorization: Bearer YOUR_API_KEY (full access, paginated response)
       - HTTP Basic auth or session (user-scoped access, no pagination)
     Query Parameters:
-        - template_id, submission_id, item_id, stable_key, version_scope, item_type, country_id, submission_type, period_name, indicator_bank_id: filters
-        - stable_key: logical field UUID (requires template_id)
-        - version_scope: ``published`` (default) or ``all`` when template_id is set
-        - date_from: Filter by submission date from (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
-        - date_to: Filter by submission date to (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
-        - sort: Sort field (default: 'submitted_at', options: 'submitted_at', 'template_id', 'country_id', 'period_name')
-        - order: Sort order (default: 'desc', options: 'asc', 'desc')
-        - page, per_page: pagination for data rows (only used with API key auth)
-        - related: scope of related form_items ('page' or 'all'); default 'page'.
-                   'page' returns form_items referenced by the current page of data.
-                   'all' returns form_items for the full filtered dataset (not paginated).
-                   countries[] always includes the full country dimension (all countries).
-        - layout: response shape — ``flat`` (default, backward compatible) or ``star``
-                  (dimensional tables: fact_form_values, dim_*, bridge_disagg_values).
-        - include_dynamic: Include DynamicIndicatorData rows (true/false). Adds ``dynamic_data`` array
-                           to the response. Each row has ``data_type="dynamic"``, ``section_id``,
-                           ``indicator_bank_id``, ``custom_label`` instead of ``form_item_id``.
-        - include_repeat: Include RepeatGroupData rows (true/false). Adds ``repeat_data`` array to
-                          the response. Each row has ``data_type="repeat"``, ``section_id``,
-                          ``repeat_instance_id``, ``instance_number``, ``instance_label``.
+        - template_id, submission_id, item_id, stable_key, version_scope, item_type, country_id,
+          country_iso2, country_iso3, submission_type, period_name, indicator_bank_id: filters
+        - date_from, date_to, sort, order, page, per_page
+        - related: scope of related form_items ('page' or 'all'); default 'page'
+        - layout: ``flat`` (default) or ``star`` (dimensional tables for BI)
+        - include_dynamic / include_repeat: default true; pass ``false`` to omit extended arrays
+        - include_non_reported, analysis, indicator_bank_ids: see data explorer / BI use cases
     """
     try:
         layout = _parse_tables_layout_param()
@@ -1026,6 +798,24 @@ def get_data_tables():
 
         item_type = request.args.get('item_type', type=str)
         country_id = request.args.get('country_id', type=int)
+        country_iso2 = request.args.get('country_iso2', type=str)
+        if country_iso2:
+            country_iso2 = country_iso2.strip().upper()[:2]
+            if not country_iso2.isalpha():
+                country_iso2 = None
+        country_iso3 = request.args.get('country_iso3', type=str)
+        if country_iso3:
+            country_iso3 = country_iso3.strip().upper()[:3]
+            if not country_iso3.isalpha():
+                country_iso3 = None
+        if (country_iso2 or country_iso3) and not country_id:
+            from app.utils.country_utils import resolve_country_from_iso
+            resolved_id, error = resolve_country_from_iso(iso2=country_iso2, iso3=country_iso3)
+            if error:
+                status_code = 400 if 'Invalid' in error else 404
+                return api_error(error, status_code)
+            if resolved_id:
+                country_id = resolved_id
         submission_type = request.args.get('submission_type')
         period_name = request.args.get('period_name', type=str)
         indicator_bank_id = request.args.get('indicator_bank_id', type=int)
@@ -1214,25 +1004,38 @@ def get_data_tables():
                             and str(submission_type or '').strip().lower() == 'assigned'
                         )
                         if not bounded_missing_request:
-                            empty_flat = {
-                                'data': [],
-                                'form_items': [],
-                                'countries': [],
-                                'total_items': 0,
-                                'total_pages': None,
-                                'current_page': None,
-                                'per_page': None,
-                            }
+                            _inc_dyn, _inc_rep = _parse_include_flags(request.args)
+                            _catalog = _build_data_array_catalog(
+                                include_dynamic=_inc_dyn,
+                                include_repeat=_inc_rep,
+                            )
+                            _countries = _load_full_countries_table()
+                            _national_societies = _load_full_national_societies_table()
+                            _indicator_bank = _load_full_indicator_bank_table()
                             if layout == 'star':
-                                return _build_star_tables_response(
-                                    [], [], [],
+                                return _build_star_data_response(
+                                    [], [], _countries, _national_societies, _indicator_bank, [],
                                     should_paginate=should_paginate,
                                     total_items=0,
                                     page=page,
                                     per_page=per_page,
                                     scope_meta=scope_meta,
+                                    array_catalog=_catalog,
                                 )
-                            return json_response(_merge_scope_into_response(empty_flat, scope_meta))
+                            return json_response(_assemble_flat_data_payload(
+                                data_rows=[],
+                                form_items_table=[],
+                                countries_table=_countries,
+                                national_societies_table=_national_societies,
+                                indicator_bank_table=_indicator_bank,
+                                matrix_cells=[],
+                                total_items=0,
+                                total_pages=None,
+                                current_page=None,
+                                per_page=None,
+                                scope_meta=scope_meta,
+                                array_catalog=_catalog,
+                            ))
 
         # ---------- Scoped API key: restrict to template_ids / country_ids on the key ----------
         api_key_scope = getattr(g, 'api_key_data_scope', None)
@@ -1257,24 +1060,38 @@ def get_data_tables():
                             and str(submission_type or '').strip().lower() == 'assigned'
                         )
                         if not bounded_missing_request:
+                            _inc_dyn, _inc_rep = _parse_include_flags(request.args)
+                            _catalog = _build_data_array_catalog(
+                                include_dynamic=_inc_dyn,
+                                include_repeat=_inc_rep,
+                            )
+                            _countries = _load_full_countries_table()
+                            _national_societies = _load_full_national_societies_table()
+                            _indicator_bank = _load_full_indicator_bank_table()
                             if layout == 'star':
-                                return _build_star_tables_response(
-                                    [], [], [],
+                                return _build_star_data_response(
+                                    [], [], _countries, _national_societies, _indicator_bank, [],
                                     should_paginate=should_paginate,
                                     total_items=0,
                                     page=page,
                                     per_page=per_page,
                                     scope_meta=scope_meta,
+                                    array_catalog=_catalog,
                                 )
-                            return json_response(_merge_scope_into_response({
-                                'data': [],
-                                'form_items': [],
-                                'countries': [],
-                                'total_items': 0,
-                                'total_pages': None,
-                                'current_page': None,
-                                'per_page': None,
-                            }, scope_meta))
+                            return json_response(_assemble_flat_data_payload(
+                                data_rows=[],
+                                form_items_table=[],
+                                countries_table=_countries,
+                                national_societies_table=_national_societies,
+                                indicator_bank_table=_indicator_bank,
+                                matrix_cells=[],
+                                total_items=0,
+                                total_pages=None,
+                                current_page=None,
+                                per_page=None,
+                                scope_meta=scope_meta,
+                                array_catalog=_catalog,
+                            ))
 
         assigned_form_data_query, public_form_data_query = apply_form_data_version_scoping(
             assigned_form_data_query,
@@ -1376,6 +1193,8 @@ def get_data_tables():
                 idd = _normalize_disagg_raw(getattr(data_item, "imputed_disagg_data", None))
                 payload = {
                     'id': data_item.id,
+                    'field_type': 'static',
+                    'data_type': 'static',
                     'submission_type': 'assigned',
                     'submission_id': status_info.id if status_info else None,
                     'form_item_id': data_item.form_item_id,
@@ -1439,6 +1258,8 @@ def get_data_tables():
                 idd = _normalize_disagg_raw(getattr(data_item, "imputed_disagg_data", None))
                 payload = {
                     'id': data_item.id,
+                    'field_type': 'static',
+                    'data_type': 'static',
                     'submission_type': 'public',
                     'submission_id': submission.id if submission else None,
                     'assignment_id': public_assignment.id if public_assignment else None,
@@ -1596,6 +1417,8 @@ def get_data_tables():
                                 virtual_id = f"m:{aes_id}:{int(fid)}"
                                 data_rows.append({
                                     'id': virtual_id,
+                                    'field_type': 'static',
+                                    'data_type': 'static',
                                     'submission_type': 'assigned',
                                     'submission_id': aes_id,
                                     'form_item_id': int(fid),
@@ -1616,25 +1439,6 @@ def get_data_tables():
             except Exception as e:
                 current_app.logger.warning("include_non_reported expansion failed: %s", e, exc_info=True)
 
-        # Collect matrix row prefixes (entity IDs) per form_item_id for entity name resolution
-        matrix_row_prefixes = {}
-        for row in data_rows:
-            disagg = row.get('disaggregation_data')
-            if not disagg or disagg.get('mode') != 'matrix':
-                continue
-            form_item_id = row.get('form_item_id')
-            if not form_item_id:
-                continue
-            values = disagg.get('values') or {}
-            for key in values:
-                if not isinstance(key, str) or key.startswith('_'):
-                    continue
-                idx = key.find('_')
-                prefix = key[:idx] if idx >= 0 else key
-                if prefix not in (None, ''):
-                    matrix_row_prefixes.setdefault(form_item_id, set()).add(prefix)
-
-        # Optionally expand related tables to cover the full filtered dataset (not only the current page)
         expansion_failed = False
         if related_scope == 'all':
             try:
@@ -1662,15 +1466,19 @@ def get_data_tables():
                 # If any of the above expansions fail, log error and return partial result
                 error_id = str(uuid.uuid4())
                 current_app.logger.error(
-                    f"related=all expansion failed in /data/tables [ID: {error_id}]: {_e}",
+                    f"related=all expansion failed in /data [ID: {error_id}]: {_e}",
                     exc_info=True,
-                    extra={'endpoint': '/data/tables', 'params': dict(request.args)}
+                    extra={'endpoint': '/data', 'params': dict(request.args)}
                 )
                 expansion_failed = True
 
         # Optionally fetch dynamic indicator and repeat section data, folding their
         # form_item_ids into the related form_items table.
         include_dynamic, include_repeat = _parse_include_flags(request.args)
+        array_catalog = _build_data_array_catalog(
+            include_dynamic=include_dynamic,
+            include_repeat=include_repeat,
+        )
         extended = _fetch_extended_data(
             template_id=template_id,
             submission_id=submission_id,
@@ -1686,7 +1494,7 @@ def get_data_tables():
             auth_user=auth_user,
             date_from=date_from,
             date_to=date_to,
-        ) if (include_dynamic or include_repeat) else {'dynamic_data': [], 'repeat_data': []}
+        ) if (include_dynamic or include_repeat) else {'dynamic_data': [], 'repeat_data': [], 'dynamic_context': []}
 
         # Collect form_item_ids referenced by extended rows so they appear in form_items[].
         for rrow in extended.get('repeat_data', []):
@@ -1716,30 +1524,34 @@ def get_data_tables():
                         template=item.template
                     )
                 )
-            # Resolve matrix row entity IDs to display names using form item matrix config
-            matrix_entity_labels = _resolve_matrix_entity_labels(matrix_row_prefixes, form_items_sorted)
-        else:
-            matrix_entity_labels = {}
-
-        # Always return the full country dimension (same coverage as /countrymap).
-        # Eager-load national_societies so format_country_info avoids N+1 NS lookups.
-        from app.services import CountryService
-        countries_table = [
-            format_country_info(country)
-            for country in CountryService.get_all_with_national_societies(ordered=True).all()
-        ]
+        countries_table = _load_full_countries_table()
+        national_societies_table = _load_full_national_societies_table()
+        indicator_bank_table = _load_full_indicator_bank_table()
+        matrix_cells = build_matrix_cells_from_data_rows(data_rows, form_items_table)
+        matrix_cells = enrich_matrix_cells(
+            matrix_cells,
+            form_items_table,
+            countries_table=countries_table,
+            national_societies_table=national_societies_table,
+            indicator_bank_table=indicator_bank_table,
+        )
+        strip_matrix_values_from_data_rows(data_rows)
 
         extra_keys = {}
         if include_dynamic:
             extra_keys['dynamic_data'] = extended['dynamic_data']
+            extra_keys['dynamic_context'] = extended.get('dynamic_context', [])
         if include_repeat:
             extra_keys['repeat_data'] = extended['repeat_data']
 
         if layout == 'star':
-            return _build_star_tables_response(
+            return _build_star_data_response(
                 data_rows,
                 form_items_table,
                 countries_table,
+                national_societies_table,
+                indicator_bank_table,
+                matrix_cells,
                 should_paginate=should_paginate,
                 total_items=total_items,
                 page=page,
@@ -1747,13 +1559,16 @@ def get_data_tables():
                 expansion_failed=expansion_failed,
                 extra=extra_keys or None,
                 scope_meta=scope_meta,
+                array_catalog=array_catalog,
             )
 
-        return _build_flat_tables_response(
+        return _build_flat_data_response(
             data_rows,
             form_items_table,
             countries_table,
-            matrix_entity_labels,
+            national_societies_table,
+            indicator_bank_table,
+            matrix_cells,
             should_paginate=should_paginate,
             total_items=total_items,
             page=page,
@@ -1761,12 +1576,24 @@ def get_data_tables():
             expansion_failed=expansion_failed,
             extra=extra_keys or None,
             scope_meta=scope_meta,
+            array_catalog=array_catalog,
         )
     except Exception as e:
         error_id = str(uuid.uuid4())
         current_app.logger.error(
-            f"API Error [ID: {error_id}] fetching data tables: {e}",
+            f"API Error [ID: {error_id}] fetching data: {e}",
             exc_info=True,
-            extra={'endpoint': '/data/tables', 'params': dict(request.args)}
+            extra={'endpoint': '/data', 'params': dict(request.args)}
         )
-        return api_error("Could not fetch data tables", 500, error_id, None)
+        return api_error("Could not fetch data", 500, error_id, None)
+
+
+@api_bp.route('/data/tables', methods=['GET'])
+def get_data_tables_legacy_redirect():
+    """Legacy redirect — use GET /api/v1/data instead."""
+    query_string = request.query_string.decode('utf-8')
+    target = f'/api/v1/data?{query_string}' if query_string else '/api/v1/data'
+    response = redirect(target, code=308)
+    response.headers['Deprecation'] = 'true'
+    response.headers['Link'] = '</api/v1/data>; rel="successor-version"'
+    return response

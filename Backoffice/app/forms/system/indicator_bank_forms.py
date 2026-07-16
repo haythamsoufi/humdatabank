@@ -9,7 +9,15 @@ from flask_wtf.file import FileField, FileAllowed
 from app.utils.request_utils import get_request_data
 from wtforms import StringField, TextAreaField, SubmitField, SelectField, BooleanField, IntegerField
 from wtforms.validators import DataRequired, Optional, Length, ValidationError
-from app.models import IndicatorBank, Sector, SubSector, IndicatorBankType, IndicatorBankUnit
+from app.extensions import db
+from app.models import (
+    IndicatorBank,
+    IndicatorBankSpef,
+    IndicatorBankType,
+    IndicatorBankUnit,
+    Sector,
+    SubSector,
+)
 from ..base import BaseForm, MultilingualFieldsMixin, FileUploadForm, CommonValidators, int_or_none
 
 
@@ -25,6 +33,21 @@ def _join_csv_tags(tags):
     if isinstance(tags, list):
         return ", ".join(str(t).strip() for t in tags if str(t).strip())
     return str(tags).strip()
+
+
+def _optional_area_code(value):
+    """Coerce SelectField value to a SPEF code string, or empty string when cleared."""
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _spef_choice_label(code, name=None):
+    code = (code or "").strip()
+    name = (name or "").strip()
+    if code and name:
+        return f"{code} — {name}"
+    return code or name or ""
 
 
 class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
@@ -50,10 +73,12 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
             "placeholder": "e.g., Number of National Societies that develop and/or implement a strategy…",
         },
     )
-    area = StringField(
+    # SPEF area code from IndicatorBankSpef catalog (denormalized onto IndicatorBank.area)
+    area = SelectField(
         "Area",
-        validators=[Optional(), Length(max=16)],
-        render_kw={"placeholder": "e.g., EF2, SP3 (IFRC SPEF code)"},
+        coerce=_optional_area_code,
+        validators=[Optional()],
+        choices=[],
     )
     data_source = TextAreaField(
         "Data Source",
@@ -97,7 +122,7 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
         self._populate_choices()
 
     def _populate_choices(self):
-        """Populate the sector and subsector choices"""
+        """Populate type/unit/SPEF area and sector/subsector choices."""
         try:
             from app.routes.admin.shared import get_localized_sector_name, get_localized_subsector_name
 
@@ -113,6 +138,15 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
                 .all()
             )
             self.unit.choices = [(None, "-- No unit --")] + [(u.id, u.name) for u in munits]
+
+            spef_rows = (
+                IndicatorBankSpef.query.filter_by(is_active=True)
+                .order_by(IndicatorBankSpef.sort_order, IndicatorBankSpef.code)
+                .all()
+            )
+            self.area.choices = [("", "-- Select Area --")] + [
+                (row.code, _spef_choice_label(row.code, row.name)) for row in spef_rows
+            ]
 
             sectors = Sector.query.filter_by(is_active=True).order_by(Sector.display_order, Sector.name).all()
             sector_choices = [(None, "-- Select Sector --")] + [
@@ -133,6 +167,7 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
         except Exception as e:
             import logging
             logging.error(f"Error populating sector/subsector choices: {e}")
+            self.area.choices = [("", "-- Select Area --")]
             empty_choices = [(None, "-- Select Sector --")]
             self.sector_primary.choices = empty_choices
             self.sector_secondary.choices = empty_choices
@@ -142,6 +177,50 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
             self.sub_sector_primary.choices = empty_subsector_choices
             self.sub_sector_secondary.choices = empty_subsector_choices
             self.sub_sector_tertiary.choices = empty_subsector_choices
+
+    def _ensure_area_choice(self, code, label=None):
+        """Keep a legacy/inactive SPEF code selectable when editing an existing indicator."""
+        code = (code or "").strip()
+        if not code:
+            return
+        existing = {choice_code for choice_code, _label in (self.area.choices or [])}
+        if code in existing:
+            return
+        self.area.choices = list(self.area.choices or [("", "-- Select Area --")]) + [
+            (code, label or code)
+        ]
+
+    @staticmethod
+    def _resolve_spef_by_code(code):
+        code = (code or "").strip()
+        if not code:
+            return None
+        return (
+            IndicatorBankSpef.query
+            .filter(db.func.upper(IndicatorBankSpef.code) == code.upper())
+            .first()
+        )
+
+    def _apply_area_selection(self, indicator_bank):
+        """Set SPEF FK and denormalized area/area_label from the selected catalog code."""
+        code = (self.area.data or "").strip() or None
+        if not code:
+            indicator_bank.indicator_spef_id = None
+            indicator_bank.area = None
+            indicator_bank.area_label = None
+            return
+
+        spef = self._resolve_spef_by_code(code)
+        if spef is not None:
+            indicator_bank.indicator_spef_id = spef.id
+            indicator_bank.area = (spef.code or "")[:16]
+            indicator_bank.area_label = spef.name
+            return
+
+        # Selected value is not in the catalog (should be rare with a select); keep the code only.
+        indicator_bank.indicator_spef_id = None
+        indicator_bank.area = code[:16]
+        indicator_bank.area_label = None
 
     def _translatable_languages(self):
         try:
@@ -204,7 +283,14 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
         self.fdrs_kpi_code.data = getattr(indicator_bank, 'fdrs_kpi_code', None) or ''
         self.definition.data = indicator_bank.definition
         self.aggregated_label.data = indicator_bank.aggregated_label or ''
-        self.area.data = indicator_bank.area or ''
+        area_code = (indicator_bank.area or '').strip()
+        if not area_code and getattr(indicator_bank, 'spef_area', None) is not None:
+            area_code = (indicator_bank.spef_area.code or '').strip()
+        self._ensure_area_choice(
+            area_code,
+            _spef_choice_label(area_code, getattr(indicator_bank, 'area_label', None)),
+        )
+        self.area.data = area_code
         self.data_source.data = indicator_bank.data_source or ''
         self.disaggregation_guidance.data = indicator_bank.disaggregation_guidance or ''
         self.tags.data = _join_csv_tags(indicator_bank.tags_list)
@@ -242,7 +328,7 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
         indicator_bank.fdrs_kpi_code = (self.fdrs_kpi_code.data or '').strip() or None
         indicator_bank.definition = self.definition.data
         indicator_bank.aggregated_label = (self.aggregated_label.data or '').strip() or None
-        indicator_bank.area = (self.area.data or '').strip() or None
+        self._apply_area_selection(indicator_bank)
         indicator_bank.data_source = (self.data_source.data or '').strip() or None
         indicator_bank.disaggregation_guidance = (self.disaggregation_guidance.data or '').strip() or None
         indicator_bank.monitoring_questions = self.monitoring_questions_from_request()

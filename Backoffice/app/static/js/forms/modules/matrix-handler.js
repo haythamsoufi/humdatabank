@@ -2361,13 +2361,13 @@ class MatrixHandler {
             return;
         }
 
-        // Get assignment entity status ID and template ID
-        const assignmentEntityStatusId = this.getAssignmentEntityStatusId();
+        // Get template ID and build request body (supports normal AES and preview mode)
         const templateId = this.getTemplateId();
+        const requestBody = this._buildVarsBody({ template_id: templateId });
 
-        if (!assignmentEntityStatusId || !templateId) {
+        if (!requestBody || !templateId) {
             debugWarn('matrix-handler', '[BATCH VARIABLE RESOLUTION] Missing required context', {
-                assignmentEntityStatusId,
+                hasRequestBody: !!requestBody,
                 templateId
             });
             return;
@@ -2413,12 +2413,7 @@ class MatrixHandler {
 
         try {
             const rowEntityIds = rowsToResolve.map(r => r.entityId);
-
-            const requestBody = {
-                assignment_entity_status_id: assignmentEntityStatusId,
-                template_id: templateId,
-                row_entity_ids: rowEntityIds
-            };
+            requestBody.row_entity_ids = rowEntityIds;
 
             // Call batch API
             const response = await _mhFetch('/api/v1/variables/resolve', {
@@ -2575,17 +2570,17 @@ class MatrixHandler {
             return;
         }
 
-        // Get assignment entity status ID from the form context
-        const assignmentEntityStatusId = this.getAssignmentEntityStatusId();
-        if (!assignmentEntityStatusId) {
-            debugWarn('matrix-handler', '[VARIABLE RESOLUTION] Cannot resolve variables: assignment_entity_status_id not found');
-            return;
-        }
-
         // Get template ID from the form context
         const templateId = this.getTemplateId();
         if (!templateId) {
             debugWarn('matrix-handler', '[VARIABLE RESOLUTION] Cannot resolve variables: template_id not found');
+            return;
+        }
+
+        // Build entity context (supports normal AES and preview mode)
+        const _baseBody = this._buildVarsBody({ template_id: templateId });
+        if (!_baseBody) {
+            debugWarn('matrix-handler', '[VARIABLE RESOLUTION] Cannot resolve variables: no entity context (AES or preview)');
             return;
         }
 
@@ -2625,11 +2620,9 @@ class MatrixHandler {
         }
 
         try {
-            const requestBody = {
-                assignment_entity_status_id: assignmentEntityStatusId,
-                template_id: templateId,
+            const requestBody = Object.assign({}, _baseBody, {
                 row_entity_id: entityId ? parseInt(entityId) : null
-            };
+            });
 
             // Call API to resolve variables
             const response = await _mhFetch('/api/v1/variables/resolve', {
@@ -2820,6 +2813,46 @@ class MatrixHandler {
             hasHiddenInput: !!hiddenInput,
             hasForm: !!form
         });
+        return null;
+    }
+
+    /**
+     * Return preview entity context { entity_id, entity_type, period_name } when in template
+     * preview mode (no real AES), or null when in a normal assignment.
+     */
+    _getPreviewEntityCtx() {
+        const meta = window.metadataContext || {};
+        const entityId = meta.entity_id ? parseInt(meta.entity_id) : null;
+        const entityType = meta.entity_type || null;
+        if (!entityId || !entityType) return null;
+        return {
+            entity_id: entityId,
+            entity_type: entityType,
+            period_name: String(meta.assignment_period || '')
+        };
+    }
+
+    /**
+     * Build the entity-context portion of a /api/v1/variables/resolve request body.
+     * Uses the real AES id when available; falls back to preview context in preview mode.
+     * Returns null if neither context is available.
+     *
+     * @param {object} extra  - Additional fields to merge into the body.
+     * @returns {object|null}
+     */
+    _buildVarsBody(extra) {
+        const aesId = this.getAssignmentEntityStatusId();
+        if (aesId) {
+            return Object.assign({ assignment_entity_status_id: aesId }, extra);
+        }
+        const pvCtx = this._getPreviewEntityCtx();
+        if (pvCtx) {
+            return Object.assign({
+                preview_entity_id: pvCtx.entity_id,
+                preview_entity_type: pvCtx.entity_type,
+                preview_period_name: pvCtx.period_name
+            }, extra);
+        }
         return null;
     }
 
@@ -3972,18 +4005,57 @@ class MatrixHandler {
         const entityScope = variableConfig.entity_scope;
         const isReverseLookup = entityScope === 'entities_containing';
 
-        // Get assignment_entity_status_id from hidden input
+        // Get assignment_entity_status_id from hidden input.
+        // In template-preview mode there is no real AES, so fall back to the
+        // entity context exposed by window.metadataContext (set by entry_form.html).
         const assignmentStatusInput = document.querySelector('input[name="assignment_entity_status_id"]');
-        if (!assignmentStatusInput || !assignmentStatusInput.value) {
-            debugWarn('matrix-handler', 'assignment_entity_status_id not found in form');
-            return;
+        let assignmentEntityStatusId = null;
+        let previewEntityCtx = null; // { entity_id, entity_type, period_name } when in preview
+
+        if (assignmentStatusInput && assignmentStatusInput.value) {
+            assignmentEntityStatusId = parseInt(assignmentStatusInput.value, 10);
+            if (isNaN(assignmentEntityStatusId)) {
+                debugWarn('matrix-handler', `Invalid assignment_entity_status_id: ${assignmentStatusInput.value}`);
+                return;
+            }
+        } else {
+            const meta = window.metadataContext || {};
+            const pvEntityId = meta.entity_id ? parseInt(meta.entity_id) : null;
+            const pvEntityType = meta.entity_type || null;
+            if (pvEntityId && pvEntityType) {
+                previewEntityCtx = {
+                    entity_id: pvEntityId,
+                    entity_type: pvEntityType,
+                    period_name: String(meta.assignment_period || '')
+                };
+                debugLog('matrix-handler', '[AUTO-LOAD] Preview mode — using entity context from metadataContext', previewEntityCtx);
+            } else {
+                debugWarn('matrix-handler', 'assignment_entity_status_id not found in form (no preview context either)');
+                return;
+            }
         }
 
-        const assignmentEntityStatusId = parseInt(assignmentStatusInput.value, 10);
-        if (isNaN(assignmentEntityStatusId)) {
-            debugWarn('matrix-handler', `Invalid assignment_entity_status_id: ${assignmentStatusInput.value}`);
-            return;
-        }
+        // Convenience helpers that build the entity-context portion of an API request body.
+        // In preview mode we send preview_entity_id / preview_entity_type instead of AES id.
+        const _mkAesBody = (extra) => {
+            if (assignmentEntityStatusId !== null) {
+                return Object.assign({ assignment_entity_status_id: assignmentEntityStatusId }, extra);
+            }
+            return Object.assign({
+                preview_entity_id: previewEntityCtx.entity_id,
+                preview_entity_type: previewEntityCtx.entity_type
+            }, extra);
+        };
+        const _mkVarsBody = (extra) => {
+            if (assignmentEntityStatusId !== null) {
+                return Object.assign({ assignment_entity_status_id: assignmentEntityStatusId }, extra);
+            }
+            return Object.assign({
+                preview_entity_id: previewEntityCtx.entity_id,
+                preview_entity_type: previewEntityCtx.entity_type,
+                preview_period_name: previewEntityCtx.period_name
+            }, extra);
+        };
 
         // Get template ID for variable resolution
         const templateId = this.getTemplateId();
@@ -3997,6 +4069,7 @@ class MatrixHandler {
             entityScope,
             isReverseLookup,
             assignmentEntityStatusId,
+            previewEntityCtx,
             templateId
         });
 
@@ -4033,10 +4106,7 @@ class MatrixHandler {
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        assignment_entity_status_id: assignmentEntityStatusId,
-                        template_id: templateId
-                    })
+                    body: JSON.stringify(_mkVarsBody({ template_id: templateId }))
                 });
 
                 if (!response.ok) {
@@ -4103,14 +4173,13 @@ class MatrixHandler {
                         debugLog('matrix-handler', `[AUTO-LOAD] Incomplete variable configuration for ${colVarName}, skipping`);
                         continue;
                     }
-                    subRequests.push({
+                    subRequests.push(_mkAesBody({
                         source_template_id: sourceTemplateId,
                         source_assignment_period: sourceAssignmentPeriod,
                         source_form_item_id: sourceFormItemId,
-                        assignment_entity_status_id: assignmentEntityStatusId,
                         require_tick_value_1: requireTickValue1,
                         tick_column_names: tickColumnNames
-                    });
+                    }));
                     subRequestColumnNames.push(colVarName);
                 }
 
@@ -4176,11 +4245,10 @@ class MatrixHandler {
                             headers: {
                                 'Content-Type': 'application/json',
                             },
-                            body: JSON.stringify({
-                                assignment_entity_status_id: assignmentEntityStatusId,
+                            body: JSON.stringify(_mkVarsBody({
                                 template_id: templateId,
                                 row_entity_id: entity.entity_id
-                            })
+                            }))
                         });
 
                         if (resolveResponse.ok) {

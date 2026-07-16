@@ -4,6 +4,16 @@ from unittest.mock import patch, MagicMock
 
 pytestmark = [pytest.mark.unit]
 
+
+@pytest.fixture(autouse=True)
+def _mock_full_dimension_tables():
+    """Avoid loading dimension tables from DB in every /data test."""
+    with patch("app.routes.api.data._load_full_countries_table", return_value=[]), \
+         patch("app.routes.api.data._load_full_national_societies_table", return_value=[]), \
+         patch("app.routes.api.data._load_full_indicator_bank_table", return_value=[]):
+        yield
+
+
 _API_HEADERS = {"Authorization": "Bearer test-key-123"}
 _API_KEY_PATCH = "app.utils.auth.authenticate_db_api_key_only"
 
@@ -275,11 +285,17 @@ class TestGetData:
 
 
 class TestGetDataTables:
-    """Tests for GET /api/v1/data/tables."""
+    """Tests for GET /api/v1/data (formerly /data/tables)."""
 
-    URL = "/api/v1/data/tables"
+    URL = "/api/v1/data"
+    LEGACY_URL = "/api/v1/data/tables"
 
-    def test_auth_error(self, client, app):
+    def test_legacy_tables_redirects_to_data(self, client, app):
+        resp = client.get(f"{self.LEGACY_URL}?template_id=1", follow_redirects=False)
+        assert resp.status_code == 308
+        assert '/api/v1/data' in resp.headers.get('Location', '')
+        assert resp.headers.get('Deprecation') == 'true'
+
         from flask import Response
         error_resp = Response('{"error":"Unauthorized"}', status=401, mimetype="application/json")
         with patch("app.routes.api.data.authenticate_api_request", return_value=error_resp):
@@ -346,9 +362,9 @@ class TestGetDataTables:
 
 
 class TestGetDataTablesStableKey:
-    """Tests for stable_key / version_scope query params on /data/tables."""
+    """Tests for stable_key / version_scope query params on /data."""
 
-    URL = "/api/v1/data/tables"
+    URL = "/api/v1/data"
 
     def test_stable_key_without_template_id_returns_400(self, client, app):
         with patch("app.routes.api.data.authenticate_api_request", return_value=_auth_api_key()):
@@ -385,6 +401,232 @@ class TestGetAllDataStableKey:
         assert resp.status_code == 400
 
 
+class TestGetDataDynamicFields:
+    """Verify dynamic_data[] includes linkage fields on /api/v1/data."""
+
+    URL = "/api/v1/data"
+
+    REQUIRED_DYNAMIC_KEYS = {
+        'id', 'field_type', 'data_type', 'submission_type', 'submission_id',
+        'template_id', 'period_name', 'country_id', 'iso2', 'iso3',
+        'section_id', 'section_stable_key', 'indicator_bank_id', 'custom_label',
+        'form_item_id', 'form_item_stable_key',
+        'repeat_instance_number', 'repeat_instance_id',
+        'value', 'num_value', 'data_status', 'submitted_at', 'created_at',
+    }
+
+    def _make_dynamic_orm_row(self, *, repeat_instance_number=None):
+        from datetime import datetime
+        row = MagicMock()
+        row.id = 501
+        row.section_id = 55
+        row.indicator_bank_id = 619
+        row.custom_label = 'Custom label'
+        row.repeat_instance_number = repeat_instance_number
+        row.value = '12000'
+        row.data_not_available = False
+        row.not_applicable = False
+        row.submitted_at = datetime(2024, 6, 1, 12, 0, 0)
+        row.prefilled_value = None
+        row.imputed_value = None
+        row.prefilled_disagg_data = None
+        row.imputed_disagg_data = None
+        row.disagg_data = None
+
+        aes = MagicMock()
+        aes.id = 88
+        aes.entity_type = 'country'
+        aes.entity_id = 7
+        af = MagicMock()
+        af.template_id = 33
+        af.period_name = '2024'
+        aes.assigned_form = af
+        row.assignment_entity_status = aes
+        row.public_submission = None
+
+        section = MagicMock()
+        section.id = 55
+        section.stable_key = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+        section.parent_section_id = 44 if repeat_instance_number is not None else None
+        row.section = section
+        return row
+
+    def _common_data_patches(self):
+        return (
+            patch("app.routes.api.data.authenticate_api_request", return_value=_auth_api_key()),
+            patch("app.routes.api.data.query_form_data", return_value=MagicMock()),
+            patch("app.routes.api.data.get_form_data_queries", return_value=(MagicMock(), MagicMock())),
+            patch("app.routes.api.data.apply_api_key_data_scoping", return_value=(MagicMock(), MagicMock())),
+            patch("app.routes.api.data.build_pagination_queries", return_value=(MagicMock(), MagicMock())),
+            patch("app.routes.api.data.get_paginated_data_ids", return_value=([], 0)),
+            patch("app.routes.api.data.fetch_paginated_rows", return_value=({}, {})),
+            patch("app.routes.api.data.validate_data_endpoint_params",
+                  return_value={'page': 1, 'per_page': 20, 'include_full_info': False}),
+        )
+
+    def test_fetch_extended_data_includes_dynamic_linkage_fields(self, app):
+        from app.routes.api.data import _fetch_extended_data
+        from app.models.forms import FormSection, RepeatGroupInstance
+
+        dynamic_row = self._make_dynamic_orm_row(repeat_instance_number=2)
+        mock_assigned_q = MagicMock()
+        mock_assigned_q.filter.return_value = mock_assigned_q
+        mock_assigned_q.all.return_value = [dynamic_row]
+
+        section = MagicMock()
+        section.id = 55
+        section.stable_key = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+        section.parent_section_id = 44
+
+        context_row = MagicMock()
+        context_row.id = 9
+        context_row.assignment_entity_status_id = 88
+        context_row.public_submission_id = None
+        context_row.section_id = 55
+        context_row.provider_id = 'emergency_operations'
+        context_row.slot = 2
+        context_row.context_key = 'MDRBD018'
+        context_row.label_snapshot = 'Bangladesh Floods'
+        context_row.status = 'active'
+        context_row.resolved_at = dynamic_row.submitted_at
+
+        with app.app_context():
+            with patch("app.routes.api.data.query_dynamic_indicator_data",
+                       return_value={'assigned': mock_assigned_q, 'public': None}), \
+                 patch("app.routes.api.data.query_repeat_group_data",
+                       return_value={'assigned': None, 'public': None}), \
+                 patch.object(FormSection, 'query') as mock_section_q, \
+                 patch.object(RepeatGroupInstance, 'query') as mock_instance_q, \
+                 patch("app.models.forms.DynamicSectionContext") as mock_ctx_model, \
+                 patch("app.utils.api_serialization._country_for_aes",
+                       return_value=MagicMock(iso2='AF', iso3='AFG')), \
+                 patch("app.utils.api_serialization.format_country_info", return_value={'id': 7}):
+                mock_section_q.filter.return_value.all.return_value = [section]
+                inst = MagicMock()
+                inst.id = 901
+                inst.assignment_entity_status_id = 88
+                inst.section_id = 44
+                inst.instance_number = 2
+                mock_instance_q.filter.return_value.all.return_value = [inst]
+                mock_ctx_model.query.filter.return_value.all.return_value = [context_row]
+
+                result = _fetch_extended_data(
+                    template_id=33,
+                    submission_id=None,
+                    item_id=None,
+                    country_id=None,
+                    period_name=None,
+                    indicator_bank_id=None,
+                    submission_type=None,
+                    include_dynamic=True,
+                    include_repeat=False,
+                    minimal_country_info=False,
+                    elevated_access=True,
+                    auth_user=None,
+                )
+
+        assert len(result['dynamic_data']) == 1
+        row = result['dynamic_data'][0]
+        assert self.REQUIRED_DYNAMIC_KEYS.issubset(row.keys())
+        assert row['field_type'] == 'repeat_dynamic'
+        assert row['section_stable_key'] == 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+        assert row['repeat_instance_number'] == 2
+        assert row['repeat_instance_id'] == 901
+        assert row['form_item_id'] is None
+        assert row['form_item_stable_key'] is None
+        assert len(result['dynamic_context']) == 1
+        assert result['dynamic_context'][0]['context_key'] == 'MDRBD018'
+
+    def test_get_data_response_includes_dynamic_data_fields(self, client, app):
+        dynamic_row = self._make_dynamic_orm_row()
+        mock_assigned_q = MagicMock()
+        mock_assigned_q.filter.return_value = mock_assigned_q
+        mock_assigned_q.all.return_value = [dynamic_row]
+
+        patches = list(self._common_data_patches())
+        patches.extend([
+            patch("app.routes.api.data.query_dynamic_indicator_data",
+                  return_value={'assigned': mock_assigned_q, 'public': None}),
+            patch("app.routes.api.data.query_repeat_group_data",
+                  return_value={'assigned': None, 'public': None}),
+            patch("app.utils.api_serialization.build_dynamic_serialization_context",
+                  return_value={'section_by_id': {55: dynamic_row.section}, 'repeat_instance_id_by_key': {}}),
+            patch("app.utils.api_serialization.fetch_dynamic_section_contexts", return_value=[]),
+            patch("app.utils.api_serialization._country_for_aes",
+                  return_value=MagicMock(iso2='AF', iso3='AFG')),
+            patch("app.utils.api_serialization.format_country_info", return_value={'id': 7}),
+        ])
+
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            for p in patches:
+                stack.enter_context(p)
+            resp = client.get(f"{self.URL}?template_id=33&page=1&per_page=20", headers=_API_HEADERS)
+
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert 'dynamic_data' in body
+        assert 'dynamic_context' in body
+        assert len(body['dynamic_data']) == 1
+        row = body['dynamic_data'][0]
+        assert self.REQUIRED_DYNAMIC_KEYS.issubset(row.keys())
+        assert row['field_type'] == 'dynamic'
+        assert row['section_stable_key'] == 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+
+    def test_get_data_response_includes_dimension_tables(self, client, app):
+        dynamic_row = self._make_dynamic_orm_row()
+        mock_assigned_q = MagicMock()
+        mock_assigned_q.filter.return_value = mock_assigned_q
+        mock_assigned_q.all.return_value = [dynamic_row]
+
+        patches = [
+            patch("app.routes.api.data.authenticate_api_request", return_value=_auth_api_key()),
+            patch("app.routes.api.data.query_form_data", return_value=MagicMock()),
+            patch("app.routes.api.data.get_form_data_queries", return_value=(MagicMock(), MagicMock())),
+            patch("app.routes.api.data.apply_api_key_data_scoping", return_value=(MagicMock(), MagicMock())),
+            patch("app.routes.api.data.build_pagination_queries", return_value=(MagicMock(), MagicMock())),
+            patch("app.routes.api.data.get_paginated_data_ids", return_value=([], 0)),
+            patch("app.routes.api.data.fetch_paginated_rows", return_value=({}, {})),
+            patch("app.routes.api.data.query_dynamic_indicator_data",
+                  return_value={'assigned': mock_assigned_q, 'public': None}),
+            patch("app.routes.api.data.query_repeat_group_data",
+                  return_value={'assigned': None, 'public': None}),
+            patch("app.utils.api_serialization.build_dynamic_serialization_context",
+                  return_value={'section_by_id': {55: dynamic_row.section}, 'repeat_instance_id_by_key': {}}),
+            patch("app.utils.api_serialization.fetch_dynamic_section_contexts", return_value=[]),
+            patch("app.utils.api_serialization._country_for_aes",
+                  return_value=MagicMock(iso2='AF', iso3='AFG')),
+            patch("app.utils.api_serialization.format_country_info", return_value={'id': 7}),
+            patch("app.routes.api.data._load_full_countries_table", return_value=[]),
+            patch("app.routes.api.data._load_full_indicator_bank_table", return_value=[]),
+            patch("app.services.CountryService.get_all_with_national_societies",
+                  return_value=MagicMock(all=lambda: [])),
+        ]
+
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            for p in patches:
+                stack.enter_context(p)
+            resp = client.get(
+                f"{self.URL}?template_id=33&page=1&per_page=20",
+                headers=_API_HEADERS,
+            )
+
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert 'dynamic_data' in body
+        assert 'dynamic_context' in body
+        assert 'form_items' in body
+        assert 'countries' in body
+        assert 'national_societies' in body
+        assert 'indicator_bank' in body
+        assert 'matrix_cells' in body
+        assert 'arrays' in body
+        assert 'data' in body['arrays']
+        assert 'description' in body['arrays']['data']
+        assert self.REQUIRED_DYNAMIC_KEYS.issubset(body['dynamic_data'][0].keys())
+
+
 class TestDataHelpers:
     """Unit tests for data module helper functions."""
 
@@ -418,40 +660,75 @@ class TestDataHelpers:
     def test_normalize_disagg_empty_dict(self, app):
         from app.routes.api.data import _normalize_disagg_payload
         result = _normalize_disagg_payload({})
-        assert result["mode"] == "matrix"
+        assert result["mode"] is None
         assert result["values"] == {}
 
-    def test_resolve_matrix_entity_labels_empty(self, app):
-        from app.routes.api.data import _resolve_matrix_entity_labels
-        result = _resolve_matrix_entity_labels(None, [])
-        assert result == {}
+    def test_build_matrix_cells_from_data_rows(self, app):
+        from app.utils.api_serialization import (
+            build_matrix_cells_from_data_rows,
+            enrich_matrix_cells,
+        )
+        form_items = [{
+            'id': 9,
+            'matrix_config': {
+                'row_mode': 'list_library',
+                'lookup_list_id': 'country_map',
+                'join_dimension': 'countries',
+                'row_entity_type': 'country',
+            },
+        }]
+        data_rows = [{
+            'id': 100,
+            'form_item_id': 9,
+            'submission_type': 'assigned',
+            'submission_id': 1,
+            'country_id': 7,
+            'disaggregation_data': {
+                'mode': 'matrix',
+                'values': {'10_SP2': 4107000, '20_SP3': 120},
+            },
+        }]
+        cells = build_matrix_cells_from_data_rows(data_rows, form_items)
+        cells = enrich_matrix_cells(cells, form_items, countries_table=[{
+            'id': 10, 'name': 'Kenya', 'iso2': 'KE', 'iso3': 'KEN',
+        }])
+        assert len(cells) == 2
+        assert cells[0]['matrix']['row']['entity_id'] == 10
+        assert cells[0]['matrix']['column']['key'] == 'SP2'
+        assert cells[0]['matrix']['row']['join_dimension'] == 'countries'
+        assert cells[0]['value'] == 4107000
+        assert cells[0]['matrix']['row']['label'] == 'Kenya'
+        assert cells[0]['matrix']['entity']['iso2'] == 'KE'
 
-    def test_resolve_matrix_entity_labels_no_form_items(self, app):
-        from app.routes.api.data import _resolve_matrix_entity_labels
-        with app.app_context():
-            result = _resolve_matrix_entity_labels({1: [10, 20]}, [])
-        assert result == {}
+    def test_strip_matrix_values_from_data_rows(self, app):
+        from app.utils.api_serialization import strip_matrix_values_from_data_rows
+        rows = [{
+            'id': 1,
+            'disaggregation_data': {
+                'mode': 'matrix',
+                'values': {'10_SP2': 100},
+            },
+            'prefilled_disaggregation_data': {
+                'mode': 'sex',
+                'values': {'male': 5},
+            },
+        }]
+        strip_matrix_values_from_data_rows(rows)
+        assert rows[0]['disaggregation_data'] == {
+            'mode': 'matrix',
+            'values': {},
+            'matrix_cells': True,
+        }
+        assert rows[0]['prefilled_disaggregation_data']['values'] == {'male': 5}
 
-    def test_resolve_matrix_entity_labels_non_matrix_item(self, app):
-        from app.routes.api.data import _resolve_matrix_entity_labels
-        fi = MagicMock()
-        fi.id = 1
-        fi.item_type = "indicator"
-        with app.app_context():
-            result = _resolve_matrix_entity_labels({1: [10, 20]}, [fi])
-        assert result == {}
-
-    def test_resolve_entity_ids_empty_prefix_ids(self, app):
-        from app.routes.api.data import _resolve_entity_ids_for_lookup
-        with app.app_context():
-            result = _resolve_entity_ids_for_lookup("some_list", "name", set())
-        assert result == {}
-
-    def test_resolve_entity_ids_empty_lookup_id(self, app):
-        from app.routes.api.data import _resolve_entity_ids_for_lookup
-        with app.app_context():
-            result = _resolve_entity_ids_for_lookup("", "name", {1, 2})
-        assert result == {}
+    def test_resolve_matrix_join_metadata_country_map(self, app):
+        from app.utils.api_serialization import resolve_matrix_join_metadata
+        meta = resolve_matrix_join_metadata({
+            'row_mode': 'list_library',
+            'lookup_list_id': 'country_map',
+        })
+        assert meta['join_dimension'] == 'countries'
+        assert meta['row_entity_type'] == 'country'
 
     def test_parse_tables_layout_flat(self, app):
         from app.routes.api.data import _parse_tables_layout_param
@@ -476,3 +753,28 @@ class TestDataHelpers:
         with app.test_request_context("/"):
             result = _parse_tables_layout_param()
         assert result == "flat"
+
+    def test_parse_include_flags_default_true(self, app):
+        from app.routes.api.data import _parse_include_flags
+        with app.test_request_context("/"):
+            include_dynamic, include_repeat = _parse_include_flags({})
+        assert include_dynamic is True
+        assert include_repeat is True
+
+    def test_parse_include_flags_explicit_false(self, app):
+        from app.routes.api.data import _parse_include_flags
+        include_dynamic, include_repeat = _parse_include_flags({
+            'include_dynamic': 'false',
+            'include_repeat': '0',
+        })
+        assert include_dynamic is False
+        assert include_repeat is False
+
+    def test_parse_include_flags_explicit_true(self, app):
+        from app.routes.api.data import _parse_include_flags
+        include_dynamic, include_repeat = _parse_include_flags({
+            'include_dynamic': 'yes',
+            'include_repeat': '1',
+        })
+        assert include_dynamic is True
+        assert include_repeat is True

@@ -81,8 +81,9 @@ def _mock_indicator_bank_form_deps():
     subsector.name = 'Primary Health'
 
     patches = [
-        patch('app.forms.system.indicator_bank_forms.IndicatorBankType.query') ,
+        patch('app.forms.system.indicator_bank_forms.IndicatorBankType.query'),
         patch('app.forms.system.indicator_bank_forms.IndicatorBankUnit.query'),
+        patch('app.forms.system.indicator_bank_forms.IndicatorBankSpef.query'),
         patch('app.forms.system.indicator_bank_forms.Sector.query'),
         patch('app.forms.system.indicator_bank_forms.SubSector.query'),
         patch('app.routes.admin.shared.get_localized_sector_name', return_value='Health'),
@@ -95,11 +96,13 @@ def _make_ib_form(app, data=None):
     """Create an IndicatorBankForm with mocked DB queries."""
     mtype = MagicMock(); mtype.id = 1; mtype.name = 'Number'
     munit = MagicMock(); munit.id = 2; munit.name = 'People'
+    mspef = MagicMock(); mspef.id = 3; mspef.code = 'EF2'; mspef.name = 'Climate'
     sector = MagicMock(); sector.id = 10; sector.name = 'Health'
     subsector = MagicMock(); subsector.id = 20; subsector.name = 'Sub'
 
     with patch('app.forms.system.indicator_bank_forms.IndicatorBankType') as mt, \
          patch('app.forms.system.indicator_bank_forms.IndicatorBankUnit') as mu, \
+         patch('app.forms.system.indicator_bank_forms.IndicatorBankSpef') as msp, \
          patch('app.forms.system.indicator_bank_forms.Sector') as ms, \
          patch('app.forms.system.indicator_bank_forms.SubSector') as mss, \
          patch('app.routes.admin.shared.get_localized_sector_name', return_value='Health'), \
@@ -107,6 +110,7 @@ def _make_ib_form(app, data=None):
 
         mt.query.filter_by.return_value.order_by.return_value.all.return_value = [mtype]
         mu.query.filter_by.return_value.order_by.return_value.all.return_value = [munit]
+        msp.query.filter_by.return_value.order_by.return_value.all.return_value = [mspef]
         ms.query.filter_by.return_value.order_by.return_value.all.return_value = [sector]
         mss.query.filter_by.return_value.order_by.return_value.all.return_value = [subsector]
 
@@ -114,6 +118,7 @@ def _make_ib_form(app, data=None):
         form = IndicatorBankForm(data=data or {'name': 'Test Indicator', 'type': 1})
         form.type.choices = [(1, 'Number')]
         form.unit.choices = [(None, '-- No unit --'), (2, 'People')]
+        form.area.choices = [('', '-- Select Area --'), ('EF2', 'EF2 — Climate')]
         form.sector_primary.choices = [(None, '-- Select --'), (10, 'Health')]
         form.sector_secondary.choices = [(None, '-- Select --'), (10, 'Health')]
         form.sector_tertiary.choices = [(None, '-- Select --'), (10, 'Health')]
@@ -140,16 +145,19 @@ class TestIndicatorBankForm:
         with app.app_context():
             with patch('app.forms.system.indicator_bank_forms.IndicatorBankType') as mt, \
                  patch('app.forms.system.indicator_bank_forms.IndicatorBankUnit') as mu, \
+                 patch('app.forms.system.indicator_bank_forms.IndicatorBankSpef') as msp, \
                  patch('app.forms.system.indicator_bank_forms.Sector') as ms, \
                  patch('app.forms.system.indicator_bank_forms.SubSector') as mss:
                 mt.query.filter_by.return_value.order_by.side_effect = RuntimeError('db fail')
                 mu.query.filter_by.return_value.order_by.return_value.all.return_value = []
+                msp.query.filter_by.return_value.order_by.return_value.all.return_value = []
                 ms.query.filter_by.return_value.order_by.return_value.all.return_value = []
                 mss.query.filter_by.return_value.order_by.return_value.all.return_value = []
                 from app.forms.system.indicator_bank_forms import IndicatorBankForm
                 form = IndicatorBankForm(data={'name': 'Test', 'type': 1})
                 # Should have fallback empty choices
                 assert form.sector_primary.choices is not None
+                assert form.area.choices == [('', '-- Select Area --')]
 
     def test_translatable_languages_fallback(self, app):
         with app.app_context():
@@ -273,6 +281,8 @@ class TestIndicatorBankFormPopulateFrom:
         ib.definition = 'A test indicator'
         ib.aggregated_label = 'Total count'
         ib.area = 'EF2'
+        ib.area_label = 'Climate'
+        ib.spef_area = None
         ib.data_source = 'IFRC'
         ib.disaggregation_guidance = 'By sex'
         ib.tags_list = ['health', 'emergency']
@@ -366,14 +376,22 @@ class TestIndicatorBankFormPopulateIndicatorBank:
             mock_ib.set_name_translation = MagicMock()
             mock_ib.set_aggregated_label_translation = MagicMock()
             mock_ib.sync_type_unit_string_columns = MagicMock()
+            mock_spef = MagicMock()
+            mock_spef.id = 3
+            mock_spef.code = 'EF2'
+            mock_spef.name = 'Climate'
 
-            with patch('app.forms.system.indicator_bank_forms.get_request_data') as mock_req:
+            with patch('app.forms.system.indicator_bank_forms.get_request_data') as mock_req, \
+                 patch.object(form, '_resolve_spef_by_code', return_value=mock_spef):
                 mock_data = MagicMock()
                 mock_data.getlist.return_value = []
                 mock_req.return_value = mock_data
                 form.populate_indicator_bank(mock_ib)
 
             assert mock_ib.name == 'My Indicator'
+            assert mock_ib.indicator_spef_id == 3
+            assert mock_ib.area == 'EF2'
+            assert mock_ib.area_label == 'Climate'
 
     def test_populate_indicator_bank_with_sectors(self, app):
         with app.app_context():
@@ -403,7 +421,8 @@ class TestIndicatorBankFormPopulateIndicatorBank:
             mock_ib.set_aggregated_label_translation = MagicMock()
             mock_ib.sync_type_unit_string_columns = MagicMock()
 
-            with patch('app.forms.system.indicator_bank_forms.get_request_data') as mock_req:
+            with patch('app.forms.system.indicator_bank_forms.get_request_data') as mock_req, \
+                 patch.object(form, '_resolve_spef_by_code', return_value=None):
                 mock_data = MagicMock()
                 mock_data.getlist.return_value = []
                 mock_req.return_value = mock_data
@@ -411,6 +430,8 @@ class TestIndicatorBankFormPopulateIndicatorBank:
 
             assert mock_ib.sector == {'primary': 10}
             assert mock_ib.sub_sector == {'primary': 20}
+            assert mock_ib.indicator_spef_id is None
+            assert mock_ib.area is None
 
     def test_populate_indicator_bank_syncs_related_programs_list(self, app):
         with app.app_context():
@@ -440,7 +461,8 @@ class TestIndicatorBankFormPopulateIndicatorBank:
             mock_ib.set_aggregated_label_translation = MagicMock()
             mock_ib.sync_type_unit_string_columns = MagicMock()
 
-            with patch('app.forms.system.indicator_bank_forms.get_request_data') as mock_req:
+            with patch('app.forms.system.indicator_bank_forms.get_request_data') as mock_req, \
+                 patch.object(form, '_resolve_spef_by_code', return_value=None):
                 mock_data = MagicMock()
                 mock_data.getlist.return_value = ['Health', 'WASH']
                 mock_req.return_value = mock_data

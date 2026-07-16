@@ -13,6 +13,10 @@
         height: 300px;
         width: 100%;
     }
+    #queryParamsDetails > summary,
+    #powerQueryDetails > summary { list-style: none; }
+    #queryParamsDetails > summary::-webkit-details-marker,
+    #powerQueryDetails > summary::-webkit-details-marker { display: none; }
     .ep-ag-row-undocumented .ag-cell { background-color: rgb(254 252 232) !important; }
     .ep-ag-row-stale .ag-cell { background-color: rgb(249 250 251) !important; opacity: 0.92; }
     .ep-ag-row-flagged .ag-cell { background-color: rgb(254 242 242) !important; }
@@ -671,11 +675,15 @@
                 </select>
             </div>
 
-            <!-- Query Parameters -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">{{ _('Query Parameters') }}</label>
-                <div class="space-y-3" id="queryParams"></div>
-            </div>
+            <!-- Query Parameters (collapsed by default) -->
+            <details id="queryParamsDetails" class="group">
+                <summary class="flex items-center gap-2 cursor-pointer list-none select-none text-sm font-medium text-gray-700 hover:text-gray-900">
+                    <i class="fas fa-chevron-right text-xs text-gray-400 transition-transform group-open:rotate-90" aria-hidden="true"></i>
+                    <span>{{ _('Query Parameters') }}</span>
+                    <span id="queryParamsCount" class="text-xs font-normal text-gray-400"></span>
+                </summary>
+                <div class="mt-2 space-y-1.5" id="queryParams"></div>
+            </details>
 
             <!-- Generated URL -->
             <div>
@@ -695,37 +703,41 @@
                 <p class="mt-2 text-sm text-gray-500">{{ _('Click Copy to copy the URL to clipboard, or Open to test the endpoint') }}</p>
             </div>
 
-            <!-- Power Query (M) for Excel & Power BI -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    <i class="fas fa-file-excel text-green-600 mr-1" aria-hidden="true"></i>
-                    {{ _('Power Query (M) — Excel & Power BI') }}
-                </label>
-                <p class="text-sm text-gray-600 mb-2">
-                    {{ _('Download Excel to get a workbook with these queries already in the Queries list. Or copy M code into Advanced Editor (Excel or Power BI).') }}
-                </p>
-                <p class="text-sm text-gray-500 mb-2">
-                    {{ _('API key is sent as api_key in the query string. Choose Anonymous when prompted.') }}
-                </p>
-                <div class="relative">
-                    <textarea id="generatedMQuery" readonly rows="14"
-                              class="w-full bg-gray-900 text-gray-100 text-xs rounded-lg border border-gray-300 p-3 pr-4 font-mono leading-relaxed resize-y"
-                              aria-label="{{ _('Generated Power Query M code') }}"></textarea>
-                    <div class="mt-2 flex flex-wrap gap-2">
-                        <button type="button" id="copyMQueryExcel" class="btn btn-success btn-sm">
-                            <i class="fas fa-copy mr-1" aria-hidden="true"></i>{{ _('Copy M for Excel') }}
-                        </button>
-                        <button type="button" id="copyMQueryPbi" class="btn btn-primary btn-sm">
-                            <i class="fas fa-copy mr-1" aria-hidden="true"></i>{{ _('Copy M for Power BI') }}
-                        </button>
-                        <button type="button" id="downloadPowerQueryExcel" class="btn btn-success btn-sm">
-                            <i class="fas fa-download mr-1" aria-hidden="true"></i>{{ _('Download Excel with queries') }}
-                        </button>
+            <!-- Power Query (M) — collapsed by default -->
+            <details id="powerQueryDetails" class="group">
+                <summary class="flex items-center gap-2 cursor-pointer list-none select-none text-sm font-medium text-gray-700 hover:text-gray-900">
+                    <i class="fas fa-chevron-right text-xs text-gray-400 transition-transform group-open:rotate-90" aria-hidden="true"></i>
+                    <i class="fas fa-code text-gray-500" aria-hidden="true"></i>
+                    <span>{{ _('Power Query (M)') }}</span>
+                </summary>
+                <div class="mt-2">
+                    <p class="text-sm text-gray-600 mb-2">
+                        {{ _('Copy into Advanced Editor (Get Data → Blank Query). Use this as a source query, then reference it to expand each array (data, form_items, countries, …).') }}
+                    </p>
+                    <p class="text-sm text-gray-500 mb-2">
+                        {{ _('API key is sent as api_key in the query string. Choose Anonymous when prompted.') }}
+                    </p>
+                    <div id="powerQueryLayoutStarWrap" class="mb-3 hidden">
+                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="powerQueryLayoutStar"
+                                   class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            <span class="text-sm font-medium text-gray-700">{{ _('layout=star') }}</span>
+                            <span class="text-sm text-gray-500">{{ _('Dimensional tables for BI (star schema)') }}</span>
+                        </label>
                     </div>
-                    <div id="mQueryPerTableButtons" class="mt-2 flex flex-wrap gap-2 hidden"></div>
+                    <div class="relative">
+                        <textarea id="generatedMQuery" readonly rows="14"
+                                  class="w-full bg-gray-900 text-gray-100 text-xs rounded-lg border border-gray-300 p-3 pr-4 font-mono leading-relaxed resize-y"
+                                  aria-label="{{ _('Generated Power Query M code') }}"></textarea>
+                        <div class="mt-2 flex flex-wrap gap-2">
+                            <button type="button" id="copyMQuery" class="btn btn-primary btn-sm">
+                                <i class="fas fa-copy mr-1" aria-hidden="true"></i>{{ _('Copy query') }}
+                            </button>
+                        </div>
+                    </div>
+                    <p id="mQueryHint" class="mt-2 text-sm text-gray-500"></p>
                 </div>
-                <p id="mQueryHint" class="mt-2 text-sm text-gray-500"></p>
-            </div>
+            </details>
         </div>
     </div>
     </div>{# /panel-builder #}
@@ -1066,6 +1078,7 @@ try {
                 {name: 'sort', type: 'select', options: ['', 'submitted_at', 'template_id', 'country_id', 'period_name'], description: '{{ _("Sort field (default: submitted_at)") }}'},
                 {name: 'order', type: 'select', options: ['desc', 'asc'], description: '{{ _("Sort order: desc (default) or asc") }}'},
                 {name: 'disagg', type: 'select', options: ['', 'true', 'false'], description: '{{ _("Include disaggregation data (default: excluded)") }}'},
+                {name: 'related', type: 'select', options: ['', 'page', 'all'], description: '{{ _("Related tables scope: page (current page) or all (full dataset)") }}'},
                 {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1, API key auth only)") }}'},
                 {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: 20, max 1000, API key auth only)") }}'}
             ],
@@ -1174,13 +1187,19 @@ try {
 
             currentParamDefinitions = endpointParamMap[endpointKey] || defaultParams;
 
+            const countEl = document.getElementById('queryParamsCount');
+            if (countEl) {
+                const n = currentParamDefinitions.length;
+                countEl.textContent = n ? '(' + n + ')' : '';
+            }
+
             currentParamDefinitions.forEach(param => {
                 const row = document.createElement('div');
-                row.className = 'flex items-center gap-4 p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors';
+                row.className = 'flex items-center gap-3 py-0.5';
 
                 // Checkbox
                 const checkboxContainer = document.createElement('div');
-                checkboxContainer.className = 'w-1/4';
+                checkboxContainer.className = 'w-1/4 min-w-0';
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.id = `enable_${param.name}`;
@@ -1196,7 +1215,7 @@ try {
                 let inputEl;
                 if (param.type === 'select') {
                     inputEl = document.createElement('select');
-                    inputEl.className = 'w-1/4 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5';
+                    inputEl.className = 'w-1/4 bg-white border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 py-1.5 px-2';
                     (param.options || []).forEach((opt, index) => {
                         const optEl = document.createElement('option');
                         optEl.value = opt;
@@ -1215,7 +1234,7 @@ try {
                 } else {
                     inputEl = document.createElement('input');
                     inputEl.type = param.type || 'text';
-                    inputEl.className = 'w-1/4 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5';
+                    inputEl.className = 'w-1/4 bg-white border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 py-1.5 px-2';
                     if (param.placeholder) inputEl.placeholder = param.placeholder;
                 }
                 inputEl.id = param.name;
@@ -1223,7 +1242,8 @@ try {
 
                 // Description
                 const desc = document.createElement('span');
-                desc.className = 'text-sm text-gray-500 flex-1';
+                desc.className = 'text-xs text-gray-500 flex-1 min-w-0 truncate';
+                desc.title = param.description || '';
                 desc.textContent = param.description || '';
 
                 row.appendChild(checkboxContainer);
@@ -1236,13 +1256,13 @@ try {
                 checkbox.addEventListener('change', () => {
                     inputEl.disabled = !checkbox.checked;
                     if (checkbox.checked) {
-                        row.classList.add('border-blue-300', 'bg-blue-50');
+                        label.classList.add('text-blue-700');
                         // For 'order' parameter, ensure it has a value when enabled
                         if (param.name === 'order' && inputEl.value === '') {
                             inputEl.value = 'desc';
                         }
                     } else {
-                        row.classList.remove('border-blue-300', 'bg-blue-50');
+                        label.classList.remove('text-blue-700');
                     }
                     updateGeneratedUrl();
                 });
@@ -1328,20 +1348,26 @@ try {
         }
         window.updateEndpointLinks = updateEndpointLinks;
 
-        const mQueryDataRootByEndpoint = {
-            '/api/v1/data': 'data',
-            '/api/v1/submissions': 'data',
-            '/api/v1/templates': 'data',
-            '/api/v1/countrymap': 'data',
-            '/api/v1/nationalsocietymap': 'data',
-            '/api/v1/users': 'data',
-            '/api/v1/indicator-bank': 'data',
-            '/api/v1/assigned-forms': 'data',
-            '/api/v1/submitted-documents': 'data',
-        };
-
         function escapeMString(value) {
             return String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '""');
+        }
+
+        function isDataTablesEndpoint(endpointKey) {
+            return endpointKey === '/api/v1/data' || endpointKey === '/api/v1/data/tables';
+        }
+
+        function isLayoutStarEnabled() {
+            const el = document.getElementById('powerQueryLayoutStar');
+            return !!(el && el.checked && isDataTablesEndpoint(
+                endpointMapKey(document.getElementById('baseEndpoint')?.value || '')
+            ));
+        }
+
+        function syncLayoutStarToggleVisibility() {
+            const wrap = document.getElementById('powerQueryLayoutStarWrap');
+            if (!wrap) return;
+            const key = endpointMapKey(document.getElementById('baseEndpoint')?.value || '');
+            wrap.classList.toggle('hidden', !isDataTablesEndpoint(key));
         }
 
         function collectEnabledQueryParams() {
@@ -1356,6 +1382,9 @@ try {
                     params.append(param.name, inputEl.value);
                 }
             });
+            if (isLayoutStarEnabled()) {
+                params.set('layout', 'star');
+            }
             return params;
         }
 
@@ -1370,24 +1399,11 @@ try {
             if (paramNames.has('per_page') && !params.has('per_page')) {
                 params.append('per_page', '1000');
             }
-            if (endpointKey === '/api/v1/data/tables' && !params.has('related')) {
+            if (isDataTablesEndpoint(endpointKey) && !params.has('related')) {
                 params.append('related', 'all');
             }
             return params;
         }
-
-        const mQueryExpandListFieldHelper = [
-            '    ExpandListField = (list as list) as table =>',
-            '        let',
-            '            SafeList = if list = null then {} else list,',
-            '            AsTable = Table.FromList(SafeList, Splitter.SplitByNothing(), {"Record"}),',
-            '            Expanded = if List.IsEmpty(SafeList) then AsTable else',
-            '                Table.ExpandRecordColumn(AsTable, "Record", Record.FieldNames(SafeList{0}))',
-            '        in',
-            '            Expanded,',
-        ].join('\n');
-
-        const M_QUERY_DOCS_URL = 'https://learn.microsoft.com/en-us/power-query/share-query';
 
         function formatMQueryRecord(params, apiKeyLiteral) {
             const entries = [`        api_key = "${apiKeyLiteral}"`];
@@ -1397,197 +1413,33 @@ try {
             return entries.join(',\n');
         }
 
-        function getMQueryBuildContext() {
-            const baseEndpoint = document.getElementById('baseEndpoint').value;
-            return {
-                baseEndpoint,
-                endpointKey: endpointMapKey(baseEndpoint),
-                params: collectMQueryParams(),
-                apiKeyLiteral: getApiKeyValue() ? escapeMString(getApiKeyValue()) : 'YOUR_API_KEY',
-                host: window.location.origin,
-                relativePath: String(baseEndpoint || '').replace(/^\/+/, ''),
-            };
-        }
-
-        function buildMQueryClientNotes(clientLabel, ctx) {
-            const clientName = clientLabel === 'excel' ? 'Microsoft Excel' : 'Power BI';
-            const clientSteps = clientLabel === 'excel'
-                ? '// Excel: Data → Get Data → From Other Sources → Blank Query → Advanced Editor → paste → Done'
-                : '// Power BI: Home → Get Data → Blank Query → Advanced Editor → paste → Done';
-            const credentialSteps = clientLabel === 'excel'
-                ? '// Credentials: when prompted choose Anonymous (not Windows/Basic).'
-                : '// Credentials: when prompted choose Anonymous (not Organizational/Basic).';
-            const pathNote = (ctx.baseEndpoint.includes('<') || ctx.baseEndpoint.includes('{'))
-                ? '\n// Replace path placeholders (e.g. <template_id>) before running.'
-                : '';
-            return {clientName, clientSteps, credentialSteps, pathNote};
-        }
-
-        function buildMQueryFormula(letBodyLines, resultName) {
-            return ['let', ...letBodyLines, 'in', `    ${resultName}`].join('\n');
-        }
-
-        function formatAdvancedEditorQuery(commentLines, letBodyLines, resultName) {
-            const lines = [];
-            (commentLines || []).forEach(line => {
-                if (line) {
-                    lines.push(line);
-                }
-            });
-            lines.push(buildMQueryFormula(letBodyLines, resultName));
-            return lines.join('\n');
-        }
-
-        function stripTrailingComma(lines) {
-            const copy = lines.slice();
-            if (!copy.length) {
-                return copy;
-            }
-            copy[copy.length - 1] = copy[copy.length - 1].replace(/,\s*$/, '');
-            return copy;
-        }
-
-        function buildMQuerySourceBlock(ctx) {
-            const webContentsOptions = [
+        function buildPowerQueryM() {
+            const baseEndpoint = document.getElementById('baseEndpoint')?.value || '';
+            const apiKeyLiteral = getApiKeyValue() ? escapeMString(getApiKeyValue()) : 'YOUR_API_KEY';
+            const host = String(window.location.origin || '').replace(/\/?$/, '/');
+            const relativePath = String(baseEndpoint || '').replace(/^\/+/, '');
+            const params = collectMQueryParams();
+            return [
+                'let',
+                `    ApiKey = "${apiKeyLiteral}",`,
+                `    Host = "${escapeMString(host)}",`,
+                `    RelativePath = "${escapeMString(relativePath)}",`,
+                '    Query = [',
+                formatMQueryRecord(params, apiKeyLiteral),
+                '    ],',
+                '    Source = Json.Document(',
+                '        Web.Contents(',
+                '            Host,',
                 '            [',
                 '                RelativePath = RelativePath,',
                 '                Query = Query,',
                 '                ManualStatusHandling = {400, 401, 403, 404, 429, 500}',
                 '            ]',
-            ].join('\n');
-            return [
-                `    ApiKey = "${ctx.apiKeyLiteral}",`,
-                `    Host = "${escapeMString(ctx.host)}",`,
-                `    RelativePath = "${escapeMString(ctx.relativePath)}",`,
-                '    Query = [',
-                formatMQueryRecord(ctx.params, ctx.apiKeyLiteral),
-                '    ],',
-                '    Source = Json.Document(',
-                '        Web.Contents(',
-                '            Host,',
-                webContentsOptions,
                 '        )',
-                '    ),',
-            ];
-        }
-
-        function buildTableExpansionBody(ctx, jsonField) {
-            return [
-                ...stripTrailingComma(buildMQuerySourceBlock(ctx)),
-                mQueryExpandListFieldHelper,
-                `    Result = ExpandListField(try Source[${jsonField}] otherwise {})`,
-            ];
-        }
-
-        function buildDataTablesSectionParts(clientLabel, ctx) {
-            const notes = buildMQueryClientNotes(clientLabel, ctx);
-            const tables = [
-                {id: 'data', queryName: 'Databank_Data', title: 'Data', jsonField: 'data'},
-                {id: 'form_items', queryName: 'Databank_FormItems', title: 'FormItems', jsonField: 'form_items'},
-                {id: 'countries', queryName: 'Databank_Countries', title: 'Countries', jsonField: 'countries'},
-            ];
-            return tables.map((table, index) => {
-                const letBody = buildTableExpansionBody(ctx, table.jsonField);
-                const formula = buildMQueryFormula(letBody, 'Result');
-                const comments = index === 0
-                    ? [
-                        `// Humanitarian Databank API — ${notes.clientName}`,
-                        notes.clientSteps,
-                        notes.credentialSteps + notes.pathNote,
-                        '// Repeat for each table: create a new Blank Query, paste, rename, Done.',
-                        `// Table ${index + 1} of ${tables.length}: ${table.title} (suggested name: ${table.queryName})`,
-                    ]
-                    : [
-                        `// Table ${index + 1} of ${tables.length}: ${table.title} (suggested name: ${table.queryName})`,
-                        notes.clientSteps,
-                        notes.credentialSteps,
-                    ];
-                return {
-                    id: table.id,
-                    title: table.title,
-                    queryName: table.queryName,
-                    formula,
-                    code: formatAdvancedEditorQuery(comments, letBody, 'Result'),
-                };
-            });
-        }
-
-        function buildSingleEndpointSection(clientLabel, ctx, dataRoot) {
-            const notes = buildMQueryClientNotes(clientLabel, ctx);
-            const queryName = (ctx.endpointKey || 'Databank_query').replace(/^\/+/, '').replace(/\//g, '_');
-            const introComments = [
-                `// Humanitarian Databank API — ${notes.clientName}`,
-                notes.clientSteps,
-                notes.credentialSteps + notes.pathNote,
-            ];
-            let letBody;
-            const resultName = 'Result';
-            if (dataRoot) {
-                letBody = [
-                    ...stripTrailingComma(buildMQuerySourceBlock(ctx)),
-                    `    DataList = Source[${dataRoot}],`,
-                    '    AsTable = Table.FromList(DataList, Splitter.SplitByNothing(), {"Record"}),',
-                    '    Result = if List.IsEmpty(DataList) then AsTable else',
-                    '        Table.ExpandRecordColumn(AsTable, "Record", Record.FieldNames(DataList{0}))',
-                ];
-            } else {
-                letBody = [
-                    ...stripTrailingComma(buildMQuerySourceBlock(ctx)),
-                    '    Result = Source',
-                ];
-            }
-            const formula = buildMQueryFormula(letBody, resultName);
-            return {
-                id: 'response',
-                title: 'Response',
-                queryName,
-                formula,
-                code: formatAdvancedEditorQuery(introComments, letBody, resultName),
-            };
-        }
-
-        function buildPowerQueryPackage(clientLabel) {
-            const ctx = getMQueryBuildContext();
-            const dataRoot = mQueryDataRootByEndpoint[ctx.endpointKey] || null;
-            const parts = ctx.endpointKey === '/api/v1/data/tables'
-                ? buildDataTablesSectionParts(clientLabel, ctx)
-                : [buildSingleEndpointSection(clientLabel, ctx, dataRoot)];
-            const notes = buildMQueryClientNotes(clientLabel, ctx);
-            const preamble = parts.length > 1
-                ? [
-                    `// ${parts.length} queries for ${ctx.endpointKey}`,
-                    '// Download Excel with queries, or copy each table into Blank Query → Advanced Editor.',
-                    `// Docs: ${M_QUERY_DOCS_URL}`,
-                    '',
-                ].join('\n')
-                : '';
-            return {
-                parts,
-                combined: preamble + parts.map(part => part.code).join('\n\n'),
-            };
-        }
-
-        function renderPerTableCopyButtons(pkg) {
-            const container = document.getElementById('mQueryPerTableButtons');
-            if (!container) {
-                return;
-            }
-            container.innerHTML = '';
-            if (!pkg || pkg.parts.length <= 1) {
-                container.classList.add('hidden');
-                return;
-            }
-            container.classList.remove('hidden');
-            pkg.parts.forEach((part) => {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'btn btn-secondary btn-sm';
-                btn.innerHTML = `<i class="fas fa-copy mr-1" aria-hidden="true"></i>${part.title}`;
-                btn.addEventListener('click', async function() {
-                    await copyTextWithFeedback(part.code, btn, '{{ _("Copied!") }}');
-                });
-                container.appendChild(btn);
-            });
+                '    )',
+                'in',
+                '    Source',
+            ].join('\n');
         }
 
         function updatePowerQueryM() {
@@ -1597,9 +1449,8 @@ try {
                 return;
             }
 
-            const pkg = buildPowerQueryPackage('excel');
-            mQueryEl.value = pkg.combined;
-            renderPerTableCopyButtons(pkg);
+            syncLayoutStarToggleVisibility();
+            mQueryEl.value = buildPowerQueryM();
 
             if (hintEl) {
                 const apiKey = getApiKeyValue();
@@ -1607,11 +1458,10 @@ try {
                     hintEl.textContent = '{{ _("Paste your API key above to embed it in the M query, or replace YOUR_API_KEY in the copied code.") }}';
                     hintEl.className = 'mt-2 text-sm text-amber-700';
                 } else {
-                    hintEl.textContent = '{{ _("Download Excel with queries, or copy M into Advanced Editor. API key is sent as api_key — choose Anonymous when prompted.") }}';
+                    hintEl.textContent = '{{ _("Rename this query (e.g. Databank_Source), then reference it from child queries that expand each array.") }}';
                     hintEl.className = 'mt-2 text-sm text-gray-500';
                 }
             }
-
         }
 
         async function copyTextWithFeedback(text, btn, copiedLabel) {
@@ -1674,10 +1524,19 @@ try {
         const baseEndpointSelect = document.getElementById('baseEndpoint');
         baseEndpointSelect.addEventListener('change', () => {
             createQueryParamInputs();
+            syncLayoutStarToggleVisibility();
         });
+
+        const layoutStarToggle = document.getElementById('powerQueryLayoutStar');
+        if (layoutStarToggle) {
+            layoutStarToggle.addEventListener('change', () => {
+                updateGeneratedUrl();
+            });
+        }
 
         // Initial build
         createQueryParamInputs();
+        syncLayoutStarToggleVisibility();
         updateEndpointLinks();
 
         // Copy URL functionality
@@ -1686,100 +1545,10 @@ try {
             await copyTextWithFeedback(urlInput.value, this, '{{ _("Copied!") }}');
         });
 
-        const copyMQueryExcelBtn = document.getElementById('copyMQueryExcel');
-        if (copyMQueryExcelBtn) {
-            copyMQueryExcelBtn.addEventListener('click', async function() {
-                const pkg = buildPowerQueryPackage('excel');
-                const label = pkg.parts.length > 1
-                    ? '{{ _("Copied M blocks for Excel — paste each into its own Blank Query") }}'
-                    : '{{ _("Copied for Excel!") }}';
-                await copyTextWithFeedback(pkg.combined, this, label);
-            });
-        }
-
-        const copyMQueryPbiBtn = document.getElementById('copyMQueryPbi');
-        if (copyMQueryPbiBtn) {
-            copyMQueryPbiBtn.addEventListener('click', async function() {
-                const pkg = buildPowerQueryPackage('pbi');
-                const label = pkg.parts.length > 1
-                    ? '{{ _("Copied M blocks for Power BI — paste each into its own Blank Query") }}'
-                    : '{{ _("Copied for Power BI!") }}';
-                await copyTextWithFeedback(pkg.combined, this, label);
-            });
-        }
-
-        const POWER_QUERY_WORKBOOK_URL = {{ url_for('api_management.power_query_workbook')|tojson }};
-
-        async function downloadPowerQueryExcel(btn) {
-            const pkg = buildPowerQueryPackage('excel');
-            const endpointKey = endpointMapKey(document.getElementById('baseEndpoint')?.value || '');
-            const filename = `databank-${endpointKey.replace(/^\/+/, '').replace(/\//g, '-') || 'queries'}.xlsx`;
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-            const originalHtml = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1" aria-hidden="true"></i>{{ _("Preparing…") }}';
-
-            try {
-                const innerPayload = {
-                    filename,
-                    queries: pkg.parts.map((part) => ({
-                        name: part.queryName || part.title,
-                        formula: part.formula,
-                    })),
-                };
-                // WAF: base64-wrap M formulas so OWASP CRS does not block SQL-like tokens.
-                const payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(innerPayload))));
-                const response = await fetch(POWER_QUERY_WORKBOOK_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(csrfToken ? {'X-CSRFToken': csrfToken} : {}),
-                    },
-                    body: JSON.stringify({ payload: payloadB64 }),
-                });
-                if (!response.ok) {
-                    let message = '{{ _("Could not build Excel workbook") }}';
-                    if (
-                        response.status === 403
-                        && typeof window.looksLikeWafResponse === 'function'
-                        && window.looksLikeWafResponse(response)
-                    ) {
-                        message = '{{ _("Download was blocked by network security. Refresh the page and try again, or use Copy M for Excel instead.") }}';
-                    } else {
-                        try {
-                            const payload = await response.json();
-                            if (payload && payload.error) {
-                                message = payload.error;
-                            }
-                        } catch (e) {}
-                    }
-                    throw new Error(message);
-                }
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = filename;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-                btn.innerHTML = '<i class="fas fa-check mr-1" aria-hidden="true"></i>{{ _("Downloaded!") }}';
-                setTimeout(() => {
-                    btn.innerHTML = originalHtml;
-                }, 2000);
-            } catch (error) {
-                btn.innerHTML = originalHtml;
-                window.alert(error.message || '{{ _("Could not build Excel workbook") }}');
-            } finally {
-                btn.disabled = false;
-            }
-        }
-
-        const downloadPowerQueryExcelBtn = document.getElementById('downloadPowerQueryExcel');
-        if (downloadPowerQueryExcelBtn) {
-            downloadPowerQueryExcelBtn.addEventListener('click', function() {
-                downloadPowerQueryExcel(this);
+        const copyMQueryBtn = document.getElementById('copyMQuery');
+        if (copyMQueryBtn) {
+            copyMQueryBtn.addEventListener('click', async function() {
+                await copyTextWithFeedback(buildPowerQueryM(), this, '{{ _("Copied!") }}');
             });
         }
 

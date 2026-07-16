@@ -1,5 +1,6 @@
 import click
 import secrets
+from flask import current_app
 from flask.cli import with_appcontext
 from .extensions import db
 from app.utils.transactions import atomic
@@ -306,6 +307,96 @@ def register_commands(app):
 
         except Exception as e:
             click.echo(f'Error showing workflow: {e}', err=True)
+            raise
+
+    @workflows_group.command('generate-static')
+    @with_appcontext
+    def generate_static_workflow_tours():
+        """Pre-render workflow tour JSON to static files (and CDN when configured).
+
+        The chatbot's "InteractiveTour" system used to fetch tour steps from a
+        Flask route on every page load, for every AI-beta user, regardless of
+        whether the chatbot was ever opened - pure background load on Gunicorn
+        workers for content that only changes on deploy. This command renders
+        every workflow x language combination to app/static/generated/tours/
+        (served via the existing static_url()/STATIC_CDN_URL mechanism, with
+        ?v=<ASSET_VERSION> cache-busting), and mirrors them to the public CDN
+        blob container when STATIC_CDN_URL + azure_blob storage are configured.
+
+        Safe and cheap to run on every boot/deploy (~40 small JSON files from
+        local markdown, no DB/network calls unless CDN mirroring is enabled).
+        The dynamic `/api/ai/documents/workflows/<id>/tour` route remains as a
+        fallback for local dev (no generated files) and brand-new workflows.
+
+        Example:
+            flask workflows generate-static
+        """
+        import json
+        from pathlib import Path
+
+        from app.services.workflow_docs_service import WorkflowDocsService
+
+        try:
+            service = WorkflowDocsService()
+            service.reload()
+            workflows = service.get_all_workflows()
+
+            if not workflows:
+                click.echo('No workflows found in docs/workflows/; nothing to generate.')
+                return
+
+            # This app disables Flask's built-in static handling (static_folder=None,
+            # see app/__init__.py) in favor of a custom cache-header-aware route, so
+            # static_folder isn't set - compute the real on-disk path the same way.
+            output_dir = Path(current_app.root_path) / 'static' / 'generated' / 'tours'
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            cdn_enabled = False
+            storage = None
+            try:
+                from app.services import storage_service as storage
+                cdn_enabled = storage.public_cdn_enabled()
+            except Exception:
+                cdn_enabled = False
+
+            written = 0
+            skipped = 0
+            mirrored = 0
+
+            for workflow in workflows:
+                for language in sorted(service.SUPPORTED_LANGUAGES):
+                    tour_config = service.get_workflow_for_tour(workflow.id, language)
+                    if not tour_config:
+                        skipped += 1
+                        continue
+
+                    filename = f'{workflow.id}.{language}.json'
+                    payload = json.dumps(
+                        tour_config, ensure_ascii=False, separators=(',', ':')
+                    ).encode('utf-8')
+
+                    (output_dir / filename).write_bytes(payload)
+                    written += 1
+
+                    if cdn_enabled and storage is not None:
+                        try:
+                            storage.publish_to_static_cdn(
+                                f'generated/tours/{filename}', payload, 'application/json'
+                            )
+                            mirrored += 1
+                        except Exception as e:
+                            click.echo(f'  WARNING: CDN mirror failed for {filename}: {e}', err=True)
+
+            click.echo(f'Wrote {written} tour file(s) to {output_dir}')
+            if skipped:
+                click.echo(f'  Skipped {skipped} workflow/language combination(s) with no tour steps')
+            if cdn_enabled:
+                click.echo(f'Mirrored {mirrored} file(s) to the public static CDN')
+            else:
+                click.echo('  STATIC_CDN_URL not configured; files are served from local /static/ only')
+
+        except Exception as e:
+            click.echo(f'Error generating static workflow tours: {e}', err=True)
             raise
 
     # ========================================================================

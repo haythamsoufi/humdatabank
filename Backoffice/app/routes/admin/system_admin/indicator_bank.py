@@ -70,6 +70,84 @@ def _indicator_bank_dynamic_list_values():
 _INDICATOR_BANK_TABS = frozenset({'indicators', 'sectors', 'common_words', 'types', 'units', 'spef'})
 
 
+def _collect_distinct_related_programs():
+    """Collect distinct related program values, tolerating JSONB arrays and legacy scalars."""
+    programs = set()
+    rows = (
+        db.session.query(IndicatorBank._related_programs_list)
+        .filter(
+            IndicatorBank._related_programs_list.isnot(None),
+            IndicatorBank.archived.is_(False),
+        )
+        .all()
+    )
+
+    for (raw,) in rows:
+        if raw is None:
+            continue
+        if isinstance(raw, list):
+            for item in raw:
+                text = str(item).strip() if item is not None else ''
+                if text:
+                    programs.add(text)
+        elif isinstance(raw, str):
+            text = raw.strip()
+            if text:
+                programs.add(text)
+        else:
+            text = str(raw).strip()
+            if text:
+                programs.add(text)
+
+    return sorted(programs, key=str.casefold)
+
+
+def _wizard_spef_areas():
+    """Return SPEF areas for the template wizard, ordered like the indicator bank lookups."""
+    spef_rows = (
+        IndicatorBankSpef.query.filter_by(is_active=True)
+        .order_by(IndicatorBankSpef.sort_order, IndicatorBankSpef.code)
+        .all()
+    )
+    areas = [
+        {
+            'id': row.id,
+            'code': row.code,
+            'label': row.name,
+            'sort_order': row.sort_order,
+        }
+        for row in spef_rows
+        if row.code
+    ]
+
+    known_codes = {(area['code'] or '').strip().upper() for area in areas}
+    orphan_rows = (
+        db.session.query(IndicatorBank.area, IndicatorBank.area_label)
+        .filter(
+            IndicatorBank.area.isnot(None),
+            IndicatorBank.archived.is_(False),
+        )
+        .distinct()
+        .order_by(IndicatorBank.area)
+        .all()
+    )
+    next_sort_order = max((area['sort_order'] for area in areas), default=0) + 1
+    for code, label in orphan_rows:
+        normalized_code = (code or '').strip()
+        if not normalized_code or normalized_code.upper() in known_codes:
+            continue
+        areas.append({
+            'code': normalized_code,
+            'label': label or normalized_code,
+            'sort_order': next_sort_order,
+        })
+        known_codes.add(normalized_code.upper())
+        next_sort_order += 1
+
+    areas.sort(key=lambda area: (area.get('sort_order', 0), (area.get('code') or '').upper()))
+    return areas
+
+
 def _resolve_indicator_bank_tab() -> str:
     tab = (request.args.get('tab') or 'indicators').strip().lower()
     if tab == 'measurement':
@@ -1084,17 +1162,71 @@ def export_indicators():
 
 # === API Endpoints ===
 
+@bp.route("/api/indicator-bank/wizard-options", methods=["GET"])
+@permission_required('admin.indicator_bank.view')
+def get_indicator_bank_wizard_options():
+    """Return filter dropdown options for the indicator bank template wizard."""
+    try:
+        sectors = (
+            Sector.query.filter_by(is_active=True)
+            .order_by(Sector.display_order, Sector.name)
+            .all()
+        )
+        subsectors = (
+            SubSector.query.filter_by(is_active=True)
+            .order_by(SubSector.display_order, SubSector.name)
+            .all()
+        )
+
+        programs = _collect_distinct_related_programs()
+        areas = _wizard_spef_areas()
+
+        types = [
+            row[0]
+            for row in (
+                db.session.query(IndicatorBank.type)
+                .filter(
+                    IndicatorBank.archived.is_(False),
+                    IndicatorBank.type.isnot(None),
+                )
+                .distinct()
+                .order_by(IndicatorBank.type)
+                .all()
+            )
+            if row[0]
+        ]
+
+        return json_ok(
+            sectors=[{'id': s.id, 'name': s.name, 'display_order': s.display_order} for s in sectors],
+            subsectors=[
+                {'id': s.id, 'name': s.name, 'sector_id': s.sector_id}
+                for s in subsectors
+            ],
+            programs=programs,
+            areas=areas,
+            types=types,
+            disaggregation_modes=Config.DISAGGREGATION_MODES,
+        )
+    except Exception as e:
+        current_app.logger.error(f"Error loading indicator bank wizard options: {e}", exc_info=True)
+        return json_server_error(GENERIC_ERROR_MESSAGE)
+
+
 @bp.route("/api/indicator-count", methods=["POST"])
 @permission_required('admin.indicator_bank.view')
 def get_filtered_indicator_count():
     """API endpoint to get count of indicators matching filters"""
     try:
-        data = request.json
+        data = request.json or {}
         filters = data.get('filters', [])
         section_id = data.get('section_id')
         include_indicators = data.get('include_indicators', False)
+        top_level_search = (data.get('search') or '').strip()
 
         query = db.session.query(IndicatorBank)
+
+        if top_level_search:
+            query = query.filter(IndicatorBank.name.ilike(f'%{top_level_search}%'))
 
         if section_id:
             from app.models import FormSection
@@ -1106,10 +1238,19 @@ def get_filtered_indicator_count():
             field = filter_obj.get('field')
             values = filter_obj.get('values', [])
 
-            if not field or not values:
+            if not field:
                 continue
 
             try:
+                if field == 'search':
+                    search_term = (values[0] if values else filter_obj.get('value') or '').strip()
+                    if search_term:
+                        query = query.filter(IndicatorBank.name.ilike(f'%{search_term}%'))
+                    continue
+
+                if not values:
+                    continue
+
                 if field == 'type':
                     query = query.filter(IndicatorBank.type.in_(values))
                 elif field == 'unit':
@@ -1128,6 +1269,8 @@ def get_filtered_indicator_count():
                         )
                     if conditions:
                         query = query.filter(db.or_(*conditions))
+                elif field == 'area':
+                    query = query.filter(IndicatorBank.area.in_(values))
                 elif field == 'sector':
                     conditions = []
                     primary_only = filter_obj.get('primary_only', False)
@@ -1175,20 +1318,19 @@ def get_filtered_indicator_count():
 
         if include_indicators:
             try:
-                indicators = query.all()
-                result['indicators'] = [{
-                    'id': indicator.id,
-                    'name': indicator.name,
-                    'type': indicator.type,
-                    'unit': indicator.unit,
-                    'fdrs_kpi_code': getattr(indicator, 'fdrs_kpi_code', None),
-                    'definition': indicator.definition,
-                    'related_programs': indicator.related_programs_list,
-                    'emergency': indicator.emergency,
-                    'archived': indicator.archived,
-                    'sector': indicator.sector,
-                    'sub_sector': indicator.sub_sector
-                } for indicator in indicators]
+                from app.services.indicator_bank_service import serialize_wizard_indicator
+
+                indicators = (
+                    query.options(
+                        joinedload(IndicatorBank.measurement_unit),
+                        joinedload(IndicatorBank.spef_area),
+                    )
+                    .all()
+                )
+                result['indicators'] = [
+                    serialize_wizard_indicator(indicator)
+                    for indicator in indicators
+                ]
             except Exception as indicators_error:
                 current_app.logger.error(f"Error retrieving indicators: {str(indicators_error)}")
                 result['indicators'] = []

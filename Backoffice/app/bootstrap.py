@@ -262,6 +262,8 @@ def init_flask_extensions(app, config_class, startup_start):
 
     configure_babel(app)
     babel.init_app(app, locale_selector=get_locale)
+    from app.services.translation_review.hooks import install_translation_review_hooks
+    install_translation_review_hooks(app)
     limiter.init_app(app)
     csrf.init_app(app)
     mail.init_app(app)

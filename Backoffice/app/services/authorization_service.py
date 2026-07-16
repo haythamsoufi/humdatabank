@@ -412,6 +412,7 @@ class AuthorizationService:
           - entity_type, entity_id
           - template_id
           - assigned_form_id
+          - language_code
         """
         if not user or not getattr(user, "is_authenticated", False):
             return False
@@ -429,6 +430,9 @@ class AuthorizationService:
         entity_id = scope.get("entity_id")
         template_id = scope.get("template_id")
         assigned_form_id = scope.get("assigned_form_id")
+        language_code = scope.get("language_code")
+        if language_code:
+            language_code = str(language_code).lower().split("_")[0]
 
         # Avoid DetachedInstanceError in edge/test scenarios by reading identity safely.
         user_id = 0
@@ -451,6 +455,7 @@ class AuthorizationService:
             int(entity_id or 0),
             int(template_id or 0),
             int(assigned_form_id or 0),
+            str(language_code or ""),
         )
         cached = _rbac_cache_get(g, "_rbac_cache", cache_key)
         if cached is not None:
@@ -518,9 +523,11 @@ class AuthorizationService:
                 return template_id is not None and int(grant.template_id or 0) == int(template_id)
             if sk == "assignment":
                 return assigned_form_id is not None and int(grant.assigned_form_id or 0) == int(assigned_form_id)
+            if sk == "language":
+                return bool(language_code) and str(grant.language_code or "").lower() == str(language_code).lower()
             return False
 
-        scope_priority = {"global": 0, "entity": 1, "template": 2, "assignment": 3}
+        scope_priority = {"global": 0, "language": 1, "entity": 2, "template": 3, "assignment": 4}
 
         # Fetch candidate grants for user and roles (filter by permission_id and principal)
         principal_filters = [
@@ -600,6 +607,9 @@ class AuthorizationService:
         entity_id = scope.get("entity_id")
         template_id = scope.get("template_id")
         assigned_form_id = scope.get("assigned_form_id")
+        language_code = scope.get("language_code")
+        if language_code:
+            language_code = str(language_code).lower().split("_")[0]
 
         g = _request_g()
         cache_key = (
@@ -609,6 +619,7 @@ class AuthorizationService:
             int(entity_id or 0),
             int(template_id or 0),
             int(assigned_form_id or 0),
+            str(language_code or ""),
         )
         cached = _rbac_cache_get(g, "_rbac_grant_decision_cache", cache_key)
         if cached is not None:
@@ -645,9 +656,11 @@ class AuthorizationService:
                 return template_id is not None and int(grant.template_id or 0) == int(template_id)
             if sk == "assignment":
                 return assigned_form_id is not None and int(grant.assigned_form_id or 0) == int(assigned_form_id)
+            if sk == "language":
+                return bool(language_code) and str(grant.language_code or "").lower() == str(language_code).lower()
             return False
 
-        scope_priority = {"global": 0, "entity": 1, "template": 2, "assignment": 3}
+        scope_priority = {"global": 0, "language": 1, "entity": 2, "template": 3, "assignment": 4}
 
         principal_filters = [
             db.and_(RbacAccessGrant.principal_type == "user", RbacAccessGrant.principal_id == user_id),

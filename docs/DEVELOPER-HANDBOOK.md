@@ -248,7 +248,43 @@ Entity answers are stored in three data tables, all keyed by either `assignment_
 ### Translation Services
 - LibreTranslate integration for automatic translation
 - Supports 7 languages: EN, FR, ES, AR, RU, ZH, HI
-- Translation files in `Backoffice/app/translations/`
+- Gettext catalogs live in `Backoffice/translations/` (compiled to `.mo` at runtime)
+
+### Inline Translation Review (in-context editor)
+Human translators can review UI strings directly on live pages without opening the admin translation grid.
+
+**Enable / disable**
+- Kill switch: `TRANSLATION_REVIEW_ENABLED` (env / `Config`, default `true`)
+
+**Permissions & assignments**
+- Permission: `translations.review.use` (scoped per locale via `RbacAccessGrant` with `scope_kind='language'`)
+- Baseline role: `translator` (organizational label only; language access comes from scoped grants)
+- Assign languages on the user form (`/admin/users/edit_user/<id>`) when the Translator role is selected (`admin.users.roles.assign` or `admin.translations.manage`)
+- Users with `admin.translations.manage` may also use the tool for their active non-English UI locale
+
+**Permission vs. UI visibility**
+Permission (`user_can_use_translation_review`) and UI visibility (`user_wants_translation_review_tool`, both in `app/services/translation_review/assignment_service.py`) are intentionally decoupled:
+- Users with explicit per-language grants (real translators) get the floating tool automatically.
+- Everyone else who merely *has permission* via a broad role/grant (e.g. `system_manager`, `admin.translations.manage`) does **not** see the tool by default — it stays hidden until they opt in via the `translation_review_tool_enabled` checkbox on their own Account Settings page. This avoids showing an intrusive floating button + pointer overlay to every admin who technically has access but doesn't want it.
+- Both the FAB rendering (`template_context.py`) and the `/translation-review/toggle` route enforce `permission AND wants`.
+
+**How it works**
+1. Translator toggles the floating **Translate** FAB (session flag `translation_review_mode`; page reload).
+2. When review mode is active, Flask-Babel gettext output is wrapped with invisible Unicode markers encoding the English `msgid` (`app/services/translation_review/marker.py`).
+3. Pointer mode scans DOM text/attributes for markers; click opens a modal with read-only English + editable target locale.
+4. Placeholders (`%(name)s`, `%s`, `%d`, …) are protected client-side (chips) and validated server-side (`app/services/translation/placeholder_validator.py`).
+5. Save writes the locale `.po` file, compiles `.mo`, calls `flask_babel.refresh()`, and logs `translation_review_edit` to `admin_action_log`.
+
+**Key modules**
+- Routes: `app/routes/translation_review/` (`/translation-review/toggle`, `/translation-review/api/string`)
+- Hooks: `app/services/translation_review/hooks.py` (wraps Jinja + `Domain.gettext`; strips markers from non-HTML responses)
+- Frontend: `app/static/js/translation_review/core.js`, `app/static/css/translation-review.css`, included from `core/layout.html`
+- Production propagation: `app/utils/translation_watcher.py` polls shared `translations/` in all environments so every Gunicorn worker refreshes catalogs after PO/MO changes
+
+**Deploy notes**
+- Run migrations: `add_rbac_language_scope`, `add_translation_review_tool_toggle`
+- Seed RBAC: `python -m flask rbac seed`
+- Ensure persistent translations volume is mounted (see `Backoffice/docs/setup/persistent-translations.md`)
 
 ### AI System Configuration (Backoffice)
 - **Chat API**: `/api/ai/v2` (chat, stream, conversations, export/import). WebSocket: `/api/ai/v2/ws`. Health: `GET /api/ai/v2/health` (includes `agent_available`).
@@ -498,7 +534,7 @@ Detailed runbook: [Incidents → Scenario F (502/504)](Backoffice/docs/runbooks/
 - **Entry form rendering + client behavior**: `Backoffice/app/templates/forms/entry_form/` and `Backoffice/app/static/js/forms/`
 - **AI endpoints + request handling**: `Backoffice/app/routes/ai.py`, `Backoffice/app/services/ai_chat_request.py`
 - **RAG / embeddings / vector store**: `Backoffice/app/services/ai_embedding_service.py`, `Backoffice/app/services/ai_vector_store.py`
-- **Translations / localization**: `Backoffice/app/utils/form_localization.py`, `Backoffice/app/translations/`
+- **Translations / localization**: `Backoffice/app/utils/form_localization.py`, `Backoffice/translations/`, `Backoffice/app/services/translation_review/`
 - **Button styles / design system**: `Backoffice/app/static/css/theme.css` (CSS variables), `Backoffice/app/static/css/components.css` (`.btn` system), `Backoffice/app/static/css/executive-header.css` (`.professional-action-btn` page-header variants)
 - **Mobile app (Flutter)**: `MobileApp/` — routes: `lib/config/routes.dart`, `lib/config/app_router.dart`; DI: `lib/di/service_locator.dart`; API constants: `lib/config/app_config.dart` (no inline `/api/mobile/v1/...` strings in providers). Shared UI: `lib/widgets/loading_indicator.dart`, `lib/widgets/error_state.dart`, `lib/widgets/async/async_body.dart`, `lib/widgets/mobile_screen_scaffold.dart`. JSON helpers: `lib/utils/mobile_api_json.dart`. iOS CocoaPods / `Podfile.lock` without a Mac: **Regenerate iOS Podfile.lock** workflow (see **Mobile App (Flutter)** in Local Development Quickstart).
 
@@ -727,38 +763,36 @@ Operational scripts (run from `Backoffice/`):
 
 See also [`Backoffice/docs/template-version-submission-identity.md`](../Backoffice/docs/template-version-submission-identity.md).
 
-### Data API (`/api/v1/data`, `/api/v1/data/tables`)
+### Data API (`GET /api/v1/data`)
 
-Submission facts stay keyed by **`form_item_id`** (the stored FK). Logical field identity lives on the **`form_items`** / **`dim_form_item`** dimension — not duplicated on every fact row.
+Unified submission data endpoint. Returns fact arrays plus full dimension tables in one response.
 
-**Join facts to labels**
+| Array | Content |
+|-------|---------|
+| `data[]` | Static FormData rows (`field_type: static`). Matrix values are in `matrix_cells[]`, not nested here. |
+| `dynamic_data[]` | Dynamic indicator rows |
+| `dynamic_context[]` | Dynamic section bindings (e.g. emergency appeals) |
+| `repeat_data[]` | Repeat-group field rows |
+| `form_items[]` | Form items referenced by facts (`related=page` or `all`) |
+| `countries[]` | Full country dimension (~192 rows) |
+| `national_societies[]` | Full National Society dimension |
+| `indicator_bank[]` | Full indicator bank (~466 rows) |
+| `matrix_cells[]` | Normalized matrix cells; matrix-specific fields grouped under `matrix` (`row`, `column`, `entity`) |
+| `arrays` | Catalog describing each top-level array |
 
-| Layout | Fact column | Dimension column |
-|--------|-------------|------------------|
-| Flat (`/data/tables`) | `data[].form_item_id` | `form_items[].id` → read `label`, `stable_key` |
-| Star (`layout=star`) | `tables.fact_form_values[].form_item_id` | `tables.dim_form_item[].id` |
+**Legacy:** `GET /api/v1/data/tables` returns HTTP 308 redirect to `/api/v1/data` (same query string).
 
-Use **`(template_id, stable_key)`** as the durable external identifier. Cache **`form_item_id` only within a single API response** — it changes when a new template version is deployed (submission FKs are remapped on deploy).
-
-**Query parameters** (both endpoints when `template_id` is set):
-
-| Param | Default | Purpose |
-|-------|---------|---------|
-| `version_scope` | `published` | `published` = facts from the published version only; `all` = include archived-version rows (e.g. removed fields) |
-| `stable_key` | — | Filter by logical field UUID; requires `template_id`. With `published`, resolves to the current published `form_item_id`; with `all`, matches any version row with that key |
-
-**Response `scope`** (when `template_id` is in the request): `{ template_id, published_version_id, version_scope, stable_key? }` — documents which version filter was applied. Star layout exposes the same object under `meta.scope`.
-
-**Dimension fields** on each form item row: `id`, `stable_key`, `version_id`, `archived`, `label`, … Star `dim_template` also includes `published_version_id`.
+**Query parameters:** `template_id`, `stable_key`, `version_scope`, `country_id`, `country_iso2`, `country_iso3`, `related`, `layout` (`flat`|`star`), `include_dynamic`, `include_repeat`, `include_non_reported`, `page`, `per_page`, …
 
 **Examples**
 
 ```http
-GET /api/v1/data/tables?template_id=12&related=all
-GET /api/v1/data/tables?template_id=12&stable_key=<uuid>
-GET /api/v1/data/tables?template_id=12&version_scope=all&layout=star
+GET /api/v1/data?template_id=33&related=all
 GET /api/v1/data?template_id=12&stable_key=<uuid>
+GET /api/v1/data?template_id=12&version_scope=all&layout=star
 ```
+
+**Star layout (`layout=star`):** all facts live under `data.tables.fact_form_values` (static, dynamic, repeat, and matrix rows — filter by `field_type`). Matrix rows have `id: null` and `matrix: { row, column, entity, source }` — expand `matrix` selectively in Power Query. Non-matrix rows have `matrix: null`.
 
 ## Troubleshooting (Common)
 

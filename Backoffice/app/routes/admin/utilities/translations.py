@@ -19,6 +19,7 @@ from app.forms.content import TranslationForm
 from app.routes.admin.shared import admin_required, permission_required, permission_required_any
 from app.utils.request_utils import is_json_request, get_request_data
 from app.services.translation.auto_translator import translate_text as auto_translate_text
+from app.services.translation.placeholder_validator import validate_placeholders
 from app.extensions import limiter
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.error_handling import handle_json_view_exception
@@ -1080,6 +1081,14 @@ def edit_translation():
             msgstr = data.get(f'msgstr_{lang}')
             if msgstr is not None:
                 lang_to_msgstr[lang] = msgstr
+
+        for lang, msgstr in lang_to_msgstr.items():
+            if lang == 'en':
+                continue
+            validation = validate_placeholders(msgid, msgstr)
+            if not validation.get('valid'):
+                return json_bad_request(validation.get('message') or _('Invalid placeholders'))
+
         updated_count, updated_langs = _update_po_translations(msgid, lang_to_msgstr)
 
         return json_ok(
@@ -1103,6 +1112,15 @@ def edit_translation():
             msgstr = (msgstr_field.data if msgstr_field else None)
             if msgstr is not None:
                 lang_to_msgstr[lang] = msgstr
+
+        for lang, msgstr in lang_to_msgstr.items():
+            if lang == 'en':
+                continue
+            validation = validate_placeholders(msgid, msgstr)
+            if not validation.get('valid'):
+                flash(validation.get('message') or _('Invalid placeholders'), 'danger')
+                return redirect(url_for('utilities.manage_translations'))
+
         updated_count, updated_langs = _update_po_translations(msgid, lang_to_msgstr)
         update_message = _translation_update_success_message(updated_langs)
 

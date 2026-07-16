@@ -628,6 +628,64 @@ class TestExportIndicators:
 
 
 # ---------------------------------------------------------------------------
+# GET /admin/api/indicator-bank/wizard-options
+# ---------------------------------------------------------------------------
+
+class TestIndicatorBankWizardOptions:
+    def test_returns_wizard_options(self, logged_in_client, db_session, app):
+        with app.app_context():
+            _create_indicator(
+                db_session,
+                name="Wizard Options Indicator",
+                itype="number",
+            )
+            indicator = IndicatorBank.query.filter_by(name="Wizard Options Indicator").first()
+            indicator.area = "EF2"
+            indicator.area_label = "Efficiency"
+            indicator._related_programs_list = ["Health"]
+            db_session.commit()
+
+        resp = logged_in_client.get("/admin/api/indicator-bank/wizard-options")
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert data["success"] is True
+        assert "sectors" in data
+        assert "subsectors" in data
+        assert "programs" in data
+        assert "areas" in data
+        assert "types" in data
+
+    def test_returns_wizard_options_with_scalar_related_programs(self, logged_in_client, db_session, app):
+        with app.app_context():
+            indicator = _create_indicator(db_session, name="Scalar Programs Indicator")
+            indicator._related_programs_list = "Health"
+            db_session.commit()
+
+        resp = logged_in_client.get("/admin/api/indicator-bank/wizard-options")
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert data["success"] is True
+        assert "Health" in data["programs"]
+
+    def test_wizard_options_areas_follow_spef_sort_order(self, logged_in_client, db_session, app):
+        with app.app_context():
+            from app.models import IndicatorBankSpef
+
+            late = IndicatorBankSpef(code="SP9", name="Late SP", sort_order=90, is_active=True)
+            early = IndicatorBankSpef(code="EF1", name="Early EF", sort_order=10, is_active=True)
+            db_session.add_all([late, early])
+            db_session.commit()
+
+        resp = logged_in_client.get("/admin/api/indicator-bank/wizard-options")
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        codes = [area["code"] for area in data["areas"] if area["code"] in {"EF1", "SP9"}]
+        assert codes.index("EF1") < codes.index("SP9")
+        assert data["areas"][0].get("sort_order") is not None
+        assert data["areas"][0].get("id") is not None
+
+
+# ---------------------------------------------------------------------------
 # POST /admin/api/indicator-count
 # ---------------------------------------------------------------------------
 
@@ -737,6 +795,43 @@ class TestGetFilteredIndicatorCount:
         assert resp.status_code == 200
         data = json.loads(resp.data)
         assert "indicators" in data
+
+    def test_returns_count_with_area_filter(self, logged_in_client, db_session, app):
+        with app.app_context():
+            indicator = _create_indicator(db_session, name="Area Filter Indicator")
+            indicator.area = "EF2"
+            indicator.area_label = "Efficiency"
+            db_session.commit()
+
+        resp = logged_in_client.post(
+            "/admin/api/indicator-count",
+            data=json.dumps({
+                "filters": [{"field": "area", "values": ["EF2"]}],
+                "include_indicators": True,
+            }),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert data["count"] >= 1
+        assert any(item.get("area") == "EF2" for item in data.get("indicators", []))
+
+    def test_returns_count_with_search_filter(self, logged_in_client, db_session, app):
+        with app.app_context():
+            _create_indicator(db_session, name="Unique Searchable Wizard Indicator")
+
+        resp = logged_in_client.post(
+            "/admin/api/indicator-count",
+            data=json.dumps({
+                "search": "Unique Searchable Wizard",
+                "include_indicators": True,
+            }),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert data["count"] >= 1
+        assert any("Unique Searchable Wizard" in item.get("name", "") for item in data.get("indicators", []))
 
     def test_with_empty_filter_values_skipped(self, logged_in_client, db_session):
         resp = logged_in_client.post(

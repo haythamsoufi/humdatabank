@@ -1229,12 +1229,24 @@ def account_settings():
     from app.services.authorization_service import AuthorizationService
     from app.services.entity_service import EntityService
     from app.forms.auth_forms import RequestCountryAccessForm
+    from app.services.translation_review.assignment_service import user_has_manage_translations
+
+    # The translation-review opt-in toggle is only meaningful (and shown) for users
+    # who already have manage-level permission via a role/grant (e.g. system
+    # managers, admin.translations.manage) but no explicit per-language
+    # assignment; real translators get the tool automatically without this toggle.
+    translation_review_toggle_visible = (
+        current_app.config.get('TRANSLATION_REVIEW_ENABLED', True)
+        and user_has_manage_translations(current_user)
+    )
 
     if form.validate_on_submit():
         # Update user information
         current_user.name = form.name.data if form.name.data else None
         current_user.title = form.title.data if form.title.data else None
         current_user.chatbot_enabled = form.chatbot_enabled.data
+        if translation_review_toggle_visible:
+            current_user.translation_review_tool_enabled = form.translation_review_tool_enabled.data
         current_user.profile_color = form.profile_color.data if form.profile_color.data else '#3B82F6'
 
         try:
@@ -1251,6 +1263,9 @@ def account_settings():
                         'name': form.name.data,
                         'title': form.title.data,
                         'chatbot_enabled': form.chatbot_enabled.data,
+                        'translation_review_tool_enabled': (
+                            form.translation_review_tool_enabled.data if translation_review_toggle_visible else None
+                        ),
                         'profile_color': form.profile_color.data
                     }
                 }
@@ -1266,6 +1281,7 @@ def account_settings():
         form.name.data = current_user.name
         form.title.data = current_user.title
         form.chatbot_enabled.data = current_user.chatbot_enabled
+        form.translation_review_tool_enabled.data = current_user.translation_review_tool_enabled
         form.profile_color.data = current_user.profile_color if current_user.profile_color else '#3B82F6'
 
     # Get user's registered devices
@@ -1342,6 +1358,7 @@ def account_settings():
 
     return render_template("auth/account_settings.html", form=form, title="Account Settings",
                          chatbot_feature_enabled=(current_app.config.get('CHATBOT_ENABLED', True) and user_has_ai_beta_access(current_user)),
+                         translation_review_toggle_visible=translation_review_toggle_visible,
                          registered_devices=registered_devices,
                          entity_access_list=entity_access_list,
                          request_access_form=request_access_form,

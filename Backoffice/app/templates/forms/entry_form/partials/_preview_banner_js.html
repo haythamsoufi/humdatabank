@@ -1,0 +1,202 @@
+{#
+  JS for the template-preview banner:
+    - year-picker.js (stepper widget)
+    - period builder logic
+
+  Flow:
+    - Main dropdown (#preview-period-select) lists existing periods + "Custom period…"
+    - Selecting an existing period sets the hidden field directly; custom pickers stay hidden
+    - Selecting "Custom period…" reveals the type/year pickers; changes there generate the period name
+    - On page load the correct option is pre-selected and pickers are pre-populated if needed
+
+  Only included when is_preview_mode is true.
+#}
+<script src="{{ static_url('js/lib/year-picker.js') }}" nonce="{{ csp_nonce() }}"></script>
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    'use strict';
+
+    var mainSel  = document.getElementById('preview-period-select');
+    if (!mainSel) return;
+
+    var customWrap = document.getElementById('preview-custom-period-wrap');
+    var ptSel      = document.getElementById('preview-period-type');
+    var hidden     = document.getElementById('preview-period-name-hidden');
+    var display    = document.getElementById('preview-period-name-display');
+
+    var inp = {
+        singleYear:     document.getElementById('preview-single-year'),
+        startYear:      document.getElementById('preview-start-year'),
+        endYear:        document.getElementById('preview-end-year'),
+        startMonthYear: document.getElementById('preview-start-month-year'),
+        startMonth:     document.getElementById('preview-start-month'),
+        endMonthYear:   document.getElementById('preview-end-month-year'),
+        endMonth:       document.getElementById('preview-end-month')
+    };
+
+    var MON_NAME = { '01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
+                     '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec' };
+    var MON_NUM  = { 'Jan':'01','Feb':'02','Mar':'03','Apr':'04','May':'05','Jun':'06',
+                     'Jul':'07','Aug':'08','Sep':'09','Oct':'10','Nov':'11','Dec':'12' };
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function setDefaultYears() {
+        var y = String(new Date().getFullYear());
+        ['singleYear', 'startYear', 'endYear', 'startMonthYear', 'endMonthYear'].forEach(function (k) {
+            if (inp[k] && !String(inp[k].value || '').trim()) inp[k].value = y;
+        });
+    }
+
+    function showCustomWrap(show) {
+        if (!customWrap) return;
+        if (show) customWrap.classList.remove('hidden');
+        else      customWrap.classList.add('hidden');
+    }
+
+    /** Show only the picker group that matches the selected period type. */
+    function togglePeriodTypeFields() {
+        if (!ptSel) return;
+        var type = ptSel.value;
+        document.querySelectorAll('.preview-pb-period-fields').forEach(function (el) {
+            el.classList.add('hidden');
+        });
+        var wrapId = {
+            'single-year': 'preview-single-year-wrap',
+            'year-range':  'preview-year-range-wrap',
+            'month-range': 'preview-month-range-wrap'
+        }[type];
+        var wrap = document.getElementById(wrapId);
+        if (wrap) wrap.classList.remove('hidden');
+        setDefaultYears();
+        if (window.YearPicker && typeof window.YearPicker.init === 'function') window.YearPicker.init();
+    }
+
+    /** Build the period_name string from the current picker values. */
+    function generateFromPickers() {
+        if (!ptSel) return '';
+        var t = ptSel.value, name = '';
+        if (t === 'single-year') {
+            var y = inp.singleYear ? inp.singleYear.value : '';
+            if (y) name = y;
+        } else if (t === 'year-range') {
+            var s = inp.startYear ? inp.startYear.value : '';
+            var e = inp.endYear   ? inp.endYear.value   : '';
+            if (s && e) name = (s === e) ? s : (s + '-' + e);
+            else if (s) name = s;
+        } else if (t === 'month-range') {
+            var sy = inp.startMonthYear ? inp.startMonthYear.value : '';
+            var sm = inp.startMonth     ? inp.startMonth.value     : '';
+            var ey = inp.endMonthYear   ? inp.endMonthYear.value   : '';
+            var em = inp.endMonth       ? inp.endMonth.value       : '';
+            if (sy && sm && ey && em) {
+                var sn = MON_NAME[sm], en = MON_NAME[em];
+                if (sy === ey && sm === em) name = sn + ' ' + sy;
+                else if (sy === ey)         name = sn + '-' + en + ' ' + sy;
+                else                        name = sn + ' ' + sy + '-' + en + ' ' + ey;
+            }
+        }
+        return name;
+    }
+
+    /** Write a period name into the hidden field and the live-display span. */
+    function applyPeriod(name) {
+        if (hidden)  hidden.value        = name || '';
+        if (display) display.textContent = name || '';
+    }
+
+    /** Parse a period string and populate the matching picker type + fields. */
+    function parsePeriodIntoPickers(name) {
+        if (!name || !ptSel) return;
+        var m;
+        if ((m = name.match(/^(\d{4})$/))) {
+            ptSel.value = 'single-year';
+            if (inp.singleYear) inp.singleYear.value = m[1];
+        } else if ((m = name.match(/^(\d{4})-(\d{4})$/))) {
+            ptSel.value = 'year-range';
+            if (inp.startYear) inp.startYear.value = m[1];
+            if (inp.endYear)   inp.endYear.value   = m[2];
+        } else if ((m = name.match(/^([A-Za-z]{3})-([A-Za-z]{3})\s+(\d{4})$/))) {
+            // Same-year month range: "Jan-Dec 2024"
+            ptSel.value = 'month-range';
+            if (inp.startMonth)     inp.startMonth.value     = MON_NUM[m[1]] || '01';
+            if (inp.startMonthYear) inp.startMonthYear.value = m[3];
+            if (inp.endMonth)       inp.endMonth.value       = MON_NUM[m[2]] || '01';
+            if (inp.endMonthYear)   inp.endMonthYear.value   = m[3];
+        } else if ((m = name.match(/^([A-Za-z]{3})\s+(\d{4})-([A-Za-z]{3})\s+(\d{4})$/))) {
+            // Cross-year month range: "Jan 2024-Dec 2025"
+            ptSel.value = 'month-range';
+            if (inp.startMonth)     inp.startMonth.value     = MON_NUM[m[1]] || '01';
+            if (inp.startMonthYear) inp.startMonthYear.value = m[2];
+            if (inp.endMonth)       inp.endMonth.value       = MON_NUM[m[3]] || '01';
+            if (inp.endMonthYear)   inp.endMonthYear.value   = m[4];
+        } else if ((m = name.match(/^([A-Za-z]{3})\s+(\d{4})$/))) {
+            // Single month: "Jan 2024"
+            ptSel.value = 'month-range';
+            if (inp.startMonth)     inp.startMonth.value     = MON_NUM[m[1]] || '01';
+            if (inp.startMonthYear) inp.startMonthYear.value = m[2];
+            if (inp.endMonth)       inp.endMonth.value       = MON_NUM[m[1]] || '01';
+            if (inp.endMonthYear)   inp.endMonthYear.value   = m[2];
+        }
+        togglePeriodTypeFields();
+    }
+
+    // ── Event: main period dropdown ───────────────────────────────────────────
+
+    mainSel.addEventListener('change', function () {
+        var v = mainSel.value;
+        if (v === '__custom__') {
+            showCustomWrap(true);
+            togglePeriodTypeFields();
+            applyPeriod(generateFromPickers());
+        } else {
+            showCustomWrap(false);
+            applyPeriod(v);
+        }
+    });
+
+    // ── Events: period-type + picker inputs ───────────────────────────────────
+
+    if (ptSel) {
+        ptSel.addEventListener('change', function () {
+            togglePeriodTypeFields();
+            applyPeriod(generateFromPickers());
+        });
+    }
+
+    ['singleYear', 'startYear', 'endYear', 'startMonthYear', 'endMonthYear'].forEach(function (k) {
+        if (!inp[k]) return;
+        inp[k].addEventListener('input',  function () { applyPeriod(generateFromPickers()); });
+        inp[k].addEventListener('change', function () { applyPeriod(generateFromPickers()); });
+    });
+    if (inp.startMonth) inp.startMonth.addEventListener('change', function () { applyPeriod(generateFromPickers()); });
+    if (inp.endMonth)   inp.endMonth.addEventListener('change',   function () { applyPeriod(generateFromPickers()); });
+
+    // ── Boot: restore state from the URL param ────────────────────────────────
+
+    var initVal = hidden && hidden.value;
+    if (initVal) {
+        // Check whether initVal matches one of the listed options
+        var foundInList = false;
+        for (var i = 0; i < mainSel.options.length; i++) {
+            if (mainSel.options[i].value === initVal) { foundInList = true; break; }
+        }
+        if (foundInList) {
+            // Already pre-selected server-side; custom wrap stays hidden
+            showCustomWrap(false);
+        } else {
+            // It's a custom period: show pickers and parse the value into them
+            mainSel.value = '__custom__';
+            showCustomWrap(true);
+            parsePeriodIntoPickers(initVal);
+            applyPeriod(initVal);
+        }
+    } else {
+        // Nothing selected yet
+        showCustomWrap(false);
+        togglePeriodTypeFields();
+    }
+
+    if (window.YearPicker && typeof window.YearPicker.init === 'function') window.YearPicker.init();
+})();
+</script>

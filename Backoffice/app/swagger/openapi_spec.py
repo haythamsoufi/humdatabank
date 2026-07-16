@@ -645,73 +645,17 @@ def get_api_paths():
         "/data": {
             "get": {
                 "tags": ["Data"],
-                "summary": "Get form data",
-                "description": "Retrieve form data with advanced filtering, sorting, and pagination.",
-                "operationId": "getFormData",
-                "security": [{"BearerAuth": []}],
-                "parameters": [
-                    {
-                        "name": "template_id",
-                        "in": "query",
-                        "description": "Filter by template ID",
-                        "required": False,
-                        "schema": {"type": "integer"}
-                    },
-                    {
-                        "name": "country_id",
-                        "in": "query",
-                        "description": "Filter by country ID",
-                        "required": False,
-                        "schema": {"type": "integer"}
-                    },
-                    {
-                        "name": "start_date",
-                        "in": "query",
-                        "description": "Start date (YYYY-MM-DD)",
-                        "required": False,
-                        "schema": {"type": "string", "format": "date"}
-                    },
-                    {
-                        "name": "end_date",
-                        "in": "query",
-                        "description": "End date (YYYY-MM-DD)",
-                        "required": False,
-                        "schema": {"type": "string", "format": "date"}
-                    },
-                    {"$ref": "#/components/parameters/PageParam"},
-                    {"$ref": "#/components/parameters/PerPageParam"}
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Form data",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {"type": "boolean"},
-                                        "data": {"type": "array", "items": {"type": "object"}},
-                                        "pagination": {"$ref": "#/components/schemas/Pagination"}
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "401": {"$ref": "#/components/responses/Unauthorized"}
-                }
-            }
-        },
-        "/data/tables": {
-            "get": {
-                "tags": ["Data"],
-                "summary": "Get form data tables",
+                "summary": "Get form data with dimension tables",
                 "description": (
-                    "Retrieve form data with related dimension tables. "
-                    "Use layout=flat (default) for the legacy bundle "
-                    "(data, form_items, countries) or layout=star for a "
-                    "dimensional export (fact_form_values, dim_*, bridge_disagg_values)."
+                    "Retrieve submission data with related dimension tables. "
+                    "Returns fact arrays (data, dynamic_data, repeat_data, dynamic_context) "
+                    "plus full dimension tables (form_items, countries, indicator_bank). "
+                    "Use layout=flat (default) for the legacy bundle or layout=star for a "
+                    "dimensional export (fact_form_values, dim_*, bridge_disagg_values). "
+                    "fact_form_values includes static, dynamic, repeat, and matrix rows (schema 1.1)."
+                    "countries[] and indicator_bank[] are always the full catalog (~192 / ~466 rows)."
                 ),
-                "operationId": "getFormDataTables",
+                "operationId": "getFormData",
                 "security": [{"BearerAuth": []}],
                 "parameters": [
                     {
@@ -736,6 +680,20 @@ def get_api_paths():
                         "schema": {"type": "integer"}
                     },
                     {
+                        "name": "country_iso2",
+                        "in": "query",
+                        "description": "Filter by country ISO2 (resolved to country_id)",
+                        "required": False,
+                        "schema": {"type": "string"}
+                    },
+                    {
+                        "name": "country_iso3",
+                        "in": "query",
+                        "description": "Filter by country ISO3 (resolved to country_id)",
+                        "required": False,
+                        "schema": {"type": "string"}
+                    },
+                    {
                         "name": "disagg",
                         "in": "query",
                         "description": "Include disaggregation data (true/false)",
@@ -745,7 +703,7 @@ def get_api_paths():
                     {
                         "name": "related",
                         "in": "query",
-                        "description": "Related form_items scope: page (current page) or all (full filtered dataset). countries[] always returns all countries.",
+                        "description": "Related form_items scope: page (current page) or all (full filtered dataset). countries[] and indicator_bank[] always return full catalogs.",
                         "required": False,
                         "schema": {"type": "string", "enum": ["page", "all"], "default": "page"}
                     },
@@ -754,7 +712,7 @@ def get_api_paths():
                 ],
                 "responses": {
                     "200": {
-                        "description": "Form data tables (flat or star layout)",
+                        "description": "Form data with dimension tables (flat or star layout)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -764,9 +722,14 @@ def get_api_paths():
                                             "description": "Flat layout (default)",
                                             "properties": {
                                                 "data": {"type": "array", "items": {"type": "object"}},
+                                                "dynamic_data": {"type": "array", "items": {"type": "object"}},
+                                                "repeat_data": {"type": "array", "items": {"type": "object"}},
+                                                "dynamic_context": {"type": "array", "items": {"type": "object"}},
                                                 "form_items": {"type": "array", "items": {"type": "object"}},
                                                 "countries": {"type": "array", "items": {"type": "object"}},
-                                                "matrix_entity_labels": {"type": "object"},
+                                                "national_societies": {"type": "array", "items": {"type": "object"}},
+                                                "indicator_bank": {"type": "array", "items": {"type": "object"}},
+                                                "matrix_cells": {"type": "array", "items": {"type": "object"}},
                                                 "total_items": {"type": "integer"},
                                                 "total_pages": {"type": "integer"},
                                                 "current_page": {"type": "integer"},
@@ -787,7 +750,10 @@ def get_api_paths():
                                                             "properties": {
                                                                 "fact_form_values": {"type": "array"},
                                                                 "dim_country": {"type": "array"},
+                                                                "dim_national_society": {"type": "array"},
+                                                                "dim_indicator_bank": {"type": "array"},
                                                                 "dim_form_item": {"type": "array"},
+                                                                "dim_dynamic_context": {"type": "array"},
                                                                 "dim_template": {"type": "array"},
                                                                 "dim_period": {"type": "array"},
                                                                 "dim_submission": {"type": "array"},
@@ -805,6 +771,33 @@ def get_api_paths():
                         }
                     },
                     "401": {"$ref": "#/components/responses/Unauthorized"}
+                }
+            }
+        },
+        "/data/tables": {
+            "get": {
+                "tags": ["Data"],
+                "summary": "Legacy redirect to /data",
+                "description": (
+                    "Deprecated. Returns HTTP 308 Permanent Redirect to /api/v1/data "
+                    "with the same query string. Use GET /data instead."
+                ),
+                "operationId": "getFormDataTablesLegacyRedirect",
+                "deprecated": True,
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"$ref": "#/components/parameters/PageParam"},
+                    {"$ref": "#/components/parameters/PerPageParam"}
+                ],
+                "responses": {
+                    "308": {
+                        "description": "Permanent redirect to /api/v1/data (same query string)",
+                        "headers": {
+                            "Location": {"schema": {"type": "string"}},
+                            "Deprecation": {"schema": {"type": "string"}},
+                            "Link": {"schema": {"type": "string"}}
+                        }
+                    }
                 }
             }
         },

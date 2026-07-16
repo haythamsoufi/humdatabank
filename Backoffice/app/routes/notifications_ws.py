@@ -86,7 +86,7 @@ def register_notifications_ws(app) -> bool:
             heartbeat_thread.start()
 
             try:
-                connection_added = ws_manager.add_connection(user_id, ws)
+                connection_added = ws_manager.add_connection(user_id, ws, channel='notifications')
                 if not connection_added:
                     try:
                         ws.send(json.dumps({
@@ -209,7 +209,7 @@ def register_notifications_ws(app) -> bool:
 
         try:
             # Register this connection
-            connection_added = ws_manager.add_connection(user_id, ws)
+            connection_added = ws_manager.add_connection(user_id, ws, channel='notifications')
             if not connection_added:
                 # Connection limit exceeded
                 ws.send(json.dumps({

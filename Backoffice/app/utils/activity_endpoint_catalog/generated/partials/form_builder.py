@@ -45,6 +45,7 @@ SPECS: dict[tuple[str, str], ActivityEndpointSpec] = {
     ("POST", "form_builder.unlink_draft_section_route"): ActivityEndpointSpec(description="Completed Unlink Draft Section Route", activity_type="admin_forms"),
     ("POST", "form_builder.update_draft_comment"): ActivityEndpointSpec(description="Updated Draft Comment", activity_type="admin_forms"),
     ("POST", "form_builder.update_version_comment"): ActivityEndpointSpec(description="Updated Version Comment", activity_type="admin_forms"),
+    ("POST", "form_builder.upload_template_image_asset"): ActivityEndpointSpec(description="Completed Upload Template Image Asset", activity_type="admin_forms"),
     ("POST", "form_builder.validate_excel_import"): ActivityEndpointSpec(description="Completed Validate Excel Import", activity_type="admin_forms"),
     ("POST", "form_builder.validate_kobo_import"): ActivityEndpointSpec(description="Completed Validate Kobo Import", activity_type="admin_forms"),
 }

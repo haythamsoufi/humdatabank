@@ -29,7 +29,7 @@ from app.utils.datetime_helpers import utcnow
 from app.utils.advanced_validation import validate_upload_extension_and_mime
 from app.utils.file_parsing import EXCEL_EXTENSIONS, XLSX_EXTENSIONS
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
-from app.utils.api_responses import json_forbidden, json_bad_request, json_not_found, json_ok, json_server_error
+from app.utils.api_responses import json_forbidden, json_bad_request, json_not_found, json_ok, json_server_error, require_json_data
 from app.utils.json_helpers import deep_copy_json as _deep_copy_json_value
 from config.config import Config
 from .helpers import (_handle_template_sharing, _handle_template_pages, _populate_template_sharing,
@@ -819,6 +819,256 @@ def new_template():
         available_templates=available_templates,
         get_localized_template_name=get_localized_template_name
     )
+
+
+@bp.route("/templates/from-indicator-bank", methods=["POST"])
+@permission_required('admin.templates.create')
+def create_template_from_indicator_bank():
+    """Create a template with sections and indicator items from the indicator bank wizard."""
+    data = get_json_safe()
+    err = require_json_data(data)
+    if err:
+        return err
+
+    name = (data.get('name') or '').strip()
+    if not name:
+        return json_bad_request('Template name is required')
+
+    sections_payload = data.get('sections') or []
+    if not sections_payload:
+        return json_bad_request('At least one section with indicators is required')
+
+    group_by = (data.get('group_by') or '').strip().lower() or None
+    from app.services.indicator_bank_service import sort_indicator_bank_wizard_sections
+
+    sections_payload = sort_indicator_bank_wizard_sections(
+        sections_payload,
+        group_by=group_by,
+    )
+
+    existing_version = FormTemplateVersion.query.filter_by(
+        name=name,
+        status='published',
+    ).join(
+        FormTemplate,
+        FormTemplateVersion.template_id == FormTemplate.id,
+    ).filter(
+        FormTemplate.id.isnot(None),
+    ).first()
+    if existing_version:
+        return json_bad_request(f"A form template with the name '{name}' already exists.")
+
+    description = (data.get('description') or '').strip()
+    try:
+        owned_by = int(data.get('owned_by') or current_user.id)
+    except (ValueError, TypeError):
+        owned_by = current_user.id
+
+    add_to_self_report = bool(data.get('add_to_self_report', False))
+    shared_with = data.get('shared_with') or []
+
+    all_indicator_ids = []
+    for section in sections_payload:
+        all_indicator_ids.extend(section.get('indicator_ids') or [])
+
+    if not all_indicator_ids:
+        return json_bad_request('At least one indicator must be selected')
+
+    indicator_ids_int = []
+    for indicator_id in all_indicator_ids:
+        try:
+            indicator_ids_int.append(int(indicator_id))
+        except (ValueError, TypeError):
+            continue
+
+    if not indicator_ids_int:
+        return json_bad_request('At least one valid indicator must be selected')
+
+    indicators_by_id = {
+        indicator.id: indicator
+        for indicator in IndicatorBank.query.filter(
+            IndicatorBank.id.in_(indicator_ids_int),
+            IndicatorBank.archived.is_(False),
+        ).options(db.joinedload(IndicatorBank.measurement_unit)).all()
+    }
+
+    if not indicators_by_id:
+        return json_bad_request('No valid indicators found')
+
+    from app.services.indicator_bank_service import (
+        indicator_bank_supports_disaggregation,
+        normalize_disaggregation_options,
+    )
+
+    disaggregation_payload = data.get('disaggregation') or {}
+    allowed_disaggregation_options = normalize_disaggregation_options(
+        disaggregation_payload.get('allowed_options')
+    )
+    age_groups_config = (disaggregation_payload.get('age_groups_config') or '').strip() or None
+    if age_groups_config and not any(
+        option in allowed_disaggregation_options for option in ('age', 'sex_age')
+    ):
+        age_groups_config = None
+
+    now = utcnow()
+    template = FormTemplate(
+        created_by=current_user.id,
+        owned_by=owned_by,
+    )
+    db.session.add(template)
+    db.session.flush()
+
+    initial_version = FormTemplateVersion(
+        template_id=template.id,
+        version_number=1,
+        status='draft',
+        name=name,
+        description=description,
+        add_to_self_report=add_to_self_report,
+        display_order_visible=False,
+        is_paginated=False,
+        enable_export_pdf=False,
+        enable_export_excel=False,
+        enable_import_excel=False,
+        enable_ai_validation=False,
+        enable_data_quality=False,
+        created_by=current_user.id,
+        updated_by=current_user.id,
+        created_at=now,
+        updated_at=now,
+    )
+
+    name_translations = data.get('name_translations')
+    if isinstance(name_translations, dict) and name_translations:
+        initial_version.name_translations = name_translations
+
+    db.session.add(initial_version)
+    db.session.flush()
+
+    version_name = initial_version.name
+    template_id = template.id
+    version_id = initial_version.id
+
+    if shared_with:
+        try:
+            shared_admin_ids = [int(user_id) for user_id in shared_with if user_id]
+            if shared_admin_ids:
+                _handle_template_sharing(
+                    template,
+                    shared_admin_ids,
+                    current_user.id,
+                    template_name=version_name,
+                )
+        except (ValueError, TypeError) as share_error:
+            current_app.logger.debug("Shared with parse failed: %s", share_error)
+
+    sections_created = 0
+    items_created = 0
+
+    for section_order, section_data in enumerate(sections_payload, start=1):
+        section_name = (section_data.get('name') or 'General').strip() or 'General'
+        section_name = section_name[:100]
+        indicator_ids = section_data.get('indicator_ids') or []
+
+        valid_indicator_ids = []
+        for indicator_id in indicator_ids:
+            try:
+                indicator_id_int = int(indicator_id)
+            except (ValueError, TypeError):
+                continue
+            if indicator_id_int in indicators_by_id:
+                valid_indicator_ids.append(indicator_id_int)
+
+        if not valid_indicator_ids:
+            continue
+
+        section = FormSection(
+            template_id=template.id,
+            version_id=version_id,
+            name=section_name,
+            order=float(section_order),
+            section_type='standard',
+        )
+        db.session.add(section)
+        db.session.flush()
+        sections_created += 1
+
+        for item_order, indicator_id in enumerate(valid_indicator_ids, start=1):
+            indicator_bank = indicators_by_id[indicator_id]
+            item_disaggregation_options = (
+                allowed_disaggregation_options
+                if indicator_bank_supports_disaggregation(indicator_bank)
+                else ['total']
+            )
+            item_config = {
+                'is_required': False,
+                'layout_column_width': 12,
+                'layout_break_after': False,
+                'allowed_disaggregation_options': item_disaggregation_options,
+                'age_groups_config': (
+                    age_groups_config
+                    if indicator_bank_supports_disaggregation(indicator_bank)
+                    else None
+                ),
+                'allow_data_not_available': False,
+                'allow_not_applicable': False,
+                'allow_disability_questions': False,
+                'indirect_reach': False,
+            }
+            form_item = FormItem(
+                item_type='indicator',
+                section_id=section.id,
+                template_id=template.id,
+                version_id=version_id,
+                label=indicator_bank.name,
+                type=indicator_bank.type,
+                unit=indicator_bank.unit or '',
+                indicator_type_id=indicator_bank.indicator_type_id,
+                indicator_unit_id=indicator_bank.indicator_unit_id,
+                order=float(item_order),
+                indicator_bank_id=indicator_bank.id,
+                config=item_config,
+            )
+            db.session.add(form_item)
+            items_created += 1
+
+    if sections_created == 0:
+        request_transaction_rollback()
+        return json_bad_request('No valid sections could be created')
+
+    try:
+        db.session.flush()
+        try:
+            log_admin_action(
+                action_type='template_create_from_indicator_bank',
+                description=(
+                    f"Created template '{version_name}' from indicator bank "
+                    f"({sections_created} sections, {items_created} indicators)"
+                ),
+                target_type='form_template',
+                target_id=template_id,
+                target_description=f"Template ID: {template_id}",
+                risk_level='medium',
+            )
+        except Exception as log_error:
+            current_app.logger.error(f"Error logging indicator bank template creation: {log_error}")
+    except Exception as exc:
+        return handle_json_view_exception(
+            exc,
+            GENERIC_ERROR_MESSAGE,
+            log_message=f"Error creating template from indicator bank: {exc}",
+        )
+
+    return json_ok(
+        message=(
+            f"Form Template '{version_name}' created with "
+            f"{sections_created} sections and {items_created} indicators."
+        ),
+        redirect_url=url_for('form_builder.edit_template', template_id=template_id),
+        sections_created=sections_created,
+        items_created=items_created,
+    )
+
 
 @bp.route("/templates/<int:template_id>/owned-by", methods=["GET"])
 @permission_required('admin.templates.view')

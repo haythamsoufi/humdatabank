@@ -1,0 +1,253 @@
+/* Inline translation review tool — FAB + hover + modal */
+
+:root {
+    --tr-z-fab: 1055;
+    --tr-z-modal: 1200;
+}
+
+/* ─── FAB: dark pill matching the chatbot button ───────────────────────────── */
+
+#translationReviewFAB {
+    position: fixed;
+    /* Stack just above the chatbot FAB */
+    bottom: calc(var(--chat-fab-bottom-inset, calc(1.5rem + env(safe-area-inset-bottom, 0px))) + var(--chat-fab-height, 48px) + 0.75rem);
+    right: calc(var(--chat-fab-offset, 1.5rem) + env(safe-area-inset-right, 0px));
+    z-index: var(--tr-z-fab);
+    height: var(--chat-fab-height, 48px);
+    width: auto;
+    padding: 0 18px 0 8px;
+    margin: 0;
+    box-sizing: border-box;
+    background: #0c0c0e;
+    color: #f1f5f9;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 100px;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.12) inset,
+        0 1px 3px rgba(0, 0, 0, 0.45),
+        0 6px 18px rgba(0, 0, 0, 0.32),
+        0 18px 40px rgba(0, 0, 0, 0.18);
+    cursor: pointer;
+    transition:
+        transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+        box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+        background 0.2s ease,
+        border-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+}
+
+/* Subtle inner highlight (matches chatbot ::before) */
+#translationReviewFAB::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(175deg, rgba(255, 255, 255, 0.09) 0%, transparent 45%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Circular icon container (matches chatbot .fab-icon-slot) */
+#translationReviewFAB .tr-fab-icon-slot {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: transparent;
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        border-color 0.2s ease,
+        transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 0.9rem;
+}
+
+#translationReviewFAB .fab-label {
+    position: relative;
+    z-index: 1;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+#translationReviewFAB:hover:not(.active) {
+    background: #1e293b;
+    transform: translateY(-1px);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.16) inset,
+        0 2px 6px rgba(0, 0, 0, 0.55),
+        0 10px 28px rgba(0, 0, 0, 0.38);
+}
+
+/* Active (review-mode on) — teal accent so it reads as "active tool" */
+#translationReviewFAB.active {
+    background: #0f766e;
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.12) inset,
+        0 1px 3px rgba(15, 118, 110, 0.4),
+        0 6px 18px rgba(15, 118, 110, 0.35),
+        0 18px 40px rgba(0, 0, 0, 0.18);
+}
+
+#translationReviewFAB.active .tr-fab-icon-slot {
+    border-color: rgba(255, 255, 255, 0.55);
+}
+
+/* ─── Review-mode cursor: magic wand ───────────────────────────────────────── */
+
+/*
+ * Custom SVG cursor: wand stick + sparkle star at tip.
+ * Hotspot at x=20 y=3 (star tip, top-right of the 24×24 canvas).
+ * Fallback: crosshair.
+ */
+body.translation-review-mode,
+body.translation-review-mode * {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cline x1='3' y1='22' x2='14' y2='11' stroke='%231e293b' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M19 1L20.4 5.6L25 7L20.4 8.4L19 13L17.6 8.4L13 7L17.6 5.6Z' fill='%23f59e0b'/%3E%3Ccircle cx='5' cy='9' r='1.5' fill='%23f59e0b' opacity='.7'/%3E%3Ccircle cx='23' cy='17' r='1' fill='%23f59e0b' opacity='.5'/%3E%3C/svg%3E") 19 2, crosshair !important;
+}
+
+/* FAB, modal, and chatbot remain interactive with normal cursor */
+body.translation-review-mode #translationReviewFAB,
+body.translation-review-mode #translationReviewFAB *,
+body.translation-review-mode #translation-review-modal,
+body.translation-review-mode #translation-review-modal *,
+body.translation-review-mode #aiChatbotFAB,
+body.translation-review-mode #aiChatWidget {
+    cursor: pointer !important;
+}
+
+/* Highlighted (hoverable) element — show clickability */
+body.translation-review-mode .translation-review-hover,
+body.translation-review-mode .translation-review-hover * {
+    cursor: pointer !important;
+}
+
+/* ─── Hover highlight ──────────────────────────────────────────────────────── */
+
+.translation-review-hover {
+    outline: 2px solid rgba(15, 118, 110, 0.9) !important;
+    outline-offset: 2px !important;
+    border-radius: 3px;
+    box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.15) !important;
+}
+
+/* ─── Modal ────────────────────────────────────────────────────────────────── */
+
+#translation-review-modal {
+    z-index: var(--tr-z-modal) !important;
+}
+
+#translation-review-modal .translation-review-field-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.35rem;
+}
+
+#translation-review-modal .translation-review-readonly,
+#translation-review-modal .translation-review-editor {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    background: #fff;
+}
+
+#translation-review-modal .translation-review-readonly {
+    background: #f9fafb;
+    color: #374151;
+    resize: vertical;
+    min-height: 4.5rem;
+}
+
+#translation-review-modal .translation-review-editor {
+    min-height: 6rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+#translation-review-modal .translation-review-editor:focus {
+    outline: 2px solid rgba(15, 118, 110, 0.35);
+    border-color: #0f766e;
+}
+
+#translation-review-modal .i18n-placeholder-chip {
+    display: inline-block;
+    padding: 0.1rem 0.45rem;
+    margin: 0 0.1rem;
+    border-radius: 0.375rem;
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    color: #92400e;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.85em;
+    user-select: none;
+    vertical-align: baseline;
+}
+
+#translation-review-modal .translation-review-error {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    font-size: 0.875rem;
+}
+
+#translation-review-modal .translation-review-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+/* ─── Save-success flash ───────────────────────────────────────────────────── */
+
+#tr-save-toast {
+    position: fixed;
+    bottom: calc(var(--chat-fab-bottom-inset, 1.5rem) + var(--chat-fab-height, 48px) + 4rem);
+    right: calc(var(--chat-fab-offset, 1.5rem) + env(safe-area-inset-right, 0px));
+    z-index: var(--tr-z-modal);
+    background: #0f766e;
+    color: #fff;
+    padding: 0.6rem 1.1rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    box-shadow: 0 4px 14px rgba(15, 118, 110, 0.4);
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+}
+
+#tr-save-toast.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ─── Responsive ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    #translationReviewFAB .fab-label {
+        display: none;
+    }
+
+    #translationReviewFAB {
+        padding: 0 12px;
+    }
+}

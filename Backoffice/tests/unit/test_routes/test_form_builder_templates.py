@@ -31,6 +31,7 @@ from tests.factories import (
     _ensure_permission,
     _grant_role_permission,
 )
+from app.models import IndicatorBank, FormSection, FormItem, FormTemplateVersion
 
 
 pytestmark = [pytest.mark.unit]
@@ -786,6 +787,213 @@ class TestManageTemplateVariables:
         ):
             resp = logged_in_client.get(f'/admin/templates/{template.id}/variables')
         assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# create_template_from_indicator_bank
+# ---------------------------------------------------------------------------
+
+class TestCreateTemplateFromIndicatorBank:
+
+    def _create_indicator(self, db_session, name="Wizard Indicator"):
+        existing = IndicatorBank.query.filter_by(name=name).first()
+        if existing:
+            return existing
+        indicator = IndicatorBank(name=name, type="number", archived=False)
+        db_session.add(indicator)
+        db_session.commit()
+        db_session.refresh(indicator)
+        return indicator
+
+    def test_creates_template_with_sections_and_items(self, logged_in_client, db_session, admin_user, app):
+        _grant_template_permissions(db_session)
+        indicator = self._create_indicator(db_session, name="Wizard Route Indicator")
+
+        with patch('app.routes.admin.form_builder.templates.log_admin_action'):
+            resp = logged_in_client.post(
+                '/admin/templates/from-indicator-bank',
+                json={
+                    'name': 'Indicator Bank Wizard Template',
+                    'description': 'Created from wizard',
+                    'owned_by': admin_user.id,
+                    'sections': [
+                        {
+                            'name': 'Core Indicators',
+                            'indicator_ids': [indicator.id],
+                        }
+                    ],
+                },
+                headers={'Content-Type': 'application/json'},
+            )
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['success'] is True
+        assert data['sections_created'] == 1
+        assert data['items_created'] == 1
+        assert 'redirect_url' in data
+
+        version = FormTemplateVersion.query.filter_by(name='Indicator Bank Wizard Template').first()
+        assert version is not None
+        sections = FormSection.query.filter_by(version_id=version.id).all()
+        assert len(sections) == 1
+        items = FormItem.query.filter_by(section_id=sections[0].id).all()
+        assert len(items) == 1
+        assert items[0].indicator_bank_id == indicator.id
+        assert items[0].item_type == 'indicator'
+
+    def test_creates_template_with_disaggregation_for_eligible_indicators(
+        self, logged_in_client, db_session, admin_user, app,
+    ):
+        _grant_template_permissions(db_session)
+        indicator = IndicatorBank(
+            name='Disagg Wizard Indicator',
+            type='number',
+            unit='People',
+            archived=False,
+        )
+        db_session.add(indicator)
+        db_session.commit()
+        db_session.refresh(indicator)
+
+        with patch('app.routes.admin.form_builder.templates.log_admin_action'):
+            resp = logged_in_client.post(
+                '/admin/templates/from-indicator-bank',
+                json={
+                    'name': 'Disagg Wizard Template',
+                    'owned_by': admin_user.id,
+                    'sections': [{'name': 'People', 'indicator_ids': [indicator.id]}],
+                    'disaggregation': {
+                        'allowed_options': ['total', 'sex', 'age', 'sex_age'],
+                        'age_groups_config': '0-17,18+',
+                    },
+                },
+                headers={'Content-Type': 'application/json'},
+            )
+
+        assert resp.status_code == 200
+        item = FormItem.query.filter_by(indicator_bank_id=indicator.id).first()
+        assert item is not None
+        assert item.allowed_disaggregation_options == ['total', 'sex', 'age', 'sex_age']
+        assert item.age_groups_config == '0-17,18+'
+
+    def test_non_disagg_eligible_indicator_stays_total_only(
+        self, logged_in_client, db_session, admin_user, app,
+    ):
+        _grant_template_permissions(db_session)
+        indicator = IndicatorBank(
+            name='Percent Wizard Indicator',
+            type='percentage',
+            unit='%',
+            archived=False,
+        )
+        db_session.add(indicator)
+        db_session.commit()
+        db_session.refresh(indicator)
+
+        with patch('app.routes.admin.form_builder.templates.log_admin_action'):
+            resp = logged_in_client.post(
+                '/admin/templates/from-indicator-bank',
+                json={
+                    'name': 'Percent Wizard Template',
+                    'owned_by': admin_user.id,
+                    'sections': [{'name': 'Rates', 'indicator_ids': [indicator.id]}],
+                    'disaggregation': {
+                        'allowed_options': ['total', 'sex', 'age', 'sex_age'],
+                    },
+                },
+                headers={'Content-Type': 'application/json'},
+            )
+
+        assert resp.status_code == 200
+        item = FormItem.query.filter_by(indicator_bank_id=indicator.id).first()
+        assert item.allowed_disaggregation_options == ['total']
+
+    def test_requires_template_name(self, logged_in_client, db_session, admin_user, app):
+        _grant_template_permissions(db_session)
+        resp = logged_in_client.post(
+            '/admin/templates/from-indicator-bank',
+            json={'sections': [{'name': 'General', 'indicator_ids': [1]}]},
+            headers={'Content-Type': 'application/json'},
+        )
+        assert resp.status_code == 400
+
+    def test_requires_sections(self, logged_in_client, db_session, admin_user, app):
+        _grant_template_permissions(db_session)
+        resp = logged_in_client.post(
+            '/admin/templates/from-indicator-bank',
+            json={'name': 'No Sections Template'},
+            headers={'Content-Type': 'application/json'},
+        )
+        assert resp.status_code == 400
+
+    def test_creates_sections_in_spef_catalog_order(self, logged_in_client, db_session, admin_user, app):
+        _grant_template_permissions(db_session)
+        with app.app_context():
+            from app.models import IndicatorBankSpef
+
+            late_spef = IndicatorBankSpef(code='SP9', name='Late SP', sort_order=90, is_active=True)
+            early_spef = IndicatorBankSpef(code='EF1', name='Early EF', sort_order=10, is_active=True)
+            db_session.add_all([late_spef, early_spef])
+            db_session.flush()
+
+            late_indicator = IndicatorBank(
+                name='Late SPEF Indicator',
+                type='number',
+                indicator_spef_id=late_spef.id,
+                area='SP9',
+                area_label='Late SP',
+                archived=False,
+            )
+            early_indicator = IndicatorBank(
+                name='Early SPEF Indicator',
+                type='number',
+                indicator_spef_id=early_spef.id,
+                area='EF1',
+                area_label='Early EF',
+                archived=False,
+            )
+            db_session.add_all([late_indicator, early_indicator])
+            db_session.commit()
+
+            late_spef_id = late_spef.id
+            early_spef_id = early_spef.id
+            late_indicator_id = late_indicator.id
+            early_indicator_id = early_indicator.id
+
+        with patch('app.routes.admin.form_builder.templates.log_admin_action'):
+            resp = logged_in_client.post(
+                '/admin/templates/from-indicator-bank',
+                json={
+                    'name': 'SPEF Ordered Wizard Template',
+                    'owned_by': admin_user.id,
+                    'group_by': 'area',
+                    'sections': [
+                        {
+                            'name': 'Late SP',
+                            'area_code': 'SP9',
+                            'spef_id': late_spef_id,
+                            'indicator_ids': [late_indicator_id],
+                        },
+                        {
+                            'name': 'Early EF',
+                            'area_code': 'EF1',
+                            'spef_id': early_spef_id,
+                            'indicator_ids': [early_indicator_id],
+                        },
+                    ],
+                },
+                headers={'Content-Type': 'application/json'},
+            )
+
+        assert resp.status_code == 200
+        version = FormTemplateVersion.query.filter_by(name='SPEF Ordered Wizard Template').first()
+        sections = (
+            FormSection.query.filter_by(version_id=version.id)
+            .order_by(FormSection.order)
+            .all()
+        )
+        assert [section.name for section in sections] == ['Early EF', 'Late SP']
 
 
 # ---------------------------------------------------------------------------

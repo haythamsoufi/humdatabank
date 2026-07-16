@@ -27,7 +27,7 @@ _ONE_HOUR = 'max-age=3600, public, must-revalidate'
 
 _CACHEABLE_EXTS = frozenset([
     '.css', '.js', '.woff', '.woff2', '.ttf', '.eot', '.svg',
-    '.png', '.jpg', '.jpeg', '.gif', '.ico', '.webmanifest',
+    '.png', '.jpg', '.jpeg', '.gif', '.ico', '.webmanifest', '.json',
 ])
 
 

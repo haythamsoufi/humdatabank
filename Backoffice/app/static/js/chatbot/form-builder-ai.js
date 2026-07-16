@@ -98,6 +98,15 @@ export const FormBuilderAiMixin = {
 
     _syncFormBuilderAiPanelFab(forceHidden) {
         if (!this.elements.fab || this._isImmersive()) return;
+        // User dismissed the FAB for this page load (dragged to hide zone) — keep it gone.
+        if (this._fabSessionHidden) {
+            const fab = this.elements.fab;
+            fab.classList.add('fab-session-hidden');
+            fab.hidden = true;
+            fab.style.setProperty('display', 'none', 'important');
+            try { fab.setAttribute('aria-hidden', 'true'); } catch (_) { /* ignore */ }
+            return;
+        }
         const hidden = typeof forceHidden === 'boolean'
             ? forceHidden
             : !!(document.body && document.body.classList.contains('fb-ai-panel-open'));

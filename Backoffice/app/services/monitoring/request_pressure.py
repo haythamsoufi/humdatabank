@@ -382,6 +382,13 @@ def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[st
     except Exception:
         pass
 
+    ws_pool_snapshot: Dict[str, Any] = {}
+    try:
+        from app.utils.ws_manager import ws_manager
+        ws_pool_snapshot = ws_manager.snapshot()
+    except Exception:
+        ws_pool_snapshot = {'error': 'unavailable'}
+
     redis_active = _redis_available is True
     scope_note = (
         'Cross-worker snapshot via Redis (other workers included).'
@@ -405,6 +412,7 @@ def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[st
         'traffic_last_60s': last_60s,
         'traffic_last_5m': last_5m,
         'db_pool': pool_stats,
+        'ws_pool': ws_pool_snapshot,
         'redis_cross_worker': redis_active,
         'scope_note': scope_note,
     }

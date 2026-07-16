@@ -131,6 +131,10 @@ Actions are grouped by where they apply. Prioritize **P0** before the next repor
 
 | Priority | Action | Detail |
 |----------|--------|--------|
+| **Done** (2026-07-15) | **Workflow tour endpoint**: stop eager/uncacheable fetch on every chatbot init | Tours now load lazily on chat-open, cached in `localStorage` + pre-generated static/CDN files (`flask workflows generate-static`); `Cache-Control` added to all `/api/ai/documents/workflows/*` GET routes |
+| **Done** (2026-07-15) | **Notification preferences** (`/notifications/api/preferences`) fetched on *every* page load | Client now caches in `localStorage` with a 15-min TTL (`components.js`); server logs `[NOTIF_PREFS_FETCH]` to confirm hit-rate drop |
+| **Done** (2026-07-15) | **WS status check** (`/notifications/api/stream/status`) fetched on *every* page load | Client caches result for 5 min; server logs `[WS_STATUS_FETCH]` |
+| **Done** (2026-07-15) | **WebSocket connections consuming Gunicorn threads unbounded** — each notification/AI-chat WS holds one `gthread` worker thread for its lifetime; no shared cap existed for AI chat/doc WS | `ws_manager` now derives `max_total_connections` from `GUNICORN_THREADS - WS_RESERVED_HTTP_THREADS` (default reserve 2) and is shared across notifications + AI chat + AI docs channels; over-budget connections are rejected and the client falls back to polling/SSE (already implemented). `[WS_POOL]` INFO logs on every connect/disconnect/rejection; snapshot exposed in platform 5xx diagnostics (`worker_metrics.ws_pool`) |
 | **P1** | **Profile `/forms/assignment/<id>`** render path | 3–4 s server time; target caching, slimmer queries, deferred fragments |
 | P1 | **EmOps plugin**: avoid **live GO API fetch** on form load when cache cold | 2026-07-09: `[EmOps List] No file cache; fetching live` during assignment load |
 | P1 | **Matrix auto-load**: batch or lazy-load | Six parallel `POST /api/v1/matrix/auto-load-entities` on every form open |
@@ -154,6 +158,7 @@ Presence `/sync` needs **no functional change** for correctness; optional **clie
 | Priority | Action | Detail |
 |----------|--------|--------|
 | Done | **Platform-error diagnostics** on 502/503/504 security events | `diagnostics_summary`, `worker_metrics`, `likely_causes` |
+| Done (2026-07-15) | **WS thread-pressure visibility**: `worker_metrics.ws_pool` (`active_total`, `pct_of_budget_used`, `by_channel`) | New `ws_thread_pressure` cause fires when a worker's WS connections use ≥75% of its thread budget. Grep prod logs for `[WS_POOL]` (connect/disconnect/rejected), `[NOTIF_PREFS_FETCH]`, `[WS_STATUS_FETCH]`, `[WORKFLOW_TOUR_DYNAMIC_HIT]` (all INFO level) to confirm the fetch-reduction and thread-budget fixes are holding in production |
 | **P1** | **Cross-worker snapshot** (Redis ring buffer of last N stuck requests + last `WORKER TIMEOUT` per process) | Fixes “0 in-flight on reporter” blind spot |
 | **P1** | Log Analytics query + alert: `WORKER TIMEOUT` count > 0 in 15 min | See §6 |
 | P2 | Alert on **AverageResponseTime > 5 s** for 5 min + **Requests/min** spike | App Service metrics |
@@ -238,3 +243,4 @@ AppServiceConsoleLogs
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-07-09 | Engineering | Initial report from 2026-06-30 and 2026-07-09 production investigations |
+| 2026-07-15 | Engineering | Shipped fixes for the highest-priority "unnecessary server exhaustion" patterns found while investigating a related AI-documents 502: workflow tour static/CDN offload, `localStorage`-cached notification preferences + WS status checks, and a Gunicorn-thread-budget-aware cap shared across notification/AI-chat/AI-docs WebSockets (with graceful polling/SSE fallback). Added `[WS_POOL]`, `[NOTIF_PREFS_FETCH]`, `[WS_STATUS_FETCH]`, `[WORKFLOW_TOUR_DYNAMIC_HIT]` INFO-level logs and a `worker_metrics.ws_pool` diagnostics field to confirm the fixes in production logs. |

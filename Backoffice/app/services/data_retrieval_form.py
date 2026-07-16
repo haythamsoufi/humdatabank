@@ -2654,12 +2654,14 @@ def query_dynamic_indicator_data(
                 AssignmentEntityStatus.assigned_form
             ),
             joinedload(DynamicIndicatorData.indicator_bank),
+            joinedload(DynamicIndicatorData.section),
         )
         public_q = public_q.options(
             joinedload(DynamicIndicatorData.public_submission).joinedload(
                 PublicSubmission.assigned_form
             ),
             joinedload(DynamicIndicatorData.indicator_bank),
+            joinedload(DynamicIndicatorData.section),
         )
 
     # Privacy: DynamicIndicatorData has no form_item, so no item-level privacy gate applies.
@@ -2754,12 +2756,18 @@ def query_repeat_group_data(
             joinedload(RepeatGroupData.repeat_instance).joinedload(
                 RepeatGroupInstance.assignment_entity_status
             ).joinedload(AssignmentEntityStatus.assigned_form),
+            joinedload(RepeatGroupData.repeat_instance).joinedload(
+                RepeatGroupInstance.section
+            ),
             joinedload(RepeatGroupData.form_item),
         )
         public_q = public_q.options(
             joinedload(RepeatGroupData.repeat_instance).joinedload(
                 RepeatGroupInstance.public_submission
             ).joinedload(PublicSubmission.assigned_form),
+            joinedload(RepeatGroupData.repeat_instance).joinedload(
+                RepeatGroupInstance.section
+            ),
             joinedload(RepeatGroupData.form_item),
         )
 

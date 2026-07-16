@@ -11,6 +11,7 @@ from flask import current_app, has_app_context
 from datetime import datetime
 import json
 import logging
+import os
 import threading
 import time
 from collections import deque
@@ -19,27 +20,76 @@ from app.utils.datetime_helpers import utcnow
 logger = logging.getLogger(__name__)
 
 
+def _default_ws_connection_budget() -> int:
+    """
+    Compute a safe cap on total concurrent WebSocket connections per worker process,
+    derived from the Gunicorn thread pool size (``GUNICORN_THREADS``).
+
+    Every WebSocket connection served by a `gthread` worker occupies one worker
+    thread for the lifetime of the connection (these are long-lived, not request/
+    response). A burst of WebSocket connections can therefore starve the same
+    worker's ability to serve regular HTTP requests, which is a known contributor
+    to 502/504 gateway errors. We reserve a minimum number of threads for HTTP so
+    WebSockets can never consume the entire pool; once the cap is hit, new
+    connections are rejected and clients fall back to polling/SSE (both already
+    implemented client-side).
+
+    Falls back to a generous default (100) when GUNICORN_THREADS is not set
+    (local dev/tests), since this throttling only matters under Gunicorn.
+    """
+    raw = os.environ.get('GUNICORN_THREADS', '').strip()
+    if not raw:
+        return 100
+    try:
+        threads = int(raw)
+    except ValueError:
+        return 100
+    try:
+        reserved_raw = os.environ.get('WS_RESERVED_HTTP_THREADS', '2').strip()
+        reserved = int(reserved_raw) if reserved_raw else 2
+    except ValueError:
+        reserved = 2
+    return max(1, threads - reserved)
+
+
 class WebSocketManager:
     """Manages WebSocket connections for real-time communication"""
 
-    def __init__(self, max_connections_per_user=5, max_total_connections=100, message_queue_size=50):
+    def __init__(self, max_connections_per_user=None, max_total_connections=None, message_queue_size=50):
         # Store active connections: {user_id: set of WebSocket objects}
-        self._connections: Dict[int, Set] = {}
+        self._connections: Dict[object, Set] = {}
         self._lock = threading.RLock()  # Reentrant lock for nested calls
-        self.max_connections_per_user = max_connections_per_user
-        self.max_total_connections = max_total_connections
+
+        budget = _default_ws_connection_budget()
+        self.max_total_connections = max_total_connections if max_total_connections is not None else budget
+        self.max_connections_per_user = (
+            max_connections_per_user if max_connections_per_user is not None else min(5, budget)
+        )
         self.message_queue_size = message_queue_size
 
-        # Track connection metadata for cleanup
+        # Track connection metadata for cleanup (includes 'channel' for diagnostics,
+        # e.g. 'notifications' vs 'ai_chat' vs 'ai_docs' — these all share the same
+        # per-process thread budget since they compete for the same gthread pool).
         self._connection_metadata: Dict[object, dict] = {}
         self._metadata_lock = threading.RLock()
 
-    def add_connection(self, user_id: int, ws) -> bool:
+        logger.info(
+            "[WS_POOL] WebSocketManager initialized: worker_pid=%s max_total_connections=%s "
+            "max_connections_per_user=%s gunicorn_threads=%s reserved_http_threads=%s",
+            os.getpid(), self.max_total_connections, self.max_connections_per_user,
+            os.environ.get('GUNICORN_THREADS', 'unset'), os.environ.get('WS_RESERVED_HTTP_THREADS', '2'),
+        )
+
+    def add_connection(self, user_id, ws, channel: str = 'default') -> bool:
         """
         Add a new WebSocket connection for a user.
         Returns True if connection was added, False if limit exceeded.
 
         Thread-safe implementation with proper atomic operations.
+
+        ``channel`` tags the connection's purpose (e.g. 'notifications', 'ai_chat',
+        'ai_docs') purely for diagnostics/logging — all channels share the same
+        total/per-user budget because they draw from the same worker thread pool.
         """
         with self._lock:
             # Calculate current total connections atomically
@@ -48,8 +98,9 @@ class WebSocketManager:
             # Check total connections limit before adding
             if total_connections >= self.max_total_connections:
                 logger.warning(
-                    f"WebSocket connection limit reached ({self.max_total_connections}), "
-                    f"rejecting new connection for user {user_id}"
+                    "[WS_POOL] rejected: worker_pid=%s channel=%s user=%s reason=limit_reached "
+                    "active=%s/%s (thread budget exhausted; client should fall back to polling/SSE)",
+                    os.getpid(), channel, user_id, total_connections, self.max_total_connections,
                 )
                 return False
 
@@ -76,14 +127,28 @@ class WebSocketManager:
             with self._metadata_lock:
                 self._connection_metadata[ws] = {
                     'user_id': user_id,
+                    'channel': channel,
                     'created_at': time.time(),
                     'last_activity': time.time(),
                     'message_count': 0
                 }
 
+            new_total = total_connections + 1
+            pct_used = round((new_total / self.max_total_connections) * 100) if self.max_total_connections else 0
+            logger.info(
+                "[WS_POOL] connect: worker_pid=%s channel=%s user=%s active=%s/%s (%s%% of thread budget)",
+                os.getpid(), channel, user_id, new_total, self.max_total_connections, pct_used,
+            )
+            if pct_used >= 75:
+                logger.warning(
+                    "[WS_POOL] approaching thread budget: worker_pid=%s active=%s/%s (%s%%) — "
+                    "risk of HTTP thread starvation if this keeps growing",
+                    os.getpid(), new_total, self.max_total_connections, pct_used,
+                )
+
             return True
 
-    def _remove_connection_internal(self, user_id: int, ws) -> None:
+    def _remove_connection_internal(self, user_id, ws) -> None:
         """Internal method to remove connection (assumes lock is held)"""
         if user_id in self._connections:
             self._connections[user_id].discard(ws)
@@ -93,10 +158,43 @@ class WebSocketManager:
         with self._metadata_lock:
             self._connection_metadata.pop(ws, None)
 
-    def remove_connection(self, user_id: int, ws) -> None:
+    def remove_connection(self, user_id, ws) -> None:
         """Remove a WebSocket connection for a user"""
+        with self._metadata_lock:
+            channel = self._connection_metadata.get(ws, {}).get('channel', 'default')
         with self._lock:
             self._remove_connection_internal(user_id, ws)
+            total_connections = sum(len(conns) for conns in self._connections.values())
+        logger.info(
+            "[WS_POOL] disconnect: worker_pid=%s channel=%s user=%s active=%s/%s",
+            os.getpid(), channel, user_id, total_connections, self.max_total_connections,
+        )
+
+    def snapshot(self) -> dict:
+        """
+        Return a diagnostics snapshot of current WebSocket connection pressure on
+        this worker process, for use in platform-error diagnostics and health checks.
+        """
+        with self._lock:
+            total = sum(len(conns) for conns in self._connections.values())
+            user_count = len(self._connections)
+
+        by_channel: Dict[str, int] = {}
+        with self._metadata_lock:
+            for meta in self._connection_metadata.values():
+                ch = meta.get('channel', 'default')
+                by_channel[ch] = by_channel.get(ch, 0) + 1
+
+        budget = self.max_total_connections
+        pct_used = round((total / budget) * 100) if budget else 0
+        return {
+            'worker_pid': os.getpid(),
+            'active_total': total,
+            'max_total_connections': budget,
+            'pct_of_budget_used': pct_used,
+            'distinct_users': user_count,
+            'by_channel': by_channel,
+        }
 
     def update_activity(self, ws) -> None:
         """Update last activity timestamp for a connection"""

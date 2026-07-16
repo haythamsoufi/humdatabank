@@ -15,6 +15,7 @@ class AccountSettingsForm(FlaskForm):
     name = StringField('Name', validators=[Optional()])
     title = StringField('Title', validators=[Optional()])
     chatbot_enabled = BooleanField('Enable AI Chatbot')
+    translation_review_tool_enabled = BooleanField('Enable inline translation review tool')
     profile_color = SelectField('Profile Color', validators=[Optional()])
     submit = SubmitField('Save Changes')
 

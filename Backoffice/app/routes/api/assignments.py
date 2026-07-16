@@ -413,7 +413,8 @@ def get_matrix_auto_load_entities():
 
 
 def _resolve_auto_load_entities_inner(
-    assignment_entity_status,
+    entity_id,
+    entity_type,
     source_template_id,
     source_assignment_period,
     source_form_item_id,
@@ -422,7 +423,7 @@ def _resolve_auto_load_entities_inner(
 ):
     """Core logic shared between the single and batch auto-load-entities endpoints.
 
-    Assumes the caller has already verified access to ``assignment_entity_status``.
+    Assumes the caller has already verified access.
     Returns a plain dict that maps to the JSON response payload.
     """
     from app.services import AssignmentService
@@ -445,8 +446,8 @@ def _resolve_auto_load_entities_inner(
             ),
         }
 
-    current_entity_id = assignment_entity_status.entity_id
-    current_entity_type = assignment_entity_status.entity_type
+    current_entity_id = entity_id
+    current_entity_type = entity_type
 
     matching_source_entity_statuses = [
         aes for aes in source_assigned_form.entity_statuses
@@ -608,22 +609,40 @@ def get_matrix_auto_load_entities_batch():
         if len(requests_list) > 50:
             return api_error('requests list too long (max 50)', 400)
 
-        # All sub-requests must share the same assignment_entity_status_id so
-        # the access check and AES load happen exactly once.
-        first_aes_id = requests_list[0].get('assignment_entity_status_id')
-        if not first_aes_id:
-            return api_error('assignment_entity_status_id required in first request', 400)
-        try:
-            first_aes_id = int(first_aes_id)
-        except (TypeError, ValueError):
-            return api_error('assignment_entity_status_id must be an integer', 400)
+        # All sub-requests must share the same entity context so the access check
+        # and entity lookup happen exactly once.  Accepts either:
+        #   • assignment_entity_status_id  (normal assignment mode)
+        #   • preview_entity_id + preview_entity_type  (template preview, admin only)
+        first_req = requests_list[0]
+        first_aes_id = first_req.get('assignment_entity_status_id')
+        preview_entity_id = first_req.get('preview_entity_id')
+        preview_entity_type = first_req.get('preview_entity_type')
 
-        from app.services import AssignmentService
-        assignment_entity_status = AssignmentService.get_assignment_entity_status_by_id(first_aes_id)
-        if not assignment_entity_status:
-            return api_error('Assignment entity status not found', 404)
-        if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
-            return api_error('Access denied', 403)
+        if first_aes_id:
+            try:
+                first_aes_id = int(first_aes_id)
+            except (TypeError, ValueError):
+                return api_error('assignment_entity_status_id must be an integer', 400)
+            from app.services import AssignmentService
+            assignment_entity_status = AssignmentService.get_assignment_entity_status_by_id(first_aes_id)
+            if not assignment_entity_status:
+                return api_error('Assignment entity status not found', 404)
+            if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
+                return api_error('Access denied', 403)
+            resolved_entity_id = assignment_entity_status.entity_id
+            resolved_entity_type = assignment_entity_status.entity_type
+        elif preview_entity_id and preview_entity_type:
+            if not AuthorizationService.is_admin(current_user):
+                return api_error('Admin access required for preview mode', 403)
+            try:
+                resolved_entity_id = int(preview_entity_id)
+            except (TypeError, ValueError):
+                return api_error('preview_entity_id must be an integer', 400)
+            resolved_entity_type = str(preview_entity_type)
+        else:
+            return api_error(
+                'Provide assignment_entity_status_id or preview_entity_id + preview_entity_type', 400
+            )
 
         results = []
         for req in requests_list:
@@ -636,7 +655,8 @@ def get_matrix_auto_load_entities_batch():
                     continue
 
                 result = _resolve_auto_load_entities_inner(
-                    assignment_entity_status=assignment_entity_status,
+                    entity_id=resolved_entity_id,
+                    entity_type=resolved_entity_type,
                     source_template_id=source_template_id,
                     source_assignment_period=source_assignment_period,
                     source_form_item_id=source_form_item_id,

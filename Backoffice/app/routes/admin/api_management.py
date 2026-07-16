@@ -1,6 +1,4 @@
-import io
-
-from flask import Blueprint, render_template, request, send_file
+from flask import Blueprint, render_template, request
 from sqlalchemy import func
 from datetime import timedelta
 from app.models.api_usage import APIUsage
@@ -10,9 +8,7 @@ from app.routes.admin.shared import admin_permission_required
 from flask import current_app
 from app.utils.datetime_helpers import utcnow
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_bad_request, json_ok, json_server_error
-from app.utils.power_query_workbook import build_power_query_workbook
-from app.utils.request_utils import get_request_data
+from app.utils.api_responses import json_ok, json_server_error
 from app.utils.sql_utils import safe_ilike_pattern
 from app.services.api_usage_stats import bulk_endpoint_usage_stats, chart_stats_for_period, endpoint_path_prefix
 
@@ -87,15 +83,14 @@ EXTERNAL_API_REGISTRY = [
     # ── Form Data ──────────────────────────────────────────────────────────────
     {'group': 'Form Data', 'path': '/api/v1/data', 'methods': ['GET'],
      'auth': 'api_key_or_session', 'rate_limited': True, 'featured': True,
-     'description': 'Filtered form data rows; API key paginates, session/Basic returns all accessible',
-     'deprecated_envelope': True},
-    {'group': 'Form Data', 'path': '/api/v1/data/tables', 'methods': ['GET'],
-     'auth': 'api_key_or_session', 'rate_limited': False, 'featured': True,
      'description': (
-         'Multi-table data bundle (layout=flat, default) or star-schema export '
-         '(layout=star: fact_form_values + dim_* + bridge_disagg_values). '
-         'Scoped API keys honour permissions.template_ids / country_ids.'
+         'Unified submission data bundle: facts (data, dynamic_data, repeat_data, matrix_cells) plus '
+         'dimension tables (form_items, countries, national_societies, indicator_bank). '
+         'layout=star for BI export. /api/v1/data/tables redirects here (308).'
      )},
+    {'group': 'Form Data', 'path': '/api/v1/data/tables', 'methods': ['GET'],
+     'auth': 'api_key_or_session', 'rate_limited': True, 'featured': False,
+     'description': 'Legacy redirect (308) to /api/v1/data — same query string preserved.'},
     {'group': 'Form Data', 'path': '/api/v1/countries/<country_id>/data', 'methods': ['GET'],
      'auth': 'api_key', 'rate_limited': True,
      'description': 'Paginated form data scoped to one country'},
@@ -958,9 +953,12 @@ def api_management():
         for ep in all_endpoints if ep['surface'] == 'v1'
     ]
 
-    # ── Legacy `api_endpoints` list kept for the chart endpoint selector ───────
-    # (sorted by total_requests descending so the selector shows busiest first)
-    api_endpoints = sorted(v1_endpoints, key=lambda x: x['total_requests'], reverse=True)
+    # ── Legacy `api_endpoints` list kept for the chart / URL-builder selectors ─
+    # Featured (endorsed) endpoints stay pinned at the top; then busiest first.
+    api_endpoints = sorted(
+        v1_endpoints,
+        key=lambda x: (0 if x.get('featured') else 1, -int(x.get('total_requests') or 0)),
+    )
 
     # ── Data for URL-builder dropdowns ────────────────────────────────────────
     templates = FormTemplate.query.all()
@@ -1030,36 +1028,6 @@ def api_management():
         mobile_summary=surface_summary['mobile'],
     )
 
-
-
-@bp.route('/api-management/power-query-workbook', methods=['POST'])
-@admin_permission_required('admin.api.manage')
-def power_query_workbook():
-    # Frontend wraps body in { payload: b64 } so Power Query M formulas do not
-    # trigger Azure WAF OWASP CRS false positives (let/in/SQL-like tokens).
-    data = get_request_data()
-    queries = data.get('queries')
-    if not isinstance(queries, list) or not queries:
-        return json_bad_request('At least one query is required')
-
-    try:
-        workbook_bytes = build_power_query_workbook(queries)
-    except ValueError as exc:
-        return json_bad_request(str(exc))
-    except Exception as exc:
-        current_app.logger.error('power_query_workbook failed: %s', exc, exc_info=True)
-        return json_server_error(GENERIC_ERROR_MESSAGE)
-
-    filename = (data.get('filename') or 'databank-queries.xlsx').strip()
-    if not filename.lower().endswith('.xlsx'):
-        filename = f'{filename}.xlsx'
-
-    return send_file(
-        io.BytesIO(workbook_bytes),
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        as_attachment=True,
-        download_name=filename,
-    )
 
 
 @bp.route('/api-management/stats')

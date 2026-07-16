@@ -120,6 +120,10 @@ export const WidgetUiMixin = {
         let startX = 0, startY = 0;
         let grabOffsetX = 0, grabOffsetY = 0;
         let baseLeft = 0, baseTop = 0;
+        let hideZone = null;
+        let hideZoneHot = false;
+        let lastPointerX = 0;
+        let lastPointerY = 0;
 
         const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
@@ -152,15 +156,85 @@ export const WidgetUiMixin = {
             baseTop  = 0;
         };
 
+        const ensureHideZone = () => {
+            if (hideZone && hideZone.isConnected) return hideZone;
+            hideZone = document.createElement('div');
+            hideZone.id = 'aiChatbotFabHideZone';
+            hideZone.className = 'fab-hide-zone';
+            hideZone.setAttribute('role', 'status');
+            hideZone.setAttribute('aria-hidden', 'true');
+            hideZone.innerHTML =
+                '<div class="fab-hide-zone-inner">' +
+                '<i class="fas fa-eye-slash" aria-hidden="true"></i>' +
+                '<span class="fab-hide-zone-label">Drop to hide</span>' +
+                '</div>';
+            document.body.appendChild(hideZone);
+            return hideZone;
+        };
+
+        const showHideZone = () => {
+            const zone = ensureHideZone();
+            zone.setAttribute('aria-hidden', 'false');
+            // Next frame so the enter transition runs.
+            requestAnimationFrame(() => zone.classList.add('fab-hide-zone--visible'));
+        };
+
+        const hideHideZone = () => {
+            if (!hideZone) return;
+            hideZone.classList.remove('fab-hide-zone--visible', 'fab-hide-zone--hot');
+            hideZone.setAttribute('aria-hidden', 'true');
+        };
+
+        const pointInHideZone = (clientX, clientY) => {
+            if (!hideZone || !hideZone.classList.contains('fab-hide-zone--visible')) return false;
+            const r = hideZone.getBoundingClientRect();
+            const pad = 12;
+            return clientX >= r.left - pad && clientX <= r.right + pad
+                && clientY >= r.top - pad && clientY <= r.bottom + pad;
+        };
+
+        const fabOverlapsHideZone = () => {
+            if (!hideZone || !hideZone.classList.contains('fab-hide-zone--visible')) return false;
+            const a = fab.getBoundingClientRect();
+            const b = hideZone.getBoundingClientRect();
+            return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        };
+
+        const setHideZoneHot = (hot) => {
+            hideZoneHot = !!hot;
+            if (!hideZone) return;
+            hideZone.classList.toggle('fab-hide-zone--hot', hideZoneHot);
+            fab.classList.toggle('fab-dragging-over-hide', hideZoneHot);
+        };
+
+        const dismissFabForSession = () => {
+            this._fabSessionHidden = true;
+            try {
+                if (typeof this.isOpen === 'function' && this.isOpen() && typeof this.toggleChat === 'function') {
+                    this.toggleChat(false);
+                }
+            } catch (_) { /* ignore */ }
+            hideHideZone();
+            endDragVisuals();
+            // Hide before resetting position so it never flashes back to the corner.
+            fab.classList.add('fab-session-hidden');
+            fab.hidden = true;
+            fab.style.setProperty('display', 'none', 'important');
+            try { fab.setAttribute('aria-hidden', 'true'); } catch (_) { /* ignore */ }
+            resetDefaultPos();
+            dlog('FAB dismissed for this page load');
+        };
+
         // Apply left/top anchoring. Called only once the drag threshold is exceeded — never on a plain click.
         const beginDrag = () => {
             fab.classList.add('fab-dragged', 'fab-dragging');
             fab.style.setProperty('transform', 'scale(1.02)', 'important');
+            showHideZone();
         };
 
         const endDragVisuals = () => {
             fab.style.removeProperty('transform');
-            fab.classList.remove('fab-dragging');
+            fab.classList.remove('fab-dragging', 'fab-dragging-over-hide');
         };
 
         // Snap finished position to nearest vertical edge with a smooth transition.
@@ -187,6 +261,7 @@ export const WidgetUiMixin = {
         // ── Pointer Events ──────────────────────────────────────────────────────
         fab.addEventListener('pointerdown', (e) => {
             if (e.pointerType === 'mouse' && e.button !== 0) return;
+            if (this._fabSessionHidden) return;
 
             const rect = fab.getBoundingClientRect();
             fabW        = rect.width  || fabW;
@@ -223,6 +298,11 @@ export const WidgetUiMixin = {
             setPos(newLeft, newTop);
             baseLeft = newLeft;
             baseTop  = newTop;
+            lastPointerX = e.clientX;
+            lastPointerY = e.clientY;
+
+            const overHide = pointInHideZone(e.clientX, e.clientY) || fabOverlapsHideZone();
+            setHideZoneHot(overHide);
         });
 
         const endDrag = (e) => {
@@ -231,19 +311,37 @@ export const WidgetUiMixin = {
             dlog('endDrag: hasDragged=%s event=%s', hasDragged, e.type);
 
             if (hasDragged) {
-                dlog('drag end: final=(%d,%d)', baseLeft, baseTop);
-                endDragVisuals();
-                snapToEdge(baseLeft, baseTop);
+                const releaseX = Number.isFinite(e.clientX) ? e.clientX : lastPointerX;
+                const releaseY = Number.isFinite(e.clientY) ? e.clientY : lastPointerY;
+                // Prefer the live "hot" state from the last move — more reliable than
+                // re-hit-testing after pointerup (coords can be stale with pointer capture).
+                const overHide = hideZoneHot
+                    || pointInHideZone(releaseX, releaseY)
+                    || fabOverlapsHideZone();
+                dlog('drag end: final=(%d,%d) overHide=%s hot=%s', baseLeft, baseTop, overHide, hideZoneHot);
 
                 // Suppress the next click so the chat widget does not open after a drag.
                 fab.addEventListener('click', (ce) => {
                     dlog('click suppressed after drag');
                     ce.stopImmediatePropagation();
                 }, { once: true, capture: true });
+
+                if (overHide) {
+                    dismissFabForSession();
+                    setHideZoneHot(false);
+                    return;
+                }
+
+                setHideZoneHot(false);
+                hideHideZone();
+                endDragVisuals();
+                snapToEdge(baseLeft, baseTop);
             } else {
                 // Plain click — no DOM changes, let the existing click handler fire normally.
                 dlog('plain click (no drag) — letting click event through');
                 endDragVisuals();
+                hideHideZone();
+                setHideZoneHot(false);
             }
         };
 
@@ -253,6 +351,7 @@ export const WidgetUiMixin = {
         // Re-snap to the correct edge whenever the viewport resizes during this session.
         window.addEventListener('resize', () => {
             if (!fab.classList.contains('fab-dragged') || isDragging) return;
+            if (this._fabSessionHidden) return;
             const minTop = NAV_BAR_HEIGHT + VIEWPORT_PAD;
             const cl = safeClamp(baseLeft, VIEWPORT_PAD, window.innerWidth  - fabW - VIEWPORT_PAD);
             const ct = safeClamp(baseTop,  minTop,        window.innerHeight - fabH - VIEWPORT_PAD);
@@ -260,12 +359,20 @@ export const WidgetUiMixin = {
         });
 
         // Always start from the default CSS position; drag position is session-only.
+        this._fabSessionHidden = false;
         resetDefaultPos();
         try { localStorage.removeItem('chatbot_fab_pos'); } catch (_) {}
     },
     /**
      * Nudge the FAB upward when it covers actionable controls (e.g. Save/Cancel at page bottom).
      * Re-checks on scroll, resize, and DOM changes; returns to default when clear.
+     *
+     * Stabilization rules (prevents up/down bouncing):
+     * - Never remeasure while an avoidance transition is in flight (rest-rect math is wrong mid-tween).
+     * - Resolve the full control rect (not a nested child) so tall buttons clear in one step.
+     * - Only move when a *single* capped target is fully clear (no second hop needed);
+     *   otherwise stay put rather than climbing the page.
+     * - Hysteresis before returning to rest so tiny layout jitter does not re-trigger.
      */
 
     _initFabOverlapAvoidance() {
@@ -275,14 +382,31 @@ export const WidgetUiMixin = {
         const GAP = 12;
         const SAMPLE_INSET = 6;
         const MIN_SHIFT = 8;
+        const HYSTERESIS = 20;
+        /** Hard ceiling: keep the FAB in the lower part of the screen (~2.5× its height). */
+        const MAX_SHIFT_PX = 120;
+        const FAB_AVOID_EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';
+        const FAB_AVOID_MS = 280;
+
         let rafId = 0;
         let debounceId = 0;
+        let transitionLock = false;
+        let transitionUnlockTimer = 0;
+        let disposed = false;
         this._fabAvoidanceShift = 0;
 
         const olog = (...args) => {
             if (window.FAB_OVERLAP_DEBUG || window.CHATBOT_DEBUG) {
                 console.log('[FAB overlap]', ...args);
             }
+        };
+
+        const maxShiftCap = (restRect) => {
+            const bySize = Math.round((restRect.height || 48) * 2.5);
+            // Also keep the FAB top within the bottom third of the viewport.
+            const minTop = Math.floor(window.innerHeight * (2 / 3));
+            const byViewport = Math.max(0, Math.round(restRect.top - minTop));
+            return Math.max(0, Math.min(MAX_SHIFT_PX, bySize, byViewport));
         };
 
         const isExcluded = (el) => {
@@ -333,8 +457,19 @@ export const WidgetUiMixin = {
         const rectsOverlap = (a, b) =>
             a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 
-        /** Default FAB slot — undo active avoidance transform so we don't clear then re-apply in a loop. */
-        const getRestFabRect = (visualRect) => {
+        const shiftRect = (rect, shift) => DOMRect.fromRect({
+            x: rect.x,
+            y: rect.y - shift,
+            width: rect.width,
+            height: rect.height,
+        });
+
+        /**
+         * Default FAB slot (home position). Safe because measure() never runs mid-transition
+         * — visualRect + known shift equals rest without neutralizing transform (no flicker).
+         */
+        const getRestFabRect = () => {
+            const visualRect = fab.getBoundingClientRect();
             const shift = this._fabAvoidanceShift || 0;
             if (!shift) return visualRect;
             return DOMRect.fromRect({
@@ -345,8 +480,105 @@ export const WidgetUiMixin = {
             });
         };
 
-        const FAB_AVOID_EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';
-        const FAB_AVOID_MS = 280;
+        const collectOverlappingControls = (fabRect) => {
+            const sampleXs = [
+                fabRect.left + SAMPLE_INSET,
+                fabRect.left + fabRect.width * 0.5,
+                fabRect.right - SAMPLE_INSET,
+            ];
+            const sampleYs = [
+                fabRect.top + SAMPLE_INSET,
+                fabRect.top + fabRect.height * 0.5,
+                fabRect.bottom - SAMPLE_INSET,
+            ];
+
+            const seen = new Set();
+            const overlaps = [];
+            const prevPE = fab.style.pointerEvents;
+            fab.style.pointerEvents = 'none';
+            try {
+                for (const y of sampleYs) {
+                    for (const x of sampleXs) {
+                        if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) continue;
+                        for (const el of document.elementsFromPoint(x, y)) {
+                            if (!isActionableControl(el)) continue;
+                            const control = resolveControl(el);
+                            if (!control || seen.has(control)) break;
+                            const controlRect = control.getBoundingClientRect();
+                            if (!rectsOverlap(fabRect, controlRect)) continue;
+                            seen.add(control);
+                            overlaps.push({ control, rect: controlRect });
+                            break;
+                        }
+                    }
+                }
+            } finally {
+                fab.style.pointerEvents = prevPE || '';
+            }
+            return overlaps;
+        };
+
+        /**
+         * One-shot avoidance: compute a single target above resting overlaps.
+         * Returns that shift only when the destination is fully clear and within the
+         * height cap; otherwise null (= do not move — stay where we are).
+         */
+        const computeSafeShift = (restRect) => {
+            const restOverlaps = collectOverlappingControls(restRect);
+            if (!restOverlaps.length) return 0;
+
+            let needed = 0;
+            for (const { rect } of restOverlaps) {
+                needed = Math.max(needed, restRect.bottom - rect.top + GAP);
+            }
+            needed = Math.round(needed);
+
+            const cap = maxShiftCap(restRect);
+            if (needed < MIN_SHIFT) return 0;
+            if (needed > cap) {
+                olog('reject: over cap', { needed, cap });
+                return null;
+            }
+
+            const destination = shiftRect(restRect, needed);
+            if (destination.top < GAP) {
+                olog('reject: above viewport floor', { top: destination.top, needed });
+                return null;
+            }
+
+            const destOverlaps = collectOverlappingControls(destination);
+            if (destOverlaps.length) {
+                olog('reject: target still covered', {
+                    needed,
+                    controls: destOverlaps.map(({ control }) => control.id || control.className || control.tagName),
+                });
+                return null;
+            }
+
+            return needed;
+        };
+
+        const endTransitionLock = () => {
+            if (disposed) return;
+            transitionLock = false;
+            fab.style.removeProperty('transition');
+            olog('transition unlock');
+            // One settle pass after the tween so we do not leave a wrong shift frozen.
+            scheduleCheckDebounced();
+        };
+
+        const armTransitionLock = () => {
+            transitionLock = true;
+            clearTimeout(transitionUnlockTimer);
+            const onEnd = (e) => {
+                if (e.target !== fab || e.propertyName !== 'transform') return;
+                clearTimeout(transitionUnlockTimer);
+                endTransitionLock();
+            };
+            fab.addEventListener('transitionend', onEnd, { once: true });
+            // Fallback if transitionend is skipped (display:none, reduced motion, etc.).
+            transitionUnlockTimer = setTimeout(endTransitionLock, FAB_AVOID_MS + 80);
+        };
 
         const applyShift = (shift) => {
             const next = Math.max(0, Math.round(shift));
@@ -354,6 +586,7 @@ export const WidgetUiMixin = {
 
             olog('apply shift', { prev: this._fabAvoidanceShift, next });
             this._fabAvoidanceShift = next;
+            armTransitionLock();
 
             if (next > 0) {
                 fab.style.setProperty('transition', `transform ${FAB_AVOID_MS}ms ${FAB_AVOID_EASE}`, 'important');
@@ -365,10 +598,6 @@ export const WidgetUiMixin = {
                 fab.classList.remove('fab-avoiding-controls');
                 fab.style.removeProperty('--fab-avoidance-shift');
                 fab.style.removeProperty('transform');
-                fab.addEventListener('transitionend', (e) => {
-                    if (e.target !== fab || e.propertyName !== 'transform') return;
-                    fab.style.removeProperty('transition');
-                }, { once: true });
             }
         };
 
@@ -387,52 +616,47 @@ export const WidgetUiMixin = {
 
         const measure = () => {
             rafId = 0;
+            if (transitionLock) {
+                olog('skip: transition-lock');
+                return;
+            }
+
             const skipReason = getSkipReason();
             if (skipReason) {
                 applyShift(0);
                 return;
             }
 
-            const visualRect = fab.getBoundingClientRect();
-            if (!visualRect.width || !visualRect.height) return;
+            const restRect = getRestFabRect();
+            if (!restRect.width || !restRect.height) return;
 
-            const restRect = getRestFabRect(visualRect);
-            const sampleXs = [
-                restRect.left + SAMPLE_INSET,
-                restRect.left + restRect.width * 0.5,
-                restRect.right - SAMPLE_INSET,
-            ];
-            const sampleYs = [
-                restRect.top + restRect.height * 0.5,
-                restRect.bottom - SAMPLE_INSET,
-            ];
+            const current = this._fabAvoidanceShift || 0;
+            const cap = maxShiftCap(restRect);
+            const needed = computeSafeShift(restRect);
 
-            const prevPE = fab.style.pointerEvents;
-            fab.style.pointerEvents = 'none';
-
-            let maxShift = 0;
-            try {
-                for (const y of sampleYs) {
-                    for (const x of sampleXs) {
-                        if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) continue;
-                        for (const el of document.elementsFromPoint(x, y)) {
-                            if (!isActionableControl(el)) continue;
-                            const controlRect = el.getBoundingClientRect();
-                            if (!rectsOverlap(restRect, controlRect)) continue;
-                            maxShift = Math.max(maxShift, restRect.bottom - controlRect.top + GAP);
-                            break;
-                        }
-                    }
-                }
-            } finally {
-                fab.style.pointerEvents = prevPE || '';
+            // null => no safe single move — stay put (do not climb / bounce).
+            let next = current;
+            if (needed === null) {
+                next = current > cap ? 0 : current;
+            } else if (needed === 0) {
+                next = 0;
+            } else if (current === 0) {
+                next = needed;
+            } else if (needed > current) {
+                // Only accept a higher nudge when that exact target is already proven clear.
+                next = needed;
+            } else if ((current - needed) >= HYSTERESIS) {
+                next = needed;
             }
 
-            applyShift(maxShift >= MIN_SHIFT ? maxShift : 0);
+            if (next > cap) next = needed === 0 || needed === null ? 0 : Math.min(next, cap);
+
+            olog('measure', { current, needed, next, cap, restTop: Math.round(restRect.top) });
+            applyShift(next);
         };
 
         const scheduleCheck = () => {
-            if (rafId) return;
+            if (rafId || transitionLock) return;
             rafId = requestAnimationFrame(measure);
         };
 
@@ -445,8 +669,9 @@ export const WidgetUiMixin = {
         window.addEventListener('resize', scheduleCheckDebounced, { passive: true });
 
         const domObs = new MutationObserver((mutations) => {
-            const onlyFabStyle = mutations.every((m) => m.target === fab && m.attributeName === 'style');
-            if (onlyFabStyle) return;
+            // Avoidance itself mutates FAB class/style — ignore those or we re-enter forever.
+            const onlyFab = mutations.every((m) => m.target === fab || (fab.contains && fab.contains(m.target)));
+            if (onlyFab) return;
             scheduleCheckDebounced();
         });
         if (document.body) {
@@ -459,12 +684,19 @@ export const WidgetUiMixin = {
         }
 
         this._fabOverlapAvoidanceCleanup = () => {
+            disposed = true;
             document.removeEventListener('scroll', scheduleCheck, { capture: true });
             window.removeEventListener('resize', scheduleCheckDebounced);
             domObs.disconnect();
             clearTimeout(debounceId);
+            clearTimeout(transitionUnlockTimer);
             if (rafId) cancelAnimationFrame(rafId);
-            applyShift(0);
+            transitionLock = false;
+            this._fabAvoidanceShift = 0;
+            fab.classList.remove('fab-avoiding-controls');
+            fab.style.removeProperty('--fab-avoidance-shift');
+            fab.style.removeProperty('transform');
+            fab.style.removeProperty('transition');
         };
 
         window.__fabOverlapRemeasure = scheduleCheck;
@@ -489,6 +721,11 @@ export const WidgetUiMixin = {
             }
             if (this.elements.input) {
                 this.elements.input.focus();
+            }
+            // Warm the tour cache for common workflows now that the user has actually
+            // opened the chat, instead of on every page load regardless of usage.
+            if (typeof this._preloadCommonWorkflowToursOnce === 'function') {
+                this._preloadCommonWorkflowToursOnce();
             }
         }
 

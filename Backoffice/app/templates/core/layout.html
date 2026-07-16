@@ -105,6 +105,7 @@
     <link rel="stylesheet" href="{{ static_url('css/components.css') }}">
     <link rel="stylesheet" href="{{ static_url('css/excel-io.css') }}">
     {% if not skip_layout_chatbot|default(false) %}<link rel="stylesheet" href="{{ static_url('css/chatbot.css') }}">{% endif %}
+    {% if TRANSLATION_REVIEW_ENABLED and translation_review_can_use|default(false) %}<link rel="stylesheet" href="{{ static_url('css/translation-review.css') }}">{% endif %}
     <link rel="stylesheet" href="{{ static_url('css/responsive.css') }}">
     <link rel="stylesheet" href="{{ static_url('css/rtl.css') }}">
 
@@ -451,8 +452,8 @@
     </div>
     {% endif %}
 
-    <!-- AI Chatbot -->
-    {% if not skip_layout_chatbot|default(false) and current_user.is_authenticated and CHATBOT_ENABLED and current_user.chatbot_enabled and (not CHATBOT_ORG_ONLY or is_organization_email(current_user.email)) and user_has_ai_beta_access(current_user) %}
+    <!-- AI Chatbot (markup stays even when skip_layout_chatbot defers JS/CSS; FAB binds after lazy load) -->
+    {% if current_user.is_authenticated and CHATBOT_ENABLED and current_user.chatbot_enabled and (not CHATBOT_ORG_ONLY or is_organization_email(current_user.email)) and user_has_ai_beta_access(current_user) %}
     <button id="aiChatbotFAB" aria-label="{{ _('Open %(assistant)s', assistant=CHATBOT_NAME) if CHATBOT_NAME else _('Open AI Assistant') }}">
         <span class="fab-icon-slot">
             <div class="robot-face">
@@ -541,6 +542,38 @@
         </div>
     </div>
     {% include 'components/_ai_policy_modal.html' %}
+    {% endif %}
+
+    {% if TRANSLATION_REVIEW_ENABLED and translation_review_can_use|default(false) %}
+    <button id="translationReviewFAB" type="button" aria-label="{{ _('Translation review') }}" aria-pressed="{{ 'true' if translation_review_active else 'false' }}">
+        <span class="tr-fab-icon-slot" aria-hidden="true">
+            <i class="fas fa-language"></i>
+        </span>
+        <span class="fab-label">{{ _('Translate') if not translation_review_active else _('Review mode') }}</span>
+    </button>
+    {% include 'components/_translation_review_modal.html' %}
+    <script nonce="{{ csp_nonce() }}">
+    window.__translationReviewConfig = {
+        enabled: {{ TRANSLATION_REVIEW_ENABLED | tojson }},
+        canUse: {{ translation_review_can_use | tojson }},
+        active: {{ translation_review_active | tojson }},
+        locale: {{ translation_review_locale | tojson }},
+        assignedLanguages: {{ translation_review_assigned_languages | tojson }},
+        urls: {
+            toggle: {{ url_for('translation_review.toggle_review_mode') | tojson }},
+            getString: {{ url_for('translation_review.get_review_string') | tojson }},
+            saveString: {{ url_for('translation_review.save_review_string') | tojson }},
+            status: {{ url_for('translation_review.review_status') | tojson }}
+        },
+        i18n: {
+            missingPlaceholders: {{ _('Missing placeholders') | tojson }},
+            extraPlaceholders: {{ _('Unexpected placeholders') | tojson }},
+            translate: {{ _('Translate') | tojson }},
+            reviewMode: {{ _('Review mode') | tojson }}
+        }
+    };
+    </script>
+    <script src="{{ static_url('js/translation_review/core.js') }}" defer></script>
     {% endif %}
 
     {% include 'components/_auto_translation_notice_banner.html' %}

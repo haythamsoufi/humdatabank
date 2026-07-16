@@ -22,6 +22,124 @@ from app.utils.sql_utils import safe_ilike_pattern
 _SECTOR_LEVELS = ('primary', 'secondary', 'tertiary')
 
 
+def indicator_bank_supports_disaggregation(indicator) -> bool:
+    """Return True when an indicator bank row supports sex/age disaggregation."""
+    from config import Config
+
+    if (getattr(indicator, 'type', None) or '').strip().lower() != 'number':
+        return False
+
+    if getattr(indicator, 'indicator_unit_id', None):
+        unit = getattr(indicator, 'measurement_unit', None)
+        if unit is not None:
+            return bool(getattr(unit, 'allows_disaggregation', False))
+
+    unit_code = (getattr(indicator, 'unit', None) or '').strip()
+    if not unit_code:
+        return False
+
+    allowed = {
+        str(value).lower()
+        for value in (getattr(Config, 'DISAGGREGATION_ALLOWED_UNITS', None) or [])
+    }
+    return unit_code.lower() in allowed
+
+
+def normalize_disaggregation_options(options) -> List[str]:
+    """Return validated disaggregation option keys, defaulting to total."""
+    from config import Config
+
+    valid = set(Config.DISAGGREGATION_MODES.keys())
+    normalized: List[str] = []
+    for option in options or []:
+        key = str(option).strip().lower()
+        if key in valid and key not in normalized:
+            normalized.append(key)
+    return normalized or ['total']
+
+
+def serialize_wizard_indicator(indicator) -> Dict[str, Any]:
+    """Serialize an indicator bank row for the template wizard."""
+    spef = getattr(indicator, 'spef_area', None)
+    area_code = (getattr(indicator, 'area', None) or '').strip()
+    area_label = getattr(indicator, 'area_label', None)
+    spef_id = getattr(indicator, 'indicator_spef_id', None)
+    if spef is not None:
+        area_code = (spef.code or area_code).strip()
+        area_label = spef.name or area_label
+        spef_id = spef.id
+
+    return {
+        'id': indicator.id,
+        'name': indicator.name,
+        'type': indicator.type,
+        'unit': indicator.unit,
+        'fdrs_kpi_code': getattr(indicator, 'fdrs_kpi_code', None),
+        'definition': indicator.definition,
+        'related_programs': indicator.related_programs_list,
+        'emergency': indicator.emergency,
+        'archived': indicator.archived,
+        'sector': indicator.sector,
+        'sub_sector': indicator.sub_sector,
+        'indicator_spef_id': spef_id,
+        'area': area_code or None,
+        'area_label': area_label,
+        'supports_disaggregation': indicator_bank_supports_disaggregation(indicator),
+    }
+
+
+def sort_indicator_bank_wizard_sections(
+    sections_payload: Sequence[dict],
+    *,
+    group_by: Optional[str] = None,
+) -> List[dict]:
+    """Reorder wizard sections to match IndicatorBankSpef catalog order."""
+    sections = list(sections_payload or [])
+    if group_by != 'area' or not sections:
+        return sections
+
+    from app.models import IndicatorBankSpef
+
+    spef_rows = (
+        IndicatorBankSpef.query.filter_by(is_active=True)
+        .order_by(IndicatorBankSpef.sort_order, IndicatorBankSpef.code)
+        .all()
+    )
+    order_by_id = {row.id: index for index, row in enumerate(spef_rows)}
+    order_by_code = {
+        (row.code or '').strip().upper(): index
+        for index, row in enumerate(spef_rows)
+    }
+    order_by_name = {row.name: index for index, row in enumerate(spef_rows)}
+
+    def section_sort_key(section: dict) -> tuple:
+        spef_id = section.get('spef_id') or section.get('indicator_spef_id')
+        if spef_id is not None:
+            try:
+                index = order_by_id.get(int(spef_id))
+                if index is not None:
+                    return (0, index, '')
+            except (TypeError, ValueError):
+                pass
+
+        area_code = (section.get('area_code') or '').strip().upper()
+        if area_code:
+            index = order_by_code.get(area_code)
+            if index is not None:
+                return (0, index, area_code)
+            return (1, len(spef_rows), area_code)
+
+        name = (section.get('name') or '').strip()
+        index = order_by_name.get(name)
+        if index is not None:
+            return (0, index, name.lower())
+        if name:
+            return (2, 0, name.lower())
+        return (3, 0, '')
+
+    return sorted(sections, key=section_sort_key)
+
+
 @dataclass
 class IndicatorBankFilters:
     search: str = ''

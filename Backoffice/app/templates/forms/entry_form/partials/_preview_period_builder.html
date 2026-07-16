@@ -1,0 +1,102 @@
+{#
+  Period builder widget used inside the template-preview banner form.
+
+  Variables expected from parent context:
+    preview_selected_period_name  – current period_name from URL (may be empty)
+    preview_period_name_options   – list of period names from real assignments for this template
+
+  The hidden input named "period_name" is submitted to the GET route.
+  JavaScript for this widget lives in _preview_banner_js.html.
+#}
+{% from "macros/year_picker.html" import year_picker %}
+
+{# Detect whether the current value is a custom (not-in-list) period #}
+{% set is_custom_period = preview_selected_period_name and preview_selected_period_name not in preview_period_name_options %}
+
+<div class="flex flex-col min-w-[200px]">
+    <label for="preview-period-select" class="block text-xs font-medium text-blue-900 mb-1">{{ _('Assignment period') }}</label>
+    <input type="hidden" name="period_name" id="preview-period-name-hidden" value="{{ preview_selected_period_name }}">
+
+    {# Main dropdown: existing periods + "Custom period…" sentinel #}
+    <select id="preview-period-select"
+            class="py-2 pl-2 pr-8 border border-blue-200 rounded-md bg-white text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-300 w-full">
+        <option value="">{{ _('— select period —') }}</option>
+        {% for p in preview_period_name_options %}
+            <option value="{{ p }}" {% if p == preview_selected_period_name %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+        <option value="__custom__" {% if is_custom_period %}selected{% endif %}>{{ _('Custom period…') }}</option>
+    </select>
+</div>
+
+{# Custom period builder — its own full-width row beneath the main controls.
+   order-1 pushes it after the Apply button in the flex-wrap form; w-full
+   forces it onto a new line so the top row (View as / period / Apply) stays intact. #}
+<div id="preview-custom-period-wrap"
+     class="{% if not is_custom_period %}hidden {% endif %}order-1 w-full flex flex-wrap items-end gap-x-4 gap-y-2 mt-1 px-3 py-2.5 rounded-md border border-blue-200 bg-white">
+
+    <div class="flex flex-col">
+        <label for="preview-period-type" class="text-xs text-blue-700 mb-1">{{ _('Type') }}</label>
+        <select id="preview-period-type"
+                class="py-1.5 pl-2 pr-6 border border-blue-200 rounded-md bg-white text-xs focus:ring-2 focus:ring-blue-300 focus:border-blue-300">
+            <option value="single-year">{{ _('Single Year') }}</option>
+            <option value="year-range">{{ _('Year Range') }}</option>
+            <option value="month-range">{{ _('Month Range') }}</option>
+        </select>
+    </div>
+
+    {# Single year #}
+    <div id="preview-single-year-wrap" class="preview-pb-period-fields flex flex-col">
+        <label class="text-xs text-blue-700 mb-1">{{ _('Year') }}</label>
+        {{ year_picker('preview-single-year') }}
+    </div>
+
+    {# Year range #}
+    <div id="preview-year-range-wrap" class="preview-pb-period-fields hidden flex items-end gap-1.5">
+        <div class="flex flex-col">
+            <label class="text-xs text-blue-700 mb-1">{{ _('From') }}</label>
+            {{ year_picker('preview-start-year') }}
+        </div>
+        <span class="text-blue-400 pb-2">–</span>
+        <div class="flex flex-col">
+            <label class="text-xs text-blue-700 mb-1">{{ _('To') }}</label>
+            {{ year_picker('preview-end-year') }}
+        </div>
+    </div>
+
+    {# Month range #}
+    <div id="preview-month-range-wrap" class="preview-pb-period-fields hidden flex items-end gap-2 flex-wrap">
+        <div class="flex flex-col">
+            <label class="text-xs text-blue-700 mb-1">{{ _('Start') }}</label>
+            <div class="period-month-row">
+                {{ year_picker('preview-start-month-year') }}
+                <select id="preview-start-month" class="period-month-select py-1.5 pl-1 pr-5 border border-blue-200 rounded-md bg-white text-xs focus:ring-2 focus:ring-blue-300">
+                    <option value="01">{{ _('Jan') }}</option><option value="02">{{ _('Feb') }}</option><option value="03">{{ _('Mar') }}</option>
+                    <option value="04">{{ _('Apr') }}</option><option value="05">{{ _('May') }}</option><option value="06">{{ _('Jun') }}</option>
+                    <option value="07">{{ _('Jul') }}</option><option value="08">{{ _('Aug') }}</option><option value="09">{{ _('Sep') }}</option>
+                    <option value="10">{{ _('Oct') }}</option><option value="11">{{ _('Nov') }}</option><option value="12">{{ _('Dec') }}</option>
+                </select>
+            </div>
+        </div>
+        <span class="text-blue-400 pb-2">–</span>
+        <div class="flex flex-col">
+            <label class="text-xs text-blue-700 mb-1">{{ _('End') }}</label>
+            <div class="period-month-row">
+                {{ year_picker('preview-end-month-year') }}
+                <select id="preview-end-month" class="period-month-select py-1.5 pl-1 pr-5 border border-blue-200 rounded-md bg-white text-xs focus:ring-2 focus:ring-blue-300">
+                    <option value="01">{{ _('Jan') }}</option><option value="02">{{ _('Feb') }}</option><option value="03">{{ _('Mar') }}</option>
+                    <option value="04">{{ _('Apr') }}</option><option value="05">{{ _('May') }}</option><option value="06">{{ _('Jun') }}</option>
+                    <option value="07">{{ _('Jul') }}</option><option value="08">{{ _('Aug') }}</option><option value="09">{{ _('Sep') }}</option>
+                    <option value="10">{{ _('Oct') }}</option><option value="11">{{ _('Nov') }}</option><option value="12">{{ _('Dec') }}</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    {# Live display of the custom period being built — pinned to the right #}
+    <div class="ml-auto self-center text-xs text-blue-700 whitespace-nowrap">
+        <span class="font-medium">{{ _('Period:') }}</span>
+        <span id="preview-period-name-display" class="font-mono">
+            {{- preview_selected_period_name if is_custom_period else '' -}}
+        </span>
+    </div>
+</div>

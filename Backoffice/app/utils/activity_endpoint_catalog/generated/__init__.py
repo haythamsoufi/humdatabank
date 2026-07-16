@@ -14,7 +14,6 @@ from app.utils.activity_endpoint_catalog.generated.partials.ai_management import
 from app.utils.activity_endpoint_catalog.generated.partials.ai_v2 import SPECS as _S_ai_v2
 from app.utils.activity_endpoint_catalog.generated.partials.analytics import SPECS as _S_analytics
 from app.utils.activity_endpoint_catalog.generated.partials.api_key_management import SPECS as _S_api_key_management
-from app.utils.activity_endpoint_catalog.generated.partials.api_management import SPECS as _S_api_management
 from app.utils.activity_endpoint_catalog.generated.partials.assignment_management import SPECS as _S_assignment_management
 from app.utils.activity_endpoint_catalog.generated.partials.auth import SPECS as _S_auth
 from app.utils.activity_endpoint_catalog.generated.partials.content_management import SPECS as _S_content_management
@@ -32,11 +31,13 @@ from app.utils.activity_endpoint_catalog.generated.partials.main import SPECS as
 from app.utils.activity_endpoint_catalog.generated.partials.monitoring import SPECS as _S_monitoring
 from app.utils.activity_endpoint_catalog.generated.partials.notifications import SPECS as _S_notifications
 from app.utils.activity_endpoint_catalog.generated.partials.organization import SPECS as _S_organization
+from app.utils.activity_endpoint_catalog.generated.partials.pb_progress import SPECS as _S_pb_progress
 from app.utils.activity_endpoint_catalog.generated.partials.plugin_management import SPECS as _S_plugin_management
 from app.utils.activity_endpoint_catalog.generated.partials.rbac_management import SPECS as _S_rbac_management
 from app.utils.activity_endpoint_catalog.generated.partials.security import SPECS as _S_security
 from app.utils.activity_endpoint_catalog.generated.partials.settings import SPECS as _S_settings
 from app.utils.activity_endpoint_catalog.generated.partials.system_admin import SPECS as _S_system_admin
+from app.utils.activity_endpoint_catalog.generated.partials.translation_review import SPECS as _S_translation_review
 from app.utils.activity_endpoint_catalog.generated.partials.upr_excel_import import SPECS as _S_upr_excel_import
 from app.utils.activity_endpoint_catalog.generated.partials.user_management import SPECS as _S_user_management
 from app.utils.activity_endpoint_catalog.generated.partials.utilities import SPECS as _S_utilities
@@ -49,7 +50,6 @@ GENERATED_ACTIVITY_SPECS: dict[tuple[str, str], ActivityEndpointSpec] = merge_ac
     _S_ai_v2,
     _S_analytics,
     _S_api_key_management,
-    _S_api_management,
     _S_assignment_management,
     _S_auth,
     _S_content_management,
@@ -67,11 +67,13 @@ GENERATED_ACTIVITY_SPECS: dict[tuple[str, str], ActivityEndpointSpec] = merge_ac
     _S_monitoring,
     _S_notifications,
     _S_organization,
+    _S_pb_progress,
     _S_plugin_management,
     _S_rbac_management,
     _S_security,
     _S_settings,
     _S_system_admin,
+    _S_translation_review,
     _S_upr_excel_import,
     _S_user_management,
     _S_utilities,

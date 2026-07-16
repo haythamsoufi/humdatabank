@@ -36,6 +36,11 @@ export FLASK_APP=run:app
 python -m flask db upgrade
 echo "✓ Database migrations completed"
 
+# Pre-render chatbot workflow tour JSON to static/CDN (best-effort, no DB required).
+# See app/cli.py `flask workflows generate-static` for details.
+echo "Generating static workflow tour JSON..."
+python -m flask workflows generate-static || echo "WARN: workflow tour generation failed (continuing)"
+
 # Start application with Gunicorn
 echo "=========================================="
 echo "Starting Gunicorn WSGI server..."

@@ -748,9 +748,9 @@ export const BlankTranslationEditor = {
   <div id="blank-trans-color-dropdown"
        class="hidden absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-2"
        role="menu">
-    <div class="grid grid-cols-4 gap-1.5">
+    <div class="blank-body-color-swatches">
       ${COLORS.map(([c, l]) =>
-          `<button type="button" class="blank-trans-color-swatch w-6 h-6 rounded-full border-2 border-white ring-1 ring-gray-300 hover:ring-2 hover:ring-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" style="background:${c}" data-color="${c}" title="${l}" role="menuitem"></button>`
+          `<button type="button" class="blank-trans-color-swatch rounded-full border-2 border-white ring-1 ring-gray-300 hover:ring-2 hover:ring-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" style="background:${c}" data-color="${c}" title="${l}" role="menuitem"></button>`
       ).join('\n      ')}
     </div>
   </div>

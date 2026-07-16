@@ -3,6 +3,8 @@ Unit tests for api_serialization utilities.
 
 Covers: format_country_info, format_country_info_minimal, format_form_item_info,
 format_indicator_details, serialize_assigned_data_item, serialize_public_data_item,
+serialize_dynamic_data_item, serialize_repeat_data_item, serialize_dynamic_section_context,
+resolve_dynamic_repeat_instance_id,
 format_dim_template, format_dim_period, format_dim_submission_assigned,
 format_dim_submission_public, format_fact_form_value_row, format_bridge_disagg_rows,
 build_bridge_disagg_from_flat_rows, build_star_schema_tables.
@@ -18,6 +20,10 @@ from app.utils.api_serialization import (
     format_indicator_details,
     serialize_assigned_data_item,
     serialize_public_data_item,
+    serialize_dynamic_data_item,
+    serialize_repeat_data_item,
+    serialize_dynamic_section_context,
+    resolve_dynamic_repeat_instance_id,
     format_dim_template,
     format_dim_period,
     format_dim_submission_assigned,
@@ -26,6 +32,7 @@ from app.utils.api_serialization import (
     format_bridge_disagg_rows,
     build_bridge_disagg_from_flat_rows,
     build_star_schema_tables,
+    enrich_matrix_cells,
     _wrap_disagg_dict,
     _resolve_matrix_cell,
 )
@@ -630,6 +637,174 @@ class TestSerializePublicDataItem:
 
 
 # ---------------------------------------------------------------------------
+# serialize_dynamic_data_item / serialize_repeat_data_item
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestSerializeDynamicDataItem:
+    def _make_dynamic_item(self, *, repeat_instance_number=None):
+        item = MagicMock()
+        item.id = 10
+        item.section_id = 55
+        item.indicator_bank_id = 619
+        item.custom_label = None
+        item.repeat_instance_number = repeat_instance_number
+        item.value = '42'
+        item.data_not_available = False
+        item.not_applicable = False
+        item.submitted_at = datetime(2024, 6, 1, 12, 0, 0)
+        item.prefilled_value = None
+        item.imputed_value = None
+        item.prefilled_disagg_data = None
+        item.imputed_disagg_data = None
+        item.disagg_data = None
+
+        aes = MagicMock()
+        aes.id = 88
+        aes.entity_type = 'country'
+        aes.entity_id = 7
+        af = MagicMock()
+        af.template_id = 33
+        af.period_name = '2024'
+        aes.assigned_form = af
+        item.assignment_entity_status = aes
+        item.public_submission = None
+
+        section = MagicMock()
+        section.id = 55
+        section.stable_key = 'section-uuid'
+        section.parent_section_id = 44 if repeat_instance_number is not None else None
+        item.section = section
+        return item
+
+    def test_section_level_dynamic_fields(self, app):
+        with app.test_request_context():
+            with patch('app.utils.api_serialization.format_country_info', return_value={'id': 7}), \
+                 patch('app.utils.api_serialization._country_for_aes', return_value=MagicMock(iso2='AF', iso3='AFG')):
+                result = serialize_dynamic_data_item(self._make_dynamic_item())
+        assert result['field_type'] == 'dynamic'
+        assert result['form_item_id'] is None
+        assert result['section_stable_key'] == 'section-uuid'
+        assert result['repeat_instance_number'] is None
+        assert result['repeat_instance_id'] is None
+        assert result['iso2'] == 'AF'
+
+    def test_repeat_scoped_dynamic_fields(self, app):
+        item = self._make_dynamic_item(repeat_instance_number=2)
+        dynamic_context = {
+            'section_by_id': {55: item.section},
+            'repeat_instance_id_by_key': {
+                ('assigned', 88, 44, 2): 901,
+            },
+        }
+        with app.test_request_context():
+            with patch('app.utils.api_serialization.format_country_info', return_value={'id': 7}), \
+                 patch('app.utils.api_serialization._country_for_aes', return_value=MagicMock(iso2='AF', iso3='AFG')):
+                result = serialize_dynamic_data_item(item, dynamic_context=dynamic_context)
+        assert result['field_type'] == 'repeat_dynamic'
+        assert result['repeat_instance_number'] == 2
+        assert result['repeat_instance_id'] == 901
+
+
+@pytest.mark.unit
+class TestSerializeRepeatDataItem:
+    def test_repeat_static_fields(self, app):
+        item = MagicMock()
+        item.id = 20
+        item.form_item_id = 1403
+        item.repeat_instance_id = 901
+        item.value = 'yes'
+        item.data_not_available = False
+        item.not_applicable = False
+        item.submitted_at = datetime(2024, 6, 1, 12, 0, 0)
+        item.prefilled_value = None
+        item.imputed_value = None
+        item.prefilled_disagg_data = None
+        item.imputed_disagg_data = None
+        item.disagg_data = None
+
+        fi = MagicMock()
+        fi.stable_key = 'item-uuid'
+        item.form_item = fi
+
+        instance = MagicMock()
+        instance.section_id = 44
+        instance.instance_number = 2
+        instance.instance_label = 'Emergency 2'
+        section = MagicMock()
+        section.stable_key = 'repeat-section-uuid'
+        instance.section = section
+        aes = MagicMock()
+        aes.id = 88
+        aes.entity_type = 'country'
+        aes.entity_id = 7
+        af = MagicMock()
+        af.template_id = 33
+        af.period_name = '2024'
+        aes.assigned_form = af
+        instance.assignment_entity_status = aes
+        instance.public_submission = None
+        item.repeat_instance = instance
+
+        with app.test_request_context():
+            with patch('app.utils.api_serialization.format_country_info', return_value={'id': 7}), \
+                 patch('app.utils.api_serialization._country_for_aes', return_value=MagicMock(iso2='AF', iso3='AFG')):
+                result = serialize_repeat_data_item(item)
+        assert result['field_type'] == 'repeat_static'
+        assert result['section_stable_key'] == 'repeat-section-uuid'
+        assert result['form_item_stable_key'] == 'item-uuid'
+        assert result['instance_number'] == 2
+
+
+@pytest.mark.unit
+class TestSerializeDynamicSectionContext:
+    def test_assigned_context(self):
+        ctx = MagicMock()
+        ctx.id = 1
+        ctx.assignment_entity_status_id = 88
+        ctx.public_submission_id = None
+        ctx.section_id = 55
+        ctx.provider_id = 'emergency_operations'
+        ctx.slot = 2
+        ctx.context_key = 'MDRBD018'
+        ctx.label_snapshot = 'Bangladesh Floods'
+        ctx.status = 'active'
+        ctx.resolved_at = datetime(2024, 6, 1, 10, 0, 0)
+        result = serialize_dynamic_section_context(ctx)
+        assert result['submission_type'] == 'assigned'
+        assert result['submission_id'] == 88
+        assert result['context_key'] == 'MDRBD018'
+        assert result['slot'] == 2
+
+
+@pytest.mark.unit
+class TestSerializeAssignedFieldType:
+    def test_static_field_type(self, app):
+        with app.test_request_context():
+            with patch('app.utils.api_serialization.format_country_info', return_value=None), \
+                 patch('app.utils.api_serialization._country_for_aes', return_value=None):
+                item = MagicMock()
+                item.id = 1
+                item.form_item_id = 10
+                item.value = '1'
+                item.data_not_available = False
+                item.not_applicable = False
+                item.submitted_at = None
+                item.prefilled_value = None
+                item.imputed_value = None
+                item.prefilled_disagg_data = None
+                item.imputed_disagg_data = None
+                item.disagg_data = None
+                item.form_item = None
+                status = MagicMock()
+                status.id = 5
+                status.assigned_form = None
+                item.assignment_entity_status = status
+                result = serialize_assigned_data_item(item, include_full_info=False)
+        assert result['field_type'] == 'static'
+
+
+# ---------------------------------------------------------------------------
 # format_dim_template
 # ---------------------------------------------------------------------------
 
@@ -959,6 +1134,65 @@ class TestResolveMatrixCell:
 
 
 # ---------------------------------------------------------------------------
+# enrich_matrix_cells
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestEnrichMatrixCells:
+    def test_resolves_country_row_and_column_labels(self):
+        form_items = [{
+            'id': 9,
+            'label': 'Funding matrix',
+            'matrix_config': {
+                'row_mode': 'list_library',
+                'join_dimension': 'countries',
+                'columns': [{'name': 'SP2', 'label': 'Strategic Priority 2'}],
+            },
+        }]
+        countries = [{'id': 10, 'name': 'Kenya', 'iso2': 'KE', 'iso3': 'KEN'}]
+        cells = [{
+            'form_data_id': 100,
+            'form_item_id': 9,
+            'row_entity_id': 10,
+            'column_key': 'SP2',
+            'join_dimension': 'countries',
+            'value': 42,
+            'source': 'reported',
+        }]
+        enriched = enrich_matrix_cells(cells, form_items, countries_table=countries)
+        assert len(enriched) == 1
+        matrix = enriched[0]['matrix']
+        assert matrix['row']['label'] == 'Kenya'
+        assert matrix['column']['label'] == 'Strategic Priority 2'
+        assert matrix['entity']['id'] == 10
+        assert matrix['entity']['name'] == 'Kenya'
+        assert matrix['entity']['iso2'] == 'KE'
+        assert enriched[0]['form_item_label'] == 'Funding matrix'
+        assert 'row_entity_label' not in enriched[0]
+
+    def test_resolves_manual_matrix_row_label(self):
+        form_items = [{
+            'id': 5,
+            'label': 'EF breakdown',
+            'matrix_config': {
+                'row_mode': 'manual',
+                'rows': [{'id': 10, 'label': 'EFs Planned'}],
+                'columns': [{'name': 'Funding', 'label': 'Funding (CHF)'}],
+            },
+        }]
+        cells = [{
+            'form_data_id': 286907,
+            'form_item_id': 5,
+            'row_entity_id': 10,
+            'column_key': 'Funding',
+            'value': 1000,
+        }]
+        enriched = enrich_matrix_cells(cells, form_items)
+        assert enriched[0]['matrix']['row']['label'] == 'EFs Planned'
+        assert enriched[0]['matrix']['column']['label'] == 'Funding (CHF)'
+
+
+# ---------------------------------------------------------------------------
 # format_bridge_disagg_rows
 # ---------------------------------------------------------------------------
 
@@ -1121,6 +1355,55 @@ class TestBuildStarSchemaTables:
             }]
             result = build_star_schema_tables(rows, [], [])
             assert len(result['bridge_disagg_values']) == 2
+
+    def test_merges_dynamic_and_repeat_into_fact_rows(self, app):
+        with app.app_context():
+            static = [{
+                'id': 1, 'field_type': 'static', 'data_type': 'static',
+                'form_item_id': 10, 'country_id': 2, 'value': 5,
+            }]
+            dynamic = [{
+                'id': 2, 'field_type': 'dynamic', 'data_type': 'dynamic',
+                'indicator_bank_id': 619, 'country_id': 2, 'value': 100,
+            }]
+            repeat = [{
+                'id': 3, 'field_type': 'repeat_static', 'data_type': 'repeat',
+                'form_item_id': 11, 'repeat_instance_id': 9, 'value': 7,
+            }]
+            result = build_star_schema_tables(
+                static,
+                [{
+                    'id': 12,
+                    'label': 'Matrix item',
+                    'matrix_config': {
+                        'columns': [{'name': 'SP2', 'label': 'SP2 column'}],
+                    },
+                }],
+                [{'id': 42, 'name': 'Test Country', 'iso2': 'TC', 'iso3': 'TST'}],
+                dynamic_data=dynamic,
+                repeat_data=repeat,
+                matrix_cells=[{
+                    'form_data_id': 1,
+                    'form_item_id': 12,
+                    'row_entity_id': 42,
+                    'column_key': 'SP2',
+                    'join_dimension': 'countries',
+                    'value': 1,
+                    'source': 'reported',
+                }],
+            )
+            assert len(result['fact_form_values']) == 4
+            assert result['fact_form_values'][1]['indicator_bank_id'] == 619
+            assert result['fact_form_values'][2]['repeat_instance_id'] == 9
+            matrix_fact = result['fact_form_values'][3]
+            assert matrix_fact['field_type'] == 'matrix'
+            assert matrix_fact['id'] is None
+            assert matrix_fact['matrix']['column']['key'] == 'SP2'
+            assert matrix_fact['matrix']['column']['label'] == 'SP2 column'
+            assert matrix_fact['matrix']['row']['label'] == 'Test Country'
+            assert matrix_fact['matrix']['entity']['id'] == 42
+            assert matrix_fact['matrix']['parent_form_data_id'] == 1
+            assert 'fact_matrix_cells' not in result
 
     def test_with_template_ids_queries_db(self, app):
         with app.app_context():

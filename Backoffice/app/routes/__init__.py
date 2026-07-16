@@ -27,6 +27,7 @@ def register_all_blueprints(app, csrf, startup_start, static_folder_path=None):
     from app.routes.ai import ai_bp
     from app.routes.ai_documents import ai_docs_bp
     from app.routes import excel as excel_bp
+    from app.routes.translation_review import bp as translation_review_bp
     from app.routes.ai_ws import register_ai_ws
     from app.swagger.routes import swagger_bp
 
@@ -57,6 +58,7 @@ def register_all_blueprints(app, csrf, startup_start, static_folder_path=None):
     app.register_blueprint(ai_bp)
     app.register_blueprint(ai_docs_bp)
     app.register_blueprint(excel_bp.bp)
+    app.register_blueprint(translation_review_bp)
 
     try:
         csrf.exempt(ai_bp)

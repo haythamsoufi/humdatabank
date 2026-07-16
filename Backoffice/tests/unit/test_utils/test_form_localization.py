@@ -861,9 +861,21 @@ class TestGetLocalizedCountryName:
         country = MagicMock()
         country.get_name_translation.side_effect = Exception("db error")
         country.name = "Syria"
+        country.name_translations = None
         with _NO_LOCALE:
             result = get_localized_country_name(country)
         assert result == "Syria"
+
+    def test_mock_without_get_name_translation_uses_translations_dict(self, app_ctx):
+        from app.utils.form_localization import get_localized_country_name
+
+        class MockCountry:
+            name = "Preview Country"
+            name_translations = {"fr": "Pays de Prévisualisation"}
+
+        with patch("app.utils.form_localization.get_translation_key", return_value="fr"):
+            result = get_localized_country_name(MockCountry())
+        assert result == "Pays de Prévisualisation"
 
 
 # ---------------------------------------------------------------------------

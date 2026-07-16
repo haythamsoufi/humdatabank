@@ -43,6 +43,8 @@ from .helpers import (
     _ensure_user_has_default_rbac_role,
     _get_user_deletion_preview,
     _cascade_delete_user_related,
+    _get_translator_form_context,
+    _apply_user_translator_languages,
 )
 
 
@@ -746,6 +748,11 @@ def new_user():
                     else:
                         _ensure_user_has_default_rbac_role(new_user, default_role_code="assignment_viewer")
 
+                    _apply_user_translator_languages(
+                        new_user.id,
+                        can_manage=_get_translator_form_context().get('can_manage_translator_languages', False),
+                    )
+
                     # Handle entity permissions from form (NS Structure and Secretariat).
                     # Requires admin.users.grants.manage or system manager.
                     entity_permissions = []
@@ -811,7 +818,8 @@ def new_user():
                            get_localized_country_name=get_localized_country_name,
                            enabled_entity_types=enabled_entity_groups,
                            azure_sso_enabled=azure_sso_enabled,
-                           profile_palette_hexes=PROFILE_COLORS)
+                           profile_palette_hexes=PROFILE_COLORS,
+                           **_get_translator_form_context())
 
 @bp.route("/users/edit_user/<int:user_id>", methods=["GET", "POST"])
 @permission_required('admin.users.edit')
@@ -1000,6 +1008,11 @@ def edit_user(user_id):
                     if dropped:
                         flash("Some admin roles were not applied because you can only assign admin roles you already have.", "warning")
                 _set_user_rbac_roles(user, requested_role_ids)
+
+            _apply_user_translator_languages(
+                user.id,
+                can_manage=_get_translator_form_context(user).get('can_manage_translator_languages', False),
+            )
 
             # Update password if provided (local auth only)
             if (not azure_sso_enabled) and form.password.data:
@@ -1233,7 +1246,8 @@ def edit_user(user_id):
                            notification_types_info=notification_types_info,
                            registered_devices=registered_devices,
                            computed_role_type=computed_role_type,
-                           profile_palette_hexes=PROFILE_COLORS)
+                           profile_palette_hexes=PROFILE_COLORS,
+                           **_get_translator_form_context(user))
 
 
 @bp.route("/users/<int:user_id>/devices/<int:device_id>/kickout", methods=["POST"])

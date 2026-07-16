@@ -486,16 +486,25 @@ def get_localized_country_name(country):
     """
     Get the localized country name based on the current session language.
     Falls back to the default name if localized version is not available.
+
+    Supports real Country models and lightweight preview mocks that may only
+    expose ``name`` / ``name_translations`` without ``get_name_translation``.
     """
     if not country:
         return _('Unknown Country')
     locale_code = get_translation_key()
-    try:
-        translated = country.get_name_translation(locale_code)
-        return translated or getattr(country, "name", _("Unknown Country"))
-    except Exception as e:
-        logger.debug("get_localized_country_name failed: %s", e)
-        return getattr(country, "name", _("Unknown Country"))
+    getter = getattr(country, "get_name_translation", None)
+    if callable(getter):
+        try:
+            translated = getter(locale_code)
+            if translated and str(translated).strip():
+                return str(translated).strip()
+        except Exception as e:
+            logger.debug("get_localized_country_name failed: %s", e)
+    localized = get_localized_name_from_translations(country)
+    if localized:
+        return localized
+    return getattr(country, "name", None) or _("Unknown Country")
 
 
 def get_localized_national_society_name(country):

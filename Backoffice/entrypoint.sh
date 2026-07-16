@@ -250,6 +250,20 @@ else
   echo "Skipping migrations (SKIP_MIGRATIONS is set)"
 fi
 
+# ---------------------------------------------------------------------------
+# Static workflow tour JSON (chatbot InteractiveTour)
+# Pre-renders docs/workflows/*.md into app/static/generated/tours/*.json (and
+# mirrors to the public CDN when STATIC_CDN_URL is configured), so the
+# chatbot's tour system is served as static content instead of hitting a
+# Gunicorn worker on every page load. Cheap, no DB required; best-effort so a
+# failure here never blocks app boot.
+# ---------------------------------------------------------------------------
+export FLASK_APP="run:app"
+echo "=========================================="
+echo "Generating static workflow tour JSON"
+echo "=========================================="
+python -m flask workflows generate-static 2>&1 || echo "WARN: workflow tour generation failed (continuing)"
+
 # If migrations are handled externally (e.g., by a separate db-init container),
 # explicitly wait until DB is at Alembic head to avoid race conditions at startup.
 WAIT_FOR_MIGRATIONS="${WAIT_FOR_MIGRATIONS:-true}"

@@ -3,7 +3,7 @@
 from contextlib import suppress
 from collections import defaultdict
 
-from flask import current_app
+from flask import current_app, request
 
 from app import db
 from app.models import (
@@ -747,3 +747,51 @@ def build_admin_user_detail_dict(user_id: int) -> dict | None:
         "computed_role_type": computed_role_type,
         "is_system_manager": is_system_manager,
     }
+
+
+def _get_translator_form_context(user=None):
+    """Template context for per-language translator grants on the user form."""
+    from flask_login import current_user
+    from app.models.rbac import RbacRole
+    from app.services.authorization_service import AuthorizationService
+    from app.services.translation_review.assignment_service import get_assigned_language_codes
+
+    translatable = list(current_app.config.get('TRANSLATABLE_LANGUAGES') or [])
+    translator_role = RbacRole.query.filter_by(code='translator').first()
+    assigned = get_assigned_language_codes(user) if user else []
+
+    actor = current_user
+    can_manage = False
+    if getattr(actor, 'is_authenticated', False):
+        can_manage = (
+            AuthorizationService.is_system_manager(actor)
+            or AuthorizationService.has_rbac_permission(actor, 'admin.users.roles.assign')
+            or AuthorizationService.has_rbac_permission(actor, 'admin.translations.manage')
+        )
+
+    return {
+        'translatable_languages': translatable,
+        'translator_language_codes': assigned,
+        'translator_role_id': int(translator_role.id) if translator_role else None,
+        'can_manage_translator_languages': can_manage,
+    }
+
+
+def _apply_user_translator_languages(user_id: int, *, can_manage: bool) -> None:
+    """Persist translator language grants from the user form POST."""
+    if not can_manage:
+        return
+
+    from flask_login import current_user
+    from app.services.translation_review.assignment_service import set_user_translator_languages
+
+    assigned_by = None
+    if getattr(current_user, 'is_authenticated', False):
+        assigned_by = int(current_user.id)
+
+    languages = request.form.getlist('translator_languages')
+    set_user_translator_languages(
+        int(user_id),
+        languages,
+        assigned_by_user_id=assigned_by,
+    )

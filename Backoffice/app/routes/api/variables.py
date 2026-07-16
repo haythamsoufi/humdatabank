@@ -27,6 +27,46 @@ from app.services.authorization_service import AuthorizationService
 from app.utils.request_validation import enforce_csrf_json
 
 
+class _PreviewEntityStatus:
+    """Minimal AES-like object for variable resolution during template preview.
+
+    Provides the attributes that VariableResolutionService reads from a real
+    AssignmentEntityStatus without requiring a database record.
+    """
+    def __init__(self, entity_id, entity_type, period_name):
+        self.id = None  # no DB record; cache key becomes (None, version_id, row_id)
+        self.entity_id = int(entity_id)
+        self.entity_type = str(entity_type)
+
+        class _AF:
+            pass
+        af = _AF()
+        af.period_name = str(period_name)
+        self.assigned_form = af
+
+        self._country = _UNSET = object()
+        self._entity = _UNSET
+
+    @property
+    def country(self):
+        # Lazy-load country by entity_id when entity_type == 'country'
+        if not hasattr(self, '_country_obj'):
+            self._country_obj = None
+            if self.entity_type == 'country':
+                try:
+                    from app.models.core import Country
+                    self._country_obj = Country.query.get(self.entity_id)
+                except Exception:
+                    pass
+        return self._country_obj
+
+    @property
+    def entity(self):
+        if not hasattr(self, '_entity_obj'):
+            self._entity_obj = None
+        return self._entity_obj
+
+
 @api_bp.route('/variables/resolve', methods=['POST'])
 @login_required
 def resolve_variables():
@@ -34,37 +74,22 @@ def resolve_variables():
     API endpoint to resolve template variables with optional row entity context.
     Used for matrix variable columns that need to lookup values per row.
 
-    Request body (single row):
+    Normal mode request body:
         {
-            "assignment_entity_status_id": int,  # Required: current assignment context
-            "template_id": int,  # Required: template ID
-            "row_entity_id": int  # Optional: entity ID for matrix row (e.g., country ID 61)
+            "assignment_entity_status_id": int,  # current assignment context
+            "template_id": int,
+            "row_entity_id": int          # optional
+            "row_entity_ids": [int, ...]  # optional (batch)
         }
 
-    Request body (batch - preferred for multiple rows):
+    Preview mode request body (admin only — no real AES available):
         {
-            "assignment_entity_status_id": int,  # Required: current assignment context
-            "template_id": int,  # Required: template ID
-            "row_entity_ids": [int, ...]  # Optional: list of entity IDs for matrix rows
-        }
-
-    Returns (single row):
-        {
-            "variables": {
-                "variable_name": resolved_value,
-                ...
-            }
-        }
-
-    Returns (batch):
-        {
-            "results": {
-                "row_entity_id": {
-                    "variable_name": resolved_value,
-                    ...
-                },
-                ...
-            }
+            "preview_entity_id": int,
+            "preview_entity_type": str,
+            "preview_period_name": str,   # optional
+            "template_id": int,
+            "row_entity_id": int          # optional
+            "row_entity_ids": [int, ...]  # optional (batch)
         }
     """
     try:
@@ -73,38 +98,57 @@ def resolve_variables():
             return csrf_error
 
         data = get_json_safe()
-        err = require_json_keys(data, ['assignment_entity_status_id', 'template_id'])
-        if err:
-            return err
+        if not data:
+            return api_error('Request body required', 400)
 
         assignment_entity_status_id = data.get('assignment_entity_status_id')
+        preview_entity_id = data.get('preview_entity_id')
+        preview_entity_type = data.get('preview_entity_type')
         template_id = data.get('template_id')
         row_entity_id = data.get('row_entity_id')
         row_entity_ids = data.get('row_entity_ids')
 
+        if not template_id:
+            return api_error('template_id required', 400)
+
         # Check if this is a batch request
         is_batch = row_entity_ids is not None and isinstance(row_entity_ids, list)
 
-        # Get assignment entity status
-        assignment_entity_status = AssignmentEntityStatus.query.get(assignment_entity_status_id)
-        if not assignment_entity_status:
-            current_app.logger.warning(f"[VARIABLE API] Assignment entity status {assignment_entity_status_id} not found")
-            return api_error('Assignment entity status not found', 404)
+        if assignment_entity_status_id:
+            # Normal mode: validate AES and check assignment access
+            assignment_entity_status = AssignmentEntityStatus.query.get(assignment_entity_status_id)
+            if not assignment_entity_status:
+                current_app.logger.warning(
+                    f"[VARIABLE API] Assignment entity status {assignment_entity_status_id} not found"
+                )
+                return api_error('Assignment entity status not found', 404)
 
-        # Check access using AuthorizationService
-        if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
-            # Use Flask-Login's stable identifier accessor to avoid SQLAlchemy
-            # DetachedInstanceError in test/edge cases.
-            user_id = None
-            try:
-                user_id = current_user.get_id()
-            except Exception as e:
-                current_app.logger.debug("current_user.get_id failed: %s", e)
+            if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
                 user_id = None
-            current_app.logger.warning(
-                f"[VARIABLE API] Access denied for user {user_id} to assignment {assignment_entity_status_id}"
+                try:
+                    user_id = current_user.get_id()
+                except Exception as e:
+                    current_app.logger.debug("current_user.get_id failed: %s", e)
+                current_app.logger.warning(
+                    f"[VARIABLE API] Access denied for user {user_id} to assignment "
+                    f"{assignment_entity_status_id}"
+                )
+                return api_error('Access denied', 403)
+
+        elif preview_entity_id and preview_entity_type:
+            # Preview mode: admin-only, no real AES — build a lightweight stub
+            if not AuthorizationService.is_admin(current_user):
+                return api_error('Admin access required for preview mode', 403)
+            assignment_entity_status = _PreviewEntityStatus(
+                entity_id=preview_entity_id,
+                entity_type=preview_entity_type,
+                period_name=data.get('preview_period_name', ''),
             )
-            return api_error('Access denied', 403)
+
+        else:
+            return api_error(
+                'Provide assignment_entity_status_id or preview_entity_id + preview_entity_type', 400
+            )
 
         # Get template version
         template = FormTemplate.query.get(template_id)

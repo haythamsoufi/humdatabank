@@ -27,9 +27,9 @@ class TranslationWatcher:
         """Initialize the translation watcher with the Flask app."""
         self.app = app
 
-        # Only start watching in development mode
-        if app.config.get('DEBUG', False):
-            self.start_watching()
+        # Poll shared translation catalogs in every environment so all Gunicorn
+        # workers pick up PO/MO changes without a manual restart.
+        self.start_watching()
 
     def get_translation_files(self):
         """Get all translation files to watch."""

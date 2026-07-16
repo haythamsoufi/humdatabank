@@ -247,6 +247,14 @@ class AccountNotificationPreferences {
                 }
                 if (data.preferences) {
                     this.updateDigestPreview(data.preferences);
+                    // Keep the sound-preference cache (components.js) in sync so this tab
+                    // doesn't act on a stale preference until its TTL expires.
+                    try {
+                        localStorage.setItem('notification_preferences', JSON.stringify(data.preferences));
+                    } catch (e) { /* localStorage unavailable — ignore */ }
+                    if (typeof window.forceRefreshNotificationPreferencesCache === 'function') {
+                        window.forceRefreshNotificationPreferencesCache();
+                    }
                 }
             } else {
                 throw new Error(data.error || 'Failed to save preferences');

@@ -59,8 +59,9 @@ export class HumDatabankChatbot {
 
         this.init();
 
-        // Register chatbot tours with InteractiveTour system
-        this._registerChatbotTours();
+        // Common workflow tours are preloaded lazily on first chat open
+        // (see widget-ui.js#toggleChat / spotlight-tours.js), not here on
+        // construction, since most page loads never open the chatbot.
     }
 
 

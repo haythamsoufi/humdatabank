@@ -2,7 +2,7 @@
 
 import os
 from datetime import datetime
-from flask import current_app, has_request_context, url_for
+from flask import current_app, has_request_context, session, url_for
 from flask_login import current_user
 
 
@@ -280,6 +280,30 @@ def register_template_context(app, config_class):
         }
 
     @app.context_processor
+    def inject_translation_review_helpers():
+        from flask_login import current_user
+
+        from app.i18n import get_locale
+        from app.services.translation_review.assignment_service import (
+            get_assigned_language_codes,
+            user_can_use_translation_review,
+            user_wants_translation_review_tool,
+        )
+
+        locale = get_locale()
+        has_permission = user_can_use_translation_review(current_user, locale) if current_user.is_authenticated else False
+        assigned_languages = get_assigned_language_codes(current_user) if current_user.is_authenticated else []
+        wants_tool = user_wants_translation_review_tool(current_user, assigned_languages) if current_user.is_authenticated else False
+        can_use = has_permission and wants_tool
+
+        return {
+            "translation_review_can_use": can_use,
+            "translation_review_active": bool(can_use and session.get("translation_review_mode")),
+            "translation_review_assigned_languages": assigned_languages,
+            "translation_review_locale": locale,
+        }
+
+    @app.context_processor
     def inject_pending_access_requests_count():
         """Pending country access requests for admin sidebar badge (Manage Users)."""
         if not has_request_context():
@@ -316,6 +340,7 @@ def register_template_context(app, config_class):
             return {"docs_pdf_export_enabled": False}
 
     app.jinja_env.globals['CHATBOT_ENABLED'] = app.config.get('CHATBOT_ENABLED', True)
+    app.jinja_env.globals['TRANSLATION_REVIEW_ENABLED'] = app.config.get('TRANSLATION_REVIEW_ENABLED', True)
     app.jinja_env.globals['ASSET_VERSION'] = app.config.get('ASSET_VERSION')
     app.jinja_env.globals['STATIC_CDN_URL'] = (app.config.get('STATIC_CDN_URL') or '').strip().rstrip('/')
     app.jinja_env.globals['config'] = app.config

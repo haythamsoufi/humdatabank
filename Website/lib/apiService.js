@@ -507,22 +507,15 @@ export async function getResources(page = 1, perPage = 9, searchQuery = '', reso
  * @throws {Error} If the network response is not ok.
  */
 /**
- * Builds URL for /data/tables endpoint
- * Note: /data/tables endpoint supports country_id but not country_iso2/iso3
- * Country filtering by name is handled on the frontend after fetching data
- * Using related=page instead of related=all to avoid transaction issues with large datasets
- */
-/**
- * Builds URL for /data/tables endpoint with comprehensive filter support
- * Note: /data/tables endpoint uses country_id, not country_iso3/iso2 directly
+ * Builds URL for GET /api/v1/data (unified data + dimension tables endpoint).
  * @param {Object} options - Filter options
  * @param {number} options.templateId - Template ID (default: FDRS_TEMPLATE_ID)
  * @param {number} options.perPage - Items per page
  * @param {string} options.periodName - Period name filter
  * @param {number} options.indicatorBankId - Indicator bank ID filter
  * @param {number} options.countryId - Country ID filter (preferred over ISO codes)
- * @param {string} options.countryIso3 - Country ISO3 code filter (note: backend may not support this in /data/tables)
- * @param {string} options.countryIso2 - Country ISO2 code filter (note: backend may not support this in /data/tables)
+ * @param {string} options.countryIso3 - Country ISO3 code filter
+ * @param {string} options.countryIso2 - Country ISO2 code filter
  * @param {string} options.submissionType - Submission type filter
  * @param {boolean} options.disagg - Include disaggregation (default: true)
  * @param {string} options.related - Related tables scope: 'page' or 'all' (default: 'all')
@@ -553,7 +546,7 @@ function buildDataTablesApiUrl({
   if (countryIso2 && !countryId) params.country_iso2 = countryIso2;
   if (submissionType) params.submission_type = submissionType;
   if (includeFullInfo) params.include_full_info = 'true';
-  return getBackofficeApiUrl('data/tables', params);
+  return getBackofficeApiUrl('data', params);
 }
 
 /**

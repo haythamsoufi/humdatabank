@@ -11,6 +11,8 @@ This blueprint handles:
 - Notification center UI
 """
 # ========== Notifications Routes ==========
+import logging
+
 from app.utils.datetime_helpers import utcnow
 from app.utils.sql_utils import safe_ilike_pattern
 
@@ -35,6 +37,9 @@ from datetime import datetime
 from contextlib import suppress
 
 bp = Blueprint("notifications", __name__, url_prefix="/notifications")
+
+logger = logging.getLogger(__name__)
+
 
 def _get_current_user_id() -> int:
     """
@@ -400,6 +405,11 @@ def api_notification_stream_status():
     # This endpoint is login-protected, so the extra fields are not publicly exposed.
     import os
 
+    # [WS_STATUS_FETCH] confirms the client-side TTL cache (components.js) is
+    # working post-deploy: hit volume should drop from "every page load" to
+    # roughly once per 5 minutes per active user.
+    logger.info("[WS_STATUS_FETCH] served user_id=%s", current_user.id)
+
     websocket_enabled = bool(current_app.config.get('WEBSOCKET_ENABLED', True))
 
     raw_env_value = os.environ.get('WEBSOCKET_ENABLED')
@@ -515,6 +525,10 @@ def api_delete_notifications():
 def api_get_notification_preferences():
     """Get notification preferences for current user"""
     try:
+        # [NOTIF_PREFS_FETCH] confirms the client-side TTL cache (components.js) is
+        # working post-deploy: hit volume should drop sharply (from "every page
+        # load" to roughly once per 15 minutes per active user).
+        logger.info("[NOTIF_PREFS_FETCH] served user_id=%s", current_user.id)
         preferences = NotificationService.get_notification_preferences(current_user.id)
 
         return json_ok(

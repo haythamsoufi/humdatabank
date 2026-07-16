@@ -91,6 +91,84 @@
     will-change: left, top;
 }
 
+#aiChatbotFAB.fab-dragging-over-hide {
+    opacity: 0.55;
+    border-color: rgba(248, 113, 113, 0.55) !important;
+    box-shadow:
+        0 2px 6px rgba(0, 0, 0, 0.45),
+        0 10px 28px rgba(127, 29, 29, 0.35) !important;
+}
+
+/* Session dismiss (dragged to hide zone). Must beat `#aiChatbotFAB { display: flex }`. */
+#aiChatbotFAB.fab-session-hidden,
+#aiChatbotFAB[hidden].fab-session-hidden {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Bottom-center drop target: dismiss FAB until next page load */
+.fab-hide-zone {
+    position: fixed;
+    left: 50%;
+    bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+    transform: translate(-50%, 12px) scale(0.96);
+    z-index: 1065;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+        opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+        transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+        visibility 0.2s;
+}
+
+.fab-hide-zone--visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, 0) scale(1);
+}
+
+.fab-hide-zone-inner {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 9.5rem;
+    padding: 0.7rem 1.15rem;
+    border-radius: 999px;
+    background: rgba(12, 12, 14, 0.92);
+    color: #f1f5f9;
+    border: 1.5px dashed rgba(248, 113, 113, 0.45);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.2) inset,
+        0 8px 28px rgba(0, 0, 0, 0.35);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.fab-hide-zone-inner .fa-eye-slash {
+    font-size: 0.95rem;
+    color: #fca5a5;
+}
+
+.fab-hide-zone--hot .fab-hide-zone-inner {
+    background: rgba(127, 29, 29, 0.95);
+    border-style: solid;
+    border-color: rgba(252, 165, 165, 0.75);
+    box-shadow:
+        0 0 0 1px rgba(254, 202, 202, 0.12) inset,
+        0 10px 32px rgba(127, 29, 29, 0.45);
+    transform: scale(1.04);
+}
+
+.fab-hide-zone--hot .fab-hide-zone-label {
+    color: #fff;
+}
+
 #aiChatbotFAB .fab-icon-slot {
     position: relative;
     z-index: 1;

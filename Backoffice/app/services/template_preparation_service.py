@@ -589,6 +589,34 @@ class TemplatePreparationService:
 
         return available_indicators_by_section
 
+    @staticmethod
+    def create_preview_mock_country():
+        """Lightweight country stand-in for template preview (no DB row)."""
+        translations = {
+            'fr': 'Pays de Prévisualisation',
+            'es': 'País de Vista Previa',
+            'ar': 'بلد المعاينة',
+            'ru': 'Страна Предварительного Просмотра',
+            'zh': '预览国家',
+            'hi': 'पूर्वावलोकन देश',
+        }
+
+        class MockCountry:
+            def __init__(self):
+                self.name = 'Preview Country'
+                self.iso3 = 'PRE'
+                self.name_translations = dict(translations)
+
+            def get_name_translation(self, language):
+                if not self.name_translations:
+                    return self.name
+                val = self.name_translations.get(language)
+                if val and isinstance(val, str) and val.strip():
+                    return val.strip()
+                return self.name
+
+        return MockCountry()
+
     @classmethod
     def create_mock_assignment_for_preview(cls, template):
         """Create a mock assignment country status for template preview"""
@@ -604,18 +632,7 @@ class TemplatePreparationService:
                 mock_assignment.period_name = 'Preview Period'
                 self.assigned_form = mock_assignment
 
-                # Mock country with all required attributes
-                mock_country = type('MockCountry', (), {})()
-                mock_country.name = 'Preview Country'
-                mock_country.name_translations = {
-                    'fr': 'Pays de Prévisualisation',
-                    'es': 'País de Vista Previa',
-                    'ar': 'بلد المعاينة',
-                    'ru': 'Страна Предварительного Просмотра',
-                    'zh': '预览国家',
-                    'hi': 'पूर्वावलोकन देश',
-                }
-                self.country = mock_country
+                self.country = TemplatePreparationService.create_preview_mock_country()
 
         return MockACS(template)
 

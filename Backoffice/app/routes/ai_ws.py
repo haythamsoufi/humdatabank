@@ -30,6 +30,7 @@ from app.utils.constants import (
 )
 from app.utils.datetime_helpers import utcnow
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.ws_manager import ws_manager
 from app.services.user_analytics_service import get_client_ip
 
 from app.routes.ai import (
@@ -465,6 +466,23 @@ def register_ai_ws(app) -> None:
                 ws.send(json.dumps({"type": "error", "message": "Authentication required", "error_type": "auth_required"}))
             except Exception as e:
                 logger.debug("ws.send auth error failed (client disconnected): %s", e)
+            return
+
+        # Admission control: AI chat WebSockets share the same per-process thread
+        # budget as notification WebSockets (both occupy a gthread worker thread
+        # for the connection lifetime). Reject early if the worker is saturated;
+        # the client already falls back to SSE transparently when a WS connection
+        # closes before a message is sent (see transport.js streamMessage()).
+        ws_pool_key = getattr(getattr(identity, "user", None), "id", None) or f"anon-aiws-{id(ws)}"
+        if not ws_manager.add_connection(ws_pool_key, ws, channel='ai_chat'):
+            try:
+                ws.send(json.dumps({
+                    "type": "error",
+                    "message": "Server is busy, please try again shortly.",
+                    "error_type": "connection_limit",
+                }))
+            except Exception as e:
+                logger.debug("ws.send connection_limit error failed (client disconnected): %s", e)
             return
         # Ensure RBAC helpers (which use current_user) work for Bearer auth
         did_login = False
@@ -1281,6 +1299,7 @@ def register_ai_ws(app) -> None:
                 current_app.logger.exception("WebSocket connection error: %s", str(e))
         finally:
             cancelled.set()  # Stop heartbeat
+            ws_manager.remove_connection(ws_pool_key, ws)
             current_app.logger.info("AI WebSocket: connection closed user_id=%s", user_id_log)
             if did_login:
                 try:
@@ -1323,6 +1342,19 @@ def register_ai_ws(app) -> None:
                 ws.send(json.dumps({"type": "error", "message": "Unauthorized"}))
             except Exception as e:
                 logger.debug("ws.send Unauthorized failed: %s", e)
+            return
+
+        # Admission control: shares the same per-process thread budget as the
+        # notifications and AI chat WebSockets (see /api/ai/v2/ws above).
+        if not ws_manager.add_connection(current_user.id, ws, channel='ai_docs'):
+            try:
+                ws.send(json.dumps({
+                    "type": "error",
+                    "message": "Server is busy, please try again shortly.",
+                    "error_type": "connection_limit",
+                }))
+            except Exception as e:
+                logger.debug("ws.send connection_limit error failed (client disconnected): %s", e)
             return
 
         cancelled = threading.Event()
@@ -1906,3 +1938,4 @@ def register_ai_ws(app) -> None:
 
         finally:
             cancelled.set()
+            ws_manager.remove_connection(current_user.id, ws)

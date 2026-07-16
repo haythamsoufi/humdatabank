@@ -94,13 +94,14 @@ class RbacAccessGrant(db.Model):
     permission_id = db.Column(db.Integer, db.ForeignKey("rbac_permission.id", ondelete="CASCADE"), nullable=False)
     permission = db.relationship("RbacPermission", foreign_keys=[permission_id])
 
-    scope_kind = db.Column(db.String(20), nullable=False)  # 'global' | 'entity' | 'template' | 'assignment'
+    scope_kind = db.Column(db.String(20), nullable=False)  # 'global' | 'entity' | 'template' | 'assignment' | 'language'
 
     # Scope payload (nullable depending on scope_kind)
     entity_type = db.Column(db.String(50), nullable=True)
     entity_id = db.Column(db.Integer, nullable=True)
     template_id = db.Column(db.Integer, db.ForeignKey("form_template.id", ondelete="CASCADE"), nullable=True)
     assigned_form_id = db.Column(db.Integer, db.ForeignKey("assigned_form.id", ondelete="CASCADE"), nullable=True)
+    language_code = db.Column(db.String(10), nullable=True)
 
     effect = db.Column(db.String(10), nullable=False, default="allow")  # 'allow' | 'deny'
 
@@ -112,7 +113,7 @@ class RbacAccessGrant(db.Model):
     __table_args__ = (
         # Basic data integrity
         db.CheckConstraint("principal_type IN ('user','role')", name="ck_rbac_access_grant_principal_type"),
-        db.CheckConstraint("scope_kind IN ('global','entity','template','assignment')", name="ck_rbac_access_grant_scope_kind"),
+        db.CheckConstraint("scope_kind IN ('global','entity','template','assignment','language')", name="ck_rbac_access_grant_scope_kind"),
         db.CheckConstraint("effect IN ('allow','deny')", name="ck_rbac_access_grant_effect"),
 
         # Enforce valid scope payload shape.
@@ -127,19 +128,23 @@ class RbacAccessGrant(db.Model):
             """
             (
               (scope_kind = 'global'
-                AND entity_type IS NULL AND entity_id IS NULL AND template_id IS NULL AND assigned_form_id IS NULL)
+                AND entity_type IS NULL AND entity_id IS NULL AND template_id IS NULL AND assigned_form_id IS NULL AND language_code IS NULL)
               OR
               (scope_kind = 'entity'
                 AND entity_type IS NOT NULL AND entity_type <> '' AND entity_id IS NOT NULL
-                AND template_id IS NULL AND assigned_form_id IS NULL)
+                AND template_id IS NULL AND assigned_form_id IS NULL AND language_code IS NULL)
               OR
               (scope_kind = 'template'
                 AND template_id IS NOT NULL
-                AND entity_type IS NULL AND entity_id IS NULL AND assigned_form_id IS NULL)
+                AND entity_type IS NULL AND entity_id IS NULL AND assigned_form_id IS NULL AND language_code IS NULL)
               OR
               (scope_kind = 'assignment'
                 AND assigned_form_id IS NOT NULL
-                AND entity_type IS NULL AND entity_id IS NULL AND template_id IS NULL)
+                AND entity_type IS NULL AND entity_id IS NULL AND template_id IS NULL AND language_code IS NULL)
+              OR
+              (scope_kind = 'language'
+                AND language_code IS NOT NULL AND language_code <> ''
+                AND entity_type IS NULL AND entity_id IS NULL AND template_id IS NULL AND assigned_form_id IS NULL)
             )
             """,
             name="ck_rbac_access_grant_scope_payload",
@@ -151,6 +156,7 @@ class RbacAccessGrant(db.Model):
         db.Index("ix_rbac_access_grant_scope_template", "scope_kind", "template_id"),
         db.Index("ix_rbac_access_grant_scope_assignment", "scope_kind", "assigned_form_id"),
         db.Index("ix_rbac_access_grant_scope_entity", "scope_kind", "entity_type", "entity_id"),
+        db.Index("ix_rbac_access_grant_scope_language", "scope_kind", "language_code"),
     )
 
     def __repr__(self) -> str:  # pragma: no cover

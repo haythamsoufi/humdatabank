@@ -75,7 +75,16 @@
             {% endif %}
 
             <button type="button"
-                    id="excel-import-btn"
+                    id="indicator-bank-btn"
+                    class="nt-method-card nt-method-card--indicator-bank"
+                    title="{{ _('Build a template by selecting indicators from the indicator bank') }}">
+                <span class="nt-method-card__icon" aria-hidden="true"><i class="fas fa-database"></i></span>
+                <span class="nt-method-card__title">{{ _('From Indicator Bank') }}</span>
+                <span class="nt-method-card__desc">{{ _('Filter indicators by sector, program, or SPEF area, select them, and auto-group into sections.') }}</span>
+                <span class="nt-method-card__cta">{{ _('Open wizard') }} <i class="fas fa-arrow-down" aria-hidden="true"></i></span>
+            </button>
+
+            <button type="button"
                     class="nt-method-card nt-method-card--excel"
                     title="{{ _('Import template structure from Excel file') }}">
                 <span class="nt-method-card__icon" aria-hidden="true"><i class="fas fa-file-excel"></i></span>
@@ -323,6 +332,239 @@
     </section>
     {% endif %}
 
+    <section id="indicator-bank-wizard-section" class="nt-details-card nt-details-card--hidden" aria-labelledby="nt-indicator-bank-heading">
+        <header class="nt-details-header">
+            <span class="nt-details-header__icon" aria-hidden="true"><i class="fas fa-database"></i></span>
+            <div>
+                <h2 id="nt-indicator-bank-heading" class="nt-details-header__title">{{ _('From Indicator Bank') }}</h2>
+                <p class="nt-details-header__subtitle">{{ _('Filter indicators, select the ones you need, group them into sections, then create the template.') }}</p>
+            </div>
+        </header>
+
+        <div class="nt-details-body">
+            <div id="indicator-bank-wizard" class="nt-wizard">
+                <ol class="nt-wizard__steps" aria-label="{{ _('Wizard steps') }}">
+                    <li class="nt-wizard__step-indicator nt-wizard__step-indicator--active" data-wizard-step-indicator="1">
+                        <span class="nt-wizard__step-number">1</span>
+                        <span>{{ _('Configure filters') }}</span>
+                    </li>
+                    <li class="nt-wizard__step-indicator" data-wizard-step-indicator="2">
+                        <span class="nt-wizard__step-number">2</span>
+                        <span>{{ _('Select indicators') }}</span>
+                    </li>
+                    <li class="nt-wizard__step-indicator" data-wizard-step-indicator="3">
+                        <span class="nt-wizard__step-number">3</span>
+                        <span>{{ _('Group & review') }}</span>
+                    </li>
+                    <li class="nt-wizard__step-indicator" data-wizard-step-indicator="4">
+                        <span class="nt-wizard__step-number">4</span>
+                        <span>{{ _('Template details') }}</span>
+                    </li>
+                </ol>
+
+                <div class="nt-wizard-step nt-wizard-step--active" data-wizard-step="1">
+                    <h3 class="nt-wizard-step__title">{{ _('Filter indicators') }}</h3>
+                    <p class="nt-wizard-step__subtitle">{{ _('Narrow the indicator bank by sector, program, SPEF area, type, or emergency status. Leave filters empty to browse all active indicators.') }}</p>
+
+                    <div class="nt-filter-panel">
+                        <div class="nt-filter-toolbar">
+                            <label class="nt-filter-search" for="ibw-filter-search">
+                                <i class="fas fa-search" aria-hidden="true"></i>
+                                <input type="search"
+                                       id="ibw-filter-search"
+                                       class="nt-filter-search__input"
+                                       placeholder="{{ _('Search by indicator name…') }}"
+                                       autocomplete="off">
+                            </label>
+                            <div class="nt-filter-toolbar__actions">
+                                <label class="nt-filter-toggle" for="ibw-filter-emergency">
+                                    <input type="checkbox" id="ibw-filter-emergency">
+                                    <span>{{ _('Emergency only') }}</span>
+                                </label>
+                                <button type="button" class="btn btn-secondary btn-sm" data-clear-filters>
+                                    {{ _('Clear filters') }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="nt-filter-active" data-active-filters hidden>
+                            <span class="nt-filter-active__label">{{ _('Active filters:') }}</span>
+                            <div class="nt-filter-active__chips" data-active-filter-chips></div>
+                        </div>
+
+                        <div class="nt-filter-categories">
+                            <section class="nt-filter-category">
+                                <header class="nt-filter-category__header">
+                                    <h4 class="nt-filter-category__title">{{ _('Sectors') }}</h4>
+                                    <span class="nt-filter-category__count" data-filter-count="sector"></span>
+                                </header>
+                                <div class="nt-filter-options" data-filter-options="sector"></div>
+                            </section>
+
+                            <section class="nt-filter-category">
+                                <header class="nt-filter-category__header">
+                                    <h4 class="nt-filter-category__title">{{ _('Sub-sectors') }}</h4>
+                                    <span class="nt-filter-category__count" data-filter-count="subsector"></span>
+                                </header>
+                                <div class="nt-filter-options" data-filter-options="subsector"></div>
+                            </section>
+
+                            <section class="nt-filter-category">
+                                <header class="nt-filter-category__header">
+                                    <h4 class="nt-filter-category__title">{{ _('Related programs') }}</h4>
+                                    <span class="nt-filter-category__count" data-filter-count="programs"></span>
+                                </header>
+                                <div class="nt-filter-options" data-filter-options="programs"></div>
+                            </section>
+
+                            <section class="nt-filter-category">
+                                <header class="nt-filter-category__header">
+                                    <h4 class="nt-filter-category__title">{{ _('SPEF areas') }}</h4>
+                                    <span class="nt-filter-category__count" data-filter-count="area"></span>
+                                </header>
+                                <div class="nt-filter-options" data-filter-options="area"></div>
+                            </section>
+
+                            <section class="nt-filter-category">
+                                <header class="nt-filter-category__header">
+                                    <h4 class="nt-filter-category__title">{{ _('Indicator types') }}</h4>
+                                    <span class="nt-filter-category__count" data-filter-count="type"></span>
+                                </header>
+                                <div class="nt-filter-options" data-filter-options="type"></div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="nt-wizard-step" data-wizard-step="2">
+                    <h3 class="nt-wizard-step__title">{{ _('Select indicators') }}</h3>
+                    <p class="nt-wizard-step__subtitle">{{ _('Choose the indicators to include in your new template.') }}</p>
+                    <div class="nt-indicator-toolbar">
+                        <div class="nt-indicator-toolbar__left">
+                            <p class="nt-indicator-count" data-indicator-count aria-live="polite"></p>
+                        </div>
+                        <div class="nt-indicator-toolbar__right">
+                            <button type="button" class="btn btn-secondary btn-sm" data-select-all>{{ _('Select all visible') }}</button>
+                            <button type="button" class="btn btn-secondary btn-sm" data-clear-selection>{{ _('Clear selection') }}</button>
+                        </div>
+                    </div>
+                    <div class="nt-wizard-loading hidden" data-indicator-loading>
+                        <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+                        <span>{{ _('Loading indicators…') }}</span>
+                    </div>
+                    <div class="nt-indicator-list" data-indicator-list role="listbox" aria-label="{{ _('Indicators') }}"></div>
+                    <p class="nt-indicator-empty hidden" data-indicator-empty role="status">{{ _('No indicators match your filters.') }}</p>
+                </div>
+
+                <div class="nt-wizard-step" data-wizard-step="3">
+                    <h3 class="nt-wizard-step__title">{{ _('Group into sections') }}</h3>
+                    <p class="nt-wizard-step__subtitle">{{ _('Auto-group selected indicators and rename sections before creating the template.') }}</p>
+                    <div class="nt-group-options" role="radiogroup" aria-label="{{ _('Group by') }}">
+                        <label class="nt-group-option-card">
+                            <input type="radio" name="ibw-group-by" value="sector" checked>
+                            <span class="nt-group-option-card__title">{{ _('Primary sector') }}</span>
+                            <span class="nt-group-option-card__desc">{{ _('One section per primary sector') }}</span>
+                        </label>
+                        <label class="nt-group-option-card">
+                            <input type="radio" name="ibw-group-by" value="area">
+                            <span class="nt-group-option-card__title">{{ _('SPEF area') }}</span>
+                            <span class="nt-group-option-card__desc">{{ _('One section per SPEF area') }}</span>
+                        </label>
+                        <label class="nt-group-option-card">
+                            <input type="radio" name="ibw-group-by" value="program">
+                            <span class="nt-group-option-card__title">{{ _('Related program') }}</span>
+                            <span class="nt-group-option-card__desc">{{ _('One section per program; multi-program indicators grouped separately') }}</span>
+                        </label>
+                        <label class="nt-group-option-card">
+                            <input type="radio" name="ibw-group-by" value="none">
+                            <span class="nt-group-option-card__title">{{ _('Single section') }}</span>
+                            <span class="nt-group-option-card__desc">{{ _('Place all indicators in one section') }}</span>
+                        </label>
+                    </div>
+                    <p class="nt-group-note hidden" data-group-by-note role="note"></p>
+                    <div class="nt-section-buckets" data-section-buckets></div>
+                </div>
+
+                <div class="nt-wizard-step" data-wizard-step="4">
+                    <h3 class="nt-wizard-step__title">{{ _('Template details') }}</h3>
+                    <p class="nt-wizard-step__subtitle">{{ _('Set the template name, description, and access before creation.') }}</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                            <label for="ibw-template-name" class="nt-field-label">{{ _('Template name') }}</label>
+                            <input type="text" id="ibw-template-name" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300" required>
+                        </div>
+                        <div>
+                            <label class="nt-field-label" for="ibw-template-access-btn">{{ _('Template access') }}</label>
+                            <button type="button" id="ibw-template-access-btn" class="nt-access-btn">
+                                <span class="nt-access-btn__left">
+                                    <i class="fas fa-users" aria-hidden="true"></i>
+                                    <span id="ibw-template-access-summary" class="nt-access-btn__summary">{{ _('Manage template access…') }}</span>
+                                </span>
+                                <i class="fas fa-chevron-right text-gray-400 text-sm" aria-hidden="true"></i>
+                            </button>
+                            <input type="hidden" id="ibw-template-owner-field" name="owned_by" value="{{ current_user.id }}">
+                            <div id="ibw-template-shared-fields"></div>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label for="ibw-template-description" class="nt-field-label">{{ _('Description') }}</label>
+                            <textarea id="ibw-template-description" rows="3" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300"></textarea>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="nt-checkbox-row" for="ibw-add-to-self-report">
+                                <input type="checkbox" id="ibw-add-to-self-report" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                                <span>{{ _('Add to self-report') }}</span>
+                            </label>
+                        </div>
+
+                        <div class="md:col-span-2 nt-disagg-panel" data-disagg-settings hidden>
+                            <h4 class="nt-disagg-panel__title">{{ _('Disaggregation for eligible indicators') }}</h4>
+                            <p class="nt-disagg-panel__subtitle" data-disagg-eligible-summary></p>
+                            <div class="nt-disagg-presets" role="radiogroup" aria-label="{{ _('Disaggregation preset') }}">
+                                <label class="nt-disagg-preset">
+                                    <input type="radio" name="ibw-disagg-preset" value="total" checked>
+                                    <span class="nt-disagg-preset__title">{{ _('Total only') }}</span>
+                                    <span class="nt-disagg-preset__desc">{{ _('Collect a single total value') }}</span>
+                                </label>
+                                <label class="nt-disagg-preset">
+                                    <input type="radio" name="ibw-disagg-preset" value="all">
+                                    <span class="nt-disagg-preset__title">{{ _('All disaggregation options') }}</span>
+                                    <span class="nt-disagg-preset__desc">{{ _('Allow total, sex, age, and sex+age') }}</span>
+                                </label>
+                                <label class="nt-disagg-preset">
+                                    <input type="radio" name="ibw-disagg-preset" value="custom">
+                                    <span class="nt-disagg-preset__title">{{ _('Custom') }}</span>
+                                    <span class="nt-disagg-preset__desc">{{ _('Choose which breakdowns to allow') }}</span>
+                                </label>
+                            </div>
+                            <div class="nt-disagg-options hidden" data-disagg-options aria-label="{{ _('Allowed disaggregation options') }}"></div>
+                            <div class="nt-disagg-age-groups hidden" data-disagg-age-groups>
+                                <label for="ibw-age-groups-config" class="nt-field-label">{{ _('Custom age groups (optional)') }}</label>
+                                <input type="text"
+                                       id="ibw-age-groups-config"
+                                       class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300"
+                                       placeholder="{{ _('e.g. <5, 5-17, 18-49, 50+') }}">
+                                <p class="nt-disagg-age-groups__hint">{{ _('Leave empty to use platform defaults when age breakdown is allowed.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="nt-wizard-status" data-wizard-status role="status" aria-live="polite"></p>
+
+                <div class="nt-wizard-footer">
+                    <button type="button" class="btn btn-secondary" data-wizard-prev>{{ _('Back') }}</button>
+                    <div class="nt-wizard-footer__right">
+                        <button type="button" class="btn btn-primary" data-wizard-next>{{ _('Next') }}</button>
+                        <button type="button" class="btn btn-success btn-lg" data-wizard-submit hidden>
+                            <i class="fas fa-plus-circle mr-2" aria-hidden="true"></i>
+                            {{ _('Create Template') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <section id="excel-import-section" class="nt-details-card nt-details-card--hidden" aria-labelledby="nt-excel-heading">
         <header class="nt-details-header">
             <span class="nt-details-header__icon" aria-hidden="true"><i class="fas fa-file-excel"></i></span>
@@ -442,10 +684,12 @@
         const methodCards = document.querySelectorAll('.nt-method-card');
         const detailsCard = document.getElementById('manual-template-form');
         const cloneSection = document.getElementById('clone-template-section');
+        const indicatorBankSection = document.getElementById('indicator-bank-wizard-section');
         const excelSection = document.getElementById('excel-import-section');
         const koboSection = document.getElementById('kobo-import-section');
         const blankTemplateBtn = document.getElementById('blank-template-btn');
         const cloneTemplateBtn = document.getElementById('clone-template-btn');
+        const indicatorBankBtn = document.getElementById('indicator-bank-btn');
         const excelImportBtn = document.getElementById('excel-import-btn');
         const koboImportBtn = document.getElementById('kobo-import-btn');
 
@@ -454,7 +698,9 @@
             panel.classList.remove('nt-details-card--highlight');
             void panel.offsetWidth;
             panel.classList.add('nt-details-card--highlight');
-            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            import('{{ static_url('js/core/scroll-container.js') }}').then(function (mod) {
+                mod.scrollElementIntoViewIfNeeded(panel);
+            });
             if (focusSelector) {
                 const focusEl = panel.querySelector(focusSelector);
                 if (focusEl) focusEl.focus({ preventScroll: true });
@@ -477,6 +723,7 @@
             }
             setPanelVisible(detailsCard, activeId === 'blank-template-btn');
             setPanelVisible(cloneSection, activeId === 'clone-template-btn');
+            setPanelVisible(indicatorBankSection, activeId === 'indicator-bank-btn');
             setPanelVisible(excelSection, activeId === 'excel-import-btn');
             setPanelVisible(koboSection, activeId === 'kobo-import-btn');
             if (activeId === 'excel-import-btn') syncExcelImportFields();
@@ -501,6 +748,12 @@
                     ? '#clone-change-btn'
                     : '#clone-template-search';
                 scrollToPanel(cloneSection, focusTarget);
+            });
+        }
+
+        if (indicatorBankBtn && indicatorBankSection) {
+            indicatorBankBtn.addEventListener('click', function() {
+                scrollToPanel(indicatorBankSection, '#ibw-filter-search');
             });
         }
 
@@ -929,8 +1182,51 @@
 <script src="{{ static_url('js/components/template-access-modal.js') }}"></script>
 <script type="module" nonce="{{ csp_nonce() }}">
 import { TranslationModal } from '{{ static_url('js/components/translation-modal.js') }}';
+import { initIndicatorBankWizard } from '{{ static_url('js/admin/indicator-bank-wizard.js') }}';
 
 document.addEventListener('DOMContentLoaded', function () {
+    initIndicatorBankWizard({
+        rootId: 'indicator-bank-wizard',
+        methodCardId: 'indicator-bank-btn',
+        csrfToken: {{ csrf_token()|tojson|safe }},
+        currentUserId: {{ current_user.id }},
+        ownerChoices: {{ form.owned_by.choices | tojson | safe }},
+        sharedChoices: {{ form.shared_with_admins.choices | tojson | safe }},
+        urls: {
+            wizardOptions: {{ url_for('system_admin.get_indicator_bank_wizard_options')|tojson|safe }},
+            indicatorCount: {{ url_for('system_admin.get_filtered_indicator_count')|tojson|safe }},
+            createTemplate: {{ url_for('form_builder.create_template_from_indicator_bank')|tojson|safe }},
+        },
+        labels: {
+            manageAccess: {{ _('Manage template access…')|tojson|safe }},
+            loading: {{ _('Loading…')|tojson|safe }},
+            loadingIndicators: {{ _('Loading indicators…')|tojson|safe }},
+            noIndicators: {{ _('No indicators match your filters.')|tojson|safe }},
+            selectAtLeastOne: {{ _('Select at least one indicator to continue.')|tojson|safe }},
+            templateNameRequired: {{ _('Template name is required.')|tojson|safe }},
+            createFailed: {{ _('Could not create the template. Please try again.')|tojson|safe }},
+            creating: {{ _('Creating template…')|tojson|safe }},
+            selectedCount: {{ _('{count} selected')|tojson|safe }},
+            matchCount: {{ _('{count} indicators')|tojson|safe }},
+            generalSection: {{ _('General')|tojson|safe }},
+            unassignedSector: {{ _('Other')|tojson|safe }},
+            unassignedArea: {{ _('Other areas')|tojson|safe }},
+            unassignedProgram: {{ _('Other programs')|tojson|safe }},
+            sharedPrograms: {{ _('Shared across programs')|tojson|safe }},
+            clearFilters: {{ _('Clear filters')|tojson|safe }},
+            activeFilters: {{ _('Active filters:')|tojson|safe }},
+            programGroupNote: {{ _('Indicators linked to multiple programs are placed in “Shared across programs”. Each indicator still appears only once in the template.')|tojson|safe }},
+            emergencyOnly: {{ _('Emergency only')|tojson|safe }},
+            noFilterOptions: {{ _('No options available')|tojson|safe }},
+            filterCount: {{ _('{count} selected')|tojson|safe }},
+            disaggEligibleSummary: {{ _('Applies to {eligible} of {selected} selected indicators with units that support sex/age disaggregation.')|tojson|safe }},
+            disaggAgeGroupsHint: {{ _('Leave empty to use platform defaults when age breakdown is allowed.')|tojson|safe }},
+            disaggPresetTotal: {{ _('Total only')|tojson|safe }},
+            disaggPresetAll: {{ _('All disaggregation options')|tojson|safe }},
+            disaggPresetCustom: {{ _('Custom')|tojson|safe }},
+        },
+    });
+
     try {
         TranslationModal.attach({
             openButtonId: 'template-name-translations-btn',

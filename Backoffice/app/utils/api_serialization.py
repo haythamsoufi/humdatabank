@@ -94,6 +94,421 @@ def format_country_info_minimal(country):
     }
 
 
+def format_national_society_info(national_society):
+    """Format a NationalSociety row for API dimension tables."""
+    if not national_society:
+        return None
+    country = getattr(national_society, 'country', None)
+    translatable_langs = (
+        current_app.config.get("TRANSLATABLE_LANGUAGES")
+        or current_app.config.get("SUPPORTED_LANGUAGES")
+        or []
+    )
+    translatable_langs = [
+        (c or "").split("_", 1)[0].split("-", 1)[0].strip().lower()
+        for c in translatable_langs
+    ]
+    translatable_langs = [c for c in translatable_langs if c and c != "en"]
+    name_translations = (
+        national_society.name_translations
+        if isinstance(getattr(national_society, "name_translations", None), dict)
+        else {}
+    )
+    multilingual_names = {lc: name_translations.get(lc) for lc in translatable_langs}
+    return {
+        'id': national_society.id,
+        'name': national_society.name,
+        'code': national_society.code,
+        'description': national_society.description,
+        'country_id': national_society.country_id,
+        'country_name': country.name if country else None,
+        'country_iso2': country.iso2 if country else None,
+        'country_iso3': country.iso3 if country else None,
+        'is_active': bool(getattr(national_society, 'is_active', True)),
+        'multilingual_names': multilingual_names,
+    }
+
+
+_MATRIX_LOOKUP_DIMENSIONS = {
+    'country_map': {
+        'row_entity_type': 'country',
+        'join_dimension': 'countries',
+        'join_key': 'id',
+    },
+    'national_society': {
+        'row_entity_type': 'national_society',
+        'join_dimension': 'national_societies',
+        'join_key': 'id',
+    },
+    'indicator_bank': {
+        'row_entity_type': 'indicator',
+        'join_dimension': 'indicator_bank',
+        'join_key': 'id',
+    },
+}
+
+
+def resolve_matrix_join_metadata(matrix_config):
+    """Derive join hints for matrix row entities from matrix_config."""
+    if not isinstance(matrix_config, dict):
+        return None
+    row_mode = str(matrix_config.get('row_mode') or 'manual').strip().lower()
+    lookup_raw = matrix_config.get('lookup_list_id') or matrix_config.get('_table') or ''
+    lookup_list_id = str(lookup_raw).strip() if lookup_raw not in (None, '') else ''
+    display_raw = matrix_config.get('list_display_column') or matrix_config.get('display_column') or 'name'
+    meta = {
+        'row_mode': row_mode,
+        'lookup_list_id': lookup_list_id or None,
+        'list_display_column': str(display_raw).strip() or 'name',
+        'row_entity_type': 'manual',
+        'join_dimension': None,
+        'join_key': None,
+    }
+    if row_mode == 'list_library' and lookup_list_id:
+        known = _MATRIX_LOOKUP_DIMENSIONS.get(lookup_list_id)
+        if known:
+            meta.update(known)
+        elif str(lookup_list_id).isdigit():
+            meta.update({
+                'row_entity_type': 'lookup_list_row',
+                'join_dimension': 'lookup_list_rows',
+                'join_key': 'id',
+                'lookup_list_id': int(lookup_list_id),
+            })
+        else:
+            meta['row_entity_type'] = 'lookup'
+    else:
+        rows = matrix_config.get('rows') or []
+        if isinstance(rows, list):
+            meta['rows'] = rows
+    columns = matrix_config.get('columns') or []
+    if isinstance(columns, list) and columns:
+        meta['columns'] = columns
+    return meta
+
+
+def _index_dimension_table(table):
+    """Build an id-indexed lookup from a dimension table array."""
+    return {
+        row['id']: row
+        for row in (table or [])
+        if isinstance(row, dict) and row.get('id') is not None
+    }
+
+
+def _lookup_matrix_column_label(matrix_config, column_key):
+    """Resolve a matrix column display label from form item matrix_config."""
+    if not column_key:
+        return None
+    for col in (matrix_config or {}).get('columns') or []:
+        if not isinstance(col, dict):
+            continue
+        name = col.get('name') if col.get('name') is not None else col.get('key')
+        if str(name) == str(column_key):
+            return col.get('label') or col.get('name') or str(column_key)
+    return str(column_key)
+
+
+def _lookup_manual_matrix_row_label(matrix_config, row_entity_id):
+    """Resolve a manual-matrix row label from configured row definitions."""
+    if row_entity_id is None:
+        return None
+    for row in (matrix_config or {}).get('rows') or []:
+        if isinstance(row, str) and str(row) == str(row_entity_id):
+            return row
+        if isinstance(row, dict):
+            row_id = row.get('id') if row.get('id') is not None else row.get('key')
+            if str(row_id) == str(row_entity_id):
+                return row.get('label') or row.get('name') or str(row_entity_id)
+    return str(row_entity_id)
+
+
+def _resolve_matrix_entity_snapshot(join_dimension, row_entity_id, dim_indexes):
+    """Inline entity attributes for list-library matrix rows."""
+    lookup_id = row_entity_id
+    try:
+        lookup_id = int(row_entity_id)
+    except (TypeError, ValueError):
+        lookup_id = row_entity_id
+
+    snapshot = {
+        'entity_id': lookup_id if isinstance(lookup_id, int) else None,
+        'entity_name': None,
+        'entity_iso2': None,
+        'entity_iso3': None,
+        'entity_code': None,
+        'entity_country_id': None,
+        'entity_country_name': None,
+    }
+    if join_dimension == 'countries':
+        entity = dim_indexes.get('countries', {}).get(lookup_id)
+        if entity:
+            snapshot.update({
+                'entity_id': entity.get('id'),
+                'entity_name': entity.get('name'),
+                'entity_iso2': entity.get('iso2'),
+                'entity_iso3': entity.get('iso3'),
+            })
+    elif join_dimension == 'national_societies':
+        entity = dim_indexes.get('national_societies', {}).get(lookup_id)
+        if entity:
+            snapshot.update({
+                'entity_id': entity.get('id'),
+                'entity_name': entity.get('name'),
+                'entity_code': entity.get('code'),
+                'entity_country_id': entity.get('country_id'),
+                'entity_country_name': entity.get('country_name'),
+            })
+    elif join_dimension == 'indicator_bank':
+        entity = dim_indexes.get('indicator_bank', {}).get(lookup_id)
+        if entity:
+            snapshot.update({
+                'entity_id': entity.get('id'),
+                'entity_name': entity.get('name'),
+            })
+    return snapshot
+
+
+def build_matrix_context(
+    *,
+    form_data_id=None,
+    row_entity_id=None,
+    row_entity_type=None,
+    row_entity_label=None,
+    join_dimension=None,
+    column_key=None,
+    column_label=None,
+    source='reported',
+    entity_id=None,
+    entity_name=None,
+    entity_iso2=None,
+    entity_iso3=None,
+    entity_code=None,
+    entity_country_id=None,
+    entity_country_name=None,
+):
+    """Build a grouped matrix context for nested expansion in BI tools."""
+    return {
+        'parent_form_data_id': form_data_id,
+        'source': source,
+        'row': {
+            'entity_id': row_entity_id,
+            'entity_type': row_entity_type,
+            'label': row_entity_label,
+            'join_dimension': join_dimension,
+        },
+        'column': {
+            'key': column_key,
+            'label': column_label,
+        },
+        'entity': {
+            'id': entity_id,
+            'name': entity_name,
+            'iso2': entity_iso2,
+            'iso3': entity_iso3,
+            'code': entity_code,
+            'country_id': entity_country_id,
+            'country_name': entity_country_name,
+        },
+    }
+
+
+_MATRIX_CELL_NESTED_KEYS = frozenset({
+    'row_entity_id',
+    'row_entity_type',
+    'row_entity_label',
+    'join_dimension',
+    'column_key',
+    'column_label',
+    'source',
+    'entity_id',
+    'entity_name',
+    'entity_iso2',
+    'entity_iso3',
+    'entity_code',
+    'entity_country_id',
+    'entity_country_name',
+})
+
+
+def enrich_matrix_cells(
+    matrix_cells,
+    form_items_table=None,
+    *,
+    countries_table=None,
+    national_societies_table=None,
+    indicator_bank_table=None,
+):
+    """
+    Add grouped matrix context with resolved labels and entity attributes.
+
+    Matrix-specific fields are nested under ``matrix`` with ``row``, ``column``,
+    and ``entity`` sub-groups for selective expansion in Power Query / BI tools.
+    """
+    form_items_index = _index_dimension_table(form_items_table)
+    dim_indexes = {
+        'countries': _index_dimension_table(countries_table),
+        'national_societies': _index_dimension_table(national_societies_table),
+        'indicator_bank': _index_dimension_table(indicator_bank_table),
+    }
+    enriched = []
+    for cell in matrix_cells or []:
+        if not isinstance(cell, dict):
+            continue
+        form_item_id = cell.get('form_item_id')
+        form_item = form_items_index.get(form_item_id) or {}
+        matrix_config = form_item.get('matrix_config') or {}
+        join_dimension = cell.get('join_dimension') or matrix_config.get('join_dimension')
+        row_entity_id = cell.get('row_entity_id')
+        column_key = cell.get('column_key')
+        column_label = _lookup_matrix_column_label(matrix_config, column_key)
+
+        entity_snapshot = _resolve_matrix_entity_snapshot(
+            join_dimension, row_entity_id, dim_indexes
+        )
+        if entity_snapshot.get('entity_name'):
+            row_entity_label = entity_snapshot['entity_name']
+        elif matrix_config.get('row_mode') == 'manual' or not join_dimension:
+            row_entity_label = _lookup_manual_matrix_row_label(
+                matrix_config, row_entity_id
+            )
+        else:
+            row_entity_label = (
+                str(row_entity_id) if row_entity_id is not None else None
+            )
+
+        out = {
+            key: value
+            for key, value in cell.items()
+            if key not in _MATRIX_CELL_NESTED_KEYS
+        }
+        out['form_item_label'] = form_item.get('label')
+        out['matrix'] = build_matrix_context(
+            form_data_id=cell.get('form_data_id'),
+            row_entity_id=row_entity_id,
+            row_entity_type=cell.get('row_entity_type'),
+            row_entity_label=row_entity_label,
+            join_dimension=join_dimension,
+            column_key=column_key,
+            column_label=column_label,
+            source=cell.get('source') or 'reported',
+            entity_id=entity_snapshot.get('entity_id'),
+            entity_name=entity_snapshot.get('entity_name'),
+            entity_iso2=entity_snapshot.get('entity_iso2'),
+            entity_iso3=entity_snapshot.get('entity_iso3'),
+            entity_code=entity_snapshot.get('entity_code'),
+            entity_country_id=entity_snapshot.get('entity_country_id'),
+            entity_country_name=entity_snapshot.get('entity_country_name'),
+        )
+        enriched.append(out)
+    return enriched
+
+
+def _coerce_matrix_entity_id(raw):
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return raw
+
+
+def parse_matrix_disagg_key(key):
+    """Split a matrix cell key ``rowId_columnName`` into entity id and column key."""
+    if not isinstance(key, str) or key.startswith('_'):
+        return None, None
+    idx = key.find('_')
+    if idx < 0:
+        return key, None
+    return key[:idx], key[idx + 1:]
+
+
+def build_matrix_cells_from_data_rows(data_rows, form_items_table=None):
+    """
+    Flatten matrix disaggregation payloads into join-friendly rows.
+
+    Each cell: form_data_id, form_item_id, row_entity_id, row_entity_type,
+    join_dimension, column_key, value, source (+ submission context).
+    """
+    form_items_index = {}
+    for item in form_items_table or []:
+        if isinstance(item, dict) and item.get('id') is not None:
+            form_items_index[item['id']] = item
+
+    cells = []
+    for row in data_rows or []:
+        if not isinstance(row, dict):
+            continue
+        form_item_id = row.get('form_item_id')
+        join_meta = {}
+        if form_item_id in form_items_index:
+            join_meta = form_items_index[form_item_id].get('matrix_config') or {}
+
+        base = {
+            'form_data_id': row.get('id'),
+            'form_item_id': form_item_id,
+            'submission_type': row.get('submission_type'),
+            'submission_id': row.get('submission_id'),
+            'template_id': row.get('template_id'),
+            'period_name': row.get('period_name'),
+            'country_id': row.get('country_id'),
+            'row_entity_type': join_meta.get('row_entity_type'),
+            'join_dimension': join_meta.get('join_dimension'),
+        }
+
+        for source, field in (
+            ('reported', 'disaggregation_data'),
+            ('prefilled', 'prefilled_disaggregation_data'),
+            ('imputed', 'imputed_disaggregation_data'),
+        ):
+            disagg = row.get(field)
+            if not disagg or disagg.get('mode') != 'matrix':
+                continue
+            values = disagg.get('values') or {}
+            if not isinstance(values, dict):
+                continue
+            for key, val in values.items():
+                row_entity_raw, column_key = parse_matrix_disagg_key(key)
+                if row_entity_raw is None:
+                    continue
+                cells.append({
+                    **base,
+                    'row_entity_id': _coerce_matrix_entity_id(row_entity_raw),
+                    'column_key': column_key,
+                    'value': _resolve_matrix_cell(val),
+                    'source': source,
+                })
+    return cells
+
+
+_MATRIX_DISAGG_FIELDS = (
+    'disaggregation_data',
+    'prefilled_disaggregation_data',
+    'imputed_disaggregation_data',
+)
+
+
+def strip_matrix_values_from_data_rows(data_rows):
+    """
+    Remove duplicated matrix cell payloads from data[] after matrix_cells[] is built.
+
+    Leaves a lightweight marker so consumers know values live in matrix_cells.
+    """
+    for row in data_rows or []:
+        if not isinstance(row, dict):
+            continue
+        for field in _MATRIX_DISAGG_FIELDS:
+            disagg = row.get(field)
+            if not disagg or disagg.get('mode') != 'matrix':
+                continue
+            values = disagg.get('values')
+            if not values:
+                continue
+            row[field] = {
+                'mode': 'matrix',
+                'values': {},
+                'matrix_cells': True,
+            }
+
+
 def batch_countries_for_aes_list(aes_list):
     """Batch-resolve related Country objects for AssignmentEntityStatus rows.
 
@@ -267,6 +682,12 @@ def format_form_item_info(form_item, section=None, template=None, assignment=Non
         form_item_info.update({
             'description': form_item.description
         })
+    elif getattr(form_item, 'item_type', None) == 'matrix':
+        raw_config = getattr(form_item, 'config', None) or {}
+        matrix_config = raw_config.get('matrix_config') if isinstance(raw_config, dict) else {}
+        join_meta = resolve_matrix_join_metadata(matrix_config if isinstance(matrix_config, dict) else {})
+        if join_meta:
+            form_item_info['matrix_config'] = join_meta
     return form_item_info
 
 
@@ -375,6 +796,187 @@ def _wrap_disagg_dict(dd):
     return {'mode': mode, 'values': values}
 
 
+def serialize_dynamic_section_context(context_row):
+    """Serialize a DynamicSectionContext row for API output."""
+    if not context_row:
+        return None
+    if getattr(context_row, 'assignment_entity_status_id', None):
+        submission_type = 'assigned'
+        submission_id = context_row.assignment_entity_status_id
+    else:
+        submission_type = 'public'
+        submission_id = context_row.public_submission_id
+    resolved_at = getattr(context_row, 'resolved_at', None)
+    return {
+        'id': context_row.id,
+        'submission_type': submission_type,
+        'submission_id': submission_id,
+        'section_id': context_row.section_id,
+        'provider_id': context_row.provider_id,
+        'slot': context_row.slot,
+        'context_key': context_row.context_key,
+        'label_snapshot': context_row.label_snapshot,
+        'status': context_row.status,
+        'resolved_at': resolved_at.isoformat() if resolved_at else None,
+    }
+
+
+def _section_stable_key(section):
+    """Return stable_key for a FormSection ORM row or None."""
+    if not section:
+        return None
+    return getattr(section, 'stable_key', None)
+
+
+def build_dynamic_serialization_context(dynamic_orm_rows):
+    """
+    Batch-load section metadata and repeat-instance IDs for dynamic indicator rows.
+
+    Returns a dict with ``section_by_id`` and ``repeat_instance_id_by_key`` where keys are
+    ``(submission_type, submission_id, parent_section_id, instance_number)``.
+    """
+    from app.models.forms import FormSection, RepeatGroupInstance
+
+    section_ids = {
+        int(row.section_id)
+        for row in (dynamic_orm_rows or [])
+        if getattr(row, 'section_id', None) is not None
+    }
+    section_by_id = {}
+    if section_ids:
+        sections = FormSection.query.filter(FormSection.id.in_(section_ids)).all()
+        section_by_id = {int(s.id): s for s in sections if s and s.id is not None}
+
+    assigned_keys = set()
+    public_keys = set()
+    for row in dynamic_orm_rows or []:
+        repeat_num = getattr(row, 'repeat_instance_number', None)
+        if repeat_num is None:
+            continue
+        section = section_by_id.get(int(row.section_id)) if row.section_id else None
+        parent_section_id = getattr(section, 'parent_section_id', None) if section else None
+        if not parent_section_id:
+            continue
+        aes = getattr(row, 'assignment_entity_status', None)
+        pub = getattr(row, 'public_submission', None)
+        if aes and aes.id:
+            assigned_keys.add((int(aes.id), int(parent_section_id), int(repeat_num)))
+        elif pub and pub.id:
+            public_keys.add((int(pub.id), int(parent_section_id), int(repeat_num)))
+
+    repeat_instance_id_by_key = {}
+    if assigned_keys:
+        aes_ids = {k[0] for k in assigned_keys}
+        parent_ids = {k[1] for k in assigned_keys}
+        instance_numbers = {k[2] for k in assigned_keys}
+        instances = RepeatGroupInstance.query.filter(
+            RepeatGroupInstance.assignment_entity_status_id.in_(aes_ids),
+            RepeatGroupInstance.section_id.in_(parent_ids),
+            RepeatGroupInstance.instance_number.in_(instance_numbers),
+        ).all()
+        for inst in instances:
+            if not inst or inst.id is None:
+                continue
+            key = (
+                'assigned',
+                int(inst.assignment_entity_status_id),
+                int(inst.section_id),
+                int(inst.instance_number),
+            )
+            repeat_instance_id_by_key[key] = int(inst.id)
+
+    if public_keys:
+        pub_ids = {k[0] for k in public_keys}
+        parent_ids = {k[1] for k in public_keys}
+        instance_numbers = {k[2] for k in public_keys}
+        instances = RepeatGroupInstance.query.filter(
+            RepeatGroupInstance.public_submission_id.in_(pub_ids),
+            RepeatGroupInstance.section_id.in_(parent_ids),
+            RepeatGroupInstance.instance_number.in_(instance_numbers),
+        ).all()
+        for inst in instances:
+            if not inst or inst.id is None:
+                continue
+            key = (
+                'public',
+                int(inst.public_submission_id),
+                int(inst.section_id),
+                int(inst.instance_number),
+            )
+            repeat_instance_id_by_key[key] = int(inst.id)
+
+    return {
+        'section_by_id': section_by_id,
+        'repeat_instance_id_by_key': repeat_instance_id_by_key,
+    }
+
+
+def resolve_dynamic_repeat_instance_id(row, dynamic_context=None):
+    """Resolve repeat_instance_id for a DynamicIndicatorData row when repeat-scoped."""
+    dynamic_context = dynamic_context or {}
+    repeat_num = getattr(row, 'repeat_instance_number', None)
+    if repeat_num is None:
+        return None
+
+    section = None
+    if getattr(row, 'section', None) is not None:
+        section = row.section
+    else:
+        section_by_id = dynamic_context.get('section_by_id') or {}
+        section = section_by_id.get(int(row.section_id)) if row.section_id else None
+
+    parent_section_id = getattr(section, 'parent_section_id', None) if section else None
+    if not parent_section_id:
+        return None
+
+    aes = getattr(row, 'assignment_entity_status', None)
+    pub = getattr(row, 'public_submission', None)
+    key = None
+    if aes and aes.id:
+        key = ('assigned', int(aes.id), int(parent_section_id), int(repeat_num))
+    elif pub and pub.id:
+        key = ('public', int(pub.id), int(parent_section_id), int(repeat_num))
+    if not key:
+        return None
+    return (dynamic_context.get('repeat_instance_id_by_key') or {}).get(key)
+
+
+def fetch_dynamic_section_contexts(dynamic_orm_rows):
+    """Load DynamicSectionContext rows for the submissions present in dynamic_orm_rows."""
+    from app.models.forms import DynamicSectionContext
+
+    aes_ids = set()
+    pub_ids = set()
+    section_ids = set()
+    for row in dynamic_orm_rows or []:
+        if getattr(row, 'section_id', None) is not None:
+            section_ids.add(int(row.section_id))
+        aes = getattr(row, 'assignment_entity_status', None)
+        if aes and aes.id:
+            aes_ids.add(int(aes.id))
+        pub = getattr(row, 'public_submission', None)
+        if pub and pub.id:
+            pub_ids.add(int(pub.id))
+
+    if not section_ids or (not aes_ids and not pub_ids):
+        return []
+
+    contexts = []
+    if aes_ids:
+        rows = DynamicSectionContext.query.filter(
+            DynamicSectionContext.assignment_entity_status_id.in_(aes_ids),
+            DynamicSectionContext.section_id.in_(section_ids),
+        ).all()
+        contexts.extend(serialize_dynamic_section_context(r) for r in rows if r)
+    if pub_ids:
+        rows = DynamicSectionContext.query.filter(
+            DynamicSectionContext.public_submission_id.in_(pub_ids),
+            DynamicSectionContext.section_id.in_(section_ids),
+        ).all()
+        contexts.extend(serialize_dynamic_section_context(r) for r in rows if r)
+    return contexts
+
+
 def serialize_assigned_data_item(
     data_item,
     include_full_info=True,
@@ -417,6 +1019,8 @@ def serialize_assigned_data_item(
 
     item_payload = {
         'id': data_item.id,
+        'field_type': 'static',
+        'data_type': 'static',
         'submission_type': 'assigned',
         'submission_id': status_info.id if status_info else None,
         'template_id': assigned_form.template_id if assigned_form else None,
@@ -502,6 +1106,8 @@ def serialize_public_data_item(data_item, include_full_info=True, minimal_countr
 
     item_payload = {
         'id': data_item.id,
+        'field_type': 'static',
+        'data_type': 'static',
         'submission_type': 'public',
         'submission_id': submission.id if submission else None,
         'assignment_id': public_assignment.id if public_assignment else None,
@@ -553,14 +1159,16 @@ def serialize_dynamic_data_item(
     data_item,
     minimal_country_info=False,
     aes_countries=None,
+    dynamic_context=None,
 ):
     """
     Serialize a DynamicIndicatorData row for API output.
 
     Shape differences from regular FormData rows:
-    - ``data_type`` is always ``"dynamic"``
+    - ``field_type`` is ``dynamic`` or ``repeat_dynamic`` (when repeat-scoped)
     - ``form_item_id`` is always ``None`` (no FormItem; indicator referenced via ``indicator_bank_id``)
-    - Adds ``section_id``, ``indicator_bank_id``, ``custom_label``
+    - Adds ``section_id``, ``section_stable_key``, ``indicator_bank_id``, ``custom_label``
+    - Repeat-scoped rows add ``repeat_instance_number`` and ``repeat_instance_id``
     """
     aes = data_item.assignment_entity_status
     pub = data_item.public_submission
@@ -597,19 +1205,37 @@ def serialize_dynamic_data_item(
 
     num_value = extract_numeric_value(value)
     submitted_at = data_item.submitted_at.isoformat() if data_item.submitted_at else None
+    repeat_instance_number = getattr(data_item, 'repeat_instance_number', None)
+    section = getattr(data_item, 'section', None)
+    if section is None and dynamic_context:
+        section = (dynamic_context.get('section_by_id') or {}).get(
+            int(data_item.section_id)
+        ) if data_item.section_id else None
+    section_stable_key = _section_stable_key(section)
+    repeat_instance_id = resolve_dynamic_repeat_instance_id(data_item, dynamic_context)
+    field_type = 'repeat_dynamic' if repeat_instance_number is not None else 'dynamic'
+    prefilled_disagg = getattr(data_item, 'prefilled_disagg_data', None)
+    imputed_disagg = getattr(data_item, 'imputed_disagg_data', None)
 
     payload = {
         'id': data_item.id,
+        'field_type': field_type,
         'data_type': 'dynamic',
         'submission_type': submission_type,
         'submission_id': submission_id,
         'template_id': template_id,
         'period_name': period_name,
         'country_id': country_id,
+        'iso2': country.iso2 if country else None,
+        'iso3': country.iso3 if country else None,
         'section_id': data_item.section_id,
+        'section_stable_key': section_stable_key,
         'indicator_bank_id': data_item.indicator_bank_id,
         'custom_label': data_item.custom_label,
         'form_item_id': None,
+        'form_item_stable_key': None,
+        'repeat_instance_number': repeat_instance_number,
+        'repeat_instance_id': repeat_instance_id,
         'value': value,
         'num_value': num_value,
         'data_status': data_status,
@@ -617,11 +1243,14 @@ def serialize_dynamic_data_item(
         'not_applicable': not_applic,
         'prefilled_value': getattr(data_item, 'prefilled_value', None),
         'imputed_value': getattr(data_item, 'imputed_value', None),
+        'prefilled_disagg_data': prefilled_disagg,
+        'imputed_disagg_data': imputed_disagg,
         'disaggregation_data': _wrap_disagg_dict(getattr(data_item, 'disagg_data', None)),
-        'prefilled_disaggregation_data': (lambda d: _wrap_disagg_dict(d) if d else None)(getattr(data_item, 'prefilled_disagg_data', None)),
-        'imputed_disaggregation_data': (lambda d: _wrap_disagg_dict(d) if d else None)(getattr(data_item, 'imputed_disagg_data', None)),
+        'prefilled_disaggregation_data': _wrap_disagg_dict(prefilled_disagg) if prefilled_disagg else None,
+        'imputed_disaggregation_data': _wrap_disagg_dict(imputed_disagg) if imputed_disagg else None,
         'date_collected': submitted_at,
         'submitted_at': submitted_at,
+        'created_at': submitted_at,
     }
 
     if minimal_country_info:
@@ -681,17 +1310,26 @@ def serialize_repeat_data_item(
 
     num_value = extract_numeric_value(value)
     submitted_at = data_item.submitted_at.isoformat() if data_item.submitted_at else None
+    section = getattr(instance, 'section', None) if instance else None
+    form_item = getattr(data_item, 'form_item', None)
+    prefilled_disagg = getattr(data_item, 'prefilled_disagg_data', None)
+    imputed_disagg = getattr(data_item, 'imputed_disagg_data', None)
 
     payload = {
         'id': data_item.id,
+        'field_type': 'repeat_static',
         'data_type': 'repeat',
         'submission_type': submission_type,
         'submission_id': submission_id,
         'template_id': template_id,
         'period_name': period_name,
         'country_id': country_id,
+        'iso2': country.iso2 if country else None,
+        'iso3': country.iso3 if country else None,
         'section_id': instance.section_id if instance else None,
+        'section_stable_key': _section_stable_key(section),
         'form_item_id': data_item.form_item_id,
+        'form_item_stable_key': getattr(form_item, 'stable_key', None) if form_item else None,
         'repeat_instance_id': data_item.repeat_instance_id,
         'instance_number': instance.instance_number if instance else None,
         'instance_label': instance.instance_label if instance else None,
@@ -702,11 +1340,14 @@ def serialize_repeat_data_item(
         'not_applicable': not_applic,
         'prefilled_value': getattr(data_item, 'prefilled_value', None),
         'imputed_value': getattr(data_item, 'imputed_value', None),
+        'prefilled_disagg_data': prefilled_disagg,
+        'imputed_disagg_data': imputed_disagg,
         'disaggregation_data': _wrap_disagg_dict(getattr(data_item, 'disagg_data', None)),
-        'prefilled_disaggregation_data': (lambda d: _wrap_disagg_dict(d) if d else None)(getattr(data_item, 'prefilled_disagg_data', None)),
-        'imputed_disaggregation_data': (lambda d: _wrap_disagg_dict(d) if d else None)(getattr(data_item, 'imputed_disagg_data', None)),
+        'prefilled_disaggregation_data': _wrap_disagg_dict(prefilled_disagg) if prefilled_disagg else None,
+        'imputed_disaggregation_data': _wrap_disagg_dict(imputed_disagg) if imputed_disagg else None,
         'date_collected': submitted_at,
         'submitted_at': submitted_at,
+        'created_at': submitted_at,
     }
 
     if minimal_country_info:
@@ -721,8 +1362,8 @@ def serialize_repeat_data_item(
 # Star-schema dimensional tables (GET /api/v1/data/tables?layout=star)
 # ---------------------------------------------------------------------------
 
-STAR_SCHEMA_VERSION = '1.0'
-STAR_SCHEMA_GRAIN = 'one row per form_data value'
+STAR_SCHEMA_VERSION = '1.1'
+STAR_SCHEMA_GRAIN = 'one row per submission field value (static, dynamic, repeat, matrix)'
 
 
 def format_dim_template(template):
@@ -807,24 +1448,92 @@ def format_dim_submission_public(public_submission):
     }
 
 
-def format_fact_form_value_row(flat_row):
-    """Map a flat /data/tables row to a star-schema fact row (FK keys only)."""
+def format_fact_matrix_cell_row(cell):
+    """Map a normalized matrix cell to a unified fact_form_values row."""
+    if not cell or not isinstance(cell, dict):
+        return None
+    matrix = cell.get('matrix')
+    if not matrix:
+        matrix = build_matrix_context(
+            form_data_id=cell.get('form_data_id'),
+            row_entity_id=cell.get('row_entity_id'),
+            row_entity_type=cell.get('row_entity_type'),
+            row_entity_label=cell.get('row_entity_label'),
+            join_dimension=cell.get('join_dimension'),
+            column_key=cell.get('column_key'),
+            column_label=cell.get('column_label'),
+            source=cell.get('source') or 'reported',
+            entity_id=cell.get('entity_id'),
+            entity_name=cell.get('entity_name'),
+            entity_iso2=cell.get('entity_iso2'),
+            entity_iso3=cell.get('entity_iso3'),
+            entity_code=cell.get('entity_code'),
+            entity_country_id=cell.get('entity_country_id'),
+            entity_country_name=cell.get('entity_country_name'),
+        )
+    form_data_id = cell.get('form_data_id') or matrix.get('parent_form_data_id')
+    row = matrix.get('row') or {}
+    column = matrix.get('column') or {}
+    row_entity_id = row.get('entity_id')
+    column_key = column.get('key')
+    if form_data_id is None or row_entity_id is None or not column_key:
+        return None
+    value = cell.get('value')
+    return {
+        'id': None,
+        'field_type': 'matrix',
+        'data_type': 'static',
+        'form_item_id': cell.get('form_item_id'),
+        'form_item_label': cell.get('form_item_label'),
+        'indicator_bank_id': None,
+        'country_id': cell.get('country_id'),
+        'template_id': cell.get('template_id'),
+        'period_name': cell.get('period_name'),
+        'submission_id': cell.get('submission_id'),
+        'submission_type': cell.get('submission_type'),
+        'section_id': None,
+        'section_stable_key': None,
+        'repeat_instance_id': None,
+        'repeat_instance_number': None,
+        'matrix': matrix,
+        'value': value,
+        'num_value': extract_numeric_value(value),
+        'data_status': 'available',
+        'submitted_at': None,
+        'is_missing': False,
+    }
+
+
+def format_fact_submission_value_row(flat_row):
+    """Map a flat fact row (static, dynamic, or repeat) to a star-schema fact row."""
     if not flat_row:
         return None
     return {
         'id': flat_row.get('id'),
+        'field_type': flat_row.get('field_type'),
+        'data_type': flat_row.get('data_type'),
         'form_item_id': flat_row.get('form_item_id'),
+        'form_item_label': None,
+        'indicator_bank_id': flat_row.get('indicator_bank_id'),
         'country_id': flat_row.get('country_id'),
         'template_id': flat_row.get('template_id'),
         'period_name': flat_row.get('period_name'),
         'submission_id': flat_row.get('submission_id'),
         'submission_type': flat_row.get('submission_type'),
+        'section_id': flat_row.get('section_id'),
+        'section_stable_key': flat_row.get('section_stable_key'),
+        'repeat_instance_id': flat_row.get('repeat_instance_id'),
+        'repeat_instance_number': flat_row.get('repeat_instance_number'),
+        'matrix': None,
         'value': flat_row.get('value'),
         'num_value': flat_row.get('num_value'),
         'data_status': flat_row.get('data_status'),
         'submitted_at': flat_row.get('submitted_at'),
         'is_missing': flat_row.get('is_missing', False),
     }
+
+
+format_fact_form_value_row = format_fact_submission_value_row
 
 
 def format_bridge_disagg_rows(form_data_id, disagg_payload, source='reported'):
@@ -877,17 +1586,37 @@ def build_star_schema_tables(
     data_rows,
     form_items_table,
     countries_table,
+    *,
+    dynamic_data=None,
+    repeat_data=None,
+    matrix_cells=None,
+    national_societies_table=None,
+    indicator_bank_table=None,
+    dynamic_context=None,
 ):
     """
-    Assemble star-schema table dicts from flat /data/tables intermediate data.
+    Assemble star-schema table dicts from unified flat fact sources.
 
-    Loads dim_template, dim_period, and dim_submission from the database using
-    FK references present on the fact rows.
+    ``fact_form_values`` includes static, dynamic, repeat, and matrix rows.
     """
+    value_rows = list(data_rows or []) + list(dynamic_data or []) + list(repeat_data or [])
     fact_rows = [
-        r for r in (format_fact_form_value_row(row) for row in (data_rows or []))
+        r for r in (format_fact_submission_value_row(row) for row in value_rows)
         if r is not None
     ]
+    enriched_matrix_cells = enrich_matrix_cells(
+        matrix_cells,
+        form_items_table,
+        countries_table=countries_table,
+        national_societies_table=national_societies_table,
+        indicator_bank_table=indicator_bank_table,
+    )
+    fact_rows.extend(
+        r for r in (
+            format_fact_matrix_cell_row(cell) for cell in enriched_matrix_cells
+        )
+        if r is not None
+    )
 
     template_ids = {
         int(r['template_id'])
@@ -972,9 +1701,12 @@ def build_star_schema_tables(
     return {
         'fact_form_values': fact_rows,
         'dim_country': countries_table or [],
+        'dim_national_society': national_societies_table or [],
+        'dim_indicator_bank': indicator_bank_table or [],
         'dim_form_item': form_items_table or [],
+        'dim_dynamic_context': list(dynamic_context or []),
         'dim_template': dim_template,
         'dim_period': dim_period,
         'dim_submission': dim_submission,
-        'bridge_disagg_values': build_bridge_disagg_from_flat_rows(data_rows),
+        'bridge_disagg_values': build_bridge_disagg_from_flat_rows(value_rows),
     }

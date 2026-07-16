@@ -238,11 +238,13 @@
                         {% endif %}
 
                         {# Group roles for readability (based on role name) #}
-                        {% set rbac_groups = namespace(system=[], core_roles=[], admin=[], assignment=[], other=[]) %}
+                        {% set rbac_groups = namespace(system=[], core_roles=[], admin=[], assignment=[], translator=[], other=[]) %}
                         {% for subfield in form.rbac_roles %}
                             {% set role_name = (subfield.label.text or '') %}
                             {% if role_name == 'System Manager' %}
                                 {% set __ = rbac_groups.system.append(subfield) %}
+                            {% elif role_name == 'Translator' %}
+                                {% set __ = rbac_groups.translator.append(subfield) %}
                             {% elif role_name.startswith('Admin') %}
                                 {% set raw_label = role_name %}
                                 {% set display_label = raw_label %}
@@ -313,6 +315,60 @@
                                         </label>
                                     {% endfor %}
                                 </div>
+                            </div>
+                            {% endif %}
+
+                            {% if rbac_groups.translator|length or (translatable_languages|default([])|length and can_manage_translator_languages|default(false)) %}
+                            <div id="translator-role-section" class="p-3 border border-gray-200 rounded-md bg-gray-50">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="text-sm font-semibold text-gray-800">
+                                        <i class="fas fa-language mr-2 text-teal-600"></i>{{ _('Translation Review') }}
+                                    </div>
+                                </div>
+                                {% if rbac_groups.translator|length %}
+                                <div class="mb-3">
+                                    {% for subfield in rbac_groups.translator %}
+                                    <label class="flex items-center">
+                                        {% if roles_disabled %}
+                                            {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 translator-role-checkbox", disabled=True) }}
+                                        {% else %}
+                                            {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 translator-role-checkbox") }}
+                                        {% endif %}
+                                        {{ subfield.label(class="ml-2 text-sm text-gray-700") }}
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                {% set assigned_langs = translator_language_codes|default([]) %}
+                                {% set langs = translatable_languages|default([]) %}
+                                {% if langs and can_manage_translator_languages|default(false) %}
+                                <div id="translator-languages-panel" class="{% if not ((translator_role_id is defined and translator_role_id in (form.rbac_roles.data or [])) or assigned_langs) %}hidden{% endif %}">
+                                    <p class="text-xs text-gray-600 mb-2">{{ _('Assign languages this user may edit with the inline translation tool.') }}</p>
+                                    <div class="flex flex-wrap gap-x-6 gap-y-2">
+                                        {% for code in langs %}
+                                        <label class="flex items-center min-w-0">
+                                            <input type="checkbox"
+                                                   name="translator_languages"
+                                                   value="{{ code }}"
+                                                   class="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500 translator-language-checkbox"
+                                                   {% if code in assigned_langs %}checked{% endif %}
+                                                   {% if roles_disabled %}disabled{% endif %}>
+                                            <span class="ml-2 text-sm {% if roles_disabled %}text-gray-500{% else %}text-gray-700{% endif %}">
+                                                {{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}
+                                            </span>
+                                        </label>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% elif langs and roles_read_only and assigned_langs %}
+                                <div class="flex flex-wrap gap-2">
+                                    {% for code in assigned_langs %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-50 text-teal-800 border border-teal-200">
+                                        {{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }}
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
                             </div>
                             {% endif %}
 
@@ -639,6 +695,7 @@ window.userFormConfig = {
     isNew: {{ 'true' if not user else 'false' }},
     isActive: {{ (user.active if user else false)|tojson }},
     readOnly: {{ (read_only or roles_read_only)|tojson }},
+    translatorRoleId: {{ translator_role_id|tojson if translator_role_id is defined else 'null' }},
     defaultCountryId: {{ (user.countries.first().id if user and user.countries.first() else none)|tojson }},
     userCountryIds: [{% if user %}{%- for country in user.countries -%}{{ country.id }}{%- if not loop.last -%},{%- endif -%}{%- endfor -%}{% endif %}],
     urls: {

@@ -220,10 +220,10 @@
                                             ('#7c3aed', _('Purple')),
                                             ('#6b7280', _('Grey')),
                                         ] %}
-                                        <div class="grid grid-cols-4 gap-1.5">
+                                        <div class="blank-body-color-swatches">
                                             {% for color, label in _colors %}
                                             <button type="button"
-                                                    class="body-fmt-color-btn w-6 h-6 rounded-full border-2 border-white ring-1 ring-gray-300 hover:ring-2 hover:ring-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+                                                    class="body-fmt-color-btn rounded-full border-2 border-white ring-1 ring-gray-300 hover:ring-2 hover:ring-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
                                                     style="background:{{ color }}"
                                                     data-color="{{ color }}"
                                                     title="{{ label }}"

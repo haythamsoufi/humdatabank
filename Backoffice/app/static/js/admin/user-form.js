@@ -381,6 +381,9 @@
                           }
                           for (const input of roleInputs) {
                             if (input === systemManagerInput) continue;
+                            // Translator is an opt-in-only role: System Manager should not
+                            // auto-enable it (it toggles a UI most admins don't need).
+                            if (input.classList.contains('translator-role-checkbox')) continue;
                             implied.add(input);
                             lockSet.add(input);
                           }
@@ -654,8 +657,37 @@
                         }
                       });
 
+                      function initTranslatorLanguagePanel() {
+                        const panel = document.getElementById('translator-languages-panel');
+                        if (!panel) return;
+
+                        const roleId = cfg.translatorRoleId;
+                        const roleInputs = roleId
+                          ? Array.from(document.querySelectorAll('input[type="checkbox"][name="rbac_roles"]'))
+                              .filter(function (input) { return String(input.value) === String(roleId); })
+                          : Array.from(document.querySelectorAll('.translator-role-checkbox'));
+
+                        function syncPanel() {
+                          const roleChecked = roleInputs.some(function (input) { return input.checked; });
+                          const langChecked = Array.from(document.querySelectorAll('.translator-language-checkbox'))
+                            .some(function (input) { return input.checked; });
+                          panel.classList.toggle('hidden', !(roleChecked || langChecked));
+                          if (!roleChecked && !READ_ONLY) {
+                            document.querySelectorAll('.translator-language-checkbox').forEach(function (input) {
+                              if (!input.disabled) input.checked = false;
+                            });
+                          }
+                        }
+
+                        roleInputs.forEach(function (input) {
+                          input.addEventListener('change', syncPanel);
+                        });
+                        syncPanel();
+                      }
+
                       applyRoleHighlights();
                       recomputeLocks();
+                      initTranslatorLanguagePanel();
                     })();
 
     // --- Block 2 (original lines 1906-2060) ---

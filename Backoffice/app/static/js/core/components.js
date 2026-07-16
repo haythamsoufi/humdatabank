@@ -1278,14 +1278,73 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Check WebSocket status once and cache the result permanently if disabled
+    // Cache the WS enabled/disabled status check itself — it was being re-fetched
+    // unconditionally on every single page load even though the answer changes
+    // only when an admin toggles server config (rare). This is part of the same
+    // "unnecessary server exhaustion" pattern as the notification-preferences fetch.
+    const WS_STATUS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+    const WS_STATUS_CACHE_KEY = 'ws_stream_status_cache';
+
+    function _readCachedWsStatus() {
+        try {
+            const raw = localStorage.getItem(WS_STATUS_CACHE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed || (Date.now() - parsed.ts) >= WS_STATUS_CACHE_TTL_MS) return null;
+            return parsed.enabled;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function _writeCachedWsStatus(enabled) {
+        try {
+            localStorage.setItem(WS_STATUS_CACHE_KEY, JSON.stringify({ enabled, ts: Date.now() }));
+        } catch (e) { /* localStorage unavailable — ignore */ }
+    }
+
+    // Open the WS connection only if the page is (still) visible. Delaying briefly
+    // and re-checking visibility avoids opening — and immediately tearing down —
+    // a connection (and its server-side thread) during fast navigations, prefetch,
+    // or background-tab page loads.
+    function connectWebSocketIfVisible() {
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+            console.debug('[notif-ws] page not visible, deferring WebSocket connection');
+            const onVisible = () => {
+                if (document.visibilityState === 'visible') {
+                    document.removeEventListener('visibilitychange', onVisible);
+                    connectWebSocket();
+                }
+            };
+            document.addEventListener('visibilitychange', onVisible);
+            return;
+        }
+        connectWebSocket();
+    }
+
     function checkWebSocketStatusOnce() {
+        const cached = _readCachedWsStatus();
+        if (cached !== null) {
+            if (cached === false) {
+                fallbackToPolling();
+            } else {
+                if (localStorage.getItem('websocket_permanently_disabled') === 'true') {
+                    localStorage.removeItem('websocket_permanently_disabled');
+                }
+                connectWebSocketIfVisible();
+            }
+            return;
+        }
+
         // Always check WebSocket status (even if previously disabled)
         // This allows the frontend to pick up configuration changes
         _nfetch('/notifications/api/stream/status')
             .then(response => response.json())
             .then(data => {
                 // Server returns { success: true, websocket_enabled: <bool> }
-                if (!data?.success || data.websocket_enabled === false) {
+                const enabled = !!(data?.success && data.websocket_enabled !== false);
+                _writeCachedWsStatus(enabled);
+                if (!enabled) {
                     // WebSocket is disabled - mark it permanently and use polling
                     localStorage.setItem('websocket_permanently_disabled', 'true');
                     fallbackToPolling();
@@ -1297,7 +1356,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         console.debug('WebSocket is enabled, connecting...');
                     }
-                    connectWebSocket();
+                    connectWebSocketIfVisible();
                 }
             })
             .catch(error => {
@@ -1409,8 +1468,21 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Cache notification preferences for sound feature
-    function cacheNotificationPreferences() {
+    // Cache notification preferences for sound feature.
+    // Re-fetched at most once per TTL window (per browser tab/session) instead of
+    // unconditionally on every page load — this endpoint was found to be one of
+    // the top contributors to unnecessary server load (see gateway-504 runbook).
+    const NOTIFICATION_PREFS_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+    const NOTIFICATION_PREFS_CACHED_AT_KEY = 'notification_preferences_cached_at';
+
+    function cacheNotificationPreferences(force) {
+        const cachedAt = parseInt(localStorage.getItem(NOTIFICATION_PREFS_CACHED_AT_KEY), 10) || 0;
+        const isFresh = !force && (Date.now() - cachedAt) < NOTIFICATION_PREFS_CACHE_TTL_MS && localStorage.getItem('notification_preferences') !== null;
+        if (isFresh) {
+            console.info('[notif-prefs] cache hit, skipping fetch (age=' + Math.round((Date.now() - cachedAt) / 1000) + 's)');
+            return;
+        }
+
         const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
         if (!csrfTokenMeta) return;
 
@@ -1425,10 +1497,18 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success && data.preferences) {
                 localStorage.setItem('notification_preferences', JSON.stringify(data.preferences));
+                localStorage.setItem(NOTIFICATION_PREFS_CACHED_AT_KEY, String(Date.now()));
+                console.info('[notif-prefs] fetched and cached (next fetch in ' + Math.round(NOTIFICATION_PREFS_CACHE_TTL_MS / 60000) + 'm)');
             }
         })
         .catch(error => console.debug('Failed to cache preferences:', error));
     }
+
+    // Preferences can change from the account settings page in another tab; let
+    // that page force a fresh fetch there via `window.forceRefreshNotificationPreferencesCache()`.
+    window.forceRefreshNotificationPreferencesCache = function() {
+        localStorage.removeItem(NOTIFICATION_PREFS_CACHED_AT_KEY);
+    };
 
     // Initial setup
     if (notificationsBellButton) {
@@ -1457,6 +1537,7 @@ document.addEventListener('DOMContentLoaded', function() {
         window.clearWebSocketCache = function() {
             console.log('Clearing WebSocket cache and re-checking status...');
             localStorage.removeItem('websocket_permanently_disabled');
+            localStorage.removeItem(WS_STATUS_CACHE_KEY);
             if (typeof WebSocket !== 'undefined') {
                 checkWebSocketStatusOnce();
             } else {

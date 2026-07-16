@@ -597,6 +597,124 @@ class TestWorkflowsShowCommand:
         assert "svc crashed" in result.output
 
 
+class TestWorkflowsGenerateStaticCommand:
+    """Tests for `flask workflows generate-static`."""
+
+    def _mock_service(self, workflows=None, tours_by_lang=None, languages=("en", "fr")):
+        """Build a mock WorkflowDocsService for the generate-static command.
+
+        tours_by_lang: dict[str, dict|None] mapping language -> tour config
+        returned for every workflow (None means "no steps, skip").
+        """
+        mock_svc = MagicMock()
+        mock_svc.reload.return_value = None
+        mock_svc.get_all_workflows.return_value = workflows if workflows is not None else [_make_workflow()]
+        mock_svc.SUPPORTED_LANGUAGES = set(languages)
+
+        tours_by_lang = tours_by_lang or {"en": {"name": "My Workflow", "steps": [{"page": "/admin"}], "language": "en"}}
+
+        def _get_tour(workflow_id, language):
+            return tours_by_lang.get(language)
+
+        mock_svc.get_workflow_for_tour.side_effect = _get_tour
+        return mock_svc
+
+    def test_generate_static_writes_files(self, runner, app, tmp_path, monkeypatch):
+        monkeypatch.setattr(app, "root_path", str(tmp_path))
+        mock_svc = self._mock_service(
+            tours_by_lang={
+                "en": {"name": "My Workflow", "steps": [{"page": "/admin"}], "language": "en"},
+                "fr": None,  # no French translation -> skipped
+            }
+        )
+
+        with patch("app.services.workflow_docs_service.WorkflowDocsService", return_value=mock_svc):
+            result = runner.invoke(args=["workflows", "generate-static"])
+
+        assert result.exit_code == 0
+        assert "Wrote 1 tour file(s)" in result.output
+        assert "Skipped 1 workflow/language" in result.output
+
+        written = tmp_path / "static" / "generated" / "tours" / "wf-1.en.json"
+        assert written.exists()
+
+        import json
+        data = json.loads(written.read_text(encoding="utf-8"))
+        assert data["steps"] == [{"page": "/admin"}]
+
+        not_written = tmp_path / "static" / "generated" / "tours" / "wf-1.fr.json"
+        assert not not_written.exists()
+
+    def test_generate_static_no_workflows(self, runner, app, tmp_path, monkeypatch):
+        monkeypatch.setattr(app, "root_path", str(tmp_path))
+        mock_svc = self._mock_service(workflows=[])
+
+        with patch("app.services.workflow_docs_service.WorkflowDocsService", return_value=mock_svc):
+            result = runner.invoke(args=["workflows", "generate-static"])
+
+        assert result.exit_code == 0
+        assert "nothing to generate" in result.output
+
+    def test_generate_static_mirrors_to_cdn_when_enabled(self, runner, app, tmp_path, monkeypatch):
+        monkeypatch.setattr(app, "root_path", str(tmp_path))
+        mock_svc = self._mock_service(languages=("en",))
+
+        mock_storage = MagicMock()
+        mock_storage.public_cdn_enabled.return_value = True
+
+        with patch("app.services.workflow_docs_service.WorkflowDocsService", return_value=mock_svc), \
+             patch("app.services.storage_service", mock_storage):
+            result = runner.invoke(args=["workflows", "generate-static"])
+
+        assert result.exit_code == 0
+        assert "Mirrored 1 file(s)" in result.output
+        mock_storage.publish_to_static_cdn.assert_called_once()
+        blob_name = mock_storage.publish_to_static_cdn.call_args[0][0]
+        assert blob_name == "generated/tours/wf-1.en.json"
+
+    def test_generate_static_cdn_disabled_message(self, runner, app, tmp_path, monkeypatch):
+        monkeypatch.setattr(app, "root_path", str(tmp_path))
+        mock_svc = self._mock_service(languages=("en",))
+
+        mock_storage = MagicMock()
+        mock_storage.public_cdn_enabled.return_value = False
+
+        with patch("app.services.workflow_docs_service.WorkflowDocsService", return_value=mock_svc), \
+             patch("app.services.storage_service", mock_storage):
+            result = runner.invoke(args=["workflows", "generate-static"])
+
+        assert result.exit_code == 0
+        assert "STATIC_CDN_URL not configured" in result.output
+        mock_storage.publish_to_static_cdn.assert_not_called()
+
+    def test_generate_static_cdn_mirror_failure_is_non_fatal(self, runner, app, tmp_path, monkeypatch):
+        monkeypatch.setattr(app, "root_path", str(tmp_path))
+        mock_svc = self._mock_service(languages=("en",))
+
+        mock_storage = MagicMock()
+        mock_storage.public_cdn_enabled.return_value = True
+        mock_storage.publish_to_static_cdn.side_effect = RuntimeError("blob unreachable")
+
+        with patch("app.services.workflow_docs_service.WorkflowDocsService", return_value=mock_svc), \
+             patch("app.services.storage_service", mock_storage):
+            result = runner.invoke(args=["workflows", "generate-static"])
+
+        assert result.exit_code == 0
+        assert "CDN mirror failed" in result.output
+        # Local file is still written even if the CDN mirror fails.
+        assert (tmp_path / "static" / "generated" / "tours" / "wf-1.en.json").exists()
+
+    def test_generate_static_general_exception(self, runner):
+        with patch(
+            "app.services.workflow_docs_service.WorkflowDocsService",
+            side_effect=RuntimeError("svc crashed"),
+        ):
+            result = runner.invoke(args=["workflows", "generate-static"])
+
+        assert result.exit_code != 0
+        assert "svc crashed" in result.output
+
+
 class TestRbacSeedCommand:
     """Tests for `flask rbac seed`."""
 

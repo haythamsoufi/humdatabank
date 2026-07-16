@@ -21,6 +21,7 @@
 {% endif %}
 <meta name="language" content="{{ _lang_for_meta }}">
 <link rel="stylesheet" href="{{ static_url('css/forms.css') }}">
+{% if is_preview_mode %}<link rel="stylesheet" href="{{ static_url('css/year-picker.css') }}">{% endif %}
 <script nonce="{{ csp_nonce() }}">
     // Gate the entry-form UI ASAP (prevents "half-rendered" form when modules fail to load)
     (function(){ try { document.documentElement.classList.add('entry-form-loading'); } catch(e) {} })();
@@ -30,62 +31,9 @@
 {% block content %}
 <div class="entry-form-root w-full max-w-full mx-auto px-0 sm:px-2 py-4 sm:py-6 min-w-0" data-is-public-submission="{{ 'true' if is_public_submission else 'false' }}" data-public-token="{{ public_token if is_public_submission else '' }}">
 
-    {# Template Preview Mode banner (with "view as" controls) #}
+    {# Template Preview Mode banner (with "view as" + period builder controls) #}
     {% if is_preview_mode %}
-        <div class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4" role="alert">
-            <div class="flex items-start justify-between gap-4 flex-wrap">
-                <div class="flex items-start gap-3 min-w-[260px]">
-                    <div class="mt-0.5 text-blue-700">
-                        <i class="fas fa-eye"></i>
-                    </div>
-                    <div>
-                        <p class="font-bold text-blue-900">{{ _('Template Preview Mode') }}</p>
-                        <p class="text-sm text-blue-800">{{ _('This is a preview of how the template will appear to users. You can test data entry in this preview mode.') }}</p>
-                    </div>
-                </div>
-
-                {% if not is_public_submission and template_structure and preview_view_as_options is defined %}
-                    <form method="GET" action="{{ url_for('forms.preview_template', template_id=template_structure.id) }}" class="flex flex-wrap items-end gap-3">
-                        {% if preview_version_id %}
-                            <input type="hidden" name="version_id" value="{{ preview_version_id }}">
-                        {% endif %}
-
-                        <div class="flex flex-col min-w-[320px]">
-                            <label for="preview-view-as" class="block text-xs font-medium text-blue-900 mb-1">{{ _('View as') }}</label>
-                            <select id="preview-view-as"
-                                    name="view_as"
-                                    class="w-full py-2 pl-3 pr-8 border border-blue-200 rounded-md bg-white text-sm select2-enable">
-                                <option value="" {% if not preview_selected_view_as %}selected{% endif %}>{{ _('Preview placeholders') }}</option>
-                                {% for opt in preview_view_as_options %}
-                                    <option value="{{ opt.value }}" {% if opt.value == preview_selected_view_as %}selected{% endif %}>{{ opt.label }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <div class="flex flex-col">
-                            <label for="preview-period-name" class="block text-xs font-medium text-blue-900 mb-1" title="{{ _('Any value is allowed (suggestions come from existing assignments).') }}">{{ _('Assignment period') }}</label>
-                            <input id="preview-period-name"
-                                   name="period_name"
-                                   list="preview-period-name-suggestions"
-                                   value="{{ preview_selected_period_name }}"
-                                   placeholder="{{ _('Preview Period') }}"
-                                   class="preview-selectlike-input min-w-[200px] px-3 py-2 border border-blue-200 rounded-md bg-white text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-300"
-                                   autocomplete="off">
-                            <datalist id="preview-period-name-suggestions">
-                                {% for p in preview_period_name_options %}
-                                    <option value="{{ p }}"></option>
-                                {% endfor %}
-                            </datalist>
-                        </div>
-
-                        <button type="submit" class="professional-action-btn professional-action-btn-blue">
-                            <i class="fas fa-sync-alt"></i>
-                            <span>{{ _('Apply') }}</span>
-                        </button>
-                    </form>
-                {% endif %}
-            </div>
-        </div>
+        {% include "forms/entry_form/partials/_preview_banner.html" %}
     {% endif %}
 
     {# Module load failures are now communicated via the loading box (#entry-form-loading) only. #}
@@ -3023,6 +2971,9 @@
 
 {% block extra_js %}
 <script src="{{ static_url('js/forms/validation-questions-panel.js') }}"></script>
+{% if is_preview_mode %}
+    {% include "forms/entry_form/partials/_preview_banner_js.html" %}
+{% endif %}
 {# Fallback if forms.css failed to load from the head block #}
         <script nonce="{{ csp_nonce() }}">
         (function ensureFormsCss(){

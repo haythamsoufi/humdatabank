@@ -909,14 +909,23 @@ class TestPreviewTemplateImpl:
         mock_entity = MagicMock()
         mock_entity.ENTITY_MODEL_MAP = {}
         mock_entity.get_all_entities_by_type.return_value = []
+        mock_entity.batch_entity_names.return_value = {}
         mock_entity.get_localized_entity_name.return_value = "Test Country"
         mock_entity.get_entity_type_label.return_value = "Country"
         mocks["EntityService"] = stack.enter_context(
             patch("app.routes.forms.entry.EntityService", mock_entity))
 
+        mock_uep = MagicMock()
+        mock_uep.query.filter_by.return_value.all.return_value = []
+        mocks["UserEntityPermission"] = stack.enter_context(
+            patch("app.models.core.UserEntityPermission", mock_uep))
+
         # TemplatePreparationService is module-level
         mock_tps = MagicMock()
         mock_tps._prepare_available_indicators.return_value = {}
+        mock_country = MagicMock()
+        mock_country.name = "Preview Country"
+        mock_tps.create_preview_mock_country.return_value = mock_country
         mocks["TemplatePreparationService"] = stack.enter_context(
             patch("app.routes.forms.entry.TemplatePreparationService", mock_tps))
 

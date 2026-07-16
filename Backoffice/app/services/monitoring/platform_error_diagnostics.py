@@ -17,6 +17,7 @@ _CAUSE_LABELS = {
     'db_pool_pressure': 'Database connection pool near or at capacity on this worker',
     'high_in_flight': 'Many concurrent requests in flight on this worker',
     'traffic_spike': 'Elevated request rate on this worker in the last minute',
+    'ws_thread_pressure': 'WebSocket connections (notifications/AI chat) consuming most of the worker thread budget',
     'upstream_gateway_timeout': 'Gateway timeout — no stale workers visible; likely queue wait or single hung request',
 }
 
@@ -57,6 +58,9 @@ def _infer_likely_causes(metrics: Dict[str, Any]) -> List[str]:
         causes.append('high_in_flight')
     if traffic_60s >= 40:
         causes.append('traffic_spike')
+    ws_pool = metrics.get('ws_pool') or {}
+    if int(ws_pool.get('pct_of_budget_used') or 0) >= 75:
+        causes.append('ws_thread_pressure')
     if not causes:
         causes.append('upstream_gateway_timeout')
     return causes
@@ -152,6 +156,12 @@ def build_platform_5xx_diagnostics(
 
     if pool_text:
         summary_parts.append(pool_text)
+    ws_pool = metrics.get('ws_pool') or {}
+    if ws_pool.get('max_total_connections'):
+        summary_parts.append(
+            f"WS pool {ws_pool.get('active_total')}/{ws_pool.get('max_total_connections')} "
+            f"({ws_pool.get('pct_of_budget_used')}%) by_channel={ws_pool.get('by_channel')}"
+        )
     if stale_summary:
         summary_parts.append(f"stale/holding: {stale_summary}")
     if failed_url:

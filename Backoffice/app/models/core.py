@@ -76,6 +76,11 @@ class User(UserMixin, db.Model):
 
     # User preferences
     chatbot_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    # Opt-in UI toggle for the inline translation review tool. Independent of RBAC
+    # permissions: admins/system managers already have permission via role/grant,
+    # but the floating tool is only shown if they've explicitly turned it on for
+    # themselves (translators with assigned languages get it automatically).
+    translation_review_tool_enabled = db.Column(db.Boolean, default=False, nullable=False)
     profile_color = db.Column(db.String(7), default='#3B82F6', nullable=False)  # Hex color code
     preferred_language = db.Column(db.String(10), nullable=True, default='en')
 

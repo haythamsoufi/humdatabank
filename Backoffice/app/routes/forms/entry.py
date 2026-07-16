@@ -1198,20 +1198,37 @@ def _preview_template_impl(template_id):
     preview_view_as_options = []
     try:
         option_rows = []
+        from app.models.core import UserEntityPermission
+
+        # Full ORM loads of every NS local unit / branch make preview multi-second
+        # for admins. Prefer ID-only queries for the common catalog types, and merge
+        # the current user's permissions for deep NS hierarchy entities.
+        _preview_full_catalog_types = {
+            EntityType.country.value,
+            EntityType.national_society.value,
+            EntityType.division.value,
+            EntityType.department.value,
+            EntityType.regional_office.value,
+            EntityType.cluster_office.value,
+        }
+
+        def _append_active_entity_ids(entity_type):
+            model_cls = EntityService.ENTITY_MODEL_MAP.get(entity_type)
+            if not model_cls:
+                return
+            q = db.session.query(model_cls.id)
+            if hasattr(model_cls, "is_active"):
+                q = q.filter(model_cls.is_active.is_(True))
+            for (eid,) in q.all():
+                if eid:
+                    option_rows.append((entity_type, int(eid)))
 
         if AuthorizationService.is_admin(current_user) or AuthorizationService.is_system_manager(current_user):
-            for et, model_cls in EntityService.ENTITY_MODEL_MAP.items():
+            for et in _preview_full_catalog_types:
                 try:
-                    entities = EntityService.get_all_entities_by_type(et, filter_active=True)
-                    for ent in entities:
-                        if not ent or not getattr(ent, "id", None):
-                            continue
-                        option_rows.append((et, int(ent.id)))
+                    _append_active_entity_ids(et)
                 except Exception as e:
-                    current_app.logger.debug("EntityService.get_all_entities failed: %s", e)
-                    continue
-        else:
-            from app.models.core import UserEntityPermission
+                    current_app.logger.debug("preview entity id query failed for %s: %s", et, e)
             perms = UserEntityPermission.query.filter_by(user_id=current_user.id).all()
             for p in perms:
                 if not p:
@@ -1220,6 +1237,19 @@ def _preview_template_impl(template_id):
                 eid = getattr(p, "entity_id", None)
                 if et and eid:
                     option_rows.append((et, int(eid)))
+        else:
+            perms = UserEntityPermission.query.filter_by(user_id=current_user.id).all()
+            for p in perms:
+                if not p:
+                    continue
+                et = getattr(p, "entity_type", None)
+                eid = getattr(p, "entity_id", None)
+                if et and eid:
+                    option_rows.append((et, int(eid)))
+
+        # Keep the currently selected view_as entity even if outside the catalog above.
+        if selected_entity_type and selected_entity_id:
+            option_rows.append((selected_entity_type, int(selected_entity_id)))
 
         seen = set()
         enriched = []
@@ -1276,18 +1306,7 @@ def _preview_template_impl(template_id):
             mock_assignment.period_name = period_name or 'Preview Period'
             self.assigned_form = mock_assignment
 
-            mock_country = type('MockCountry', (), {})()
-            mock_country.name = 'Preview Country'
-            mock_country.iso3 = 'PRE'
-            mock_country.name_translations = {
-                'fr': 'Pays de Prévisualisation',
-                'es': 'País de Vista Previa',
-                'ar': 'بلد المعاينة',
-                'ru': 'Страна Предварительного Просмотра',
-                'zh': '预览国家',
-                'hi': 'पूर्वावलोकन देश'
-            }
-            self._placeholder_country = mock_country
+            self._placeholder_country = TemplatePreparationService.create_preview_mock_country()
 
         @property
         def entity(self):
@@ -1494,5 +1513,7 @@ def _preview_template_impl(template_id):
                          preview_view_as_options=preview_view_as_options,
                          preview_period_name_options=preview_period_name_options,
                          form_features=form_features,
+                         # Same as assignment entry: defer chatbot JS until formInitialized.
+                         skip_layout_chatbot=True,
                          plugin_manager=current_app.plugin_manager if hasattr(current_app, 'plugin_manager') else None,
                          form_integration=current_app.form_integration if hasattr(current_app, 'form_integration') else None)

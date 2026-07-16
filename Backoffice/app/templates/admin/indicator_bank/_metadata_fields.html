@@ -27,7 +27,7 @@
         <div class="mb-4">
             {{ form.area.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
             {{ form.area(class=input_class) }}
-            <p class="mt-1 text-xs text-gray-500">{{ _('Strategy 2030 area code from IFRC SPEF (e.g. EF2, SP3).') }}</p>
+            <p class="mt-1 text-xs text-gray-500">{{ _('Strategy 2030 area from the IFRC SPEF catalog (SPs & EFs).') }}</p>
             {% for error in form.area.errors %}
                 <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
             {% endfor %}

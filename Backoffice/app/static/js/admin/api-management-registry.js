@@ -170,10 +170,24 @@
     /** Synthetic full-width header rows; real endpoint rows stay in epRegistryAllRows / __epRegistryAllRows only. */
     function buildRegistryGroupedRows(rows) {
         if (!rows || !rows.length) return [];
+        // Groups that contain a featured (endorsed) endpoint float to the top of the list;
+        // within a group, featured rows sort first so paths like /api/v1/data stay pinned.
+        var featuredGroups = {};
+        for (var fi = 0; fi < rows.length; fi++) {
+            if (rows[fi].featured) {
+                featuredGroups[String(rows[fi].registryGroup || '')] = true;
+            }
+        }
         var sorted = rows.slice().sort(function (a, b) {
             var ga = String(a.registryGroup || '');
             var gb = String(b.registryGroup || '');
+            var groupPinA = featuredGroups[ga] ? 0 : 1;
+            var groupPinB = featuredGroups[gb] ? 0 : 1;
+            if (groupPinA !== groupPinB) return groupPinA - groupPinB;
             if (ga !== gb) return ga < gb ? -1 : ga > gb ? 1 : 0;
+            var featA = a.featured ? 0 : 1;
+            var featB = b.featured ? 0 : 1;
+            if (featA !== featB) return featA - featB;
             var pa = String(a.path || '');
             var pb = String(b.path || '');
             return pa < pb ? -1 : pa > pb ? 1 : 0;

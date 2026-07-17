@@ -381,6 +381,22 @@ def reset_in_memory_rate_limits():
         pass
 
 
+@pytest.fixture(autouse=True)
+def reset_aes_access_light_cache():
+    """Clear the (user, aes) access cache in data_retrieval_service.
+
+    check_aes_access_light caches positive results in a module-level dict;
+    without this reset a hit from one test could mask changed fixtures or
+    permissions in a later test reusing the same ids.
+    """
+    yield
+    try:
+        from app.services.data_retrieval_service import clear_aes_access_light_cache
+        clear_aes_access_light_cache()
+    except Exception:
+        pass
+
+
 @pytest.fixture(scope='function')
 def runner(app):
     """Create test CLI runner."""

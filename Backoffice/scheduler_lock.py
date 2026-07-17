@@ -5,7 +5,9 @@ package) so the Gunicorn master process can import it from the hooks in
 ``config/gunicorn.conf.py`` without executing ``app/__init__`` (Flask,
 SQLAlchemy, config) — the master never serves requests and should stay
 light. Application code imports the same objects through the
-``app.scheduler_lock`` compatibility shim.
+``app.scheduler_lock`` compatibility shim. Besides the lock itself it hosts
+the worker-teardown helpers used by the hooks: bounded scheduler shutdown
+and the lingering-thread hard-exit escape hatch.
 
 Locking strategy
 ----------------
@@ -583,3 +585,91 @@ def shutdown_worker_scheduler(
         )
         _flush_logging_and_stdio()
         os._exit(0)
+
+
+# ---------------------------------------------------------------------------
+# Worker exit: interpreter-shutdown hang escape hatch
+# ---------------------------------------------------------------------------
+
+# How long a graceful worker exit waits for remaining non-daemon threads to
+# finish on their own before abandoning interpreter finalization. Idle gthread
+# pool threads exit within milliseconds of the pool shutdown; anything still
+# alive after this grace period is wedged for good (typically a pool thread
+# pinned by a live WebSocket connection, blocked in ws.receive(), plus
+# simple_websocket's own non-daemon reader thread per connection).
+WORKER_EXIT_THREAD_JOIN_GRACE_SECONDS = 1.0
+
+
+def lingering_nondaemon_threads(
+    grace_seconds: float = WORKER_EXIT_THREAD_JOIN_GRACE_SECONDS,
+) -> list[threading.Thread]:
+    """Join other non-daemon threads for at most ``grace_seconds`` total.
+
+    Returns the survivors — exactly the threads ``threading._shutdown()``
+    (and ``concurrent.futures``' registered atexit join) would then wait on
+    *without* a timeout during interpreter finalization.
+    """
+    current = threading.current_thread()
+    candidates = [
+        t for t in threading.enumerate()
+        if t is not current and t is not threading.main_thread()
+        and t.is_alive() and not t.daemon
+    ]
+    deadline = _time.monotonic() + max(0.0, grace_seconds)
+    for t in candidates:
+        remaining = deadline - _time.monotonic()
+        if remaining <= 0:
+            break
+        try:
+            t.join(remaining)
+        except Exception:
+            pass
+    return [t for t in candidates if t.is_alive()]
+
+
+def hard_exit_if_lingering_threads(
+    worker_pid: int,
+    *,
+    grace_seconds: float = WORKER_EXIT_THREAD_JOIN_GRACE_SECONDS,
+    exit_code: int = 0,
+    log_fn: Optional[Callable[[str], None]] = None,
+) -> bool:
+    """``os._exit`` a finished worker whose interpreter shutdown would hang.
+
+    Called at the very end of the Gunicorn ``worker_exit``/``worker_abort``
+    hooks, after all teardown. gthread's ThreadPoolExecutor threads are
+    non-daemon (Python 3.9+), and a thread pinned by a live WebSocket
+    connection never finishes: ``threading._shutdown()`` joins it forever,
+    the worker stops heartbeating, and the master SIGKILLs it after
+    GUNICORN_TIMEOUT — the recurring post-incident ``WORKER TIMEOUT`` +
+    "Perhaps out of memory?" pattern on recycles of workers holding
+    notification WebSockets. Exiting via ``os._exit`` merely skips that
+    doomed finalization: the pinned connections die with the process either
+    way (clients auto-reconnect to a fresh worker), and the master replaces
+    the worker immediately instead of after the timeout.
+
+    No-op returning False in the master's reap path (``worker_pid`` is not
+    this process) and when every non-daemon thread finishes within
+    ``grace_seconds``. Returns True only in tests where ``os._exit`` is
+    mocked.
+    """
+    if os.getpid() != worker_pid:
+        return False
+    lingering = lingering_nondaemon_threads(grace_seconds)
+    if not lingering:
+        return False
+
+    _log = log_fn or (lambda msg: logger.info(msg))
+    names = ', '.join(t.name for t in lingering[:8])
+    if len(lingering) > 8:
+        names += f', +{len(lingering) - 8} more'
+    _log(
+        f"[WORKER_EXIT] pid={worker_pid} hard exit (os._exit({exit_code})):"
+        f" {len(lingering)} non-daemon thread(s) still alive after"
+        f" {grace_seconds:.1f}s grace ({names}) — interpreter shutdown would"
+        f" join them unboundedly and the master would SIGKILL this worker"
+        f" after WORKER TIMEOUT"
+    )
+    _flush_logging_and_stdio()
+    os._exit(exit_code)
+    return True

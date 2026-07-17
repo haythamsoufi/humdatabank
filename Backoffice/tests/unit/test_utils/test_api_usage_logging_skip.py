@@ -17,6 +17,7 @@ from app.utils.api_usage_logging_skip import should_skip_api_usage_path
         ("/api/preferences", "GET", True),
         ("/api/v1/matrix/auto-load-entities", "POST", True),
         ("/api/forms/assignment/1641/completion-rate", "GET", True),
+        ("/api/forms/assignment/1641/entry-bootstrap", "GET", True),
         ("/api/forms/dynamic-indicators/21/render", "GET", True),
         ("/api/forms/dynamic-indicators/render-pending", "GET", True),
         ("/api/forms/lookup-lists/emergency_operations/options", "GET", True),

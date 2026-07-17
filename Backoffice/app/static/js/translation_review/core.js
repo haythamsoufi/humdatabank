@@ -224,7 +224,7 @@
     /* ── Toggle (no page reload) ──────────────────────────────────────────── */
 
     async function postToggle() {
-        const response = await fetch(config.urls.toggle, {
+        const data = await window.apiFetch(config.urls.toggle, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -234,8 +234,7 @@
             body: JSON.stringify({}),
             credentials: 'same-origin',
         });
-        const data = await response.json();
-        if (!response.ok || !data || data.success === false)
+        if (!data || data.success === false)
             throw new Error((data && (data.message || data.error)) || 'Toggle failed');
         setReviewMode(data.active);
     }
@@ -337,8 +336,7 @@
         const msgidB64 = btoa(unescape(encodeURIComponent(msgid)));
         const url = `${config.urls.getString}?msgid_b64=${encodeURIComponent(msgidB64)}&locale=${encodeURIComponent(config.locale)}`;
 
-        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
-            .then((r) => r.json())
+        window.apiFetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
             .then((data) => {
                 if (!data || data.success === false)
                     throw new Error((data && data.message) || 'Failed to load translation');
@@ -360,7 +358,7 @@
         const translation = serializeEditor();
         if (saveBtn) saveBtn.disabled = true;
         try {
-            const response = await fetch(config.urls.saveString, {
+            const data = await window.apiFetch(config.urls.saveString, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -370,8 +368,7 @@
                 credentials: 'same-origin',
                 body: JSON.stringify({ msgid: currentMsgid, locale: config.locale, translation }),
             });
-            const data = await response.json();
-            if (!response.ok || !data || data.success === false)
+            if (!data || data.success === false)
                 throw new Error((data && (data.message || data.error)) || 'Save failed');
 
             // Patch every DOM occurrence of this string — no reload needed

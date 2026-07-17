@@ -1046,7 +1046,7 @@ export function initIndicatorBankWizard(config) {
         updateStepUi();
 
         try {
-            const response = await fetch(config.urls.createTemplate, {
+            const payload = await window.apiFetch(config.urls.createTemplate, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1068,9 +1068,7 @@ export function initIndicatorBankWizard(config) {
                     },
                 }),
             });
-
-            const payload = await response.json();
-            if (!response.ok || payload.success === false) {
+            if (payload.success === false) {
                 throw new Error(payload.message || payload.error || labels.createFailed);
             }
 

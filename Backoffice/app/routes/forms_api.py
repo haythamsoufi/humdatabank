@@ -41,7 +41,10 @@ from app.services.presence_store import (
 )
 from sqlalchemy import select
 
-from app.models import AssignmentEntityStatus, AssignedForm, FormTemplate
+from app.models import (
+    AssignmentEntityStatus, AssignedForm, FormTemplate, FormTemplateVersion,
+    FormItem, FormData,
+)
 from app.services import check_aes_access_light, check_country_access, ensure_aes_access
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.request_utils import get_json_or_form, is_json_request
@@ -1044,6 +1047,290 @@ def api_assignment_completion_rate(aes_id):
         return response
     except Exception as e:
         return handle_json_view_exception(e, 'Failed to compute completion rate', status_code=500)
+
+
+def _matrix_uses_auto_load(matrix_item):
+    """Cheap config-only check (no DB/service calls) for whether a matrix FormItem
+    is configured for auto-load. Lets callers skip the heavier per-matrix resolution
+    work entirely when no matrix on the template actually needs it."""
+    cfg = matrix_item.config if isinstance(matrix_item.config, dict) else {}
+    mc = cfg.get('matrix_config') if isinstance(cfg.get('matrix_config'), dict) else cfg
+    return bool(mc and mc.get('auto_load_entities') and mc.get('row_mode') == 'list_library')
+
+
+def _entry_bootstrap_matrix_candidates(aes, matrix_item, variable_configs, assignment_level_resolved):
+    """Collect auto-load entity candidates for one matrix FormItem (or None if unused).
+
+    Forward-lookup ("same"/"any"/"specific") entities are already tick-filtered
+    server-side by `_resolve_auto_load_entities_inner`. Reverse-lookup
+    ("entities_containing") entities still need a tick-column check, but that check
+    is deferred to the caller: this returns `tick_var_names` (non-empty only when a
+    reverse tick filter is still needed) instead of resolving it here, so
+    `api_assignment_entry_bootstrap` can run ONE batch `resolve_variables_batch` across
+    every matrix's candidates plus already-saved rows instead of one batch call per matrix.
+
+    `assignment_level_resolved` is the assignment-level `resolve_variables` result,
+    computed once by the caller and shared across all matrices (previously each matrix
+    with a reverse variable re-computed this independently).
+    """
+    from app.routes.api.assignments import _resolve_auto_load_entities_inner
+    from app.services.variable_resolution_service import VariableResolutionService
+
+    cfg = matrix_item.config if isinstance(matrix_item.config, dict) else {}
+    mc = cfg.get('matrix_config') if isinstance(cfg.get('matrix_config'), dict) else cfg
+    if not mc or not mc.get('auto_load_entities'):
+        return None
+    if mc.get('row_mode') != 'list_library':
+        return None
+
+    columns = mc.get('columns') or []
+    variable_columns = [c for c in columns if isinstance(c, dict) and c.get('is_variable')]
+    if not variable_columns or not variable_configs:
+        return None
+
+    tick_column_names = []
+    tick_var_names_all = []
+    for col in variable_columns:
+        if (col.get('type') or col.get('column_type') or '').lower() != 'tick':
+            continue
+        vname = col.get('variable') or col.get('variable_name')
+        vcfg = variable_configs.get(vname) if vname else None
+        if isinstance(vcfg, dict) and vcfg.get('matrix_column_name'):
+            tick_column_names.append(vcfg['matrix_column_name'])
+        else:
+            tick_column_names.append(col.get('name') or '')
+        if vname:
+            tick_var_names_all.append(vname)
+
+    entity_map = {}
+    entity_type = None
+    has_reverse = False
+
+    for col in variable_columns:
+        vname = col.get('variable') or col.get('variable_name')
+        if not vname:
+            continue
+        vcfg = variable_configs.get(vname)
+        if not isinstance(vcfg, dict):
+            continue
+        scope = (vcfg.get('entity_scope') or 'same').strip()
+        if scope == 'entities_containing':
+            has_reverse = True
+            continue
+
+        source_template_id = vcfg.get('source_template_id')
+        source_period = vcfg.get('source_assignment_period')
+        source_form_item_id = vcfg.get('source_form_item_id')
+        if not source_template_id or not source_period or not source_form_item_id:
+            continue
+
+        effective_period = VariableResolutionService._resolve_effective_period(
+            source_period, source_template_id, aes
+        ) or source_period
+
+        result = _resolve_auto_load_entities_inner(
+            aes.entity_id,
+            aes.entity_type,
+            int(source_template_id),
+            effective_period,
+            int(source_form_item_id),
+            require_tick_value_1=bool(tick_column_names),
+            tick_column_names=tick_column_names,
+        )
+        if result.get('entity_type') and not entity_type:
+            entity_type = result['entity_type']
+        for ent in result.get('entities') or []:
+            eid = ent.get('entity_id') if isinstance(ent, dict) else None
+            etype = (ent.get('entity_type') if isinstance(ent, dict) else None) or entity_type
+            if eid is not None and etype:
+                entity_map[int(eid)] = {'entity_id': int(eid), 'entity_type': etype}
+
+    tick_var_names = []
+    if has_reverse and assignment_level_resolved is not None:
+        # Reverse lookup: parse auto_load_format JSON blobs from the (already computed,
+        # shared) assignment-level resolve instead of resolving again per matrix.
+        for col in variable_columns:
+            vname = col.get('variable') or col.get('variable_name')
+            vcfg = variable_configs.get(vname) if vname else None
+            if not isinstance(vcfg, dict):
+                continue
+            if (vcfg.get('entity_scope') or '').strip() != 'entities_containing':
+                continue
+            raw = assignment_level_resolved.get(vname)
+            if not raw:
+                continue
+            try:
+                parsed = json.loads(raw) if isinstance(raw, str) else raw
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            if not isinstance(parsed, dict) or not isinstance(parsed.get('entities'), list):
+                continue
+            if parsed.get('entity_type') and not entity_type:
+                entity_type = parsed['entity_type']
+            for ent in parsed['entities']:
+                if not isinstance(ent, dict):
+                    continue
+                eid = ent.get('entity_id', ent.get('id'))
+                etype = ent.get('entity_type') or parsed.get('entity_type') or entity_type
+                if eid is not None and etype:
+                    entity_map[int(eid)] = {'entity_id': int(eid), 'entity_type': etype}
+
+        if entity_map and tick_var_names_all:
+            tick_var_names = tick_var_names_all
+
+    return {
+        'entity_map': entity_map,
+        'entity_type': entity_type,
+        'tick_var_names': tick_var_names,
+    }
+
+
+@bp.route('/assignment/<int:aes_id>/entry-bootstrap', methods=['GET'])
+@login_required
+def api_assignment_entry_bootstrap(aes_id):
+    """One-shot bootstrap for the entry form: completion rate + initial matrix auto-load
+    + variable resolve for known row entity ids.
+
+    Replaces separate load-time calls to completion-rate, auto-load-entities/batch, and
+    variables/resolve when the published template actually needs them. Interactive flows
+    (adding rows later) continue to use the individual endpoints.
+    """
+    try:
+        if not check_aes_access_light(aes_id):
+            return json_forbidden('Assignment not found or access denied')
+
+        row = db.session.execute(
+            select(
+                AssignmentEntityStatus,
+                FormTemplate.id,
+                FormTemplate.published_version_id,
+            )
+            .join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+            .join(FormTemplate, AssignedForm.template_id == FormTemplate.id)
+            .where(AssignmentEntityStatus.id == aes_id)
+        ).first()
+        if not row:
+            return json_not_found('Assignment form not found')
+
+        aes, template_id, published_version_id = row
+        if not published_version_id:
+            return json_ok(completion_rate=0.0, auto_load={}, resolved_variables={})
+
+        from app.services.assignment_completion_service import AssignmentCompletionService
+        from app.services.variable_resolution_service import VariableResolutionService
+
+        metrics = AssignmentCompletionService.compute_for_assignment(
+            aes_id, template_id, published_version_id
+        )
+        completion_rate = round(metrics.completion_rate, 1)
+
+        template_version = FormTemplateVersion.query.get(published_version_id)
+        variable_configs = (template_version.variables if template_version else None) or {}
+
+        matrices = FormItem.query.filter_by(
+            template_id=template_id,
+            version_id=published_version_id,
+            item_type='matrix',
+            archived=False,
+        ).all()
+        # Cheap config-only filter — skips all per-matrix resolution work below
+        # (including the assignment-level resolve it would otherwise trigger for
+        # reverse-lookup columns) when no matrix on this template uses auto-load.
+        auto_load_matrices = [item for item in matrices if _matrix_uses_auto_load(item)]
+
+        resolved_variables = {}
+        assignment_level_resolved = None
+        if template_version and variable_configs:
+            try:
+                # Computed once and shared: used for resolved_variables[''] below AND
+                # passed into every matrix's candidate collection so reverse-lookup
+                # ("entities_containing") columns don't each re-resolve it.
+                assignment_level_resolved = VariableResolutionService.resolve_variables(
+                    template_version, aes
+                )
+                resolved_variables[''] = assignment_level_resolved or {}
+                resolved_variables['assignment'] = assignment_level_resolved or {}
+            except Exception as e:
+                current_app.logger.debug('entry-bootstrap assignment resolve failed: %s', e)
+
+        auto_load = {}
+        pending_tick_filters = []  # [(form_item_id_str, candidates), ...]
+        row_entity_ids = set()
+
+        for item in auto_load_matrices:
+            try:
+                candidates = _entry_bootstrap_matrix_candidates(
+                    aes, item, variable_configs, assignment_level_resolved
+                )
+            except Exception as e:
+                current_app.logger.debug(
+                    'entry-bootstrap auto_load skipped for form_item %s: %s', item.id, e
+                )
+                candidates = None
+            if not candidates:
+                continue
+            if candidates['tick_var_names']:
+                # Needs a reverse+tick filter — deferred to the single batch resolve below.
+                pending_tick_filters.append((str(item.id), candidates))
+            else:
+                auto_load[str(item.id)] = {
+                    'entities': list(candidates['entity_map'].values()),
+                    'entity_type': candidates['entity_type'],
+                }
+            row_entity_ids.update(candidates['entity_map'].keys())
+
+        # Also include already-saved matrix row entity ids for variable resolve.
+        matrix_ids = [item.id for item in matrices]
+        if matrix_ids:
+            fd_rows = FormData.query.filter(
+                FormData.assignment_entity_status_id == aes_id,
+                FormData.form_item_id.in_(matrix_ids),
+            ).all()
+            for entry in fd_rows:
+                dd = entry.disagg_data or {}
+                for key in dd:
+                    if key == '_table' or '_' not in str(key):
+                        continue
+                    try:
+                        row_entity_ids.add(int(str(key).split('_')[0]))
+                    except (ValueError, TypeError):
+                        pass
+
+        # ONE batch resolve covers both the reverse+tick auto-load filter and
+        # resolved_variables for already-saved rows (previously: one batch call per
+        # reverse-lookup matrix, plus a second, separate assignment-wide batch call).
+        batch = {}
+        if template_version and row_entity_ids:
+            try:
+                batch = VariableResolutionService.resolve_variables_batch(
+                    template_version, aes, list(row_entity_ids)
+                ) or {}
+            except Exception as e:
+                current_app.logger.debug('entry-bootstrap batch resolve failed: %s', e)
+
+        for rid, vals in batch.items():
+            resolved_variables[str(rid)] = vals
+
+        for item_id_str, candidates in pending_tick_filters:
+            filtered = {}
+            for eid, ent in candidates['entity_map'].items():
+                vals = batch.get(eid) or batch.get(int(eid)) or {}
+                if any(vals.get(vn) in (1, '1', True) for vn in candidates['tick_var_names']):
+                    filtered[eid] = ent
+            auto_load[item_id_str] = {
+                'entities': list(filtered.values()),
+                'entity_type': candidates['entity_type'],
+            }
+
+        response = json_ok(
+            completion_rate=completion_rate,
+            auto_load=auto_load,
+            resolved_variables=resolved_variables,
+        )
+        response.headers['Cache-Control'] = 'private, max-age=30'
+        return response
+    except Exception as e:
+        return handle_json_view_exception(e, 'Failed to build entry bootstrap', status_code=500)
 
 
 # ===================== Presence (Live Users) APIs =====================

@@ -310,15 +310,18 @@ export function initExcelImportDropzone(root, options = {}) {
                 body: formData,
                 credentials: 'same-origin',
             });
-            const data = await response.json();
             if (!response.ok) {
-                renderValidationStatus({
-                    valid: false,
-                    message: data.message || labels.validationFailedLabel,
-                    errors: data.errors || [data.message || labels.validationFailedLabel],
-                });
+                let message = labels.validationFailedLabel || 'Validation failed';
+                let errors = [message];
+                if (window.parseHttpError) {
+                    const err = await window.parseHttpError(response);
+                    message = err.message || message;
+                    errors = [message];
+                }
+                renderValidationStatus({ valid: false, message, errors });
                 return;
             }
+            const data = await response.json();
             renderValidationStatus(data);
             if (data.valid && autoSubmitOnSelect && fileInput.form) {
                 if (fileInput.form.dataset.excelImportSubmitting === '1') {

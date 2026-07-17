@@ -591,6 +591,11 @@
     <script src="{{ static_url('js/lib/auto-translate-service.js') }}"></script>
     <script src="{{ static_url('js/components/status-labels.js') }}"></script>
     <script src="{{ static_url('js/components/assignment-status-pipeline.js') }}"></script>
+    {% if current_user.is_authenticated %}
+    <script nonce="{{ csp_nonce() }}">
+    window.NOTIFY_WS_ENABLED = {{ notify_websocket_enabled|default(true)|tojson }};
+    </script>
+    {% endif %}
     <script src="{{ static_url('js/core/components.js') }}"></script>
     <script src="{{ static_url('js/components/country-region-select.js') }}"></script>
     <script src="{{ static_url('js/components/thumbnail-upload.js') }}"></script>

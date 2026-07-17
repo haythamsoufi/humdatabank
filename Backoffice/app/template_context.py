@@ -339,6 +339,16 @@ def register_template_context(app, config_class):
             current_app.logger.debug("inject_docs_pdf_export_enabled failed: %s", e)
             return {"docs_pdf_export_enabled": False}
 
+    @app.context_processor
+    def inject_notifications_config():
+        """Expose WEBSOCKET_ENABLED so layout pages can skip GET /notifications/api/stream/status."""
+        try:
+            enabled = bool(current_app.config.get('WEBSOCKET_ENABLED', True))
+            return {'notify_websocket_enabled': enabled}
+        except Exception as e:
+            current_app.logger.debug("inject_notifications_config failed: %s", e)
+            return {'notify_websocket_enabled': True}
+
     app.jinja_env.globals['CHATBOT_ENABLED'] = app.config.get('CHATBOT_ENABLED', True)
     app.jinja_env.globals['TRANSLATION_REVIEW_ENABLED'] = app.config.get('TRANSLATION_REVIEW_ENABLED', True)
     app.jinja_env.globals['ASSET_VERSION'] = app.config.get('ASSET_VERSION')

@@ -584,6 +584,7 @@
             );
         }
 
+        AgGridHelper.normalizeCustomColDefProps(this.config.columnDefs);
         AgGridHelper.wrapActionsColumnRenderers(this.config.columnDefs);
 
         // Detect grid API
@@ -3137,7 +3138,7 @@
 
     /**
      * Resolve a cell value for CSV/Excel export.
-     * Prefers exportValueGetter, then valueGetter, then raw field data.
+     * Prefers context.exportValueGetter (or legacy exportValueGetter), then valueGetter, then raw field data.
      * @param {Object} col - Column descriptor with field / getters / colDef
      * @param {Object} node - AG Grid row node (or { data: row })
      * @returns {*}
@@ -3158,8 +3159,9 @@
             }
         };
 
-        if (typeof colDef.exportValueGetter === 'function') {
-            return colDef.exportValueGetter(params);
+        var exportProps = AgGridHelper.getColDefExportProps(colDef);
+        if (exportProps.exportValueGetter) {
+            return exportProps.exportValueGetter(params);
         }
         if (typeof col.exportValueGetter === 'function') {
             return col.exportValueGetter(params);
@@ -3215,7 +3217,10 @@
         }
 
         const exportCols = this.config.columnDefs
-            .filter(function(col) { return col.field && (col.hide !== true || col.exportAlways === true); });
+            .filter(function(col) {
+                var exportProps = AgGridHelper.getColDefExportProps(col);
+                return col.field && (col.hide !== true || exportProps.exportAlways);
+            });
         const headers = exportCols.map(function(col) { return col.headerName || col.field; });
 
         const rows = selectedRows.map(function(row) {
@@ -3264,16 +3269,18 @@
                         if (!field || field === 'ag-Grid-SelectionColumn' || field === 'ag-Grid-AutoColumn') {
                             return false;
                         }
+                        var exportProps = AgGridHelper.getColDefExportProps(def);
                         // Include visible columns, plus any marked exportAlways (even if hidden)
-                        return visible || def.exportAlways === true;
+                        return visible || exportProps.exportAlways;
                     })
                     .map(function(col) {
                         var def = col.getColDef ? col.getColDef() : (col.colDef || {});
+                        var exportProps = AgGridHelper.getColDefExportProps(def);
                         return {
                             field: def.field || (col.getColId ? col.getColId() : col.colId),
                             headerName: def.headerName || def.field || (col.getColId ? col.getColId() : col.colId),
                             valueGetter: def.valueGetter,
-                            exportValueGetter: def.exportValueGetter,
+                            exportValueGetter: exportProps.exportValueGetter,
                             colDef: def,
                             column: col
                         };
@@ -3284,14 +3291,16 @@
             var columnDefs = this.config.columnDefs || [];
             visibleCols = columnDefs
                 .filter(function(col) {
-                    return col.field && (col.hide !== true || col.exportAlways === true);
+                    var exportProps = AgGridHelper.getColDefExportProps(col);
+                    return col.field && (col.hide !== true || exportProps.exportAlways);
                 })
                 .map(function(col) {
+                    var exportProps = AgGridHelper.getColDefExportProps(col);
                     return {
                         field: col.field,
                         headerName: col.headerName || col.field,
                         valueGetter: col.valueGetter,
-                        exportValueGetter: col.exportValueGetter,
+                        exportValueGetter: exportProps.exportValueGetter,
                         colDef: col,
                         column: null
                     };
@@ -4312,6 +4321,54 @@
                 // Non-fatal
             }
         }
+    };
+
+    /**
+     * Move app-specific colDef keys into colDef.context so AG Grid v31+ validation stays quiet.
+     * @param {Array} columnDefs
+     * @returns {Array}
+     */
+    AgGridHelper.normalizeCustomColDefProps = function(columnDefs) {
+        if (!Array.isArray(columnDefs)) {
+            return columnDefs;
+        }
+        columnDefs.forEach(function(def) {
+            if (!def || typeof def !== 'object') {
+                return;
+            }
+            if (def.children && def.children.length) {
+                AgGridHelper.normalizeCustomColDefProps(def.children);
+            }
+            var ctx = def.context;
+            if (!ctx || typeof ctx !== 'object') {
+                ctx = {};
+                def.context = ctx;
+            }
+            if (typeof def.exportValueGetter === 'function') {
+                ctx.exportValueGetter = def.exportValueGetter;
+                delete def.exportValueGetter;
+            }
+            if (def.exportAlways === true) {
+                ctx.exportAlways = true;
+                delete def.exportAlways;
+            }
+        });
+        return columnDefs;
+    };
+
+    /**
+     * Read export helpers stored on colDef.context (or legacy top-level props).
+     * @param {Object} colDef
+     * @returns {{exportValueGetter: Function|null, exportAlways: boolean}}
+     */
+    AgGridHelper.getColDefExportProps = function(colDef) {
+        var ctx = (colDef && colDef.context) || {};
+        return {
+            exportValueGetter: typeof ctx.exportValueGetter === 'function'
+                ? ctx.exportValueGetter
+                : (colDef && typeof colDef.exportValueGetter === 'function' ? colDef.exportValueGetter : null),
+            exportAlways: ctx.exportAlways === true || (colDef && colDef.exportAlways === true)
+        };
     };
 
     /**

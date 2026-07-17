@@ -743,13 +743,17 @@
                 }
             });
 
-            const data = await response.json();
-            if (response.ok && data.success) {
-                showSuccess(i18n.success_plugin_uninstalled.replace('%(plugin)s', pluginToUninstall));
-                await loadPlugins();
+            if (!response.ok) {
+                const err = window.parseHttpError ? await window.parseHttpError(response) : new Error('HTTP ' + response.status);
+                showError(err.message || i18n.error_failed_uninstall);
             } else {
-                const errorMessage = data.error || i18n.error_failed_uninstall;
-                showError(errorMessage);
+                const data = await response.json();
+                if (data.success) {
+                    showSuccess(i18n.success_plugin_uninstalled.replace('%(plugin)s', pluginToUninstall));
+                    await loadPlugins();
+                } else {
+                    showError(data.error || i18n.error_failed_uninstall);
+                }
             }
         } catch (error) {
             console.error('Error uninstalling plugin:', error);

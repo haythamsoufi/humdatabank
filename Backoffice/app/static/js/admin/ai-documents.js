@@ -3046,17 +3046,10 @@ function updateIfrcSelectedCount() {
 
 async function fetchIfrcImportJobStatus(jobId) {
     const cacheBust = Date.now();
-    const response = await ((window.getFetch && window.getFetch()) || fetch)(`/api/ai/documents/ifrc-api/import-bulk/${encodeURIComponent(jobId)}/status?_=${cacheBust}`, {
-        method: 'GET',
+    return window.apiFetch(`/api/ai/documents/ifrc-api/import-bulk/${encodeURIComponent(jobId)}/status?_=${cacheBust}`, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'same-origin'
     });
-    const data = await response.json();
-    if (!response.ok) {
-        const msg = (data && data.error) ? String(data.error) : `HTTP ${response.status}`;
-        throw new Error(msg);
-    }
-    return data;
 }
 
 function stopIfrcImportJobPolling() {
@@ -3164,18 +3157,11 @@ function resumeIfrcImportJobIfAny() {
 
 async function fetchBulkReprocessJobStatus(jobId) {
     const cacheBust = Date.now();
-    const response = await ((window.getFetch && window.getFetch()) || fetch)(`/admin/ai/documents/bulk-reprocess/${encodeURIComponent(jobId)}/status?_=${cacheBust}`, {
-        method: 'GET',
+    return window.apiFetch(`/admin/ai/documents/bulk-reprocess/${encodeURIComponent(jobId)}/status?_=${cacheBust}`, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'same-origin',
         cache: 'no-store'
     });
-    const data = await response.json();
-    if (!response.ok) {
-        const msg = (data && data.error) ? String(data.error) : `HTTP ${response.status}`;
-        throw new Error(msg);
-    }
-    return data;
 }
 
 function stopBulkReprocessJobPolling() {

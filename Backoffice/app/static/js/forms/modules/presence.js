@@ -24,7 +24,6 @@
 
   let isExpanded = false;
   let isWarningDismissed = false;
-  let lastUserIds = '';
   let lastRenderedIds = '';
   // Counts consecutive sync failures; resets on success or tab focus.
   let syncErrorCount = 0;
@@ -35,14 +34,33 @@
   // Must match PRESENCE_TTL_SECONDS in presence_store.py (120 s).
   const PRESENCE_TTL_MS    = 120 * 1000;
   const SYNC_BASE_MS       = 30000;
+  // Slower cadence while nobody else is editing (the common case). A joining
+  // co-editor is still discovered within one idle tick, well inside the TTL.
+  const SYNC_IDLE_MS       = 60000;
   const MAX_BACKOFF_MS     = 5 * 60 * 1000;
   // Sync backoff cap: base + backoff + max-jitter (2 s) must stay under TTL.
   const SYNC_BACKOFF_CAP_MS = PRESENCE_TTL_MS - SYNC_BASE_MS - 5000;
   const MAX_SYNC_ERRORS_BEFORE_HIDE = 3;
 
+  // Cross-tab dedupe: one "leader" tab per assignment does the network syncs
+  // and shares results over a BroadcastChannel; sibling tabs just render them.
+  // The lease must exceed the slowest cadence (SYNC_IDLE_MS + jitter) so a
+  // live leader is never usurped between two broadcasts.
+  const LEASE_MS = SYNC_IDLE_MS + 10000;
+  const SIBLING_FRESH_MS = LEASE_MS + 5000;
+  // A user re-appearing within this window (e.g. a brief server-side presence
+  // flicker) does not re-trigger the warning or the auto-expand.
+  const NEW_USER_MEMORY_MS = 10 * 60 * 1000;
+  const TAB_ID = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+
   let syncTimer = null;
   let stopped = false;
   let syncBackoffMs = 0;
+  let lastHadUsers = false;
+  let leaderId = null;                 // tabId currently doing network syncs (may be self)
+  let leaderSeenAt = 0;                // last time a foreign leader broadcast USERS
+  const siblings = new Map();          // tabId -> last message timestamp
+  const recentlySeenUsers = new Map(); // userId -> last rendered timestamp
 
   function getInitials(name) {
     if (!name) return '?';
@@ -160,50 +178,46 @@
   function renderUsers(users) {
     const list = users || [];
     const currentUserIds = list.map(u => String(u.id)).sort().join(',');
-    const usersChanged = currentUserIds !== lastUserIds;
-
-    // Skip DOM rebuild when the visible user set is unchanged.
-    if (currentUserIds === lastRenderedIds) {
-      const hasOtherUsers = list.length > 0;
-      if (usersChanged && lastUserIds !== '') {
-        isWarningDismissed = false;
-      }
-      if (hasOtherUsers && usersChanged) {
-        expandByDefault();
-      }
-      if (!hasOtherUsers) {
-        clearAutoCollapseTimer();
-        if (isExpanded) {
-          setExpanded(false);
-        }
-      }
-      lastUserIds = currentUserIds;
-      showOrHideBar(list.length > 0);
-      showOrHideWarning(list.length > 0);
-      return;
-    }
-
-    if (usersContainer) {
-      usersContainer.replaceChildren();
-      list.forEach((u, index) => {
-        usersContainer.appendChild(buildCollapsedAvatar(u, index));
-      });
-    }
-
-    if (usersListEl) {
-      usersListEl.replaceChildren();
-      list.forEach(u => {
-        usersListEl.appendChild(buildExpandedRow(u));
-      });
-    }
-
     const hasOtherUsers = list.length > 0;
 
-    if (usersChanged && lastUserIds !== '') {
-      isWarningDismissed = false;
+    // "New" = not rendered within NEW_USER_MEMORY_MS. A user briefly dropping
+    // out of one poll and returning on the next (server-side flicker) must not
+    // re-trigger the dismissed warning or the auto-expand.
+    const now = Date.now();
+    let hasNewUser = false;
+    list.forEach(u => {
+      const seenAt = recentlySeenUsers.get(u.id);
+      if (seenAt === undefined || (now - seenAt) > NEW_USER_MEMORY_MS) {
+        hasNewUser = true;
+      }
+      recentlySeenUsers.set(u.id, now);
+    });
+    recentlySeenUsers.forEach((seenAt, id) => {
+      if (now - seenAt > NEW_USER_MEMORY_MS * 2) recentlySeenUsers.delete(id);
+    });
+    lastHadUsers = hasOtherUsers;
+
+    // Skip DOM rebuild when the visible user set is unchanged.
+    if (currentUserIds !== lastRenderedIds) {
+      if (usersContainer) {
+        usersContainer.replaceChildren();
+        list.forEach((u, index) => {
+          usersContainer.appendChild(buildCollapsedAvatar(u, index));
+        });
+      }
+
+      if (usersListEl) {
+        usersListEl.replaceChildren();
+        list.forEach(u => {
+          usersListEl.appendChild(buildExpandedRow(u));
+        });
+      }
+
+      lastRenderedIds = currentUserIds;
     }
 
-    if (hasOtherUsers && usersChanged) {
+    if (hasNewUser) {
+      isWarningDismissed = false;
       expandByDefault();
     }
 
@@ -213,9 +227,6 @@
         setExpanded(false);
       }
     }
-
-    lastUserIds = currentUserIds;
-    lastRenderedIds = currentUserIds;
 
     showOrHideBar(hasOtherUsers);
     showOrHideWarning(hasOtherUsers);
@@ -252,8 +263,68 @@
     return 60;
   }
 
+  function nextBaseMs() {
+    return lastHadUsers ? SYNC_BASE_MS : SYNC_IDLE_MS;
+  }
+
+  // ── Cross-tab coordination ────────────────────────────────────────────────
+  let bc = null;
+  try {
+    bc = (typeof BroadcastChannel !== 'undefined')
+      ? new BroadcastChannel('ifrc-presence-' + aesId)
+      : null;
+  } catch (_) { bc = null; }
+
+  function bcPost(msg) {
+    if (!bc) return;
+    try { bc.postMessage(Object.assign({ tabId: TAB_ID }, msg)); } catch (_) {}
+  }
+
+  function hasFreshForeignLease() {
+    return !!(bc && leaderId && leaderId !== TAB_ID && (Date.now() - leaderSeenAt) < LEASE_MS);
+  }
+
+  function scheduleTakeover() {
+    // Small random delay so multiple follower tabs don't all poll at once.
+    if (syncTimer) clearTimeout(syncTimer);
+    syncTimer = setTimeout(sync, 500 + Math.floor(Math.random() * 2500));
+  }
+
+  if (bc) {
+    bc.onmessage = (ev) => {
+      const msg = ev && ev.data;
+      if (!msg || !msg.tabId || msg.tabId === TAB_ID) return;
+      siblings.set(msg.tabId, Date.now());
+      if (msg.type === 'USERS') {
+        // Foreign leader claim. If both tabs believe they lead (e.g. they
+        // started simultaneously), the lower tabId wins and the other yields.
+        if (leaderId !== TAB_ID || msg.tabId < TAB_ID) {
+          leaderId = msg.tabId;
+          leaderSeenAt = Date.now();
+          renderUsers(Array.isArray(msg.users) ? msg.users : []);
+          bcPost({ type: 'FOLLOW' });
+        }
+      } else if (msg.type === 'BYE' || msg.type === 'ABDICATE') {
+        if (msg.type === 'BYE') siblings.delete(msg.tabId);
+        if (leaderId === msg.tabId) {
+          leaderId = null;
+          leaderSeenAt = 0;
+          if (!stopped && document.visibilityState === 'visible') scheduleTakeover();
+        }
+      }
+      // HELLO / FOLLOW need no handling beyond the sibling refresh above.
+    };
+    bcPost({ type: 'HELLO' });
+  }
+
   async function sync() {
     if (stopped || document.visibilityState !== 'visible') return;
+    if (hasFreshForeignLease()) {
+      // Another tab of this browser is polling for this assignment; its
+      // results arrive over the BroadcastChannel.
+      scheduleNext(sync, nextBaseMs(), 0);
+      return;
+    }
     try {
       const fetchFn = (window.getFetch && window.getFetch()) || fetch;
       const csrfToken = (window.getCSRFToken && window.getCSRFToken()) || CSRF_TOKEN;
@@ -300,6 +371,8 @@
       syncErrorCount = 0;
       syncBackoffMs = 0;
       renderUsers(users);
+      leaderId = TAB_ID;
+      bcPost({ type: 'USERS', users: users });
     } catch (e) {
       syncErrorCount++;
       if (syncErrorCount >= MAX_SYNC_ERRORS_BEFORE_HIDE) {
@@ -307,7 +380,7 @@
         showOrHideWarning(false);
       }
     }
-    scheduleNext(sync, SYNC_BASE_MS, syncBackoffMs);
+    scheduleNext(sync, nextBaseMs(), syncBackoffMs);
   }
 
   function sendLeaveBeacon() {
@@ -358,11 +431,28 @@
     if (document.visibilityState === 'visible') {
       start();
     } else {
+      // A hidden tab stops polling, so hand leadership over right away —
+      // otherwise a visible sibling would wait out the full lease first.
+      if (leaderId === TAB_ID) {
+        leaderId = null;
+        bcPost({ type: 'ABDICATE' });
+      }
       stop();
     }
   });
 
-  window.addEventListener('pagehide', sendLeaveBeacon);
+  window.addEventListener('pagehide', () => {
+    bcPost({ type: 'BYE' });
+    // Skip the leave beacon when another tab of this browser still has the
+    // same assignment open — it keeps the user's presence alive, and removing
+    // it here would make the user flicker for other editors.
+    const now = Date.now();
+    let hasFreshSibling = false;
+    siblings.forEach((ts) => {
+      if (now - ts < SIBLING_FRESH_MS) hasFreshSibling = true;
+    });
+    if (!hasFreshSibling) sendLeaveBeacon();
+  });
 
   start();
 })();

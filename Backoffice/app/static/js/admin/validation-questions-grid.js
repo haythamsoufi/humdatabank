@@ -249,7 +249,7 @@
         var templateId = document.getElementById('vqs-template')?.value;
         var country = getSelectedSummaryCountry();
         if (!templateId || !country) return;
-        var resp = await fetch(config.sendUrl, {
+        await window.apiFetch(config.sendUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf, Accept: 'application/json' },
             credentials: 'same-origin',
@@ -260,8 +260,6 @@
                 channels: ['in_app', 'email'],
             }),
         });
-        var data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || t.sendFailed || 'Send failed');
         showFeedback(t.sendSuccess || 'Validation questions sent to focal points.', 'success');
     }
 
@@ -409,13 +407,11 @@
     async function loadRows() {
         try {
             var listUrl = config.listUrl + (config.listUrl.indexOf('?') >= 0 ? '&' : '?') + '_=' + Date.now();
-            var resp = await fetch(listUrl, {
+            var data = await window.apiFetch(listUrl, {
                 headers: { Accept: 'application/json' },
                 credentials: 'same-origin',
                 cache: 'no-store',
             });
-            var data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || t.loadFailed);
             var rows = (data.rows || []).map(normalizeListRow);
             indexRowStore(rows);
             if (data.truncated) {
@@ -446,11 +442,10 @@
         }
         periodEl.disabled = true;
         try {
-            var resp = await fetch(config.periodsUrl + '?template_id=' + encodeURIComponent(templateId), {
+            var data = await window.apiFetch(config.periodsUrl + '?template_id=' + encodeURIComponent(templateId), {
                 headers: { Accept: 'application/json' },
                 credentials: 'same-origin',
             });
-            var data = await resp.json();
             var periods = data.periods || [];
             periodEl.innerHTML = '<option value="">' + esc('Choose period') + '</option>' +
                 periods.map(function (p) { return '<option value="' + esc(p) + '">' + esc(p) + '</option>'; }).join('');
@@ -470,9 +465,7 @@
         var preferredCountryId = document.getElementById('vqs-country')?.value || null;
         try {
             var url = config.countriesUrl + '?template_id=' + encodeURIComponent(templateId) + '&period=' + encodeURIComponent(period);
-            var resp = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-            var data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || t.summaryFailed);
+            var data = await window.apiFetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
             var rows = data.countries || [];
             if (summaryApi) {
                 summaryApi.setGridOption('rowData', rows);
@@ -489,14 +482,12 @@
 
     async function updateStatus(id, status) {
         var url = (config.statusUrlTemplate || '').replace('{id}', id);
-        var resp = await fetch(url, {
+        await window.apiFetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf, Accept: 'application/json' },
             credentials: 'same-origin',
             body: JSON.stringify({ status: status }),
         });
-        var data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || 'Update failed');
         showFeedback(t.updated || 'Status updated', 'success');
         await loadRows();
     }
@@ -574,7 +565,7 @@
         if (saveBtn) saveBtn.disabled = true;
         try {
             var url = (config.followUpUrlTemplate || '').replace('{id}', parentId);
-            var resp = await fetch(url, {
+            await window.apiFetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf, Accept: 'application/json' },
                 credentials: 'same-origin',
@@ -583,8 +574,6 @@
                     definition_text: definitionText,
                 }),
             });
-            var data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || t.followUpFailed || 'Follow-up failed');
             followUpModalCtrl.closeModal();
             showFeedback(t.followUpCreated || 'Follow-up question created.', 'success');
             await loadRows();
@@ -649,7 +638,7 @@
 
         try {
             var url = (config.updateUrlTemplate || '').replace('{id}', id);
-            var resp = await fetch(url, {
+            await window.apiFetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf, Accept: 'application/json' },
                 credentials: 'same-origin',
@@ -662,8 +651,6 @@
                     answer_outcome: answerOutcome || null,
                 }),
             });
-            var data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || t.saveFailed || 'Save failed');
             editModalCtrl.closeModal();
             editingRow = null;
             showFeedback(t.questionSaved || 'Question saved', 'success');
@@ -778,9 +765,7 @@
                     formData.append('excel_file', file);
                     formData.append('csrf_token', csrf);
                     try {
-                        var resp = await fetch(config.importUrl, { method: 'POST', body: formData, credentials: 'same-origin', headers: { Accept: 'application/json' } });
-                        var data = await resp.json();
-                        if (!resp.ok) throw new Error(data.error || t.importFailed);
+                        var data = await window.apiFetch(config.importUrl, { method: 'POST', body: formData, credentials: 'same-origin', headers: { Accept: 'application/json' } });
                         var msg = 'Import complete — updated: ' + (data.updated || 0);
                         if (data.errors && data.errors.length) {
                             msg += ' (' + data.errors.length + ' row(s) with errors: ' +

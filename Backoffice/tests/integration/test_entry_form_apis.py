@@ -8,6 +8,7 @@ from app.models import (
     AssignedForm,
     AssignmentEntityStatus,
     DynamicIndicatorData,
+    FormItem,
     FormSection,
     IndicatorBank,
     LookupList,
@@ -640,3 +641,301 @@ class TestEntryFormFormsApiPresenceActiveUsers:
             assert isinstance(data["users"], list)
             assert len(data["users"]) == 1
             assert data["users"][0]["id"] == user.id
+
+
+@pytest.mark.integration
+class TestEntryFormFormsApiEntryBootstrap:
+    """Covers /api/forms/assignment/<id>/entry-bootstrap (see 2026-07-17 handover:
+    'defer page-load requests'). Focuses on the behaviors that were reviewed/fixed:
+    auth/access gating, the no-published-version short circuit, skipping matrices
+    that are not configured for auto-load, and — most importantly — that the
+    per-matrix auto-load + variable-resolve work is deduplicated into a single
+    assignment-level resolve and a single batch resolve regardless of how many
+    matrices/columns are involved (HIGH #3 fix in forms_api.py).
+    """
+
+    def _make_assignment(self, db_session, template=None):
+        country = create_test_country(db_session)
+        template = template or create_test_template(db_session)
+        assigned_form = AssignedForm(template_id=template.id, period_name="2024")
+        db_session.add(assigned_form)
+        db_session.flush()
+        aes = AssignmentEntityStatus(
+            assigned_form_id=assigned_form.id,
+            entity_type=EntityType.country.value,
+            entity_id=country.id,
+            status="in_progress",
+        )
+        db_session.add(aes)
+        db_session.flush()
+        db_session.commit()
+        return template, aes
+
+    def test_requires_login(self, client, db_session, app):
+        with app.app_context():
+            _, aes = self._make_assignment(db_session)
+            resp = client.get(f"/api/forms/assignment/{aes.id}/entry-bootstrap")
+            assert resp.status_code in (302, 401)
+
+    def test_unknown_assignment_returns_403(self, client, db_session, app):
+        # check_aes_access_light() runs before the not-found lookup and returns False
+        # for a nonexistent id, so this — like an access-denied case — surfaces as 403
+        # rather than 404 (avoids revealing whether the id exists to unauthorized/absent
+        # records).
+        with app.app_context():
+            user = create_test_user(db_session, role="admin")
+            _login(client, user.id)
+            resp = client.get("/api/forms/assignment/999999999/entry-bootstrap")
+            assert resp.status_code == 403
+
+    def test_forbidden_without_entity_access(self, client, db_session, app):
+        with app.app_context():
+            _, aes = self._make_assignment(db_session)
+            aes_id = aes.id
+            # No entity permissions granted; a plain non-admin user must be denied.
+            user = create_test_user(db_session, role="user")
+            _login(client, user.id)
+            resp = client.get(f"/api/forms/assignment/{aes_id}/entry-bootstrap")
+            assert resp.status_code == 403
+
+    def test_no_published_version_returns_zeroed_defaults(self, client, db_session, app):
+        with app.app_context():
+            user = create_test_user(db_session, role="admin")
+            _login(client, user.id)
+
+            template = create_test_template(db_session, status="draft")
+            template.published_version_id = None
+            db_session.commit()
+
+            _, aes = self._make_assignment(db_session, template=template)
+
+            resp = client.get(f"/api/forms/assignment/{aes.id}/entry-bootstrap")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["success"] is True
+            assert data["completion_rate"] == 0.0
+            assert data["auto_load"] == {}
+            assert data["resolved_variables"] == {}
+
+    def test_happy_path_no_matrices(self, client, db_session, app):
+        with app.app_context():
+            user = create_test_user(db_session, role="admin")
+            _login(client, user.id)
+
+            _, aes = self._make_assignment(db_session)
+
+            resp = client.get(f"/api/forms/assignment/{aes.id}/entry-bootstrap")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["success"] is True
+            assert data["completion_rate"] == 0.0
+            assert data["auto_load"] == {}
+            assert data["resolved_variables"] == {}
+
+    def test_matrix_without_auto_load_config_is_skipped(self, client, db_session, app):
+        """A matrix FormItem that isn't configured for auto-load must contribute
+        nothing to `auto_load` and must not trigger any variable-resolution calls
+        (the cheap `_matrix_uses_auto_load` pre-filter added in the HIGH #3 fix)."""
+        with app.app_context():
+            user = create_test_user(db_session, role="admin")
+            _login(client, user.id)
+
+            template, aes = self._make_assignment(db_session)
+            section = FormSection(
+                template_id=template.id,
+                version_id=template.published_version_id,
+                name="Matrix Section",
+                order=1,
+            )
+            db_session.add(section)
+            db_session.flush()
+            db_session.add(FormItem(
+                section_id=section.id,
+                version_id=template.published_version_id,
+                template_id=template.id,
+                item_type='matrix',
+                label='No auto-load',
+                order=1,
+                config={'matrix_config': {'auto_load_entities': False, 'row_mode': 'list_library'}},
+            ))
+            db_session.commit()
+
+            with patch(
+                "app.services.variable_resolution_service.VariableResolutionService.resolve_variables"
+            ) as mock_resolve:
+                resp = client.get(f"/api/forms/assignment/{aes.id}/entry-bootstrap")
+
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["auto_load"] == {}
+            # No variable_configs on this template either, so resolve_variables should
+            # never even be attempted — belt-and-suspenders confirmation of the skip.
+            mock_resolve.assert_not_called()
+
+    def test_forward_lookup_auto_load_populates_entities(self, client, db_session, app):
+        """A forward-lookup ('same') matrix column should surface entities returned
+        by `_resolve_auto_load_entities_inner` under `auto_load[<form_item_id>]`."""
+        with app.app_context():
+            user = create_test_user(db_session, role="admin")
+            _login(client, user.id)
+
+            template, aes = self._make_assignment(db_session)
+            version_id = template.published_version_id
+
+            from app.models import FormTemplateVersion
+            version = db_session.get(FormTemplateVersion, version_id)
+            version.variables = {
+                'my_var': {
+                    'entity_scope': 'same',
+                    'source_template_id': 999,
+                    'source_assignment_period': '2024',
+                    'source_form_item_id': 111,
+                }
+            }
+            db_session.commit()
+
+            section = FormSection(
+                template_id=template.id,
+                version_id=version_id,
+                name="Matrix Section",
+                order=1,
+            )
+            db_session.add(section)
+            db_session.flush()
+            matrix_item = FormItem(
+                section_id=section.id,
+                version_id=version_id,
+                template_id=template.id,
+                item_type='matrix',
+                label='Auto-load matrix',
+                order=1,
+                config={
+                    'matrix_config': {
+                        'auto_load_entities': True,
+                        'row_mode': 'list_library',
+                        'columns': [
+                            {'name': 'my_col', 'is_variable': True, 'variable': 'my_var', 'type': 'text'},
+                        ],
+                    }
+                },
+            )
+            db_session.add(matrix_item)
+            db_session.commit()
+            matrix_item_id = matrix_item.id
+
+            fake_result = {
+                'entities': [{'entity_id': 42, 'entity_type': 'country'}],
+                'entity_type': 'country',
+            }
+            with patch(
+                "app.routes.api.assignments._resolve_auto_load_entities_inner",
+                return_value=fake_result,
+            ) as mock_inner:
+                resp = client.get(f"/api/forms/assignment/{aes.id}/entry-bootstrap")
+
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert str(matrix_item_id) in data["auto_load"]
+            assert data["auto_load"][str(matrix_item_id)]["entities"] == [
+                {'entity_id': 42, 'entity_type': 'country'}
+            ]
+            assert data["auto_load"][str(matrix_item_id)]["entity_type"] == 'country'
+            # Forward-lookup entities are already tick-filtered server-side inside
+            # _resolve_auto_load_entities_inner (called once here for the one column).
+            assert mock_inner.call_count == 1
+
+    def test_reverse_lookup_and_saved_rows_share_one_batch_resolve(self, client, db_session, app):
+        """Reverse-lookup ('entities_containing') tick filtering and resolved_variables
+        for already-saved matrix rows must be served by exactly ONE
+        `resolve_variables_batch` call (HIGH #3: previously one batch call per
+        reverse-lookup matrix, plus a second, separate call for saved rows)."""
+        with app.app_context():
+            user = create_test_user(db_session, role="admin")
+            _login(client, user.id)
+
+            template, aes = self._make_assignment(db_session)
+            version_id = template.published_version_id
+
+            from app.models import FormTemplateVersion
+            version = db_session.get(FormTemplateVersion, version_id)
+            version.variables = {
+                'rev_var': {
+                    'entity_scope': 'entities_containing',
+                }
+            }
+            db_session.commit()
+
+            section = FormSection(
+                template_id=template.id,
+                version_id=version_id,
+                name="Matrix Section",
+                order=1,
+            )
+            db_session.add(section)
+            db_session.flush()
+            matrix_item = FormItem(
+                section_id=section.id,
+                version_id=version_id,
+                template_id=template.id,
+                item_type='matrix',
+                label='Reverse auto-load matrix',
+                order=1,
+                config={
+                    'matrix_config': {
+                        'auto_load_entities': True,
+                        'row_mode': 'list_library',
+                        'columns': [
+                            {
+                                'name': 'tick_col', 'is_variable': True, 'variable': 'rev_var',
+                                'type': 'tick',
+                            },
+                        ],
+                    }
+                },
+            )
+            db_session.add(matrix_item)
+            db_session.commit()
+            matrix_item_id = matrix_item.id
+
+            # Assignment-level resolve returns the auto_load_format JSON blob for the
+            # reverse variable, listing two candidate entities.
+            assignment_level_resolved = {
+                'rev_var': json.dumps({
+                    'entity_type': 'country',
+                    'entities': [
+                        {'entity_id': 7, 'entity_type': 'country'},
+                        {'entity_id': 8, 'entity_type': 'country'},
+                    ],
+                }),
+            }
+            # Only entity 7 has the tick column set — entity 8 must be filtered out.
+            batch_resolve_result = {
+                7: {'rev_var': 1},
+                8: {'rev_var': 0},
+            }
+
+            with patch(
+                "app.services.variable_resolution_service.VariableResolutionService.resolve_variables",
+                return_value=assignment_level_resolved,
+            ) as mock_resolve, patch(
+                "app.services.variable_resolution_service.VariableResolutionService.resolve_variables_batch",
+                return_value=batch_resolve_result,
+            ) as mock_batch:
+                resp = client.get(f"/api/forms/assignment/{aes.id}/entry-bootstrap")
+
+            assert resp.status_code == 200
+            data = resp.get_json()
+
+            assert data["auto_load"][str(matrix_item_id)]["entities"] == [
+                {'entity_id': 7, 'entity_type': 'country'}
+            ]
+            assert data["resolved_variables"]["7"] == {'rev_var': 1}
+            assert data["resolved_variables"]["8"] == {'rev_var': 0}
+
+            # Deduplication: exactly one assignment-level resolve (shared for the
+            # reverse-lookup parse AND resolved_variables['']), and exactly one batch
+            # resolve (covering both the reverse+tick filter and saved-row resolve).
+            assert mock_resolve.call_count == 1
+            assert mock_batch.call_count == 1
+            batch_call_entity_ids = set(mock_batch.call_args.args[2])
+            assert batch_call_entity_ids == {7, 8}

@@ -561,6 +561,18 @@ class WorkflowTourParser {
     }
 
     /**
+     * Remove #chatbot-tour=... from the URL without navigating.
+     * Prevents sticky failed hashes from re-fetching the tour API on every refresh.
+     */
+    _clearChatbotTourHash() {
+        try {
+            const hash = window.location.hash || '';
+            if (!/chatbot-tour=/i.test(hash)) return;
+            window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+        } catch (_) { /* ignore */ }
+    }
+
+    /**
      * Check URL for tour hash on page load.
      * If a tour hash is present but the tour isn't registered,
      * fetch and register it dynamically.
@@ -598,6 +610,8 @@ class WorkflowTourParser {
                         }, 100);
                     } else {
                         this._warn(`[WorkflowTourParser] Failed to register tour: ${workflowId}`);
+                        // Clear sticky #chatbot-tour= so every refresh does not re-hit the API.
+                        this._clearChatbotTourHash();
                     }
                 } else {
                     this._log(`[WorkflowTourParser] Tour "${workflowId}" already registered, starting...`);
@@ -610,6 +624,7 @@ class WorkflowTourParser {
                 }
             } else {
                 this._warn(`[WorkflowTourParser] InteractiveTour not available or no registeredTours`);
+                this._clearChatbotTourHash();
             }
         } else {
             this._log(`[WorkflowTourParser] No tour hash found in URL`);

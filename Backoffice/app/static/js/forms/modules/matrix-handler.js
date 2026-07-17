@@ -2413,33 +2413,64 @@ class MatrixHandler {
 
         try {
             const rowEntityIds = rowsToResolve.map(r => r.entityId);
-            requestBody.row_entity_ids = rowEntityIds;
 
-            // Call batch API
-            const response = await _mhFetch('/api/v1/variables/resolve', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': this.getCsrfToken()
-                },
-                body: JSON.stringify(requestBody)
-            });
+            // Prefer entry-bootstrap resolved_variables when it covers every row.
+            let batchResults = null;
+            try {
+                if (window.__entryBootstrapPromise) {
+                    await window.__entryBootstrapPromise;
+                }
+                const bootResolved = window.__entryBootstrap && window.__entryBootstrap.resolved_variables;
+                if (bootResolved && typeof bootResolved === 'object') {
+                    const fromBoot = {};
+                    let allCovered = true;
+                    for (const eid of rowEntityIds) {
+                        const vals = bootResolved[String(eid)] || bootResolved[eid];
+                        if (!vals || typeof vals !== 'object') {
+                            allCovered = false;
+                            break;
+                        }
+                        fromBoot[eid] = vals;
+                    }
+                    if (allCovered) {
+                        batchResults = fromBoot;
+                        debugLog('matrix-handler', '[BATCH VARIABLE RESOLUTION] Using entry-bootstrap resolved_variables', {
+                            fieldId,
+                            rowCount: rowEntityIds.length,
+                        });
+                    }
+                }
+            } catch (_) { /* fall through to API */ }
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                debugError('matrix-handler', '[BATCH VARIABLE RESOLUTION] API error', {
-                    status: response.status,
-                    errorText
+            if (!batchResults) {
+                requestBody.row_entity_ids = rowEntityIds;
+
+                // Call batch API
+                const response = await _mhFetch('/api/v1/variables/resolve', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCsrfToken()
+                    },
+                    body: JSON.stringify(requestBody)
                 });
-                throw (window.httpErrorSync && window.httpErrorSync(response, `API error: ${response.status} ${response.statusText} - ${errorText}`)) || new Error(`API error: ${response.status} ${response.statusText} - ${errorText}`);
-            }
 
-            const data = await response.json();
-            const batchResults = data.results || {};
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    debugError('matrix-handler', '[BATCH VARIABLE RESOLUTION] API error', {
+                        status: response.status,
+                        errorText
+                    });
+                    throw (window.httpErrorSync && window.httpErrorSync(response, `API error: ${response.status} ${response.statusText} - ${errorText}`)) || new Error(`API error: ${response.status} ${response.statusText} - ${errorText}`);
+                }
+
+                const data = await response.json();
+                batchResults = data.results || {};
+            }
 
             // Process results for each row
             rowsToResolve.forEach(rowInfo => {
-                const resolvedVariables = batchResults[rowInfo.entityId] || {};
+                const resolvedVariables = batchResults[rowInfo.entityId] || batchResults[String(rowInfo.entityId)] || {};
                 this._applyResolvedVariablesToRow(fieldId, rowInfo.rowId, rowInfo.rowElement, rowInfo.variableInputs, resolvedVariables);
             });
 
@@ -4095,9 +4126,33 @@ class MatrixHandler {
 
         let entities = [];
         let entityType = null;
+        // True only when `entities`/`entityType` above were populated from entry-bootstrap.
+        // Using this (rather than entities.length === 0) is required so that a bootstrap
+        // entry with a genuinely empty entities array is NOT treated as "bootstrap had
+        // nothing" and re-fetched via the legacy per-endpoint APIs below.
+        let usedBootstrap = false;
+
+        // Prefer entry-bootstrap auto_load (one round-trip with completion-rate) when available.
+        try {
+            if (window.__entryBootstrapPromise) {
+                await window.__entryBootstrapPromise;
+            }
+            const bootPayload = window.__entryBootstrap
+                && window.__entryBootstrap.auto_load
+                && window.__entryBootstrap.auto_load[String(fieldId)];
+            if (bootPayload && Array.isArray(bootPayload.entities)) {
+                entities = bootPayload.entities;
+                entityType = bootPayload.entity_type || null;
+                usedBootstrap = true;
+                debugLog('matrix-handler', `[AUTO-LOAD] Using entry-bootstrap entities for field ${fieldId}`, {
+                    count: entities.length,
+                    entityType,
+                });
+            }
+        } catch (_) { /* fall through to per-endpoint path */ }
 
         try {
-            if (isReverseLookup) {
+            if (!usedBootstrap && isReverseLookup) {
                 // For reverse lookup (entities_containing), use variable resolution once and collect entities from ALL variable columns
                 debugLog('matrix-handler', '[AUTO-LOAD] Using reverse lookup via variable resolution (all variable columns)');
 
@@ -4153,7 +4208,7 @@ class MatrixHandler {
 
                 entities = Array.from(entityMapById.values());
                 debugLog('matrix-handler', `[AUTO-LOAD] Merged ${entities.length} unique entities from ${variableConfigsByColumn.length} variable column(s)`);
-            } else {
+            } else if (!usedBootstrap) {
                 // For forward lookup (same, any, specific), collect all sub-requests and
                 // send a single batch call instead of one call per variable column.
                 // This reduces N HTTP round-trips to 1, cutting thread-slot consumption
@@ -4224,46 +4279,54 @@ class MatrixHandler {
             }
 
             // Filter entities: only include those with at least one tick variable column = 1
+            // Skip when entities came from entry-bootstrap (already filtered server-side for forward
+            // and reverse+tick — see _entry_bootstrap_matrix_candidates in forms_api.py). `usedBootstrap` reflects
+            // whether `entities` currently holds bootstrap data specifically, not just whether a
+            // bootstrap entry existed, so a legacy-fetch fallback is always re-filtered here.
 
             // For forward lookup, backend already filters entities by tick columns
             // For reverse lookup, we need to filter in the frontend
-            if (tickVariableColumns.length > 0 && isReverseLookup) {
+            if (!usedBootstrap && tickVariableColumns.length > 0 && isReverseLookup) {
                 debugLog('matrix-handler', `[AUTO-LOAD] Filtering entities by tick columns (reverse lookup): ${tickVariableColumns.length} tick variable columns found`);
 
-                // Filter entities based on tick column values using variable resolution
-                const filteredEntities = [];
+                // One batched resolve for all candidate entities (was N sequential POSTs).
                 const originalCount = entities.length;
+                const rowEntityIds = entities
+                    .map(ent => ent.entity_id)
+                    .filter(id => id != null);
 
-                for (const entity of entities) {
-                    // For reverse lookup, resolve variable for this entity to check if it's ticked
-                    // The variable resolution will return 1 if ticked, 0 if not
-                    let hasTickedBox = false;
+                let resultsByEntityId = {};
+                try {
+                    const resolveResponse = await _mhFetch('/api/v1/variables/resolve', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(_mkVarsBody({
+                            template_id: templateId,
+                            row_entity_ids: rowEntityIds
+                        }))
+                    });
 
-                    try {
-                        const resolveResponse = await _mhFetch('/api/v1/variables/resolve', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify(_mkVarsBody({
-                                template_id: templateId,
-                                row_entity_id: entity.entity_id
-                            }))
-                        });
-
-                        if (resolveResponse.ok) {
-                            const resolveData = await resolveResponse.json();
-                            const resolvedVariables = resolveData.variables || {};
-                            // Entity is included if ANY variable column is ticked for this entity
-                            hasTickedBox = variableConfigsByColumn.some(({ variableName: vn }) => {
-                                const v = resolvedVariables[vn];
-                                return v === 1 || v === '1' || v === true;
-                            });
-                        }
-                    } catch (error) {
-                        debugError('matrix-handler', `[AUTO-LOAD] Error checking tick status for entity ${entity.entity_id}:`, error);
+                    if (resolveResponse.ok) {
+                        const resolveData = await resolveResponse.json();
+                        resultsByEntityId = resolveData.results || {};
+                    } else {
+                        debugWarn('matrix-handler', `[AUTO-LOAD] Batch tick resolve failed: ${resolveResponse.status}`);
                     }
+                } catch (error) {
+                    debugError('matrix-handler', '[AUTO-LOAD] Error batch-checking tick status for entities:', error);
+                }
 
+                const filteredEntities = [];
+                for (const entity of entities) {
+                    const resolvedVariables = resultsByEntityId[String(entity.entity_id)]
+                        || resultsByEntityId[entity.entity_id]
+                        || {};
+                    const hasTickedBox = variableConfigsByColumn.some(({ variableName: vn }) => {
+                        const v = resolvedVariables[vn];
+                        return v === 1 || v === '1' || v === true;
+                    });
                     if (hasTickedBox) {
                         filteredEntities.push(entity);
                     } else {
@@ -4272,7 +4335,7 @@ class MatrixHandler {
                 }
 
                 entities = filteredEntities;
-                debugLog('matrix-handler', `[AUTO-LOAD] Filtered entities: ${entities.length} entities have at least one ticked box (from ${originalCount} total)`);
+                debugLog('matrix-handler', `[AUTO-LOAD] Filtered entities: ${entities.length} entities have at least one ticked box (from ${originalCount} total, 1 batch resolve)`);
             } else if (tickVariableColumns.length > 0 && !isReverseLookup) {
                 debugLog('matrix-handler', `[AUTO-LOAD] Forward lookup - backend will filter entities by tick columns`);
             } else {

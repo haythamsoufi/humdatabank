@@ -54,6 +54,12 @@ def should_skip_api_usage_path(path: str | None, method: str | None = None) -> b
     if path.startswith("/api/forms/assignment/") and path.endswith("/completion-rate"):
         return True
 
+    # Entry-form bootstrap (completion rate + auto-load + resolved variables in one
+    # call) — same UI-plumbing role as completion-rate above, fired on every entry
+    # form page load.
+    if path.startswith("/api/forms/assignment/") and path.endswith("/entry-bootstrap"):
+        return True
+
     if path == "/api/ai/v2/token":
         return True
 

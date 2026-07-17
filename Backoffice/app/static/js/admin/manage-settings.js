@@ -1944,9 +1944,7 @@
       },
       body: bodyStr
     }).then(function (resp) {
-      return resp.json().then(function (payload) {
-        return { ok: resp.ok, status: resp.status, payload: payload };
-      });
+      return window.responseAsResult(resp);
     }).then(function (result) {
       _debugEmailSettingsApi('template-var-preview response', { ok: result.ok, status: result.status, payload: result.payload });
       var p = result.payload || {};
@@ -2640,7 +2638,7 @@
         },
         body: testBodyStr
       }).then(function (resp) {
-        return resp.json().then(function (payload) { return { ok: resp.ok, status: resp.status, payload: payload }; });
+        return window.responseAsResult(resp);
       }).then(function (result) {
         var p = result.payload || {};
         _debugEmailSettingsApi('test-send response', {
@@ -2792,9 +2790,7 @@
         headers: headers,
         body: JSON.stringify({ force: !!force })
       }).then(function (resp) {
-        return resp.json().then(function (payload) {
-          return { ok: resp.ok, status: resp.status, payload: payload || {} };
-        });
+        return window.responseAsResult(resp);
       }).then(function (r) {
         _debugEmailSettingsApi('seed response', { ok: r.ok, status: r.status, success: r.payload && r.payload.success, payload: r.payload || {} });
         setBusy(false);
@@ -2880,9 +2876,7 @@
         },
         body: JSON.stringify({ force: !!force })
       }).then(function (resp) {
-        return resp.json().then(function (payload) {
-          return { ok: resp.ok, status: resp.status, payload: payload || {} };
-        });
+        return window.responseAsResult(resp);
       }).then(function (r) {
         setBusy(false);
         if (r.ok && r.payload && r.payload.success) {

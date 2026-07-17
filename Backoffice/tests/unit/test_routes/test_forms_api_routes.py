@@ -1154,3 +1154,177 @@ class TestPresenceRateLimitKey:
                 mock_user.is_authenticated = False
                 key = _presence_rate_limit_key()
         assert "presence_ip" in key
+
+
+# =====================================================================
+# Entry-bootstrap helpers: _matrix_uses_auto_load, _entry_bootstrap_matrix_candidates
+# (see docs/handovers/2026-07-17-defer-page-load-requests.md HIGH #3 — dedup/gate
+# per-matrix auto-load + variable-resolve work in the /entry-bootstrap endpoint)
+# =====================================================================
+
+
+class TestMatrixUsesAutoLoad:
+    def _item(self, config):
+        item = MagicMock()
+        item.config = config
+        return item
+
+    def test_true_for_qualifying_matrix(self):
+        from app.routes.forms_api import _matrix_uses_auto_load
+
+        item = self._item({'matrix_config': {'auto_load_entities': True, 'row_mode': 'list_library'}})
+        assert _matrix_uses_auto_load(item) is True
+
+    def test_false_when_auto_load_entities_disabled(self):
+        from app.routes.forms_api import _matrix_uses_auto_load
+
+        item = self._item({'matrix_config': {'auto_load_entities': False, 'row_mode': 'list_library'}})
+        assert _matrix_uses_auto_load(item) is False
+
+    def test_false_when_row_mode_is_not_list_library(self):
+        from app.routes.forms_api import _matrix_uses_auto_load
+
+        item = self._item({'matrix_config': {'auto_load_entities': True, 'row_mode': 'manual'}})
+        assert _matrix_uses_auto_load(item) is False
+
+    def test_false_when_config_missing(self):
+        from app.routes.forms_api import _matrix_uses_auto_load
+
+        assert _matrix_uses_auto_load(self._item(None)) is False
+        assert _matrix_uses_auto_load(self._item({})) is False
+
+    def test_config_flattened_at_top_level_also_supported(self):
+        # matrix_config may be inlined directly on `config` rather than nested.
+        from app.routes.forms_api import _matrix_uses_auto_load
+
+        item = self._item({'auto_load_entities': True, 'row_mode': 'list_library'})
+        assert _matrix_uses_auto_load(item) is True
+
+
+class TestEntryBootstrapMatrixCandidates:
+    def _item(self, columns, auto_load_entities=True, row_mode='list_library'):
+        item = MagicMock()
+        item.config = {
+            'matrix_config': {
+                'auto_load_entities': auto_load_entities,
+                'row_mode': row_mode,
+                'columns': columns,
+            }
+        }
+        return item
+
+    def test_returns_none_when_matrix_not_configured_for_auto_load(self):
+        from app.routes.forms_api import _entry_bootstrap_matrix_candidates
+
+        item = self._item(columns=[], auto_load_entities=False)
+        result = _entry_bootstrap_matrix_candidates(
+            aes=MagicMock(), matrix_item=item, variable_configs={}, assignment_level_resolved=None
+        )
+        assert result is None
+
+    def test_returns_none_when_no_variable_columns(self):
+        from app.routes.forms_api import _entry_bootstrap_matrix_candidates
+
+        item = self._item(columns=[{'name': 'plain_col', 'is_variable': False}])
+        result = _entry_bootstrap_matrix_candidates(
+            aes=MagicMock(), matrix_item=item, variable_configs={'x': {}}, assignment_level_resolved=None
+        )
+        assert result is None
+
+    def test_forward_lookup_collects_entities_without_tick_filter(self):
+        """Forward lookup ('same'/'any'/'specific') is already tick-filtered
+        server-side by _resolve_auto_load_entities_inner, so tick_var_names must stay
+        empty — that's what lets the caller skip the batch-resolve tick filter for it."""
+        from app.routes.forms_api import _entry_bootstrap_matrix_candidates
+
+        item = self._item(columns=[
+            {'name': 'col_a', 'is_variable': True, 'variable': 'my_var', 'type': 'text'},
+        ])
+        variable_configs = {
+            'my_var': {
+                'entity_scope': 'same',
+                'source_template_id': 10,
+                'source_assignment_period': '2024',
+                'source_form_item_id': 20,
+            }
+        }
+        aes = MagicMock()
+        aes.entity_id = 1
+        aes.entity_type = 'country'
+
+        fake_result = {'entities': [{'entity_id': 5, 'entity_type': 'country'}], 'entity_type': 'country'}
+        with patch(
+            "app.routes.api.assignments._resolve_auto_load_entities_inner", return_value=fake_result
+        ) as mock_inner, patch(
+            "app.services.variable_resolution_service.VariableResolutionService._resolve_effective_period",
+            return_value='2024',
+        ):
+            result = _entry_bootstrap_matrix_candidates(
+                aes=aes, matrix_item=item, variable_configs=variable_configs,
+                assignment_level_resolved=None,
+            )
+
+        assert result is not None
+        assert result['entity_map'] == {5: {'entity_id': 5, 'entity_type': 'country'}}
+        assert result['entity_type'] == 'country'
+        assert result['tick_var_names'] == []
+        assert mock_inner.call_count == 1
+
+    def test_reverse_lookup_defers_tick_filter_to_caller(self):
+        """Reverse lookup ('entities_containing') must return unfiltered candidates
+        plus the tick variable names — filtering itself is deferred to a single
+        shared batch resolve in the caller (api_assignment_entry_bootstrap), not
+        done here per-matrix."""
+        from app.routes.forms_api import _entry_bootstrap_matrix_candidates
+
+        item = self._item(columns=[
+            {'name': 'tick_col', 'is_variable': True, 'variable': 'rev_var', 'type': 'tick'},
+        ])
+        variable_configs = {
+            'rev_var': {'entity_scope': 'entities_containing'},
+        }
+        assignment_level_resolved = {
+            'rev_var': json.dumps({
+                'entity_type': 'country',
+                'entities': [
+                    {'entity_id': 7, 'entity_type': 'country'},
+                    {'entity_id': 8, 'entity_type': 'country'},
+                ],
+            }),
+        }
+
+        result = _entry_bootstrap_matrix_candidates(
+            aes=MagicMock(), matrix_item=item, variable_configs=variable_configs,
+            assignment_level_resolved=assignment_level_resolved,
+        )
+
+        assert result is not None
+        assert set(result['entity_map'].keys()) == {7, 8}
+        assert result['entity_type'] == 'country'
+        # Non-empty tick_var_names signals "filter me" to the caller.
+        assert result['tick_var_names'] == ['rev_var']
+
+    def test_reverse_lookup_without_assignment_level_resolved_skips_reverse_parse(self):
+        """If the caller hasn't computed assignment_level_resolved yet (e.g. no
+        variable_configs at all — which can't happen for this matrix specifically,
+        but is defensively handled), the reverse branch must be skipped rather than
+        resolving again itself (that would defeat the HIGH #3 dedup)."""
+        from app.routes.forms_api import _entry_bootstrap_matrix_candidates
+
+        item = self._item(columns=[
+            {'name': 'tick_col', 'is_variable': True, 'variable': 'rev_var', 'type': 'tick'},
+        ])
+        variable_configs = {'rev_var': {'entity_scope': 'entities_containing'}}
+
+        with patch(
+            "app.services.variable_resolution_service.VariableResolutionService.resolve_variables"
+        ) as mock_resolve:
+            result = _entry_bootstrap_matrix_candidates(
+                aes=MagicMock(), matrix_item=item, variable_configs=variable_configs,
+                assignment_level_resolved=None,
+            )
+
+        mock_resolve.assert_not_called()
+        assert result is not None
+        assert result['entity_map'] == {}
+        assert result['tick_var_names'] == []

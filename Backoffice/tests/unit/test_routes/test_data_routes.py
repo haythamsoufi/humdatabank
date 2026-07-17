@@ -624,6 +624,9 @@ class TestGetDataDynamicFields:
         assert 'arrays' in body
         assert 'data' in body['arrays']
         assert 'description' in body['arrays']['data']
+        assert 'assignment_statuses' in body
+        assert isinstance(body['assignment_statuses'], list)
+        assert 'assignment_statuses' in body['arrays']
         assert self.REQUIRED_DYNAMIC_KEYS.issubset(body['dynamic_data'][0].keys())
 
 
@@ -778,3 +781,26 @@ class TestDataHelpers:
         })
         assert include_dynamic is True
         assert include_repeat is True
+
+    def test_collect_assigned_submission_ids(self, app):
+        from app.routes.api.data import _collect_assigned_submission_ids
+        ids = _collect_assigned_submission_ids(
+            [
+                {'submission_type': 'assigned', 'submission_id': 3},
+                {'submission_type': 'public', 'submission_id': 9},
+                {'submission_type': 'assigned', 'submission_id': '1'},
+                {'submission_type': 'assigned', 'submission_id': 3},
+            ],
+            [{'submission_type': 'assigned', 'submission_id': 2}],
+        )
+        assert ids == [1, 2, 3]
+
+    def test_load_assignment_statuses_table_empty(self, app):
+        from app.routes.api.data import _load_assignment_statuses_table
+        assert _load_assignment_statuses_table([]) == []
+
+    def test_build_data_array_catalog_includes_assignment_statuses(self, app):
+        from app.routes.api.data import _build_data_array_catalog
+        catalog = _build_data_array_catalog(include_dynamic=True, include_repeat=False)
+        assert catalog['assignment_statuses']['included'] is True
+        assert 'status' in catalog['assignment_statuses']['key_fields']

@@ -26,6 +26,7 @@ from app.utils.api_serialization import (
     format_country_info,
     format_form_item_info,
     format_national_society_info,
+    format_dim_submission_assigned,
     build_star_schema_tables,
     build_matrix_cells_from_data_rows,
     enrich_matrix_cells,
@@ -166,6 +167,19 @@ _DATA_ARRAY_CATALOG = {
             'matrix.entity.id', 'matrix.entity.name',
         ],
     },
+    'assignment_statuses': {
+        'title': 'Assignment entity status dimension',
+        'description': (
+            'Workflow status rows for assigned submissions (AssignmentEntityStatus). '
+            'Join via submission_id on data[] / dynamic_data[] / repeat_data[] when '
+            'submission_type is assigned. Equivalent to dim_submission (assigned) in layout=star.'
+        ),
+        'grain': 'assignment_entity_status',
+        'key_fields': [
+            'id', 'type', 'status', 'entity_type', 'entity_id',
+            'submitted_at', 'due_date', 'assigned_form_id',
+        ],
+    },
 }
 
 
@@ -178,6 +192,7 @@ def _build_data_array_catalog(*, include_dynamic: bool, include_repeat: bool) ->
         'national_societies': {**_DATA_ARRAY_CATALOG['national_societies'], 'included': True},
         'indicator_bank': {**_DATA_ARRAY_CATALOG['indicator_bank'], 'included': True},
         'matrix_cells': {**_DATA_ARRAY_CATALOG['matrix_cells'], 'included': True},
+        'assignment_statuses': {**_DATA_ARRAY_CATALOG['assignment_statuses'], 'included': True},
     }
     if include_dynamic:
         catalog['dynamic_data'] = {**_DATA_ARRAY_CATALOG['dynamic_data'], 'included': True}
@@ -192,6 +207,43 @@ def _merge_scope_into_response(response_data, scope_meta):
     if scope_meta:
         response_data['scope'] = scope_meta
     return response_data
+
+
+def _collect_assigned_submission_ids(*row_lists) -> list:
+    """Return sorted unique AssignmentEntityStatus ids from fact row dicts."""
+    ids = set()
+    for rows in row_lists:
+        for row in rows or []:
+            if not isinstance(row, dict):
+                continue
+            if str(row.get('submission_type') or '').strip().lower() != 'assigned':
+                continue
+            sid = row.get('submission_id')
+            if sid is None or str(sid).strip() == '':
+                continue
+            try:
+                ids.add(int(sid))
+            except (TypeError, ValueError):
+                continue
+    return sorted(ids)
+
+
+def _load_assignment_statuses_table(aes_ids) -> list:
+    """Serialize AssignmentEntityStatus rows for the flat /data dimension array."""
+    if not aes_ids:
+        return []
+    aes_rows = query_filter_in_batches(
+        AssignmentEntityStatus.query,
+        AssignmentEntityStatus.id,
+        list(aes_ids),
+    )
+    table = [
+        format_dim_submission_assigned(aes)
+        for aes in aes_rows
+        if aes
+    ]
+    table.sort(key=lambda row: row.get('id') or 0)
+    return table
 
 
 def _assemble_flat_data_payload(
@@ -209,6 +261,7 @@ def _assemble_flat_data_payload(
     dynamic_data=None,
     repeat_data=None,
     dynamic_context=None,
+    assignment_statuses=None,
     warning=None,
     partial=None,
     scope_meta=None,
@@ -240,6 +293,9 @@ def _assemble_flat_data_payload(
     payload['countries'] = countries_table
     payload['national_societies'] = national_societies_table
     payload['indicator_bank'] = indicator_bank_table
+    payload['assignment_statuses'] = (
+        assignment_statuses if assignment_statuses is not None else []
+    )
     if warning:
         payload['warning'] = warning
     if partial:
@@ -619,6 +675,7 @@ def _build_flat_data_response(
     per_page,
     expansion_failed=False,
     extra=None,
+    assignment_statuses=None,
     scope_meta=None,
     array_catalog=None,
 ):
@@ -658,6 +715,7 @@ def _build_flat_data_response(
         dynamic_data=dynamic_data,
         repeat_data=repeat_data,
         dynamic_context=dynamic_context,
+        assignment_statuses=assignment_statuses,
         warning=warning,
         partial=partial,
         scope_meta=scope_meta,
@@ -743,8 +801,8 @@ def get_all_data():
     API endpoint to retrieve submission data with related dimension tables.
 
     Returns fact arrays (``data``, ``dynamic_data``, ``repeat_data``, ``dynamic_context``,
-    ``matrix_cells``) plus full dimension tables (``form_items``, ``countries``,
-    ``national_societies``, ``indicator_bank``).
+    ``matrix_cells``) plus dimension tables (``form_items``, ``countries``,
+    ``national_societies``, ``indicator_bank``, ``assignment_statuses``).
 
     Authentication (one of):
       - Authorization: Bearer YOUR_API_KEY (full access, paginated response)
@@ -1029,6 +1087,7 @@ def get_all_data():
                                 national_societies_table=_national_societies,
                                 indicator_bank_table=_indicator_bank,
                                 matrix_cells=[],
+                                assignment_statuses=[],
                                 total_items=0,
                                 total_pages=None,
                                 current_page=None,
@@ -1085,6 +1144,7 @@ def get_all_data():
                                 national_societies_table=_national_societies,
                                 indicator_bank_table=_indicator_bank,
                                 matrix_cells=[],
+                                assignment_statuses=[],
                                 total_items=0,
                                 total_pages=None,
                                 current_page=None,
@@ -1562,6 +1622,13 @@ def get_all_data():
                 array_catalog=array_catalog,
             )
 
+        assignment_statuses_table = _load_assignment_statuses_table(
+            _collect_assigned_submission_ids(
+                data_rows,
+                extended.get('dynamic_data'),
+                extended.get('repeat_data'),
+            )
+        )
         return _build_flat_data_response(
             data_rows,
             form_items_table,
@@ -1575,6 +1642,7 @@ def get_all_data():
             per_page=per_page,
             expansion_failed=expansion_failed,
             extra=extra_keys or None,
+            assignment_statuses=assignment_statuses_table,
             scope_meta=scope_meta,
             array_catalog=array_catalog,
         )

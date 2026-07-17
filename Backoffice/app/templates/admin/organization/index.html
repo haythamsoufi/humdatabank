@@ -711,52 +711,9 @@ try {
         {% endfor %}
     ];
 
-    // List of available categories (each becomes a column)
-    let availableCategories = [];
-
-    // Load categories list on page load
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            loadCategoriesList();
-        });
-    } else {
-        // DOM already loaded, load immediately
-        setTimeout(loadCategoriesList, 100);
-    }
-
-    // Load the list of available categories
-    function loadCategoriesList() {
-        fetch("{{ url_for('organization.api_get_part_of_programs') }}", {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            },
-            credentials: 'same-origin'
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to load categories list (' + response.status + ')');
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success && (data.categories || data.programs)) {
-                availableCategories = data.categories || data.programs;
-                // Rebuild grid columns if grid is already initialized
-                if (window.nssGridApi && nssGridHelper) {
-                    rebuildGridColumns();
-                } else if (!nssGridHelper && nssData && nssData.length > 0) {
-                    // Grid not initialized yet, but data is ready - initialize it
-                    // This will be handled by initializeNssGrid when called
-                }
-            }
-        })
-        .catch(error => {
-            console.error('Error loading categories list:', error);
-        });
-    }
+    // Available categories (each becomes a column) — injected with the page so we
+    // do not need GET /api/part-of-programs on load.
+    let availableCategories = {{ (part_of_programs or [])|tojson }};
 
     /**
      * Re-apply persisted column visibility after dynamic columns are injected.

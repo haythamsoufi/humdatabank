@@ -287,6 +287,25 @@ def worker_exit(server, worker):
         worker.pid, elapsed,
     )
 
+    # Teardown is done — nothing useful remains for this process. If non-daemon
+    # threads linger (gthread pool threads pinned by live WebSocket connections),
+    # interpreter finalization would join them forever and the master would
+    # SIGKILL this worker after WORKER TIMEOUT — the residual post-2026-07-16
+    # kill pattern on recycles of workers holding notification WebSockets.
+    # Skip the doomed finalization and exit cleanly now. No-op in the master's
+    # reap path and when all threads finish within the grace period.
+    try:
+        from scheduler_lock import hard_exit_if_lingering_threads
+        hard_exit_if_lingering_threads(
+            worker.pid,
+            log_fn=lambda msg: server.log.info(msg),
+        )
+    except Exception as exc:
+        server.log.warning(
+            "[WORKER_EXIT] lingering-thread check failed (pid=%s): %s",
+            worker.pid, exc,
+        )
+
 
 def worker_abort(worker):
     """Called (in the worker process) when Gunicorn kills a worker that exceeded GUNICORN_TIMEOUT.
@@ -355,3 +374,22 @@ def worker_abort(worker):
         "[WORKER_ABORT] pid=%s abort handler finished in %.3fs",
         worker.pid, elapsed,
     )
+
+    # After this hook gunicorn calls sys.exit(1), which hangs in interpreter
+    # finalization when non-daemon threads are wedged (the usual reason the
+    # heartbeat stopped) — producing the "Exception ignored in threading
+    # _shutdown" traceback and a second SIGKILL from the master. The process
+    # is condemned either way; exit immediately instead. grace_seconds=0:
+    # the worker was already silent for >GUNICORN_TIMEOUT, nothing will
+    # finish now, and the master SIGKILLs ~1s after SIGABRT so there is no
+    # time budget for joining.
+    try:
+        from scheduler_lock import hard_exit_if_lingering_threads
+        hard_exit_if_lingering_threads(
+            worker.pid,
+            grace_seconds=0.0,
+            exit_code=1,
+            log_fn=lambda msg: worker.log.error(msg),
+        )
+    except Exception:
+        pass

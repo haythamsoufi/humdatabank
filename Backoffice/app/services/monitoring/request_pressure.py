@@ -418,6 +418,41 @@ def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[st
     }
 
 
+def sibling_snapshot(*, exclude_request_id: Optional[int] = None, limit: int = 5) -> Dict[str, Any]:
+    """Lightweight same-process concurrency snapshot for slow/stuck request logs.
+
+    Unlike ``snapshot_inflight`` (Redis + DB-pool + ws-pool lookups, meant for
+    platform-5xx security events), this only reads the process-local in-flight
+    registry and thread count — cheap enough to call on every ``[SLOW_REQUEST]``/
+    ``[STUCK_REQUEST]`` log line so "what else was this process doing?" doesn't
+    require a separate investigation after the fact.
+    """
+    now = time.time()
+    with _lock:
+        entries = [e for e in _inflight.values() if e.get('id') != exclude_request_id]
+
+    entries.sort(key=lambda e: float(e.get('started_at', now)))
+    siblings: List[Dict[str, Any]] = []
+    for entry in entries[:limit]:
+        siblings.append({
+            'method': entry.get('method'),
+            'path': entry.get('path'),
+            'endpoint': entry.get('endpoint'),
+            'elapsed_s': round(now - float(entry.get('started_at', now)), 1),
+        })
+
+    try:
+        active_threads: Optional[int] = threading.active_count()
+    except Exception:
+        active_threads = None
+
+    return {
+        'active_threads': active_threads,
+        'sibling_count': len(entries),
+        'siblings': siblings,
+    }
+
+
 def dump_inflight_on_abort(pid: int, log_fn=None) -> None:
     """Called from the Gunicorn worker_abort hook — no Flask app context available.
 

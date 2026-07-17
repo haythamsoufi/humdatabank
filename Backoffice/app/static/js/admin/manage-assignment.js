@@ -739,7 +739,9 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken || '' },
                     body: JSON.stringify({ status_ids: ids })
-                }).then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+                }).then(function(res) {
+                    return window.responseAsResult(res);
+                })
                   .then(function(result) {
                       if (result.ok && result.data.success) { window.location.reload(); }
                       else {
@@ -770,7 +772,9 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken || '' },
                     body: JSON.stringify({ status_ids: ids, enable: enable })
-                }).then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+                }).then(function(res) {
+                    return window.responseAsResult(res);
+                })
                   .then(function(result) {
                       if (result.ok && result.data.success) {
                           if (typeof Utils !== 'undefined' && Utils.showSuccess) Utils.showSuccess(result.data.message);
@@ -824,7 +828,9 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken || '' },
                 body: JSON.stringify({ status_ids: ids, status: status })
-            }).then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+            }).then(function(res) {
+                return window.responseAsResult(res);
+            })
               .then(function(result) {
                   if (result.ok && result.data.success) { closeModal(bulkStatusModal); window.location.reload(); }
                   else {
@@ -872,7 +878,9 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken || '' },
                 body: JSON.stringify({ status_ids: ids, due_date: dueDate })
-            }).then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+            }).then(function(res) {
+                return window.responseAsResult(res);
+            })
               .then(function(result) {
                   if (result.ok && result.data.success) { closeModal(bulkDuedateSelectedModal); window.location.reload(); }
                   else {
@@ -1064,6 +1072,24 @@
             }
         }
 
+        // Load category filters only when a panel that uses them becomes visible
+        // (Add Entities → Countries, or Manage Existing Entities) — not on every page load.
+        //
+        // Defined here (before activateEntityTab / activateAddEntitiesSubTab, and before
+        // page-load tab restoration runs below) so those functions can call it directly
+        // when the relevant panel actually becomes visible — via click OR via
+        // localStorage-restored state (e.g. expanding a collapsed section that then
+        // auto-selects "Manage Existing Entities" or "Countries" without ever firing a
+        // button `click` event, which a click-listener-only approach would miss).
+        // `loadCategoriesAndMapping` is a hoisted function declaration (defined further
+        // below in this scope), so calling it here ahead of its textual definition is safe.
+        let categoriesLoaded = false;
+        function loadCategoriesOnce() {
+            if (categoriesLoaded) return;
+            categoriesLoaded = true;
+            loadCategoriesAndMapping();
+        }
+
         function activateEntityTab(tabId) {
             window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab called with tabId:', tabId);
             if (!tabId) {
@@ -1136,11 +1162,14 @@
                     window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: SHOWING panel', panel.id, 'after - hidden:', afterHidden, 'display:', afterDisplay);
 
                     // Initialize AG Grid when "Manage Existing Entities" tab is shown
-                    if (panel.id === 'manage-entities-panel' && typeof initializeEntityGrid === 'function') {
-                        setTimeout(function() {
-                            window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Initializing grid for manage-entities-panel');
-                            initializeEntityGrid();
-                        }, 150);
+                    if (panel.id === 'manage-entities-panel') {
+                        loadCategoriesOnce();
+                        if (typeof initializeEntityGrid === 'function') {
+                            setTimeout(function() {
+                                window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Initializing grid for manage-entities-panel');
+                                initializeEntityGrid();
+                            }, 150);
+                        }
                     }
                     // Initialize sub-tabs when "Add Entities" tab is shown
                     if (panel.id === 'add-entities-panel') {
@@ -1265,6 +1294,9 @@
                     if (panel.id === panelId) {
                         panel.classList.remove('hidden');
                         panel.style.display = 'block';
+                        if (panelId === 'add-entities-countries-panel') {
+                            loadCategoriesOnce();
+                        }
                     } else {
                         panel.classList.add('hidden');
                         panel.style.display = 'none';
@@ -1712,12 +1744,10 @@
             gridApi.setGridOption('rowData', filtered);
         }
 
-        // Initialize category filters on page load
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', loadCategoriesAndMapping);
-        } else {
-            loadCategoriesAndMapping();
-        }
+        // Category filters are now loaded directly from activateEntityTab /
+        // activateAddEntitiesSubTab (see loadCategoriesOnce above) whenever the Manage
+        // Existing Entities or Add Entities → Countries panel actually becomes visible —
+        // covering click, page-load, and localStorage-restored activation uniformly.
 
         // Function to update the state of a region "Select All" checkbox
         function updateEntityRegionSelectAll(region) {
@@ -2241,13 +2271,13 @@
                 nsCountrySelect.addEventListener('change', function() {
                     loadNsForCountry(this.value);
                 });
-                // If editing an assignment and it has countries, preselect the first
+                // If editing an assignment and it has countries, preselect the first country
+                // but defer the hierarchy fetch until the NS Structure tab is opened.
                 if (cfg.assignmentId) {
                 const assignmentCountryIds = new Set(cfg.assignmentCountryIds || []);
                 const firstCountryId = Array.from(assignmentCountryIds)[0];
                 if (firstCountryId) {
                     nsCountrySelect.value = String(firstCountryId);
-                    loadNsForCountry(firstCountryId);
                 }
                 }
             }
@@ -2263,9 +2293,30 @@
                     }, 300);
                 });
             }
+
+            // Defer NS hierarchy fetch until the NS Structure tab is first shown.
+            let nsHierarchyLoaded = false;
+            function loadNsHierarchyOnce() {
+                if (nsHierarchyLoaded) return;
+                if (!nsCountrySelect || !nsCountrySelect.value) return;
+                nsHierarchyLoaded = true;
+                loadNsForCountry(nsCountrySelect.value);
+            }
+            const nsStructureTabBtn = document.getElementById('ns-structure-tab');
+            if (nsStructureTabBtn) {
+                nsStructureTabBtn.addEventListener('click', loadNsHierarchyOnce);
+            }
+            if (document.querySelector('#ns-structure-panel:not(.hidden)')) {
+                loadNsHierarchyOnce();
+            }
         }
 
+        // Hoisted so activateSecretariatSubtab can trigger lazy loads.
+        let loadSecretariatHierarchyOnce = function () {};
+        let loadSecretariatRegionsHierarchyOnce = function () {};
+
         // Initialize Secretariat hierarchical selector (Divisions & Departments)
+        // Hierarchy fetch is deferred until the secretariat panel/tab is first shown.
         if (document.getElementById('secretariat-hierarchy-container')) {
             if (cfg.assignmentId) {
             secretariatSelector = new AssignmentHierarchicalEntitySelector({
@@ -2276,16 +2327,6 @@
                 saveButtonId: 'save-secretariat-changes-btn',
                 onChange: function(data) {}
             });
-
-            // Load Secretariat hierarchy after ensuring assigned entities are loaded so checkboxes reflect current state
-            const ensureSecretariatAssignedLoaded = (secretariatSelector && secretariatSelector._assignedLoaded)
-                ? Promise.resolve()
-                : secretariatSelector.loadAssignedEntities();
-            ensureSecretariatAssignedLoaded
-                .then(() => {
-                    secretariatSelector.loadHierarchy(cfg.urls.secretariatHierarchy);
-                })
-                .catch(function(err) { console.error('[manage-assignment] Failed to load secretariat hierarchy:', err); });
             } else {
             // For new assignments, use regular HierarchicalEntitySelector (no assigned entities yet)
             secretariatSelector = new HierarchicalEntitySelector({
@@ -2298,9 +2339,43 @@
                     // Changes will be saved when form is submitted
                 }
             });
+            }
 
-            // Load Secretariat hierarchy immediately for new assignments
-            secretariatSelector.loadHierarchy(cfg.urls.secretariatHierarchy);
+            let secretariatHierarchyLoaded = false;
+            loadSecretariatHierarchyOnce = function () {
+                if (secretariatHierarchyLoaded || !secretariatSelector) return;
+                secretariatHierarchyLoaded = true;
+                if (cfg.assignmentId) {
+                    const ensureSecretariatAssignedLoaded = secretariatSelector._assignedLoaded
+                        ? Promise.resolve()
+                        : secretariatSelector.loadAssignedEntities();
+                    ensureSecretariatAssignedLoaded
+                        .then(() => {
+                            secretariatSelector.loadHierarchy(cfg.urls.secretariatHierarchy);
+                        })
+                        .catch(function(err) { console.error('[manage-assignment] Failed to load secretariat hierarchy:', err); });
+                } else {
+                    secretariatSelector.loadHierarchy(cfg.urls.secretariatHierarchy);
+                }
+            };
+            const addEntitiesSecretariatTab = document.getElementById('add-entities-secretariat-tab');
+            const secretariatDivisionsTab = document.getElementById('secretariat-divisions-tab');
+            if (addEntitiesSecretariatTab) addEntitiesSecretariatTab.addEventListener('click', loadSecretariatHierarchyOnce);
+            if (secretariatDivisionsTab) secretariatDivisionsTab.addEventListener('click', loadSecretariatHierarchyOnce);
+            // Also when Add Entities is opened and secretariat is the (only/default) visible sub-panel
+            const addEntitiesTabBtn = document.getElementById('add-entities-tab');
+            if (addEntitiesTabBtn) {
+                addEntitiesTabBtn.addEventListener('click', function () {
+                    if (document.querySelector('#add-entities-secretariat-panel:not(.hidden)') ||
+                        !document.getElementById('add-entities-countries-panel')) {
+                        loadSecretariatHierarchyOnce();
+                    }
+                });
+            }
+            // If the secretariat panel is already the default-visible add-entities sub-tab, load now.
+            const secretariatPanel = document.getElementById('add-entities-secretariat-panel');
+            if (secretariatPanel && !secretariatPanel.classList.contains('hidden')) {
+                loadSecretariatHierarchyOnce();
             }
 
             // Add search functionality
@@ -2327,15 +2402,6 @@
                 saveButtonId: 'save-secretariat-regions-changes-btn',
                 onChange: function(data) {}
             });
-
-            const ensureRegionsAssignedLoaded = (secretariatRegionsSelector && secretariatRegionsSelector._assignedLoaded)
-                ? Promise.resolve()
-                : secretariatRegionsSelector.loadAssignedEntities();
-            ensureRegionsAssignedLoaded
-                .then(() => {
-                    secretariatRegionsSelector.loadHierarchy(cfg.urls.secretariatRegionsHierarchy);
-                })
-                .catch(function(err) { console.error('[manage-assignment] Failed to load secretariat regions hierarchy:', err); });
             } else {
             // For new assignments, use regular HierarchicalEntitySelector (no assigned entities yet)
             secretariatRegionsSelector = new HierarchicalEntitySelector({
@@ -2348,9 +2414,34 @@
                     // Changes will be saved when form is submitted
                 }
             });
+            }
 
-            // Load Secretariat Regions hierarchy immediately for new assignments
-            secretariatRegionsSelector.loadHierarchy(cfg.urls.secretariatRegionsHierarchy);
+            let secretariatRegionsHierarchyLoaded = false;
+            loadSecretariatRegionsHierarchyOnce = function () {
+                if (secretariatRegionsHierarchyLoaded || !secretariatRegionsSelector) return;
+                secretariatRegionsHierarchyLoaded = true;
+                if (cfg.assignmentId) {
+                    const ensureRegionsAssignedLoaded = secretariatRegionsSelector._assignedLoaded
+                        ? Promise.resolve()
+                        : secretariatRegionsSelector.loadAssignedEntities();
+                    ensureRegionsAssignedLoaded
+                        .then(() => {
+                            secretariatRegionsSelector.loadHierarchy(cfg.urls.secretariatRegionsHierarchy);
+                        })
+                        .catch(function(err) { console.error('[manage-assignment] Failed to load secretariat regions hierarchy:', err); });
+                } else {
+                    secretariatRegionsSelector.loadHierarchy(cfg.urls.secretariatRegionsHierarchy);
+                }
+            };
+            const secretariatRegionsTab = document.getElementById('secretariat-regions-tab');
+            if (secretariatRegionsTab) {
+                secretariatRegionsTab.addEventListener('click', loadSecretariatRegionsHierarchyOnce);
+            }
+            if (
+                document.querySelector('#secretariat-regions-panel') &&
+                !document.querySelector('#secretariat-regions-panel').classList.contains('hidden')
+            ) {
+                loadSecretariatRegionsHierarchyOnce();
             }
 
             const secretariatRegionsSearchInput = document.getElementById('secretariat-regions-search');
@@ -2389,6 +2480,24 @@
                 }
             });
             localStorage.setItem('selectedAssignmentSecretariatSubtab', panelId);
+            // Lazy-load hierarchy for the newly visible secretariat sub-tab — but only when
+            // the ancestor Add Entities → Secretariat panel is actually visible. This function
+            // also runs on page init to restore the last-selected sub-tab's button/panel
+            // classes even when the whole Secretariat section is hidden (e.g. Add Entities →
+            // Countries is the active sub-tab, or "Manage Existing Entities" is the active
+            // top-level tab); network loads must not fire in that case.
+            const addEntitiesPanelForSecretariat = document.getElementById('add-entities-panel');
+            const addEntitiesSecretariatPanel = document.getElementById('add-entities-secretariat-panel');
+            const secretariatSectionVisible =
+                (!addEntitiesPanelForSecretariat || !addEntitiesPanelForSecretariat.classList.contains('hidden')) &&
+                (!addEntitiesSecretariatPanel || !addEntitiesSecretariatPanel.classList.contains('hidden'));
+            if (secretariatSectionVisible) {
+                if (panelId === 'secretariat-divisions-panel') {
+                    loadSecretariatHierarchyOnce();
+                } else if (panelId === 'secretariat-regions-panel') {
+                    loadSecretariatRegionsHierarchyOnce();
+                }
+            }
         }
         secretariatSubtabButtons.forEach(btn => {
             btn.addEventListener('click', function() {

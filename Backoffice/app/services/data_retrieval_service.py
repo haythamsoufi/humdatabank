@@ -16,6 +16,8 @@ Domain modules:
 import json
 import logging
 import re
+import threading
+import time
 from typing import Dict, List, Optional, Union, Any
 from datetime import timedelta
 
@@ -545,9 +547,54 @@ from app.services.upr.data_retrieval import (  # noqa: E402,F401
 )
 
 
+# check_aes_access_light backs the high-frequency presence endpoints (one sync
+# every ~30-60 s per open entry form tab), so positive results are cached per
+# (user, aes) and steady-state presence ticks skip the DB entirely.
+# Staleness trade-off: revoking a user's access can take up to the TTL below to
+# propagate to presence visibility — all data-bearing endpoints re-check access
+# with ensure_aes_access(). Denials are never cached.
+_AES_ACCESS_CACHE_TTL_SECONDS = 300
+_AES_ACCESS_CACHE_MAX_ENTRIES = 5000
+_aes_access_cache: Dict[tuple, float] = {}  # (user_id, aes_id) -> monotonic expiry
+_aes_access_cache_lock = threading.Lock()
+
+
+def clear_aes_access_light_cache() -> None:
+    """Drop all cached AES access results (tests / manual invalidation)."""
+    with _aes_access_cache_lock:
+        _aes_access_cache.clear()
+
+
+def _store_aes_access_cache(cache_key: tuple, expiry: float) -> None:
+    with _aes_access_cache_lock:
+        if len(_aes_access_cache) >= _AES_ACCESS_CACHE_MAX_ENTRIES:
+            now = time.monotonic()
+            expired = [k for k, exp in _aes_access_cache.items() if exp <= now]
+            for k in expired:
+                _aes_access_cache.pop(k, None)
+            if len(_aes_access_cache) >= _AES_ACCESS_CACHE_MAX_ENTRIES:
+                _aes_access_cache.clear()
+        _aes_access_cache[cache_key] = expiry
+
+
 def check_aes_access_light(aes_id: int) -> bool:
-    """Presence-only RBAC check — no template/assigned_form joins needed."""
+    """Presence-only RBAC check — no template/assigned_form joins needed.
+
+    Positive results are cached for up to ``_AES_ACCESS_CACHE_TTL_SECONDS``
+    per (user, aes); see the staleness note above.
+    """
     try:
+        user_id = getattr(current_user, 'id', None)
+        cache_key = (user_id, int(aes_id))
+        if user_id is not None:
+            now = time.monotonic()
+            with _aes_access_cache_lock:
+                expiry = _aes_access_cache.get(cache_key)
+                if expiry is not None:
+                    if expiry > now:
+                        return True
+                    _aes_access_cache.pop(cache_key, None)
+
         from app.services.entity_service import EntityService
 
         row = db.session.execute(
@@ -556,9 +603,14 @@ def check_aes_access_light(aes_id: int) -> bool:
         ).first()
         if not row:
             return False
-        return EntityService.check_user_entity_access(
+        allowed = EntityService.check_user_entity_access(
             current_user, row.entity_type, row.entity_id
         )
+        if allowed and user_id is not None:
+            _store_aes_access_cache(
+                cache_key, time.monotonic() + _AES_ACCESS_CACHE_TTL_SECONDS
+            )
+        return allowed
     except Exception as e:
         logger.exception("Error checking AES access (light) for %s: %s", aes_id, e)
         return False

@@ -59,9 +59,9 @@ export class HumDatabankChatbot {
 
         this.init();
 
-        // Common workflow tours are preloaded lazily on first chat open
-        // (see widget-ui.js#toggleChat / spotlight-tours.js), not here on
-        // construction, since most page loads never open the chatbot.
+        // Note: workflow tours are NOT preloaded on chat open (see
+        // spotlight-tours.js#_preloadCommonWorkflowToursOnce, intentionally a
+        // no-op) — tours are fetched only when a user explicitly starts one.
     }
 
 
@@ -276,9 +276,8 @@ export class HumDatabankChatbot {
                 this._setupVisibilityChangeHandler();
             } else {
                 this._updateImmersiveLinkHref();
-                if (this._getFloatingConversationId()) {
-                    void this._refreshFloatingHeaderTitleFromServer();
-                }
+                // Floating conversation title is fetched on first actual chat open
+                // (see widget-ui.js#toggleChat), not here on every page load.
             }
             this.isInitialized = true;
         }

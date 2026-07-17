@@ -1389,117 +1389,133 @@
         initFixedColumnsObserver('secretariat-divisions-container');
         initFixedColumnsObserver('secretariat-regions-container');
 
-        // Initialize Hierarchical Entity Selectors
+        // Hierarchical entity selectors — deferred until Entity Permissions tab is first opened
+        // so hierarchy/entity fetches are not paid on every user-form page load.
         let nsStructureSelector = null;
         let secretariatDivisionsSelector = null;
         let secretariatRegionsSelector = null;
+        let entityPermissionsLoaded = false;
 
-        // Initialize NS Structure hierarchical selector
-        if (document.getElementById('ns-structure-hierarchy-container')) {
-            nsStructureSelector = new HierarchicalEntitySelector({
-                containerId: 'ns-structure-hierarchy-container',
-                apiBaseUrl: '', // Empty since blueprint already has /admin prefix
-                targetUserId: cfg.userId,
-                entityTypes: ['ns_branch', 'ns_subbranch', 'ns_localunit'],
-                onChange: function(data) {
-                    // Just update hidden form fields - no need to reload from server
-                    // Changes will be saved when form is submitted
-                }
-            });
+        function initEntityPermissionsTab() {
+            if (entityPermissionsLoaded) return;
+            entityPermissionsLoaded = true;
 
-            // Country select wiring for NS Structure
-            const nsCountrySelect = document.getElementById('ns-country-select');
-            const nsContainer = document.getElementById('ns-structure-hierarchy-container');
-            function loadNsForCountry(countryId) {
-                if (!countryId) {
-                    nsContainer.innerHTML = `
+            // Initialize NS Structure hierarchical selector
+            if (document.getElementById('ns-structure-hierarchy-container')) {
+                nsStructureSelector = new HierarchicalEntitySelector({
+                    containerId: 'ns-structure-hierarchy-container',
+                    apiBaseUrl: '', // Empty since blueprint already has /admin prefix
+                    targetUserId: cfg.userId,
+                    entityTypes: ['ns_branch', 'ns_subbranch', 'ns_localunit'],
+                    onChange: function(data) {
+                        // Just update hidden form fields - no need to reload from server
+                        // Changes will be saved when form is submitted
+                    }
+                });
+
+                // Country select wiring for NS Structure
+                const nsCountrySelect = document.getElementById('ns-country-select');
+                const nsContainer = document.getElementById('ns-structure-hierarchy-container');
+                function loadNsForCountry(countryId) {
+                    if (!countryId) {
+                        nsContainer.innerHTML = `
                         <div class="text-center py-4">
                             <i class="fas fa-info-circle text-gray-400"></i>
                             <p class="text-sm text-gray-500 mt-2">Select a country to view NS structure.</p>
                         </div>`;
-                    return;
-                }
-                nsContainer.innerHTML = `
+                        return;
+                    }
+                    nsContainer.innerHTML = `
                     <div class=\"text-center py-4\">\n                        <i class=\"fas fa-spinner fa-spin text-gray-400\"></i>\n                        <p class=\"text-sm text-gray-500 mt-2\">Loading NS structure...</p>\n                    </div>`;
-                nsStructureSelector.loadHierarchy(`/admin/structure/ns-hierarchy?country_id=${countryId}`);
-            }
-            if (nsCountrySelect) {
-                nsCountrySelect.addEventListener('change', function() {
-                    loadNsForCountry(this.value);
-                });
-                // If editing a user and they have countries, preselect the first
-                const defaultCountryId = cfg.defaultCountryId;
-                if (defaultCountryId) {
-                    nsCountrySelect.value = String(defaultCountryId);
-                    loadNsForCountry(defaultCountryId);
+                    nsStructureSelector.loadHierarchy(`/admin/structure/ns-hierarchy?country_id=${countryId}`);
+                }
+                if (nsCountrySelect) {
+                    nsCountrySelect.addEventListener('change', function() {
+                        loadNsForCountry(this.value);
+                    });
+                    // If editing a user and they have countries, preselect the first
+                    const defaultCountryId = cfg.defaultCountryId;
+                    if (defaultCountryId) {
+                        nsCountrySelect.value = String(defaultCountryId);
+                        loadNsForCountry(defaultCountryId);
+                    }
+                }
+
+                // Add search functionality
+                const nsSearchInput = document.getElementById('ns-structure-search');
+                if (nsSearchInput) {
+                    let searchTimeout;
+                    nsSearchInput.addEventListener('input', (e) => {
+                        clearTimeout(searchTimeout);
+                        searchTimeout = setTimeout(() => {
+                            nsStructureSelector.filterHierarchy(e.target.value);
+                        }, 300);
+                    });
                 }
             }
+            if (cfg.userId) {
+                // Initialize Secretariat Divisions & Departments selector
+                if (document.getElementById('secretariat-divisions-container')) {
+                    secretariatDivisionsSelector = new HierarchicalEntitySelector({
+                        containerId: 'secretariat-divisions-container',
+                        apiBaseUrl: '',
+                        targetUserId: cfg.userId,
+                        entityTypes: ['division', 'department'],
+                        onChange: function(data) {}
+                    });
 
-            // Add search functionality
-            const nsSearchInput = document.getElementById('ns-structure-search');
-            if (nsSearchInput) {
-                let searchTimeout;
-                nsSearchInput.addEventListener('input', (e) => {
-                    clearTimeout(searchTimeout);
-                    searchTimeout = setTimeout(() => {
-                        nsStructureSelector.filterHierarchy(e.target.value);
-                    }, 300);
-                });
-            }
-        }
-        if (cfg.userId) {
-        // Initialize Secretariat Divisions & Departments selector
-        if (document.getElementById('secretariat-divisions-container')) {
-            secretariatDivisionsSelector = new HierarchicalEntitySelector({
-                containerId: 'secretariat-divisions-container',
-                apiBaseUrl: '',
-                targetUserId: cfg.userId,
-                entityTypes: ['division', 'department'],
-                onChange: function(data) {}
-            });
+                    secretariatDivisionsSelector.loadHierarchy('/admin/structure/secretariat-hierarchy');
 
-            secretariatDivisionsSelector.loadHierarchy('/admin/structure/secretariat-hierarchy');
+                    const secretariatDivisionsSearchInput = document.getElementById('secretariat-divisions-search');
+                    if (secretariatDivisionsSearchInput) {
+                        let searchTimeout;
+                        secretariatDivisionsSearchInput.addEventListener('input', (e) => {
+                            clearTimeout(searchTimeout);
+                            searchTimeout = setTimeout(() => {
+                                secretariatDivisionsSelector.filterHierarchy(e.target.value);
+                            }, 300);
+                        });
+                    }
+                }
 
-            const secretariatDivisionsSearchInput = document.getElementById('secretariat-divisions-search');
-            if (secretariatDivisionsSearchInput) {
-                let searchTimeout;
-                secretariatDivisionsSearchInput.addEventListener('input', (e) => {
-                    clearTimeout(searchTimeout);
-                    searchTimeout = setTimeout(() => {
-                        secretariatDivisionsSelector.filterHierarchy(e.target.value);
-                    }, 300);
-                });
-            }
-        }
+                // Initialize Secretariat Regions selector
+                if (document.getElementById('secretariat-regions-container')) {
+                    secretariatRegionsSelector = new HierarchicalEntitySelector({
+                        containerId: 'secretariat-regions-container',
+                        apiBaseUrl: '',
+                        targetUserId: cfg.userId,
+                        entityTypes: ['regional_office', 'cluster_office'],
+                        onChange: function(data) {}
+                    });
 
-        // Initialize Secretariat Regions selector
-        if (document.getElementById('secretariat-regions-container')) {
-            secretariatRegionsSelector = new HierarchicalEntitySelector({
-                containerId: 'secretariat-regions-container',
-                apiBaseUrl: '',
-                targetUserId: cfg.userId,
-                entityTypes: ['regional_office', 'cluster_office'],
-                onChange: function(data) {}
-            });
+                    secretariatRegionsSelector.loadHierarchy('/admin/structure/secretariat-regions-hierarchy');
 
-            secretariatRegionsSelector.loadHierarchy('/admin/structure/secretariat-regions-hierarchy');
+                    const secretariatRegionsSearchInput = document.getElementById('secretariat-regions-search');
+                    if (secretariatRegionsSearchInput) {
+                        let searchTimeout;
+                        secretariatRegionsSearchInput.addEventListener('input', (e) => {
+                            clearTimeout(searchTimeout);
+                            searchTimeout = setTimeout(() => {
+                                secretariatRegionsSelector.filterHierarchy(e.target.value);
+                            }, 300);
+                        });
+                    }
+                }
 
-            const secretariatRegionsSearchInput = document.getElementById('secretariat-regions-search');
-            if (secretariatRegionsSearchInput) {
-                let searchTimeout;
-                secretariatRegionsSearchInput.addEventListener('input', (e) => {
-                    clearTimeout(searchTimeout);
-                    searchTimeout = setTimeout(() => {
-                        secretariatRegionsSelector.filterHierarchy(e.target.value);
-                    }, 300);
-                });
+                // Store selectors globally for debugging
+                window.nsStructureSelector = nsStructureSelector;
+                window.secretariatDivisionsSelector = secretariatDivisionsSelector;
+                window.secretariatRegionsSelector = secretariatRegionsSelector;
             }
         }
 
-        // Store selectors globally for debugging
-        window.nsStructureSelector = nsStructureSelector;
-        window.secretariatDivisionsSelector = secretariatDivisionsSelector;
-        window.secretariatRegionsSelector = secretariatRegionsSelector;
+        const entityPermissionsTabBtn = document.getElementById('entity-permissions-tab');
+        if (entityPermissionsTabBtn) {
+            entityPermissionsTabBtn.addEventListener('click', initEntityPermissionsTab);
+        }
+        // If Entity Permissions is the initial active tab (URL/localStorage), load immediately.
+        if (resolveInitialMainTabId() === 'entity') {
+            initEntityPermissionsTab();
         }
 
         // Secretariat sub-tabs behavior

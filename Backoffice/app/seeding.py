@@ -99,7 +99,7 @@ def create_default_data(app_instance):
 
             if test_country:
                 ns_exists = NationalSociety.query.filter_by(
-                    country_id=test_country.id, name="Testland NS"
+                    country_id=test_country.id, name="Testlandic Red Emblem Society"
                 ).first()
                 if not ns_exists:
                     ns = NationalSociety(

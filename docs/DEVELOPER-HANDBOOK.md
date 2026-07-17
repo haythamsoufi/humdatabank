@@ -781,6 +781,7 @@ Unified submission data endpoint. Returns fact arrays plus full dimension tables
 | `national_societies[]` | Full National Society dimension |
 | `indicator_bank[]` | Full indicator bank (~466 rows) |
 | `matrix_cells[]` | Normalized matrix cells; matrix-specific fields grouped under `matrix` (`row`, `column`, `entity`) |
+| `assignment_statuses[]` | AssignmentEntityStatus rows for assigned `submission_id`s (workflow status / due date); join when `submission_type` is `assigned` |
 | `arrays` | Catalog describing each top-level array |
 
 **Legacy:** `GET /api/v1/data/tables` returns HTTP 308 redirect to `/api/v1/data` (same query string).

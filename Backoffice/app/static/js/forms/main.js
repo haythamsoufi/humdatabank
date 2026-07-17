@@ -39,6 +39,30 @@ async function initializeEntryForm() {
         }
     };
 
+    // Kick off entry-bootstrap as early as possible (parallel with module imports).
+    // Provides completion_rate + initial auto_load + resolved_variables in one round-trip.
+    const completionDisplayEarly = document.getElementById('completion-rate-display');
+    const bootstrapAesId = completionDisplayEarly && completionDisplayEarly.dataset.aesId;
+    if (bootstrapAesId && !window.__entryBootstrapPromise) {
+        const fetchFn = (window.getCsrfAwareFetch && window.getCsrfAwareFetch()) || fetch;
+        window.__entryBootstrapPromise = fetchFn(
+            `/api/forms/assignment/${bootstrapAesId}/entry-bootstrap`,
+            {
+                headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+                credentials: 'same-origin',
+            }
+        )
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                window.__entryBootstrap = data || null;
+                return data;
+            })
+            .catch(() => {
+                window.__entryBootstrap = null;
+                return null;
+            });
+    }
+
     // Resolve feature flags. Fall back to loading everything when flags are absent
     // (e.g. preview pages or older entry_form.html without the __formFeatures block).
     const feat = window.__formFeatures || {
@@ -220,25 +244,32 @@ async function initializeEntryForm() {
         debugLog('main', initErrors.length ? '⚠️ Form initialization completed with errors' : '✅ Form initialization completed successfully');
     }
 
-    // Fetch completion rate asynchronously so the heavy aggregation queries are off
-    // the critical render path. The template renders a "…" placeholder that we replace.
+    // Apply completion rate from entry-bootstrap (preferred) or legacy completion-rate endpoint.
     const completionDisplay = document.getElementById('completion-rate-display');
     if (completionDisplay && completionDisplay.dataset.aesId) {
-        const aesId = completionDisplay.dataset.aesId;
-        const fetchFn = (window.getCsrfAwareFetch && window.getCsrfAwareFetch()) || fetch;
-        fetchFn(`/api/forms/assignment/${aesId}/completion-rate`, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            credentials: 'same-origin',
-        })
-            .then(r => r.ok ? r.json() : null)
-            .then(data => {
-                if (!data || typeof data.completion_rate !== 'number') return;
-                const cr = data.completion_rate;
-                let colorClass = 'text-red-600 font-semibold';
-                if (cr >= 80) colorClass = 'text-green-700 font-semibold';
-                else if (cr >= 25) colorClass = 'text-amber-600 font-semibold';
-                completionDisplay.textContent = `${cr.toFixed(1)}%`;
-                completionDisplay.className = `font-medium ${colorClass}`;
+        const applyCompletion = (data) => {
+            if (!data || typeof data.completion_rate !== 'number') return false;
+            const cr = data.completion_rate;
+            let colorClass = 'text-red-600 font-semibold';
+            if (cr >= 80) colorClass = 'text-green-700 font-semibold';
+            else if (cr >= 25) colorClass = 'text-amber-600 font-semibold';
+            completionDisplay.textContent = `${cr.toFixed(1)}%`;
+            completionDisplay.className = `font-medium ${colorClass}`;
+            return true;
+        };
+        const bootstrapPromise = window.__entryBootstrapPromise || Promise.resolve(window.__entryBootstrap);
+        bootstrapPromise
+            .then((data) => {
+                if (applyCompletion(data)) return;
+                // Fallback for older servers / bootstrap failure
+                const aesId = completionDisplay.dataset.aesId;
+                const fetchFn = (window.getCsrfAwareFetch && window.getCsrfAwareFetch()) || fetch;
+                return fetchFn(`/api/forms/assignment/${aesId}/completion-rate`, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                })
+                    .then((r) => (r.ok ? r.json() : null))
+                    .then((legacy) => { applyCompletion(legacy); });
             })
             .catch(() => { completionDisplay.textContent = '—'; });
     }

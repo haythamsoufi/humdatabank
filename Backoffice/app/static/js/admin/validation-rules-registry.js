@@ -61,14 +61,7 @@
     }
 
     function fetchJson(url, options) {
-        return fetch(url, options || {}).then(function (resp) {
-            return resp.json().then(function (data) {
-                if (!resp.ok) {
-                    throw new Error(data.message || data.error || t.loadFailed || 'Request failed');
-                }
-                return data;
-            });
-        });
+        return window.apiFetch(url, options || {});
     }
 
     function severityBadge(value) {

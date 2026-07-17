@@ -589,7 +589,7 @@
                     onDone(new Error(labels.couldNotLoadSampleValues || 'Preview failed.'));
                     return;
                 }
-                return resp.json().then((payload) => ({ ok: resp.ok, status: resp.status, payload }));
+                return window.responseAsResult(resp);
             }).then((result) => {
                 if (!result) return;
                 const p = result.payload || {};

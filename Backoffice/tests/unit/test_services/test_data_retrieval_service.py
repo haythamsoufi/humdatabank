@@ -663,3 +663,113 @@ class TestEnsureAesAccess:
                        side_effect=Exception("fail")):
                 result = ensure_aes_access(1)
                 assert "error" in result
+
+
+# ---------------------------------------------------------------------------
+# check_aes_access_light (+ per-(user, aes) positive-result cache)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestCheckAesAccessLight:
+    def _mock_user(self, user_id):
+        mock_user = MagicMock()
+        mock_user.id = user_id
+        return mock_user
+
+    def test_not_found_returns_false_and_not_cached(self, app, db_session):
+        with app.app_context():
+            from app.services.data_retrieval_service import (
+                check_aes_access_light, _aes_access_cache, clear_aes_access_light_cache,
+            )
+            clear_aes_access_light_cache()
+            with patch("app.services.data_retrieval_service.current_user",
+                       self._mock_user(7)):
+                assert check_aes_access_light(999999) is False
+            assert _aes_access_cache == {}
+
+    def test_positive_result_cached_skips_recheck(self, app, db_session):
+        with app.app_context():
+            from app.services.data_retrieval_service import (
+                check_aes_access_light, clear_aes_access_light_cache,
+            )
+            clear_aes_access_light_cache()
+            country = create_test_country(db_session)
+            template = create_test_template(db_session)
+            aes = create_test_assignment_entity_status(
+                db_session, country=country, template=template
+            )
+            with patch("app.services.data_retrieval_service.current_user",
+                       self._mock_user(7)), \
+                 patch("app.services.entity_service.EntityService.check_user_entity_access",
+                       return_value=True) as mock_check:
+                assert check_aes_access_light(aes.id) is True
+                assert check_aes_access_light(aes.id) is True
+                assert mock_check.call_count == 1
+
+    def test_denial_not_cached(self, app, db_session):
+        with app.app_context():
+            from app.services.data_retrieval_service import (
+                check_aes_access_light, _aes_access_cache, clear_aes_access_light_cache,
+            )
+            clear_aes_access_light_cache()
+            country = create_test_country(db_session)
+            template = create_test_template(db_session)
+            aes = create_test_assignment_entity_status(
+                db_session, country=country, template=template
+            )
+            with patch("app.services.data_retrieval_service.current_user",
+                       self._mock_user(7)), \
+                 patch("app.services.entity_service.EntityService.check_user_entity_access",
+                       return_value=False) as mock_check:
+                assert check_aes_access_light(aes.id) is False
+                assert check_aes_access_light(aes.id) is False
+                assert mock_check.call_count == 2
+            assert _aes_access_cache == {}
+
+    def test_cache_is_per_user(self, app, db_session):
+        with app.app_context():
+            from app.services.data_retrieval_service import (
+                check_aes_access_light, clear_aes_access_light_cache,
+            )
+            clear_aes_access_light_cache()
+            country = create_test_country(db_session)
+            template = create_test_template(db_session)
+            aes = create_test_assignment_entity_status(
+                db_session, country=country, template=template
+            )
+            with patch("app.services.entity_service.EntityService.check_user_entity_access",
+                       return_value=True) as mock_check:
+                with patch("app.services.data_retrieval_service.current_user",
+                           self._mock_user(7)):
+                    assert check_aes_access_light(aes.id) is True
+                with patch("app.services.data_retrieval_service.current_user",
+                           self._mock_user(8)):
+                    assert check_aes_access_light(aes.id) is True
+                assert mock_check.call_count == 2
+
+    def test_expired_entry_rechecks(self, app, db_session):
+        with app.app_context():
+            import app.services.data_retrieval_service as drs
+            drs.clear_aes_access_light_cache()
+            country = create_test_country(db_session)
+            template = create_test_template(db_session)
+            aes = create_test_assignment_entity_status(
+                db_session, country=country, template=template
+            )
+            with patch("app.services.data_retrieval_service.current_user",
+                       self._mock_user(7)), \
+                 patch("app.services.entity_service.EntityService.check_user_entity_access",
+                       return_value=True) as mock_check:
+                assert drs.check_aes_access_light(aes.id) is True
+                # Force the entry to be expired, then confirm a fresh DB check.
+                import time as _time
+                drs._aes_access_cache[(7, aes.id)] = _time.monotonic() - 1
+                assert drs.check_aes_access_light(aes.id) is True
+                assert mock_check.call_count == 2
+
+    def test_clear_cache_helper(self, app, db_session):
+        with app.app_context():
+            import app.services.data_retrieval_service as drs
+            drs._aes_access_cache[(7, 1)] = 10.0
+            drs.clear_aes_access_light_cache()
+            assert drs._aes_access_cache == {}

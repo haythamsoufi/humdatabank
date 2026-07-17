@@ -391,7 +391,9 @@
                 },
                 body: JSON.stringify({ csrf_token: csrfToken })
             })
-            .then(function(response) { return response.json().then(function(data) { return { ok: response.ok, data: data }; }); })
+            .then(function(response) {
+                return window.responseAsResult(response);
+            })
             .then(function(result) {
                 if (result.ok && result.data && result.data.success) {
                     if (window.showAlert) window.showAlert(result.data.message || cfg.t.removedObsolete, 'success');
@@ -1257,7 +1259,9 @@
                 },
                 body: JSON.stringify({ payload: payloadB64 })
             })
-            .then(function(response) { return response.json().then(function(data) { return { ok: response.ok, data: data }; }); })
+            .then(function(response) {
+                return window.responseAsResult(response);
+            })
             .then(function(result) {
                 if (result.ok && result.data && result.data.success) {
                     if (window.showAlert) window.showAlert(result.data.message || cfg.t.removedObsolete, 'success');

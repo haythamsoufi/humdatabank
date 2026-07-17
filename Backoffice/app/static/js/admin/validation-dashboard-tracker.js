@@ -708,11 +708,10 @@
         }
         periodEl.disabled = true;
         try {
-            var resp = await fetch(config.periodsUrl + '?template_id=' + encodeURIComponent(templateId), {
+            var data = await window.apiFetch(config.periodsUrl + '?template_id=' + encodeURIComponent(templateId), {
                 headers: { Accept: 'application/json' },
                 credentials: 'same-origin',
             });
-            var data = await resp.json();
             var periods = data.periods || [];
             periodEl.innerHTML = '<option value="">' + esc('Choose period') + '</option>' +
                 periods.map(function (p) { return '<option value="' + esc(p) + '">' + esc(p) + '</option>'; }).join('');
@@ -753,9 +752,7 @@
         try {
             var url = config.trackerUrl + '?template_id=' + encodeURIComponent(templateId) +
                 '&period=' + encodeURIComponent(period);
-            var resp = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-            var data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || t.trackerLoadFailed);
+            var data = await window.apiFetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
             state.sectionsMeta = data.sections_meta || [];
             state.documentsMeta = data.documents_meta || [];
             state.delegationReviewEnabled = !!data.delegation_review_enabled;

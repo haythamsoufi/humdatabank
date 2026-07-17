@@ -19,6 +19,8 @@ import pytest
 import scheduler_lock
 from scheduler_lock import (
     SchedulerLockResult,
+    hard_exit_if_lingering_threads,
+    lingering_nondaemon_threads,
     pid_alive,
     read_lock_owner,
     release_scheduler_lock,
@@ -461,9 +463,128 @@ class TestHardExitOnTimeout:
         mock_exit.assert_not_called()
 
 
+class TestLingeringNondaemonThreads:
+    """WS-pinned recycle escape hatch: detection half."""
+
+    @staticmethod
+    def _blocked_thread(name, daemon):
+        stop = threading.Event()
+        t = threading.Thread(target=stop.wait, name=name, daemon=daemon)
+        t.start()
+        return t, stop
+
+    def test_daemon_threads_are_ignored(self):
+        t, stop = self._blocked_thread('daemon-heartbeat', daemon=True)
+        try:
+            assert t not in lingering_nondaemon_threads(grace_seconds=0.05)
+        finally:
+            stop.set()
+            t.join()
+
+    def test_wedged_nondaemon_thread_is_reported(self):
+        t, stop = self._blocked_thread('ws-pinned', daemon=False)
+        try:
+            assert t in lingering_nondaemon_threads(grace_seconds=0.05)
+        finally:
+            stop.set()
+            t.join()
+
+    def test_thread_finishing_within_grace_is_not_reported(self):
+        t, stop = self._blocked_thread('almost-done', daemon=False)
+        threading.Timer(0.1, stop.set).start()
+        try:
+            assert t not in lingering_nondaemon_threads(grace_seconds=5.0)
+        finally:
+            stop.set()
+            t.join()
+
+    def test_zero_grace_skips_joining(self):
+        t, stop = self._blocked_thread('no-time-budget', daemon=False)
+        try:
+            t0 = time.monotonic()
+            assert t in lingering_nondaemon_threads(grace_seconds=0.0)
+            assert time.monotonic() - t0 < 1.0
+        finally:
+            stop.set()
+            t.join()
+
+
+class TestHardExitIfLingeringThreads:
+    """WS-pinned recycle escape hatch: exit half."""
+
+    @staticmethod
+    def _pinned_thread():
+        stop = threading.Event()
+        t = threading.Thread(target=stop.wait, name='fake-ws-pinned', daemon=False)
+        t.start()
+        return t, stop
+
+    def test_no_lingering_threads_returns_false(self):
+        with patch('scheduler_lock.os._exit') as mock_exit, \
+             patch('scheduler_lock.lingering_nondaemon_threads', return_value=[]):
+            assert hard_exit_if_lingering_threads(os.getpid(), grace_seconds=0.05) is False
+        mock_exit.assert_not_called()
+
+    def test_lingering_thread_hard_exits_and_flushes(self):
+        t, stop = self._pinned_thread()
+        logs = []
+        try:
+            with patch('scheduler_lock.os._exit') as mock_exit, \
+                 patch('scheduler_lock._flush_logging_and_stdio') as mock_flush:
+                result = hard_exit_if_lingering_threads(
+                    os.getpid(), grace_seconds=0.05, log_fn=logs.append,
+                )
+            assert result is True
+            mock_exit.assert_called_once_with(0)
+            mock_flush.assert_called_once()
+            assert any('fake-ws-pinned' in line for line in logs)
+        finally:
+            stop.set()
+            t.join()
+
+    def test_abort_path_uses_exit_code_1(self):
+        t, stop = self._pinned_thread()
+        try:
+            with patch('scheduler_lock.os._exit') as mock_exit, \
+                 patch('scheduler_lock._flush_logging_and_stdio'):
+                hard_exit_if_lingering_threads(
+                    os.getpid(), grace_seconds=0.0, exit_code=1,
+                )
+            mock_exit.assert_called_once_with(1)
+        finally:
+            stop.set()
+            t.join()
+
+    def test_master_reap_path_never_exits(self):
+        """worker_pid != os.getpid() (master reaping a dead worker) must not _exit."""
+        t, stop = self._pinned_thread()
+        try:
+            with patch('scheduler_lock.os._exit') as mock_exit:
+                result = hard_exit_if_lingering_threads(
+                    os.getpid() + 1, grace_seconds=0.05,
+                )
+            assert result is False
+            mock_exit.assert_not_called()
+        finally:
+            stop.set()
+            t.join()
+
+    def test_thread_finishing_within_grace_avoids_exit(self):
+        t, stop = self._pinned_thread()
+        threading.Timer(0.1, stop.set).start()
+        try:
+            with patch('scheduler_lock.os._exit') as mock_exit:
+                assert hard_exit_if_lingering_threads(os.getpid(), grace_seconds=5.0) is False
+            mock_exit.assert_not_called()
+        finally:
+            stop.set()
+            t.join()
+
+
 class TestShimReExport:
     def test_app_scheduler_lock_exposes_same_objects(self):
         import app.scheduler_lock as shim
         assert shim.try_acquire_scheduler_lock is try_acquire_scheduler_lock
         assert shim.SchedulerLockResult is SchedulerLockResult
         assert shim.shutdown_worker_scheduler is shutdown_worker_scheduler
+        assert shim.hard_exit_if_lingering_threads is hard_exit_if_lingering_threads

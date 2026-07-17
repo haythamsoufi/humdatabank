@@ -3096,7 +3096,9 @@
             initializeComplianceGrid();
         }
         setupEventHandlers();
-        if (CAN_ACCESS_COMPLIANCE) {
+        // Only auto-load compliance when that tab is the default active one;
+        // otherwise the tab click handler loads it on first access.
+        if (CAN_ACCESS_COMPLIANCE && {{ (explore_first_tab == 'compliance')|tojson }}) {
             loadComplianceData();
         }
         bootstrapDisaggFilters();

@@ -442,11 +442,10 @@
         }
         periodEl.disabled = true;
         try {
-            var resp = await fetch(config.periodsUrl + '?template_id=' + encodeURIComponent(templateId), {
+            var data = await window.apiFetch(config.periodsUrl + '?template_id=' + encodeURIComponent(templateId), {
                 headers: { Accept: 'application/json' },
                 credentials: 'same-origin',
             });
-            var data = await resp.json();
             var periods = data.periods || [];
             periodEl.innerHTML = '<option value="">' + esc('Choose period') + '</option>' +
                 periods.map(function (p) { return '<option value="' + esc(p) + '">' + esc(p) + '</option>'; }).join('');
@@ -468,12 +467,10 @@
             return null;
         }
         try {
-            var resp = await fetch(
+            var data = await window.apiFetch(
                 config.countriesUrl + '?template_id=' + encodeURIComponent(templateId) + '&period=' + encodeURIComponent(period),
                 { headers: { Accept: 'application/json' }, credentials: 'same-origin' }
             );
-            var data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || t.loadFailed);
             state.countries = data.countries || [];
             return populateCountrySelect(state.countries, preferredCountryId);
         } catch (err) {
@@ -519,9 +516,7 @@
         try {
             var url = config.previewUrl + '?template_id=' + encodeURIComponent(state.templateId) +
                 '&period=' + encodeURIComponent(state.period) + '&country_id=' + encodeURIComponent(countryId);
-            var resp = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-            var data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || t.previewFailed);
+            var data = await window.apiFetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
             state.preview = data.preview || null;
             state.rawIndicatorRows = (state.preview && state.preview.indicators) || [];
             state.historyYears = (state.preview && state.preview.history_years) || [];
@@ -534,7 +529,7 @@
     }
 
     async function runChecks(countryIds) {
-        var resp = await fetch(config.runChecksUrl, {
+        var data = await window.apiFetch(config.runChecksUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf, Accept: 'application/json' },
             credentials: 'same-origin',
@@ -544,8 +539,6 @@
                 country_ids: countryIds,
             }),
         });
-        var data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || 'Generate failed');
         showFeedback(data.message || 'Questions generated.', data.has_errors ? 'error' : 'success');
         var countryId = state.selectedCountry && state.selectedCountry.country_id;
         await loadDashboard(countryId);

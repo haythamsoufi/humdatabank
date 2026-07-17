@@ -1231,8 +1231,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (message.type === 'error') {
                         console.warn('WebSocket error message:', message.data);
                         if (message.data && message.data.message && message.data.message.includes('limit exceeded')) {
-                            // Connection limit exceeded - fallback to polling
+                            // Connection limit exceeded - close socket then fall back to polling
+                            // (do not leave the WS open while the 120s count poll runs)
                             console.warn('WebSocket connection limit exceeded, using polling');
+                            if (wsConnection) {
+                                try { wsConnection.close(); } catch (e) { /* ignore */ }
+                                wsConnection = null;
+                            }
+                            if (pingIntervalId !== null) {
+                                clearInterval(pingIntervalId);
+                                pingIntervalId = null;
+                            }
+                            // Stop any pending reconnect attempt — we're intentionally
+                            // giving up on WS for this session, not just this connection.
+                            if (reconnectTimeout !== null) {
+                                clearTimeout(reconnectTimeout);
+                                reconnectTimeout = null;
+                            }
+                            reconnectAttempts = 0;
                             fallbackToPolling();
                         }
                         return;
@@ -1322,21 +1338,45 @@ document.addEventListener('DOMContentLoaded', function() {
         connectWebSocket();
     }
 
+    // Guarded read/write for the "permanently disabled" flag — localStorage can throw
+    // in private-browsing / storage-restricted contexts, and this flag is touched from
+    // three separate WS-status code paths below.
+    function _setWsPermanentlyDisabled(disabled) {
+        try {
+            if (disabled) {
+                localStorage.setItem('websocket_permanently_disabled', 'true');
+            } else if (localStorage.getItem('websocket_permanently_disabled') === 'true') {
+                localStorage.removeItem('websocket_permanently_disabled');
+            }
+        } catch (e) { /* localStorage unavailable — ignore */ }
+    }
+
     function checkWebSocketStatusOnce() {
-        const cached = _readCachedWsStatus();
-        if (cached !== null) {
-            if (cached === false) {
+        // Prefer server-injected config (layout.html) so we never need GET /stream/status.
+        if (typeof window.NOTIFY_WS_ENABLED !== 'undefined') {
+            const enabled = !!window.NOTIFY_WS_ENABLED;
+            _writeCachedWsStatus(enabled);
+            _setWsPermanentlyDisabled(!enabled);
+            if (!enabled) {
                 fallbackToPolling();
             } else {
-                if (localStorage.getItem('websocket_permanently_disabled') === 'true') {
-                    localStorage.removeItem('websocket_permanently_disabled');
-                }
                 connectWebSocketIfVisible();
             }
             return;
         }
 
-        // Always check WebSocket status (even if previously disabled)
+        const cached = _readCachedWsStatus();
+        if (cached !== null) {
+            _setWsPermanentlyDisabled(cached === false);
+            if (cached === false) {
+                fallbackToPolling();
+            } else {
+                connectWebSocketIfVisible();
+            }
+            return;
+        }
+
+        // Fallback HTTP check when layout did not inject NOTIFY_WS_ENABLED
         // This allows the frontend to pick up configuration changes
         _nfetch('/notifications/api/stream/status')
             .then(response => response.json())
@@ -1344,32 +1384,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Server returns { success: true, websocket_enabled: <bool> }
                 const enabled = !!(data?.success && data.websocket_enabled !== false);
                 _writeCachedWsStatus(enabled);
+                _setWsPermanentlyDisabled(!enabled);
                 if (!enabled) {
-                    // WebSocket is disabled - mark it permanently and use polling
-                    localStorage.setItem('websocket_permanently_disabled', 'true');
+                    // WebSocket is disabled - use polling
                     fallbackToPolling();
                 } else {
-                    // WebSocket is enabled - clear any cached disabled state and proceed with connection
-                    if (localStorage.getItem('websocket_permanently_disabled') === 'true') {
-                        console.debug('WebSocket is now enabled (was previously disabled), clearing cache and connecting...');
-                        localStorage.removeItem('websocket_permanently_disabled');
-                    } else {
-                        console.debug('WebSocket is enabled, connecting...');
-                    }
+                    // WebSocket is enabled - proceed with connection
+                    console.debug('WebSocket is enabled, connecting...');
                     connectWebSocketIfVisible();
                 }
             })
             .catch(error => {
                 console.debug('Error checking WebSocket status, falling back to polling:', error);
-                // On error, check if we have a cached disabled state
-                const cachedDisabled = localStorage.getItem('websocket_permanently_disabled') === 'true';
-                if (cachedDisabled) {
-                    // Use cached disabled state
-                    fallbackToPolling();
-                } else {
-                    // No cache, assume temporary error and don't mark permanently
-                    fallbackToPolling();
-                }
+                // On error, fall back to polling regardless of any cached disabled state
+                // (a transient status-check failure isn't grounds to change that cache).
+                fallbackToPolling();
             });
     }
 
@@ -1407,7 +1436,10 @@ document.addEventListener('DOMContentLoaded', function() {
             clearInterval(pollingInterval);
             pollingInterval = null;
         }
-        // Poll for badge count every 120 seconds (reduced frequency to minimize server load)
+        // Poll for badge count every 120 seconds (reduced frequency to minimize server load).
+        // Also fetch immediately: without this, a session that lands on polling (WS disabled,
+        // limit exceeded, WS unsupported, etc.) would show a blank badge for up to 120s.
+        updateBadgeCountFromAPI();
         pollingInterval = setInterval(updateBadgeCountFromAPI, 120000);
     }
 
@@ -1472,7 +1504,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Re-fetched at most once per TTL window (per browser tab/session) instead of
     // unconditionally on every page load — this endpoint was found to be one of
     // the top contributors to unnecessary server load (see gateway-504 runbook).
-    const NOTIFICATION_PREFS_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+    const NOTIFICATION_PREFS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours (invalidated via forceRefreshNotificationPreferencesCache on save)
     const NOTIFICATION_PREFS_CACHED_AT_KEY = 'notification_preferences_cached_at';
 
     function cacheNotificationPreferences(force) {
@@ -1512,12 +1544,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initial setup
     if (notificationsBellButton) {
-        // Check if WebSocket was previously disabled (for initial badge load)
-        const websocketPermanentlyDisabled = localStorage.getItem('websocket_permanently_disabled') === 'true';
-        if (websocketPermanentlyDisabled) {
-            // Load badge count immediately if WebSocket was disabled
-            setTimeout(updateBadgeCountFromAPI, 1000);
-        }
+        // Note: no special-cased immediate badge fetch here for the "WebSocket was
+        // previously disabled" case — fallbackToPolling() (called below via
+        // checkWebSocketStatusOnce(), synchronously whenever NOTIFY_WS_ENABLED or a
+        // cached status is available) now always fetches the badge count immediately
+        // when entering polling, so a duplicate fetch here would just waste a request.
 
         // Cache notification preferences for sound feature (only once on page load)
         setTimeout(cacheNotificationPreferences, 2000);

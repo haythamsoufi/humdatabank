@@ -722,10 +722,18 @@ export const WidgetUiMixin = {
             if (this.elements.input) {
                 this.elements.input.focus();
             }
-            // Warm the tour cache for common workflows now that the user has actually
-            // opened the chat, instead of on every page load regardless of usage.
+            // No-op by design (see spotlight-tours.js#_preloadCommonWorkflowToursOnce) —
+            // kept as a call site in case tour preloading is reinstated later.
             if (typeof this._preloadCommonWorkflowToursOnce === 'function') {
                 this._preloadCommonWorkflowToursOnce();
+            }
+            // Fetch the floating header title once per page load, on first actual open,
+            // instead of on every page load. Centralized here (rather than only on the FAB
+            // click listener) so it also fires when chat is opened programmatically, e.g.
+            // form-builder-ai.js calling toggleChat(true) without going through the FAB.
+            if (!this._floatingTitleLoaded && !this._isImmersive() && this._getFloatingConversationId()) {
+                this._floatingTitleLoaded = true;
+                void this._refreshFloatingHeaderTitleFromServer();
             }
         }
 

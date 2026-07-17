@@ -312,14 +312,13 @@
         }
         var url = base + '?' + sp.toString();
 
-        var res = await fetch(url, {
+        var data = await window.apiFetch(url, {
             credentials: 'same-origin',
             headers: {
                 'Accept': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
             }
         });
-        var data = await res.json();
         if (!data || data.success !== true) {
             throw new Error((data && data.message) || 'Request failed');
         }

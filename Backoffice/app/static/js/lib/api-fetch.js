@@ -83,6 +83,30 @@
     }
 
     /**
+     * Convert a fetch Response into a safe result object — never throws, never crashes on HTML bodies.
+     * Use when callers need to inspect result.ok inline rather than catch exceptions.
+     *
+     * Returns {ok, status, data, payload} — `data` and `payload` both reference the same body object
+     * so callers that use either key continue to work without changes.
+     *
+     * @param {Response} response - Fetch Response object
+     * @returns {Promise<{ok: boolean, status: number, data: object, payload: object}>}
+     */
+    async function responseAsResult(response) {
+        if (!response.ok) {
+            const err = await parseHttpError(response);
+            const errBody = { error: err.message };
+            return { ok: false, status: response.status, data: errBody, payload: errBody };
+        }
+        try {
+            const body = await response.json();
+            return { ok: true, status: response.status, data: body, payload: body };
+        } catch (_) {
+            return { ok: true, status: response.status, data: {}, payload: {} };
+        }
+    }
+
+    /**
      * Fetch with CSRF, parse JSON, optionally show errors.
      * @param {string} url - Request URL
      * @param {RequestInit & { showAlertOnError?: boolean, parseJson?: boolean }} [options]
@@ -126,5 +150,10 @@
         window.parseHttpError = parseHttpError;
         /** Sync: create Error from Response. Use: throw (window.httpErrorSync && window.httpErrorSync(r)) */
         window.httpErrorSync = httpErrorSync;
+        /**
+         * Convert a Response to {ok, status, data, payload} — never throws, safe on HTML error bodies.
+         * Use: .then(window.responseAsResult) or const result = await window.responseAsResult(response)
+         */
+        window.responseAsResult = responseAsResult;
     }
 })();

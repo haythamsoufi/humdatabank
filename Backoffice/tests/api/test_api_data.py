@@ -36,6 +36,10 @@ class TestApiData:
         assert "national_societies" in data
         assert "indicator_bank" in data
         assert "matrix_cells" in data
+        assert "assignment_statuses" in data
+        assert isinstance(data["assignment_statuses"], list)
+        assert "arrays" in data
+        assert "assignment_statuses" in data["arrays"]
         assert "total_items" in data
 
     def test_legacy_data_tables_redirects_to_data(self, client, auth_headers):

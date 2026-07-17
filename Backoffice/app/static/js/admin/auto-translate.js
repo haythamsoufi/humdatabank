@@ -67,11 +67,15 @@
             return;
         }
 
+        // Lazy-load flag: fetch once on first modal open; reset to false on error so the
+        // next open retries rather than showing permanently stale/broken state.
+        let servicesLoaded = false;
+
         // Load available translation services
         function loadTranslationServices() {
+            servicesLoaded = true;
             const _fetchFn = (window.getFetch && window.getFetch()) || fetch;
-            _fetchFn(cfg.urls.translationServices)
-                .then(response => response.json())
+            window.apiFetch(cfg.urls.translationServices)
                 .then(data => {
                     if (data.success) {
                         populateServiceDropdown(data.services, data.default_service);
@@ -83,6 +87,7 @@
                     }
                 })
                 .catch(error => {
+                    servicesLoaded = false;
                     const errorLoadingMsg = cfg.t.error_loading_translation_services_608b37e2;
                     console.error(errorLoadingMsg + ':', error);
                     const serviceMessage = document.getElementById('service-loading-message');
@@ -599,6 +604,11 @@
 
         // Show modal button
         jQuery('#auto-translate-all-btn').on('click', function() {
+            // Fetch translation services on first open (deferred to avoid a page-load request)
+            if (!servicesLoaded) {
+                loadTranslationServices();
+            }
+
             // Reset overwrite checkbox to unchecked by default
             jQuery('#overwrite-existing-translations').prop('checked', false);
 
@@ -725,11 +735,6 @@
             updateEstimatedTime();
             updateStartButtonState();
         });
-
-        // Load translation services when modal is shown
-        if (autoTranslateConfig.endpoint) {
-            loadTranslationServices();
-        }
 
         // Start translation
         jQuery('#auto-translate-start-btn').on('click', function() {

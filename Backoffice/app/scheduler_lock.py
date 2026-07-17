@@ -10,7 +10,10 @@ share the same in-process lock state.
 
 from scheduler_lock import (  # noqa: F401
     SCHEDULER_SHUTDOWN_WAIT_SECONDS,
+    WORKER_EXIT_THREAD_JOIN_GRACE_SECONDS,
     SchedulerLockResult,
+    hard_exit_if_lingering_threads,
+    lingering_nondaemon_threads,
     pid_alive,
     read_lock_owner,
     release_scheduler_lock,
@@ -23,7 +26,10 @@ from scheduler_lock import (  # noqa: F401
 
 __all__ = [
     'SCHEDULER_SHUTDOWN_WAIT_SECONDS',
+    'WORKER_EXIT_THREAD_JOIN_GRACE_SECONDS',
     'SchedulerLockResult',
+    'hard_exit_if_lingering_threads',
+    'lingering_nondaemon_threads',
     'pid_alive',
     'read_lock_owner',
     'release_scheduler_lock',

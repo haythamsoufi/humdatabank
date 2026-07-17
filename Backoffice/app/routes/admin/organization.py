@@ -897,6 +897,16 @@ def index():
 
         return json_ok(**response_data)
 
+    # Derive part_of categories from already-loaded NSs so the page does not
+    # need a separate GET /api/part-of-programs round-trip on load.
+    part_of_programs = sorted({
+        item.strip()
+        for ns in nss
+        if ns.part_of and isinstance(ns.part_of, list)
+        for item in ns.part_of
+        if item and isinstance(item, str) and item.strip()
+    })
+
     return render_template('admin/organization/index.html',
                          countries_count=countries_count,
                          nss_count=nss_count,
@@ -920,6 +930,7 @@ def index():
                          regions=regions,
                          clusters=clusters,
                          all_countries=all_countries,
+                         part_of_programs=part_of_programs,
                          # Filter parameters
                          selected_country_id=selected_country_id,
                          selected_division_id=selected_division_id,

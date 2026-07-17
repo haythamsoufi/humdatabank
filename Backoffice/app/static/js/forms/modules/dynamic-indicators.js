@@ -329,11 +329,12 @@ function deleteDynamicIndicator(assignmentId, indicatorName) {
     })
     .then(response => {
         if (!response.ok) {
-            return response.json().then(data => {
-                const labels = window.DYNAMIC_INDICATORS_LABELS || {};
-                const errorMessage = labels.failedToDelete || 'Failed to delete indicator';
-                throw new Error(data.error || errorMessage);
-            });
+            if (window.parseHttpError) {
+                return window.parseHttpError(response).then(err => { throw err; });
+            }
+            const err = new Error(`HTTP ${response.status}`);
+            err.status = response.status;
+            throw err;
         }
         return response.json();
     })
@@ -906,11 +907,12 @@ function addDynamicIndicator(sectionId, indicatorId, rowId, repeatInstance = nul
     })
     .then(response => {
         if (!response.ok) {
-            return response.json().then(data => {
-                const labels = window.DYNAMIC_INDICATORS_LABELS || {};
-                const errorMessage = labels.failedToAdd || 'Failed to add indicator';
-                throw new Error(data.error || errorMessage);
-            });
+            if (window.parseHttpError) {
+                return window.parseHttpError(response).then(err => { throw err; });
+            }
+            const err = new Error(`HTTP ${response.status}`);
+            err.status = response.status;
+            throw err;
         }
         return response.json();
     })
@@ -986,10 +988,17 @@ function addDynamicIndicator(sectionId, indicatorId, rowId, repeatInstance = nul
         debugError('dynamic-indicators', 'Failed to add dynamic indicator:', error);
         removeIndicatorLoadingState(rowId);
         const labels = window.DYNAMIC_INDICATORS_LABELS || {};
-        const errorMessage = labels.failedToAdd || 'Failed to add indicator';
-        const msg = `${errorMessage}: ${error.message}`;
-        if (window.showAlert) window.showAlert(msg, 'error');
-        else (window.__clientWarn || console.warn)(msg);
+        const status = error.status;
+        if (status >= 502 && status <= 504) {
+            const msg = labels.gatewayError || 'The server is temporarily unavailable. Please try again in a moment.';
+            if (window.showAlert) window.showAlert(msg, 'warning');
+            else (window.__clientWarn || console.warn)(msg);
+        } else {
+            const errorMessage = labels.failedToAdd || 'Failed to add indicator';
+            const msg = `${errorMessage}: ${error.message}`;
+            if (window.showAlert) window.showAlert(msg, 'error');
+            else (window.__clientWarn || console.warn)(msg);
+        }
     });
 }
 
@@ -1043,9 +1052,12 @@ export function addPendingDynamicIndicatorForImport(sectionId, indicatorBankId, 
     })
         .then((response) => {
             if (!response.ok) {
-                return response.json().then((data) => {
-                    throw new Error(data.error || 'Failed to render indicator');
-                });
+                if (window.parseHttpError) {
+                    return window.parseHttpError(response).then(err => { throw err; });
+                }
+                const err = new Error(`HTTP ${response.status}`);
+                err.status = response.status;
+                throw err;
             }
             return response.json();
         })

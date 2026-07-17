@@ -519,12 +519,28 @@ class WorkflowDocsService:
         language = self._normalize_language(language)
         workflow = self._get_workflow_translated(workflow_id, language)
 
+        # Some translation files use localized field labels (e.g. Sélecteur/Aide) that
+        # the English step parser does not extract yet, yielding an empty steps list.
+        # Fall back to English so static/CDN tour JSON still exists for every language
+        # and the browser does not need to hit the dynamic /tour API.
+        is_fallback = False
+        if (not workflow or not workflow.steps) and language != 'en':
+            workflow = self._get_workflow_translated(workflow_id, 'en')
+            is_fallback = workflow is not None and bool(workflow.steps)
+
         if not workflow or not workflow.steps:
             return None
 
         tour_config = workflow.to_tour_config()
-        # Add language info to the response
-        tour_config['language'] = language
+        # `language` reflects the ACTUAL content language (i.e. 'en' on fallback), not
+        # merely the requested one — this is what the client compares against its own
+        # requested language to detect + cache a fallback (see workflow-tour-parser.js),
+        # and is also what gets baked into the generated static/CDN JSON filenames'
+        # *content*, so a French tour file never silently claims English content is
+        # French. `is_fallback` makes the same fact explicit for any other consumer
+        # (e.g. a future localized UI hint) without having to compare language codes.
+        tour_config['language'] = 'en' if is_fallback else language
+        tour_config['is_fallback'] = is_fallback
         return tour_config
 
     def get_workflow_summary(self, workflow_id: str) -> Optional[str]:

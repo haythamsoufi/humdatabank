@@ -78,6 +78,30 @@ def _append_pool_stats(message: str) -> str:
     return message
 
 
+def _append_pressure_context(message: str, *, exclude_request_id: Optional[int] = None) -> str:
+    """Append active-thread count and concurrent in-flight requests to a slow/stuck log line.
+
+    Answers "was this process doing something else at the time?" directly in the
+    log, instead of requiring a separate investigation after the fact — the
+    request's own duration alone can't distinguish "this code is slow" from
+    "this thread was waiting behind other concurrent work on the same process".
+    """
+    with suppress(Exception):
+        from app.services.monitoring.request_pressure import sibling_snapshot
+
+        snap = sibling_snapshot(exclude_request_id=exclude_request_id)
+        message += (
+            f' | active_threads={snap["active_threads"]} '
+            f'concurrent_requests={snap["sibling_count"]}'
+        )
+        if snap['siblings']:
+            sibling_desc = ', '.join(
+                f'{s["method"]} {s["path"]} ({s["elapsed_s"]}s)' for s in snap['siblings']
+            )
+            message += f' | concurrent=[{sibling_desc}]'
+    return message
+
+
 def _log_inflight(
     level: str,
     tag: str,
@@ -87,6 +111,7 @@ def _log_inflight(
     path: str,
     query: str = '',
     endpoint: Optional[str] = None,
+    pressure_request_id: Optional[int] = None,
 ) -> None:
     logger = current_app.logger
     message = (
@@ -94,6 +119,7 @@ def _log_inflight(
         f'{_format_request_context(method=method, path=path, query=query, endpoint=endpoint)}'
     )
     message = _append_pool_stats(message)
+    message = _append_pressure_context(message, exclude_request_id=pressure_request_id)
     log_fn = getattr(logger, level, logger.warning)
     log_fn(message)
 
@@ -113,6 +139,7 @@ class _InflightTimer:
         path: str,
         query: str = '',
         endpoint: Optional[str] = None,
+        pressure_request_id: Optional[int] = None,
     ):
         self._app = app
         self._start_time = start_time
@@ -123,6 +150,7 @@ class _InflightTimer:
         self._path = path
         self._query = query
         self._endpoint = endpoint
+        self._pressure_request_id = pressure_request_id
         self._cancelled = False
         self._timer: Optional[threading.Timer] = None
 
@@ -146,6 +174,7 @@ class _InflightTimer:
                 path=self._path,
                 query=self._query,
                 endpoint=self._endpoint,
+                pressure_request_id=self._pressure_request_id,
             )
 
     def cancel(self) -> None:
@@ -175,6 +204,11 @@ def track_slow_request_start() -> None:
     g.slow_request_endpoint = request.endpoint
     g.slow_request_query = request.query_string.decode('utf-8', errors='replace')[:200]
     g.slow_request_timers = []
+    # Captured now (not read from `g` inside the timer callback) because the timer
+    # fires on a background thread under a fresh app_context that doesn't carry
+    # this request's `g` — see request_pressure.track_pressure_start, which runs
+    # earlier in the before_request chain and sets this on the *request's* g.
+    pressure_request_id = getattr(g, 'pressure_request_id', None)
 
     schedule = (
         (_stuck_warning_seconds, 'warning', 'STUCK_REQUEST'),
@@ -193,6 +227,7 @@ def track_slow_request_start() -> None:
             path=g.slow_request_path,
             query=g.slow_request_query,
             endpoint=g.slow_request_endpoint,
+            pressure_request_id=pressure_request_id,
         )
         g.slow_request_timers.append(timer)
         timer.start()
@@ -213,6 +248,7 @@ def track_slow_request_end() -> None:
         f'(threshold={_threshold_seconds:.0f}s) | {_format_request_context()}'
     )
     message = _append_pool_stats(message)
+    message = _append_pressure_context(message, exclude_request_id=getattr(g, 'pressure_request_id', None))
     current_app.logger.warning(message)
 
 

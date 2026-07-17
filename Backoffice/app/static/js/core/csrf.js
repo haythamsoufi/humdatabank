@@ -47,6 +47,9 @@ function applyCsrfToken(token) {
     }
 
     csrfLastRefreshAt = Date.now();
+    try {
+        localStorage.setItem('csrf_last_refresh_at', String(csrfLastRefreshAt));
+    } catch (_) { /* localStorage unavailable */ }
     return token;
 }
 
@@ -153,9 +156,23 @@ async function refreshCSRFToken() {
     }
 }
 
+// Cross-tab-aware "last refreshed at": another tab may have refreshed more
+// recently than this one's in-memory csrfLastRefreshAt (set only by this tab's
+// own applyCsrfToken calls). Used by the wake path so N open tabs don't each
+// independently re-refresh on focus/visibility just because their own timer
+// hasn't fired yet — consistent with the periodic-interval gate below.
+function _crossTabLastRefreshAt() {
+    try {
+        return parseInt(localStorage.getItem('csrf_last_refresh_at'), 10) || 0;
+    } catch (_) {
+        return 0;
+    }
+}
+
 function refreshCSRFTokenIfStale(maxAgeMs = CSRF_PRE_SUBMIT_REFRESH_AFTER_MS) {
     if (csrfSessionExpired) return Promise.resolve(null);
-    if ((Date.now() - csrfLastRefreshAt) < maxAgeMs) return Promise.resolve(getCSRFToken());
+    const lastRefreshAt = Math.max(csrfLastRefreshAt, _crossTabLastRefreshAt());
+    if ((Date.now() - lastRefreshAt) < maxAgeMs) return Promise.resolve(getCSRFToken());
     return refreshCSRFToken();
 }
 
@@ -271,8 +288,14 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // Periodically refresh CSRF token (every 45 minutes).
-    // Admin pages use /admin/api/refresh-csrf-token; other pages re-fetch the current page.
-    csrfRefreshTimerId = setInterval(refreshCSRFToken, CSRF_REFRESH_INTERVAL_MS);
+    // Skip hidden tabs (wake handler refreshes on focus) and share a cross-tab
+    // localStorage gate so N open tabs do not each hit the refresh endpoint.
+    csrfRefreshTimerId = setInterval(function () {
+        if (typeof document !== 'undefined' && document.hidden) return;
+        const last = _crossTabLastRefreshAt();
+        if (last && (Date.now() - last) < CSRF_WAKE_REFRESH_AFTER_MS) return;
+        refreshCSRFToken();
+    }, CSRF_REFRESH_INTERVAL_MS);
     document.addEventListener('submit', handleStaleCsrfFormSubmit, true);
     document.addEventListener('visibilitychange', refreshCsrfOnPageWake);
     window.addEventListener('focus', refreshCsrfOnPageWake);

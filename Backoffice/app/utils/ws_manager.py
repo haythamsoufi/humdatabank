@@ -5,16 +5,14 @@ Handles both AI chat streaming and notification delivery via WebSocket.
 Uses connection pooling and timeouts to prevent blocking the main application.
 """
 
-from typing import Dict, Set, Optional
-from contextlib import suppress
+from typing import Dict, Optional
+from collections import OrderedDict
 from flask import current_app, has_app_context
-from datetime import datetime
 import json
 import logging
 import os
 import threading
 import time
-from collections import deque
 from app.utils.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)
@@ -52,33 +50,73 @@ def _default_ws_connection_budget() -> int:
     return max(1, threads - reserved)
 
 
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name, '').strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _default_channel_budgets(total: int) -> Dict[str, int]:
+    """
+    Per-channel caps so long-running AI sockets cannot starve notification slots
+    (and vice versa). Total budget still applies on top.
+    """
+    # Leave at least one slot for notifications when AI saturates.
+    ai_chat = _env_int('WS_MAX_AI_CHAT', max(1, min(total // 2, total - 1) if total > 1 else total))
+    ai_docs = _env_int('WS_MAX_AI_DOCS', max(1, min(total // 3, total - 1) if total > 1 else total))
+    notifications = _env_int('WS_MAX_NOTIFICATIONS', total)
+    return {
+        'notifications': max(1, notifications),
+        'ai_chat': max(1, ai_chat),
+        'ai_docs': max(1, ai_docs),
+        'default': total,
+    }
+
+
 class WebSocketManager:
     """Manages WebSocket connections for real-time communication"""
 
-    def __init__(self, max_connections_per_user=None, max_total_connections=None, message_queue_size=50):
-        # Store active connections: {user_id: set of WebSocket objects}
-        self._connections: Dict[object, Set] = {}
-        self._lock = threading.RLock()  # Reentrant lock for nested calls
+    def __init__(
+        self,
+        max_connections_per_user=None,
+        max_total_connections=None,
+        message_queue_size=50,
+        channel_budgets: Optional[Dict[str, int]] = None,
+    ):
+        # Insertion-ordered per user so eviction is true FIFO.
+        self._connections: Dict[object, OrderedDict] = {}
+        self._lock = threading.RLock()
 
         budget = _default_ws_connection_budget()
         self.max_total_connections = max_total_connections if max_total_connections is not None else budget
         self.max_connections_per_user = (
-            max_connections_per_user if max_connections_per_user is not None else min(5, budget)
+            max_connections_per_user if max_connections_per_user is not None else min(5, self.max_total_connections)
         )
         self.message_queue_size = message_queue_size
+        self.channel_budgets = channel_budgets if channel_budgets is not None else _default_channel_budgets(
+            self.max_total_connections
+        )
 
-        # Track connection metadata for cleanup (includes 'channel' for diagnostics,
-        # e.g. 'notifications' vs 'ai_chat' vs 'ai_docs' — these all share the same
-        # per-process thread budget since they compete for the same gthread pool).
+        # Track connection metadata for cleanup (includes 'channel' for diagnostics
+        # and per-channel admission control).
         self._connection_metadata: Dict[object, dict] = {}
         self._metadata_lock = threading.RLock()
+        self._channel_counts: Dict[str, int] = {}
 
         logger.info(
             "[WS_POOL] WebSocketManager initialized: worker_pid=%s max_total_connections=%s "
-            "max_connections_per_user=%s gunicorn_threads=%s reserved_http_threads=%s",
+            "max_connections_per_user=%s channel_budgets=%s gunicorn_threads=%s reserved_http_threads=%s",
             os.getpid(), self.max_total_connections, self.max_connections_per_user,
+            self.channel_budgets,
             os.environ.get('GUNICORN_THREADS', 'unset'), os.environ.get('WS_RESERVED_HTTP_THREADS', '2'),
         )
+
+    def _channel_count_unlocked(self, channel: str) -> int:
+        return self._channel_counts.get(channel, 0)
 
     def add_connection(self, user_id, ws, channel: str = 'default') -> bool:
         """
@@ -88,14 +126,12 @@ class WebSocketManager:
         Thread-safe implementation with proper atomic operations.
 
         ``channel`` tags the connection's purpose (e.g. 'notifications', 'ai_chat',
-        'ai_docs') purely for diagnostics/logging — all channels share the same
-        total/per-user budget because they draw from the same worker thread pool.
+        'ai_docs') for diagnostics and per-channel admission. All channels still
+        share the total per-process thread budget.
         """
         with self._lock:
-            # Calculate current total connections atomically
             total_connections = sum(len(conns) for conns in self._connections.values())
 
-            # Check total connections limit before adding
             if total_connections >= self.max_total_connections:
                 logger.warning(
                     "[WS_POOL] rejected: worker_pid=%s channel=%s user=%s reason=limit_reached "
@@ -104,40 +140,51 @@ class WebSocketManager:
                 )
                 return False
 
-            # Initialize user's connection set if needed
+            channel_cap = self.channel_budgets.get(channel, self.max_total_connections)
+            channel_active = self._channel_count_unlocked(channel)
+            if channel_active >= channel_cap:
+                logger.warning(
+                    "[WS_POOL] rejected: worker_pid=%s channel=%s user=%s reason=channel_limit "
+                    "channel_active=%s/%s total=%s/%s",
+                    os.getpid(), channel, user_id, channel_active, channel_cap,
+                    total_connections, self.max_total_connections,
+                )
+                return False
+
             if user_id not in self._connections:
-                self._connections[user_id] = set()
+                self._connections[user_id] = OrderedDict()
 
             user_connections = self._connections[user_id]
 
-            # Check per-user limit and handle if exceeded
             if len(user_connections) >= self.max_connections_per_user:
-                # Remove oldest connection (FIFO - first in, first out)
+                # True FIFO: OrderedDict popitem(last=False) removes oldest.
+                oldest_ws, _ = user_connections.popitem(last=False)
                 logger.warning(
-                    f"User {user_id} has {len(user_connections)} connections "
-                    f"(max: {self.max_connections_per_user}), removing oldest"
+                    "[WS_POOL] per-user eviction: user=%s channel=%s "
+                    "evicted_oldest (max_per_user=%s)",
+                    user_id, channel, self.max_connections_per_user,
                 )
-                oldest_ws = next(iter(user_connections))
-                self._remove_connection_internal(user_id, oldest_ws)
+                self._remove_connection_internal(user_id, oldest_ws, already_popped=True)
 
-            # Add new connection
-            user_connections.add(ws)
+            user_connections[ws] = None
 
-            # Store connection metadata
             with self._metadata_lock:
                 self._connection_metadata[ws] = {
                     'user_id': user_id,
                     'channel': channel,
                     'created_at': time.time(),
                     'last_activity': time.time(),
-                    'message_count': 0
+                    'message_count': 0,
                 }
+            self._channel_counts[channel] = self._channel_count_unlocked(channel) + 1
 
-            new_total = total_connections + 1
+            new_total = sum(len(conns) for conns in self._connections.values())
             pct_used = round((new_total / self.max_total_connections) * 100) if self.max_total_connections else 0
             logger.info(
-                "[WS_POOL] connect: worker_pid=%s channel=%s user=%s active=%s/%s (%s%% of thread budget)",
+                "[WS_POOL] connect: worker_pid=%s channel=%s user=%s active=%s/%s (%s%% of thread budget) "
+                "channel_active=%s/%s",
                 os.getpid(), channel, user_id, new_total, self.max_total_connections, pct_used,
+                self._channel_count_unlocked(channel), channel_cap,
             )
             if pct_used >= 75:
                 logger.warning(
@@ -148,15 +195,27 @@ class WebSocketManager:
 
             return True
 
-    def _remove_connection_internal(self, user_id, ws) -> None:
+    def _remove_connection_internal(self, user_id, ws, *, already_popped: bool = False) -> None:
         """Internal method to remove connection (assumes lock is held)"""
-        if user_id in self._connections:
-            self._connections[user_id].discard(ws)
+        channel = 'default'
+        with self._metadata_lock:
+            meta = self._connection_metadata.pop(ws, None)
+            if meta:
+                channel = meta.get('channel', 'default')
+
+        if not already_popped and user_id in self._connections:
+            self._connections[user_id].pop(ws, None)
             if not self._connections[user_id]:
                 del self._connections[user_id]
+        elif already_popped:
+            # Oldest was already popped from the OrderedDict; clean empty user entry.
+            if user_id in self._connections and not self._connections[user_id]:
+                del self._connections[user_id]
 
-        with self._metadata_lock:
-            self._connection_metadata.pop(ws, None)
+        if channel in self._channel_counts and self._channel_counts[channel] > 0:
+            self._channel_counts[channel] -= 1
+            if self._channel_counts[channel] == 0:
+                del self._channel_counts[channel]
 
     def remove_connection(self, user_id, ws) -> None:
         """Remove a WebSocket connection for a user"""
@@ -178,12 +237,7 @@ class WebSocketManager:
         with self._lock:
             total = sum(len(conns) for conns in self._connections.values())
             user_count = len(self._connections)
-
-        by_channel: Dict[str, int] = {}
-        with self._metadata_lock:
-            for meta in self._connection_metadata.values():
-                ch = meta.get('channel', 'default')
-                by_channel[ch] = by_channel.get(ch, 0) + 1
+            by_channel = dict(self._channel_counts)
 
         budget = self.max_total_connections
         pct_used = round((total / budget) * 100) if budget else 0
@@ -194,6 +248,7 @@ class WebSocketManager:
             'pct_of_budget_used': pct_used,
             'distinct_users': user_count,
             'by_channel': by_channel,
+            'channel_budgets': dict(self.channel_budgets),
         }
 
     def update_activity(self, ws) -> None:
@@ -218,16 +273,11 @@ class WebSocketManager:
         This minimizes lock contention and prevents blocking.
         """
         try:
-            # Step 1: Acquire lock briefly to get connection list
             with self._lock:
                 if user_id not in self._connections:
                     return 0
+                connections_copy = list(self._connections[user_id].keys())
 
-                # Create copy of connections while holding lock
-                connections_copy = list(self._connections[user_id])
-
-            # Step 2: Release lock before sending messages
-            # This allows concurrent sends to different users without blocking
             sent_count = 0
             broken_connections = []
 
@@ -238,31 +288,30 @@ class WebSocketManager:
             }
             message_json = json.dumps(message)
 
-            # Send messages without holding lock (non-blocking)
             for ws in connections_copy:
                 try:
-                    # flask-sock's send() is non-blocking when used with proper WSGI server
-                    # (Gunicorn with threads, or async server)
                     ws.send(message_json)
-                    # Update activity (uses its own lock, safe to call without main lock)
                     self.update_activity(ws)
                     sent_count += 1
                 except Exception as e:
-                    logger.debug(f"Error sending WebSocket message to user {user_id}: {str(e)}")
-                    # Mark connection as broken for removal
+                    logger.debug(
+                        "[WS_POOL] send failed user=%s error=%s",
+                        user_id, e,
+                    )
                     broken_connections.append(ws)
 
-            # Step 3: Re-acquire lock only to remove broken connections
             if broken_connections:
                 with self._lock:
                     for ws in broken_connections:
-                        # Double-check connection still exists before removing
                         if user_id in self._connections and ws in self._connections[user_id]:
                             self._remove_connection_internal(user_id, ws)
 
             return sent_count
         except Exception as e:
-            logger.error(f"Unexpected error in send_to_user for user {user_id}: {str(e)}")
+            logger.error(
+                "[WS_POOL] unexpected error in send_to_user user=%s: %s",
+                user_id, e, exc_info=True,
+            )
             return 0
 
     def send_to_connection(self, ws, event_type: str, data: dict) -> bool:
@@ -280,12 +329,11 @@ class WebSocketManager:
             self.update_activity(ws)
             return True
         except Exception as e:
-            logger.debug(f"Error sending WebSocket message to connection: {str(e)}")
-            # Try to find and remove the connection
+            logger.debug("[WS_POOL] send_to_connection failed: %s", e)
             with self._lock:
-                for user_id, connections in list(self._connections.items()):
+                for uid, connections in list(self._connections.items()):
                     if ws in connections:
-                        self._remove_connection_internal(user_id, ws)
+                        self._remove_connection_internal(uid, ws)
                         break
             return False
 
@@ -293,10 +341,10 @@ class WebSocketManager:
         """Get the number of active connections"""
         with self._lock:
             if user_id:
-                return len(self._connections.get(user_id, []))
+                return len(self._connections.get(user_id, {}))
             return sum(len(conns) for conns in self._connections.values())
 
-    def get_all_user_ids(self) -> Set[int]:
+    def get_all_user_ids(self) -> set:
         """Get all user IDs with active connections"""
         with self._lock:
             return set(self._connections.keys())
@@ -316,14 +364,18 @@ class WebSocketManager:
                 for ws, metadata in list(self._connection_metadata.items()):
                     idle_time = current_time - metadata['last_activity']
                     if idle_time > max_idle_seconds:
-                        stale_connections.append((metadata['user_id'], ws))
+                        stale_connections.append((metadata['user_id'], ws, metadata.get('channel', 'default')))
 
-            for user_id, ws in stale_connections:
+            for user_id, ws, channel in stale_connections:
                 self._remove_connection_internal(user_id, ws)
                 cleaned += 1
+                logger.info(
+                    "[WS_POOL] stale cleanup: user=%s channel=%s idle>%ss",
+                    user_id, channel, max_idle_seconds,
+                )
 
         if cleaned > 0:
-            logger.info(f"Cleaned up {cleaned} stale WebSocket connections")
+            logger.info("[WS_POOL] cleaned up %s stale WebSocket connection(s)", cleaned)
 
         return cleaned
 
@@ -357,10 +409,16 @@ def broadcast_notification(user_id: int, notification_data: dict) -> bool:
             }
         )
         if sent_count > 0:
-            logger.debug(f"Broadcasted notification to user {user_id} via WebSocket ({sent_count} connection(s))")
+            logger.debug(
+                "[WS:notifications] broadcasted notification user=%s connections=%s",
+                user_id, sent_count,
+            )
         return sent_count > 0
     except Exception as e:
-        logger.error(f"Error broadcasting notification to user {user_id}: {str(e)}")
+        logger.error(
+            "[WS:notifications] broadcast notification failed user=%s: %s",
+            user_id, e, exc_info=True,
+        )
         return False
 
 
@@ -389,8 +447,14 @@ def broadcast_unread_count(user_id: int, unread_count: int) -> bool:
             }
         )
         if sent_count > 0:
-            logger.debug(f"Broadcasted unread count ({unread_count}) to user {user_id} via WebSocket ({sent_count} connection(s))")
+            logger.debug(
+                "[WS:notifications] broadcasted unread_count=%s user=%s connections=%s",
+                unread_count, user_id, sent_count,
+            )
         return sent_count > 0
     except Exception as e:
-        logger.error(f"Error broadcasting unread count to user {user_id}: {str(e)}")
+        logger.error(
+            "[WS:notifications] broadcast unread_count failed user=%s: %s",
+            user_id, e, exc_info=True,
+        )
         return False

@@ -507,6 +507,8 @@ Key env vars to set in **Azure Portal → App Service → Configuration → Appl
 | `GUNICORN_TIMEOUT` | `60` (default) | Heartbeat murder threshold, **not** a request timeout: gthread workers heartbeat from the accept loop, so stuck requests never trip it (App Gateway 504s clients at ~30s). Must exceed `GUNICORN_GRACEFUL_TIMEOUT` (15) + scheduler shutdown wait (10) with margin, or recycles get SIGKILLed mid-teardown (2026-07-16 incident) |
 | `GUNICORN_WORKERS` | `3` or `4` (explicit) | Prevents RAM exhaustion on smaller SKUs |
 | `GUNICORN_THREADS` | `8` (default) | Request slots per worker; also drives the per-worker WebSocket budget (threads − 2). The effective value is written back to the env so `ws_manager` always sees it |
+| `WS_MAX_AI_CHAT` / `WS_MAX_AI_DOCS` / `WS_MAX_NOTIFICATIONS` | derived from budget | Optional per-channel WebSocket caps (on top of the total thread budget) so AI sockets cannot starve notifications |
+| `WS_MAX_MESSAGE_BYTES` | `262144` | Max inbound WebSocket frame size (also set as `SOCK_SERVER_OPTIONS.max_message_size`) |
 | `GUNICORN_KEEPALIVE` | `75` (default) | Backend keepalive must outlive App Gateway connection reuse to avoid idle-close 502 races |
 | `GUNICORN_MAX_REQUESTS` | `500` | Workers recycle before OOM; jitter prevents mass recycling |
 | `GUNICORN_MAX_REQUESTS_JITTER` | `100` | Spreads recycling across workers |

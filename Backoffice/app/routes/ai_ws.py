@@ -31,6 +31,15 @@ from app.utils.constants import (
 from app.utils.datetime_helpers import utcnow
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.ws_manager import ws_manager
+from app.utils.ws_helpers import (
+    WsInboundPump,
+    apply_sock_server_options,
+    check_websocket_origin,
+    get_ws_redis_client,
+    is_ws_disconnect_error,
+    log_ws,
+    release_request_db_session,
+)
 from app.services.user_analytics_service import get_client_ip
 
 from app.routes.ai import (
@@ -108,11 +117,9 @@ def _global_ws_allow_memory(*, key: str, window_seconds: float, max_events: int)
 def _global_ws_allow_redis(*, key: str, window_seconds: float, max_events: int) -> Optional[float]:
     """Redis-backed rate limiter (cross-worker). Returns retry_delay if limited, else None. Fail-open on error."""
     try:
-        import redis
-        redis_url = current_app.config.get("REDIS_URL")
-        if not redis_url:
+        r = get_ws_redis_client()
+        if r is None:
             return None
-        r = redis.from_url(redis_url)
         redis_key = f"ai_ws_rate:{key}"
         now = time.time()
         r.zadd(redis_key, {str(now): now})
@@ -126,7 +133,7 @@ def _global_ws_allow_redis(*, key: str, window_seconds: float, max_events: int) 
                 return float(retry)
         return None
     except Exception as e:
-        logger.debug("Redis rate limiter failed (fail-open): %s", e, exc_info=True)
+        log_ws(logging.WARNING, "ai_chat", "Redis rate limiter failed (fail-open)", error=str(e), exc_info=True)
         return None  # fail open
 
 
@@ -407,6 +414,7 @@ def register_ai_ws(app) -> None:
         app.logger.warning("flask-sock not installed; AI WebSocket endpoint disabled: %s", e)
         return
 
+    apply_sock_server_options(app)
     sock = Sock(app)
 
     @sock.route("/api/ai/v2/ws")
@@ -441,6 +449,18 @@ def register_ai_ws(app) -> None:
           OR
           {"type":"cancelled"}  // Generation cancelled
         """
+        ok_origin, origin_err = check_websocket_origin(channel="ai_chat")
+        if not ok_origin:
+            try:
+                ws.send(json.dumps({
+                    "type": "error",
+                    "message": origin_err or "Origin not allowed",
+                    "error_type": "origin_rejected",
+                }))
+            except Exception:
+                pass
+            return
+
         identity = resolve_ai_identity()
         try:
             from app.services.app_settings_service import is_ai_beta_restricted, user_has_ai_beta_access
@@ -450,22 +470,22 @@ def register_ai_ws(app) -> None:
                     try:
                         ws.send(json.dumps({"type": "error", "message": "AI beta access is limited to selected users.", "error_type": "auth_required"}))
                     except Exception as e:
-                        logger.debug("ws.send beta auth-required failed (client disconnected): %s", e)
+                        log_ws(logging.DEBUG, "ai_chat", "beta auth-required send failed", error=str(e))
                     return
                 if not user_has_ai_beta_access(identity.user):
                     try:
                         ws.send(json.dumps({"type": "error", "message": "AI beta access is limited to selected users.", "error_type": "forbidden"}))
                     except Exception as e:
-                        logger.debug("ws.send beta forbidden failed (client disconnected): %s", e)
+                        log_ws(logging.DEBUG, "ai_chat", "beta forbidden send failed", error=str(e))
                     return
         except Exception as e:
-            logger.debug("AI WebSocket beta gate check failed: %s", e, exc_info=True)
+            log_ws(logging.WARNING, "ai_chat", "beta gate check failed", error=str(e), exc_info=True)
         # Anonymous access is only allowed via the Website proxy (shared-secret header), matching HTTP/SSE policy.
         if not getattr(identity, "is_authenticated", False) and not _is_allowed_public_proxy_request():
             try:
                 ws.send(json.dumps({"type": "error", "message": "Authentication required", "error_type": "auth_required"}))
             except Exception as e:
-                logger.debug("ws.send auth error failed (client disconnected): %s", e)
+                log_ws(logging.DEBUG, "ai_chat", "auth error send failed", error=str(e))
             return
 
         # Admission control: AI chat WebSockets share the same per-process thread
@@ -482,7 +502,7 @@ def register_ai_ws(app) -> None:
                     "error_type": "connection_limit",
                 }))
             except Exception as e:
-                logger.debug("ws.send connection_limit error failed (client disconnected): %s", e)
+                log_ws(logging.DEBUG, "ai_chat", "connection_limit send failed", error=str(e))
             return
         # Ensure RBAC helpers (which use current_user) work for Bearer auth
         did_login = False
@@ -496,16 +516,28 @@ def register_ai_ws(app) -> None:
                 except Exception as sess_e:
                     logger.debug("session.modified = False failed: %s", sess_e)
         except Exception as e:
-            current_app.logger.warning(
-                "AI WebSocket: failed to attach bearer-auth identity to flask-login session: %s",
-                e,
+            log_ws(
+                logging.WARNING,
+                "ai_chat",
+                "failed to attach bearer-auth identity",
+                error=str(e),
                 exc_info=True,
             )
 
-        # Cancel flag for aborting generation
-        cancelled = threading.Event()
+        # Connection-level disconnect; per-generation cancel is swapped below.
+        connection_closed = threading.Event()
+        gen_cancel_holder: Dict[str, Optional[threading.Event]] = {"event": None}
+        cancel_pending = threading.Event()
         # Last activity timestamp for heartbeat
-        last_activity = time.time()
+        last_activity = [time.time()]  # list so inbound pump can mutate
+
+        def _on_cancel() -> None:
+            evt = gen_cancel_holder.get("event")
+            if evt is not None:
+                evt.set()
+            else:
+                # Cancel arrived before the generation event was installed.
+                cancel_pending.set()
 
         # Basic per-connection rate limiting (WS decorators don't apply here).
         # This protects the LLM providers + DB from message floods.
@@ -532,67 +564,58 @@ def register_ai_ws(app) -> None:
 
         def send_heartbeat():
             """Send periodic heartbeat to keep connection alive"""
-            while not cancelled.is_set():
+            while not connection_closed.is_set():
                 try:
                     time.sleep(WS_HEARTBEAT_INTERVAL_SECONDS)
-                    if time.time() - last_activity < 60:  # Only if connection is active
+                    if time.time() - last_activity[0] < WS_INACTIVITY_STALE_SECONDS:
                         ws.send(json.dumps({"type": "ping"}))
                 except Exception as e:
-                    logger.debug("Heartbeat send failed: %s", e)
+                    if is_ws_disconnect_error(e):
+                        connection_closed.set()
+                        _on_cancel()
+                    else:
+                        log_ws(logging.DEBUG, "ai_chat", "heartbeat send failed", error=str(e))
                     break
 
         # Start heartbeat thread
         heartbeat_thread = threading.Thread(target=send_heartbeat, daemon=True)
         heartbeat_thread.start()
 
+        # Inbound pump owns ws.receive() so cancel/ping work during engine.run().
+        inbound = WsInboundPump(
+            ws,
+            connection_closed,
+            channel="ai_chat",
+            on_activity=lambda: last_activity.__setitem__(0, time.time()),
+            on_cancel=_on_cancel,
+        )
+        inbound.start()
+
         user_id_log = getattr(getattr(identity, "user", None), "id", "anon")
-        current_app.logger.info("AI WebSocket: connection accepted user_id=%s", user_id_log)
+        log_ws(logging.INFO, "ai_chat", "connection accepted", user=user_id_log)
 
         try:
-            # Main message loop
-            # Note: ws.receive() may block, but flask-sock handles this at the WSGI level
-            # We use daemon threads and proper error handling to prevent hanging the main app
-            while True:
-                try:
-                    # flask-sock's receive() blocks until a message is received
-                    # This is handled by the WSGI server's async capabilities
-                    # We add timeout checks and error handling to prevent issues
-                    raw = ws.receive()
-                    if not raw:
-                        # Check if connection is still alive
-                        if time.time() - last_activity > WS_INACTIVITY_STALE_SECONDS:
-                            current_app.logger.debug("Closing stale AI WebSocket connection")
-                            break
-                        continue
-                    payload = json.loads(raw)
-                except Exception as e:
-                    # Check if it's a connection error (connection closed)
-                    if "closed" in str(e).lower() or "disconnect" in str(e).lower():
+            # Main message loop — application messages come from the inbound pump.
+            while not connection_closed.is_set() and not inbound.disconnected.is_set():
+                # No active generation while waiting for the next application message.
+                gen_cancel_holder["event"] = None
+                payload, status = inbound.wait_message(idle_timeout=1.0)
+                if status == "closed":
+                    break
+                if status == "timeout":
+                    if time.time() - last_activity[0] > WS_INACTIVITY_STALE_SECONDS:
+                        log_ws(logging.INFO, "ai_chat", "closing stale connection", user=user_id_log)
                         break
-                    # Check if connection is stale
-                    if time.time() - last_activity > WS_INACTIVITY_STALE_SECONDS:
-                        break
-                    # For other errors, try to send error message (might fail if connection is dead)
-                    try:
-                        ws.send(json.dumps({"type": "error", "message": "Invalid JSON"}))
-                    except Exception as e:
-                        logger.debug("ws.send Invalid JSON error failed: %s", e)
-                        break
+                    continue
+                if not payload:
+                    continue
+
+                if payload.get("type") == "_parse_error":
+                    _ws_send_json(ws, {"type": "error", "message": payload.get("message") or "Invalid JSON"})
                     continue
 
                 msg_type = payload.get("type", "user_message")
-                last_activity = time.time()
-
-                # Handle ping
-                if msg_type == "ping":
-                    _ws_send_json(ws, {"type": "pong"})
-                    continue
-
-                # Handle cancel
-                if msg_type == "cancel":
-                    cancelled.set()
-                    _ws_send_json(ws, {"type": "cancelled"})
-                    continue
+                last_activity[0] = time.time()
 
                 # Accept legacy Backoffice format (type "message") as user_message for unified API
                 if msg_type == "message":
@@ -604,6 +627,17 @@ def register_ai_ws(app) -> None:
                 # Handle user message
                 if msg_type != "user_message":
                     continue
+
+                # Fresh cancel event per generation so a prior cancel cannot leak,
+                # and a cancel that arrives before engine.start is still observed.
+                cancelled = threading.Event()
+                gen_cancel_holder["event"] = cancelled
+                if cancel_pending.is_set():
+                    cancelled.set()
+                    cancel_pending.clear()
+                if connection_closed.is_set() or inbound.disconnected.is_set():
+                    cancelled.set()
+                    break
 
                 # Daily quotas (cost control). Uses Redis if REDIS_URL is configured; otherwise per-worker memory.
                 # Note: This is independent of the HTTP/SSE daily limiter buckets.
@@ -1106,7 +1140,14 @@ def register_ai_ws(app) -> None:
                                 ws.send(json.dumps(payload))
                         except Exception as e:
                             ws_client_disconnected.set()
-                            logger.debug("_ws_step send failed (client disconnected): %s", e)
+                            # Propagate disconnect into cancelled so engine.run() stops burning tokens.
+                            cancelled.set()
+                            log_ws(
+                                logging.DEBUG,
+                                "ai_chat",
+                                "step send failed; cancelling generation",
+                                error=str(e),
+                            )
 
                     def _ws_delta(delta_html: str) -> None:
                         if cancelled.is_set():
@@ -1118,7 +1159,13 @@ def register_ai_ws(app) -> None:
                                 ws.send(json.dumps({"type": "delta", "text": delta_html}))
                         except Exception as e:
                             ws_client_disconnected.set()
-                            logger.debug("_ws_delta send failed (client disconnected): %s", e)
+                            cancelled.set()
+                            log_ws(
+                                logging.DEBUG,
+                                "ai_chat",
+                                "delta send failed; cancelling generation",
+                                error=str(e),
+                            )
 
                     # Run inside app + request context so `current_user`/RBAC helpers work for tool calls.
                     app_obj = current_app._get_current_object()
@@ -1291,16 +1338,34 @@ def register_ai_ws(app) -> None:
                     _clear_inflight_snapshot()
 
         except Exception as e:
-            if ConnectionClosed and isinstance(e, ConnectionClosed):
-                current_app.logger.debug(
-                    "AI ws: connection closed during session (code=%s)", getattr(e, "code", None)
+            if is_ws_disconnect_error(e):
+                log_ws(
+                    logging.DEBUG,
+                    "ai_chat",
+                    "connection closed during session",
+                    user=user_id_log,
+                    error=str(e),
                 )
             else:
-                current_app.logger.exception("WebSocket connection error: %s", str(e))
+                log_ws(
+                    logging.ERROR,
+                    "ai_chat",
+                    "connection error",
+                    user=user_id_log,
+                    error=str(e),
+                    exc_info=True,
+                )
         finally:
-            cancelled.set()  # Stop heartbeat
+            connection_closed.set()
+            _on_cancel()
+            try:
+                inbound.stop()
+            except Exception:
+                pass
+            gen_cancel_holder["event"] = None
             ws_manager.remove_connection(ws_pool_key, ws)
-            current_app.logger.info("AI WebSocket: connection closed user_id=%s", user_id_log)
+            release_request_db_session(reason="ai_chat_ws_cleanup")
+            log_ws(logging.INFO, "ai_chat", "connection closed", user=user_id_log)
             if did_login:
                 try:
                     logout_user()
@@ -1309,7 +1374,13 @@ def register_ai_ws(app) -> None:
                     except Exception as sess_e:
                         logger.debug("session.modified = False in cleanup failed: %s", sess_e)
                 except Exception as e_logout:
-                    current_app.logger.debug("AI WebSocket: logout_user() failed during cleanup: %s", e_logout, exc_info=True)
+                    log_ws(
+                        logging.DEBUG,
+                        "ai_chat",
+                        "logout_user failed during cleanup",
+                        error=str(e_logout),
+                        exc_info=True,
+                    )
 
     @sock.route("/api/ai/documents/ws")
     def ai_documents_ws(ws):
@@ -1331,7 +1402,19 @@ def register_ai_ws(app) -> None:
             try:
                 ws.send(json.dumps({"type": "error", "message": "WebSocket disabled"}))
             except Exception as e:
-                logger.debug("ws.send WebSocket disabled failed: %s", e)
+                log_ws(logging.DEBUG, "ai_docs", "disabled send failed", error=str(e))
+            return
+
+        ok_origin, origin_err = check_websocket_origin(channel="ai_docs")
+        if not ok_origin:
+            try:
+                ws.send(json.dumps({
+                    "type": "error",
+                    "message": origin_err or "Origin not allowed",
+                    "error_type": "origin_rejected",
+                }))
+            except Exception:
+                pass
             return
 
         # Admin-only (matches where this UI is exposed)
@@ -1341,7 +1424,7 @@ def register_ai_ws(app) -> None:
             try:
                 ws.send(json.dumps({"type": "error", "message": "Unauthorized"}))
             except Exception as e:
-                logger.debug("ws.send Unauthorized failed: %s", e)
+                log_ws(logging.DEBUG, "ai_docs", "unauthorized send failed", error=str(e))
             return
 
         # Admission control: shares the same per-process thread budget as the
@@ -1354,20 +1437,40 @@ def register_ai_ws(app) -> None:
                     "error_type": "connection_limit",
                 }))
             except Exception as e:
-                logger.debug("ws.send connection_limit error failed (client disconnected): %s", e)
+                log_ws(logging.DEBUG, "ai_docs", "connection_limit send failed", error=str(e))
             return
 
-        cancelled = threading.Event()
+        connection_closed = threading.Event()
+        gen_cancel_holder: Dict[str, Optional[threading.Event]] = {"event": None}
+        cancel_pending = threading.Event()
         request_id = str(uuid.uuid4())
+        user_id_log = getattr(current_user, "id", None)
+
+        def _on_docs_cancel() -> None:
+            evt = gen_cancel_holder.get("event")
+            if evt is not None:
+                evt.set()
+            else:
+                cancel_pending.set()
 
         def _send(obj: Dict[str, Any]) -> None:
             try:
                 ws.send(json.dumps(obj))
             except Exception as e:
-                logger.debug("_send failed: %s", e)
-                cancelled.set()
+                log_ws(logging.DEBUG, "ai_docs", "send failed; cancelling", error=str(e))
+                connection_closed.set()
+                _on_docs_cancel()
+
+        inbound = WsInboundPump(
+            ws,
+            connection_closed,
+            channel="ai_docs",
+            on_cancel=_on_docs_cancel,
+        )
+        inbound.start()
 
         _send({"type": "meta", "request_id": request_id})
+        log_ws(logging.INFO, "ai_docs", "connection accepted", user=user_id_log)
 
         # Simple per-connection throttle
         recent = deque()
@@ -1384,27 +1487,33 @@ def register_ai_ws(app) -> None:
             return True
 
         try:
-            while not cancelled.is_set():
-                raw = ws.receive()
-                if not raw:
+            while not connection_closed.is_set() and not inbound.disconnected.is_set():
+                gen_cancel_holder["event"] = None
+                payload, status = inbound.wait_message(idle_timeout=1.0)
+                if status == "closed":
                     break
-                try:
-                    payload = json.loads(raw)
-                except Exception as e:
-                    logger.debug("JSON parse failed: %s", e)
-                    _send({"type": "error", "message": "Invalid JSON"})
+                if status == "timeout":
+                    continue
+                if not payload:
+                    continue
+
+                if payload.get("type") == "_parse_error":
+                    _send({"type": "error", "message": payload.get("message") or "Invalid JSON"})
                     continue
 
                 msg_type = (payload.get("type") or "answer").strip().lower()
-                if msg_type == "ping":
-                    _send({"type": "pong"})
-                    continue
-                if msg_type == "cancel":
-                    cancelled.set()
-                    _send({"type": "cancelled"})
-                    continue
                 if msg_type not in ("answer", "query"):
                     continue
+
+                cancelled = threading.Event()
+                gen_cancel_holder["event"] = cancelled
+                if cancel_pending.is_set():
+                    cancelled.set()
+                    cancel_pending.clear()
+                if connection_closed.is_set() or inbound.disconnected.is_set():
+                    cancelled.set()
+                    break
+
                 if not _allow():
                     _send({"type": "error", "error_type": "rate_limited", "message": "Too many requests. Please wait."})
                     continue
@@ -1937,5 +2046,13 @@ def register_ai_ws(app) -> None:
                     _send({"type": "done", "answer": f"Failed to generate answer: {e}", "sources": sources, "model": "error"})
 
         finally:
-            cancelled.set()
+            connection_closed.set()
+            _on_docs_cancel()
+            try:
+                inbound.stop()
+            except Exception:
+                pass
+            gen_cancel_holder["event"] = None
             ws_manager.remove_connection(current_user.id, ws)
+            release_request_db_session(reason="ai_docs_ws_cleanup")
+            log_ws(logging.INFO, "ai_docs", "connection closed", user=user_id_log)

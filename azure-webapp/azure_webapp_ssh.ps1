@@ -25,7 +25,7 @@ $exitCode = Use-AzureWebAppTunnel `
                 Write-Host 'ERROR: Tunnel closed during host key discovery.'
                 return 1
             }
-            Write-Host 'Opening SSH session...'
+            Write-Host 'Opening SSH session (handshake can take a few seconds -- please wait for the login banner)...'
             & $Ctx.PlinkPath -batch -hostkey $hostKey -t -ssh 'root@127.0.0.1' -P $Ctx.Port -pw $Ctx.Password
             if ($LASTEXITCODE -eq 0) { return 0 }
         }

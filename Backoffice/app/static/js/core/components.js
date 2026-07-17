@@ -1111,13 +1111,15 @@ document.addEventListener('DOMContentLoaded', function() {
             wsConnection = null;
         }
 
-        // Reconnect with exponential backoff
+        // Reconnect with exponential backoff + jitter so deploys don't thundering-herd.
         if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-            const delay = INITIAL_RECONNECT_DELAY * Math.pow(2, reconnectAttempts);
+            const base = INITIAL_RECONNECT_DELAY * Math.pow(2, reconnectAttempts);
+            const jitter = Math.floor(Math.random() * Math.min(1000, base * 0.3));
+            const delay = base + jitter;
             reconnectAttempts++;
 
             reconnectTimeout = setTimeout(function() {
-                console.debug(`Reconnecting WebSocket (attempt ${reconnectAttempts})...`);
+                console.debug(`Reconnecting WebSocket (attempt ${reconnectAttempts}, delay=${delay}ms)...`);
                 connectWebSocket();
             }, delay);
         } else {

@@ -287,6 +287,14 @@ def worker_exit(server, worker):
         worker.pid, elapsed,
     )
 
+    # Drop shared FS pressure mirror so SSH diagnostics do not treat this pid
+    # as still holding in-flight work after recycle/exit.
+    try:
+        from app.services.monitoring.request_pressure import clear_fs_mirror
+        clear_fs_mirror(worker.pid)
+    except Exception:
+        pass
+
     # Teardown is done — nothing useful remains for this process. If non-daemon
     # threads linger (gthread pool threads pinned by live WebSocket connections),
     # interpreter finalization would join them forever and the master would

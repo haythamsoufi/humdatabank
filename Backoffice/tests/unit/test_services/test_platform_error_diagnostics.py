@@ -1,5 +1,7 @@
 """Tests for platform 5xx diagnostics and request pressure tracking."""
 
+import json
+import os
 import time
 from unittest.mock import MagicMock, patch
 
@@ -14,7 +16,9 @@ from app.services.monitoring.platform_error_diagnostics import (
 
 
 @pytest.fixture(autouse=True)
-def reset_pressure_state():
+def reset_pressure_state(tmp_path, monkeypatch):
+    monkeypatch.setenv('PRESSURE_FS_DIR', str(tmp_path / 'humdb-pressure'))
+    monkeypatch.setenv('PRESSURE_FS_MIRROR', '1')
     request_pressure.reset_for_tests()
     yield
     request_pressure.reset_for_tests()
@@ -69,6 +73,64 @@ class TestRequestPressure:
         snap = request_pressure.snapshot_inflight()
         assert len(snap['recent_slow_completions']) == 1
         assert snap['recent_slow_completions'][0]['path'] == '/heavy'
+
+    def test_fs_mirror_written_on_register(self, tmp_path):
+        rid = request_pressure.register_inflight(
+            method='GET',
+            path='/forms/assignment/9',
+            endpoint='forms.entry',
+        )
+        # Force flush past throttle
+        request_pressure._fs_write_snapshot(force=True)
+        fs_dir = request_pressure.resolve_pressure_fs_dir(create=False)
+        assert fs_dir
+        path = os.path.join(fs_dir, f'{os.getpid()}.json')
+        assert os.path.isfile(path)
+        with open(path, encoding='utf-8') as fh:
+            data = json.load(fh)
+        assert data['in_flight_count'] >= 1
+        assert any(r.get('path') == '/forms/assignment/9' for r in data['in_flight'])
+        request_pressure.unregister_inflight(rid, duration_seconds=0.01)
+
+    def test_fs_cross_worker_visible_without_redis(self, tmp_path, monkeypatch):
+        monkeypatch.delenv('REDIS_URL', raising=False)
+        other_pid = os.getpid() + 99991
+        fs_dir = request_pressure.resolve_pressure_fs_dir(create=True)
+        assert fs_dir
+        sibling = {
+            'pid': other_pid,
+            'updated_at': time.time(),
+            'in_flight_count': 1,
+            'in_flight': [{
+                'method': 'GET',
+                'path': '/notifications/api/preferences',
+                'endpoint': 'prefs',
+                'started_at': time.time() - 20,
+                'pid': other_pid,
+            }],
+            'traffic_last_60s': 3,
+            'traffic_last_5m': 10,
+            'recent_slow_completions': [],
+            'ws_pool': {'active_total': 2, 'max_total_connections': 6},
+            'db_pool': {},
+        }
+        with open(os.path.join(fs_dir, f'{other_pid}.json'), 'w', encoding='utf-8') as fh:
+            json.dump(sibling, fh)
+
+        snap = request_pressure.snapshot_inflight(stale_after_seconds=15)
+        assert snap.get('fs_cross_worker') is True
+        assert snap['other_workers_in_flight']
+        assert snap['other_workers_in_flight'][0]['path'] == '/notifications/api/preferences'
+        assert snap['other_workers_stale_count'] >= 1
+
+    def test_fs_mirror_can_be_disabled(self, monkeypatch, tmp_path):
+        monkeypatch.setenv('PRESSURE_FS_MIRROR', '0')
+        request_pressure.reset_for_tests()
+        monkeypatch.setenv('PRESSURE_FS_DIR', str(tmp_path / 'disabled-pressure'))
+        rid = request_pressure.register_inflight(method='GET', path='/x')
+        request_pressure._fs_write_snapshot(force=True)
+        assert request_pressure.resolve_pressure_fs_dir(create=True) is None
+        request_pressure.unregister_inflight(rid, duration_seconds=0.01)
 
 
 class TestBuildPlatform5xxDiagnostics:

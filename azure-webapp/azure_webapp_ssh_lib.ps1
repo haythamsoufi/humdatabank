@@ -25,6 +25,48 @@ function Test-AzureWebAppPortListening {
     }
 }
 
+function Get-AzureWebAppExcludedPortRanges {
+    # Windows (Hyper-V/WSL NAT) periodically reserves TCP port ranges that cannot be bound
+    # by user-mode sockets, even though nothing shows as "listening" on them. Binding one of
+    # these ports fails with WinError 10013 ("access forbidden by its access permissions").
+    $ranges = @()
+    try {
+        $lines = netsh interface ipv4 show excludedportrange protocol=tcp 2>$null
+        foreach ($line in $lines) {
+            if ($line -match '^\s*(\d+)\s+(\d+)') {
+                $ranges += [PSCustomObject]@{ Start = [int]$Matches[1]; End = [int]$Matches[2] }
+            }
+        }
+    } catch {
+        # netsh unavailable; fall through with no known exclusions.
+    }
+    return $ranges
+}
+
+function Test-AzureWebAppPortExcluded {
+    param([int]$Port, [array]$ExcludedRanges)
+    foreach ($range in $ExcludedRanges) {
+        if ($Port -ge $range.Start -and $Port -le $range.End) { return $true }
+    }
+    return $false
+}
+
+function Get-AzureWebAppAvailableLocalPort {
+    param(
+        [Parameter(Mandatory = $true)][int]$PreferredPort,
+        [int]$MaxAttempts = 500
+    )
+    $excluded = Get-AzureWebAppExcludedPortRanges
+    for ($i = 0; $i -lt $MaxAttempts; $i++) {
+        $candidate = $PreferredPort + $i
+        if ($candidate -gt 65535) { break }
+        if (Test-AzureWebAppPortExcluded -Port $candidate -ExcludedRanges $excluded) { continue }
+        if (Test-AzureWebAppPortListening -LocalPort $candidate) { continue }
+        return $candidate
+    }
+    throw "Could not find an available, non-Windows-reserved local port starting from $PreferredPort."
+}
+
 function Find-AzureWebAppPlink {
     @(
         (Get-Command plink -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source),
@@ -144,12 +186,27 @@ function Show-AzureWebAppTunnelDiagnostics {
     Write-Host ""
     Write-Host "Tunnel diagnostics:"
     if ($Job) { Write-Host "  Job state: $($Job.State)" }
+    $logText = ''
     if (Test-Path $LogPath) {
+        $logText = (Get-Content $LogPath -Raw -ErrorAction SilentlyContinue)
         Write-Host ""
         Write-Host "Tunnel output:"
-        Get-Content $LogPath -ErrorAction SilentlyContinue
+        if ([string]::IsNullOrWhiteSpace($logText)) {
+            Write-Host "  (log file is empty)"
+        } else {
+            Write-Host $logText
+        }
     } else {
         Write-Host "  (no tunnel log at $LogPath)"
+    }
+    if ($logText -match 'WinError 10013') {
+        Write-Host ""
+        Write-Host "Hint: WinError 10013 means Windows refused the local socket bind for this port," -ForegroundColor Yellow
+        Write-Host "usually because it falls in a Hyper-V/WSL port-exclusion range. Run:" -ForegroundColor Yellow
+        Write-Host "  netsh interface ipv4 show excludedportrange protocol=tcp" -ForegroundColor Yellow
+        Write-Host "and re-run; the tooling should now auto-pick a free port, but if this persists" -ForegroundColor Yellow
+        Write-Host "try rebooting (Windows reshuffles these ranges on restart) or edit the Port in" -ForegroundColor Yellow
+        Write-Host "azure_webapp_config.ps1." -ForegroundColor Yellow
     }
 }
 
@@ -228,6 +285,12 @@ function Use-AzureWebAppTunnel {
     if (-not $plink -and -not (Get-Command ssh -ErrorAction SilentlyContinue)) {
         throw 'Neither plink nor ssh found. Install PuTTY: winget install PuTTY.PuTTY'
     }
+
+    $resolvedPort = Get-AzureWebAppAvailableLocalPort -PreferredPort $Port
+    if ($resolvedPort -ne $Port) {
+        Write-Host "Port $Port is reserved by Windows (Hyper-V/WSL port exclusions); using $resolvedPort instead."
+    }
+    $Port = $resolvedPort
 
     $tunnelLog = Join-Path $env:TEMP "${LogPrefix}_${Port}.log"
     Stop-AzureWebAppTunnelPort -LocalPort $Port

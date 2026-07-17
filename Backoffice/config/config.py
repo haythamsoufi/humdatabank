@@ -318,6 +318,12 @@ class Config:
     # WebSocket Configuration (env: true/false only)
     # WebSocket is used for real-time notifications and AI chat streaming
     WEBSOCKET_ENABLED = _parse_bool(os.environ.get('WEBSOCKET_ENABLED'), default=True)
+    # Max inbound WebSocket frame size (bytes). Enforced via flask-sock SOCK_SERVER_OPTIONS
+    # and an application-level parse guard.
+    WS_MAX_MESSAGE_BYTES = int(os.environ.get('WS_MAX_MESSAGE_BYTES', str(256 * 1024)))
+    SOCK_SERVER_OPTIONS = {
+        'max_message_size': WS_MAX_MESSAGE_BYTES,
+    }
 
     # Content Security Policy Configuration
     CSP_REPORT_URI = os.environ.get('CSP_REPORT_URI')  # Optional CSP reporting endpoint

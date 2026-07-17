@@ -5,15 +5,15 @@ are attached to platform-error security events to explain worker saturation.
 
 Cross-worker visibility (optional)
 -----------------------------------
-When ``REDIS_URL`` is set the module also mirrors in-flight registrations to a
-Redis hash keyed by worker PID (``humdb:pressure:iflt:<pid>``).  ``snapshot_inflight``
-then reads *other* workers' hashes to expose the full-cluster picture in platform
-502/503/504 security events.  This fixes the "0 stale in-flight on the reporting
-worker" blind spot: the stuck request may be on a different worker that this one
-has no direct visibility into.
+1. **Redis** (``REDIS_URL``): mirrors in-flight to ``humdb:pressure:iflt:<pid>``.
+   Best for multi-instance / shared view across containers.
+2. **Shared filesystem** (same container, no Redis required): each worker writes
+   ``<PRESSURE_FS_DIR>/<pid>.json`` so SSH diagnostics and sibling workers can
+   see in-flight/WS pressure without Redis. Default dirs tried in order:
+   ``/home/LogFiles/humdb-pressure``, ``/tmp/humdb-pressure``.
+   Disable with ``PRESSURE_FS_MIRROR=0``.
 
-All Redis operations are fire-and-forget with full exception suppression.  If Redis
-is unavailable, behaviour is identical to the original per-worker-only mode.
+All Redis / FS operations are fire-and-forget with full exception suppression.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ import threading
 import time
 from collections import deque
 from contextlib import suppress
+from glob import glob
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
 from flask import g, request
@@ -52,6 +53,23 @@ _REDIS_ABORT_TTL = 600      # 10 min — long enough to appear in subsequent 504
 _redis_client: Any = None   # lazy-initialised; None = unavailable
 _redis_init_lock = threading.Lock()
 _redis_available: Optional[bool] = None  # None = not yet tried
+
+# ── Shared-filesystem mirror (same-container cross-worker, no Redis) ───────────
+
+_FS_DEFAULT_CANDIDATES = (
+    '/home/LogFiles/humdb-pressure',
+    '/tmp/humdb-pressure',
+)
+_FS_STALE_FILE_S = 120.0
+_FS_MIN_WRITE_INTERVAL_S = 0.25
+_FS_ABORT_KEEP = 10
+
+_fs_dir_resolved: Optional[str] = None  # set only after a successful resolve
+_fs_mirror_disabled: bool = False
+_fs_dir_lock = threading.Lock()
+_fs_write_lock = threading.Lock()
+_fs_last_write_mono = 0.0
+_fs_dirty = False
 
 
 def _get_redis() -> Any:
@@ -84,6 +102,236 @@ def _get_redis() -> Any:
             _redis_available = False
             _redis_client = None
     return _redis_client
+
+
+def _fs_mirror_enabled() -> bool:
+    raw = (os.environ.get('PRESSURE_FS_MIRROR') or '1').strip().lower()
+    return raw not in {'0', 'false', 'no', 'off'}
+
+
+def resolve_pressure_fs_dir(*, create: bool = False) -> Optional[str]:
+    """Return the directory used for per-worker pressure JSON files, or None."""
+    global _fs_dir_resolved, _fs_mirror_disabled
+    if _fs_mirror_disabled:
+        return None
+    if _fs_dir_resolved:
+        return _fs_dir_resolved
+    with _fs_dir_lock:
+        if _fs_mirror_disabled:
+            return None
+        if _fs_dir_resolved:
+            return _fs_dir_resolved
+        if not _fs_mirror_enabled():
+            _fs_mirror_disabled = True
+            return None
+        explicit = (os.environ.get('PRESSURE_FS_DIR') or '').strip()
+        candidates = [p for p in ((explicit,) if explicit else _FS_DEFAULT_CANDIDATES) if p]
+        if create and '/tmp/humdb-pressure' not in candidates:
+            candidates.append('/tmp/humdb-pressure')
+        for path in candidates:
+            try:
+                if create:
+                    os.makedirs(path, mode=0o755, exist_ok=True)
+                if not os.path.isdir(path):
+                    continue
+                need = os.W_OK if create else os.R_OK
+                if os.access(path, need):
+                    _fs_dir_resolved = path
+                    return path
+            except OSError:
+                continue
+        # Do not cache failure when create=False — writers may create the dir later.
+        return None
+
+
+def _fs_worker_path(pid: int) -> Optional[str]:
+    base = resolve_pressure_fs_dir(create=True)
+    if not base:
+        return None
+    return os.path.join(base, f'{pid}.json')
+
+
+def _fs_build_payload(pid: int) -> Dict[str, Any]:
+    now = time.time()
+    with _lock:
+        inflight_entries = list(_inflight.values())
+        last_60s, last_5m = _traffic_counts(now)
+        recent_slow = list(_recent_slow_completions)[-8:]
+
+    inflight_rows: List[Dict[str, Any]] = []
+    for entry in inflight_entries:
+        started = float(entry.get('started_at', now))
+        inflight_rows.append({
+            'method': entry.get('method'),
+            'path': entry.get('path'),
+            'endpoint': entry.get('endpoint'),
+            'started_at': started,
+            'elapsed_s': round(now - started, 1),
+            'pid': entry.get('pid', pid),
+        })
+    inflight_rows.sort(key=lambda r: -r['elapsed_s'])
+
+    ws_pool: Dict[str, Any] = {}
+    with suppress(Exception):
+        from app.utils.ws_manager import ws_manager
+        ws_pool = ws_manager.snapshot()
+
+    db_pool: Dict[str, Any] = {}
+    with suppress(Exception):
+        from app import db
+        pool = db.engine.pool
+        db_pool = {
+            'size': pool.size(),
+            'checked_out': pool.checkedout(),
+            'checked_in': pool.checkedin(),
+            'overflow': pool.overflow(),
+        }
+
+    return {
+        'pid': pid,
+        'updated_at': now,
+        'in_flight_count': len(inflight_rows),
+        'in_flight': inflight_rows[:20],
+        'traffic_last_60s': last_60s,
+        'traffic_last_5m': last_5m,
+        'recent_slow_completions': recent_slow,
+        'ws_pool': ws_pool,
+        'db_pool': db_pool,
+        'active_threads': threading.active_count(),
+    }
+
+
+def _fs_write_snapshot(*, force: bool = False) -> None:
+    """Mirror this worker's pressure state to a shared JSON file (throttled)."""
+    global _fs_last_write_mono, _fs_dirty
+    if not _fs_mirror_enabled():
+        return
+    pid = os.getpid()
+    path = _fs_worker_path(pid)
+    if not path:
+        return
+    now_mono = time.monotonic()
+    with _fs_write_lock:
+        if not force and (now_mono - _fs_last_write_mono) < _FS_MIN_WRITE_INTERVAL_S:
+            _fs_dirty = True
+            return
+        _fs_dirty = False
+        _fs_last_write_mono = now_mono
+        payload = _fs_build_payload(pid)
+        tmp_path = f'{path}.{os.getpid()}.tmp'
+        try:
+            with open(tmp_path, 'w', encoding='utf-8') as fh:
+                json.dump(payload, fh, separators=(',', ':'))
+            os.replace(tmp_path, path)
+        except OSError:
+            with suppress(OSError):
+                os.unlink(tmp_path)
+
+
+def _fs_schedule_write() -> None:
+    """Write soon; force a flush if a previous write was throttled away."""
+    global _fs_dirty
+    _fs_write_snapshot(force=False)
+    if _fs_dirty:
+        _fs_write_snapshot(force=True)
+
+
+def _fs_push_aborted_worker(pid: int, entries: List[Dict[str, Any]], stale_count: int) -> None:
+    base = resolve_pressure_fs_dir(create=True)
+    if not base:
+        return
+    with suppress(Exception):
+        record = {
+            'pid': pid,
+            'aborted_at': time.time(),
+            'stale_count': stale_count,
+            'in_flight': entries,
+        }
+        path = os.path.join(base, f'abort-{pid}-{int(record["aborted_at"])}.json')
+        with open(path, 'w', encoding='utf-8') as fh:
+            json.dump(record, fh, separators=(',', ':'))
+        # Keep only the newest abort dumps
+        aborts = sorted(glob(os.path.join(base, 'abort-*.json')), reverse=True)
+        for old in aborts[_FS_ABORT_KEEP:]:
+            with suppress(OSError):
+                os.unlink(old)
+    _fs_write_snapshot(force=True)
+    # Remove live worker file so readers do not treat a dead pid as active
+    with suppress(OSError):
+        live = os.path.join(base, f'{pid}.json')
+        if os.path.isfile(live):
+            os.unlink(live)
+
+
+def _fs_get_cross_worker_inflight(
+    current_pid: int, stale_threshold: float
+) -> List[Dict[str, Any]]:
+    """Read in-flight entries from sibling workers' FS mirror files."""
+    base = resolve_pressure_fs_dir(create=False)
+    if not base:
+        # Still try creating so first writer path is visible; readers may only need read
+        base = resolve_pressure_fs_dir(create=True)
+    if not base or not os.path.isdir(base):
+        return []
+    results: List[Dict[str, Any]] = []
+    now = time.time()
+    with suppress(OSError):
+        for name in os.listdir(base):
+            if not name.endswith('.json') or name.startswith('abort-'):
+                continue
+            path = os.path.join(base, name)
+            with suppress(Exception):
+                try:
+                    pid = int(name[:-5])
+                except ValueError:
+                    continue
+                if pid == current_pid:
+                    continue
+                with open(path, encoding='utf-8') as fh:
+                    data = json.load(fh)
+                updated = float(data.get('updated_at') or 0)
+                if updated and (now - updated) > _FS_STALE_FILE_S:
+                    continue
+                for entry in data.get('in_flight') or []:
+                    started = float(entry.get('started_at', now))
+                    elapsed = now - started
+                    if 'elapsed_s' in entry and updated:
+                        # Prefer wall-clock from started_at when present
+                        elapsed = now - started
+                    results.append({
+                        'method': entry.get('method'),
+                        'path': entry.get('path'),
+                        'endpoint': entry.get('endpoint'),
+                        'elapsed_s': round(elapsed, 1),
+                        'stale': elapsed >= stale_threshold,
+                        'pid': entry.get('pid', pid),
+                        'source': 'fs',
+                    })
+    return results
+
+
+def _fs_get_aborted_workers() -> List[Dict[str, Any]]:
+    base = resolve_pressure_fs_dir(create=False)
+    if not base:
+        return []
+    results: List[Dict[str, Any]] = []
+    with suppress(OSError):
+        paths = sorted(glob(os.path.join(base, 'abort-*.json')), reverse=True)
+        for path in paths[:_FS_ABORT_KEEP]:
+            with suppress(Exception):
+                with open(path, encoding='utf-8') as fh:
+                    results.append(json.load(fh))
+    return results
+
+
+def clear_fs_mirror(pid: Optional[int] = None) -> None:
+    """Remove this worker's FS mirror file (call from worker_exit if desired)."""
+    target = pid if pid is not None else os.getpid()
+    base = resolve_pressure_fs_dir(create=False)
+    if not base:
+        return
+    with suppress(OSError):
+        os.unlink(os.path.join(base, f'{target}.json'))
 
 
 def _redis_push_inflight(pid: int, request_id: int, entry: Dict[str, Any]) -> None:
@@ -260,6 +508,8 @@ def register_inflight(
     with _lock:
         _inflight[request_id] = entry
     _redis_push_inflight(pid, request_id, entry)
+    with suppress(Exception):
+        _fs_schedule_write()
     return request_id
 
 
@@ -273,6 +523,8 @@ def unregister_inflight(request_id: Optional[int], *, duration_seconds: float) -
         _redis_remove_inflight(entry.get('pid', os.getpid()), request_id)
         if duration_seconds >= _SLOW_COMPLETION_THRESHOLD_SECONDS:
             _remember_slow_completion(entry, duration_seconds)
+        with suppress(Exception):
+            _fs_schedule_write()
 
 
 def _remember_slow_completion(entry: Dict[str, Any], duration_seconds: float) -> None:
@@ -304,9 +556,9 @@ def _traffic_counts(now: float) -> Tuple[int, int]:
 
 def _gunicorn_timeout_seconds() -> float:
     try:
-        return float(os.environ.get('GUNICORN_TIMEOUT', '25'))
+        return float(os.environ.get('GUNICORN_TIMEOUT', '60'))
     except (TypeError, ValueError):
-        return 25.0
+        return 60.0
 
 
 def _gunicorn_threads() -> Optional[int]:
@@ -354,13 +606,18 @@ def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[st
     # Stale / longest-running first so truncation keeps the most useful rows.
     inflight_requests.sort(key=lambda row: (-int(row['stale']), -row['elapsed_s']))
 
-    # Cross-worker in-flight data from Redis (empty list if Redis is unavailable).
+    # Cross-worker: prefer Redis; fall back to shared FS mirror (same container).
     cross_worker = _redis_get_cross_worker_inflight(current_pid, stale_threshold)
+    fs_cross = False
+    if not cross_worker:
+        cross_worker = _fs_get_cross_worker_inflight(current_pid, stale_threshold)
+        fs_cross = bool(cross_worker)
     cross_worker.sort(key=lambda row: (-int(row['stale']), -row['elapsed_s']))
     cross_worker_stale = sum(1 for r in cross_worker if r.get('stale'))
 
-    # Recent worker aborts from Redis (empty list if Redis is unavailable).
     recent_aborts = _redis_get_aborted_workers()
+    if not recent_aborts:
+        recent_aborts = _fs_get_aborted_workers()
 
     pool_stats: Dict[str, Any] = {}
     try:
@@ -390,11 +647,23 @@ def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[st
         ws_pool_snapshot = {'error': 'unavailable'}
 
     redis_active = _redis_available is True
-    scope_note = (
-        'Cross-worker snapshot via Redis (other workers included).'
-        if redis_active
-        else 'Per-worker snapshot (Gunicorn multi-process); other workers not included. Set REDIS_URL to enable cross-worker visibility.'
-    )
+    fs_dir = resolve_pressure_fs_dir(create=False)
+    if redis_active:
+        scope_note = 'Cross-worker snapshot via Redis (other workers included).'
+    elif fs_cross or fs_dir:
+        scope_note = (
+            'Cross-worker snapshot via shared filesystem mirror '
+            f'({fs_dir or "humdb-pressure"}); Redis not configured.'
+        )
+    else:
+        scope_note = (
+            'Per-worker snapshot (Gunicorn multi-process); other workers not included. '
+            'FS mirror inactive and REDIS_URL unset.'
+        )
+
+    # Keep FS mirror fresh for SSH diagnostics even when only snapshot is called.
+    with suppress(Exception):
+        _fs_write_snapshot(force=False)
 
     return {
         'worker_pid': current_pid,
@@ -414,6 +683,8 @@ def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[st
         'db_pool': pool_stats,
         'ws_pool': ws_pool_snapshot,
         'redis_cross_worker': redis_active,
+        'fs_cross_worker': bool(fs_cross or (fs_dir and not redis_active)),
+        'fs_pressure_dir': fs_dir,
         'scope_note': scope_note,
     }
 
@@ -511,13 +782,22 @@ def dump_inflight_on_abort(pid: int, log_fn=None) -> None:
         f'{len(entries)} in-flight, {stale_count} stale (>={stale_threshold:.0f}s)'
     )
     _redis_push_aborted_worker(pid, serialised, stale_count)
+    with suppress(Exception):
+        _fs_push_aborted_worker(pid, serialised, stale_count)
 
 
 def reset_for_tests() -> None:
     """Clear registry state (tests only)."""
-    global _next_request_id
+    global _next_request_id, _fs_dir_resolved, _fs_mirror_disabled
+    global _fs_last_write_mono, _fs_dirty, _redis_available, _redis_client
     with _lock:
         _next_request_id = 0
         _inflight.clear()
         _traffic_timestamps.clear()
         _recent_slow_completions.clear()
+    _fs_dir_resolved = None
+    _fs_mirror_disabled = False
+    _fs_last_write_mono = 0.0
+    _fs_dirty = False
+    _redis_available = None
+    _redis_client = None

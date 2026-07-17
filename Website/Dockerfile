@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Build-time environment variables (can be passed as --build-arg)
@@ -69,7 +69,7 @@ RUN echo "🏗️  Starting Next.js build..." && \
     NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 # Production runtime image
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 
 # Accept build args to pass environment variables to runtime

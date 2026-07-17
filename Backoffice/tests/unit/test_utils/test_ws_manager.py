@@ -50,6 +50,37 @@ class TestWebSocketManagerAddConnection:
         # Third connection for same user: oldest should be removed
         mgr.add_connection(1, ws3)
         assert mgr.get_connection_count(1) == 2
+        assert ws1 not in mgr._connection_metadata
+        assert ws2 in mgr._connection_metadata
+        assert ws3 in mgr._connection_metadata
+
+    def test_fifo_eviction_removes_first_inserted(self):
+        mgr = WebSocketManager(max_connections_per_user=2, max_total_connections=100)
+        ws1, ws2, ws3, ws4 = _make_ws(), _make_ws(), _make_ws(), _make_ws()
+        mgr.add_connection(1, ws1)
+        mgr.add_connection(1, ws2)
+        mgr.add_connection(1, ws3)  # evicts ws1
+        mgr.add_connection(1, ws4)  # evicts ws2
+        assert set(mgr._connections[1].keys()) == {ws3, ws4}
+
+    def test_channel_budget_rejects(self):
+        mgr = WebSocketManager(
+            max_total_connections=10,
+            max_connections_per_user=10,
+            channel_budgets={'ai_chat': 1, 'notifications': 10, 'ai_docs': 1, 'default': 10},
+        )
+        ws1, ws2 = _make_ws(), _make_ws()
+        assert mgr.add_connection(1, ws1, channel='ai_chat') is True
+        assert mgr.add_connection(2, ws2, channel='ai_chat') is False
+        assert mgr.add_connection(2, ws2, channel='notifications') is True
+
+    def test_snapshot_includes_channel_budgets(self):
+        mgr = WebSocketManager(max_total_connections=5, channel_budgets={'notifications': 5, 'ai_chat': 2, 'ai_docs': 1, 'default': 5})
+        ws = _make_ws()
+        mgr.add_connection(1, ws, channel='notifications')
+        snap = mgr.snapshot()
+        assert snap['by_channel']['notifications'] == 1
+        assert snap['channel_budgets']['ai_chat'] == 2
 
     def test_metadata_stored_on_add(self):
         mgr = WebSocketManager()

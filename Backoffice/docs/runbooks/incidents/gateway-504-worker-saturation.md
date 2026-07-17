@@ -5,7 +5,7 @@
 **Primary symptom:** HTTP **504 Gateway Timeout** reported by users; often on lightweight endpoints (presence sync, notifications, profile lookups)  
 **Last reviewed:** 2026-07-09
 
-Related playbooks: [General incident triage](general-incident-triage.md) (Scenario F), [Azure App Service](../deployment/azure-app-service.md) §3a.
+Related playbooks: [General incident triage](general-incident-triage.md) (Scenario F), [Azure App Service](../deployment/azure-app-service.md) §3a, [Gateway load-test reproduction plan](gateway-loadtest-reproduction-plan.md).
 
 ---
 

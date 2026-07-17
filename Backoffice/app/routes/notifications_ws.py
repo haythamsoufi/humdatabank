@@ -4,10 +4,17 @@ WebSocket endpoint for real-time notifications.
 Provides bidirectional communication and prevents blocking the main application thread.
 """
 
-from flask import current_app
 from flask_login import login_required, current_user
 from app.utils.constants import SESSION_INACTIVITY_SECONDS, WS_INACTIVITY_STALE_SECONDS
 from app.utils.ws_manager import ws_manager
+from app.utils.ws_helpers import (
+    apply_sock_server_options,
+    check_websocket_origin,
+    is_ws_disconnect_error,
+    log_ws,
+    parse_ws_json,
+    release_request_db_session,
+)
 import json
 import logging
 import threading
@@ -18,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 # Heartbeat interval for notifications WebSocket (shorter than AI WS for responsiveness)
 HEARTBEAT_INTERVAL_SECONDS = 15
+CHANNEL = "notifications"
 
 
 def register_notifications_ws(app) -> bool:
@@ -31,6 +39,8 @@ def register_notifications_ws(app) -> bool:
     if not app.config.get('WEBSOCKET_ENABLED', True):
         app.logger.debug("WebSocket disabled; Notifications WebSocket endpoint not registered")
         return False
+
+    apply_sock_server_options(app)
 
     # ------------------------------------------------------------------
     # Windows/gevent dev server path (avoid simple-websocket threads)
@@ -57,6 +67,10 @@ def register_notifications_ws(app) -> bool:
         @app.route("/api/notifications/ws")
         @login_required
         def notifications_ws_gevent():  # type: ignore
+            ok_origin, origin_err = check_websocket_origin(channel=CHANNEL)
+            if not ok_origin:
+                return {"error": origin_err or "Origin not allowed"}, 403
+
             ws = request.environ.get("wsgi.websocket")
             if ws is None:
                 return {"error": "WebSocket upgrade required"}, 400
@@ -76,17 +90,17 @@ def register_notifications_ws(app) -> bool:
                             try:
                                 ws.send(json.dumps({"type": "pong"}))
                             except Exception as e:
-                                logger.debug("WS pong send failed: %s", e)
+                                log_ws(logging.DEBUG, CHANNEL, "pong send failed", user=user_id, error=str(e))
                                 break
                     except Exception as e:
-                        logger.debug("heartbeat loop failed: %s", e)
+                        log_ws(logging.DEBUG, CHANNEL, "heartbeat loop failed", user=user_id, error=str(e))
                         break
 
             heartbeat_thread = threading.Thread(target=send_heartbeat, daemon=True)
             heartbeat_thread.start()
 
             try:
-                connection_added = ws_manager.add_connection(user_id, ws, channel='notifications')
+                connection_added = ws_manager.add_connection(user_id, ws, channel=CHANNEL)
                 if not connection_added:
                     try:
                         ws.send(json.dumps({
@@ -94,11 +108,13 @@ def register_notifications_ws(app) -> bool:
                             "data": {"message": "Connection limit exceeded. Please close other tabs and try again."},
                         }))
                     except Exception as e:
-                        logger.debug("WS connection limit error send failed: %s", e)
+                        log_ws(logging.DEBUG, CHANNEL, "limit error send failed", user=user_id, error=str(e))
                     return ""
 
                 from app.services.notification.service import NotificationService
                 initial_unread_count = NotificationService.get_unread_count(user_id)
+                # Long-lived WS must not hold a DB pool connection after the handshake query.
+                release_request_db_session(reason="notifications_ws_gevent_handshake")
 
                 try:
                     ws.send(json.dumps({
@@ -115,21 +131,22 @@ def register_notifications_ws(app) -> bool:
                         "unread_count": initial_unread_count,
                     })
                 except Exception as e:
-                    logger.debug("WS connected/unread send failed: %s", e)
+                    log_ws(logging.DEBUG, CHANNEL, "connected/unread send failed", user=user_id, error=str(e))
                     return ""
+
+                log_ws(logging.INFO, CHANNEL, "connected", user=user_id, mode="gevent")
 
                 while not cancelled.is_set():
                     try:
                         raw = ws.receive()
                         if not raw:
                             if time.time() - last_activity > SESSION_INACTIVITY_SECONDS:
-                                logger.info(f"Closing stale WebSocket connection for user {user_id}")
+                                log_ws(logging.INFO, CHANNEL, "closing stale connection", user=user_id)
                                 break
                             continue
 
-                        try:
-                            payload = json.loads(raw)
-                        except json.JSONDecodeError:
+                        payload, err = parse_ws_json(raw, channel=CHANNEL)
+                        if err or not payload:
                             continue
 
                         msg_type = payload.get("type", "")
@@ -138,15 +155,20 @@ def register_notifications_ws(app) -> bool:
                             try:
                                 ws.send(json.dumps({"type": "pong"}))
                             except Exception as e:
-                                logger.debug("WS pong send failed: %s", e)
+                                log_ws(logging.DEBUG, CHANNEL, "pong send failed", user=user_id, error=str(e))
                                 break
                     except Exception as e:
-                        logger.debug("WS recv loop failed: %s", e)
+                        if is_ws_disconnect_error(e):
+                            log_ws(logging.DEBUG, CHANNEL, "recv loop closed", user=user_id, error=str(e))
+                        else:
+                            log_ws(logging.WARNING, CHANNEL, "recv loop failed", user=user_id, error=str(e), exc_info=True)
                         break
             finally:
                 cancelled.set()
                 if connection_added:
                     ws_manager.remove_connection(user_id, ws)
+                release_request_db_session(reason="notifications_ws_gevent_cleanup")
+                log_ws(logging.INFO, CHANNEL, "disconnected", user=user_id, mode="gevent")
 
             return ""
 
@@ -179,10 +201,20 @@ def register_notifications_ws(app) -> bool:
         Connection is automatically cleaned up on disconnect.
         Uses non-blocking operations to prevent hanging the main app.
         """
+        ok_origin, origin_err = check_websocket_origin(channel=CHANNEL)
+        if not ok_origin:
+            try:
+                ws.send(json.dumps({
+                    "type": "error",
+                    "data": {"message": origin_err or "Origin not allowed", "error_type": "origin_rejected"},
+                }))
+            except Exception:
+                pass
+            return
+
         user_id = current_user.id
         connection_added = False
 
-        # Cancel flag for graceful shutdown
         cancelled = threading.Event()
         last_activity = time.time()
 
@@ -197,21 +229,18 @@ def register_notifications_ws(app) -> bool:
                         try:
                             ws.send(json.dumps({"type": "pong"}))
                         except Exception as e:
-                            logger.debug("WS pong send failed: %s", e)
+                            log_ws(logging.DEBUG, CHANNEL, "pong send failed", user=user_id, error=str(e))
                             break
                 except Exception as e:
-                    logger.debug("heartbeat loop failed: %s", e)
+                    log_ws(logging.DEBUG, CHANNEL, "heartbeat loop failed", user=user_id, error=str(e))
                     break
 
-        # Start heartbeat thread (daemon so it doesn't block shutdown)
         heartbeat_thread = threading.Thread(target=send_heartbeat, daemon=True)
         heartbeat_thread.start()
 
         try:
-            # Register this connection
-            connection_added = ws_manager.add_connection(user_id, ws, channel='notifications')
+            connection_added = ws_manager.add_connection(user_id, ws, channel=CHANNEL)
             if not connection_added:
-                # Connection limit exceeded
                 ws.send(json.dumps({
                     'type': 'error',
                     'data': {
@@ -220,9 +249,11 @@ def register_notifications_ws(app) -> bool:
                 }))
                 return
 
-            # Send initial connection message with unread count
             from app.services.notification.service import NotificationService
             initial_unread_count = NotificationService.get_unread_count(user_id)
+            # Critical: release the request-scoped DB session so idle notification
+            # sockets do not pin a pool connection for the connection lifetime.
+            release_request_db_session(reason="notifications_ws_handshake")
 
             try:
                 ws.send(json.dumps({
@@ -234,82 +265,86 @@ def register_notifications_ws(app) -> bool:
                     }
                 }))
 
-                # Also send as unread_count message for consistency
-                from app.utils.ws_manager import broadcast_unread_count
                 ws_manager.send_to_connection(ws, 'unread_count', {
                     'type': 'unread_count_update',
                     'unread_count': initial_unread_count
                 })
             except Exception as send_error:
-                # Connection was closed before we could send initial message
-                error_str = str(send_error).lower()
-                if "closed" in error_str or "1005" in str(send_error) or "1006" in str(send_error):
+                if is_ws_disconnect_error(send_error):
+                    log_ws(logging.DEBUG, CHANNEL, "closed before handshake send", user=user_id)
                     return
+                log_ws(
+                    logging.WARNING,
+                    CHANNEL,
+                    "handshake send failed",
+                    user=user_id,
+                    error=str(send_error),
+                    exc_info=True,
+                )
                 raise
 
-            # Main message loop - handle incoming messages (pings, etc.)
-            # Note: ws.receive() may block, but flask-sock handles this at the WSGI level
-            # We use daemon threads and proper error handling to prevent hanging
+            log_ws(logging.INFO, CHANNEL, "connected", user=user_id)
+
             while not cancelled.is_set():
                 try:
-                    # flask-sock's receive() blocks until a message is received
-                    # This is handled by the WSGI server's async capabilities
-                    # We add timeout checks and error handling to prevent issues
                     raw = ws.receive()
 
                     if not raw:
-                        # Check if connection is stale
-                        if time.time() - last_activity > 300:  # 5 minutes of inactivity
-                            logger.info(f"Closing stale WebSocket connection for user {user_id}")
+                        if time.time() - last_activity > SESSION_INACTIVITY_SECONDS:
+                            log_ws(logging.INFO, CHANNEL, "closing stale connection", user=user_id)
                             break
                         continue
 
-                    # Parse incoming message
-                    try:
-                        payload = json.loads(raw)
-                        msg_type = payload.get("type", "")
-                        last_activity = time.time()
-
-                        # Handle ping
-                        if msg_type == "ping":
-                            ws.send(json.dumps({"type": "pong"}))
-                            continue
-
-                        # Unknown message type - just acknowledge
-                        logger.debug(f"Received unknown message type from user {user_id}: {msg_type}")
-
-                    except json.JSONDecodeError:
-                        logger.warning(f"Invalid JSON received from user {user_id}: {raw[:100]}")
+                    payload, err = parse_ws_json(raw, channel=CHANNEL)
+                    if err or not payload:
                         continue
 
+                    msg_type = payload.get("type", "")
+                    last_activity = time.time()
+
+                    if msg_type == "ping":
+                        ws.send(json.dumps({"type": "pong"}))
+                        continue
+
+                    log_ws(logging.DEBUG, CHANNEL, "unknown message type", user=user_id, msg_type=msg_type)
+
                 except Exception as e:
-                    # Check if it's a connection error (connection closed)
-                    error_str = str(e).lower()
-                    if "closed" in error_str or "disconnect" in error_str or "broken" in error_str:
+                    if is_ws_disconnect_error(e):
+                        log_ws(logging.DEBUG, CHANNEL, "connection closed", user=user_id, error=str(e))
                         break
 
-                    # Check if connection is stale
-                    if time.time() - last_activity > 300:
-                        logger.info(f"Closing stale WebSocket connection for user {user_id}")
+                    if time.time() - last_activity > SESSION_INACTIVITY_SECONDS:
+                        log_ws(logging.INFO, CHANNEL, "closing stale connection", user=user_id)
                         break
 
-                    # For other errors, log and continue (connection might still be alive)
-                    logger.debug(f"Error in WebSocket receive for user {user_id}: {str(e)}")
-                    # Small delay to prevent tight loop on errors
+                    log_ws(
+                        logging.WARNING,
+                        CHANNEL,
+                        "receive error",
+                        user=user_id,
+                        error=str(e),
+                        exc_info=True,
+                    )
                     time.sleep(0.1)
                     continue
 
         except Exception as e:
-            error_str = str(e).lower()
-            # Don't log connection closed as an error - it's expected behavior
-            if "closed" in error_str or "disconnect" in error_str or "1005" in str(e) or "1006" in str(e):
-                pass
+            if is_ws_disconnect_error(e):
+                log_ws(logging.DEBUG, CHANNEL, "session ended", user=user_id, error=str(e))
             else:
-                logger.error(f"Error in notifications WebSocket for user {user_id}: {str(e)}", exc_info=True)
+                log_ws(
+                    logging.ERROR,
+                    CHANNEL,
+                    "handler error",
+                    user=user_id,
+                    error=str(e),
+                    exc_info=True,
+                )
         finally:
-            # Clean up connection
-            cancelled.set()  # Stop heartbeat
+            cancelled.set()
             if connection_added:
                 ws_manager.remove_connection(user_id, ws)
+            release_request_db_session(reason="notifications_ws_cleanup")
+            log_ws(logging.INFO, CHANNEL, "disconnected", user=user_id)
 
     return True

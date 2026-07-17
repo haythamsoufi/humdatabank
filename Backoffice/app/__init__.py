@@ -210,14 +210,6 @@ def create_app(config_name=None):
 
 def _configure_cors(app, selected_config_name):
     """Enable CORS for API routes when allowed origins are configured."""
-    try:
-        from flask_cors import CORS  # type: ignore
-    except ImportError:
-        app.logger.warning(
-            "CORS not enabled - Flask-CORS package not available. Install with: pip install Flask-Cors"
-        )
-        return
-
     cors_origins_env = os.environ.get('CORS_ALLOWED_ORIGINS', '')
     if cors_origins_env:
         cors_origins = [origin.strip() for origin in cors_origins_env.split(',') if origin.strip()]
@@ -237,6 +229,18 @@ def _configure_cors(app, selected_config_name):
             "CORS_ALLOWED_ORIGINS not set for %s. CORS disabled for security.",
             selected_config_name,
         )
+
+    # Always expose the resolved list for WebSocket Origin checks (even when CORS is off
+    # or Flask-CORS is unavailable).
+    app.config["CORS_ALLOWED_ORIGINS"] = list(cors_origins)
+
+    try:
+        from flask_cors import CORS  # type: ignore
+    except ImportError:
+        app.logger.warning(
+            "CORS not enabled - Flask-CORS package not available. Install with: pip install Flask-Cors"
+        )
+        return
 
     if not cors_origins:
         app.logger.debug("CORS disabled - no allowed origins configured")

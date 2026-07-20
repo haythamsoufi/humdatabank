@@ -799,8 +799,78 @@ class TestDataHelpers:
         from app.routes.api.data import _load_assignment_statuses_table
         assert _load_assignment_statuses_table([]) == []
 
+    def test_collect_scoped_assignment_status_ids_requires_scope(self, app):
+        from app.routes.api.data import _collect_scoped_assignment_status_ids
+        assert _collect_scoped_assignment_status_ids() == []
+
+    def test_collect_scoped_assignment_status_ids_empty_allow_list(self, app):
+        from app.routes.api.data import _collect_scoped_assignment_status_ids
+        assert _collect_scoped_assignment_status_ids(
+            template_id=1,
+            allowed_template_ids=[],
+        ) == []
+
+    def test_collect_scoped_assignment_status_ids_by_assigned_form(self, app):
+        from app.routes.api.data import _collect_scoped_assignment_status_ids
+        q = MagicMock()
+        q.join.return_value = q
+        q.filter.return_value = q
+        q.with_entities.return_value.all.return_value = [(11,), (12,)]
+        with patch("app.routes.api.data.AssignmentEntityStatus") as mock_aes:
+            mock_aes.query = q
+            ids = _collect_scoped_assignment_status_ids(
+                assignment_id=99,
+                template_id=33,
+                period_name="wrong-period",
+            )
+        assert ids == [11, 12]
+        assert q.filter.called
+
+    def test_build_star_uses_assignment_statuses_override(self, app):
+        from app.utils.api_serialization import build_star_schema_tables
+        pending = [{'id': 7, 'type': 'assigned', 'status': 'pending'}]
+        with patch("app.utils.api_serialization.AssignmentEntityStatus") as mock_aes, \
+             patch("app.utils.api_serialization.PublicSubmission") as mock_ps:
+            mock_aes.query.filter.return_value.all.return_value = []
+            mock_ps.query.filter.return_value.all.return_value = []
+            tables = build_star_schema_tables(
+                [{'submission_type': 'assigned', 'submission_id': 1}],
+                [],
+                [],
+                assignment_statuses=pending,
+            )
+        assert tables['dim_submission'] == pending
+
+    def test_build_assignment_statuses_table_skips_public_submission_type(self, app):
+        from app.routes.api.data import _build_assignment_statuses_table
+        assert _build_assignment_statuses_table(
+            [{'submission_type': 'assigned', 'submission_id': 1}],
+            template_id=1,
+            submission_type='public',
+        ) == []
+
+    def test_build_assignment_statuses_table_merges_fact_and_scoped_ids(self, app):
+        from app.routes.api.data import _build_assignment_statuses_table
+        with patch(
+            "app.routes.api.data._collect_scoped_assignment_status_ids",
+            return_value=[10, 11],
+        ), patch(
+            "app.routes.api.data._load_assignment_statuses_table",
+            side_effect=lambda ids: [{'id': i, 'status': 'pending'} for i in ids],
+        ) as load_mock:
+            rows = _build_assignment_statuses_table(
+                [{'submission_type': 'assigned', 'submission_id': 11}],
+                template_id=5,
+            )
+        load_mock.assert_called_once_with([10, 11])
+        assert rows == [
+            {'id': 10, 'status': 'pending'},
+            {'id': 11, 'status': 'pending'},
+        ]
+
     def test_build_data_array_catalog_includes_assignment_statuses(self, app):
         from app.routes.api.data import _build_data_array_catalog
         catalog = _build_data_array_catalog(include_dynamic=True, include_repeat=False)
         assert catalog['assignment_statuses']['included'] is True
         assert 'status' in catalog['assignment_statuses']['key_fields']
+        assert 'pending' in catalog['assignment_statuses']['description'].lower()

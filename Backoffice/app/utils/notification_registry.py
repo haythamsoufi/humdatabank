@@ -75,11 +75,15 @@ NOTIFICATION_TYPE_REGISTRY_SPECS: List[Dict[str, Any]] = [
         "group": "Assignments",
         "type_key": "assignment_sent_for_review",
         "emitter_active": True,
-        "audiences": ["focal_points"],
+        "audiences": ["focal_points", "admin_users"],
         "description": (
             "Created when a National Society focal point sends an assignment to org delegation for review."
         ),
-        "recipients": "Organization-email focal points on the assignment entity.",
+        "recipients": (
+            "Organization-email focal points on the assignment entity (action-oriented copy). "
+            "Org admins (entity-scoped admin_core / admin_*) can optionally be added with "
+            "a separate FYI wording; system managers are not notified for this type."
+        ),
     },
     {
         "group": "Assignments",

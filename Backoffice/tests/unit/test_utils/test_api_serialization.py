@@ -16,6 +16,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 from app.utils.api_serialization import (
     format_country_info,
     format_country_info_minimal,
+    format_national_society_info,
     format_form_item_info,
     format_indicator_details,
     serialize_assigned_data_item,
@@ -43,7 +44,7 @@ from app.utils.api_serialization import (
 # ---------------------------------------------------------------------------
 
 def _make_country(name='Test Country', iso3='TST', iso2='TS', region='Europe',
-                  partof=None, status='active', preferred_language='en',
+                  status='active', preferred_language='en',
                   currency_code='USD', name_translations=None):
     c = MagicMock()
     c.id = 1
@@ -51,7 +52,6 @@ def _make_country(name='Test Country', iso3='TST', iso2='TS', region='Europe',
     c.iso3 = iso3
     c.iso2 = iso2
     c.region = region
-    c.partof = partof
     c.status = status
     c.preferred_language = preferred_language
     c.currency_code = currency_code
@@ -201,6 +201,47 @@ class TestFormatCountryInfoMinimal:
         result = format_country_info_minimal(country)
         assert 'national_society_name' not in result
         assert 'multilingual_names' not in result
+
+
+# ---------------------------------------------------------------------------
+# format_national_society_info
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestFormatNationalSocietyInfo:
+    def test_none_returns_none(self, app):
+        with app.test_request_context():
+            assert format_national_society_info(None) is None
+
+    def test_includes_part_of_list(self, app):
+        with app.test_request_context():
+            ns = MagicMock()
+            ns.id = 7
+            ns.name = 'Test NS'
+            ns.code = 'TNS'
+            ns.description = None
+            ns.country_id = 1
+            ns.is_active = True
+            ns.name_translations = {}
+            ns.part_of = ['UP', 'GRBMP']
+            ns.country = _make_country()
+            result = format_national_society_info(ns)
+            assert result['part_of'] == ['UP', 'GRBMP']
+
+    def test_part_of_defaults_to_empty_list(self, app):
+        with app.test_request_context():
+            ns = MagicMock()
+            ns.id = 7
+            ns.name = 'Test NS'
+            ns.code = 'TNS'
+            ns.description = None
+            ns.country_id = 1
+            ns.is_active = True
+            ns.name_translations = {}
+            ns.part_of = None
+            ns.country = _make_country()
+            result = format_national_society_info(ns)
+            assert result['part_of'] == []
 
 
 # ---------------------------------------------------------------------------

@@ -64,6 +64,10 @@ def get_assigned_forms():
 
         # Get filter parameters
         template_id = request.args.get('template_id', type=int)
+        assignment_id = request.args.get('assignment_id', type=int)
+        if assignment_id is None:
+            # Legacy alias
+            assignment_id = request.args.get('assigned_form_id', type=int)
         period_name = request.args.get('period_name', default='', type=str).strip()
 
         # Build base query
@@ -82,6 +86,7 @@ def get_assigned_forms():
                         'current_page': page,
                         'per_page': per_page,
                         'template_id_filter': template_id,
+                        'assignment_id_filter': assignment_id,
                         'period_name_filter': period_name
                     })
                 else:
@@ -92,11 +97,14 @@ def get_assigned_forms():
                         'current_page': None,
                         'per_page': None,
                         'template_id_filter': template_id,
+                        'assignment_id_filter': assignment_id,
                         'period_name_filter': period_name
                     })
             query = query.filter(AssignedForm.template_id.in_(allowed_template_ids))
 
         # Apply filters
+        if assignment_id:
+            query = query.filter(AssignedForm.id == assignment_id)
         if template_id:
             query = query.filter(AssignedForm.template_id == template_id)
         if period_name:
@@ -163,6 +171,7 @@ def get_assigned_forms():
                 'current_page': page,
                 'per_page': per_page,
                 'template_id_filter': template_id,
+                'assignment_id_filter': assignment_id,
                 'period_name_filter': period_name
             })
         else:
@@ -173,6 +182,7 @@ def get_assigned_forms():
                 'current_page': None,
                 'per_page': None,
                 'template_id_filter': template_id,
+                'assignment_id_filter': assignment_id,
                 'period_name_filter': period_name
             })
 

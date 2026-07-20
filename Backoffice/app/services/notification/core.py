@@ -313,6 +313,12 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
         'notification.assignment_sent_for_review.message': _notification_msgid(
             'Period %(period)s: a National Society focal point sent this assignment for your review before submission.'
         ),
+        'notification.assignment_sent_for_review.admin.title': _notification_msgid(
+            'Sent for review: %(template)s'
+        ),
+        'notification.assignment_sent_for_review.admin.message': _notification_msgid(
+            'Period %(period)s: a National Society focal point escalated this assignment for delegation review.'
+        ),
 
         'notification.assignment_returned_for_revision.title': _notification_msgid(
             'Changes requested: %(template)s'
@@ -2668,7 +2674,7 @@ def _focal_point_ids_by_org_domain(entity_type, entity_id, *, org_only: bool, ex
 
 
 def notify_assignment_sent_for_review(assignment_entity_status):
-    """Notify org-email delegation focal points when NS sends an assignment for review."""
+    """Notify org-email delegation focal points (and, if enabled, entity-scoped org admins) when NS sends an assignment for review."""
     aes = assignment_entity_status
     entity_type = aes.entity_type
     entity_id = aes.entity_id
@@ -2703,32 +2709,62 @@ def notify_assignment_sent_for_review(assignment_entity_status):
     org_focal_ids = _focal_point_ids_by_org_domain(
         entity_type, entity_id, org_only=True, exclude_user_ids=exclude
     )
-    if not org_focal_ids:
-        return []
 
-    if not audience_bucket_enabled(NotificationType.assignment_sent_for_review, "focal_points"):
-        return []
+    notifications = []
+    if org_focal_ids and audience_bucket_enabled(NotificationType.assignment_sent_for_review, "focal_points"):
+        notifications = create_notification(
+            user_ids=org_focal_ids,
+            notification_type=NotificationType.assignment_sent_for_review,
+            title_key='notification.assignment_sent_for_review.title',
+            title_params={'template': template_name, 'period': assigned_form.period_name},
+            message_key='notification.assignment_sent_for_review.message',
+            message_params={
+                'template': template_name,
+                'period': assigned_form.period_name,
+                '_entity_type': entity_type,
+                '_entity_id': entity_id,
+            },
+            entity_type=entity_type,
+            entity_id=entity_id,
+            related_object_type='assignment',
+            related_object_id=aes.id,
+            related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+            priority='high',
+            override_email_preferences=True,
+        ) or []
 
-    return create_notification(
-        user_ids=org_focal_ids,
-        notification_type=NotificationType.assignment_sent_for_review,
-        title_key='notification.assignment_sent_for_review.title',
-        title_params={'template': template_name, 'period': assigned_form.period_name},
-        message_key='notification.assignment_sent_for_review.message',
-        message_params={
-            'template': template_name,
-            'period': assigned_form.period_name,
-            '_entity_type': entity_type,
-            '_entity_id': entity_id,
-        },
-        entity_type=entity_type,
-        entity_id=entity_id,
-        related_object_type='assignment',
-        related_object_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
-        priority='high',
-        override_email_preferences=True,
+    # Optional admin channel (org admins only — system managers stay off for this type).
+    admin_notifications = []
+    secondary_recipients = collect_entity_admin_audience_recipient_ids(
+        NotificationType.assignment_sent_for_review,
+        entity_type,
+        entity_id,
+        exclude_user_ids=exclude,
     )
+    admin_only = [uid for uid in secondary_recipients if uid not in set(org_focal_ids)]
+    if admin_only:
+        admin_notifications = create_notification(
+            user_ids=admin_only,
+            notification_type=NotificationType.assignment_sent_for_review,
+            title_key='notification.assignment_sent_for_review.admin.title',
+            title_params={'template': template_name, 'period': assigned_form.period_name},
+            message_key='notification.assignment_sent_for_review.admin.message',
+            message_params={
+                'template': template_name,
+                'period': assigned_form.period_name,
+                '_entity_type': entity_type,
+                '_entity_id': entity_id,
+            },
+            entity_type=entity_type,
+            entity_id=entity_id,
+            related_object_type='assignment',
+            related_object_id=aes.id,
+            related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+            priority='high',
+            override_email_preferences=True,
+        ) or []
+
+    return list(notifications) + list(admin_notifications)
 
 
 def notify_assignment_returned_for_revision(assignment_entity_status):

@@ -2,7 +2,15 @@ from flask import Blueprint, render_template, request
 from sqlalchemy import func
 from datetime import timedelta
 from app.models.api_usage import APIUsage
-from app.models import IndicatorBank, Sector, SubSector, FormTemplate, Country, User
+from app.models import (
+    AssignedForm,
+    IndicatorBank,
+    Sector,
+    SubSector,
+    FormTemplate,
+    Country,
+    User,
+)
 from app import db
 from app.routes.admin.shared import admin_permission_required
 from flask import current_app
@@ -11,6 +19,57 @@ from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_ok, json_server_error
 from app.utils.sql_utils import safe_ilike_pattern
 from app.services.api_usage_stats import bulk_endpoint_usage_stats, chart_stats_for_period, endpoint_path_prefix
+from app.services.reporting_period_service import period_chronology_sort_key
+from sqlalchemy.orm import joinedload
+
+
+def _assignment_label_for_url_builder(assignment: AssignedForm) -> str:
+    """Label for URL-builder assignment dropdown (custom name, else template – period)."""
+    template_name = (
+        assignment.template.name
+        if assignment.template and assignment.template.name
+        else 'Template Missing'
+    )
+    period = (assignment.period_name or '').strip()
+    default_label = f"{template_name} \u2013 {period}" if period else template_name
+    custom = (assignment.custom_name or '').strip()
+    if custom:
+        if period and period not in custom:
+            return f"{custom} ({template_name} \u2013 {period})"
+        return custom
+    return default_label
+
+
+def _assignment_options_for_url_builder():
+    """AssignedForm options for the API URL builder (id + label + API filter fields)."""
+    assignments = (
+        AssignedForm.query
+        .options(joinedload(AssignedForm.template))
+        .order_by(AssignedForm.assigned_at.desc(), AssignedForm.id.desc())
+        .all()
+    )
+    assignments.sort(
+        key=lambda af: (
+            period_chronology_sort_key(
+                af.period_name,
+                period_start=af.period_start,
+                period_end=af.period_end,
+            ),
+            (af.template.name if af.template and af.template.name else '').casefold(),
+            -(af.id or 0),
+        ),
+        reverse=True,
+    )
+    return [
+        {
+            'id': af.id,
+            'template_id': af.template_id,
+            'period_name': af.period_name,
+            'label': _assignment_label_for_url_builder(af),
+        }
+        for af in assignments
+        if af and af.id is not None
+    ]
 
 bp = Blueprint('api_management', __name__, url_prefix='/admin')
 
@@ -965,6 +1024,7 @@ def api_management():
     templates.sort(key=lambda t: t.name if t.name else '')
     countries = Country.query.order_by(Country.name.asc()).all()
     users = User.query.order_by(User.name.asc()).all()
+    assignment_options = _assignment_options_for_url_builder()
 
     sector_options     = [s.name for s in Sector.query.order_by(Sector.name.asc()).all()]
     sub_sector_options = [ss.name for ss in SubSector.query.order_by(SubSector.name.asc()).all()]
@@ -1023,6 +1083,7 @@ def api_management():
         type_options=type_options,
         templates=templates,
         countries=countries,
+        assignment_options=assignment_options,
         users=users,
         # Legacy — keep mobile_summary accessible if needed elsewhere
         mobile_summary=surface_summary['mobile'],

@@ -498,32 +498,112 @@ def seed_rbac_permissions_and_roles(*, use_advisory_lock: bool = True) -> Dict[s
     permission_catalog = _permission_catalog() + _extension_permission_catalog()
     baseline_roles = _baseline_roles(permission_catalog) + _extension_baseline_roles()
 
-    # Defense-in-depth: rbac_role.code should be protected by a DB-level UNIQUE
-    # constraint (see migrations/versions/add_rbac_tables.py), but if that constraint
-    # was ever dropped out-of-band, `RbacRole.query.filter_by(code=...).first()`-style
-    # "get or create" checks below become racy and can silently insert duplicate role
-    # rows over time (see migrations/versions/repair_rbac_role_duplicate_rows.py for a
-    # historical repair). Surface that loudly instead of continuing to seed on top of it.
+    # Defense-in-depth: rbac_role.code / rbac_permission.code should each be protected
+    # by a DB-level UNIQUE constraint or unique index (either is fine -- environments
+    # bootstrapped via `db.create_all()` from the ORM models get a unique *index* named
+    # after the column, e.g. `ix_rbac_role_code`, while ones bootstrapped via the
+    # add_rbac_tables migration get an explicitly named UNIQUE *constraint*,
+    # `uq_rbac_role_code`; both give the same protection). If that protection was ever
+    # dropped out-of-band (e.g. an ad hoc `drop_all()`/`create_all()` run against a real
+    # database instead of a scratch/test one), `RbacRole.query.filter_by(code=...)
+    # .first()`-style "get or create" checks below become racy and can silently insert
+    # duplicate rows over time. Surface that loudly instead of continuing to seed on top
+    # of it. Checked directly (actual duplicate rows, not just "is a constraint present")
+    # so this can never miss real corruption regardless of naming/history.
+    for _table, _col in (("rbac_role", "code"), ("rbac_permission", "code")):
+        try:
+            dup_codes = [
+                str(row[0])
+                for row in db.session.execute(
+                    db.text(
+                        f"SELECT {_col} FROM {_table} GROUP BY {_col} HAVING count(*) > 1"
+                    )
+                ).fetchall()
+            ]
+            if dup_codes:
+                logger.error(
+                    "RBAC integrity: %d duplicate %s.%s value(s) detected (%s). "
+                    "This usually means %s's unique protection on %s (constraint or "
+                    "index) is missing (dropped out-of-band). Seeding will proceed but "
+                    "may hit a StaleDataError or pick an arbitrary duplicate; a DBA needs "
+                    "to de-duplicate the table and add back "
+                    "`UNIQUE (%s)` before this is safe.",
+                    len(dup_codes),
+                    _table,
+                    _col,
+                    ", ".join(dup_codes[:20]),
+                    _table,
+                    _col,
+                    _col,
+                )
+                continue
+
+            has_unique_protection = bool(
+                db.session.execute(
+                    db.text(
+                        """
+                        SELECT 1
+                        FROM pg_index i
+                        JOIN pg_attribute a
+                          ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
+                        WHERE i.indrelid = :table_name::regclass
+                          AND i.indisunique
+                          AND i.indnatts = 1
+                          AND a.attname = :col_name
+                        LIMIT 1
+                        """
+                    ),
+                    {"table_name": _table, "col_name": _col},
+                ).fetchone()
+            )
+            if not has_unique_protection:
+                logger.error(
+                    "RBAC integrity: %s.%s has no unique constraint/index. No duplicate "
+                    "rows exist yet, but nothing in the database stops one from being "
+                    "inserted by a race between two seeding processes. Add back "
+                    "`UNIQUE (%s)` on %s before this drifts.",
+                    _table,
+                    _col,
+                    _col,
+                    _table,
+                )
+        except Exception as e:
+            logger.debug("%s unique-protection integrity check failed: %s", _table, e)
+
     try:
-        dup_codes = [
+        missing_constraints = [
             str(row[0])
             for row in db.session.execute(
-                db.text("SELECT code FROM rbac_role GROUP BY code HAVING count(*) > 1")
+                db.text(
+                    """
+                    SELECT expected.conname
+                    FROM (VALUES
+                        ('rbac_role_pkey'),
+                        ('rbac_permission_pkey'),
+                        ('rbac_role_permission_pkey'),
+                        ('rbac_role_permission_role_id_fkey'),
+                        ('rbac_role_permission_permission_id_fkey'),
+                        ('rbac_user_role_role_id_fkey')
+                    ) AS expected(conname)
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM pg_constraint WHERE conname = expected.conname
+                    )
+                    """
+                )
             ).fetchall()
         ]
-        if dup_codes:
+        if missing_constraints:
             logger.error(
-                "RBAC integrity: %d duplicate rbac_role.code value(s) detected (%s). "
-                "This usually means rbac_role's UNIQUE(code)/PRIMARY KEY(id) constraints "
-                "are missing (dropped out-of-band). Seeding will proceed but may hit "
-                "StaleDataError or pick an arbitrary duplicate; run "
-                "migrations/versions/repair_rbac_role_duplicate_rows.py's logic (or "
-                "`flask db upgrade`) to de-duplicate and restore the constraints first.",
-                len(dup_codes),
-                ", ".join(dup_codes[:20]),
+                "RBAC integrity: %d expected constraint(s) missing from the database (%s). "
+                "RBAC tables were likely altered out-of-band (e.g. a drop_all/create_all "
+                "run against this database instead of a scratch/test database) and are no "
+                "longer protected against duplicate/orphaned rows. A DBA needs to "
+                "investigate and restore them.",
+                len(missing_constraints),
+                ", ".join(missing_constraints),
             )
     except Exception as e:
-        logger.debug("rbac_role duplicate-code integrity check failed: %s", e)
+        logger.debug("RBAC constraint-presence integrity check failed: %s", e)
 
     # This lock prevents multiple gunicorn workers (or multi-instance rollouts)
     # from racing on unique constraints during seeding.

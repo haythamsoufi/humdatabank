@@ -855,6 +855,18 @@ const templateOptions = JSON.parse('{{ templates|map(attribute="id")|list|tojson
 const templateLabels = JSON.parse('{{ templates|map(attribute="name")|list|tojson|safe }}');
 const countryOptions = JSON.parse('{{ countries|map(attribute="id")|list|tojson|safe }}');
 const countryLabels = JSON.parse('{{ countries|map(attribute="name")|list|tojson|safe }}');
+const assignmentOptions = JSON.parse('{{ assignment_options|tojson|safe }}');
+const assignmentOptionsById = Object.fromEntries(
+    (assignmentOptions || []).map(function(item) {
+        return [String(item.id), item];
+    })
+);
+const assignmentSelectOptions = [''].concat(
+    (assignmentOptions || []).map(function(item) { return String(item.id); })
+);
+const assignmentSelectLabels = [''].concat(
+    (assignmentOptions || []).map(function(item) { return item.label || String(item.id); })
+);
 
 $(document).ready(function() {
 {% if config.CLIENT_CONSOLE_LOGGING %}
@@ -1070,7 +1082,7 @@ try {
                 {name: 'submission_id', type: 'number', placeholder: '{{ _("Submission ID") }}', description: '{{ _("Filter by submission ID") }}'},
                 {name: 'item_type', type: 'select', options: ['', 'indicator', 'question', 'document_field'], description: '{{ _("Filter by item type") }}'},
                 {name: 'item_id', type: 'number', placeholder: '{{ _("Item ID") }}', description: '{{ _("Filter by form item ID") }}'},
-                {name: 'period_name', type: 'text', placeholder: '{{ _("Period Name") }}', description: '{{ _("Filter by period name") }}'},
+                {name: 'assignment_id', type: 'select', options: assignmentSelectOptions, labels: assignmentSelectLabels, description: '{{ _("Filter by assignment ID") }}'},
                 {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: '{{ _("Filter by country ID") }}'},
                 {name: 'submission_type', type: 'select', options: ['', 'assigned', 'public'], description: '{{ _("Filter by submission type") }}'},
                 {name: 'date_from', type: 'text', placeholder: '{{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS") }}', description: '{{ _("Filter by submission date from (ISO format)") }}'},
@@ -1088,7 +1100,7 @@ try {
                 {name: 'item_type', type: 'select', options: ['', 'indicator', 'question', 'document_field'], description: '{{ _("Filter by item type") }}'},
                 {name: 'item_id', type: 'number', placeholder: '{{ _("Item ID") }}', description: '{{ _("Filter by form item ID") }}'},
                 {name: 'indicator_bank_id', type: 'number', placeholder: '{{ _("Indicator Bank ID") }}', description: '{{ _("Filter by indicator bank ID") }}'},
-                {name: 'period_name', type: 'text', placeholder: '{{ _("Period Name") }}', description: '{{ _("Filter by period name") }}'},
+                {name: 'assignment_id', type: 'select', options: assignmentSelectOptions, labels: assignmentSelectLabels, description: '{{ _("Filter by assignment ID") }}'},
                 {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: '{{ _("Filter by country ID") }}'},
                 {name: 'submission_type', type: 'select', options: ['', 'assigned', 'public'], description: '{{ _("Filter by submission type") }}'},
                 {name: 'date_from', type: 'text', placeholder: '{{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS") }}', description: '{{ _("Filter by submission date from (ISO format)") }}'},
@@ -1147,8 +1159,7 @@ try {
             ],
             '/api/v1/indicator-bank/<indicator_id>': [],
             '/api/v1/assigned-forms': [
-                {name: 'template_id', type: 'select', options: [''].concat(templateOptions), labels: [''].concat(templateLabels), description: '{{ _("Filter by template ID") }}'},
-                {name: 'period_name', type: 'text', placeholder: '{{ _("Period Name") }}', description: '{{ _("Filter by period name") }}'},
+                {name: 'assignment_id', type: 'select', options: assignmentSelectOptions, labels: assignmentSelectLabels, description: '{{ _("Filter by assignment ID") }}'},
                 {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1)") }}'},
                 {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: 20)") }}'}
             ],
@@ -1215,7 +1226,11 @@ try {
                 let inputEl;
                 if (param.type === 'select') {
                     inputEl = document.createElement('select');
-                    inputEl.className = 'w-1/4 bg-white border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 py-1.5 px-2';
+                    inputEl.className = (
+                        param.name === 'assignment_id'
+                            ? 'w-2/5 min-w-0 bg-white border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 py-1.5 px-2'
+                            : 'w-1/4 bg-white border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 py-1.5 px-2'
+                    );
                     (param.options || []).forEach((opt, index) => {
                         const optEl = document.createElement('option');
                         optEl.value = opt;
@@ -1372,8 +1387,24 @@ try {
 
         function collectEnabledQueryParams() {
             const params = new URLSearchParams();
+            const assignmentCheckbox = document.getElementById('enable_assignment_id');
+            const assignmentInput = document.getElementById('assignment_id');
+            const assignmentEnabled = !!(
+                assignmentCheckbox &&
+                assignmentCheckbox.checked &&
+                assignmentInput &&
+                assignmentInput.value !== ''
+            );
+
             currentParamDefinitions.forEach(param => {
                 if (param.name === 'api_key') {
+                    return;
+                }
+                // Exact assignment scope replaces coarser template/period filters.
+                if (
+                    assignmentEnabled &&
+                    (param.name === 'template_id' || param.name === 'period_name')
+                ) {
                     return;
                 }
                 const checkbox = document.getElementById(`enable_${param.name}`);
@@ -1382,6 +1413,7 @@ try {
                     params.append(param.name, inputEl.value);
                 }
             });
+
             if (isLayoutStarEnabled()) {
                 params.set('layout', 'star');
             }

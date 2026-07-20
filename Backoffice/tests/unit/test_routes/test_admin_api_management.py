@@ -54,6 +54,7 @@ class TestApiManagementView:
              patch("app.routes.admin.shared.AuthorizationService.has_rbac_permission", return_value=True), \
              patch("app.routes.admin.api_management.scan_flask_routes", return_value=_make_scan()), \
              patch("app.routes.admin.api_management.bulk_endpoint_usage_stats", return_value={}), \
+             patch("app.routes.admin.api_management._assignment_options_for_url_builder", return_value=[]), \
              patch("app.routes.admin.api_management.FormTemplate") as mock_ft, \
              patch("app.routes.admin.api_management.Country") as mock_c, \
              patch("app.routes.admin.api_management.User") as mock_u, \
@@ -97,6 +98,7 @@ class TestApiManagementView:
              patch("app.routes.admin.shared.AuthorizationService.has_rbac_permission", return_value=True), \
              patch("app.routes.admin.api_management.scan_flask_routes", return_value=scan), \
              patch("app.routes.admin.api_management.bulk_endpoint_usage_stats", return_value={}), \
+             patch("app.routes.admin.api_management._assignment_options_for_url_builder", return_value=[]), \
              patch("app.routes.admin.api_management.FormTemplate") as mock_ft, \
              patch("app.routes.admin.api_management.Country") as mock_c, \
              patch("app.routes.admin.api_management.User") as mock_u, \
@@ -176,6 +178,48 @@ class TestApiStats:
 
 
 class TestApiManagementHelpers:
+    def test_assignment_label_for_url_builder_default_and_custom(self, app):
+        from app.routes.admin.api_management import _assignment_label_for_url_builder
+
+        af = MagicMock()
+        af.custom_name = None
+        af.period_name = "2024"
+        af.template = MagicMock(name="ignored")
+        af.template.name = "FDRS"
+        assert _assignment_label_for_url_builder(af) == "FDRS \u2013 2024"
+
+        af.custom_name = "My Custom Assignment"
+        assert _assignment_label_for_url_builder(af) == "My Custom Assignment (FDRS \u2013 2024)"
+
+    def test_assignment_options_for_url_builder(self, app):
+        from app.routes.admin.api_management import _assignment_options_for_url_builder
+
+        af = MagicMock()
+        af.id = 7
+        af.template_id = 33
+        af.period_name = "2024"
+        af.period_start = None
+        af.period_end = None
+        af.custom_name = None
+        af.template = MagicMock()
+        af.template.name = "FDRS"
+
+        with patch("app.routes.admin.api_management.AssignedForm") as mock_af, \
+             patch("app.routes.admin.api_management.joinedload", return_value="jl"), \
+             patch(
+                 "app.routes.admin.api_management.period_chronology_sort_key",
+                 return_value=(1, 1, "2024"),
+             ):
+            mock_af.query.options.return_value.order_by.return_value.all.return_value = [af]
+            rows = _assignment_options_for_url_builder()
+
+        assert rows == [{
+            "id": 7,
+            "template_id": 33,
+            "period_name": "2024",
+            "label": "FDRS \u2013 2024",
+        }]
+
     def test_normalize_path_strips_type_annotations(self):
         from app.routes.admin.api_management import _normalize_path
         assert _normalize_path("/api/v1/items/<int:item_id>") == "/api/v1/items/<item_id>"

@@ -71,7 +71,6 @@ def format_country_info(country):
         'national_society_name': (ns.name if ns else None),
         'region': country.region,
         'secretariat_regional_office_id': getattr(country, 'secretariat_regional_office_id', None),
-        'partof': country.partof,
         'status': country.status,
         'preferred_language': country.preferred_language,
         'currency_code': country.currency_code,
@@ -115,6 +114,7 @@ def format_national_society_info(national_society):
         else {}
     )
     multilingual_names = {lc: name_translations.get(lc) for lc in translatable_langs}
+    part_of = getattr(national_society, 'part_of', None)
     return {
         'id': national_society.id,
         'name': national_society.name,
@@ -125,6 +125,7 @@ def format_national_society_info(national_society):
         'country_iso2': country.iso2 if country else None,
         'country_iso3': country.iso3 if country else None,
         'is_active': bool(getattr(national_society, 'is_active', True)),
+        'part_of': part_of if isinstance(part_of, list) else [],
         'multilingual_names': multilingual_names,
     }
 
@@ -1593,11 +1594,15 @@ def build_star_schema_tables(
     national_societies_table=None,
     indicator_bank_table=None,
     dynamic_context=None,
+    assignment_statuses=None,
 ):
     """
     Assemble star-schema table dicts from unified flat fact sources.
 
     ``fact_form_values`` includes static, dynamic, repeat, and matrix rows.
+
+    When ``assignment_statuses`` is provided (pre-scoped AES rows, including pending
+    with no FormData), it replaces fact-derived assigned ``dim_submission`` rows.
     """
     value_rows = list(data_rows or []) + list(dynamic_data or []) + list(repeat_data or [])
     fact_rows = [
@@ -1670,11 +1675,6 @@ def build_star_schema_tables(
             )
         )
 
-    assigned_submission_ids = {
-        int(r['submission_id'])
-        for r in fact_rows
-        if r.get('submission_type') == 'assigned' and r.get('submission_id') is not None
-    }
     public_submission_ids = {
         int(r['submission_id'])
         for r in fact_rows
@@ -1682,13 +1682,24 @@ def build_star_schema_tables(
     }
 
     dim_submission = []
-    if assigned_submission_ids:
-        aes_rows = AssignmentEntityStatus.query.filter(
-            AssignmentEntityStatus.id.in_(assigned_submission_ids)
-        ).all()
+    if assignment_statuses is not None:
         dim_submission.extend(
-            format_dim_submission_assigned(aes) for aes in aes_rows if aes
+            row for row in assignment_statuses
+            if isinstance(row, dict)
         )
+    else:
+        assigned_submission_ids = {
+            int(r['submission_id'])
+            for r in fact_rows
+            if r.get('submission_type') == 'assigned' and r.get('submission_id') is not None
+        }
+        if assigned_submission_ids:
+            aes_rows = AssignmentEntityStatus.query.filter(
+                AssignmentEntityStatus.id.in_(assigned_submission_ids)
+            ).all()
+            dim_submission.extend(
+                format_dim_submission_assigned(aes) for aes in aes_rows if aes
+            )
     if public_submission_ids:
         ps_rows = PublicSubmission.query.filter(
             PublicSubmission.id.in_(public_submission_ids)

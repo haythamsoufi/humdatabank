@@ -448,7 +448,6 @@ class Country(db.Model):
         index=True,
     )
     region = Column(String(100), nullable=False)
-    partof = Column(String(100), nullable=True)
 
     secretariat_regional_office = relationship(
         'SecretariatRegionalOffice',

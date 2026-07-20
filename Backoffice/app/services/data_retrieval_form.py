@@ -557,6 +557,7 @@ def query_form_data(
     item_type: Optional[str] = None,
     country_id: Optional[int] = None,
     period_name: Optional[str] = None,
+    assignment_id: Optional[int] = None,
     indicator_bank_id: Optional[int] = None,
     indicator_bank_ids: Optional[List[int]] = None,
     submission_type: Optional[str] = None,
@@ -568,6 +569,8 @@ def query_form_data(
     but encapsulates join shapes and filters consistently for assigned and public data.
 
     Returns a dict with two query objects: 'assigned' and 'public'. Callers may further iterate .all().
+
+    ``assignment_id`` filters by ``AssignedForm.id`` (API-facing name for an assignment).
     """
     try:
         assigned_q = FormData.query
@@ -581,42 +584,48 @@ def query_form_data(
         ).join(AssignedForm, PublicSubmission.assigned_form_id == AssignedForm.id)
 
         # Assigned path joins lazily: add joins only when needed to avoid ambiguous columns
-        if template_id or country_id or period_name:
+        needs_af_join = bool(template_id or country_id or period_name or assignment_id)
+        if needs_af_join:
             assigned_q = assigned_q.join(AssignmentEntityStatus).join(AssignedForm)
 
-        if template_id:
-            assigned_q = assigned_q.filter(AssignedForm.template_id == template_id)
-            public_q = public_q.filter(AssignedForm.template_id == template_id)
+        if assignment_id:
+            # Exact assignment scope wins over template_id / period_name.
+            assigned_q = assigned_q.filter(AssignedForm.id == assignment_id)
+            public_q = public_q.filter(AssignedForm.id == assignment_id)
+        else:
+            if template_id:
+                assigned_q = assigned_q.filter(AssignedForm.template_id == template_id)
+                public_q = public_q.filter(AssignedForm.template_id == template_id)
+            if period_name:
+                _pat = f"%{escape_like_pattern(period_name)}%"
+                period_filter = AssignedForm.period_name.ilike(_pat, escape="\\")
+                years = [int(y) for y in re.findall(r"\b(19\d{2}|20\d{2}|21\d{2})\b", str(period_name))]
+                if years:
+                    start_year = min(years)
+                    end_year = max(years)
+                    period_start = _dt(start_year, 1, 1).date()
+                    period_end = _dt(end_year, 12, 31).date()
+                    period_filter = or_(
+                        period_filter,
+                        and_(
+                            AssignedForm.period_start.isnot(None),
+                            AssignedForm.period_end.isnot(None),
+                            AssignedForm.period_start <= period_end,
+                            AssignedForm.period_end >= period_start,
+                        ),
+                    )
+                assigned_q = assigned_q.filter(period_filter)
+                public_q = public_q.filter(period_filter)
         if country_id:
             assigned_q = assigned_q.filter(
                 AssignmentEntityStatus.entity_id == country_id,
                 AssignmentEntityStatus.entity_type == 'country'
             )
             public_q = public_q.filter(PublicSubmission.country_id == country_id)
-        if period_name:
-            _pat = f"%{escape_like_pattern(period_name)}%"
-            period_filter = AssignedForm.period_name.ilike(_pat, escape="\\")
-            years = [int(y) for y in re.findall(r"\b(19\d{2}|20\d{2}|21\d{2})\b", str(period_name))]
-            if years:
-                start_year = min(years)
-                end_year = max(years)
-                period_start = _dt(start_year, 1, 1).date()
-                period_end = _dt(end_year, 12, 31).date()
-                period_filter = or_(
-                    period_filter,
-                    and_(
-                        AssignedForm.period_start.isnot(None),
-                        AssignedForm.period_end.isnot(None),
-                        AssignedForm.period_start <= period_end,
-                        AssignedForm.period_end >= period_start,
-                    ),
-                )
-            assigned_q = assigned_q.filter(period_filter)
-            public_q = public_q.filter(period_filter)
 
         if submission_id:
-            # For assigned path, ensure ACStatus join exists
-            if not (template_id or country_id or period_name):
+            # For assigned path, ensure AES join exists
+            if not needs_af_join:
                 assigned_q = assigned_q.join(AssignmentEntityStatus)
             assigned_q = assigned_q.filter(AssignmentEntityStatus.id == submission_id)
             public_q = public_q.filter(PublicSubmission.id == submission_id)
@@ -2578,6 +2587,7 @@ def query_dynamic_indicator_data(
     submission_id: Optional[int] = None,
     country_id: Optional[int] = None,
     period_name: Optional[str] = None,
+    assignment_id: Optional[int] = None,
     section_id: Optional[int] = None,
     indicator_bank_id: Optional[int] = None,
     submission_type: Optional[str] = None,
@@ -2595,7 +2605,9 @@ def query_dynamic_indicator_data(
     """
     from app.models.forms import DynamicIndicatorData
 
-    needs_aes_join = bool(template_id or country_id or period_name or submission_id)
+    needs_aes_join = bool(
+        template_id or country_id or period_name or submission_id or assignment_id
+    )
 
     # --- Assigned path ---
     assigned_q = DynamicIndicatorData.query.filter(
@@ -2618,9 +2630,18 @@ def query_dynamic_indicator_data(
         ).join(AssignedForm, PublicSubmission.assigned_form_id == AssignedForm.id)
 
     # --- Shared filters ---
-    if template_id:
-        assigned_q = assigned_q.filter(AssignedForm.template_id == template_id)
-        public_q = public_q.filter(AssignedForm.template_id == template_id)
+    if assignment_id:
+        assigned_q = assigned_q.filter(AssignedForm.id == assignment_id)
+        public_q = public_q.filter(AssignedForm.id == assignment_id)
+    else:
+        if template_id:
+            assigned_q = assigned_q.filter(AssignedForm.template_id == template_id)
+            public_q = public_q.filter(AssignedForm.template_id == template_id)
+        if period_name:
+            _pat = f"%{escape_like_pattern(period_name)}%"
+            _period_filter = AssignedForm.period_name.ilike(_pat, escape="\\")
+            assigned_q = assigned_q.filter(_period_filter)
+            public_q = public_q.filter(_period_filter)
 
     if country_id:
         assigned_q = assigned_q.filter(
@@ -2628,12 +2649,6 @@ def query_dynamic_indicator_data(
             AssignmentEntityStatus.entity_type == 'country',
         )
         public_q = public_q.filter(PublicSubmission.country_id == country_id)
-
-    if period_name:
-        _pat = f"%{escape_like_pattern(period_name)}%"
-        _period_filter = AssignedForm.period_name.ilike(_pat, escape="\\")
-        assigned_q = assigned_q.filter(_period_filter)
-        public_q = public_q.filter(_period_filter)
 
     if submission_id:
         assigned_q = assigned_q.filter(AssignmentEntityStatus.id == submission_id)
@@ -2680,6 +2695,7 @@ def query_repeat_group_data(
     item_id: Optional[int] = None,
     country_id: Optional[int] = None,
     period_name: Optional[str] = None,
+    assignment_id: Optional[int] = None,
     section_id: Optional[int] = None,
     submission_type: Optional[str] = None,
     preload: bool = False,
@@ -2694,7 +2710,9 @@ def query_repeat_group_data(
     """
     from app.models.forms import RepeatGroupData, RepeatGroupInstance
 
-    needs_instance_join = bool(template_id or country_id or period_name or submission_id or section_id)
+    needs_instance_join = bool(
+        template_id or country_id or period_name or submission_id or section_id or assignment_id
+    )
 
     # --- Assigned path ---
     assigned_q = RepeatGroupData.query.join(
@@ -2721,9 +2739,18 @@ def query_repeat_group_data(
         ).join(AssignedForm, PublicSubmission.assigned_form_id == AssignedForm.id)
 
     # --- Shared filters ---
-    if template_id:
-        assigned_q = assigned_q.filter(AssignedForm.template_id == template_id)
-        public_q = public_q.filter(AssignedForm.template_id == template_id)
+    if assignment_id:
+        assigned_q = assigned_q.filter(AssignedForm.id == assignment_id)
+        public_q = public_q.filter(AssignedForm.id == assignment_id)
+    else:
+        if template_id:
+            assigned_q = assigned_q.filter(AssignedForm.template_id == template_id)
+            public_q = public_q.filter(AssignedForm.template_id == template_id)
+        if period_name:
+            _pat = f"%{escape_like_pattern(period_name)}%"
+            _period_filter = AssignedForm.period_name.ilike(_pat, escape="\\")
+            assigned_q = assigned_q.filter(_period_filter)
+            public_q = public_q.filter(_period_filter)
 
     if country_id:
         assigned_q = assigned_q.filter(
@@ -2731,12 +2758,6 @@ def query_repeat_group_data(
             AssignmentEntityStatus.entity_type == 'country',
         )
         public_q = public_q.filter(PublicSubmission.country_id == country_id)
-
-    if period_name:
-        _pat = f"%{escape_like_pattern(period_name)}%"
-        _period_filter = AssignedForm.period_name.ilike(_pat, escape="\\")
-        assigned_q = assigned_q.filter(_period_filter)
-        public_q = public_q.filter(_period_filter)
 
     if submission_id:
         assigned_q = assigned_q.filter(AssignmentEntityStatus.id == submission_id)

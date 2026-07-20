@@ -337,7 +337,6 @@ Appears in `countries[]` of `/data/tables`.
   "iso2": "AF",
   "national_society_name": "Afghan Red Crescent Society",
   "region": "Asia Pacific",
-  "partof": null,
   "status": "active",
   "preferred_language": "fa",
   "currency_code": "AFN",

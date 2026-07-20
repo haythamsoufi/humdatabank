@@ -201,8 +201,8 @@ function toggleAdditionalChanges(button, activityIndex) {
 function renderCompletionRateChart() {
     const ctx = document.getElementById('completionRateChart');
 
+    // Absent on no-access / other dashboard variants
     if (!ctx) {
-        console.error("Completion Rate Chart canvas element not found!");
         return;
     }
 
@@ -251,8 +251,8 @@ function renderCompletionRateChart() {
 function renderDataQualityChart() {
     const ctx = document.getElementById('dataQualityChart');
 
-     if (!ctx) {
-        console.error("Data Quality Chart canvas element not found!");
+    // Absent on no-access / other dashboard variants
+    if (!ctx) {
         return;
     }
 
@@ -1209,7 +1209,7 @@ function initDataQualityDashboard() {
 document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('data-quality-dashboard')) {
         initDataQualityDashboard();
-    } else {
+    } else if (document.getElementById('completionRateChart') || document.getElementById('dataQualityChart')) {
         renderCompletionRateChart();
         renderDataQualityChart();
     }

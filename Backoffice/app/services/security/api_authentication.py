@@ -433,7 +433,14 @@ def _get_user_allowed_country_ids(auth_user):
     return {p.entity_id for p in perms}
 
 
-def apply_user_template_scoping(queries, auth_user, template_id=None, country_id=None, period_name=None):
+def apply_user_template_scoping(
+    queries,
+    auth_user,
+    template_id=None,
+    country_id=None,
+    period_name=None,
+    assignment_id=None,
+):
     """Apply RBAC template + entity-level filtering to queries for user-scoped access."""
     assigned_form_data_query = queries['assigned']
     public_form_data_query = queries['public']
@@ -452,7 +459,12 @@ def apply_user_template_scoping(queries, auth_user, template_id=None, country_id
 
     # Template scoping
     if assigned_form_data_query is not None:
-        joins_exist = template_id is not None or country_id is not None or period_name is not None
+        joins_exist = (
+            template_id is not None
+            or country_id is not None
+            or period_name is not None
+            or assignment_id is not None
+        )
         if joins_exist:
             assigned_form_data_query = assigned_form_data_query.filter(AssignedForm.template_id.in_(allowed_template_ids))
         else:
@@ -485,7 +497,14 @@ def apply_user_template_scoping(queries, auth_user, template_id=None, country_id
     }
 
 
-def apply_api_key_data_scoping(queries, scope, template_id=None, country_id=None, period_name=None):
+def apply_api_key_data_scoping(
+    queries,
+    scope,
+    template_id=None,
+    country_id=None,
+    period_name=None,
+    assignment_id=None,
+):
     """
     Restrict data queries to template/country IDs allowed on a scoped API key.
 
@@ -514,7 +533,12 @@ def apply_api_key_data_scoping(queries, scope, template_id=None, country_id=None
                 'public': FormData.query.filter(literal(False)),
             }
         if assigned_form_data_query is not None:
-            joins_exist = template_id is not None or country_id is not None or period_name is not None
+            joins_exist = (
+                template_id is not None
+                or country_id is not None
+                or period_name is not None
+                or assignment_id is not None
+            )
             if joins_exist:
                 assigned_form_data_query = assigned_form_data_query.filter(
                     AssignedForm.template_id.in_(allowed_template_ids)

@@ -49,17 +49,50 @@
 
 <div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 mb-6">
     {% if template_options %}
+    {% set upr_ns = namespace(tab=none) %}
+    {% for tmpl in template_options if tmpl.children %}
+        {% if upr_ns.tab is none %}{% set upr_ns.tab = tmpl %}{% endif %}
+    {% endfor %}
+    {% set upr_tab = upr_ns.tab %}
     {% call scroll_tab_bar(inner_id='vd-template-tabs', aria_label=_('Templates')) %}
         {% for tmpl in template_options %}
+        {% set default_id = tmpl.children[0].id if tmpl.children else tmpl.id %}
+        {% set child_ids = tmpl.children | map(attribute='id') | list if tmpl.children else [] %}
         <button type="button" role="tab"
                 class="vd-template-tab {{ admin_underline_tab_btn_classes(loop.first) }}"
-                data-template-id="{{ tmpl.id }}"
+                data-template-id="{{ default_id }}"
+                {% if child_ids %}data-child-ids="{{ child_ids | join(',') }}"{% endif %}
                 aria-selected="{{ 'true' if loop.first else 'false' }}">
-            {{ tmpl.name }}
+            {% if tmpl.children %}
+                {{ _('Unified Planning and Reporting') }}
+            {% else %}
+                {{ tmpl.name }}
+            {% endif %}
         </button>
         {% endfor %}
     {% endcall %}
-    <input type="hidden" id="vd-template" value="{{ template_options[0].id }}">
+    {% if upr_tab and upr_tab.children %}
+    <div id="vd-upr-subtabs" class="hidden border-b border-ifrc-gray-100">
+        {% call scroll_tab_bar(inner_id='vd-upr-template-tabs', aria_label=_('Unified Planning and Reporting templates'), wrapper_class='px-4 sm:px-6') %}
+            {% for child in upr_tab.children %}
+            <button type="button" role="tab"
+                    class="vd-upr-template-tab {{ admin_underline_tab_btn_classes(loop.first) }}"
+                    data-template-id="{{ child.id }}"
+                    aria-selected="{{ 'true' if loop.first else 'false' }}">
+                {% if child.id == 33 %}
+                    {{ _('Reporting') }}
+                {% elif child.id == 24 %}
+                    {{ _('Planning') }}
+                {% else %}
+                    {{ child.name }}
+                {% endif %}
+            </button>
+            {% endfor %}
+        {% endcall %}
+    </div>
+    {% endif %}
+    {% set initial_template = template_options[0].children[0].id if template_options[0].children else template_options[0].id %}
+    <input type="hidden" id="vd-template" value="{{ initial_template }}">
     {% else %}
     <div class="p-6 text-sm text-ifrc-gray-600">{{ _('No templates with validation checks enabled.') }}</div>
     {% endif %}

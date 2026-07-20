@@ -15,10 +15,21 @@ from app.services.reporting_period_service import sort_period_names
 from app.services.validation.rule_labels import format_rule_labels
 from app.services.validation.types import CheckResult, ValidationEvaluationResult
 from app.services.validation_check_service import evaluate_validation_checks
+from app.utils.data_quality_constants import (
+    UPR_LEGACY_REPORTING_TEMPLATE_ID,
+    UPR_PLANNING_TEMPLATE_ID,
+    UPR_REPORTING_TEMPLATE_ID,
+    UPR_VALIDATION_TEMPLATE_IDS,
+)
 
 HISTORY_YEARS_LOOKBACK = 3
 
 _QUESTION_STATUS_PRIORITY = {"open": 0, "answered": 1, "waived": 2, "resolved": 3}
+
+_UPR_CHILD_LABELS = {
+    UPR_REPORTING_TEMPLATE_ID: "Reporting",
+    UPR_PLANNING_TEMPLATE_ID: "Planning",
+}
 
 
 def _history_year_columns(current_year: int | None) -> list[int]:
@@ -76,8 +87,61 @@ def _templates_with_validation() -> list[FormTemplate]:
     )
 
 
+def _upr_display_name(template_id: int, fallback: str) -> str:
+    child = _UPR_CHILD_LABELS.get(template_id)
+    if child:
+        return f"Unified Planning and Reporting — {child}"
+    return fallback
+
+
+def _validation_templates_by_id() -> dict[int, FormTemplate]:
+    """DQ-enabled templates plus UPR country templates (24/33), excluding legacy 25 when 33 exists."""
+    by_id = {t.id: t for t in _templates_with_validation()}
+    missing_upr = [tid for tid in UPR_VALIDATION_TEMPLATE_IDS if tid not in by_id]
+    if missing_upr:
+        for tmpl in FormTemplate.query.filter(FormTemplate.id.in_(missing_upr)).all():
+            by_id[tmpl.id] = tmpl
+    if UPR_REPORTING_TEMPLATE_ID in by_id:
+        by_id.pop(UPR_LEGACY_REPORTING_TEMPLATE_ID, None)
+    return by_id
+
+
 def template_options() -> list[dict[str, Any]]:
-    return [{"id": t.id, "name": t.name} for t in _templates_with_validation()]
+    """Flat template list for selects (questions/rules) and API consumers."""
+    by_id = _validation_templates_by_id()
+    options: list[dict[str, Any]] = []
+    for tid in sorted(by_id):
+        tmpl = by_id[tid]
+        options.append({"id": tmpl.id, "name": _upr_display_name(tmpl.id, tmpl.name)})
+    return options
+
+
+def template_tab_options() -> list[dict[str, Any]]:
+    """Product tabs for the validation dashboard (UPR grouped as one tab)."""
+    by_id = _validation_templates_by_id()
+    tabs: list[dict[str, Any]] = []
+    for tid in sorted(by_id):
+        if tid in UPR_VALIDATION_TEMPLATE_IDS:
+            continue
+        tmpl = by_id[tid]
+        tabs.append({"id": tmpl.id, "name": tmpl.name, "children": None})
+
+    upr_children: list[dict[str, Any]] = []
+    for tid in UPR_VALIDATION_TEMPLATE_IDS:
+        tmpl = by_id.get(tid)
+        if not tmpl:
+            continue
+        upr_children.append({
+            "id": tmpl.id,
+            "name": _UPR_CHILD_LABELS.get(tmpl.id, tmpl.name),
+        })
+    if upr_children:
+        tabs.append({
+            "id": upr_children[0]["id"],
+            "name": "Unified Planning and Reporting",
+            "children": upr_children,
+        })
+    return tabs
 
 
 def global_periods_for_template(template_id: int) -> list[str]:

@@ -149,8 +149,22 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
         {
             "code": "admin_full",
             "name": "Admin: Full (All admin roles)",
-            "description": "Full access to all admin modules (does not grant System Manager powers).",
-            "permission_codes": [code for code, _, _ in permission_catalog if code.startswith("admin.")],
+            "description": (
+                "Full access to all admin modules except Settings and Plugins "
+                "(does not grant System Manager powers). Assign the dedicated "
+                "Settings/Plugins roles separately if needed."
+            ),
+            # NOTE: Settings and Plugins are intentionally excluded here. The user
+            # management UI (user_form.html / user-form.js) treats "Full" as a bulk
+            # preset for the *other* admin modules and never auto-checks or locks the
+            # Settings/Plugins checkboxes. Keeping them out of this role's permission
+            # set keeps the seeded RBAC data consistent with that UI behavior.
+            "permission_codes": [
+                code
+                for code, _, _ in permission_catalog
+                if code.startswith("admin.")
+                and code not in ("admin.settings.manage", "admin.plugins.manage")
+            ],
         },
         # ----------------------------------------------------------------
         # Granular admin module roles (recommended for most admins)
@@ -257,12 +271,17 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
             ],
         },
         {
+            # NOTE: previously named "Admin: Content (Manage)" and also granted
+            # admin.documents.manage, which overlapped/duplicated the dedicated
+            # "Admin: Documents (Manage)" role below and rendered in a different
+            # UI category (Website Management vs. General), confusing which role
+            # actually controls document access. Rescoped to resources only; use
+            # "Admin: Documents (Manage)" separately for document management.
             "code": "admin_content_manager",
-            "name": "Admin: Content (Manage)",
-            "description": "Manage resources (including publications) and documents.",
+            "name": "Admin: Resources (Manage)",
+            "description": "Manage resources (including publications).",
             "permission_codes": [
                 "admin.resources.manage",
-                "admin.documents.manage",
             ],
         },
         {
@@ -438,6 +457,32 @@ def _extension_baseline_roles() -> List[Dict[str, Any]]:
         return []
 
 
+def get_missing_baseline_role_codes() -> List[str]:
+    """
+    Return baseline/extension role codes defined in code but absent from `rbac_role`.
+
+    Best-effort, read-only diagnostic (no writes). Used to surface RBAC seed drift
+    (e.g. after a code update added new roles, or after manual/out-of-band database
+    changes) as an actionable warning instead of a silently incomplete/odd-looking
+    roles UI. Returns [] on any error so callers can safely ignore failures (e.g.
+    RBAC tables not created yet).
+    """
+    try:
+        permission_catalog = _permission_catalog() + _extension_permission_catalog()
+        baseline_roles = _baseline_roles(permission_catalog) + _extension_baseline_roles()
+        expected_codes = {str(r.get("code")) for r in baseline_roles if r.get("code")}
+        if not expected_codes:
+            return []
+        existing_codes = {
+            str(code)
+            for (code,) in RbacRole.query.with_entities(RbacRole.code).filter(RbacRole.code.in_(expected_codes)).all()
+        }
+        return sorted(expected_codes - existing_codes)
+    except Exception as e:
+        logger.debug("get_missing_baseline_role_codes failed: %s", e)
+        return []
+
+
 def seed_rbac_permissions_and_roles(*, use_advisory_lock: bool = True) -> Dict[str, int]:
     """
     Seed RBAC permissions and baseline roles (idempotent).
@@ -452,6 +497,33 @@ def seed_rbac_permissions_and_roles(*, use_advisory_lock: bool = True) -> Dict[s
     """
     permission_catalog = _permission_catalog() + _extension_permission_catalog()
     baseline_roles = _baseline_roles(permission_catalog) + _extension_baseline_roles()
+
+    # Defense-in-depth: rbac_role.code should be protected by a DB-level UNIQUE
+    # constraint (see migrations/versions/add_rbac_tables.py), but if that constraint
+    # was ever dropped out-of-band, `RbacRole.query.filter_by(code=...).first()`-style
+    # "get or create" checks below become racy and can silently insert duplicate role
+    # rows over time (see migrations/versions/repair_rbac_role_duplicate_rows.py for a
+    # historical repair). Surface that loudly instead of continuing to seed on top of it.
+    try:
+        dup_codes = [
+            str(row[0])
+            for row in db.session.execute(
+                db.text("SELECT code FROM rbac_role GROUP BY code HAVING count(*) > 1")
+            ).fetchall()
+        ]
+        if dup_codes:
+            logger.error(
+                "RBAC integrity: %d duplicate rbac_role.code value(s) detected (%s). "
+                "This usually means rbac_role's UNIQUE(code)/PRIMARY KEY(id) constraints "
+                "are missing (dropped out-of-band). Seeding will proceed but may hit "
+                "StaleDataError or pick an arbitrary duplicate; run "
+                "migrations/versions/repair_rbac_role_duplicate_rows.py's logic (or "
+                "`flask db upgrade`) to de-duplicate and restore the constraints first.",
+                len(dup_codes),
+                ", ".join(dup_codes[:20]),
+            )
+    except Exception as e:
+        logger.debug("rbac_role duplicate-code integrity check failed: %s", e)
 
     # This lock prevents multiple gunicorn workers (or multi-instance rollouts)
     # from racing on unique constraints during seeding.

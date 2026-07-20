@@ -228,6 +228,21 @@
                         </div>
                     {% endif %}
 
+                    {# System-Manager-only diagnostic: RBAC role definitions expected by the current
+                       code are missing from the database (stale/never-seeded/corrupted seed data).
+                       This is the same condition that makes role groups below (e.g. Assignment Roles)
+                       silently render empty/short instead of showing every expected role. #}
+                    {% if missing_rbac_role_codes|default([])|length %}
+                        <div class="lg:col-span-3 mb-4">
+                            <p class="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
+                                <i class="fas fa-triangle-exclamation mr-1"></i>
+                                {{ _('RBAC role data looks incomplete: %(codes)s missing from the database. Roles/permissions shown below may be incomplete. Run', codes=missing_rbac_role_codes|join(', ')) }}
+                                <code class="bg-red-100 px-1 rounded">flask rbac seed</code>
+                                {{ _('to fix.') }}
+                            </p>
+                        </div>
+                    {% endif %}
+
                     {% if (can_assign_rbac_roles or roles_read_only) and form.rbac_roles is defined and form.rbac_roles.choices %}
                     <div class="lg:col-span-3 mb-4">
                         {# If roles are shown read-only (disabled inputs), keep values submitted so the form can validate. #}
@@ -313,11 +328,12 @@
                                             {% set display_label = raw_label[11:] %}
                                         {% endif %}
                                         {% set is_approver = 'approver' in raw_label.lower() %}
+                                        {% set subfield_role_code = (role_codes_by_id|default({})).get(subfield.data, '') %}
                                         <label class="flex items-center min-w-0 assignment-role-item {% if is_approver %}assignment-approver-role{% if not show_admin_sections %} hidden{% endif %}{% endif %} {% if roles_disabled %}cursor-not-allowed{% endif %}" {% if is_approver %}data-role-type="approver"{% endif %}>
                                             {% if roles_disabled %}
-                                                {{ subfield(class="h-4 w-4 shrink-0 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True) }}
+                                                {{ subfield(class="h-4 w-4 shrink-0 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True, data_role_code=subfield_role_code) }}
                                             {% else %}
-                                                {{ subfield(class="h-4 w-4 shrink-0 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                                {{ subfield(class="h-4 w-4 shrink-0 text-blue-600 border-gray-300 rounded focus:ring-blue-500", data_role_code=subfield_role_code) }}
                                             {% endif %}
                                             <span class="ml-2 text-sm {% if roles_disabled %}text-gray-500{% else %}text-gray-700{% endif %}">{{ display_label }}</span>
                                         </label>
@@ -338,9 +354,9 @@
                                     {% for subfield in rbac_groups.translator %}
                                     <label class="flex items-center">
                                         {% if roles_disabled %}
-                                            {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 translator-role-checkbox", disabled=True) }}
+                                            {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 translator-role-checkbox", disabled=True, data_role_code=(role_codes_by_id|default({})).get(subfield.data, '')) }}
                                         {% else %}
-                                            {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 translator-role-checkbox") }}
+                                            {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 translator-role-checkbox", data_role_code=(role_codes_by_id|default({})).get(subfield.data, '')) }}
                                         {% endif %}
                                         {{ subfield.label(class="ml-2 text-sm text-gray-700") }}
                                     </label>
@@ -403,9 +419,9 @@
                                         {% for subfield in rbac_groups.system %}
                                             <label class="flex items-center {% if roles_disabled %}opacity-70 cursor-not-allowed{% endif %}">
                                                 {% if roles_disabled %}
-                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True) }}
+                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True, data_role_code=(role_codes_by_id|default({})).get(subfield.data, '')) }}
                                                 {% else %}
-                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", data_role_code=(role_codes_by_id|default({})).get(subfield.data, '')) }}
                                                 {% endif %}
                                                 <span class="ml-2 text-sm font-medium text-red-600">{{ subfield.label.text }}</span>
                                             </label>
@@ -438,9 +454,9 @@
                                             {% endif %}
                                             <label class="flex items-center {% if roles_disabled %}opacity-70 cursor-not-allowed{% endif %}">
                                                 {% if roles_disabled %}
-                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True) }}
+                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True, data_role_code=(role_codes_by_id|default({})).get(subfield.data, '')) }}
                                                 {% else %}
-                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", data_role_code=(role_codes_by_id|default({})).get(subfield.data, '')) }}
                                                 {% endif %}
                                                 <span class="ml-2 text-sm text-gray-800 font-medium">{{ display_label }}</span>
                                             </label>
@@ -454,9 +470,9 @@
                                             {% endif %}
                                             <label class="flex items-center {% if roles_disabled %}opacity-70 cursor-not-allowed{% endif %}">
                                                 {% if roles_disabled %}
-                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True) }}
+                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True, data_role_code=(role_codes_by_id|default({})).get(subfield.data, '')) }}
                                                 {% else %}
-                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                                    {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", data_role_code=(role_codes_by_id|default({})).get(subfield.data, '')) }}
                                                 {% endif %}
                                                 <span class="ml-2 text-sm text-gray-800 font-medium">{{ display_label }}</span>
                                             </label>
@@ -516,7 +532,7 @@
                                         {% set __ = admin_cats.user_management.append(feature) %}
                                     {% elif feature in ['Templates', 'Assignments', 'Data Explorer', 'Validation Dashboard', 'Validation Questions', 'Validation Rules'] %}
                                         {% set __ = admin_cats.form_data.append(feature) %}
-                                    {% elif feature in ['Content'] %}
+                                    {% elif feature in ['Resources'] %}
                                         {% set __ = admin_cats.website.append(feature) %}
                                     {% elif feature in ['Countries & Organization', 'Indicator Bank'] %}
                                         {% set __ = admin_cats.reference.append(feature) %}
@@ -531,7 +547,7 @@
                                 {% set ordered_general = ['Docs', 'Settings', 'Documents', 'Communication', 'Notifications', 'Plugins'] %}
                                 {% set ordered_user_mgmt = ['Users'] %}
                                 {% set ordered_form_data = ['Templates', 'Assignments', 'Data Explorer', 'Validation Dashboard', 'Validation Questions', 'Validation Rules'] %}
-                                {% set ordered_website = ['Content'] %}
+                                {% set ordered_website = ['Resources'] %}
                                 {% set ordered_reference = ['Countries & Organization', 'Indicator Bank'] %}
                                 {% set ordered_analytics = ['Analytics', 'Audit Trail', 'Governance', 'AI', 'API', 'Security'] %}
                                 {% set ordered_other = admin_cats.other %}
@@ -560,9 +576,9 @@
                                                                     {% if feature != 'Plugins' or current_user_has_role('system_manager') %}
                                                                         <label class="inline-flex items-center {% if roles_disabled %}opacity-70 cursor-not-allowed{% endif %}">
                                                                             {% if roles_disabled %}
-                                                                                {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True) }}
+                                                                                {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True, data_role_code=(role_codes_by_id|default({})).get(subfield.data, '')) }}
                                                                             {% else %}
-                                                                                {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                                                                {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", data_role_code=(role_codes_by_id|default({})).get(subfield.data, '')) }}
                                                                             {% endif %}
                                                                             <span class="ml-2 text-sm {% if roles_disabled %}text-gray-500{% else %}text-gray-700{% endif %}">{{ action_label if action_label else display_label }}</span>
                                                                         </label>
@@ -679,9 +695,9 @@
                                     {% for subfield in rbac_groups.other %}
                                         <label class="flex items-center">
                                             {% if roles_disabled %}
-                                                {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True) }}
+                                                {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", disabled=True, data_role_code=(role_codes_by_id|default({})).get(subfield.data, '')) }}
                                             {% else %}
-                                                {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                                {{ subfield(class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500", data_role_code=(role_codes_by_id|default({})).get(subfield.data, '')) }}
                                             {% endif %}
                                             {{ subfield.label(class="ml-2 text-sm text-gray-700") }}
                                         </label>
@@ -710,6 +726,41 @@ window.userFormConfig = {
         deletionPreview: {% if user %}{{ url_for('user_management.user_deletion_preview', user_id=user.id)|tojson }}{% else %}null{% endif %},
         loginUrl: {{ url_for('auth.login')|tojson }}
     },
+    {# Server-side roles snapshot — compare against DOM after JS sync if UI looks wrong #}
+    rolesDebug: {
+        computedRoleType: {{ (computed_role_type|default(none))|tojson }},
+        selectedRoleType: {{ (selected_role_type|default(none))|tojson }},
+        defaultRoleType: {{ default_role_type|tojson }},
+        showAdminSections: {{ show_admin_sections|tojson }},
+        rolesDisabled: {{ roles_disabled|tojson }},
+        canAssignRbacRoles: {{ can_assign_rbac_roles|tojson }},
+        rolesReadOnly: {{ roles_read_only|tojson }},
+        formRbacRoleIds: {{ (form.rbac_roles.data or [])|list|tojson }},
+        translatorRoleId: {{ translator_role_id|tojson if translator_role_id is defined else 'null' }},
+        groupCounts: {
+            system: {{ rbac_groups.system|length }},
+            core: {{ rbac_groups.core_roles|length }},
+            admin: {{ rbac_groups.admin|length }},
+            assignment: {{ rbac_groups.assignment|length }},
+            translator: {{ rbac_groups.translator|length }},
+            other: {{ rbac_groups.other|length }}
+        },
+        roles: [
+            {%- for subfield in form.rbac_roles %}
+            {
+                id: {{ subfield.data|tojson }},
+                label: {{ (subfield.label.text or '')|tojson }},
+                checked: {{ subfield.checked|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {%- endfor %}
+        ]
+    },
+    entityDebug: {
+        userCountryIds: [{% if user %}{%- for country in user.countries -%}{{ country.id }}{%- if not loop.last -%},{%- endif -%}{%- endfor -%}{% endif %}],
+        defaultCountryId: {{ (user.countries.first().id if user and user.countries.first() else none)|tojson }},
+        hasEntityTabs: {{ (entity_tabs.order|default([])|length > 0)|tojson }},
+        defaultEntityTab: {{ (default_entity_tab|default(none))|tojson }}
+    },
     t: {
         deactivate: {{ _('Deactivate')|tojson }},
         cancel: {{ _('Cancel')|tojson }},
@@ -730,6 +781,46 @@ window.userFormConfig = {
         loadingAnalytics: {{ _("Loading analytics...")|tojson }}
     }
 };
+(function () {
+    var dbg = window.userFormConfig && window.userFormConfig.rolesDebug;
+    var ent = window.userFormConfig && window.userFormConfig.entityDebug;
+    window.__clientGroupCollapsed && window.__clientGroupCollapsed('[user_form] SSR roles/permissions bootstrap');
+    window.__clientLog && window.__clientLog('config', {
+        userId: window.userFormConfig.userId,
+        isNew: window.userFormConfig.isNew,
+        readOnly: window.userFormConfig.readOnly,
+        translatorRoleId: window.userFormConfig.translatorRoleId
+    });
+    window.__clientLog && window.__clientLog('rolesDebug (server-stored / form data)', dbg);
+    if (dbg) {
+        var checked = (dbg.roles || []).filter(function (r) { return r.checked; });
+        window.__clientLog && window.__clientLog('checked roles from form.data', checked);
+        window.__clientLog && window.__clientLog('role type resolution', {
+            computedRoleType: dbg.computedRoleType,
+            selectedRoleType: dbg.selectedRoleType,
+            defaultRoleTypeUsedInTemplate: dbg.defaultRoleType,
+            showAdminSections: dbg.showAdminSections,
+            formRbacRoleIds: dbg.formRbacRoleIds,
+            groupCounts: dbg.groupCounts
+        });
+        var idSet = {};
+        (dbg.formRbacRoleIds || []).forEach(function (id) { idSet[String(id)] = true; });
+        var missingFromChoices = (dbg.formRbacRoleIds || []).filter(function (id) {
+            return !(dbg.roles || []).some(function (r) { return String(r.id) === String(id); });
+        });
+        var checkedButNotInFormData = checked.filter(function (r) { return !idSet[String(r.id)]; });
+        if (missingFromChoices.length) {
+            window.__clientWarn && window.__clientWarn('form.rbac_roles.data IDs missing from rendered choices (stale/orphan?)', missingFromChoices);
+        }
+        if (checkedButNotInFormData.length) {
+            window.__clientWarn && window.__clientWarn('checkbox checked in template but id not in form.rbac_roles.data', checkedButNotInFormData);
+        }
+    } else {
+        window.__clientWarn && window.__clientWarn('rolesDebug missing — roles UI block may not have rendered (no choices / no permission)');
+    }
+    window.__clientLog && window.__clientLog('entityDebug', ent);
+    window.__clientGroupEnd && window.__clientGroupEnd();
+})();
 </script>
 
                     {% if not azure_sso_enabled %}

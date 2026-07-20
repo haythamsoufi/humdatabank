@@ -46,7 +46,12 @@ from .helpers import (
     _cascade_delete_user_related,
     _get_translator_form_context,
     _apply_user_translator_languages,
+    _warn_if_critical_rbac_roles_missing,
+    _get_role_codes_by_id,
+    _get_missing_rbac_role_codes_for_display,
 )
+
+_RESTRICTED_RBAC_ROLE_CODES = ["system_manager", "admin_full", "admin_plugins_manager"]
 
 
 # === User Management Routes ===
@@ -624,12 +629,12 @@ def new_user():
     # Prevent privilege escalation: non-system-managers cannot assign certain high-privilege roles.
     restricted_role_ids = set()
     try:
-        restricted_codes = ["system_manager", "admin_full", "admin_plugins_manager"]
-        rows = RbacRole.query.filter(RbacRole.code.in_(restricted_codes)).with_entities(RbacRole.id).all()
+        rows = RbacRole.query.filter(RbacRole.code.in_(_RESTRICTED_RBAC_ROLE_CODES)).with_entities(RbacRole.id).all()
         restricted_role_ids = {int(r[0]) for r in rows if r and r[0] is not None}
     except Exception as e:
         current_app.logger.debug("restricted_role_ids query failed: %s", e)
         restricted_role_ids = set()
+    _warn_if_critical_rbac_roles_missing(_RESTRICTED_RBAC_ROLE_CODES, restricted_role_ids)
     if not current_is_sys_mgr and restricted_role_ids:
         form.rbac_roles.choices = [
             (rid, label)
@@ -821,6 +826,8 @@ def new_user():
                            azure_sso_enabled=azure_sso_enabled,
                            selected_role_type=_selected_role_type_for_rerender(form),
                            profile_palette_hexes=PROFILE_COLORS,
+                           role_codes_by_id=_get_role_codes_by_id(),
+                           missing_rbac_role_codes=_get_missing_rbac_role_codes_for_display(current_is_sys_mgr),
                            **_get_translator_form_context())
 
 @bp.route("/users/edit_user/<int:user_id>", methods=["GET", "POST"])
@@ -871,12 +878,12 @@ def edit_user(user_id):
     # Prevent privilege escalation: non-system-managers cannot assign certain high-privilege roles.
     restricted_role_ids = set()
     try:
-        restricted_codes = ["system_manager", "admin_full", "admin_plugins_manager"]
-        rows = RbacRole.query.filter(RbacRole.code.in_(restricted_codes)).with_entities(RbacRole.id).all()
+        rows = RbacRole.query.filter(RbacRole.code.in_(_RESTRICTED_RBAC_ROLE_CODES)).with_entities(RbacRole.id).all()
         restricted_role_ids = {int(r[0]) for r in rows if r and r[0] is not None}
     except Exception as e:
         current_app.logger.debug("restricted_role_ids query failed: %s", e)
         restricted_role_ids = set()
+    _warn_if_critical_rbac_roles_missing(_RESTRICTED_RBAC_ROLE_CODES, restricted_role_ids)
     if not current_is_sys_mgr and restricted_role_ids:
         form.rbac_roles.choices = [
             (rid, label)
@@ -1207,7 +1214,7 @@ def edit_user(user_id):
         .order_by(UserDevice.last_active_at.desc().nullslast(), UserDevice.created_at.desc().nullslast()) \
         .all()
 
-    computed_role_type = _compute_role_type_for_user_id(user.id)
+    computed_role_type = _compute_role_type_for_user_id(user.id, check_admin_grants=True)
     selected_role_type = _selected_role_type_for_rerender(form)
 
     return render_template("admin/user_management/user_form.html",
@@ -1225,6 +1232,8 @@ def edit_user(user_id):
                            computed_role_type=computed_role_type,
                            selected_role_type=selected_role_type,
                            profile_palette_hexes=PROFILE_COLORS,
+                           role_codes_by_id=_get_role_codes_by_id(),
+                           missing_rbac_role_codes=_get_missing_rbac_role_codes_for_display(current_is_sys_mgr),
                            **_get_translator_form_context(user))
 
 

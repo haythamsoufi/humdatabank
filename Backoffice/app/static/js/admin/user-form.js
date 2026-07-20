@@ -7,14 +7,92 @@
 
     // --- Block 1 (original lines 660-1313) ---
                     (function () {
+                      function snapshotRolesUi(phase) {
+                        const roleTypeSelectEl = document.getElementById('role_type_select');
+                        const adminSectionsEl = document.getElementById('admin-sections');
+                        const assignmentGroupEl = document.getElementById('roles-assignment-group');
+                        const coreGroupEl = document.getElementById('roles-core-group');
+                        const formEl = document.querySelector('form#userForm') || document.querySelector('form');
+                        const inputs = formEl
+                          ? Array.from(formEl.querySelectorAll('input[type="checkbox"][name="rbac_roles"], input[type="hidden"][name="rbac_roles"]'))
+                          : [];
+                        const roles = inputs.map(function (input) {
+                          const label = input.closest('label');
+                          const span = label ? label.querySelector('span') : null;
+                          return {
+                            id: input.value,
+                            type: input.type,
+                            checked: !!input.checked,
+                            disabled: !!input.disabled,
+                            label: span ? String(span.textContent || '').trim() : '',
+                            userWanted: input.dataset.userWanted,
+                            userTouched: input.dataset.userTouched,
+                            manualOverride: input.dataset.manualOverride || null,
+                            indeterminate: !!input.indeterminate,
+                            hiddenByAncestor: !!(input.closest('.hidden') || (label && label.classList.contains('hidden')))
+                          };
+                        });
+                        const checked = roles.filter(function (r) { return r.checked || r.type === 'hidden'; });
+                        const payload = {
+                          phase: phase,
+                          roleType: roleTypeSelectEl ? roleTypeSelectEl.value : null,
+                          roleTypeDisabled: roleTypeSelectEl ? !!roleTypeSelectEl.disabled : null,
+                          adminSectionsHidden: adminSectionsEl ? adminSectionsEl.classList.contains('hidden') : null,
+                          hasAssignmentGroup: !!assignmentGroupEl,
+                          hasCoreGroup: !!coreGroupEl,
+                          inputCount: roles.length,
+                          checkedCount: checked.length,
+                          checkedRoles: checked,
+                          allRoles: roles,
+                          ssrRolesDebug: cfg.rolesDebug || null
+                        };
+                        window.__clientLog && window.__clientLog('[user_form:roles] UI snapshot — ' + phase, payload);
+                        if (cfg.rolesDebug && cfg.rolesDebug.formRbacRoleIds) {
+                          const domIds = new Set(checked.map(function (r) { return String(r.id); }));
+                          const ssrIds = (cfg.rolesDebug.formRbacRoleIds || []).map(String);
+                          const inSsrNotDom = ssrIds.filter(function (id) { return !domIds.has(id); });
+                          const inDomNotSsr = Array.from(domIds).filter(function (id) { return ssrIds.indexOf(id) === -1; });
+                          if (inSsrNotDom.length || inDomNotSsr.length) {
+                            window.__clientWarn && window.__clientWarn('[user_form:roles] SSR form.data vs DOM checked mismatch', {
+                              phase: phase,
+                              inSsrNotDom: inSsrNotDom,
+                              inDomNotSsr: inDomNotSsr
+                            });
+                          }
+                        }
+                        return payload;
+                      }
+
+                      window.__clientLog && window.__clientLog('[user_form:roles] interactive block loading', {
+                        readOnly: !!cfg.readOnly,
+                        rolesDebug: cfg.rolesDebug || null,
+                        entityDebug: cfg.entityDebug || null
+                      });
+
                       const READ_ONLY = cfg.readOnly;
-                      if (READ_ONLY) return;
+                      if (READ_ONLY) {
+                        window.__clientWarn && window.__clientWarn('[user_form:roles] skipping interactive role sync (readOnly=true); logging SSR/DOM only');
+                        snapshotRolesUi('read-only-skip');
+                        return;
+                      }
 
                       const form = document.querySelector('form');
-                      if (!form) return;
+                      if (!form) {
+                        window.__clientWarn && window.__clientWarn('[user_form:roles] no form found — aborting role UI init');
+                        return;
+                      }
 
                       const roleInputs = Array.from(form.querySelectorAll('input[type="checkbox"][name="rbac_roles"]'));
-                      if (!roleInputs.length) return;
+                      if (!roleInputs.length) {
+                        window.__clientWarn && window.__clientWarn('[user_form:roles] no rbac_roles checkboxes in form — aborting', {
+                          hiddenRoleInputs: form.querySelectorAll('input[type="hidden"][name="rbac_roles"]').length,
+                          rolesDebug: cfg.rolesDebug || null
+                        });
+                        snapshotRolesUi('no-checkboxes');
+                        return;
+                      }
+
+                      snapshotRolesUi('dom-before-init');
 
                       // Track what the user explicitly wants (vs auto-checked due to implication)
                       for (const input of roleInputs) {
@@ -51,6 +129,15 @@
                       const roleTypeSelect = document.getElementById('role_type_select');
                       const adminSectionsContainer = document.getElementById('admin-sections');
 
+                      // Prefer the stable RBAC role `code` (rendered as data-role-code) to identify
+                      // special roles. Falls back to label-text parsing for roles that predate this
+                      // attribute or don't carry a recognized code (e.g. custom/plugin roles), so a
+                      // renamed baseline role (name edited via the generic Role admin UI) doesn't lose
+                      // its special UI behavior until the next RBAC seed run reverts the name.
+                      function roleCodeOf(input) {
+                        return (input && input.dataset && input.dataset.roleCode || '').trim();
+                      }
+
                       function getAssignmentRoleInputs() {
                         if (!assignmentGroup) return { viewer: null, editorSubmitter: null, approver: null, all: [] };
                         const aInputs = Array.from(
@@ -60,10 +147,14 @@
                         let editorSubmitter = null;
                         let approver = null;
                         for (const input of aInputs) {
+                          const code = roleCodeOf(input);
                           const txt = (getLabelSpanText(input) || '').toLowerCase();
-                          if (txt === 'viewer') viewer = input;
-                          if (txt === 'editor & submitter' || txt === 'editor and submitter') editorSubmitter = input;
-                          if (txt === 'approver') approver = input;
+                          if (code === 'assignment_viewer' || (!code && txt === 'viewer')) viewer = input;
+                          if (
+                            code === 'assignment_editor_submitter' ||
+                            (!code && (txt === 'editor & submitter' || txt === 'editor and submitter'))
+                          ) editorSubmitter = input;
+                          if (code === 'assignment_approver' || (!code && txt === 'approver')) approver = input;
                         }
                         return { viewer, editorSubmitter, approver, all: aInputs };
                       }
@@ -82,6 +173,12 @@
                         const selectedType = roleTypeSelect?.value || 'admin';
                         const isFocalPoint = selectedType === 'focal_point';
 
+                        window.__clientLog && window.__clientLog('[user_form:roles] syncRoleTypeUi', {
+                          selectedType: selectedType,
+                          isFocalPoint: isFocalPoint,
+                          adminSectionsWillHide: isFocalPoint
+                        });
+
                         if (adminSectionsContainer) {
                           adminSectionsContainer.classList.toggle('hidden', isFocalPoint);
                         }
@@ -98,6 +195,11 @@
                         const selectedType = roleTypeSelect?.value || 'admin';
                         const isFocalPoint = selectedType === 'focal_point';
 
+                        window.__clientLog && window.__clientLog('[user_form:roles] role_type changed by user', {
+                          selectedType: selectedType,
+                          isFocalPoint: isFocalPoint
+                        });
+
                         syncRoleTypeUi();
 
                         // If switching to Focal Point, clear ALL admin roles (including Full/Core/System Manager presets).
@@ -108,6 +210,7 @@
                         }
 
                         try { recomputeLocks(); } catch (e) {}
+                        snapshotRolesUi('after-role-type-change');
                       }
 
                       function clearAdminRolesForFocalPoint() {
@@ -137,12 +240,19 @@
 
                       // Add event listener to role type dropdown
                       if (roleTypeSelect) {
+                        window.__clientLog && window.__clientLog('[user_form:roles] binding role_type_select', {
+                          initialValue: roleTypeSelect.value,
+                          disabled: !!roleTypeSelect.disabled,
+                          ssrDefaultRoleType: cfg.rolesDebug && cfg.rolesDebug.defaultRoleType
+                        });
                         roleTypeSelect.addEventListener('change', handleRoleTypeChangeFromUser);
                         syncRoleTypeUi();
                         if (roleTypeSelect.value === 'focal_point') {
                           ensureMinimumFocalPointAssignmentRoles();
                         }
                         try { recomputeLocks(); } catch (e) {}
+                      } else {
+                        window.__clientWarn && window.__clientWarn('[user_form:roles] #role_type_select not found');
                       }
 
                       function normalize(s) {
@@ -172,6 +282,21 @@
                       if (coreGroup) {
                         const coreInputs = Array.from(coreGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]'));
                         for (const input of coreInputs) {
+                          const code = roleCodeOf(input);
+                          if (code === 'system_manager') {
+                            systemManagerInputRef = input;
+                            continue;
+                          }
+                          if (code === 'admin_full') {
+                            fullAdminInputRef = input;
+                            continue;
+                          }
+                          if (code === 'admin_core') {
+                            coreEssentialsInputRef = input;
+                            continue;
+                          }
+                          if (code) continue; // Recognized-but-different code: don't fall back to label parsing.
+
                           const label = getLabelSpanText(input);
                           const normalizedLabel = normalize(label);
                           if (normalizedLabel.includes('system manager')) {
@@ -230,7 +355,13 @@
                       }
 
                       // Full (All admin roles) should NOT include Settings or Plugins.
+                      // Prefer the stable role code (seeded rbac_seed_service.py deliberately excludes
+                      // admin.settings.manage/admin.plugins.manage from admin_full's permission set to
+                      // match this), falling back to the card title text for custom/plugin roles.
+                      const FULL_EXCLUDED_ROLE_CODES = ['admin_settings_manager', 'admin_plugins_manager'];
                       function isExcludedFromFull(input) {
+                        const code = roleCodeOf(input);
+                        if (code) return FULL_EXCLUDED_ROLE_CODES.includes(code);
                         const featureTitle = getFeatureTitleForInput(input);
                         return featureTitle === 'Settings' || featureTitle === 'Plugins';
                       }
@@ -502,16 +633,7 @@
 
                         // 4) Assignment roles: Approver / Editor & Submitter imply Viewer
                         if (assignmentGroup) {
-                          const aInputs = Array.from(assignmentGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]'));
-                          let viewer = null;
-                          let editorSubmitter = null;
-                          let approver = null;
-                          for (const input of aInputs) {
-                            const txt = getLabelSpanText(input).toLowerCase();
-                            if (txt === 'viewer') viewer = input;
-                            if (txt === 'editor & submitter' || txt === 'editor and submitter') editorSubmitter = input;
-                            if (txt === 'approver') approver = input;
-                          }
+                          const { viewer, editorSubmitter, approver } = getAssignmentRoleInputs();
                           if (viewer && ((editorSubmitter && editorSubmitter.checked) || (approver && approver.checked))) {
                             implied.add(viewer);
                             lockSet.add(viewer);
@@ -613,6 +735,7 @@
 
                       // Ensure disabled/locked checked roles are submitted (disabled inputs don't submit)
                       form.addEventListener('submit', function () {
+                        snapshotRolesUi('form-submit-before-normalize');
                         if (roleTypeSelect && roleTypeSelect.value === 'admin') {
                           const adminCheckboxes = adminGroup
                             ? Array.from(adminGroup.querySelectorAll('input[type="checkbox"][name="rbac_roles"]'))
@@ -662,6 +785,7 @@
                             form.appendChild(hidden);
                           }
                         }
+                        snapshotRolesUi('form-submit-after-normalize');
                       });
 
                       function initTranslatorLanguagePanel() {
@@ -696,11 +820,18 @@
                       // After helpers exist: if Focal Point is selected (including after a failed
                       // save), strip any leftover checked admin roles that are only hidden in the UI.
                       if (roleTypeSelect && roleTypeSelect.value === 'focal_point') {
+                        window.__clientLog && window.__clientLog('[user_form:roles] focal_point init cleanup — clearing admin roles still checked in DOM');
                         clearAdminRolesForFocalPoint();
                         ensureMinimumFocalPointAssignmentRoles();
                       }
                       recomputeLocks();
                       initTranslatorLanguagePanel();
+                      snapshotRolesUi('dom-after-init');
+                      window.__clientLog && window.__clientLog('[user_form:roles] resolved umbrella refs', {
+                        systemManager: systemManagerInputRef ? systemManagerInputRef.value : null,
+                        fullAdmin: fullAdminInputRef ? fullAdminInputRef.value : null,
+                        coreEssentials: coreEssentialsInputRef ? coreEssentialsInputRef.value : null
+                      });
                     })();
 
     // --- Block 2 (original lines 1906-2060) ---
@@ -1397,11 +1528,33 @@
         let entityPermissionsLoaded = false;
 
         function initEntityPermissionsTab() {
-            if (entityPermissionsLoaded) return;
+            if (entityPermissionsLoaded) {
+                window.__clientLog && window.__clientLog('[user_form:entity] initEntityPermissionsTab skipped (already loaded)');
+                return;
+            }
             entityPermissionsLoaded = true;
+            window.__clientGroupCollapsed && window.__clientGroupCollapsed('[user_form:entity] loading Entity Permissions tab');
+            window.__clientLog && window.__clientLog('entityDebug (SSR)', cfg.entityDebug || null);
+            window.__clientLog && window.__clientLog('userId / defaultCountryId / userCountryIds', {
+                userId: cfg.userId,
+                defaultCountryId: cfg.defaultCountryId,
+                userCountryIds: cfg.userCountryIds
+            });
+            window.__clientLog && window.__clientLog('containers present', {
+                nsStructure: !!document.getElementById('ns-structure-hierarchy-container'),
+                secretariatDivisions: !!document.getElementById('secretariat-divisions-container'),
+                secretariatRegions: !!document.getElementById('secretariat-regions-container'),
+                countriesPanel: !!document.getElementById('panel-countries'),
+                countryCheckboxes: document.querySelectorAll('.country-checkbox').length,
+                checkedCountries: document.querySelectorAll('.country-checkbox:checked').length
+            });
 
             // Initialize NS Structure hierarchical selector
             if (document.getElementById('ns-structure-hierarchy-container')) {
+                window.__clientLog && window.__clientLog('[user_form:entity] init NS Structure selector', {
+                    targetUserId: cfg.userId,
+                    defaultCountryId: cfg.defaultCountryId
+                });
                 nsStructureSelector = new HierarchicalEntitySelector({
                     containerId: 'ns-structure-hierarchy-container',
                     apiBaseUrl: '', // Empty since blueprint already has /admin prefix
@@ -1410,6 +1563,7 @@
                     onChange: function(data) {
                         // Just update hidden form fields - no need to reload from server
                         // Changes will be saved when form is submitted
+                        window.__clientLog && window.__clientLog('[user_form:entity] NS Structure onChange', data);
                     }
                 });
 
@@ -1417,6 +1571,7 @@
                 const nsCountrySelect = document.getElementById('ns-country-select');
                 const nsContainer = document.getElementById('ns-structure-hierarchy-container');
                 function loadNsForCountry(countryId) {
+                    window.__clientLog && window.__clientLog('[user_form:entity] loadNsForCountry', { countryId: countryId });
                     if (!countryId) {
                         nsContainer.innerHTML = `
                         <div class="text-center py-4">
@@ -1438,6 +1593,10 @@
                     if (defaultCountryId) {
                         nsCountrySelect.value = String(defaultCountryId);
                         loadNsForCountry(defaultCountryId);
+                    } else {
+                        window.__clientWarn && window.__clientWarn('[user_form:entity] no defaultCountryId — NS structure not auto-loaded', {
+                            userCountryIds: cfg.userCountryIds
+                        });
                     }
                 }
 
@@ -1456,12 +1615,15 @@
             if (cfg.userId) {
                 // Initialize Secretariat Divisions & Departments selector
                 if (document.getElementById('secretariat-divisions-container')) {
+                    window.__clientLog && window.__clientLog('[user_form:entity] init Secretariat Divisions selector', { targetUserId: cfg.userId });
                     secretariatDivisionsSelector = new HierarchicalEntitySelector({
                         containerId: 'secretariat-divisions-container',
                         apiBaseUrl: '',
                         targetUserId: cfg.userId,
                         entityTypes: ['division', 'department'],
-                        onChange: function(data) {}
+                        onChange: function(data) {
+                            window.__clientLog && window.__clientLog('[user_form:entity] Secretariat Divisions onChange', data);
+                        }
                     });
 
                     secretariatDivisionsSelector.loadHierarchy('/admin/structure/secretariat-hierarchy');
@@ -1480,12 +1642,15 @@
 
                 // Initialize Secretariat Regions selector
                 if (document.getElementById('secretariat-regions-container')) {
+                    window.__clientLog && window.__clientLog('[user_form:entity] init Secretariat Regions selector', { targetUserId: cfg.userId });
                     secretariatRegionsSelector = new HierarchicalEntitySelector({
                         containerId: 'secretariat-regions-container',
                         apiBaseUrl: '',
                         targetUserId: cfg.userId,
                         entityTypes: ['regional_office', 'cluster_office'],
-                        onChange: function(data) {}
+                        onChange: function(data) {
+                            window.__clientLog && window.__clientLog('[user_form:entity] Secretariat Regions onChange', data);
+                        }
                     });
 
                     secretariatRegionsSelector.loadHierarchy('/admin/structure/secretariat-regions-hierarchy');
@@ -1506,15 +1671,22 @@
                 window.nsStructureSelector = nsStructureSelector;
                 window.secretariatDivisionsSelector = secretariatDivisionsSelector;
                 window.secretariatRegionsSelector = secretariatRegionsSelector;
+            } else {
+                window.__clientWarn && window.__clientWarn('[user_form:entity] no cfg.userId — hierarchy selectors not initialized (new user?)');
             }
+            window.__clientGroupEnd && window.__clientGroupEnd();
         }
 
         const entityPermissionsTabBtn = document.getElementById('entity-permissions-tab');
         if (entityPermissionsTabBtn) {
             entityPermissionsTabBtn.addEventListener('click', initEntityPermissionsTab);
+            window.__clientLog && window.__clientLog('[user_form:entity] Entity Permissions tab click handler bound');
+        } else {
+            window.__clientLog && window.__clientLog('[user_form:entity] #entity-permissions-tab not present');
         }
         // If Entity Permissions is the initial active tab (URL/localStorage), load immediately.
         if (resolveInitialMainTabId() === 'entity') {
+            window.__clientLog && window.__clientLog('[user_form:entity] initial main tab is entity — loading immediately');
             initEntityPermissionsTab();
         }
 

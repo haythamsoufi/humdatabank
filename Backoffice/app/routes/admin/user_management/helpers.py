@@ -61,6 +61,12 @@ def _apply_role_type_and_implications(
     drop_role_codes = drop_role_codes or set()
     normalized_role_type = (role_type or "").strip().lower()
 
+    # Unknown/tampered role_type values (anything other than the two valid options)
+    # must not silently bypass both the admin-auto-downgrade and the focal-point
+    # admin-stripping safety nets below. Default to the more restrictive option.
+    if normalized_role_type not in ("admin", "focal_point"):
+        normalized_role_type = "focal_point"
+
     # Auto-downgrade: "admin" without any admin_* roles and without assignment_approver
     # is effectively a focal point.  The UI does this client-side too, but we enforce here
     # as a safety net.
@@ -180,6 +186,57 @@ def _get_allowed_non_country_entity_types():
     return list(get_allowed_entity_type_codes(groups))
 
 
+def _warn_if_critical_rbac_roles_missing(restricted_codes: list, restricted_role_ids: set) -> None:
+    """
+    Defensive integrity check for the privilege-escalation guards in new_user/edit_user.
+
+    Those guards look up System Manager / Admin: Full / Plugins-manager by RBAC role
+    `code` and simply no-op (fail OPEN, not closed) if the lookup comes back empty —
+    e.g. `if sys_role and not current_is_sys_mgr: <filter choices>` silently skips the
+    filter when `sys_role` is None. That's expected/harmless on a fresh install before
+    `flask rbac seed` has ever run. But if RBAC *has* been seeded and one of these
+    specific codes is still missing (renamed via direct DB edit, corrupted migration,
+    accidental deletion, ...), it's a silent, security-relevant misconfiguration that
+    should be surfaced in logs rather than swallowed.
+    """
+    try:
+        from app.models.rbac import RbacRole
+
+        if RbacRole.query.first() is None:
+            # RBAC hasn't been seeded at all yet; nothing to warn about.
+            return
+        if len(restricted_role_ids) < len(restricted_codes):
+            current_app.logger.warning(
+                "RBAC integrity: expected critical role code(s) %s in rbac_role but "
+                "only found %d matching row(s). Privilege-escalation guards for the "
+                "missing role(s) will not be enforced until the seed data is corrected "
+                "(re-run `flask rbac seed`).",
+                restricted_codes,
+                len(restricted_role_ids),
+            )
+    except Exception as e:
+        current_app.logger.debug("critical RBAC role integrity check failed: %s", e)
+
+
+def _get_missing_rbac_role_codes_for_display(current_is_sys_mgr: bool) -> list:
+    """
+    Best-effort list of baseline/extension RBAC role codes missing from the database,
+    for the user_form.html "RBAC seed data looks incomplete" banner.
+
+    Only computed for System Managers: they're the only ones who can act on it (by
+    running `flask rbac seed`), and it costs an extra query, so non-system-managers
+    loading the same form don't pay for it.
+    """
+    if not current_is_sys_mgr:
+        return []
+    try:
+        from app.services.rbac_seed_service import get_missing_baseline_role_codes
+        return get_missing_baseline_role_codes()
+    except Exception as e:
+        current_app.logger.debug("_get_missing_rbac_role_codes_for_display failed: %s", e)
+        return []
+
+
 def _is_azure_sso_enabled() -> bool:
     """
     Return True when Azure AD B2C (OIDC) login is configured.
@@ -196,7 +253,7 @@ def _normalize_user_email_for_comparison(value) -> str:
     return str(value).strip().lower()
 
 
-def _compute_role_type_for_user_id(user_id: int) -> str:
+def _compute_role_type_for_user_id(user_id: int, *, check_admin_grants: bool = False) -> str:
     """
     Align with user_form.html role type selector: users with any admin_* role,
     system_manager, or assignment_approver are treated as Admin; otherwise Focal Point.
@@ -204,6 +261,15 @@ def _compute_role_type_for_user_id(user_id: int) -> str:
     Approver counts as Admin because the UI only exposes (and preserves) the Approver
     checkbox in Admin mode; rendering an approver-only user as Focal Point would hide
     the role and strip it on the next save.
+
+    When `check_admin_grants` is True, also treats the user as Admin if
+    `AuthorizationService.is_admin()` is true (e.g. via a global scoped admin.*
+    access grant with no admin_* role attached). This keeps the Role Type default
+    and "target is admin" gating in user_form.html aligned with the actual
+    authorization check (`AuthorizationService.is_admin`) used elsewhere (e.g. in
+    `edit_user`/`archive_user`) to block non-System-Managers from modifying admins.
+    Opt-in only: it costs an extra RBAC query, so bulk list/detail builders that
+    call this per-user (see `build_admin_user_list_rows`) should leave it off.
     """
     try:
         from app.models.rbac import RbacUserRole, RbacRole
@@ -221,7 +287,17 @@ def _compute_role_type_for_user_id(user_id: int) -> str:
             c.startswith("admin_") or c in ("system_manager", "assignment_approver")
             for c in user_role_codes
         )
-        return "admin" if has_admin_roles else "focal_point"
+        if has_admin_roles:
+            return "admin"
+
+        if check_admin_grants:
+            from app.services.authorization_service import AuthorizationService
+
+            target_user = User.query.get(user_id)
+            if target_user and AuthorizationService.is_admin(target_user):
+                return "admin"
+
+        return "focal_point"
     except Exception as e:
         current_app.logger.debug("computed_role_type check failed: %s", e)
         return "admin"
@@ -369,6 +445,23 @@ def _country_access_request_to_dict(req: CountryAccessRequest) -> dict:
             else None
         ),
     }
+
+
+def _get_role_codes_by_id() -> dict:
+    """
+    Return {role_id: role_code} for all RBAC roles (best-effort).
+
+    Used by user_form.html / user-form.js to identify special roles (System
+    Manager, Admin: Full, Admin: Core, Translator, Assignment Viewer/Editor &
+    Submitter/Approver) by their stable `code` rather than by parsing the
+    human-editable `name` label. Falls back to {} if RBAC isn't available yet.
+    """
+    try:
+        from app.models.rbac import RbacRole
+        return {int(r.id): str(r.code) for r in RbacRole.query.with_entities(RbacRole.id, RbacRole.code).all()}
+    except Exception as e:
+        current_app.logger.debug("_get_role_codes_by_id query failed: %s", e)
+        return {}
 
 
 def _get_countries_by_region():

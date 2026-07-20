@@ -21,6 +21,7 @@ from app.services.validation_dashboard_service import (
     preview_country_validation,
     summarize_period,
     template_options,
+    template_tab_options,
 )
 
 
@@ -252,9 +253,49 @@ class TestTemplateOptions:
         with patch(
             "app.services.validation_dashboard_service._templates_with_validation",
             return_value=[tpl],
-        ):
+        ), patch(
+            "app.services.validation_dashboard_service.FormTemplate.query"
+        ) as mock_q:
+            mock_q.filter.return_value.all.return_value = []
             result = template_options()
         assert result == [{"id": 21, "name": "FDRS"}]
+
+    def test_includes_upr_templates_and_groups_tab(self):
+        fdrs = MagicMock()
+        fdrs.id = 21
+        fdrs.name = "FDRS"
+        legacy = MagicMock()
+        legacy.id = 25
+        legacy.name = "Unified Country Report"
+        reporting = MagicMock()
+        reporting.id = 33
+        reporting.name = "Unified Country Report"
+        planning = MagicMock()
+        planning.id = 24
+        planning.name = "Unified Country Plan"
+        with patch(
+            "app.services.validation_dashboard_service._templates_with_validation",
+            return_value=[fdrs, legacy],
+        ), patch(
+            "app.services.validation_dashboard_service.FormTemplate.query"
+        ) as mock_q:
+            mock_q.filter.return_value.all.return_value = [reporting, planning]
+            flat = template_options()
+            tabs = template_tab_options()
+
+        assert {"id": 21, "name": "FDRS"} in flat
+        assert {"id": 33, "name": "Unified Planning and Reporting — Reporting"} in flat
+        assert {"id": 24, "name": "Unified Planning and Reporting — Planning"} in flat
+        assert not any(opt["id"] == 25 for opt in flat)
+
+        assert tabs[0] == {"id": 21, "name": "FDRS", "children": None}
+        upr = tabs[-1]
+        assert upr["name"] == "Unified Planning and Reporting"
+        assert upr["id"] == 33
+        assert upr["children"] == [
+            {"id": 33, "name": "Reporting"},
+            {"id": 24, "name": "Planning"},
+        ]
 
 
 class TestGlobalPeriodsForTemplate:

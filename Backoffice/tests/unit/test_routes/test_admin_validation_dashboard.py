@@ -29,7 +29,7 @@ class TestValidationDashboard:
 
     def test_renders_for_permitted_user(self, logged_in_client, db_session, app):
         with _perm_patch(), \
-             patch("app.routes.admin.validation_dashboard.template_options", return_value=[]), \
+             patch("app.routes.admin.validation_dashboard.template_tab_options", return_value=[]), \
              patch("app.routes.admin.validation_dashboard.render_template", return_value=_mock_render("vd")):
             resp = logged_in_client.get("/admin/validation-dashboard")
         assert resp.status_code == 200

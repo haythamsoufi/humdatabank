@@ -33,19 +33,57 @@
         return document.querySelectorAll('#vd-template-tabs .vd-template-tab');
     }
 
+    function uprTemplateTabButtons() {
+        return document.querySelectorAll('#vd-upr-template-tabs .vd-upr-template-tab');
+    }
+
+    function parseChildIds(btn) {
+        var raw = btn && btn.getAttribute('data-child-ids');
+        if (!raw) return [];
+        return raw.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    }
+
+    function findTemplateTabForId(templateId) {
+        var target = String(templateId || '');
+        var buttons = templateTabButtons();
+        for (var i = 0; i < buttons.length; i++) {
+            var btn = buttons[i];
+            if (btn.getAttribute('data-template-id') === target) return btn;
+            if (parseChildIds(btn).indexOf(target) !== -1) return btn;
+        }
+        return null;
+    }
+
+    function syncUprSubtabs(activeTemplateId) {
+        var subtabs = el('vd-upr-subtabs');
+        var parent = findTemplateTabForId(activeTemplateId);
+        var childIds = parseChildIds(parent);
+        var show = !!(subtabs && childIds.length);
+        if (subtabs) subtabs.classList.toggle('hidden', !show);
+        if (!show) return;
+        var A = window.AdminUnderlineTabs;
+        var target = String(activeTemplateId || '');
+        uprTemplateTabButtons().forEach(function (btn) {
+            var isActive = btn.getAttribute('data-template-id') === target;
+            if (A) A.setStripButtonActive(btn, isActive);
+            btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+    }
+
     function setTemplateId(templateId) {
         var target = templateId == null ? '' : String(templateId);
-        var matched = false;
+        var matchedTab = target ? findTemplateTabForId(target) : null;
+        var matched = !!matchedTab;
         var A = window.AdminUnderlineTabs;
         templateTabButtons().forEach(function (btn) {
-            var isActive = btn.getAttribute('data-template-id') === target;
-            if (isActive) matched = true;
+            var isActive = btn === matchedTab;
             if (A) A.setStripButtonActive(btn, isActive);
             btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
         });
         if (!matched && target) return false;
         var hidden = el('vd-template');
         if (hidden) hidden.value = matched ? target : '';
+        syncUprSubtabs(matched ? target : '');
         return matched || !target;
     }
 
@@ -546,16 +584,35 @@
 
     /* ——— Event wiring ——— */
 
+    function switchTemplate(id) {
+        if (!id || id === getTemplateId()) {
+            // Still sync UPR subtabs when re-clicking the parent product tab.
+            syncUprSubtabs(getTemplateId());
+            return;
+        }
+        setTemplateId(id);
+        resetDashboardScope();
+        applyScope(null, null).catch(function (err) { console.error(err); });
+        if (window.validationDashboardTracker && window.validationDashboardTracker.onTemplateChanged) {
+            window.validationDashboardTracker.onTemplateChanged(null).catch(function (err) { console.error(err); });
+        }
+    }
+
     templateTabButtons().forEach(function (btn) {
         btn.addEventListener('click', function () {
-            var id = btn.getAttribute('data-template-id');
-            if (!id || id === getTemplateId()) return;
-            setTemplateId(id);
-            resetDashboardScope();
-            applyScope(null, null).catch(function (err) { console.error(err); });
-            if (window.validationDashboardTracker && window.validationDashboardTracker.onTemplateChanged) {
-                window.validationDashboardTracker.onTemplateChanged(null).catch(function (err) { console.error(err); });
-            }
+            var childIds = parseChildIds(btn);
+            var current = getTemplateId();
+            // Keep the active UPR child when re-selecting the product tab.
+            var id = (childIds.length && childIds.indexOf(current) !== -1)
+                ? current
+                : btn.getAttribute('data-template-id');
+            switchTemplate(id);
+        });
+    });
+
+    uprTemplateTabButtons().forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            switchTemplate(btn.getAttribute('data-template-id'));
         });
     });
 

@@ -908,6 +908,7 @@
 <script type="application/json" id="entity-management-data">[
 {% for aes in assignment_entities %}
 {% set aes_display_name = assignment_entity_display.get(aes.id, '') if assignment_entity_display is defined else EntityService.get_entity_name(aes.entity_type, aes.entity_id, include_hierarchy=True) %}
+{% set fds_info = (assignment_entity_fds_members.get(aes.entity_id) if assignment_entity_fds_members is defined and aes.entity_type == 'country' else none) %}
 {
     "id": {{ aes.id }},
     "entity_type": {{ (aes.entity_type or '')|tojson }},
@@ -924,6 +925,11 @@
     )|tojson }},
     "entity_name": {{ aes_display_name|tojson }},
     "entity_id": {{ aes.entity_id|tojson }},
+    "fds_member_user_id": {{ (fds_info.fds_member_user_id if fds_info else none)|tojson }},
+    "fds_member_name": {{ ((fds_info.fds_member_name if fds_info else '') or '')|tojson }},
+    "fds_member_email": {{ ((fds_info.fds_member_email if fds_info else '') or '')|tojson }},
+    "fds_member_active": {{ (fds_info.fds_member_active if fds_info else true)|tojson }},
+    "fds_member_profile_color": {{ ((fds_info.fds_member_profile_color if fds_info else '') or '')|tojson }},
     "status": {{ (aes.status or '')|tojson }},
     "due_date": {{ (aes.due_date|datetime_iso if aes.due_date else '')|tojson }},
     "is_public_available": {{ aes.is_public_available|tojson }},

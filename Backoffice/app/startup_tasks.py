@@ -40,7 +40,13 @@ def deferred_rbac_seed(app, selected_config_name, is_reloader):
     if auto_seed_env is not None and str(auto_seed_env).strip() != "":
         auto_seed = str(auto_seed_env).strip().lower() == "true"
     else:
-        auto_seed = selected_config_name in {"production", "staging"}
+        # Default to always seeding (idempotent, deferred to a background thread) so
+        # RBAC role/permission definitions can't silently drift out of sync with the
+        # code in any environment -- including local dev, where nobody automatically
+        # runs `flask rbac seed` after pulling changes that add/rename roles. A stale
+        # dev DB missing newer roles (e.g. assignment_* roles) previously surfaced as
+        # confusing, incomplete-looking role checkboxes in the user management UI.
+        auto_seed = True
 
     if not auto_seed:
         return

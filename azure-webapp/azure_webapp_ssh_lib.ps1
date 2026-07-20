@@ -166,7 +166,7 @@ function Get-AzureWebAppPlinkHostKeys {
     $prev = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        $output = & $PlinkPath -batch -ssh "root@127.0.0.1" -P $LocalPort -pw $Password 2>&1 | Out-String
+        $output = & $PlinkPath -batch -legacy-stdio-prompts -ssh "root@127.0.0.1" -P $LocalPort -pw $Password 2>&1 | Out-String
     } finally {
         $ErrorActionPreference = $prev
     }
@@ -248,7 +248,7 @@ function Send-AzureWebAppRemoteFile {
         if ($LASTEXITCODE -ne 0) { throw "pscp failed for $LocalPath" }
         return
     }
-    Get-Content -Raw -Path $LocalPath | & $PlinkPath -batch -hostkey $HostKey -ssh "root@127.0.0.1" -P $LocalPort -pw $Password "cat > $RemotePath"
+    Get-Content -Raw -Path $LocalPath | & $PlinkPath -batch -legacy-stdio-prompts -hostkey $HostKey -ssh "root@127.0.0.1" -P $LocalPort -pw $Password "cat > $RemotePath"
     if ($LASTEXITCODE -ne 0) { throw "Upload failed for $LocalPath" }
 }
 
@@ -261,7 +261,7 @@ function Invoke-AzureWebAppPlinkCommand {
         [switch]$Interactive,
         [string]$Password = $script:AzureWebAppSshPassword
     )
-    $args = @('-batch', '-hostkey', $HostKey, '-ssh', 'root@127.0.0.1', '-P', "$LocalPort", '-pw', $Password)
+    $args = @('-batch', '-legacy-stdio-prompts', '-hostkey', $HostKey, '-ssh', 'root@127.0.0.1', '-P', "$LocalPort", '-pw', $Password)
     if ($Interactive) { $args += '-t' }
     & $PlinkPath @args $RemoteCommand
     return $LASTEXITCODE

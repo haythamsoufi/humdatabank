@@ -29,10 +29,12 @@ from app.utils.error_handling import handle_json_view_exception
 from app.routes.admin.shared import admin_required, permission_required
 from app.utils.request_utils import is_json_request
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 from app.models.forms import FormData, DynamicIndicatorData, DynamicSectionContext, RepeatGroupInstance, RepeatGroupData
 from app.utils.form_localization import get_localized_country_name, build_template_select_choices
 from app.utils.country_utils import get_countries_by_region
 from app.services.entity_service import EntityService
+from app.services.country_service import fds_member_user_display_name
 from app.services.reporting_period_service import sync_assigned_form_reporting_period
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, SubmitField, DateField, BooleanField
@@ -532,6 +534,28 @@ def edit_assignment(assignment_id):
         for aes in assignment_entities
     }
 
+    country_ids = [
+        aes.entity_id for aes in assignment_entities if aes.entity_type == 'country'
+    ]
+    assignment_entity_fds_members = {}
+    if country_ids:
+        countries = (
+            Country.query.options(joinedload(Country.fds_member_user))
+            .filter(Country.id.in_(country_ids))
+            .all()
+        )
+        for country in countries:
+            fds_user = country.fds_member_user
+            assignment_entity_fds_members[country.id] = {
+                'fds_member_user_id': country.fds_member_user_id,
+                'fds_member_name': fds_member_user_display_name(fds_user),
+                'fds_member_email': (fds_user.email or '') if fds_user else '',
+                'fds_member_active': bool(fds_user.active) if fds_user else True,
+                'fds_member_profile_color': (
+                    (fds_user.profile_color or '') if fds_user else ''
+                ),
+            }
+
     # Create form for editing assignment entity status
     edit_aes_form = AssignmentEntityStatusForm()
     assignment_entity_status_choices = AssignmentEntityStatusValue.choices()
@@ -542,6 +566,7 @@ def edit_assignment(assignment_id):
                          assignment_countries=assignment_countries,
                          assignment_entities=assignment_entities,
                          assignment_entity_display=assignment_entity_display,
+                         assignment_entity_fds_members=assignment_entity_fds_members,
                          countries_by_region=countries_by_region,
                          edit_aes_form=edit_aes_form,
                          assignment_entity_status_choices=assignment_entity_status_choices,
@@ -644,9 +669,35 @@ def get_assignment_entities(assignment_id):
     hierarchy_names = EntityService.batch_entity_names(
         pairs, include_hierarchy=True, prefetched=prefetched,
     )
+    country_ids = [
+        aes.entity_id for aes in entity_statuses if aes.entity_type == 'country'
+    ]
+    fds_by_country_id = {}
+    if country_ids:
+        countries = (
+            Country.query.options(joinedload(Country.fds_member_user))
+            .filter(Country.id.in_(country_ids))
+            .all()
+        )
+        for country in countries:
+            fds_user = country.fds_member_user
+            fds_by_country_id[country.id] = {
+                'fds_member_user_id': country.fds_member_user_id,
+                'fds_member_name': fds_member_user_display_name(fds_user),
+                'fds_member_email': (fds_user.email or '') if fds_user else '',
+                'fds_member_active': bool(fds_user.active) if fds_user else True,
+                'fds_member_profile_color': (
+                    (fds_user.profile_color or '') if fds_user else ''
+                ),
+            }
     for aes in entity_statuses:
         entity = prefetched.get((aes.entity_type, aes.entity_id))
         if entity:
+            fds_info = (
+                fds_by_country_id.get(aes.entity_id, {})
+                if aes.entity_type == 'country'
+                else {}
+            )
             entities_data.append({
                 'status_id': aes.id,
                 'entity_type': aes.entity_type,
@@ -654,7 +705,12 @@ def get_assignment_entities(assignment_id):
                 'entity_name': hierarchy_names.get((aes.entity_type, aes.entity_id), entity.name),
                 'status': aes.status,
                 'due_date': aes.due_date.strftime('%Y-%m-%d') if aes.due_date else None,
-                'is_public_available': aes.is_public_available
+                'is_public_available': aes.is_public_available,
+                'fds_member_user_id': fds_info.get('fds_member_user_id'),
+                'fds_member_name': fds_info.get('fds_member_name', ''),
+                'fds_member_email': fds_info.get('fds_member_email', ''),
+                'fds_member_active': fds_info.get('fds_member_active', True),
+                'fds_member_profile_color': fds_info.get('fds_member_profile_color', ''),
             })
 
     return json_ok(entities=entities_data)

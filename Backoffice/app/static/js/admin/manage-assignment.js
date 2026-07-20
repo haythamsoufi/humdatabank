@@ -602,6 +602,7 @@
                 width: 150,
                 minWidth: 120,
                 maxWidth: 200,
+                hide: true,
                 filter: 'customSetFilter',
                 sortable: true,
                 cellRenderer: function(params) {
@@ -616,6 +617,36 @@
                 maxWidth: 500,
                 filter: 'agTextColumnFilter',
                 sortable: true
+            },
+            {
+                field: 'fds_member_name',
+                headerName: 'FDS Member',
+                width: 220,
+                minWidth: 180,
+                maxWidth: 300,
+                filter: 'agTextColumnFilter',
+                sortable: true,
+                cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' },
+                valueGetter: function(params) {
+                    return params.data && params.data.fds_member_name ? params.data.fds_member_name : '';
+                },
+                cellRenderer: function(params) {
+                    if (!params.data || !params.data.fds_member_user_id) {
+                        return '<span class="text-gray-400">-</span>';
+                    }
+                    if (typeof AgGridRenderers !== 'undefined' && AgGridRenderers.userHoverCell) {
+                        return AgGridRenderers.userHoverCell(params, {
+                            idField: 'fds_member_user_id',
+                            nameField: 'fds_member_name',
+                            emailField: 'fds_member_email',
+                            activeField: 'fds_member_active',
+                            profileColorField: 'fds_member_profile_color',
+                            fallbackLabel: 'Unknown User',
+                            showEmail: true
+                        });
+                    }
+                    return params.data.fds_member_name || '-';
+                }
             },
             {
                 field: 'status',

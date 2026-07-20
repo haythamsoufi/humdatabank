@@ -18,7 +18,7 @@ from app.services.validation_dashboard_service import (
     list_countries_for_period,
     preview_country_validation,
     summarize_period,
-    template_options,
+    template_tab_options,
 )
 from app.services.validation_tracker_service import build_tracker_data
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
@@ -32,7 +32,7 @@ from app.utils.request_validation import enforce_csrf_json
 def validation_dashboard():
     return render_template(
         "admin/validation_dashboard.html",
-        template_options=template_options(),
+        template_options=template_tab_options(),
         mapbox_access_token=current_app.config.get("MAPBOX_ACCESS_TOKEN") or "",
         mapbox_style_id=current_app.config.get("MAPBOX_STYLE_ID") or "go-ifrc/ckrfe16ru4c8718phmckdfjh0",
     )

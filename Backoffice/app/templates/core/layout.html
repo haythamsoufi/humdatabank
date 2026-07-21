@@ -105,6 +105,22 @@
     <link rel="stylesheet" href="{{ static_url('css/components.css') }}">
     <link rel="stylesheet" href="{{ static_url('css/excel-io.css') }}">
     {% if not skip_layout_chatbot|default(false) %}<link rel="stylesheet" href="{{ static_url('css/chatbot.css') }}">{% endif %}
+    {% if skip_layout_chatbot|default(false) and current_user.is_authenticated and CHATBOT_ENABLED and current_user.chatbot_enabled and (not CHATBOT_ORG_ONLY or is_organization_email(current_user.email)) and user_has_ai_beta_access(current_user) %}
+    <style nonce="{{ csp_nonce() }}">
+        /* Entry-form perf: hide chatbot chrome until deferred chatbot.css loads (prevents FOUC). */
+        html.chatbot-deferred-pending #aiChatWidget,
+        html.chatbot-deferred-pending #aiChatbotFAB {
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+    </style>
+    <script nonce="{{ csp_nonce() }}">
+        (function() {
+            try { document.documentElement.classList.add('chatbot-deferred-pending'); } catch (_) {}
+        })();
+    </script>
+    {% endif %}
     {% if TRANSLATION_REVIEW_ENABLED and translation_review_can_use|default(false) %}<link rel="stylesheet" href="{{ static_url('css/translation-review.css') }}">{% endif %}
     <link rel="stylesheet" href="{{ static_url('css/responsive.css') }}">
     <link rel="stylesheet" href="{{ static_url('css/rtl.css') }}">

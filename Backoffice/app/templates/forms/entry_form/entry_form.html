@@ -3958,23 +3958,33 @@
         marker.id = '_chatbot_deferred_loaded';
         document.head.appendChild(marker);
 
+        function revealChatbotChrome() {
+            try { document.documentElement.classList.remove('chatbot-deferred-pending'); } catch (_) {}
+        }
         function addScript(src, asModule) {
             var s = document.createElement('script');
             s.src = src;
             if (asModule) { s.type = 'module'; } else { s.defer = true; }
             document.head.appendChild(s);
         }
-        function addLink(href) {
-            var l = document.createElement('link');
-            l.rel = 'stylesheet';
-            l.href = href;
-            document.head.appendChild(l);
+        function loadScripts() {
+            addScript('{{ static_url("js/chatbot/messages.js") }}');
+            addScript('{{ static_url("js/tours/interactive-tour.js") }}');
+            addScript('{{ static_url("js/tours/workflow-tour-parser.js") }}');
+            addScript('{{ static_url("js/chatbot/main.js") }}', true);
         }
-        addLink('{{ static_url("css/chatbot.css") }}');
-        addScript('{{ static_url("js/chatbot/messages.js") }}');
-        addScript('{{ static_url("js/tours/interactive-tour.js") }}');
-        addScript('{{ static_url("js/tours/workflow-tour-parser.js") }}');
-        addScript('{{ static_url("js/chatbot/main.js") }}', true);
+        var css = document.createElement('link');
+        css.rel = 'stylesheet';
+        css.href = '{{ static_url("css/chatbot.css") }}';
+        css.onload = function() {
+            revealChatbotChrome();
+            loadScripts();
+        };
+        css.onerror = function() {
+            revealChatbotChrome();
+            loadScripts();
+        };
+        document.head.appendChild(css);
     }
 
     // Load after form is initialized; fall back to idle callback or 3 s timeout.

@@ -419,6 +419,52 @@ def _format_states(states: Dict[str, int]) -> str:
     return ','.join(parts)
 
 
+def _hr(char: str = '-', width: int = 64) -> str:
+    # ASCII only — Azure SSH / Windows consoles may not be UTF-8.
+    return char * width
+
+
+def _section(title: str) -> None:
+    print()
+    print(_hr('-'))
+    print(f' {title}')
+    print(_hr('-'))
+
+
+def _fmt_age(age_s: Any) -> str:
+    if age_s is None:
+        return '?'
+    try:
+        val = float(age_s)
+    except (TypeError, ValueError):
+        return '?'
+    if val < 10:
+        return f'{val:.1f}s'
+    return f'{val:.0f}s'
+
+
+def _inflight_mark(row: Dict[str, Any]) -> str:
+    if row.get('stale'):
+        return 'STALE'
+    if row.get('stale_soft'):
+        return 'SLOW'
+    return ''
+
+
+def _ws_channel_totals(fs_workers: List[Dict[str, Any]]) -> Dict[str, int]:
+    totals: Dict[str, int] = {}
+    for w in fs_workers:
+        by_ch = (w.get('ws_pool') or {}).get('by_channel') or {}
+        if not isinstance(by_ch, dict):
+            continue
+        for name, count in by_ch.items():
+            try:
+                totals[str(name)] = totals.get(str(name), 0) + int(count)
+            except (TypeError, ValueError):
+                continue
+    return totals
+
+
 def _verdicts(
     *,
     cfg: Dict[str, Any],
@@ -525,129 +571,163 @@ def _collect_snapshot(cfg: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _print_snapshot(cfg: Dict[str, Any], snap: Dict[str, Any], *, header: bool = True) -> int:
-    if header:
-        print('=== Gunicorn pressure snapshot ===')
-        print(f'time_utc={time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}')
-        print(
-            f'config workers={cfg["workers_env"]} threads={cfg["threads"]} '
-            f'class={cfg["worker_class"]} timeout={cfg["timeout_s"]:.0f}s '
-            f'max_requests={cfg["max_requests"]} graceful={cfg["graceful_timeout_s"]}s'
-        )
-        print(
-            f'capacity_slots={snap["capacity"]}  '
-            f'(workers×threads; HTTP+WS share this pool; nlwp≠busy slots)'
-        )
+    inflight = snap['inflight']
+    capacity = int(snap['capacity'] or 0)
+    ws_total = int(snap['ws_total'] or 0)
+    in_flight_n = len(inflight)
+    # Best-effort occupancy: short HTTP + long-lived WS share the gthread pool.
+    busy_est = in_flight_n + ws_total
+    free_est = max(0, capacity - busy_est) if capacity else None
+    pct = round(100 * busy_est / capacity) if capacity else 0
+    channels = _ws_channel_totals(snap['fs_workers'])
+    log_info = snap['log_info']
 
-    print('\n-- processes --')
-    procs = snap['procs']
-    if not procs:
-        print('(no gunicorn processes found in /proc — are you in the app container?)')
-    for p in procs:
-        nlwp = p['threads_nlwp']
-        nlwp_s = f'{nlwp}' if isinstance(nlwp, int) else '?'
-        fds_s = str(p['fds']) if p.get('fds') is not None else '?'
-        tcp_s = str(p['tcp_est']) if p.get('tcp_est') is not None else '?'
-        states = _format_states(p.get('thread_states') or {})
-        print(
-            f"  role={p['role']:<6} pid={p['pid']:<6} "
-            f"nlwp={nlwp_s:<3} fds={fds_s:<4} tcp_est={tcp_s:<4} "
-            f"states[{states}]"
-        )
+    if header:
+        print(_hr('='))
+        print(' Gunicorn pressure snapshot')
+        print(f' {time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())} UTC')
+        print(_hr('='))
+    else:
+        print()
+        print(f' sample @ {time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())} UTC')
+
+    _section('SUMMARY')
     print(
-        f"alive_masters={len(snap['masters'])} alive_workers={len(snap['workers'])}  "
-        f"(note: nlwp includes pool/overhead threads, not request occupancy)"
+        f'  Config      {cfg["workers_env"]} workers x {cfg["threads"]} threads'
+        f'  ({cfg["worker_class"]})'
+    )
+    print(
+        f'  Timeouts    request={cfg["timeout_s"]:.0f}s'
+        f'  graceful={cfg["graceful_timeout_s"]}s'
+        f'  max_requests={cfg["max_requests"]}'
+    )
+    print(f'  Capacity    {capacity} slots  (HTTP + WS share this pool)')
+    if free_est is not None:
+        print(
+            f'  Occupancy   ~{busy_est} busy / ~{free_est} free'
+            f'  ({pct}% of {capacity}; est = in_flight + ws)'
+        )
+    else:
+        print(f'  Occupancy   ~{busy_est} busy  (capacity unknown)')
+    print(
+        f'  In-flight   {in_flight_n}'
+        f'  (source={snap["inflight_source"]}'
+        f', stale>={cfg["timeout_s"]:.0f}s: {snap["stale_n"]}'
+        f', slow>={STALE_SOFT_S:.0f}s: {snap["soft_stale_n"]})'
+    )
+    if channels:
+        ch_s = '  '.join(f'{name}={count}' for name, count in sorted(channels.items()))
+        print(f'  WebSockets  {ws_total} active   [{ch_s}]')
+    else:
+        print(f'  WebSockets  {ws_total} active')
+    if snap['redis_ok']:
+        data_s = f'Redis ok  |  in-flight source={snap["inflight_source"]}'
+    elif cfg['redis_configured']:
+        data_s = 'Redis configured but unreachable  |  FS / process table'
+    elif snap['fs_ok']:
+        data_s = 'FS mirror  |  Redis unset'
+    else:
+        data_s = 'process table only  |  no fresh FS  |  Redis unset'
+    print(f'  Data        {data_s}')
+    print(
+        f'  Processes   {len(snap["masters"])} master, '
+        f'{len(snap["workers"])} workers alive'
     )
 
-    print('\n-- fs mirror (humdb-pressure/*.json) --')
-    if not snap['fs_dir']:
-        print(
-            'dir not found (workers write after traffic; defaults: '
-            f'{", ".join(FS_DEFAULT_CANDIDATES)})'
-        )
-    elif not snap['fs_workers']:
-        print(f'dir={snap["fs_dir"]} — no fresh worker files '
-              f'(>{FS_STALE_FILE_S:.0f}s old ignored; generate traffic then retry)')
+    _section('PROCESSES  (nlwp = OS threads, not pool occupancy)')
+    procs = snap['procs']
+    if not procs:
+        print('  (no gunicorn processes in /proc - are you in the app container?)')
     else:
-        print(f'dir={snap["fs_dir"]} workers_with_files={len(snap["fs_workers"])}')
+        print(f'  {"role":<7} {"pid":>6}  {"nlwp":>4}  {"fds":>4}  {"tcp":>4}  states')
+        for p in procs:
+            nlwp_s = str(p['threads_nlwp']) if p.get('threads_nlwp') is not None else '?'
+            fds_s = str(p['fds']) if p.get('fds') is not None else '?'
+            tcp_s = str(p['tcp_est']) if p.get('tcp_est') is not None else '?'
+            print(
+                f'  {p["role"]:<7} {p["pid"]:>6}  {nlwp_s:>4}  {fds_s:>4}  {tcp_s:>4}  '
+                f'{_format_states(p.get("thread_states") or {})}'
+            )
+
+    _section('WORKERS (FS mirror)')
+    if not snap['fs_dir']:
+        print('  Dir not found - workers write after traffic.')
+        print(f'  Tried: {", ".join(FS_DEFAULT_CANDIDATES)}')
+    elif not snap['fs_workers']:
+        print(f'  Dir: {snap["fs_dir"]}')
+        print(
+            f'  No fresh worker files (>{FS_STALE_FILE_S:.0f}s old ignored).'
+            ' Generate traffic, then retry.'
+        )
+    else:
+        print(f'  Dir: {snap["fs_dir"]}  ({len(snap["fs_workers"])} fresh files)')
+        print(
+            f'  {"pid":>6}  {"age":>6}  {"in_flt":>6}  {"traf/min":>8}  '
+            f'{"ws":>7}  {"db":>10}'
+        )
         for w in snap['fs_workers']:
             ws = w.get('ws_pool') or {}
             db = w.get('db_pool') or {}
             ws_s = (
-                f"ws={ws.get('active_total', '?')}/{ws.get('max_total_connections', '?')}"
-                if ws else 'ws=?'
+                f"{ws.get('active_total', '?')}/{ws.get('max_total_connections', '?')}"
+                if ws else '?'
             )
-            db_s = (
-                f"db={db.get('checked_out', '?')}/{db.get('size', '?')}"
-                f"+ov={db.get('overflow', '?')}"
-                if db and 'error' not in db else 'db=?'
-            )
+            if db and 'error' not in db:
+                ov = db.get('overflow', '?')
+                db_s = f"{db.get('checked_out', '?')}/{db.get('size', '?')}"
+                if ov not in (None, 0, '0'):
+                    db_s = f'{db_s}+ov={ov}'
+            else:
+                db_s = '?'
+            traf = w.get('traffic_last_60s')
+            traf_s = '?' if traf is None else str(traf)
             print(
-                f"  pid={w['pid']} age={w.get('age_s')}s "
-                f"in_flight={w['in_flight_count']} "
-                f"traffic/min={w.get('traffic_last_60s')} "
-                f"{ws_s} {db_s}"
+                f'  {w["pid"]:>6}  {_fmt_age(w.get("age_s")):>6}  '
+                f'{w["in_flight_count"]:>6}  {traf_s:>8}  '
+                f'{ws_s:>7}  {db_s:>10}'
             )
-            for row in (w.get('in_flight') or [])[:8]:
-                marks = []
-                if row['stale']:
-                    marks.append('STALE')
-                elif row['stale_soft']:
-                    marks.append('SLOW')
-                mark = f" [{' '.join(marks)}]" if marks else ''
-                print(
-                    f"    {row.get('method')} {row.get('path')} "
-                    f"elapsed={row['elapsed_s']}s{mark}"
-                )
 
-    print('\n-- redis in-flight (humdb:pressure:iflt:*) --')
-    if snap['redis_ok']:
-        print(f'connected; using source={snap["inflight_source"]}')
-    elif cfg['redis_configured']:
-        print('REDIS_URL set but client could not connect')
+    _section('IN-FLIGHT REQUESTS')
+    if not inflight:
+        print('  (none)')
     else:
-        print('REDIS_URL unset — using FS mirror / process table')
-
-    inflight = snap['inflight']
-    print(
-        f'in_flight_total={len(inflight)} source={snap["inflight_source"]} '
-        f'stale>={cfg["timeout_s"]:.0f}s={snap["stale_n"]} '
-        f'slow>={STALE_SOFT_S:.0f}s={snap["soft_stale_n"]} '
-        f'ws_total(fs)={snap["ws_total"]}'
-    )
-    if snap['inflight_source'] == 'redis':
-        if not inflight:
-            print('  (none)')
+        print(f'  {"pid":>6}  {"elapsed":>8}  {"flag":<6}  request')
+        # Prefer global list; if source is fs, rows may already be merged.
+        shown = 0
         for row in inflight[:20]:
-            marks = []
-            if row['stale']:
-                marks.append('STALE')
-            elif row.get('stale_soft'):
-                marks.append('SLOW')
-            mark = f" [{' '.join(marks)}]" if marks else ''
+            mark = _inflight_mark(row)
             print(
-                f"  pid={row['pid']} {row.get('method')} {row.get('path')} "
-                f"elapsed={row['elapsed_s']}s{mark}"
+                f'  {str(row.get("pid") or "?"):>6}  '
+                f'{row.get("elapsed_s", "?"):>7}s  '
+                f'{mark:<6}  '
+                f'{row.get("method") or "?"} {row.get("path") or "?"}'
             )
+            shown += 1
+        if len(inflight) > shown:
+            print(f'  ... +{len(inflight) - shown} more')
 
     if snap['aborts']:
-        print('\n-- recent worker aborts --')
+        _section('RECENT WORKER ABORTS')
         now = time.time()
         for ab in snap['aborts'][:3]:
             age = round(now - float(ab.get('aborted_at', now)))
             print(
-                f"  pid={ab.get('pid')} age={age}s "
-                f"stale_count={ab.get('stale_count')} "
-                f"in_flight={len(ab.get('in_flight') or [])}"
+                f'  pid={ab.get("pid")}  age={age}s  '
+                f'stale_count={ab.get("stale_count")}  '
+                f'in_flight={len(ab.get("in_flight") or [])}'
             )
 
-    print('\n-- recent docker-log signals (best-effort) --')
-    log_info = snap['log_info']
-    for pat, n in log_info['counts'].items():
-        ts = log_info['last_ts'].get(pat) or '-'
-        print(f'  {pat}: {n}  last={ts}')
-        sample = log_info['last_line'].get(pat)
-        if sample and n:
-            print(f'    └ {sample}')
+    _section('LOG SIGNALS (last ~15m, best-effort)')
+    hits = [(pat, n) for pat, n in log_info['counts'].items() if n]
+    if not hits:
+        print('  (none)')
+    else:
+        for pat, n in hits:
+            ts = log_info['last_ts'].get(pat) or '-'
+            print(f'  {pat:<18}  count={n:<4}  last={ts}')
+            sample = log_info['last_line'].get(pat)
+            if sample:
+                print(f'    | {sample}')
 
     flags = _verdicts(
         cfg=cfg,
@@ -658,11 +738,14 @@ def _print_snapshot(cfg: Dict[str, Any], snap: Dict[str, Any], *, header: bool =
         aborts=snap['aborts'],
         redis_ok=snap['redis_ok'],
         fs_ok=snap['fs_ok'],
-        ws_total=snap['ws_total'],
+        ws_total=ws_total,
         log_timeouts=int(log_info['counts'].get('WORKER TIMEOUT') or 0),
     )
-    print('\n-- verdict --')
-    print(' | '.join(flags))
+    _section('VERDICT')
+    for flag in flags:
+        print(f'  * {flag}')
+    print()
+
     saturated = any(
         f.startswith(prefix)
         for f in flags
@@ -702,14 +785,19 @@ def main(argv: Optional[List[str]] = None) -> int:
         sample = 0
         while True:
             sample += 1
-            print(f'\n######## watch sample #{sample} ########')
+            print()
+            print(_hr('='))
+            print(f' Watch sample #{sample}')
             snap = _collect_snapshot(cfg)
             code = _print_snapshot(cfg, snap, header=(sample == 1))
             exit_code = max(exit_code, code)
             if time.time() + args.interval > deadline:
                 break
             time.sleep(max(0.2, args.interval))
-        print(f'\nwatch_done samples={sample} worst_exit={exit_code}')
+        print()
+        print(_hr('='))
+        print(f' Watch done - samples={sample}  worst_exit={exit_code}')
+        print(_hr('='))
         return exit_code
 
     snap = _collect_snapshot(cfg)

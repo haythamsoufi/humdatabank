@@ -1127,11 +1127,9 @@ class Config:
     MAX_NOTIFICATIONS_PER_USER_PER_HOUR = int(os.environ.get('MAX_NOTIFICATIONS_PER_USER_PER_HOUR', '100'))
     MAX_NOTIFICATIONS_GLOBAL_PER_HOUR = int(os.environ.get('MAX_NOTIFICATIONS_GLOBAL_PER_HOUR', '10000'))
 
-    # Feature flags for notifications (env: true/false only)
+    # Feature flags for notifications (env: true/false only).
+    # Notification delivery is HTTP-only (no WS). AI chat/docs WS use WEBSOCKET_ENABLED.
     FEATURES = {
-        # Default false: notification UI uses HTTP polling only (avoids pinning
-        # gthread workers). Independent of WEBSOCKET_ENABLED (AI chat still needs WS).
-        'notifications_websocket_enabled': _parse_bool(os.environ.get('FEATURES_NOTIFICATIONS_WEBSOCKET_ENABLED'), default=False),
         'notifications_push_enabled': _parse_bool(os.environ.get('FEATURES_NOTIFICATIONS_PUSH_ENABLED'), default=True),
         'notifications_email_digests_enabled': _parse_bool(os.environ.get('FEATURES_NOTIFICATIONS_EMAIL_DIGESTS_ENABLED'), default=True),
         'notifications_analytics_enabled': _parse_bool(os.environ.get('FEATURES_NOTIFICATIONS_ANALYTICS_ENABLED'), default=True),

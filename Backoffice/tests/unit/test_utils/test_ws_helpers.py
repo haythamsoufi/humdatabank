@@ -9,11 +9,23 @@ import pytest
 from app.utils.ws_helpers import (
     WsInboundPump,
     check_websocket_origin,
+    is_notifications_websocket_enabled,
     is_ws_disconnect_error,
     parse_ws_json,
     release_request_db_session,
     reset_ws_redis_client_for_tests,
 )
+
+
+@pytest.mark.unit
+class TestIsNotificationsWebsocketEnabled:
+    def test_always_false(self, app):
+        """Notification WS is permanently off; WEBSOCKET_ENABLED is for AI only."""
+        app.config["WEBSOCKET_ENABLED"] = True
+        assert is_notifications_websocket_enabled(app) is False
+        assert is_notifications_websocket_enabled() is False
+        app.config["WEBSOCKET_ENABLED"] = False
+        assert is_notifications_websocket_enabled(app) is False
 
 
 @pytest.mark.unit

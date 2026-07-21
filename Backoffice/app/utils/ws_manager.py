@@ -395,8 +395,10 @@ def broadcast_notification(user_id: int, notification_data: dict) -> bool:
     Returns:
         True if message was sent to at least one connection, False otherwise
     """
-    if not has_app_context() or not current_app.config.get('WEBSOCKET_ENABLED', True):
-        logger.debug("WebSocket disabled or no app context; skipping notification broadcast")
+    from app.utils.ws_helpers import is_notifications_websocket_enabled
+
+    if not has_app_context() or not is_notifications_websocket_enabled():
+        logger.debug("Notifications WebSocket disabled or no app context; skipping notification broadcast")
         return False
 
     try:
@@ -433,8 +435,10 @@ def broadcast_unread_count(user_id: int, unread_count: int) -> bool:
     Returns:
         True if message was sent to at least one connection, False otherwise
     """
-    if not has_app_context() or not current_app.config.get('WEBSOCKET_ENABLED', True):
-        logger.debug("WebSocket disabled or no app context; skipping unread count broadcast")
+    from app.utils.ws_helpers import is_notifications_websocket_enabled
+
+    if not has_app_context() or not is_notifications_websocket_enabled():
+        logger.debug("Notifications WebSocket disabled or no app context; skipping unread count broadcast")
         return False
 
     try:

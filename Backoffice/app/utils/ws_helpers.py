@@ -32,6 +32,18 @@ _REDIS_LOCK = threading.Lock()
 _REDIS_FAILED = False
 
 
+def is_notifications_websocket_enabled(app=None) -> bool:
+    """
+    Notification (bell) WebSockets are permanently disabled.
+
+    Badge/list use HTTP polling only so idle tabs cannot pin gthread workers.
+    AI chat/docs WebSockets remain gated solely by ``WEBSOCKET_ENABLED``.
+    Always returns False so route registration, layout inject, and broadcasts
+    stay off — including for clients still running cached JS that tries to connect.
+    """
+    return False
+
+
 def is_ws_disconnect_error(exc: BaseException) -> bool:
     """True when the exception indicates a normal/expected client disconnect."""
     if ConnectionClosed is not None and isinstance(exc, ConnectionClosed):

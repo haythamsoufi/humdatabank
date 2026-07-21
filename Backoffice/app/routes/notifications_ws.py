@@ -10,6 +10,7 @@ from app.utils.ws_manager import ws_manager
 from app.utils.ws_helpers import (
     apply_sock_server_options,
     check_websocket_origin,
+    is_notifications_websocket_enabled,
     is_ws_disconnect_error,
     log_ws,
     parse_ws_json,
@@ -35,9 +36,13 @@ def register_notifications_ws(app) -> bool:
     We keep this separate so deployments that don't install websocket deps can still run.
     Returns True if the endpoint was registered, False otherwise.
     """
-    # Check if WebSocket is enabled
-    if not app.config.get('WEBSOCKET_ENABLED', True):
-        app.logger.debug("WebSocket disabled; Notifications WebSocket endpoint not registered")
+    # Notifications never use WebSocket (HTTP polling only). Do not register the
+    # route so cached old JS cannot open a socket and pin a gthread worker.
+    # AI chat/docs WS remain controlled by WEBSOCKET_ENABLED alone.
+    if not is_notifications_websocket_enabled(app):
+        app.logger.debug(
+            "Notifications WebSocket disabled (HTTP-only); endpoint not registered"
+        )
         return False
 
     apply_sock_server_options(app)

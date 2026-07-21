@@ -575,30 +575,9 @@ class TestInjectNotificationsConfig:
                 pass
         return {}
 
-    def test_and_logic_matrix(self, app):
-        """notify_websocket_enabled requires both global WS and feature flag."""
-        cases = [
-            (True, True, True),
-            (True, False, False),
-            (False, True, False),
-            (False, False, False),
-        ]
-        for global_ws, notify_feature, expected in cases:
-            app.config["WEBSOCKET_ENABLED"] = global_ws
-            features = dict(app.config.get("FEATURES") or {})
-            features["notifications_websocket_enabled"] = notify_feature
-            app.config["FEATURES"] = features
-            with app.test_request_context("/"):
-                result = self._notify_ws_result(app)
-            assert result.get("notify_websocket_enabled") is expected, (
-                f"global={global_ws} feature={notify_feature}: "
-                f"expected {expected}, got {result.get('notify_websocket_enabled')}"
-            )
-
-    def test_default_feature_off_with_global_on(self, app):
-        """When feature flag is False (prod default), inject reports disabled."""
+    def test_always_disabled(self, app):
+        """Notification WS inject is always false; WEBSOCKET_ENABLED is for AI only."""
         app.config["WEBSOCKET_ENABLED"] = True
-        app.config["FEATURES"] = {"notifications_websocket_enabled": False}
         with app.test_request_context("/"):
             result = self._notify_ws_result(app)
         assert result.get("notify_websocket_enabled") is False

@@ -410,15 +410,17 @@ def api_notification_stream_status():
     # roughly once per 5 minutes per active user.
     logger.info("[WS_STATUS_FETCH] served user_id=%s", current_user.id)
 
-    # Global WS flag (also used by AI chat). Notification UI additionally requires
-    # FEATURES.notifications_websocket_enabled — keep them independent.
+    from app.utils.ws_helpers import is_notifications_websocket_enabled
+
+    # Notification stream is always HTTP-only. WEBSOCKET_ENABLED is for AI chat/docs.
     global_ws_enabled = bool(current_app.config.get('WEBSOCKET_ENABLED', True))
+    websocket_enabled = is_notifications_websocket_enabled()
 
     raw_env_value = os.environ.get('WEBSOCKET_ENABLED')
     normalized_env_value = (raw_env_value if raw_env_value is not None else '').strip().lower()
     parsed_env_value = (normalized_env_value == 'true') if raw_env_value is not None else None
 
-    # Optional: detect whether websocket dependency is installed (endpoint registration depends on it)
+    # Optional: detect whether websocket dependency is installed (AI WS registration depends on it)
     try:
         import flask_sock  # type: ignore
         flask_sock_available = True
@@ -426,23 +428,6 @@ def api_notification_stream_status():
     except Exception as e:
         flask_sock_available = False
         flask_sock_error = GENERIC_ERROR_MESSAGE
-
-    notifications_feature_enabled = None
-    try:
-        features = current_app.config.get('FEATURES') or {}
-        notifications_feature_enabled = features.get('notifications_websocket_enabled')
-    except Exception as e:
-        current_app.logger.debug("FEATURES config lookup failed: %s", e)
-        notifications_feature_enabled = None
-
-    # Client-facing enablement matches layout inject (NOTIFY_WS_ENABLED): both flags required.
-    # Missing FEATURES key defaults True for legacy configs; Config.FEATURES defaults to False.
-    notify_feature = (
-        bool(notifications_feature_enabled)
-        if notifications_feature_enabled is not None
-        else True
-    )
-    websocket_enabled = global_ws_enabled and notify_feature
 
     return json_ok(
         success=True,
@@ -457,7 +442,7 @@ def api_notification_stream_status():
             'env_WEBSOCKET_ENABLED_parsed': parsed_env_value,
             'flask_sock_available': flask_sock_available,
             'flask_sock_error': flask_sock_error,
-            'features_notifications_websocket_enabled': notifications_feature_enabled,
+            'notifications_websocket': False,
         }
     )
 

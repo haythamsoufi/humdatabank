@@ -343,17 +343,12 @@ def register_template_context(app, config_class):
     def inject_notifications_config():
         """Expose notification-WS enablement so layout can skip GET /notifications/api/stream/status.
 
-        Requires both global WEBSOCKET_ENABLED and FEATURES.notifications_websocket_enabled
-        so AI chat WS can stay on while notification UI uses HTTP-only polling.
+        Uses the centralized ``is_notifications_websocket_enabled`` helper so the
+        injected ``NOTIFY_WS_ENABLED`` matches route registration and broadcasts.
         """
         try:
-            global_ws = bool(current_app.config.get('WEBSOCKET_ENABLED', True))
-            features = current_app.config.get('FEATURES') or {}
-            # Default True here only if FEATURES key is missing (legacy configs);
-            # Config.FEATURES itself defaults notifications_websocket_enabled to False.
-            notify_feature = bool(features.get('notifications_websocket_enabled', True))
-            enabled = global_ws and notify_feature
-            return {'notify_websocket_enabled': enabled}
+            from app.utils.ws_helpers import is_notifications_websocket_enabled
+            return {'notify_websocket_enabled': is_notifications_websocket_enabled()}
         except Exception as e:
             current_app.logger.debug("inject_notifications_config failed: %s", e)
             return {'notify_websocket_enabled': False}

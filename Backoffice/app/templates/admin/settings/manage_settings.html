@@ -1186,13 +1186,12 @@
         </div>
         {# Feature flags (read-only): show effective On/Off from Config.FEATURES — not editable here #}
         {% set notification_ff_rows = [
-          ('notifications_websocket_enabled', _('WebSockets')),
           ('notifications_push_enabled', _('Push notifications')),
           ('notifications_email_digests_enabled', _('Email digests')),
           ('notifications_analytics_enabled', _('Analytics')),
           ('notifications_webhooks_enabled', _('Webhooks')),
         ] %}
-        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-y-5 gap-x-6 p-4 border border-gray-100 rounded-lg bg-white/80 xl:gap-x-0 xl:divide-x xl:divide-gray-300">
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-y-5 gap-x-6 p-4 border border-gray-100 rounded-lg bg-white/80 xl:gap-x-0 xl:divide-x xl:divide-gray-300">
           {% for fk, flabel in notification_ff_rows %}
           {% set fv = (notification_feature_flags or {}).get(fk, false) %}
           <div class="flex items-start justify-between gap-3 min-w-0 xl:px-5 xl:first:ps-0 xl:last:pe-0">

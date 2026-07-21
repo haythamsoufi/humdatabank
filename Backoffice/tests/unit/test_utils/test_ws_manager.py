@@ -307,7 +307,8 @@ class TestWebSocketManagerCleanupStaleConnections:
 
 
 # ---------------------------------------------------------------------------
-# broadcast_notification
+# broadcast_notification / broadcast_unread_count
+# Notification WS is permanently off — broadcasts always no-op.
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestBroadcastNotification:
@@ -315,77 +316,33 @@ class TestBroadcastNotification:
         result = broadcast_notification(1, {'msg': 'hello'})
         assert result is False
 
-    def test_websocket_disabled_returns_false(self, app):
-        with app.app_context():
-            app.config['WEBSOCKET_ENABLED'] = False
-            result = broadcast_notification(1, {'msg': 'hello'})
-            assert result is False
-            app.config['WEBSOCKET_ENABLED'] = True
-
-    def test_sends_when_user_has_connection(self, app):
+    def test_always_disabled_even_when_websocket_enabled(self, app):
         with app.app_context():
             app.config['WEBSOCKET_ENABLED'] = True
             ws = _make_ws()
             ws_manager.add_connection(1, ws)
             try:
                 result = broadcast_notification(1, {'title': 'Test'})
-                assert result is True
-                ws.send.assert_called_once()
+                assert result is False
+                ws.send.assert_not_called()
             finally:
                 ws_manager.remove_connection(1, ws)
 
-    def test_returns_false_when_no_ws_connection(self, app):
-        with app.app_context():
-            app.config['WEBSOCKET_ENABLED'] = True
-            result = broadcast_notification(99999, {'title': 'Test'})
-            assert result is False
 
-    def test_exception_during_send_returns_false(self, app):
-        with app.app_context():
-            app.config['WEBSOCKET_ENABLED'] = True
-            with patch.object(ws_manager, 'send_to_user', side_effect=Exception('boom')):
-                result = broadcast_notification(1, {'title': 'Test'})
-                assert result is False
-
-
-# ---------------------------------------------------------------------------
-# broadcast_unread_count
-# ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestBroadcastUnreadCount:
     def test_no_app_context_returns_false(self):
         result = broadcast_unread_count(1, 5)
         assert result is False
 
-    def test_websocket_disabled_returns_false(self, app):
-        with app.app_context():
-            app.config['WEBSOCKET_ENABLED'] = False
-            result = broadcast_unread_count(1, 3)
-            assert result is False
-            app.config['WEBSOCKET_ENABLED'] = True
-
-    def test_sends_unread_count_when_connected(self, app):
+    def test_always_disabled_even_when_websocket_enabled(self, app):
         with app.app_context():
             app.config['WEBSOCKET_ENABLED'] = True
             ws = _make_ws()
             ws_manager.add_connection(2, ws)
             try:
                 result = broadcast_unread_count(2, 7)
-                assert result is True
-                sent_payload = json.loads(ws.send.call_args[0][0])
-                assert sent_payload['data']['unread_count'] == 7
+                assert result is False
+                ws.send.assert_not_called()
             finally:
                 ws_manager.remove_connection(2, ws)
-
-    def test_returns_false_when_no_connection(self, app):
-        with app.app_context():
-            app.config['WEBSOCKET_ENABLED'] = True
-            result = broadcast_unread_count(99998, 0)
-            assert result is False
-
-    def test_exception_during_send_returns_false(self, app):
-        with app.app_context():
-            app.config['WEBSOCKET_ENABLED'] = True
-            with patch.object(ws_manager, 'send_to_user', side_effect=Exception('boom')):
-                result = broadcast_unread_count(1, 3)
-                assert result is False

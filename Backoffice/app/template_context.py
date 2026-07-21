@@ -341,13 +341,22 @@ def register_template_context(app, config_class):
 
     @app.context_processor
     def inject_notifications_config():
-        """Expose WEBSOCKET_ENABLED so layout pages can skip GET /notifications/api/stream/status."""
+        """Expose notification-WS enablement so layout can skip GET /notifications/api/stream/status.
+
+        Requires both global WEBSOCKET_ENABLED and FEATURES.notifications_websocket_enabled
+        so AI chat WS can stay on while notification UI uses HTTP-only polling.
+        """
         try:
-            enabled = bool(current_app.config.get('WEBSOCKET_ENABLED', True))
+            global_ws = bool(current_app.config.get('WEBSOCKET_ENABLED', True))
+            features = current_app.config.get('FEATURES') or {}
+            # Default True here only if FEATURES key is missing (legacy configs);
+            # Config.FEATURES itself defaults notifications_websocket_enabled to False.
+            notify_feature = bool(features.get('notifications_websocket_enabled', True))
+            enabled = global_ws and notify_feature
             return {'notify_websocket_enabled': enabled}
         except Exception as e:
             current_app.logger.debug("inject_notifications_config failed: %s", e)
-            return {'notify_websocket_enabled': True}
+            return {'notify_websocket_enabled': False}
 
     app.jinja_env.globals['CHATBOT_ENABLED'] = app.config.get('CHATBOT_ENABLED', True)
     app.jinja_env.globals['TRANSLATION_REVIEW_ENABLED'] = app.config.get('TRANSLATION_REVIEW_ENABLED', True)

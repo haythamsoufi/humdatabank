@@ -1129,7 +1129,9 @@ class Config:
 
     # Feature flags for notifications (env: true/false only)
     FEATURES = {
-        'notifications_websocket_enabled': _parse_bool(os.environ.get('FEATURES_NOTIFICATIONS_WEBSOCKET_ENABLED'), default=True),
+        # Default false: notification UI uses HTTP polling only (avoids pinning
+        # gthread workers). Independent of WEBSOCKET_ENABLED (AI chat still needs WS).
+        'notifications_websocket_enabled': _parse_bool(os.environ.get('FEATURES_NOTIFICATIONS_WEBSOCKET_ENABLED'), default=False),
         'notifications_push_enabled': _parse_bool(os.environ.get('FEATURES_NOTIFICATIONS_PUSH_ENABLED'), default=True),
         'notifications_email_digests_enabled': _parse_bool(os.environ.get('FEATURES_NOTIFICATIONS_EMAIL_DIGESTS_ENABLED'), default=True),
         'notifications_analytics_enabled': _parse_bool(os.environ.get('FEATURES_NOTIFICATIONS_ANALYTICS_ENABLED'), default=True),

@@ -410,7 +410,9 @@ def api_notification_stream_status():
     # roughly once per 5 minutes per active user.
     logger.info("[WS_STATUS_FETCH] served user_id=%s", current_user.id)
 
-    websocket_enabled = bool(current_app.config.get('WEBSOCKET_ENABLED', True))
+    # Global WS flag (also used by AI chat). Notification UI additionally requires
+    # FEATURES.notifications_websocket_enabled — keep them independent.
+    global_ws_enabled = bool(current_app.config.get('WEBSOCKET_ENABLED', True))
 
     raw_env_value = os.environ.get('WEBSOCKET_ENABLED')
     normalized_env_value = (raw_env_value if raw_env_value is not None else '').strip().lower()
@@ -425,7 +427,6 @@ def api_notification_stream_status():
         flask_sock_available = False
         flask_sock_error = GENERIC_ERROR_MESSAGE
 
-    # Feature flag exists but is separate from global websocket enablement.
     notifications_feature_enabled = None
     try:
         features = current_app.config.get('FEATURES') or {}
@@ -434,6 +435,15 @@ def api_notification_stream_status():
         current_app.logger.debug("FEATURES config lookup failed: %s", e)
         notifications_feature_enabled = None
 
+    # Client-facing enablement matches layout inject (NOTIFY_WS_ENABLED): both flags required.
+    # Missing FEATURES key defaults True for legacy configs; Config.FEATURES defaults to False.
+    notify_feature = (
+        bool(notifications_feature_enabled)
+        if notifications_feature_enabled is not None
+        else True
+    )
+    websocket_enabled = global_ws_enabled and notify_feature
+
     return json_ok(
         success=True,
         enabled=websocket_enabled,
@@ -441,7 +451,7 @@ def api_notification_stream_status():
         websocket_endpoint='/api/notifications/ws',
         diagnostics={
             'flask_config': current_app.config.get('FLASK_CONFIG') or os.environ.get('FLASK_CONFIG'),
-            'config_websocket_enabled': websocket_enabled,
+            'config_websocket_enabled': global_ws_enabled,
             'env_WEBSOCKET_ENABLED_raw': raw_env_value,
             'env_WEBSOCKET_ENABLED_normalized': normalized_env_value,
             'env_WEBSOCKET_ENABLED_parsed': parsed_env_value,

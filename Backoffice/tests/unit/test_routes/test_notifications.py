@@ -387,6 +387,25 @@ class TestApiGetNotificationCount:
 # ---------------------------------------------------------------------------
 
 class TestApiNotificationStreamStatus:
+    def _set_ws_flags(self, app, *, global_ws, notify_feature):
+        original_global = app.config.get("WEBSOCKET_ENABLED")
+        original_features = app.config.get("FEATURES")
+        features = dict(original_features or {})
+        features["notifications_websocket_enabled"] = notify_feature
+        app.config["WEBSOCKET_ENABLED"] = global_ws
+        app.config["FEATURES"] = features
+        return original_global, original_features
+
+    def _restore_ws_flags(self, app, original_global, original_features):
+        if original_global is not None:
+            app.config["WEBSOCKET_ENABLED"] = original_global
+        else:
+            app.config.pop("WEBSOCKET_ENABLED", None)
+        if original_features is not None:
+            app.config["FEATURES"] = original_features
+        else:
+            app.config.pop("FEATURES", None)
+
     def test_stream_status(self, logged_in_client, db_session):
         resp = logged_in_client.get("/notifications/api/stream/status")
         _assert_status(resp, 200)
@@ -395,19 +414,56 @@ class TestApiNotificationStreamStatus:
         assert "enabled" in data
         assert "diagnostics" in data
 
-    def test_stream_status_websocket_disabled(self, logged_in_client, db_session, app):
-        original = app.config.get("WEBSOCKET_ENABLED")
-        app.config["WEBSOCKET_ENABLED"] = False
+    def test_stream_status_default_notification_ws_off(self, logged_in_client, db_session, app):
+        """Default FEATURES.notifications_websocket_enabled is False even if global WS is on."""
+        original_global, original_features = self._set_ws_flags(
+            app, global_ws=True, notify_feature=False
+        )
         try:
             resp = logged_in_client.get("/notifications/api/stream/status")
         finally:
-            if original is not None:
-                app.config["WEBSOCKET_ENABLED"] = original
-            else:
-                app.config.pop("WEBSOCKET_ENABLED", None)
+            self._restore_ws_flags(app, original_global, original_features)
         _assert_status(resp, 200)
         data = _get_json(resp)
         assert data.get("websocket_enabled") is False
+        assert data.get("enabled") is False
+        assert data.get("diagnostics", {}).get("config_websocket_enabled") is True
+        assert data.get("diagnostics", {}).get("features_notifications_websocket_enabled") is False
+
+    def test_stream_status_websocket_disabled(self, logged_in_client, db_session, app):
+        original_global, original_features = self._set_ws_flags(
+            app, global_ws=False, notify_feature=True
+        )
+        try:
+            resp = logged_in_client.get("/notifications/api/stream/status")
+        finally:
+            self._restore_ws_flags(app, original_global, original_features)
+        _assert_status(resp, 200)
+        data = _get_json(resp)
+        assert data.get("websocket_enabled") is False
+
+    def test_stream_status_both_flags_required(self, logged_in_client, db_session, app):
+        """Notification WS is enabled only when global WS AND feature flag are both true."""
+        cases = [
+            (True, True, True),
+            (True, False, False),
+            (False, True, False),
+            (False, False, False),
+        ]
+        for global_ws, notify_feature, expected in cases:
+            original_global, original_features = self._set_ws_flags(
+                app, global_ws=global_ws, notify_feature=notify_feature
+            )
+            try:
+                resp = logged_in_client.get("/notifications/api/stream/status")
+            finally:
+                self._restore_ws_flags(app, original_global, original_features)
+            _assert_status(resp, 200)
+            data = _get_json(resp)
+            assert data.get("websocket_enabled") is expected, (
+                f"global={global_ws} feature={notify_feature}: "
+                f"expected {expected}, got {data.get('websocket_enabled')}"
+            )
 
 
 # ---------------------------------------------------------------------------

@@ -422,12 +422,17 @@ def parse_matrix_disagg_key(key):
     return key[:idx], key[idx + 1:]
 
 
-def build_matrix_cells_from_data_rows(data_rows, form_items_table=None):
+def build_matrix_cells_from_data_rows(data_rows, form_items_table=None, *, strip=False):
     """
     Flatten matrix disaggregation payloads into join-friendly rows.
 
     Each cell: form_data_id, form_item_id, row_entity_id, row_entity_type,
     join_dimension, column_key, value, source (+ submission context).
+
+    When ``strip=True``, each row's matrix disaggregation fields are cleared
+    in the same pass (equivalent to a separate ``strip_matrix_values_from_data_rows``
+    call) so callers don't need to scan ``data_rows`` a second time just to
+    remove the values that were just extracted into ``cells``.
     """
     form_items_index = {}
     for item in form_items_table or []:
@@ -477,6 +482,12 @@ def build_matrix_cells_from_data_rows(data_rows, form_items_table=None):
                     'value': _resolve_matrix_cell(val),
                     'source': source,
                 })
+            if strip and values:
+                row[field] = {
+                    'mode': 'matrix',
+                    'values': {},
+                    'matrix_cells': True,
+                }
     return cells
 
 

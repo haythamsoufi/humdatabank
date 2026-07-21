@@ -7,18 +7,22 @@ Part of the /api/v1 blueprint.
 from datetime import datetime as _dt
 import re
 from flask import request, current_app, g, redirect
-from sqlalchemy import and_, desc, literal, or_
+from sqlalchemy import and_, desc, event as sa_event, literal, or_
 import uuid
 from contextlib import suppress
 from typing import Any, Dict, List, Optional, Sequence
 
 # Import the API blueprint from parent
 from app.routes.api import api_bp
+from app.utils.ttl_cache import TTLCache
 
 # Import models
 from app.models import (
     AssignedForm,
+    Country,
     FormData,
+    IndicatorBank,
+    NationalSociety,
     PublicSubmission,
     FormItem,
     FormTemplate,
@@ -39,7 +43,6 @@ from app.utils.api_serialization import (
     build_star_schema_tables,
     build_matrix_cells_from_data_rows,
     enrich_matrix_cells,
-    strip_matrix_values_from_data_rows,
     STAR_SCHEMA_VERSION,
     STAR_SCHEMA_GRAIN,
     serialize_dynamic_data_item,
@@ -450,14 +453,28 @@ def _assemble_flat_data_payload(
     return payload
 
 
-def _load_full_indicator_bank_table():
+# Dimension tables below (countries, national societies, indicator bank) change
+# rarely and are always included in full on every /data response, so they are
+# cached per-worker with a long TTL. Cache entries are also invalidated
+# immediately on writes to the underlying models (see event listeners below),
+# so admins editing this data see it reflected right away without waiting for
+# the TTL to expire; the TTL is just a safety net for writes that happen
+# outside the ORM event hooks (e.g. direct SQL, another process).
+_REFERENCE_TABLE_CACHE_TTL_SECONDS = 24 * 60 * 60  # 1 day
+
+_countries_table_cache: TTLCache = TTLCache(ttl_seconds=_REFERENCE_TABLE_CACHE_TTL_SECONDS)
+_national_societies_table_cache: TTLCache = TTLCache(ttl_seconds=_REFERENCE_TABLE_CACHE_TTL_SECONDS)
+_indicator_bank_table_cache: TTLCache = TTLCache(ttl_seconds=_REFERENCE_TABLE_CACHE_TTL_SECONDS)
+
+
+def _load_full_indicator_bank_table_uncached():
     """Return the full indicator bank dimension (~466 rows, stable size)."""
     from app.services.indicator_bank_service import IndicatorBankFilters, get_indicator_list
     indicators, _total, _page, _per_page = get_indicator_list(IndicatorBankFilters())
     return indicators
 
 
-def _load_full_countries_table():
+def _load_full_countries_table_uncached():
     """Return the full country dimension (same coverage as /countrymap)."""
     from app.services import CountryService
     return [
@@ -466,9 +483,8 @@ def _load_full_countries_table():
     ]
 
 
-def _load_full_national_societies_table():
+def _load_full_national_societies_table_uncached():
     """Return the full National Society dimension table."""
-    from app.models.organization import NationalSociety
     from sqlalchemy.orm import joinedload
     societies = (
         NationalSociety.query
@@ -478,6 +494,46 @@ def _load_full_national_societies_table():
         .all()
     )
     return [format_national_society_info(ns) for ns in societies]
+
+
+def _load_full_indicator_bank_table():
+    return _indicator_bank_table_cache.get_or_load(_load_full_indicator_bank_table_uncached)
+
+
+def _load_full_countries_table():
+    return _countries_table_cache.get_or_load(_load_full_countries_table_uncached)
+
+
+def _load_full_national_societies_table():
+    return _national_societies_table_cache.get_or_load(_load_full_national_societies_table_uncached)
+
+
+def _invalidate_reference_table_caches_for_test():
+    """Test-only helper to reset all three reference-table caches."""
+    _countries_table_cache.invalidate()
+    _national_societies_table_cache.invalidate()
+    _indicator_bank_table_cache.invalidate()
+
+
+def _register_reference_table_cache_invalidation():
+    """Invalidate the relevant cache whenever Country / NationalSociety / IndicatorBank rows change.
+
+    Registered once at module import time. Fires on flush (before commit), so a
+    rollback after a write causes one harmless extra reload rather than a
+    correctness issue.
+    """
+    for _model, _cache in (
+        (Country, _countries_table_cache),
+        (NationalSociety, _national_societies_table_cache),
+        (IndicatorBank, _indicator_bank_table_cache),
+    ):
+        for _event_name in ('after_insert', 'after_update', 'after_delete'):
+            sa_event.listens_for(_model, _event_name)(
+                lambda mapper, connection, target, _cache=_cache: _cache.invalidate()
+            )
+
+
+_register_reference_table_cache_invalidation()
 
 
 def _normalize_disagg_payload(disagg_data):
@@ -548,6 +604,9 @@ def _fetch_extended_data(
     repeat_rows = []
     dynamic_context_rows = []
     dynamic_orm_rows = []
+    # Collected inline (while rows are already being built) so the caller can
+    # feed assignment_statuses[] without a second pass over dynamic_rows/repeat_rows.
+    assigned_submission_ids = set()
 
     def _apply_user_scoping(q_dict, needs_af_join):
         """Apply user-level template + country RBAC to a dynamic/repeat query dict."""
@@ -631,14 +690,15 @@ def _fetch_extended_data(
                 dynamic_serialization_context = build_dynamic_serialization_context(dynamic_orm_rows)
                 dynamic_context_rows = fetch_dynamic_section_contexts(dynamic_orm_rows)
                 for row in dynamic_orm_rows:
-                    dynamic_rows.append(
-                        serialize_dynamic_data_item(
-                            row,
-                            minimal_country_info=minimal_country_info,
-                            aes_countries=aes_countries,
-                            dynamic_context=dynamic_serialization_context,
-                        )
+                    item = serialize_dynamic_data_item(
+                        row,
+                        minimal_country_info=minimal_country_info,
+                        aes_countries=aes_countries,
+                        dynamic_context=dynamic_serialization_context,
                     )
+                    if item.get('submission_type') == 'assigned' and item.get('submission_id') is not None:
+                        assigned_submission_ids.add(int(item['submission_id']))
+                    dynamic_rows.append(item)
         except Exception as e:
             current_app.logger.warning("_fetch_extended_data: dynamic query failed: %s", e, exc_info=True)
 
@@ -678,17 +738,23 @@ def _fetch_extended_data(
                 from app.utils.api_serialization import batch_countries_for_aes_list
                 aes_countries = batch_countries_for_aes_list(assigned_aes)
                 for row in rows:
-                    repeat_rows.append(
-                        serialize_repeat_data_item(
-                            row,
-                            minimal_country_info=minimal_country_info,
-                            aes_countries=aes_countries,
-                        )
+                    item = serialize_repeat_data_item(
+                        row,
+                        minimal_country_info=minimal_country_info,
+                        aes_countries=aes_countries,
                     )
+                    if item.get('submission_type') == 'assigned' and item.get('submission_id') is not None:
+                        assigned_submission_ids.add(int(item['submission_id']))
+                    repeat_rows.append(item)
         except Exception as e:
             current_app.logger.warning("_fetch_extended_data: repeat query failed: %s", e, exc_info=True)
 
-    return {'dynamic_data': dynamic_rows, 'repeat_data': repeat_rows, 'dynamic_context': dynamic_context_rows}
+    return {
+        'dynamic_data': dynamic_rows,
+        'repeat_data': repeat_rows,
+        'dynamic_context': dynamic_context_rows,
+        'assigned_submission_ids': assigned_submission_ids,
+    }
 
 
 @api_bp.route('/templates/<int:template_id>/data', methods=['GET'])
@@ -1420,6 +1486,9 @@ def get_all_data():
         # Initialize data_rows early to ensure it's always defined
         data_rows = []
         form_item_ids = set()
+        # Collected inline while building data_rows below, so assignment_statuses[]
+        # can be scoped without a second full pass over data_rows afterward.
+        fact_assigned_submission_ids = set()
 
         # Collect form_item IDs from the current page for the related form_items table.
         # countries[] is always the full dimension (loaded later), so country_ids are not tracked here.
@@ -1507,6 +1576,8 @@ def get_all_data():
                         _normalize_disagg_payload(idd) if idd else None
                     ),
                 }
+                if status_info is not None:
+                    fact_assigned_submission_ids.add(status_info.id)
                 data_rows.append(payload)
             else:
                 data_item = public_map.get(row.id)
@@ -1701,6 +1772,7 @@ def get_all_data():
                         missing_count = 0
                         for (aes, af) in aes_list:
                             aes_id = int(aes.id)
+                            fact_assigned_submission_ids.add(aes_id)
                             for fid in expected_item_ids:
                                 if (aes_id, int(fid)) in existing_set:
                                     continue
@@ -1787,7 +1859,9 @@ def get_all_data():
             auth_user=auth_user,
             date_from=date_from,
             date_to=date_to,
-        ) if (include_dynamic or include_repeat) else {'dynamic_data': [], 'repeat_data': [], 'dynamic_context': []}
+        ) if (include_dynamic or include_repeat) else {
+            'dynamic_data': [], 'repeat_data': [], 'dynamic_context': [], 'assigned_submission_ids': set(),
+        }
 
         # Collect form_item_ids referenced by extended rows so they appear in form_items[].
         for rrow in extended.get('repeat_data', []):
@@ -1820,7 +1894,9 @@ def get_all_data():
         countries_table = _load_full_countries_table()
         national_societies_table = _load_full_national_societies_table()
         indicator_bank_table = _load_full_indicator_bank_table()
-        matrix_cells = build_matrix_cells_from_data_rows(data_rows, form_items_table)
+        # strip=True clears matrix values out of data_rows in the same pass that
+        # extracts them into matrix_cells, avoiding a second full scan over data_rows.
+        matrix_cells = build_matrix_cells_from_data_rows(data_rows, form_items_table, strip=True)
         matrix_cells = enrich_matrix_cells(
             matrix_cells,
             form_items_table,
@@ -1828,7 +1904,6 @@ def get_all_data():
             national_societies_table=national_societies_table,
             indicator_bank_table=indicator_bank_table,
         )
-        strip_matrix_values_from_data_rows(data_rows)
 
         extra_keys = {}
         if include_dynamic:
@@ -1837,10 +1912,15 @@ def get_all_data():
         if include_repeat:
             extra_keys['repeat_data'] = extended['repeat_data']
 
+        # Union of assigned submission_ids already seen while building data_rows /
+        # dynamic_data / repeat_data above — collected inline, so this is a cheap
+        # set union rather than a second full scan over those (potentially large) lists.
+        fact_assigned_submission_ids |= extended.get('assigned_submission_ids') or set()
         assignment_statuses_table = _assignment_statuses_for_scope(
-            data_rows,
-            extended.get('dynamic_data'),
-            extended.get('repeat_data'),
+            [
+                {'submission_type': 'assigned', 'submission_id': sid}
+                for sid in fact_assigned_submission_ids
+            ]
         )
         if layout == 'star':
             return _build_star_data_response(

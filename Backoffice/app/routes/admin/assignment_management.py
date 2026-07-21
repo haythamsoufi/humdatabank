@@ -1,5 +1,8 @@
+import json
+
 from app.utils.transactions import request_transaction_rollback
 from contextlib import suppress
+from config.config import Config
 # File: Backoffice/app/routes/admin/assignment_management.py
 from app.utils.datetime_helpers import utcnow
 """
@@ -44,6 +47,46 @@ from app.utils.entity_groups import get_enabled_entity_groups
 bp = Blueprint("assignment_management", __name__, url_prefix="/admin")
 
 # --- Internal utilities ---
+def _supported_language_codes():
+    """Return configured ISO language codes (includes 'en')."""
+    try:
+        from app.services.app_settings_service import get_supported_languages
+
+        return list(get_supported_languages(default=Config.LANGUAGES) or [])
+    except Exception:
+        return list(
+            current_app.config.get('SUPPORTED_LANGUAGES')
+            or getattr(Config, 'LANGUAGES', ['en'])
+            or []
+        )
+
+
+def _parse_custom_name_translations_from_form():
+    """Parse custom_name translations from JSON hidden field + explicit code inputs."""
+    translations = {}
+    supported_codes = _supported_language_codes()
+
+    with suppress((TypeError, json.JSONDecodeError)):
+        raw_json = request.form.get('custom_name_translations')
+        if raw_json:
+            parsed = json.loads(raw_json)
+            if isinstance(parsed, dict):
+                for key, value in parsed.items():
+                    if isinstance(key, str) and isinstance(value, str) and value.strip():
+                        code = key.strip().lower().split('_', 1)[0]
+                        if code in supported_codes and code != 'en':
+                            translations[code] = value.strip()
+
+    for code in supported_codes:
+        if code == 'en':
+            continue
+        raw_val = request.form.get(f'custom_name_{code}')
+        if isinstance(raw_val, str) and raw_val.strip():
+            translations[code] = raw_val.strip()
+
+    return translations or None
+
+
 def _delete_assignment_entity_status_with_children(aes):
     """
     Safely delete an AssignmentEntityStatus and all dependent rows to avoid FK violations.
@@ -285,19 +328,12 @@ def new_assignment():
                 return redirect(url_for("assignment_management.new_assignment"))
 
             custom_name_value = (form.custom_name.data or '').strip() or None
-            # Collect per-language translations for custom_name
-            _trans_langs = current_app.config.get('TRANSLATABLE_LANGUAGES', []) or []
-            custom_name_trans = {}
-            for _lang in _trans_langs:
-                _val = (request.form.get(f'custom_name_{_lang}') or '').strip()
-                if _val:
-                    custom_name_trans[_lang] = _val
 
             new_assignment = AssignedForm(
                 template_id=form.template_id.data,
                 period_name=period_name,
                 custom_name=custom_name_value,
-                custom_name_translations=custom_name_trans or None,
+                custom_name_translations=_parse_custom_name_translations_from_form(),
                 expiry_date=form.expiry_date.data if form.expiry_date.data else None,
                 data_owner_id=form.data_owner_id.data or None,
                 requires_delegation_review=bool(form.requires_delegation_review.data),
@@ -488,14 +524,7 @@ def edit_assignment(assignment_id):
             assignment.period_name = (form.period_name.data or '').strip()
             sync_assigned_form_reporting_period(assignment)
             assignment.custom_name = (form.custom_name.data or '').strip() or None
-            # Persist per-language translations for custom_name
-            _trans_langs = current_app.config.get('TRANSLATABLE_LANGUAGES', []) or []
-            _new_trans = {}
-            for _lang in _trans_langs:
-                _val = (request.form.get(f'custom_name_{_lang}') or '').strip()
-                if _val:
-                    _new_trans[_lang] = _val
-            assignment.custom_name_translations = _new_trans or None
+            assignment.custom_name_translations = _parse_custom_name_translations_from_form()
             assignment.expiry_date = form.expiry_date.data if form.expiry_date.data else None
             assignment.data_owner_id = form.data_owner_id.data or None
             assignment.requires_delegation_review = bool(form.requires_delegation_review.data)

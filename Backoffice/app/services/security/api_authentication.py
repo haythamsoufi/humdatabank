@@ -85,6 +85,16 @@ def _try_finish_auth_with_env_mobile_api_key(*, log_prefix: str, provided_key: s
     return True
 
 
+def _best_effort_touch_api_key_last_used(db_api_key) -> None:
+    """Update last_used_at without blocking or poisoning the request session."""
+    from app.models.api_key_management import APIKey
+
+    try:
+        APIKey.touch_last_used(db_api_key.id)
+    except Exception as e:
+        current_app.logger.warning("Failed to update API key last_used_at: %s", e)
+
+
 def _extract_bearer_or_x_api_key() -> str:
     """Return API key from Authorization Bearer or legacy X-API-Key header."""
     auth_header = request.headers.get('Authorization', '')
@@ -168,11 +178,8 @@ def authenticate_db_api_key_only():
         g.api_key_usage_id = db_api_key.id
         g.api_key_usage_client_name = db_api_key.client_name
 
-        # Best-effort usage bookkeeping
-        try:
-            db_api_key.update_last_used()
-        except Exception as e:
-            current_app.logger.warning(f"Failed to update API key last_used_at: {e}")
+        # Best-effort usage bookkeeping (isolated session; must not block auth)
+        _best_effort_touch_api_key_last_used(db_api_key)
 
         if current_app.config.get('LOG_API_KEY_USAGE', False):
             current_app.logger.info(
@@ -227,10 +234,7 @@ def validate_plaintext_db_api_key_for_mobile_auth(provided_key: str) -> bool:
                 return False
             storage.append(now)
 
-            try:
-                db_api_key.update_last_used()
-            except Exception as e:
-                current_app.logger.warning("Failed to update API key last_used_at: %s", e)
+            _best_effort_touch_api_key_last_used(db_api_key)
 
             if current_app.config.get("LOG_API_KEY_USAGE", False):
                 current_app.logger.info(
@@ -322,17 +326,14 @@ def authenticate_api_request():
                 # Add current request timestamp
                 storage.append(now)
 
-                # Update last used timestamp (async, don't block)
-                try:
-                    db_api_key.update_last_used()
-                except Exception as e:
-                    current_app.logger.warning(f"Failed to update API key last_used_at: {e}")
-
                 # Store API key record in Flask g for usage tracking
                 g.api_key_record = db_api_key
                 g.api_key_usage_id = db_api_key.id
                 g.api_key_usage_client_name = db_api_key.client_name
                 api_key_record = db_api_key
+
+                # Best-effort usage bookkeeping (isolated session; must not block auth)
+                _best_effort_touch_api_key_last_used(db_api_key)
 
                 from app.models.api_key_management import (
                     API_KEY_DATA_NONE,

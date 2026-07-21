@@ -176,13 +176,16 @@
                     placeholder=_('e.g. Annual Country Survey 2025 — leave blank to use "Template – Period"')
                 ) }}
                 {% if TRANSLATABLE_LANGUAGES %}
-                {% for code in TRANSLATABLE_LANGUAGES %}
+                {% for code in SUPPORTED_LANGUAGES %}
+                {% if code != 'en' %}
                 <input type="hidden"
                        name="custom_name_{{ code }}"
                        id="custom_name_{{ code }}"
-                       value="{{ existing_trans.get(code, '') }}">
+                       value="{{ existing_trans.get(code, '')|e }}">
+                {% endif %}
                 {% endfor %}
                 <input type="hidden"
+                       name="custom_name_translations"
                        id="custom-name-translations"
                        value="{{ existing_trans|tojson|e }}"
                        data-existing-translations="{{ existing_trans|tojson|e }}">
@@ -869,6 +872,46 @@
     document.addEventListener('DOMContentLoaded', function () {
         if (!document.getElementById('custom-name-translations-modal')) return;
 
+        function syncCustomNameTranslationsToForm(collected) {
+            var translations = collected;
+            if (translations === undefined || translations === null) {
+                var hiddenJson = document.getElementById('custom-name-translations');
+                if (hiddenJson && hiddenJson.value && hiddenJson.value.trim() && hiddenJson.value.trim() !== '{}') {
+                    try { translations = JSON.parse(hiddenJson.value); } catch (e) { translations = null; }
+                }
+                if (!translations || Object.keys(translations).length === 0) {
+                    if (window.TranslationModalUtils) {
+                        var fromModal = window.TranslationModalUtils.collectFields('custom-name');
+                        var hasModalContent = Object.keys(fromModal || {}).some(function (code) {
+                            return fromModal[code] && String(fromModal[code]).trim();
+                        });
+                        if (hasModalContent) {
+                            translations = fromModal;
+                        }
+                    }
+                }
+                if (!translations || Object.keys(translations).length === 0) {
+                    translations = {};
+                    document.querySelectorAll('input[name^="custom_name_"]').forEach(function (field) {
+                        var name = field.getAttribute('name') || '';
+                        var code = name.slice('custom_name_'.length);
+                        if (code && field.value && field.value.trim()) {
+                            translations[code] = field.value.trim();
+                        }
+                    });
+                }
+            }
+            translations = translations || {};
+            var hiddenJson = document.getElementById('custom-name-translations');
+            if (hiddenJson) hiddenJson.value = JSON.stringify(translations);
+            document.querySelectorAll('input[name^="custom_name_"]').forEach(function (field) {
+                var name = field.getAttribute('name') || '';
+                var code = name.slice('custom_name_'.length);
+                if (code) field.value = translations[code] || '';
+            });
+        }
+        window.syncCustomNameTranslationsToForm = syncCustomNameTranslationsToForm;
+
         TranslationModal.attach({
             openButtonId: 'custom-name-translations-btn',
             modalId: 'custom-name-translations-modal',
@@ -879,12 +922,7 @@
                 return input ? input.value : '';
             },
             onSaveHiddenFields: function (collected) {
-                const hiddenJson = document.getElementById('custom-name-translations');
-                if (hiddenJson) hiddenJson.value = JSON.stringify(collected || {});
-                Object.keys(collected || {}).forEach(function (code) {
-                    const field = document.getElementById('custom_name_' + code);
-                    if (field) field.value = collected[code] || '';
-                });
+                syncCustomNameTranslationsToForm(collected);
                 const btn = document.getElementById('custom-name-translations-btn');
                 if (btn) {
                     const originalNodes = Array.from(btn.childNodes).map(function (n) { return n.cloneNode(true); });

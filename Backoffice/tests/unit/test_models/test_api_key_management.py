@@ -266,6 +266,27 @@ class TestAPIKey:
             api_key_obj.update_last_used()
             assert api_key_obj.last_used_at is not None
 
+    def test_touch_last_used_updates_timestamp(self, db_session, app):
+        """touch_last_used writes via an isolated session."""
+        with app.app_context():
+            api_key_obj, _ = create_test_api_key(db_session)
+            assert api_key_obj.last_used_at is None
+            APIKey.touch_last_used(api_key_obj.id, min_interval_seconds=0)
+            db.session.refresh(api_key_obj)
+            assert api_key_obj.last_used_at is not None
+
+    def test_touch_last_used_throttled(self, db_session, app):
+        """touch_last_used skips writes inside the min interval."""
+        with app.app_context():
+            api_key_obj, _ = create_test_api_key(db_session)
+            APIKey.touch_last_used(api_key_obj.id, min_interval_seconds=3600)
+            db.session.refresh(api_key_obj)
+            first = api_key_obj.last_used_at
+            assert first is not None
+            APIKey.touch_last_used(api_key_obj.id, min_interval_seconds=3600)
+            db.session.refresh(api_key_obj)
+            assert api_key_obj.last_used_at == first
+
 
 @pytest.mark.unit
 class TestAPIKeyUsage:

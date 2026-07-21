@@ -208,7 +208,10 @@ class TestAuthenticateDbApiKeyOnly:
     def test_update_last_used_failure_is_non_fatal(self, app, db_session, api_key):
         obj, full_key = api_key
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            with patch.object(obj, "update_last_used", side_effect=RuntimeError("db down")):
+            with patch(
+                "app.models.api_key_management.APIKey.touch_last_used",
+                side_effect=RuntimeError("db down"),
+            ):
                 with patch.object(app.logger, "warning") as mock_warning:
                     result = authenticate_db_api_key_only()
         assert hasattr(result, "client_name")
@@ -307,7 +310,10 @@ class TestValidatePlaintextDbApiKeyForMobileAuth:
     def test_update_last_used_failure_is_non_fatal(self, app, db_session, api_key):
         obj, full_key = api_key
         with app.test_request_context():
-            with patch.object(obj, "update_last_used", side_effect=RuntimeError("db down")):
+            with patch(
+                "app.models.api_key_management.APIKey.touch_last_used",
+                side_effect=RuntimeError("db down"),
+            ):
                 with patch.object(app.logger, "warning") as mock_warning:
                     assert validate_plaintext_db_api_key_for_mobile_auth(full_key) is True
         mock_warning.assert_called()
@@ -507,7 +513,10 @@ class TestAuthenticateApiRequest:
     def test_update_last_used_failure_is_non_fatal(self, app, db_session, api_key):
         obj, full_key = api_key
         with app.test_request_context("/api/v1/foo", headers=_bearer_headers(full_key)):
-            with patch.object(obj, "update_last_used", side_effect=RuntimeError("db down")):
+            with patch(
+                "app.models.api_key_management.APIKey.touch_last_used",
+                side_effect=RuntimeError("db down"),
+            ):
                 with patch.object(app.logger, "warning") as mock_warning:
                     result = authenticate_api_request()
         assert isinstance(result, tuple)

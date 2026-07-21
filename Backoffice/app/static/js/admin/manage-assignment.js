@@ -2545,6 +2545,9 @@
 
         // Function to validate period name before form submission
         function validatePeriodName(form) {
+            if (typeof window.syncCustomNameTranslationsToForm === 'function') {
+                window.syncCustomNameTranslationsToForm();
+            }
             const periodNameField = document.querySelector('input[name="period_name"]');
             const errorContainer = document.getElementById('period-name-error');
 

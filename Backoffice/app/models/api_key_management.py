@@ -9,7 +9,9 @@ from datetime import datetime, timedelta
 from app import db
 import secrets
 import hashlib
-from sqlalchemy import Index, UniqueConstraint
+from flask import current_app
+from sqlalchemy import Index, UniqueConstraint, update, text
+from sqlalchemy.orm import sessionmaker
 from typing import Any, Dict, List, Optional, Tuple
 from app.utils.datetime_helpers import utcnow, ensure_utc
 
@@ -182,6 +184,43 @@ class APIKey(db.Model):
         self.revocation_reason = reason
         if revoked_by_user_id is not None:
             self.revoked_by_user_id = revoked_by_user_id
+
+    @classmethod
+    def touch_last_used(cls, api_key_id: int, *, min_interval_seconds: Optional[int] = None) -> None:
+        """
+        Best-effort ``last_used_at`` update in an isolated session.
+
+        Uses a throttled UPDATE so high-volume clients (e.g. Power Query) do not
+        block request auth on row-lock contention in the main transaction.
+        """
+        if api_key_id is None:
+            return
+
+        if min_interval_seconds is None:
+            min_interval_seconds = int(
+                current_app.config.get("API_KEY_LAST_USED_MIN_INTERVAL_SECONDS") or 60
+            )
+
+        now = utcnow()
+        cutoff = now - timedelta(seconds=max(min_interval_seconds, 0))
+        lock_timeout_ms = int(current_app.config.get("API_KEY_LAST_USED_LOCK_TIMEOUT_MS") or 500)
+        temp_db = sessionmaker(bind=db.engine)()
+        try:
+            if lock_timeout_ms > 0:
+                temp_db.execute(text(f"SET LOCAL lock_timeout = '{lock_timeout_ms}ms'"))
+            result = temp_db.execute(
+                update(cls)
+                .where(cls.id == api_key_id)
+                .where((cls.last_used_at.is_(None)) | (cls.last_used_at < cutoff))
+                .values(last_used_at=now)
+            )
+            if result.rowcount:
+                temp_db.commit()
+        except Exception:
+            temp_db.rollback()
+            raise
+        finally:
+            temp_db.close()
 
     def update_last_used(self):
         """Update last used timestamp (flush only; caller owns the transaction)."""

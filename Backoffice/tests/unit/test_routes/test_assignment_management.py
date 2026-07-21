@@ -318,6 +318,58 @@ class TestEditAssignment:
         assert resp.status_code in (200, 302)
 
 
+class TestParseCustomNameTranslationsFromForm:
+    def test_reads_explicit_fields(self, app):
+        from app.routes.admin.assignment_management import _parse_custom_name_translations_from_form
+
+        with app.test_request_context(
+            method='POST',
+            data={'custom_name_fr': ' Nom FR ', 'custom_name_ar': 'Arabic name'},
+        ):
+            app.config['SUPPORTED_LANGUAGES'] = ['en', 'fr', 'ar']
+            result = _parse_custom_name_translations_from_form()
+
+        assert result == {'fr': 'Nom FR', 'ar': 'Arabic name'}
+
+    def test_reads_json_hidden_field(self, app):
+        from app.routes.admin.assignment_management import _parse_custom_name_translations_from_form
+
+        with app.test_request_context(
+            method='POST',
+            data={
+                'custom_name_translations': '{"fr": "Nom JSON", "es": "Nombre"}',
+            },
+        ):
+            app.config['SUPPORTED_LANGUAGES'] = ['en', 'fr', 'es']
+            result = _parse_custom_name_translations_from_form()
+
+        assert result == {'fr': 'Nom JSON', 'es': 'Nombre'}
+
+    def test_explicit_fields_override_json(self, app):
+        from app.routes.admin.assignment_management import _parse_custom_name_translations_from_form
+
+        with app.test_request_context(
+            method='POST',
+            data={
+                'custom_name_translations': '{"fr": "From JSON"}',
+                'custom_name_fr': 'From field',
+            },
+        ):
+            app.config['SUPPORTED_LANGUAGES'] = ['en', 'fr']
+            result = _parse_custom_name_translations_from_form()
+
+        assert result == {'fr': 'From field'}
+
+    def test_empty_returns_none(self, app):
+        from app.routes.admin.assignment_management import _parse_custom_name_translations_from_form
+
+        with app.test_request_context(method='POST', data={}):
+            app.config['SUPPORTED_LANGUAGES'] = ['en', 'fr']
+            result = _parse_custom_name_translations_from_form()
+
+        assert result is None
+
+
 # ---------------------------------------------------------------------------
 # add_countries_to_assignment
 # ---------------------------------------------------------------------------

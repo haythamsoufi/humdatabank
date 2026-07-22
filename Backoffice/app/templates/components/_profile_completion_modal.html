@@ -1,0 +1,164 @@
+{# Profile Completion Modal #}
+{# Shown once per login session when the user has not yet set their job title. #}
+{# They can dismiss it ("Later") but will see it again on the next login until they fill it in. #}
+{% if show_profile_completion %}
+<div id="profile-completion-modal"
+     class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-labelledby="profile-completion-heading">
+    <div class="relative w-full max-w-md p-5 border shadow-lg rounded-md bg-white">
+        <div>
+            {# Header #}
+            <div class="flex items-start justify-between mb-4">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full bg-blue-100 mr-3">
+                        <i class="fas fa-user-edit text-blue-600" aria-hidden="true"></i>
+                    </div>
+                    <div>
+                        <h3 id="profile-completion-heading" class="text-lg font-semibold text-gray-900">
+                            {{ _('Complete Your Profile') }}
+                        </h3>
+                        <p class="text-sm text-gray-500 mt-0.5">
+                            {{ _('Help your colleagues know who you are.') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {# Body #}
+            <p class="text-sm text-gray-600 mb-5">
+                {{ _('Your profile is missing a job title. Adding it helps administrators and focal points identify you. You can update this at any time in your account settings.') }}
+            </p>
+
+            <div id="profile-completion-error"
+                 class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+            </div>
+
+            <form id="profile-completion-form" novalidate>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                {# Name (pre-filled if already set) #}
+                {% if not current_user.name %}
+                <div class="mb-4">
+                    <label for="profile-completion-name"
+                           class="block text-sm font-medium text-gray-700 mb-1">
+                        {{ _('Full Name') }}
+                        <span class="text-gray-400 font-normal ml-1">{{ _('(optional)') }}</span>
+                    </label>
+                    <input type="text"
+                           id="profile-completion-name"
+                           name="name"
+                           maxlength="100"
+                           class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                           placeholder="{{ _('e.g. Jane Smith') }}">
+                </div>
+                {% endif %}
+
+                {# Title (required) #}
+                <div class="mb-6">
+                    <label for="profile-completion-title-input"
+                           class="block text-sm font-medium text-gray-700 mb-1">
+                        {{ _('Job Title') }}
+                        <span class="text-red-500 ml-0.5">*</span>
+                    </label>
+                    <input type="text"
+                           id="profile-completion-title-input"
+                           name="title"
+                           maxlength="100"
+                           required
+                           class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                           placeholder="{{ _('e.g. Data Manager, Focal Point') }}">
+                </div>
+
+                {# Actions #}
+                <div class="flex items-center justify-between gap-3">
+                    <button type="button"
+                            id="profile-completion-later"
+                            class="text-sm text-gray-500 hover:text-gray-700 underline underline-offset-2 transition-colors">
+                        {{ _('Do it later') }}
+                    </button>
+                    <button type="submit"
+                            id="profile-completion-submit"
+                            class="btn btn-primary flex items-center gap-2">
+                        <span id="profile-completion-spinner"
+                              class="hidden animate-spin">
+                            <i class="fas fa-circle-notch" aria-hidden="true"></i>
+                        </span>
+                        {{ _('Save & Continue') }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce() }}">
+(function () {
+    'use strict';
+
+    const modal   = document.getElementById('profile-completion-modal');
+    const form    = document.getElementById('profile-completion-form');
+    const errBox  = document.getElementById('profile-completion-error');
+    const spinner = document.getElementById('profile-completion-spinner');
+    const submitBtn = document.getElementById('profile-completion-submit');
+    const laterBtn  = document.getElementById('profile-completion-later');
+
+    if (!modal || !form) return;
+
+    function closeModal() {
+        modal.classList.add('hidden');
+    }
+
+    laterBtn.addEventListener('click', closeModal);
+
+    // Close on backdrop click
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) closeModal();
+    });
+
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        const titleInput = document.getElementById('profile-completion-title-input');
+        const title = (titleInput ? titleInput.value : '').trim();
+        if (!title) {
+            titleInput && titleInput.focus();
+            showError('{{ _("Job title is required.") }}');
+            return;
+        }
+
+        setLoading(true);
+        errBox.classList.add('hidden');
+
+        try {
+            const fd = new FormData(form);
+            const resp = await fetch('{{ url_for("auth.complete_profile") }}', {
+                method: 'POST',
+                body: fd,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const data = await resp.json().catch(() => ({}));
+
+            if (resp.ok && data.success) {
+                closeModal();
+            } else {
+                showError(data.message || data.error || '{{ _("An error occurred. Please try again.") }}');
+            }
+        } catch (err) {
+            showError('{{ _("Network error. Please check your connection and try again.") }}');
+        } finally {
+            setLoading(false);
+        }
+    });
+
+    function setLoading(loading) {
+        submitBtn.disabled = loading;
+        spinner.classList.toggle('hidden', !loading);
+    }
+
+    function showError(msg) {
+        errBox.textContent = msg;
+        errBox.classList.remove('hidden');
+    }
+}());
+</script>
+{% endif %}

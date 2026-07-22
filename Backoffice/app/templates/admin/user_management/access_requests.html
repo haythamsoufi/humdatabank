@@ -653,14 +653,14 @@
                 AgGridRenderers.escapeHtmlAttr(approveConfirm) + '">' +
                 '<input type="hidden" name="csrf_token" value="' + CSRF_TOKEN + '">' +
                 '<button type="submit" class="btn btn-success btn-sm">' +
-                '<i class="fas fa-check-double mr-1"></i> {{ _("Approve all") }}' +
+                '<i class="fas fa-check-double mr-1"></i> ' + {{ _('Approve all')|tojson|safe }} +
                 '</button>' +
                 '</form>' +
                 '<form action="' + rejectAllUrl + '" method="POST" data-confirm="' +
                 AgGridRenderers.escapeHtmlAttr(rejectConfirm) + '" data-confirm-danger="true">' +
                 '<input type="hidden" name="csrf_token" value="' + CSRF_TOKEN + '">' +
                 '<button type="submit" class="btn btn-danger btn-sm">' +
-                '<i class="fas fa-times-circle mr-1"></i> {{ _("Reject all") }}' +
+                '<i class="fas fa-times-circle mr-1"></i> ' + {{ _('Reject all')|tojson|safe }} +
                 '</button>' +
                 '</form>' +
                 '</div>';
@@ -673,13 +673,13 @@
                 '<form action="' + approveUrl + '" method="POST">' +
                 '<input type="hidden" name="csrf_token" value="' + CSRF_TOKEN + '">' +
                 '<button type="submit" class="btn btn-success btn-sm">' +
-                '<i class="fas fa-check mr-1"></i> {{ _("Approve") }}' +
+                '<i class="fas fa-check mr-1"></i> ' + {{ _('Approve')|tojson|safe }} +
                 '</button>' +
                 '</form>' +
                 '<form action="' + rejectUrl + '" method="POST">' +
                 '<input type="hidden" name="csrf_token" value="' + CSRF_TOKEN + '">' +
                 '<button type="submit" class="btn btn-danger btn-sm">' +
-                '<i class="fas fa-times mr-1"></i> {{ _("Reject") }}' +
+                '<i class="fas fa-times mr-1"></i> ' + {{ _('Reject')|tojson|safe }} +
                 '</button>' +
                 '</form>' +
                 '</div>';
@@ -823,7 +823,7 @@
                     : statusSummary.filterValue,
                 processed_by_id: multipleProcessedBy ? null : firstRequest.processed_by_id,
                 processed_by_email: multipleProcessedBy
-                    ? '{{ _("Multiple") }} (' + uniqueProcessedBy.length + ')'
+                    ? {{ _('Multiple')|tojson|safe }} + ' (' + uniqueProcessedBy.length + ')'
                     : (firstRequest.processed_by_email || '-'),
                 processed_by_name: multipleProcessedBy ? '' : (firstRequest.processed_by_name || ''),
                 processed_by_active: multipleProcessedBy ? true : firstRequest.processed_by_active,
@@ -836,7 +836,7 @@
         return {
             colId: 'user_name',
             field: 'user_name',
-            headerName: '{{ _("User") }}',
+            headerName: {{ _('User')|tojson|safe }},
             width: 200,
             minWidth: 150,
             maxWidth: 300,
@@ -851,7 +851,7 @@
                     titleField: 'user_title',
                     activeField: 'user_active',
                     profileColorField: 'user_profile_color',
-                    fallbackLabel: '{{ _("Unknown User") }}',
+                    fallbackLabel: {{ _('Unknown User')|tojson|safe }},
                     showEmail: true
                 });
             }
@@ -862,7 +862,7 @@
         return {
             colId: 'request_message',
             field: 'request_message',
-            headerName: '{{ _("Message") }}',
+            headerName: {{ _('Message')|tojson|safe }},
             width: 300,
             minWidth: 200,
             flex: 1,
@@ -961,7 +961,7 @@
         return {
             colId: 'request_message',
             field: 'request_message',
-            headerName: '{{ _("Message") }}',
+            headerName: {{ _('Message')|tojson|safe }},
             width: 300,
             minWidth: 200,
             flex: 1,
@@ -1009,7 +1009,7 @@
         return {
             colId: 'country',
             field: 'country_names_display',
-            headerName: '{{ _("Countries") }}',
+            headerName: {{ _('Countries')|tojson|safe }},
             width: 260,
             minWidth: 180,
             maxWidth: 420,
@@ -1041,7 +1041,7 @@
         return {
             colId: 'fds_member_name',
             field: 'fds_member_name',
-            headerName: '{{ _("FDS Member") }}',
+            headerName: {{ _('FDS Member')|tojson|safe }},
             width: 180,
             minWidth: 150,
             maxWidth: 280,
@@ -1063,7 +1063,7 @@
                     emailField: 'fds_member_email',
                     activeField: 'fds_member_active',
                     profileColorField: 'fds_member_profile_color',
-                    fallbackLabel: '{{ _("Unknown User") }}',
+                    fallbackLabel: {{ _('Unknown User')|tojson|safe }},
                     showEmail: true
                 });
             }
@@ -1119,7 +1119,7 @@
         return {
             colId: 'actions',
             field: 'actions',
-            headerName: '{{ _("Actions") }}',
+            headerName: {{ _('Actions')|tojson|safe }},
             width: 132,
             minWidth: 120,
             maxWidth: 148,
@@ -1156,7 +1156,7 @@
             cols.push({
                 colId: 'id',
                 field: 'id',
-                headerName: '{{ _("Request ID") }}',
+                headerName: {{ _('Request ID')|tojson|safe }},
                 width: 120,
                 minWidth: 100,
                 maxWidth: 150,
@@ -1171,7 +1171,7 @@
             {
                 colId: 'created_at',
                 field: 'created_at',
-                headerName: '{{ _("Requested At") }}',
+                headerName: {{ _('Requested At')|tojson|safe }},
                 width: 180,
                 minWidth: 150,
                 maxWidth: 250,
@@ -1185,7 +1185,7 @@
                 : {
                     colId: 'country',
                     field: 'country_name',
-                    headerName: '{{ _("Country") }}',
+                    headerName: {{ _('Country')|tojson|safe }},
                     width: 200,
                     minWidth: 150,
                     maxWidth: 300,
@@ -1205,7 +1205,7 @@
             cols.push({
                 colId: 'id',
                 field: 'id',
-                headerName: '{{ _("Request ID") }}',
+                headerName: {{ _('Request ID')|tojson|safe }},
                 width: 120,
                 minWidth: 100,
                 maxWidth: 150,
@@ -1220,7 +1220,7 @@
             {
                 colId: 'created_at',
                 field: 'created_at',
-                headerName: '{{ _("Requested At") }}',
+                headerName: {{ _('Requested At')|tojson|safe }},
                 width: 180,
                 minWidth: 150,
                 maxWidth: 250,
@@ -1234,7 +1234,7 @@
                 : {
                     colId: 'country',
                     field: 'country_name',
-                    headerName: '{{ _("Country") }}',
+                    headerName: {{ _('Country')|tojson|safe }},
                     width: 200,
                     minWidth: 150,
                     maxWidth: 300,
@@ -1246,7 +1246,7 @@
             {
                 colId: 'status',
                 field: 'status',
-                headerName: '{{ _("Status") }}',
+                headerName: {{ _('Status')|tojson|safe }},
                 width: 150,
                 minWidth: 120,
                 maxWidth: 220,
@@ -1260,7 +1260,7 @@
             {
                 colId: 'processed_by_email',
                 field: 'processed_by_email',
-                headerName: '{{ _("Processed By") }}',
+                headerName: {{ _('Processed By')|tojson|safe }},
                 width: 250,
                 minWidth: 200,
                 maxWidth: 400,
@@ -1276,7 +1276,7 @@
                         emailField: 'processed_by_email',
                         activeField: 'processed_by_active',
                         profileColorField: 'processed_by_profile_color',
-                        fallbackLabel: '{{ _("Unknown User") }}',
+                        fallbackLabel: {{ _('Unknown User')|tojson|safe }},
                         showEmail: false
                     });
                 }
@@ -1284,7 +1284,7 @@
             {
                 colId: 'processed_at',
                 field: 'processed_at',
-                headerName: '{{ _("Processed At") }}',
+                headerName: {{ _('Processed At')|tojson|safe }},
                 width: 180,
                 minWidth: 150,
                 maxWidth: 250,
@@ -1316,7 +1316,7 @@
                 pendingLabel = pendingRowCount + ' / ' + pendingReqCount;
             }
             pendingTab.innerHTML =
-                '<i class="fas fa-inbox mr-1.5"></i>{{ _("Pending Requests") }} (' + pendingLabel + ')';
+                '<i class="fas fa-inbox mr-1.5"></i>' + {{ _('Pending Requests')|tojson|safe }} + ' (' + pendingLabel + ')';
         }
         if (processedCountEl) {
             processedCountEl.textContent = String(processedRequestsTotal);

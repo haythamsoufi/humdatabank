@@ -29,7 +29,7 @@ Use menu options **5** and **6** in `pb-report.bat` to install Python dependenci
 ├── requirements.txt        Python dependencies (includes scripts/pb_figures/)
 ├── scripts/                Python pipeline
 │   ├── build_report.py     Main build entry point
-│   ├── pre_render.py       Quarto pre-render hook (figures + _body.qmd)
+│   ├── pre_render.py       Generates figures + report/_body.qmd (run by build_report.py)
 │   ├── generate_pb_figures.py
 │   ├── generate_report_docx.py
 │   ├── package_figures.py

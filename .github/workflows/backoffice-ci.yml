@@ -52,6 +52,20 @@ jobs:
             python Backoffice/scripts/check_no_inline_js_in_diff.py --base-ref "$BASE"
           fi
 
+      - name: No unsafe gettext embedding in template diff
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            echo "::warning::No base SHA available (first push to branch?) — skipping gettext embed check"
+          else
+            python Backoffice/scripts/check_unsafe_gettext_embedding.py --base-ref "$BASE"
+          fi
+
   # ── Bandit static security analysis ────────────────────────────────────────
   bandit:
     name: Bandit (Python security)

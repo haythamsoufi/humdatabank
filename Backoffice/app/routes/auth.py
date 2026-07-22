@@ -227,6 +227,10 @@ def login():
 
             seed_session_language_from_user(user)
 
+            # Flag incomplete profile so the dashboard shows a completion modal
+            if not (user.title and user.title.strip()):
+                session['prompt_profile_completion'] = True
+
             # Log successful login
             log_login_attempt(user.email, success=True, user=user, session_id=session_id)
 
@@ -800,6 +804,10 @@ def azure_callback():
     from app.i18n import seed_session_language_from_user
 
     seed_session_language_from_user(user)
+
+    # Flag incomplete profile so the dashboard shows a completion modal
+    if not (user.title and user.title.strip()):
+        session['prompt_profile_completion'] = True
 
     # Log successful login (skip analytics when callback was deduplicated)
     if created_new_session:
@@ -1377,6 +1385,35 @@ def account_settings():
                          notification_preferences=notification_preferences,
                          notification_types=notification_types_info['for_user'],
                          notification_type_labels=get_notification_type_labels())
+
+
+@bp.route("/complete-profile", methods=["POST"])
+@login_required
+def complete_profile():
+    """AJAX endpoint: save name/title from the post-login profile-completion modal."""
+    name = (request.form.get('name') or '').strip()
+    title = (request.form.get('title') or '').strip()
+
+    if not title:
+        return json_bad_request(_('Job title is required.'))
+
+    if name:
+        current_user.name = name
+    current_user.title = title
+
+    try:
+        db.session.flush()
+        log_user_activity(
+            activity_type='profile_update',
+            description=f'User {current_user.email} completed their profile via post-login modal',
+            context_data={'user_id': current_user.id, 'updated_fields': {'name': name, 'title': title}},
+        )
+        return json_ok(message=_('Profile updated successfully.'))
+    except Exception as e:
+        request_transaction_rollback()
+        current_app.logger.error("complete_profile: failed to save: %s", e, exc_info=True)
+        return json_server_error(_('Failed to save profile. Please try again.'))
+
 
 @bp.route("/debug/profile-picture", methods=["GET"])
 @login_required

@@ -90,6 +90,21 @@ def _run_docx_and_pdf(env: dict[str, str]) -> None:
         raise subprocess.CalledProcessError(pdf_code, pdf_cmd)
 
 
+def _run_pre_render(env: dict[str, str]) -> None:
+    """Generate figures and report/_body.qmd before Quarto render.
+
+    Quarto 1.6+ resolves ``{{< include >}}`` during project setup, before
+    ``pre-render`` hooks in _quarto.yml run, so _body.qmd must already exist.
+    """
+    print("[build_report] pre_render: figures + _body.qmd", flush=True)
+    subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "pre_render.py")],
+        check=True,
+        env=env,
+        cwd=ROOT,
+    )
+
+
 def _run_quarto(formats: list[str], env: dict[str, str]) -> None:
     quarto = _quarto_exe()
     if not quarto:
@@ -126,7 +141,8 @@ def main() -> None:
     formats = args.formats or ["html"]
     env = os.environ.copy()
     env["PB_REPORT_LANGUAGE"] = "all"
-    env["PB_REPORT_YEAR"] = "2026"
+    if not env.get("PB_REPORT_YEAR"):
+        env["PB_REPORT_YEAR"] = "2026"
     env["PB_FIGURES_RENDERER"] = "html"
     if args.style:
         env[ENV_VAR] = args.style
@@ -136,12 +152,7 @@ def main() -> None:
 
     if args.figures_only:
         try:
-            subprocess.run(
-                [sys.executable, str(ROOT / "scripts" / "pre_render.py")],
-                check=True,
-                env=env,
-                cwd=ROOT,
-            )
+            _run_pre_render(env)
         finally:
             cleanup_build_copy(args.excel)
         return
@@ -151,10 +162,9 @@ def main() -> None:
         quarto_formats = [f if f != "docx-flat" else "docx" for f in quarto_formats]
 
     if quarto_formats:
-        # Figures and _body.qmd are generated once via Quarto pre-render hooks
-        # configured in report/_quarto.yml.
-        print("[build_report] rendering via Quarto (pre-render: figures + body)", flush=True)
         try:
+            _run_pre_render(env)
+            print("[build_report] rendering via Quarto", flush=True)
             _run_quarto(quarto_formats, env)
             if "html" in formats:
                 from package_figures import package_figures  # noqa: E402

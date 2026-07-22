@@ -3,8 +3,8 @@ project:
   output-dir: output
   render:
     - pb-report.qmd
-  pre-render:
-    - python ../scripts/pre_render.py
+  # pre_render.py is run by build_report.py before quarto render. Quarto 1.6+
+  # resolves {{< include _body.qmd >}} before project pre-render hooks run.
 
 format:
   html:

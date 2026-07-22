@@ -32,7 +32,7 @@
      aria-label="{{ aria_label or modal_title }}"
      {% for k, v in (data_attrs or {}).items() %} data-{{ k|replace('_', '-') }}="{{ v|e }}"{% endfor %}>
     <div class="relative p-6 border w-full {{ max_width }} shadow-xl rounded-lg bg-white mx-auto modal-shell-content">
-        <button type="button"{% if close_id %} id="{{ close_id }}"{% endif %} class="absolute top-3 right-3 btn-close-icon text-gray-400 hover:text-gray-600 close-modal {{ close_class }}" aria-label="{{ _('Close') }}">
+        <button type="button"{% if close_id %} id="{{ close_id }}"{% endif %} class="absolute top-3 right-3 btn-close-icon text-gray-400 hover:text-gray-600 close-modal {{ close_class }}" aria-label="{{ _('Close')|forceescape }}">
             <i class="fas fa-times w-5 h-5"></i>
         </button>
         <h3 id="{{ modal_id }}-title" class="text-xl font-semibold text-gray-800 pr-8 {{ title_class }}">{% if title_safe %}{{ modal_title|safe }}{% else %}{{ modal_title }}{% endif %}</h3>

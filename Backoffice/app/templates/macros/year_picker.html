@@ -4,12 +4,12 @@
 <label for="{{ input_id }}" class="{{ label_class }}">{{ label }}</label>
 {% endif %}
 <div class="year-picker" data-year-picker data-year-min="{{ min }}" data-year-max="{{ max }}">
-    <button type="button" class="year-picker-btn" data-year-picker-decrement aria-label="{{ _('Previous year') }}">
+    <button type="button" class="year-picker-btn" data-year-picker-decrement aria-label="{{ _('Previous year')|forceescape }}">
         <i class="fas fa-chevron-left" aria-hidden="true"></i>
     </button>
     <div class="year-picker-input-wrap">
         <button type="button" class="year-picker-calendar-toggle" data-year-picker-calendar
-                aria-label="{{ _('Open year calendar') }}" aria-haspopup="listbox" aria-expanded="false">
+                aria-label="{{ _('Open year calendar')|forceescape }}" aria-haspopup="listbox" aria-expanded="false">
             <i class="fas fa-calendar-alt" aria-hidden="true"></i>
         </button>
         <input type="text"
@@ -21,9 +21,9 @@
                autocomplete="off"
                data-year-min="{{ min }}"
                data-year-max="{{ max }}"
-               aria-label="{{ label or _('Year') }}">
+               aria-label="{{ label or _('Year')|forceescape }}">
     </div>
-    <button type="button" class="year-picker-btn" data-year-picker-increment aria-label="{{ _('Next year') }}">
+    <button type="button" class="year-picker-btn" data-year-picker-increment aria-label="{{ _('Next year')|forceescape }}">
         <i class="fas fa-chevron-right" aria-hidden="true"></i>
     </button>
 </div>

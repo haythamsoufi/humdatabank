@@ -218,7 +218,7 @@
     {# Same stat-card pattern as admin/dashboard.html #}
     <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-6">
         <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200"
-             title="{{ _('Share of live API paths that appear in the endpoint registry') }}">
+             title="{{ _('Share of live API paths that appear in the endpoint registry')|forceescape }}">
             <div class="flex items-center justify-between mb-2">
                 <h3 class="text-sm font-semibold text-gray-700">{{ _('Registry coverage') }}</h3>
                 <i class="fas fa-shield-check {{ cov_icon_class }}"></i>
@@ -294,7 +294,7 @@
                         {{ _('Endpoint Registry') }}
                     </h2>
                     <button type="button" id="epExportBtn" class="btn btn-secondary btn-sm flex items-center gap-1.5 whitespace-nowrap shrink-0"
-                            title="{{ _('Export report as Markdown (issues, overlaps, full table)') }}">
+                            title="{{ _('Export report as Markdown (issues, overlaps, full table)')|forceescape }}">
                         <i class="fas fa-file-export"></i>
                         {{ _('Export Report') }}
                     </button>
@@ -498,13 +498,13 @@
 
         <!-- Legend (mostly native title; AI Session uses fixed-layer tooltip — see epAiIdentityTooltipInit) -->
         <div class="px-6 py-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-400 flex flex-wrap gap-x-5 gap-y-1 min-w-0 overflow-x-auto [-webkit-overflow-scrolling:touch] overscroll-x-contain">
-            <span class="cursor-help" title="{{ _('No authentication. Anyone who can reach the server may call the route (rate limits may still apply).') }}">
+            <span class="cursor-help" title="{{ _('No authentication. Anyone who can reach the server may call the route (rate limits may still apply).')|forceescape }}">
                 <i class="fas fa-globe text-gray-400 mr-1" aria-hidden="true"></i>{{ _('Public — no auth') }}</span>
-            <span class="cursor-help" title="{{ _('Bearer token using a database-managed API key (Authorization: Bearer …). Typical for external integrations.') }}">
+            <span class="cursor-help" title="{{ _('Bearer token using a database-managed API key (Authorization: Bearer …). Typical for external integrations.')|forceescape }}">
                 <i class="fas fa-key text-amber-500 mr-1" aria-hidden="true"></i>{{ _('API Key — Bearer DB-managed key') }}</span>
-            <span class="cursor-help" title="{{ _('Valid API key (Bearer) or an authenticated Backoffice session, depending on the client. Pagination and response shape may differ by mode.') }}">
+            <span class="cursor-help" title="{{ _('Valid API key (Bearer) or an authenticated Backoffice session, depending on the client. Pagination and response shape may differ by mode.')|forceescape }}">
                 <i class="fas fa-key text-indigo-500 mr-1" aria-hidden="true"></i>{{ _('Key / Session — either works') }}</span>
-            <span class="cursor-help" title="{{ _('Flask-Login session only (@login_required). The user is already signed into the Backoffice in the browser.') }}">
+            <span class="cursor-help" title="{{ _('Flask-Login session only (@login_required). The user is already signed into the Backoffice in the browser.')|forceescape }}">
                 <i class="fas fa-user text-blue-500 mr-1" aria-hidden="true"></i>{{ _('Session — @login_required') }}</span>
             {% set ep_ai_identity_tip = _('AI identity from resolve_ai_identity(): (1) Backoffice session cookie, (2) short-lived AI JWT in Authorization: Bearer (often from GET /api/ai/v2/token), or (3) anonymous when the route allows. Coarse access is public / user / admin / system_manager; AI tools can still enforce granular RBAC permissions.') %}
             <span class="ep-ai-identity-tip-trigger cursor-help outline-none rounded-sm" tabindex="0"
@@ -514,11 +514,11 @@
                 </span>
                 <span class="ep-ai-identity-tip-source sr-only" aria-hidden="true">{{ ep_ai_identity_tip }}</span>
             </span>
-            <span class="cursor-help" title="{{ _('Mobile user JWT or compatible session via @mobile_auth_required, without requiring a specific RBAC permission on the route.') }}">
+            <span class="cursor-help" title="{{ _('Mobile user JWT or compatible session via @mobile_auth_required, without requiring a specific RBAC permission on the route.')|forceescape }}">
                 <i class="fas fa-mobile-alt text-teal-500 mr-1" aria-hidden="true"></i>{{ _('User JWT — @mobile_auth_required') }}</span>
-            <span class="cursor-help" title="{{ _('Mobile admin: @mobile_auth_required plus one RBAC permission. The exact permission code appears in the Permission column.') }}">
+            <span class="cursor-help" title="{{ _('Mobile admin: @mobile_auth_required plus one RBAC permission. The exact permission code appears in the Permission column.')|forceescape }}">
                 <i class="fas fa-shield-alt text-orange-500 mr-1" aria-hidden="true"></i>{{ _('RBAC — @mobile_auth_required(permission=…)') }}</span>
-            <span class="cursor-help" title="{{ _('This route applies request throttling (for example a maximum number of requests per minute).') }}">
+            <span class="cursor-help" title="{{ _('This route applies request throttling (for example a maximum number of requests per minute).')|forceescape }}">
                 <i class="fas fa-tachometer-alt text-yellow-400 mr-1" aria-hidden="true"></i>{{ _('Rate limited') }}</span>
         </div>
         {# Fixed tooltip host (moved to document.body by JS so it is not clipped by the grid or cards) #}
@@ -643,7 +643,7 @@
         </div>
 
         <!-- API key input (client-side only; sessionStorage, cleared when the tab closes). -->
-        <form class="mt-4 mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4" onsubmit="return false;" autocomplete="off" aria-label="{{ _('API key for URL builder') }}">
+        <form class="mt-4 mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4" onsubmit="return false;" autocomplete="off" aria-label="{{ _('API key for URL builder')|forceescape }}">
             <div class="flex flex-wrap items-end justify-between gap-3 mb-2">
                 <label for="apiKeyInput" class="block text-sm font-medium text-blue-900">
                     <i class="fas fa-key mr-1"></i>{{ _('API Key') }}
@@ -658,7 +658,7 @@
               value is correctly honoured by Safari and prevents password-manager autofill.
             #}
             <input id="apiKeyInput" name="api_key" type="password" autocomplete="new-password"
-                   placeholder="{{ _('Paste an API key created in API Key Management') }}"
+                   placeholder="{{ _('Paste an API key created in API Key Management')|forceescape }}"
                    class="w-full px-3 py-2 border border-blue-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono text-sm bg-white">
             <p class="mt-2 text-xs text-blue-800">
                 {{ _('This key is kept only in your browser session (session storage) to help build URLs. It is not rendered by the server.') }}
@@ -728,7 +728,7 @@
                     <div class="relative">
                         <textarea id="generatedMQuery" readonly rows="14"
                                   class="w-full bg-gray-900 text-gray-100 text-xs rounded-lg border border-gray-300 p-3 pr-4 font-mono leading-relaxed resize-y"
-                                  aria-label="{{ _('Generated Power Query M code') }}"></textarea>
+                                  aria-label="{{ _('Generated Power Query M code')|forceescape }}"></textarea>
                         <div class="mt-2 flex flex-wrap gap-2">
                             <button type="button" id="copyMQuery" class="btn btn-primary btn-sm">
                                 <i class="fas fa-copy mr-1" aria-hidden="true"></i>{{ _('Copy query') }}
@@ -914,7 +914,7 @@ try {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `{{ _('Requests') }}: ${context.parsed.y}`;
+                            return {{ _('Requests')|tojson|safe }} + `: ${context.parsed.y}`;
                         }
                     }
                 }
@@ -964,7 +964,7 @@ try {
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: '{{ _("Requests") }}',
+                        label: {{ _("Requests")|tojson|safe }},
                         data: counts,
                         borderColor: 'rgb(59, 130, 246)',
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -1014,7 +1014,7 @@ try {
                         ctx.font = "16px Arial";
                         ctx.fillStyle = "red";
                         ctx.textAlign = "center";
-                        ctx.fillText("{{ _('Error loading chart data') }}", canvas.width / 2, canvas.height / 2);
+                        ctx.fillText({{ _('Error loading chart data')|tojson|safe }}, canvas.width / 2, canvas.height / 2);
                     });
             }
         }
@@ -1078,106 +1078,106 @@ try {
         // Mapping of endpoints to their available query parameters
         const endpointParamMap = {
             '/api/v1/data': [
-                {name: 'template_id', type: 'select', options: [''].concat(templateOptions), labels: [''].concat(templateLabels), description: '{{ _("Filter by template ID") }}'},
-                {name: 'submission_id', type: 'number', placeholder: '{{ _("Submission ID") }}', description: '{{ _("Filter by submission ID") }}'},
-                {name: 'item_type', type: 'select', options: ['', 'indicator', 'question', 'document_field'], description: '{{ _("Filter by item type") }}'},
-                {name: 'item_id', type: 'number', placeholder: '{{ _("Item ID") }}', description: '{{ _("Filter by form item ID") }}'},
-                {name: 'assignment_id', type: 'select', options: assignmentSelectOptions, labels: assignmentSelectLabels, description: '{{ _("Filter by assignment ID") }}'},
-                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: '{{ _("Filter by country ID") }}'},
-                {name: 'submission_type', type: 'select', options: ['', 'assigned', 'public'], description: '{{ _("Filter by submission type") }}'},
-                {name: 'date_from', type: 'text', placeholder: '{{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS") }}', description: '{{ _("Filter by submission date from (ISO format)") }}'},
-                {name: 'date_to', type: 'text', placeholder: '{{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS") }}', description: '{{ _("Filter by submission date to (ISO format)") }}'},
-                {name: 'sort', type: 'select', options: ['', 'submitted_at', 'template_id', 'country_id', 'period_name'], description: '{{ _("Sort field (default: submitted_at)") }}'},
-                {name: 'order', type: 'select', options: ['desc', 'asc'], description: '{{ _("Sort order: desc (default) or asc") }}'},
-                {name: 'disagg', type: 'select', options: ['', 'true', 'false'], description: '{{ _("Include disaggregation data (default: excluded)") }}'},
-                {name: 'related', type: 'select', options: ['', 'page', 'all'], description: '{{ _("Related tables scope: page (current page) or all (full dataset)") }}'},
-                {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1, API key auth only)") }}'},
-                {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: 20, max 1000, API key auth only)") }}'}
+                {name: 'template_id', type: 'select', options: [''].concat(templateOptions), labels: [''].concat(templateLabels), description: {{ _("Filter by template ID")|tojson|safe }}},
+                {name: 'submission_id', type: 'number', placeholder: {{ _("Submission ID")|tojson|safe }}, description: {{ _("Filter by submission ID")|tojson|safe }}},
+                {name: 'item_type', type: 'select', options: ['', 'indicator', 'question', 'document_field'], description: {{ _("Filter by item type")|tojson|safe }}},
+                {name: 'item_id', type: 'number', placeholder: {{ _("Item ID")|tojson|safe }}, description: {{ _("Filter by form item ID")|tojson|safe }}},
+                {name: 'assignment_id', type: 'select', options: assignmentSelectOptions, labels: assignmentSelectLabels, description: {{ _("Filter by assignment ID")|tojson|safe }}},
+                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: {{ _("Filter by country ID")|tojson|safe }}},
+                {name: 'submission_type', type: 'select', options: ['', 'assigned', 'public'], description: {{ _("Filter by submission type")|tojson|safe }}},
+                {name: 'date_from', type: 'text', placeholder: {{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS")|tojson|safe }}, description: {{ _("Filter by submission date from (ISO format)")|tojson|safe }}},
+                {name: 'date_to', type: 'text', placeholder: {{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS")|tojson|safe }}, description: {{ _("Filter by submission date to (ISO format)")|tojson|safe }}},
+                {name: 'sort', type: 'select', options: ['', 'submitted_at', 'template_id', 'country_id', 'period_name'], description: {{ _("Sort field (default: submitted_at)")|tojson|safe }}},
+                {name: 'order', type: 'select', options: ['desc', 'asc'], description: {{ _("Sort order: desc (default) or asc")|tojson|safe }}},
+                {name: 'disagg', type: 'select', options: ['', 'true', 'false'], description: {{ _("Include disaggregation data (default: excluded)")|tojson|safe }}},
+                {name: 'related', type: 'select', options: ['', 'page', 'all'], description: {{ _("Related tables scope: page (current page) or all (full dataset)")|tojson|safe }}},
+                {name: 'page', type: 'number', placeholder: {{ _("Page")|tojson|safe }}, description: {{ _("Page number (default: 1, API key auth only)")|tojson|safe }}},
+                {name: 'per_page', type: 'number', placeholder: {{ _("Items per page")|tojson|safe }}, description: {{ _("Items per page (default: 20, max 1000, API key auth only)")|tojson|safe }}}
             ],
             '/api/v1/data/tables': [
-                {name: 'template_id', type: 'select', options: [''].concat(templateOptions), labels: [''].concat(templateLabels), description: '{{ _("Filter by template ID") }}'},
-                {name: 'submission_id', type: 'number', placeholder: '{{ _("Submission ID") }}', description: '{{ _("Filter by submission ID") }}'},
-                {name: 'item_type', type: 'select', options: ['', 'indicator', 'question', 'document_field'], description: '{{ _("Filter by item type") }}'},
-                {name: 'item_id', type: 'number', placeholder: '{{ _("Item ID") }}', description: '{{ _("Filter by form item ID") }}'},
-                {name: 'indicator_bank_id', type: 'number', placeholder: '{{ _("Indicator Bank ID") }}', description: '{{ _("Filter by indicator bank ID") }}'},
-                {name: 'assignment_id', type: 'select', options: assignmentSelectOptions, labels: assignmentSelectLabels, description: '{{ _("Filter by assignment ID") }}'},
-                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: '{{ _("Filter by country ID") }}'},
-                {name: 'submission_type', type: 'select', options: ['', 'assigned', 'public'], description: '{{ _("Filter by submission type") }}'},
-                {name: 'date_from', type: 'text', placeholder: '{{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS") }}', description: '{{ _("Filter by submission date from (ISO format)") }}'},
-                {name: 'date_to', type: 'text', placeholder: '{{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS") }}', description: '{{ _("Filter by submission date to (ISO format)") }}'},
-                {name: 'sort', type: 'select', options: ['', 'submitted_at', 'template_id', 'country_id', 'period_name'], description: '{{ _("Sort field (default: submitted_at)") }}'},
-                {name: 'order', type: 'select', options: ['desc', 'asc'], description: '{{ _("Sort order: desc (default) or asc") }}'},
-                {name: 'disagg', type: 'select', options: ['', 'true', 'false'], description: '{{ _("Include disaggregation data (default: excluded)") }}'},
-                {name: 'related', type: 'select', options: ['', 'page', 'all'], description: '{{ _("Related tables scope: page (current page) or all (full dataset)") }}'},
-                {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1, API key auth only)") }}'},
-                {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: 20, max 1000, API key auth only)") }}'}
+                {name: 'template_id', type: 'select', options: [''].concat(templateOptions), labels: [''].concat(templateLabels), description: {{ _("Filter by template ID")|tojson|safe }}},
+                {name: 'submission_id', type: 'number', placeholder: {{ _("Submission ID")|tojson|safe }}, description: {{ _("Filter by submission ID")|tojson|safe }}},
+                {name: 'item_type', type: 'select', options: ['', 'indicator', 'question', 'document_field'], description: {{ _("Filter by item type")|tojson|safe }}},
+                {name: 'item_id', type: 'number', placeholder: {{ _("Item ID")|tojson|safe }}, description: {{ _("Filter by form item ID")|tojson|safe }}},
+                {name: 'indicator_bank_id', type: 'number', placeholder: {{ _("Indicator Bank ID")|tojson|safe }}, description: {{ _("Filter by indicator bank ID")|tojson|safe }}},
+                {name: 'assignment_id', type: 'select', options: assignmentSelectOptions, labels: assignmentSelectLabels, description: {{ _("Filter by assignment ID")|tojson|safe }}},
+                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: {{ _("Filter by country ID")|tojson|safe }}},
+                {name: 'submission_type', type: 'select', options: ['', 'assigned', 'public'], description: {{ _("Filter by submission type")|tojson|safe }}},
+                {name: 'date_from', type: 'text', placeholder: {{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS")|tojson|safe }}, description: {{ _("Filter by submission date from (ISO format)")|tojson|safe }}},
+                {name: 'date_to', type: 'text', placeholder: {{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS")|tojson|safe }}, description: {{ _("Filter by submission date to (ISO format)")|tojson|safe }}},
+                {name: 'sort', type: 'select', options: ['', 'submitted_at', 'template_id', 'country_id', 'period_name'], description: {{ _("Sort field (default: submitted_at)")|tojson|safe }}},
+                {name: 'order', type: 'select', options: ['desc', 'asc'], description: {{ _("Sort order: desc (default) or asc")|tojson|safe }}},
+                {name: 'disagg', type: 'select', options: ['', 'true', 'false'], description: {{ _("Include disaggregation data (default: excluded)")|tojson|safe }}},
+                {name: 'related', type: 'select', options: ['', 'page', 'all'], description: {{ _("Related tables scope: page (current page) or all (full dataset)")|tojson|safe }}},
+                {name: 'page', type: 'number', placeholder: {{ _("Page")|tojson|safe }}, description: {{ _("Page number (default: 1, API key auth only)")|tojson|safe }}},
+                {name: 'per_page', type: 'number', placeholder: {{ _("Items per page")|tojson|safe }}, description: {{ _("Items per page (default: 20, max 1000, API key auth only)")|tojson|safe }}}
             ],
             '/api/v1/submissions': [
-                {name: 'template_id', type: 'select', options: [''].concat(templateOptions), labels: [''].concat(templateLabels), description: '{{ _("Filter by template ID") }}'},
-                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: '{{ _("Filter by country ID") }}'},
-                {name: 'submission_type', type: 'select', options: ['', 'assigned', 'public'], description: '{{ _("Filter by submission type") }}'}
+                {name: 'template_id', type: 'select', options: [''].concat(templateOptions), labels: [''].concat(templateLabels), description: {{ _("Filter by template ID")|tojson|safe }}},
+                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: {{ _("Filter by country ID")|tojson|safe }}},
+                {name: 'submission_type', type: 'select', options: ['', 'assigned', 'public'], description: {{ _("Filter by submission type")|tojson|safe }}}
             ],
             '/api/v1/submissions/<submission_id>': [
-                {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
+                {name: 'api_key', type: 'text', placeholder: {{ _("API Key")|tojson|safe }}, description: {{ _("Required API key for authentication")|tojson|safe }}}
             ],
             '/api/v1/templates/<template_id>/data': [
-                {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
+                {name: 'api_key', type: 'text', placeholder: {{ _("API Key")|tojson|safe }}, description: {{ _("Required API key for authentication")|tojson|safe }}}
             ],
             '/api/v1/countries/<country_id>/data': [
-                {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
+                {name: 'api_key', type: 'text', placeholder: {{ _("API Key")|tojson|safe }}, description: {{ _("Required API key for authentication")|tojson|safe }}}
             ],
             '/api/v1/countrymap': [
-                {name: 'locale', type: 'text', placeholder: '{{ _("Locale code (en, fr, es, etc.)") }}', description: '{{ _("Two-letter locale code for localization") }}'},
-                {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1)") }}'},
-                {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: all)") }}'},
-                {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
+                {name: 'locale', type: 'text', placeholder: {{ _("Locale code (en, fr, es, etc.)")|tojson|safe }}, description: {{ _("Two-letter locale code for localization")|tojson|safe }}},
+                {name: 'page', type: 'number', placeholder: {{ _("Page")|tojson|safe }}, description: {{ _("Page number (default: 1)")|tojson|safe }}},
+                {name: 'per_page', type: 'number', placeholder: {{ _("Items per page")|tojson|safe }}, description: {{ _("Items per page (default: all)")|tojson|safe }}},
+                {name: 'api_key', type: 'text', placeholder: {{ _("API Key")|tojson|safe }}, description: {{ _("Required API key for authentication")|tojson|safe }}}
             ],
             '/api/v1/nationalsocietymap': [
-                {name: 'locale', type: 'text', placeholder: '{{ _("Locale code (en, fr, es, etc.)") }}', description: '{{ _("Two-letter locale code for localization") }}'},
-                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: '{{ _("Filter by country ID") }}'},
-                {name: 'is_active', type: 'select', options: ['', 'true', 'false'], description: '{{ _("Filter by active status") }}'},
-                {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1)") }}'},
-                {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: all)") }}'},
-                {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
+                {name: 'locale', type: 'text', placeholder: {{ _("Locale code (en, fr, es, etc.)")|tojson|safe }}, description: {{ _("Two-letter locale code for localization")|tojson|safe }}},
+                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: {{ _("Filter by country ID")|tojson|safe }}},
+                {name: 'is_active', type: 'select', options: ['', 'true', 'false'], description: {{ _("Filter by active status")|tojson|safe }}},
+                {name: 'page', type: 'number', placeholder: {{ _("Page")|tojson|safe }}, description: {{ _("Page number (default: 1)")|tojson|safe }}},
+                {name: 'per_page', type: 'number', placeholder: {{ _("Items per page")|tojson|safe }}, description: {{ _("Items per page (default: all)")|tojson|safe }}},
+                {name: 'api_key', type: 'text', placeholder: {{ _("API Key")|tojson|safe }}, description: {{ _("Required API key for authentication")|tojson|safe }}}
             ],
             '/api/v1/users': [
-                {name: 'role', type: 'select', options: ['', 'admin', 'focal_point'], description: '{{ _("Filter by user role") }}'},
-                {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1)") }}'},
-                {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: 20)") }}'},
-                {name: 'search', type: 'text', placeholder: '{{ _("Search term") }}', description: '{{ _("Search by name or email") }}'}
+                {name: 'role', type: 'select', options: ['', 'admin', 'focal_point'], description: {{ _("Filter by user role")|tojson|safe }}},
+                {name: 'page', type: 'number', placeholder: {{ _("Page")|tojson|safe }}, description: {{ _("Page number (default: 1)")|tojson|safe }}},
+                {name: 'per_page', type: 'number', placeholder: {{ _("Items per page")|tojson|safe }}, description: {{ _("Items per page (default: 20)")|tojson|safe }}},
+                {name: 'search', type: 'text', placeholder: {{ _("Search term")|tojson|safe }}, description: {{ _("Search by name or email")|tojson|safe }}}
             ],
             '/api/v1/users/<user_id>': [
-                {name: 'api_key', type: 'text', placeholder: '{{ _("API Key") }}', description: '{{ _("Required API key for authentication") }}'}
+                {name: 'api_key', type: 'text', placeholder: {{ _("API Key")|tojson|safe }}, description: {{ _("Required API key for authentication")|tojson|safe }}}
             ],
             '/api/v1/indicator-bank': [
-                {name: 'search', type: 'text', placeholder: '{{ _("Search term") }}', description: '{{ _("Search by name or definition") }}'},
-                {name: 'type', type: 'select', options: [''].concat(indicatorBankTypeOptions), description: '{{ _("Filter by indicator type") }}'},
-                {name: 'sector', type: 'select', options: [''].concat(indicatorBankSectorOptions), description: '{{ _("Filter by sector") }}'},
-                {name: 'sub_sector', type: 'select', options: [''].concat(indicatorBankSubSectorOptions), description: '{{ _("Filter by sub-sector") }}'},
-                {name: 'emergency', type: 'text', placeholder: '{{ _("Emergency type") }}', description: '{{ _("Filter by emergency type") }}'},
-                {name: 'archived', type: 'select', options: ['', 'true', 'false'], description: '{{ _("Filter by archived status") }}'}
+                {name: 'search', type: 'text', placeholder: {{ _("Search term")|tojson|safe }}, description: {{ _("Search by name or definition")|tojson|safe }}},
+                {name: 'type', type: 'select', options: [''].concat(indicatorBankTypeOptions), description: {{ _("Filter by indicator type")|tojson|safe }}},
+                {name: 'sector', type: 'select', options: [''].concat(indicatorBankSectorOptions), description: {{ _("Filter by sector")|tojson|safe }}},
+                {name: 'sub_sector', type: 'select', options: [''].concat(indicatorBankSubSectorOptions), description: {{ _("Filter by sub-sector")|tojson|safe }}},
+                {name: 'emergency', type: 'text', placeholder: {{ _("Emergency type")|tojson|safe }}, description: {{ _("Filter by emergency type")|tojson|safe }}},
+                {name: 'archived', type: 'select', options: ['', 'true', 'false'], description: {{ _("Filter by archived status")|tojson|safe }}}
             ],
             '/api/v1/indicator-bank/<indicator_id>': [],
             '/api/v1/assigned-forms': [
-                {name: 'assignment_id', type: 'select', options: assignmentSelectOptions, labels: assignmentSelectLabels, description: '{{ _("Filter by assignment ID") }}'},
-                {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1)") }}'},
-                {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: 20)") }}'}
+                {name: 'assignment_id', type: 'select', options: assignmentSelectOptions, labels: assignmentSelectLabels, description: {{ _("Filter by assignment ID")|tojson|safe }}},
+                {name: 'page', type: 'number', placeholder: {{ _("Page")|tojson|safe }}, description: {{ _("Page number (default: 1)")|tojson|safe }}},
+                {name: 'per_page', type: 'number', placeholder: {{ _("Items per page")|tojson|safe }}, description: {{ _("Items per page (default: 20)")|tojson|safe }}}
             ],
             '/api/v1/submitted-documents': [
-                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: '{{ _("Filter by country ID") }}'},
-                {name: 'document_type', type: 'text', placeholder: '{{ _("Document Type") }}', description: '{{ _("Filter by document type") }}'},
-                {name: 'language', type: 'text', placeholder: '{{ _("Language Code") }}', description: '{{ _("Filter by language code") }}'},
-                {name: 'is_public', type: 'select', options: ['', 'true', 'false'], description: '{{ _("Filter by public status") }}'},
-                {name: 'status', type: 'select', options: ['', 'approved', 'pending', 'rejected'], description: '{{ _("Filter by approval status") }}'},
-                {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number (default: 1)") }}'},
-                {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page (default: 20)") }}'}
+                {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: {{ _("Filter by country ID")|tojson|safe }}},
+                {name: 'document_type', type: 'text', placeholder: {{ _("Document Type")|tojson|safe }}, description: {{ _("Filter by document type")|tojson|safe }}},
+                {name: 'language', type: 'text', placeholder: {{ _("Language Code")|tojson|safe }}, description: {{ _("Filter by language code")|tojson|safe }}},
+                {name: 'is_public', type: 'select', options: ['', 'true', 'false'], description: {{ _("Filter by public status")|tojson|safe }}},
+                {name: 'status', type: 'select', options: ['', 'approved', 'pending', 'rejected'], description: {{ _("Filter by approval status")|tojson|safe }}},
+                {name: 'page', type: 'number', placeholder: {{ _("Page")|tojson|safe }}, description: {{ _("Page number (default: 1)")|tojson|safe }}},
+                {name: 'per_page', type: 'number', placeholder: {{ _("Items per page")|tojson|safe }}, description: {{ _("Items per page (default: 20)")|tojson|safe }}}
             ]
         };
 
         // Fallback parameters if endpoint not listed above
         const defaultParams = [
-            {name: 'page', type: 'number', placeholder: '{{ _("Page") }}', description: '{{ _("Page number") }}'},
-            {name: 'per_page', type: 'number', placeholder: '{{ _("Items per page") }}', description: '{{ _("Items per page") }}'}
+            {name: 'page', type: 'number', placeholder: {{ _("Page")|tojson|safe }}, description: {{ _("Page number")|tojson|safe }}},
+            {name: 'per_page', type: 'number', placeholder: {{ _("Items per page")|tojson|safe }}, description: {{ _("Items per page")|tojson|safe }}}
         ];
 
         let currentParamDefinitions = [];
@@ -1236,9 +1236,9 @@ try {
                         optEl.value = opt;
                         // Use labels if available, otherwise use the option value
                         if (param.labels && param.labels[index]) {
-                            optEl.textContent = opt === '' ? '{{ _("-- none --") }}' : param.labels[index];
+                            optEl.textContent = opt === '' ? {{ _("-- none --")|tojson|safe }} : param.labels[index];
                         } else {
-                            optEl.textContent = opt === '' ? '{{ _("-- none --") }}' : opt;
+                            optEl.textContent = opt === '' ? {{ _("-- none --")|tojson|safe }} : opt;
                         }
                         // For 'order' parameter, set 'desc' as default (first option)
                         if (param.name === 'order' && opt === 'desc') {
@@ -1487,10 +1487,10 @@ try {
             if (hintEl) {
                 const apiKey = getApiKeyValue();
                 if (!apiKey) {
-                    hintEl.textContent = '{{ _("Paste your API key above to embed it in the M query, or replace YOUR_API_KEY in the copied code.") }}';
+                    hintEl.textContent = {{ _("Paste your API key above to embed it in the M query, or replace YOUR_API_KEY in the copied code.")|tojson|safe }};
                     hintEl.className = 'mt-2 text-sm text-amber-700';
                 } else {
-                    hintEl.textContent = '{{ _("Rename this query (e.g. Databank_Source), then reference it from child queries that expand each array.") }}';
+                    hintEl.textContent = {{ _("Rename this query (e.g. Databank_Source), then reference it from child queries that expand each array.")|tojson|safe }};
                     hintEl.className = 'mt-2 text-sm text-gray-500';
                 }
             }
@@ -1504,7 +1504,7 @@ try {
                 if (copiedLabel) {
                     btn.textContent = copiedLabel;
                 } else {
-                    btn.textContent = '{{ _("Copied!") }}';
+                    btn.textContent = {{ _("Copied!")|tojson|safe }};
                 }
                 btn.classList.add('bg-green-500');
                 setTimeout(() => {
@@ -1574,13 +1574,13 @@ try {
         // Copy URL functionality
         document.getElementById('copyUrl').addEventListener('click', async function() {
             const urlInput = document.getElementById('generatedUrl');
-            await copyTextWithFeedback(urlInput.value, this, '{{ _("Copied!") }}');
+            await copyTextWithFeedback(urlInput.value, this, {{ _("Copied!")|tojson|safe }});
         });
 
         const copyMQueryBtn = document.getElementById('copyMQuery');
         if (copyMQueryBtn) {
             copyMQueryBtn.addEventListener('click', async function() {
-                await copyTextWithFeedback(buildPowerQueryM(), this, '{{ _("Copied!") }}');
+                await copyTextWithFeedback(buildPowerQueryM(), this, {{ _("Copied!")|tojson|safe }});
             });
         }
 
@@ -1621,7 +1621,7 @@ try {
 
                 // Show feedback
                 const originalText = this.textContent;
-                this.textContent = '{{ _("Opened!") }}';
+                this.textContent = {{ _("Opened!")|tojson|safe }};
                 this.classList.add('bg-blue-500');
 
                 setTimeout(() => {
@@ -1631,7 +1631,7 @@ try {
             } else {
                 // Show error feedback
                 const originalText = this.textContent;
-                this.textContent = '{{ _("No URL!") }}';
+                this.textContent = {{ _("No URL!")|tojson|safe }};
                 this.classList.add('bg-red-500');
 
                 setTimeout(() => {
@@ -1645,7 +1645,7 @@ try {
         console.error('Critical error in chart initialization:', error);
         const debugOutput = document.getElementById('debug-output');
         if (debugOutput) {
-            debugOutput.textContent = `{{ _('Critical error') }}: ${error.message}`;
+            debugOutput.textContent = {{ _('Critical error')|tojson|safe }} + `: ${error.message}`;
             debugOutput.classList.remove('hidden');
         }
     }

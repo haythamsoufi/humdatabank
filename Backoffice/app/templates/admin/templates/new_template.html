@@ -39,11 +39,11 @@
             <p class="nt-methods__subtitle">{{ _('Pick a creation method. Each option opens its own section below the cards.') }}</p>
         </header>
 
-        <div class="nt-methods-grid" role="group" aria-label="{{ _('Template creation methods') }}">
+        <div class="nt-methods-grid" role="group" aria-label="{{ _('Template creation methods')|forceescape }}">
             <button type="button"
                     id="blank-template-btn"
                     class="nt-method-card nt-method-card--blank nt-method-card--active"
-                    title="{{ _('Create a blank template manually') }}">
+                    title="{{ _('Create a blank template manually')|forceescape }}">
                 <span class="nt-method-card__icon" aria-hidden="true"><i class="fas fa-plus-circle"></i></span>
                 <span class="nt-method-card__title">{{ _('Blank template') }}</span>
                 <span class="nt-method-card__desc">{{ _('Enter a name and settings, then build the form structure in the form builder after creation.') }}</span>
@@ -54,7 +54,7 @@
             <button type="button"
                     id="ai-assistant-btn"
                     class="nt-method-card nt-method-card--ai"
-                    title="{{ _('Describe the form you need and the AI assistant will create a draft template') }}">
+                    title="{{ _('Describe the form you need and the AI assistant will create a draft template')|forceescape }}">
                 <span class="nt-method-card__icon" aria-hidden="true"><i class="fas fa-wand-magic-sparkles"></i></span>
                 <span class="nt-method-card__title">{{ _('Create with AI') }}</span>
                 <span class="nt-method-card__desc">{{ _('Describe your form or attach a questionnaire. The assistant drafts sections and questions for you to review.') }}</span>
@@ -66,7 +66,7 @@
             <button type="button"
                     id="clone-template-btn"
                     class="nt-method-card nt-method-card--clone"
-                    title="{{ _('Clone an existing template') }}">
+                    title="{{ _('Clone an existing template')|forceescape }}">
                 <span class="nt-method-card__icon" aria-hidden="true"><i class="fas fa-copy"></i></span>
                 <span class="nt-method-card__title">{{ _('Clone template') }}</span>
                 <span class="nt-method-card__desc">{{ _('Copy an existing template including its sections, pages, and items. A unique name is assigned automatically.') }}</span>
@@ -77,7 +77,7 @@
             <button type="button"
                     id="indicator-bank-btn"
                     class="nt-method-card nt-method-card--indicator-bank"
-                    title="{{ _('Build a template by selecting indicators from the indicator bank') }}">
+                    title="{{ _('Build a template by selecting indicators from the indicator bank')|forceescape }}">
                 <span class="nt-method-card__icon" aria-hidden="true"><i class="fas fa-database"></i></span>
                 <span class="nt-method-card__title">{{ _('From Indicator Bank') }}</span>
                 <span class="nt-method-card__desc">{{ _('Filter indicators by sector, program, or SPEF area, select them, and auto-group into sections.') }}</span>
@@ -86,7 +86,7 @@
 
             <button type="button"
                     class="nt-method-card nt-method-card--excel"
-                    title="{{ _('Import template structure from Excel file') }}">
+                    title="{{ _('Import template structure from Excel file')|forceescape }}">
                 <span class="nt-method-card__icon" aria-hidden="true"><i class="fas fa-file-excel"></i></span>
                 <span class="nt-method-card__title">{{ _('Import from Excel') }}</span>
                 <span class="nt-method-card__desc">{{ _('Load sections, pages, and items from a Humanitarian Databank Excel template export.') }}</span>
@@ -96,7 +96,7 @@
             <button type="button"
                     id="kobo-import-btn"
                     class="nt-method-card nt-method-card--kobo"
-                    title="{{ _('Import from Kobo XLSForm') }}">
+                    title="{{ _('Import from Kobo XLSForm')|forceescape }}">
                 <span class="nt-method-card__icon" aria-hidden="true"><i class="fas fa-file-import"></i></span>
                 <span class="nt-method-card__title">{{ _('Import from Kobo') }}</span>
                 <span class="nt-method-card__desc">{{ _('Upload an XLSForm exported from KoboToolbox. Groups, repeats, and supported question types are mapped automatically.') }}</span>
@@ -122,7 +122,7 @@
                     <div>
                         <div class="nt-name-row">
                             <label for="{{ form.name.id }}" class="nt-field-label mb-0">{{ form.name.label.text }}</label>
-                            <button type="button" id="template-name-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 transition shrink-0" title="{{ _('Edit template name translations') }}" aria-label="{{ _('Translations') }}">
+                            <button type="button" id="template-name-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 transition shrink-0" title="{{ _('Edit template name translations')|forceescape }}" aria-label="{{ _('Translations')|forceescape }}">
                                 <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                             </button>
                         </div>
@@ -214,7 +214,7 @@
                                 <input type="search"
                                        id="clone-template-search"
                                        class="nt-clone-search__input"
-                                       placeholder="{{ _('Search by name, description, or owner…') }}"
+                                       placeholder="{{ _('Search by name, description, or owner…')|forceescape }}"
                                        autocomplete="off"
                                        {% if not available_templates %}disabled{% endif %}>
                             </label>
@@ -245,8 +245,8 @@
                                 <button type="button"
                                         id="clone-clear-btn"
                                         class="nt-clone-clear-btn"
-                                        title="{{ _('Clear selection') }}"
-                                        aria-label="{{ _('Clear selection') }}">
+                                        title="{{ _('Clear selection')|forceescape }}"
+                                        aria-label="{{ _('Clear selection')|forceescape }}">
                                     <i class="fas fa-times" aria-hidden="true"></i>
                                 </button>
                             </div>
@@ -258,7 +258,7 @@
                     <div id="clone-template-list"
                          class="nt-clone-list"
                          role="listbox"
-                         aria-label="{{ _('Templates to clone') }}"
+                         aria-label="{{ _('Templates to clone')|forceescape }}"
                          aria-activedescendant="">
                         {% for template in available_templates %}
                             {% set version = template.published_version if template.published_version else template.versions.order_by('created_at').first() %}
@@ -289,17 +289,17 @@
                                     <span class="nt-clone-card__desc nt-clone-card__desc--empty">{{ _('No description') }}</span>
                                     {% endif %}
                                     <span class="nt-clone-card__meta">
-                                        <span class="nt-clone-card__meta-item" title="{{ _('Owner') }}">
+                                        <span class="nt-clone-card__meta-item" title="{{ _('Owner')|forceescape }}">
                                             <i class="fas fa-user" aria-hidden="true"></i>
                                             {{ owner_name }}
                                         </span>
                                         {% if template.created_at %}
-                                        <span class="nt-clone-card__meta-item" title="{{ _('Created') }}">
+                                        <span class="nt-clone-card__meta-item" title="{{ _('Created')|forceescape }}">
                                             <i class="fas fa-calendar" aria-hidden="true"></i>
                                             {{ template.created_at|format_date_localized('medium') }}
                                         </span>
                                         {% endif %}
-                                        <span class="nt-clone-card__meta-item" title="{{ _('Template ID') }}">
+                                        <span class="nt-clone-card__meta-item" title="{{ _('Template ID')|forceescape }}">
                                             <i class="fas fa-hashtag" aria-hidden="true"></i>
                                             {{ template.id }}
                                         </span>
@@ -343,7 +343,7 @@
 
         <div class="nt-details-body">
             <div id="indicator-bank-wizard" class="nt-wizard">
-                <ol class="nt-wizard__steps" aria-label="{{ _('Wizard steps') }}">
+                <ol class="nt-wizard__steps" aria-label="{{ _('Wizard steps')|forceescape }}">
                     <li class="nt-wizard__step-indicator nt-wizard__step-indicator--active" data-wizard-step-indicator="1">
                         <span class="nt-wizard__step-number">1</span>
                         <span>{{ _('Configure filters') }}</span>
@@ -373,7 +373,7 @@
                                 <input type="search"
                                        id="ibw-filter-search"
                                        class="nt-filter-search__input"
-                                       placeholder="{{ _('Search by indicator name…') }}"
+                                       placeholder="{{ _('Search by indicator name…')|forceescape }}"
                                        autocomplete="off">
                             </label>
                             <div class="nt-filter-toolbar__actions">
@@ -452,14 +452,14 @@
                         <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
                         <span>{{ _('Loading indicators…') }}</span>
                     </div>
-                    <div class="nt-indicator-list" data-indicator-list role="listbox" aria-label="{{ _('Indicators') }}"></div>
+                    <div class="nt-indicator-list" data-indicator-list role="listbox" aria-label="{{ _('Indicators')|forceescape }}"></div>
                     <p class="nt-indicator-empty hidden" data-indicator-empty role="status">{{ _('No indicators match your filters.') }}</p>
                 </div>
 
                 <div class="nt-wizard-step" data-wizard-step="3">
                     <h3 class="nt-wizard-step__title">{{ _('Group into sections') }}</h3>
                     <p class="nt-wizard-step__subtitle">{{ _('Auto-group selected indicators and rename sections before creating the template.') }}</p>
-                    <div class="nt-group-options" role="radiogroup" aria-label="{{ _('Group by') }}">
+                    <div class="nt-group-options" role="radiogroup" aria-label="{{ _('Group by')|forceescape }}">
                         <label class="nt-group-option-card">
                             <input type="radio" name="ibw-group-by" value="sector" checked>
                             <span class="nt-group-option-card__title">{{ _('Primary sector') }}</span>
@@ -519,7 +519,7 @@
                         <div class="md:col-span-2 nt-disagg-panel" data-disagg-settings hidden>
                             <h4 class="nt-disagg-panel__title">{{ _('Disaggregation for eligible indicators') }}</h4>
                             <p class="nt-disagg-panel__subtitle" data-disagg-eligible-summary></p>
-                            <div class="nt-disagg-presets" role="radiogroup" aria-label="{{ _('Disaggregation preset') }}">
+                            <div class="nt-disagg-presets" role="radiogroup" aria-label="{{ _('Disaggregation preset')|forceescape }}">
                                 <label class="nt-disagg-preset">
                                     <input type="radio" name="ibw-disagg-preset" value="total" checked>
                                     <span class="nt-disagg-preset__title">{{ _('Total only') }}</span>
@@ -536,13 +536,13 @@
                                     <span class="nt-disagg-preset__desc">{{ _('Choose which breakdowns to allow') }}</span>
                                 </label>
                             </div>
-                            <div class="nt-disagg-options hidden" data-disagg-options aria-label="{{ _('Allowed disaggregation options') }}"></div>
+                            <div class="nt-disagg-options hidden" data-disagg-options aria-label="{{ _('Allowed disaggregation options')|forceescape }}"></div>
                             <div class="nt-disagg-age-groups hidden" data-disagg-age-groups>
                                 <label for="ibw-age-groups-config" class="nt-field-label">{{ _('Custom age groups (optional)') }}</label>
                                 <input type="text"
                                        id="ibw-age-groups-config"
                                        class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300"
-                                       placeholder="{{ _('e.g. <5, 5-17, 18-49, 50+') }}">
+                                       placeholder="{{ _('e.g. <5, 5-17, 18-49, 50+')|forceescape }}">
                                 <p class="nt-disagg-age-groups__hint">{{ _('Leave empty to use platform defaults when age breakdown is allowed.') }}</p>
                             </div>
                         </div>

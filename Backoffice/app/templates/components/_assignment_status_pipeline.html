@@ -14,7 +14,7 @@
     <span class="assignment-status-pipeline-container relative inline-block align-middle shrink-0">
         <span tabindex="0"
               class="assignment-status-pipeline-trigger cursor-help"
-              aria-label="{{ _('Status') }}: {{ status_text }}">
+              aria-label="{{ _('Status')|forceescape }}: {{ status_text }}">
             {{ status_label(status_text, status_variant) }}
         </span>
         <span class="assignment-status-pipeline-tooltip absolute top-full {% if lang == 'ar' %}assignment-status-pipeline-tooltip--rtl{% endif %}"
@@ -25,7 +25,7 @@
                 <span class="assignment-status-pipeline-tooltip-hint">{{ _('Hover a step for details') }}</span>
             </span>
 
-            <span class="assignment-status-pipeline" role="list" aria-label="{{ _('Assignment status workflow') }}">
+            <span class="assignment-status-pipeline" role="list" aria-label="{{ _('Assignment status workflow')|forceescape }}">
                     {% for step in steps %}
                         {% set step_idx = loop.index0 %}
                         <span class="assignment-status-pipeline-step

@@ -44,7 +44,7 @@
 
     <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
         <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200"
-             title="{{ _('Number of successful login events recorded for this user in the selected period.') }}">
+             title="{{ _('Number of successful login events recorded for this user in the selected period.')|forceescape }}">
             <div class="flex items-center justify-between mb-2">
                 <h3 class="text-sm font-semibold text-gray-700">{{ _('Total logins') }}</h3>
                 <i class="fas fa-sign-in-alt text-blue-500"></i>
@@ -54,7 +54,7 @@
         </div>
 
         <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200"
-             title="{{ _('Number of failed login attempts (wrong password, unknown account, etc.) for this user in the selected period.') }}">
+             title="{{ _('Number of failed login attempts (wrong password, unknown account, etc.) for this user in the selected period.')|forceescape }}">
             <div class="flex items-center justify-between mb-2">
                 <h3 class="text-sm font-semibold text-gray-700">{{ _('Failed logins') }}</h3>
                 <i class="fas fa-times-circle text-red-500"></i>
@@ -64,7 +64,7 @@
         </div>
 
         <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200"
-             title="{{ _('All tracked actions in the selected period: page views, form saves/submits, data edits, file uploads, data exports, profile updates, AI interactions, API key events, and more.') }}">
+             title="{{ _('All tracked actions in the selected period: page views, form saves/submits, data edits, file uploads, data exports, profile updates, AI interactions, API key events, and more.')|forceescape }}">
             <div class="flex items-center justify-between mb-2">
                 <h3 class="text-sm font-semibold text-gray-700">{{ _('Total activities') }}</h3>
                 <i class="fas fa-chart-line text-green-500"></i>
@@ -74,7 +74,7 @@
         </div>
 
         <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200"
-             title="{{ _('Total active time across all sessions in the selected period, measured from session start to last recorded activity — excludes idle timeout padding.') }}">
+             title="{{ _('Total active time across all sessions in the selected period, measured from session start to last recorded activity — excludes idle timeout padding.')|forceescape }}">
             <div class="flex items-center justify-between mb-2">
                 <h3 class="text-sm font-semibold text-gray-700">{{ _('Active time (total)') }}</h3>
                 <i class="fas fa-hourglass-half text-teal-500"></i>
@@ -92,7 +92,7 @@
         </div>
 
         <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200"
-             title="{{ _('Total login sessions started by this user in the selected period. The table below shows the 10 most recent.') }}">
+             title="{{ _('Total login sessions started by this user in the selected period. The table below shows the 10 most recent.')|forceescape }}">
             <div class="flex items-center justify-between mb-2">
                 <h3 class="text-sm font-semibold text-gray-700">{{ _('Sessions') }}</h3>
                 <i class="fas fa-layer-group text-purple-500"></i>
@@ -102,14 +102,14 @@
         </div>
 
         <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200"
-             title="{{ _('Sum of session page-view counters for this user in the selected period (same basis as page path analytics).') }}">
+             title="{{ _('Sum of session page-view counters for this user in the selected period (same basis as page path analytics).')|forceescape }}">
             <div class="flex items-center justify-between gap-2 mb-2">
                 <h3 class="text-sm font-semibold text-gray-700 min-w-0">{{ _('Total page views') }}</h3>
                 <a href="{{ url_for('analytics.page_path_analytics', user_id=user.id, days=selected_days) }}"
                    class="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-900"
-                   title="{{ _('View page path breakdown') }}"
+                   title="{{ _('View page path breakdown')|forceescape }}"
                    {% if user_analytics_embedded %}target="_blank" rel="noopener noreferrer"{% endif %}
-                   aria-label="{{ _('View page path breakdown') }}">
+                   aria-label="{{ _('View page path breakdown')|forceescape }}">
                     <i class="fas fa-route" aria-hidden="true"></i>
                 </a>
             </div>
@@ -135,16 +135,16 @@
                         <tr>
                             <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Session start') }}</th>
                             <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                title="{{ _('Wall clock from login to session close, including idle after last activity until timeout or logout.') }}">
+                                title="{{ _('Wall clock from login to session close, including idle after last activity until timeout or logout.')|forceescape }}">
                                 {{ _('Session length') }}
                             </th>
                             <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                title="{{ _('From login to last recorded activity; excludes idle after last activity.') }}">
+                                title="{{ _('From login to last recorded activity; excludes idle after last activity.')|forceescape }}">
                                 {{ _('Active time') }}
                             </th>
                             <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Page views') }}</th>
                             <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                title="{{ _('Actions performed during this session (form saves/submits, data edits, file uploads, etc.) — excludes page views.') }}">
+                                title="{{ _('Actions performed during this session (form saves/submits, data edits, file uploads, etc.) — excludes page views.')|forceescape }}">
                                 {{ _('Actions') }} <i class="fas fa-info-circle text-gray-400 ml-1 text-xs cursor-help"></i>
                             </th>
                             <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Status') }}</th>

@@ -356,7 +356,7 @@ class TimelineChart {
             const fillYears = (selectId) => {
                 const sel = document.getElementById(selectId);
                 if (!sel) return;
-                sel.innerHTML = '<option value="">'+ '{{ _("All Years") }}' +'</option>';
+                sel.innerHTML = '<option value="">'+ {{ _("All Years")|tojson|safe }} +'</option>';
                 for (let y = minYear; y <= maxYear; y++) {
                     const opt = document.createElement('option');
                     opt.value = y;
@@ -519,12 +519,12 @@ class TimelineChart {
 
         if (this.currentView === 'current-year') {
             this.currentView = 'all-years';
-            span.textContent = '{{ _("Show Current Year") }}';
-            info.textContent = '{{ _("All Years View") }}';
+            span.textContent = {{ _("Show Current Year")|tojson|safe }};
+            info.textContent = {{ _("All Years View")|tojson|safe }};
         } else {
             this.currentView = 'current-year';
-            span.textContent = '{{ _("Show All Years") }}';
-            info.textContent = '{{ _("Current Year View") }}';
+            span.textContent = {{ _("Show All Years")|tojson|safe }};
+            info.textContent = {{ _("Current Year View")|tojson|safe }};
         }
 
         this.renderChart();

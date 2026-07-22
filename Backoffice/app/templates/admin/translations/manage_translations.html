@@ -111,7 +111,7 @@
     <button type="button"
             class="professional-action-btn professional-action-btn-blue"
             id="build-apply-btn"
-            title="{{ _('Extract, compile, and reload translation files') }}"
+            title="{{ _('Extract, compile, and reload translation files')|forceescape }}"
             aria-haspopup="true"
             aria-expanded="false">
         <i class="fas fa-tools"></i>
@@ -122,14 +122,14 @@
         <form action="{{ url_for('utilities.extract_update_translations') }}" method="POST" style="display:contents;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="action-dropdown-item" role="menuitem"
-                    title="{{ _('Extract translatable strings from templates and Python files, then update all PO files') }}">
+                    title="{{ _('Extract translatable strings from templates and Python files, then update all PO files')|forceescape }}">
                 <i class="fas fa-sync-alt"></i>
                 <span>{{ _('Regenerate Strings') }}</span>
             </button>
         </form>
         <div class="action-dropdown-divider"></div>
         <button type="button" id="compile-translations-btn" class="action-dropdown-item" role="menuitem"
-                title="{{ _('Compile translations and restart the application') }}">
+                title="{{ _('Compile translations and restart the application')|forceescape }}">
             <i class="fas fa-cog"></i>
             <span>{{ _('Compile Translations') }}</span>
         </button>
@@ -137,7 +137,7 @@
         <form action="{{ url_for('utilities.reload_translations') }}" method="POST" style="display:contents;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="action-dropdown-item" role="menuitem"
-                    title="{{ _('Reload translations without restarting') }}">
+                    title="{{ _('Reload translations without restarting')|forceescape }}">
                 <i class="fas fa-rotate-right"></i>
                 <span>{{ _('Reload Translations') }}</span>
             </button>
@@ -231,7 +231,7 @@
                 <i class="fas fa-exchange-alt w-6 h-6 mr-2 text-blue-600"></i>
                 {{ _('Import / Export Translations') }}
             </h3>
-            <button type="button" class="text-gray-400 hover:text-gray-600 close-translations-io-modal" aria-label="{{ _('Close') }}">
+            <button type="button" class="text-gray-400 hover:text-gray-600 close-translations-io-modal" aria-label="{{ _('Close')|forceescape }}">
                 <i class="fas fa-times w-5 h-5"></i>
             </button>
         </div>
@@ -361,7 +361,7 @@
                         </h4>
                         {# PO Import Tabs (Single / ZIP) #}
                         <div class="border-b border-gray-200 mb-4">
-                            <nav class="-mb-px flex space-x-6" aria-label="{{ _('PO Import Tabs') }}">
+                            <nav class="-mb-px flex space-x-6" aria-label="{{ _('PO Import Tabs')|forceescape }}">
                                 <button type="button"
                                         id="po-import-tab-single"
                                         class="po-import-tab-btn active whitespace-nowrap py-2 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600">
@@ -396,7 +396,7 @@
                                 </div>
 
                                 <div class="file-upload-wrapper relative h-32 border-2 border-dashed border-gray-300 rounded-lg">
-                                    <input type="file" name="file" id="translations-import-po-file" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label="{{ _('Select PO file to import') }}" accept=".po"/>
+                                    <input type="file" name="file" id="translations-import-po-file" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label="{{ _('Select PO file to import')|forceescape }}" accept=".po"/>
                                     <div class="file-upload-box absolute inset-0 flex flex-col items-center justify-center">
                                         <div class="text-center">
                                             <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
@@ -435,7 +435,7 @@
                                 <input type="hidden" name="format" value="po-zip"/>
 
                                 <div class="file-upload-wrapper relative h-32 border-2 border-dashed border-gray-300 rounded-lg">
-                                    <input type="file" name="file" id="translations-import-pozip-file" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label="{{ _('Select PO ZIP file to import') }}" accept=".zip"/>
+                                    <input type="file" name="file" id="translations-import-pozip-file" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" aria-label="{{ _('Select PO ZIP file to import')|forceescape }}" accept=".zip"/>
                                     <div class="file-upload-box absolute inset-0 flex flex-col items-center justify-center">
                                         <div class="text-center">
                                             <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
@@ -482,7 +482,7 @@
                 <i class="fas fa-language w-6 h-6 mr-2 text-blue-600"></i>
                 <span id="edit-translation-modal-title-text">{{ _('Edit Translation') }}</span>
             </h3>
-            <button type="button" class="btn-close-icon text-gray-500 hover:text-gray-700 close-edit-translation-modal" aria-label="{{ _('Close') }}">
+            <button type="button" class="btn-close-icon text-gray-500 hover:text-gray-700 close-edit-translation-modal" aria-label="{{ _('Close')|forceescape }}">
                 <i class="fas fa-times w-5 h-5"></i>
             </button>
         </div>
@@ -526,12 +526,12 @@
 
                     <div class="flex justify-between items-center gap-2 pt-6 border-t border-gray-200">
                         <div class="flex gap-2">
-                            <button type="button" id="modal-auto-translate-btn" class="btn btn-warning" title="{{ _('Automatically translate blank fields using AI') }}">
+                            <button type="button" id="modal-auto-translate-btn" class="btn btn-warning" title="{{ _('Automatically translate blank fields using AI')|forceescape }}">
                                 <i class="fas fa-magic" id="modal-auto-translate-icon"></i>
                                 <i class="fas fa-spinner fa-spin hidden" id="modal-auto-translate-spinner"></i>
                                 <span id="modal-auto-translate-text">{{ _('Auto Translate') }}</span>
                             </button>
-                            <button type="button" id="modal-clear-translations-btn" class="btn btn-ghost-danger" title="{{ _('Clear all translation fields except English') }}">
+                            <button type="button" id="modal-clear-translations-btn" class="btn btn-ghost-danger" title="{{ _('Clear all translation fields except English')|forceescape }}">
                                 <i class="fas fa-eraser"></i>
                                 {{ _('Clear Translations') }}
                             </button>

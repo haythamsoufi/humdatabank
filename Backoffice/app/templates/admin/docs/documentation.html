@@ -1120,15 +1120,15 @@
                         <button type="button"
                                 id="expand-all-btn"
                                 class="nav-control-btn"
-                                aria-label="{{ _('Expand all') }}"
-                                title="{{ _('Expand all') }}">
+                                aria-label="{{ _('Expand all')|forceescape }}"
+                                title="{{ _('Expand all')|forceescape }}">
                             <i class="fas fa-chevron-down"></i>
                         </button>
                         <button type="button"
                                 id="collapse-all-btn"
                                 class="nav-control-btn"
-                                aria-label="{{ _('Collapse all') }}"
-                                title="{{ _('Collapse all') }}">
+                                aria-label="{{ _('Collapse all')|forceescape }}"
+                                title="{{ _('Collapse all')|forceescape }}">
                             <i class="fas fa-chevron-up"></i>
                         </button>
                     </div>
@@ -1137,13 +1137,13 @@
                     <input type="text"
                            id="docs-search-input"
                            class="docs-search-input"
-                           placeholder="{{ _('Search documentation...') }}"
+                           placeholder="{{ _('Search documentation...')|forceescape }}"
                            autocomplete="off">
                     <i class="fas fa-search docs-search-icon" id="docs-search-icon"></i>
                     <button type="button"
                             class="docs-search-clear"
                             id="docs-search-clear"
-                            aria-label="{{ _('Clear search') }}">
+                            aria-label="{{ _('Clear search')|forceescape }}">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
@@ -1195,7 +1195,7 @@
     <section class="docs-content">
         <div class="docs-content-inner">
             <div class="docs-loading-overlay" aria-hidden="true">
-                <div class="docs-loading-indicator" role="status" aria-live="polite" aria-label="{{ _('Loading documentation') }}">
+                <div class="docs-loading-indicator" role="status" aria-live="polite" aria-label="{{ _('Loading documentation')|forceescape }}">
                     <div class="docs-spinner"></div>
                     <div>{{ _('Loading…') }}</div>
                 </div>
@@ -1209,7 +1209,7 @@
                         <button type="button"
                                 id="docs-export-pdf-btn"
                                 class="docs-export-pdf-button"
-                                title="{{ _('Download this page as PDF') }}">
+                                title="{{ _('Download this page as PDF')|forceescape }}">
                             <i class="fas fa-file-pdf docs-export-pdf-icon" aria-hidden="true"></i>
                             <span data-export-label>{{ _('Export PDF') }}</span>
                             <span data-export-busy hidden>{{ _('Exporting…') }}</span>
@@ -1221,7 +1221,7 @@
                                 id="start-tour-btn"
                                 class="docs-tour-button"
                                 data-workflow="{{ workflow_id }}"
-                                title="{{ _('Start interactive tour for this guide') }}">
+                                title="{{ _('Start interactive tour for this guide')|forceescape }}">
                             <i class="fas fa-compass mr-2"></i>
                             <span>{{ _('Take the Tour') }}</span>
                         </button>
@@ -1242,8 +1242,8 @@
 <button type="button"
         class="docs-back-to-top"
         id="docs-back-to-top"
-        aria-label="{{ _('Back to top') }}"
-        title="{{ _('Back to top') }}">
+        aria-label="{{ _('Back to top')|forceescape }}"
+        title="{{ _('Back to top')|forceescape }}">
     <i class="fas fa-chevron-up"></i>
 </button>
 

@@ -116,7 +116,7 @@
                       data-current-lang="en"
                       rows="20"
                       spellcheck="false"
-                      placeholder="{{ _('Enter Jinja2 template HTML here...') }}">{{ current_campaign_email_templates.get(template.key, {}).get('en', '') }}</textarea>
+                      placeholder="{{ _('Enter Jinja2 template HTML here...')|forceescape }}">{{ current_campaign_email_templates.get(template.key, {}).get('en', '') }}</textarea>
           </div>
           <input type="hidden"
                  id="{{ template.key }}-translations"
@@ -130,7 +130,7 @@
                       data-email-visual-for="{{ template.key }}"
                       rows="1"
                       spellcheck="true"
-                      aria-label="{{ _('Visual email editor') }}"></textarea>
+                      aria-label="{{ _('Visual email editor')|forceescape }}"></textarea>
           </div>
         </div>
       </div>

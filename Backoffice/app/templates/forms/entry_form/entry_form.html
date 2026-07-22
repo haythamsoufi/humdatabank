@@ -51,7 +51,7 @@
                         <span id="offline-status-text">{{ _('Manual save required') }}</span>
                     </div>
                 </div>
-                <button type="button" id="offline-dismiss" class="btn btn-icon btn-sm btn-warning ml-4" aria-label="{{ _('Dismiss offline notice') }}">
+                <button type="button" id="offline-dismiss" class="btn btn-icon btn-sm btn-warning ml-4" aria-label="{{ _('Dismiss offline notice')|forceescape }}">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -211,14 +211,14 @@
                         <p class="text-sm mt-1">
                         {% if is_public_submission %}
                             {{ _('This public submission is read-only. You can review the responses but cannot change them.') }}
-                        {% elif assignment_status is defined and assignment_status.is_round_closed_for_entity %}
-                            {{ _('This assignment\'s data collection round is closed. You can view the form, but only an administrator can make changes or reopen it for this entity.') }}
                         {% elif _assignment_status_value == 'sent_for_review' %}
                             {{ _('This assignment has been sent to %(org)s for review. You cannot make changes until it is returned for revision.', org=ORG_NAME) }}
                         {% elif _assignment_status_value == 'approved' %}
                             {{ _('This form has been validated and is read-only. To request changes, please write to %(email)s and include your reason for the request.', email=_org_data_email) }}
                         {% elif _assignment_status_value == 'submitted' %}
                             {{ _('This form has been submitted and is read-only. To request reopening, please write to %(email)s and include your reason for the request.', email=_org_data_email) }}
+                        {% elif assignment_status is defined and assignment_status.is_round_closed_for_entity %}
+                            {{ _('This assignment\'s data collection round is closed. You can view the form, but only an administrator can make changes or reopen it for this entity.') }}
                         {% elif _assignment_scope and not _can_enter_assignment %}
                             {{ _('You have view-only access to this assignment. You can review the data but cannot enter or change values.') }}
                         {% else %}
@@ -283,7 +283,7 @@
                     <button type="button"
                             id="data-guidance-dismiss"
                             class="btn btn-icon btn-sm btn-success flex-shrink-0"
-                            aria-label="{{ _('Dismiss') }}">
+                            aria-label="{{ _('Dismiss')|forceescape }}">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
@@ -294,6 +294,8 @@
             });
             </script>
         {% endif %}
+
+        {# View-only entry form hardening TODOs: Backoffice/docs/runbooks/development/tailwind-and-template-safety.md §7 #}
 
         {% if can_edit %}
         <form method="POST" id="focalDataEntryForm" enctype="multipart/form-data" action="{{ form_action }}">
@@ -306,6 +308,20 @@
             <input type="hidden" name="assignment_entity_status_id" value="{{ assignment_entity_status_id }}">
             {% endif %}
 
+        {% endif %}
+
+        {# View-only assignment pages omit the POST form but matrix/conditions JS still need template/AES context. #}
+        {% if not can_edit and form_type == 'assignment' and assignment_entity_status_id is defined %}
+        <div id="entry-form-js-context"
+             hidden
+             aria-hidden="true"
+             {% if template_id is defined %}data-template-id="{{ template_id }}"{% endif %}
+             data-assignment-entity-status-id="{{ assignment_entity_status_id }}">
+            {% if template_id is defined %}
+            <input type="hidden" name="template_id" value="{{ template_id }}">
+            {% endif %}
+            <input type="hidden" name="assignment_entity_status_id" value="{{ assignment_entity_status_id }}">
+        </div>
         {% endif %}
 
         {# Loading overlay (shown until JS signals formInitialized) #}
@@ -339,14 +355,14 @@
                     <h2 id="sidebar-title" class="text-xl font-semibold text-gray-700">{{ _('Navigation') }}</h2>
 
                     {# Close button for mobile/collapsed navigation #}
-                    <button type="button" id="mobile-nav-close-button" class="btn btn-close-icon xl:hidden z-50" aria-label="{{ _('Close navigation') }}">
+                    <button type="button" id="mobile-nav-close-button" class="btn btn-close-icon xl:hidden z-50" aria-label="{{ _('Close navigation')|forceescape }}">
                         <i class="fas fa-times text-base"></i>
                     </button>
 
                     {# Collapse button for large screens (≥1100px) #}
                     <button type="button" id="sidebar-collapse-toggle"
                             class="btn btn-icon btn-sm btn-secondary hidden xl:block z-50"
-                            title="{{ _('Collapse navigation panel') }}">
+                            title="{{ _('Collapse navigation panel')|forceescape }}">
                         <i class="fas fa-chevron-left text-lg"></i>
                     </button>
                 </div>
@@ -533,9 +549,9 @@
                             {% if can_send_for_review %}
                             <button type="submit" name="action" value="send_for_review"
                                     class="btn btn-success flex-1"
-                                    data-confirm-title="{{ _('Send for Review?') }}"
-                                    data-confirm-label="{{ _('Send for Review') }}"
-                                    data-confirm-message="{{ _('Send this assignment to delegation for review? You will not be able to edit it until they return it for changes.') }}">
+                                    data-confirm-title="{{ _('Send for Review?')|forceescape }}"
+                                    data-confirm-label="{{ _('Send for Review')|forceescape }}"
+                                    data-confirm-message="{{ _('Send this assignment to delegation for review? You will not be able to edit it until they return it for changes.')|forceescape }}">
                                 <i class="fas fa-user-check w-4 h-4 mr-2"></i>
                                 {{ _('Send for Review') }}
                             </button>
@@ -543,9 +559,9 @@
                             {% if can_finalize_submit %}
                             <button type="submit" name="action" value="submit"
                                     class="btn btn-success flex-1"
-                                    data-confirm-title="{{ _('Submit Form?') }}"
-                                    data-confirm-label="{{ _('Submit') }}"
-                                    data-confirm-message="{{ _('Are you sure you want to submit this form? You will not be able to edit it after submission.') }}">
+                                    data-confirm-title="{{ _('Submit Form?')|forceescape }}"
+                                    data-confirm-label="{{ _('Submit')|forceescape }}"
+                                    data-confirm-message="{{ _('Are you sure you want to submit this form? You will not be able to edit it after submission.')|forceescape }}">
                                 <i class="fas fa-paper-plane w-4 h-4 mr-2"></i>
                                 {{ _('Submit') }}
                             </button>
@@ -554,7 +570,7 @@
                             <form action="{{ url_for('main.return_assignment_for_revision', aes_id=assignment_status.id) }}" method="POST" class="flex-1 return-for-revision-form min-w-[10rem]">
                                 {{ csrf_form.csrf_token }}
                                 <button type="submit" class="btn btn-warning w-full"
-                                        data-confirm-message="{{ _('Return this assignment to the National Society for changes?') }}">
+                                        data-confirm-message="{{ _('Return this assignment to the National Society for changes?')|forceescape }}">
                                     <i class="fas fa-reply w-4 h-4 mr-2"></i>
                                     {{ _('Request changes') }}
                                 </button>
@@ -714,7 +730,7 @@
                                         {% if template_structure.display_order_visible %}<span class="text-xl font-semibold text-gray-700 mr-1">{{ section.display_order }}.</span>{% endif %}
                                         {% set section_display_name = section._display_name_resolved if hasattr(section, '_display_name_resolved') and section._display_name_resolved else section.display_name %}
                                         {{ section_display_name }}
-                                        <button type="button" class="collapse-toggle btn btn-icon btn-sm btn-secondary ml-auto" aria-expanded="true" aria-controls="collapsible-content-{{ section.id }}" title="{{ _('Collapse/Expand') }}">
+                                        <button type="button" class="collapse-toggle btn btn-icon btn-sm btn-secondary ml-auto" aria-expanded="true" aria-controls="collapsible-content-{{ section.id }}" title="{{ _('Collapse/Expand')|forceescape }}">
                                             <i class="fas fa-chevron-up"></i>
                                         </button>
                                     </h3>
@@ -1069,16 +1085,16 @@
                                                                         <button type="button"
                                                                                 class="w-5 h-5 flex items-center justify-center text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors propose-changes-btn"
                                                                                 data-indicator-id="{{ field.source_indicator_from_bank.id if field.source_indicator_from_bank else '' }}"
-                                                                                data-indicator-name="{{ field_display_label or field_label or _('Unknown Indicator') }}"
-                                                                                title="{{ _('Propose changes to this indicator') }}">
+                                                                                data-indicator-name="{{ field_display_label or field_label or _('Unknown Indicator')|forceescape }}"
+                                                                                title="{{ _('Propose changes to this indicator')|forceescape }}">
                                                                             <i class="fas fa-lightbulb text-xs"></i>
                                                                         </button>
                                                                         {% endif %}
                                                                         <button type="button"
                                                                                 class="w-5 h-5 flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors delete-dynamic-indicator-btn"
                                                                                 data-assignment-id="{{ field.dynamic_assignment_id }}"
-                                                                                data-indicator-name="{{ field_display_label or field_label or _('Unknown Indicator') }}"
-                                                                                title="{{ _('Remove this indicator') }}">
+                                                                                data-indicator-name="{{ field_display_label or field_label or _('Unknown Indicator')|forceescape }}"
+                                                                                title="{{ _('Remove this indicator')|forceescape }}">
                                                                             <i class="fas fa-trash"></i>
                                                                         </button>
                                                                     </div>
@@ -1252,7 +1268,7 @@
                                                                         <div class="flex items-center gap-6">
                                                                             <div class="flex items-center gap-3 flex-wrap sm:flex-nowrap">
                                                                                 <label for="indicator-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{% if field.indirect_reach %}{{ _('Total Direct:') }}{% else %}{{ _('Total:') }}{% endif %}</label>
-                                                                                <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
+                                                                                <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -1299,7 +1315,7 @@
                                                                     <div class="flex flex-wrap items-start gap-3 gap-y-2">
                                                                         <div class="flex flex-wrap items-center gap-3">
                                                                             <label for="indicator-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{% if field.indirect_reach %}{{ _('Total Direct:') }}{% else %}{{ _('Total:') }}{% endif %}</label>
-                                                                            <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
+                                                                            <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
                                                                         </div>
                                                                         {% if field.indirect_reach %}
                                                                         <div class="flex flex-wrap items-center gap-3">
@@ -1405,7 +1421,7 @@
                                                                         <div class="flex items-center gap-6">
                                                                             <div class="flex items-center gap-3 flex-wrap sm:flex-nowrap">
                                                                                 <label for="indicator-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{% if field.indirect_reach %}{{ _('Total Direct:') }}{% else %}{{ _('Total:') }}{% endif %}</label>
-                                                                                <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
+                                                                                <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -1452,7 +1468,7 @@
                                                                     <div class="flex flex-wrap items-start gap-3 gap-y-2">
                                                                         <div class="flex flex-wrap items-center gap-3">
                                                                             <label for="indicator-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{% if field.indirect_reach %}{{ _('Total Direct:') }}{% else %}{{ _('Total:') }}{% endif %}</label>
-                                                                            <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
+                                                                            <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="{{ indicator_number_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %}>
                                                                         </div>
                                                                         {% if field.indirect_reach %}
                                                                         <div class="flex flex-wrap items-center gap-3">
@@ -1489,7 +1505,7 @@
                                                             {% elif field.field_type_for_js|lower == 'percentage' %}
                                                                 {% set indicator_percentage_classes = "w-20 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm bg-white text-right" %}
                                                                 <div class="inline-flex items-center gap-1">
-                                                                    <input type="number" name="indicator_{{ field.id }}_total_value" id="field-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" min="0"{% if not (field.config and field.config.allow_over_100) %} max="100"{% endif %} class="{{ indicator_percentage_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} placeholder="0" {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %} data-field-type="percentage"{% if field.config %} data-field-config='{{ field.config | tojson | e }}'{% endif %}>
+                                                                    <input type="number" name="indicator_{{ field.id }}_total_value" id="field-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" min="0"{% if not (field.config and field.config.allow_over_100) %} max="100"{% endif %} class="{{ indicator_percentage_classes }}{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} placeholder="0" {% if not can_edit or indicator_is_readonly %}disabled{% endif %} {% if indicator_is_readonly %}readonly{% endif %} data-field-type="percentage"{% if field.config %} data-field-config='{{ field.config | tojson | e }}'{% endif %}>
                                                                     <span class="text-gray-700 font-medium text-sm">%</span>
                                                                 </div>
 
@@ -1552,7 +1568,7 @@
                                                                 {% set field_classes = field_classes ~ " bg-white" %}
                                                             {% endif %}
                                                             {% if field.field_type_for_js == 'text' %}
-                                                                <input type="text" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ existing_q_value | default('', true) }}" class="{{ field_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit or is_readonly %}disabled{% endif %} {% if is_readonly %}readonly{% endif %}>
+                                                                <input type="text" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ existing_q_value | default('', true) }}" class="{{ field_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit or is_readonly %}disabled{% endif %} {% if is_readonly %}readonly{% endif %}>
                                                             {% elif field.field_type_for_js == 'textarea' %}
                                                                 {% set textarea_classes = "block w-full px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm" %}
                                                                 {% if is_prefilled %}
@@ -1562,7 +1578,7 @@
                                                                 {% else %}
                                                                     {% set textarea_classes = textarea_classes ~ " bg-white" %}
                                                                 {% endif %}
-                                                                <textarea name="field_value[{{ field.id }}]" id="field-{{ field.id }}" rows="3" class="{{ textarea_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}>{{ existing_q_value | default('', true) }}</textarea>
+                                                                <textarea name="field_value[{{ field.id }}]" id="field-{{ field.id }}" rows="3" class="{{ textarea_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit %}disabled{% endif %}>{{ existing_q_value | default('', true) }}</textarea>
                                                             {% elif field.field_type_for_js|lower == 'number' %}
                                                                 {% set number_classes = "w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm text-right" %}
                                                                 {% if is_prefilled %}
@@ -1575,7 +1591,7 @@
                                                                 <input type="number" name="field_value[{{ field.id }}]" id="field-{{ field.id }}"
                                                                        value="{{ format_number_value(existing_q_value) |strip_commas }}"
                                                                        class="{{ number_classes }}"
-                                                                       {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
+                                                                       {% if is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
                                                             {% elif field.field_type_for_js|lower == 'percentage' %}
                                                                 {% set percentage_classes = "w-20 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 sm:text-sm text-right" %}
                                                                 {% if is_prefilled %}
@@ -1590,7 +1606,7 @@
                                                                            value="{{ format_number_value(existing_q_value) |strip_commas }}"
                                                                            min="0"{% if not (field.config and field.config.allow_over_100) %} max="100"{% endif %}
                                                                            class="{{ percentage_classes }}"
-                                                                           {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} placeholder="0" {% if not can_edit %}disabled{% endif %} data-field-type="percentage"{% if field.config %} data-field-config='{{ field.config | tojson | e }}'{% endif %}>
+                                                                           {% if is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} placeholder="0" {% if not can_edit %}disabled{% endif %} data-field-type="percentage"{% if field.config %} data-field-config='{{ field.config | tojson | e }}'{% endif %}>
                                                                     <span class="text-gray-700 font-medium text-sm">%</span>
                                                                 </div>
                                                             {% elif field.field_type_for_js|lower == 'yesno' %}
@@ -1614,7 +1630,7 @@
                                                                 {% elif is_imputed %}
                                                                     {% set date_classes = date_classes ~ " bg-blue-50 border-blue-300" %}
                                                                 {% endif %}
-                                                                <input type="date" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (existing_q_value|string|lower == 'none') else (existing_q_value | default('', true)) }}" class="{{ date_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
+                                                                <input type="date" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (existing_q_value|string|lower == 'none') else (existing_q_value | default('', true)) }}" class="{{ date_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
                                                             {% elif field.field_type_for_js == 'datetime' %}
                                                                 {% set datetime_classes = "mt-1 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md" %}
                                                                 {% if is_prefilled %}
@@ -1622,7 +1638,7 @@
                                                                 {% elif is_imputed %}
                                                                     {% set datetime_classes = datetime_classes ~ " bg-blue-50 border-blue-300" %}
                                                                 {% endif %}
-                                                                <input type="datetime-local" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (existing_q_value|string|lower == 'none') else (existing_q_value | default('', true)) }}" class="{{ datetime_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
+                                                                <input type="datetime-local" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (existing_q_value|string|lower == 'none') else (existing_q_value | default('', true)) }}" class="{{ datetime_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
                                                             {% elif field.field_type_for_js == 'single_choice' %}
                                                                 {% include 'forms/entry_form/partials/_question_single_choice.html' %}
                                                             {% elif field.field_type_for_js == 'multiple_choice' %}
@@ -1636,7 +1652,7 @@
                                                                 {% elif is_imputed %}
                                                                     {% set default_classes = default_classes ~ " bg-blue-50 border-blue-300" %}
                                                                 {% endif %}
-                                                                <input type="text" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ existing_q_value | default('', true) }}" class="{{ default_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
+                                                                <input type="text" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ existing_q_value | default('', true) }}" class="{{ default_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
                                                             {% endif %}
 
                                                             {# --- INDIRECT REACH FIELD FOR QUESTIONS (Main Section) --- #}
@@ -1726,7 +1742,7 @@
                                                         {% if template_structure.display_order_visible %}<span class="text-gray-700 mr-1">{{ sub_section.display_order }}.</span>{% endif %}
                                                         {% set sub_section_display_name = sub_section._display_name_resolved if hasattr(sub_section, '_display_name_resolved') and sub_section._display_name_resolved else sub_section.display_name %}
                                                         <span class="text-gray-600 font-medium">↳ {{ sub_section_display_name }}</span>
-                                                        <button type="button" class="collapse-toggle btn btn-icon btn-sm btn-secondary ml-auto" aria-expanded="true" aria-controls="collapsible-content-sub-{{ sub_section.id }}" title="{{ _('Collapse/Expand') }}">
+                                                        <button type="button" class="collapse-toggle btn btn-icon btn-sm btn-secondary ml-auto" aria-expanded="true" aria-controls="collapsible-content-sub-{{ sub_section.id }}" title="{{ _('Collapse/Expand')|forceescape }}">
                                                             <i class="fas fa-chevron-up"></i>
                                                         </button>
                                                     </h4>
@@ -2012,16 +2028,16 @@
                                                                                 <button type="button"
                                                                                         class="w-5 h-5 flex items-center justify-center text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors propose-changes-btn"
                                                                                         data-indicator-id="{{ field.source_indicator_from_bank.id if field.source_indicator_from_bank else '' }}"
-                                                                                        data-indicator-name="{{ field.display_label or field.label or _('Unknown Indicator') }}"
-                                                                                        title="{{ _('Propose changes to this indicator') }}">
+                                                                                        data-indicator-name="{{ field.display_label or field.label or _('Unknown Indicator')|forceescape }}"
+                                                                                        title="{{ _('Propose changes to this indicator')|forceescape }}">
                                                                                     <i class="fas fa-lightbulb text-xs"></i>
                                                                                 </button>
                                                                                 {% endif %}
                                                                                 <button type="button"
                                                                                         class="w-5 h-5 flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors delete-dynamic-indicator-btn"
                                                                                         data-assignment-id="{{ field.dynamic_assignment_id }}"
-                                                                                        data-indicator-name="{{ field.display_label or field.label or _('Unknown Indicator') }}"
-                                                                                        title="{{ _('Remove this indicator') }}">
+                                                                                        data-indicator-name="{{ field.display_label or field.label or _('Unknown Indicator')|forceescape }}"
+                                                                                        title="{{ _('Remove this indicator')|forceescape }}">
                                                                                     <i class="fas fa-trash"></i>
                                                                                 </button>
                                                                             </div>
@@ -2071,7 +2087,7 @@
                                                                         <div class="flex items-center gap-6">
                                                                                                                                                         <div class="flex items-center gap-3">
                                                                                 <label for="indicator-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{% if field.indirect_reach %}{{ _('Total Direct:') }}{% else %}{{ _('Total:') }}{% endif %}</label>
-                                                                      <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white text-right{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
+                                                                      <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white text-right{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -2168,7 +2184,7 @@
                                                                     {# Simple input for single mode (total only) without disaggregation #}
                                                                     <div class="flex flex-wrap items-center gap-3">
                                                                         <label for="indicator-total-{{ field.id }}" class="text-sm font-medium text-gray-700">{{ _('Total:') }}</label>
-                                                                        <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white text-right{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
+                                                                        <input type="number" name="indicator_{{ field.id }}_total_value" id="indicator-total-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" class="w-32 px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white text-right{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
                                                                     </div>
                                                                     {% if field.indirect_reach %}
                                                                     {# Indirect reach with calculated total displayed adjacent #}
@@ -2191,7 +2207,7 @@
                                                             {% elif field.field_type_for_js|lower == 'yesno' %} {% set current_yesno_val = (existing_entry_data.get('values').get('value') | lower) if (existing_entry_data is mapping and existing_entry_data.get('values') and existing_entry_data.get('values').get('value')) else (raw_value_indicator | lower if raw_value_indicator is not none else '') %} <div class="flex items-center gap-4"> <div class="flex items-center gap-3"> <label class="inline-flex items-center cursor-pointer"> <input type="checkbox" name="indicator_{{ field.id }}_standard_value" value="yes" class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500" {% if current_yesno_val == 'yes' %}checked{% endif %} {% if not can_edit %}disabled{% endif %}> <span class="ml-2 text-sm font-medium text-green-700">Yes</span> </label> <label class="inline-flex items-center cursor-pointer"> <input type="checkbox" name="indicator_{{ field.id }}_standard_value" value="no" class="form-checkbox h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500" {% if current_yesno_val == 'no' %}checked{% endif %} {% if not can_edit %}disabled{% endif %}> <span class="ml-2 text-sm font-medium text-red-700">No</span> </label> </div> </div>
                                                                             {% elif field.field_type_for_js == 'date' %} <input type="date" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (raw_value_indicator is none or raw_value_indicator|string|lower == 'none') else raw_value_indicator }}" class="mt-1 block w-full shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}>
                                                                             {% elif field.field_type_for_js == 'datetime' %} <input type="datetime-local" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ '' if (raw_value_indicator is none or raw_value_indicator|string|lower == 'none') else raw_value_indicator }}" class="mt-1 block w-full shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}>
-                                                                            {% elif field.field_type_for_js|lower == 'percentage' %} <div class="inline-flex items-center gap-1"> <input type="number" name="indicator_{{ field.id }}_total_value" id="field-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" min="0"{% if not (field.config and field.config.allow_over_100) %} max="100"{% endif %} class="mt-1 w-20 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md text-right{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} placeholder="0" {% if not can_edit %}disabled{% endif %} data-field-type="percentage"{% if field.config %} data-field-config='{{ field.config | tojson | e }}'{% endif %}> <span class="mt-1 text-gray-700 font-medium text-sm">%</span> </div>
+                                                                            {% elif field.field_type_for_js|lower == 'percentage' %} <div class="inline-flex items-center gap-1"> <input type="number" name="indicator_{{ field.id }}_total_value" id="field-{{ field.id }}" value="{{ (current_values.get('total', raw_value_indicator) if (current_values.get('total', raw_value_indicator) is not none) else '') | strip_commas }}" min="0"{% if not (field.config and field.config.allow_over_100) %} max="100"{% endif %} class="mt-1 w-20 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md text-right{% if indicator_is_prefilled %} bg-yellow-100 border-yellow-300{% elif indicator_is_imputed %} bg-blue-50 border-blue-300{% endif %}" {% if indicator_is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif indicator_is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} placeholder="0" {% if not can_edit %}disabled{% endif %} data-field-type="percentage"{% if field.config %} data-field-config='{{ field.config | tojson | e }}'{% endif %}> <span class="mt-1 text-gray-700 font-medium text-sm">%</span> </div>
 
                                                                             {% else %}
                                                                                 <input type="text" name="field_value[{{ field.id }}]" id="field-{{ field.id }}" value="{{ raw_value_indicator if raw_value_indicator is not none else '' }}" class="mt-1 block w-full shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md" {% if not can_edit %}disabled{% endif %}>
@@ -2480,7 +2496,7 @@
             {% endif %}
 
             {# Floating button for mobile navigation - shows on screens < 1100px #}
-            <button type="button" id="mobile-nav-toggle-button" title="{{ _('Open Sections Menu') }}"
+            <button type="button" id="mobile-nav-toggle-button" title="{{ _('Open Sections Menu')|forceescape }}"
                     class="btn btn-primary xl:hidden fixed bottom-6 left-6 z-50 text-white w-14 h-14 rounded-full items-center justify-center transition-all duration-300 border-2 border-white/30"
                     style="box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2), 0 2px 5px rgba(0,0,0,0.1);">
                 <i class="fas fa-list text-xl"></i>
@@ -2488,22 +2504,22 @@
             {% if can_edit and not is_preview_mode %}
             {# Hover FAB action menu (Save/Submit/Pin) - appears above the floating button #}
             <div id="fab-menu" class="xl:hidden fixed z-50"
-                 data-submit-confirm="{{ _('Are you sure you want to submit this form? You will not be able to edit it after submission.') }}">
+                 data-submit-confirm="{{ _('Are you sure you want to submit this form? You will not be able to edit it after submission.')|forceescape }}">
                 <button type="button" id="fab-pin-btn"
                         class="fab-tooltip w-12 h-12 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center border-2 border-white/30"
-                        aria-label="{{ _('Pin Sections Pane') }}">
+                        aria-label="{{ _('Pin Sections Pane')|forceescape }}">
                     <i class="fas fa-thumbtack"></i>
                     <span class="tooltip-text">{{ _('Pin Sections Pane') }}</span>
                 </button>
                 <button type="button" id="fab-save-btn"
                         class="fab-tooltip w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center border-2 border-white/30 mt-2"
-                        aria-label="{{ _('Save') }}">
+                        aria-label="{{ _('Save')|forceescape }}">
                     <i class="fas fa-save"></i>
                     <span class="tooltip-text">{{ _('Save') }}</span>
                 </button>
                 <button type="button" id="fab-submit-btn"
                         class="fab-tooltip w-12 h-12 rounded-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center border-2 border-white/30 mt-2"
-                        aria-label="{{ _('Submit') }}">
+                        aria-label="{{ _('Submit')|forceescape }}">
                     <i class="fas fa-paper-plane"></i>
                     <span class="tooltip-text">{{ _('Submit') }}</span>
                 </button>
@@ -2519,7 +2535,7 @@
                 <div class="chatbot-ai-hover-row">
                     <button type="button" id="fab-validation-summary-btn"
                             class="fab-hover-pill"
-                            aria-label="{{ _('Validation Summary') }}">
+                            aria-label="{{ _('Validation Summary')|forceescape }}">
                         <span class="fab-hover-pill-icon">
                             <i class="fas fa-clipboard-check"></i>
                         </span>
@@ -2530,7 +2546,7 @@
                 <div class="chatbot-ai-hover-row">
                     <button type="button" id="fab-run-ai-opinions-btn"
                             class="fab-hover-pill"
-                            aria-label="{{ _('Run AI validation') }}">
+                            aria-label="{{ _('Run AI validation')|forceescape }}">
                         <span class="fab-hover-pill-icon">
                             <i class="fas fa-robot"></i>
                         </span>
@@ -2542,7 +2558,7 @@
             {% endif %}
 
             {# Expand button for collapsed sidebar on large screens (≥1100px) #}
-            <button type="button" id="sidebar-expand-button" title="{{ _('Expand Sections Menu') }}"
+            <button type="button" id="sidebar-expand-button" title="{{ _('Expand Sections Menu')|forceescape }}"
                     class="btn btn-primary hidden cubic-bezier(0.4, 0, 0.2, 1) border-2 border-white/30">
                 <i class="fas fa-chevron-right text-lg"></i>
             </button>
@@ -2918,7 +2934,7 @@
                     <p class="text-xs font-semibold text-orange-800 mb-0.5">{{ _('Others are editing this form') }}</p>
                     <p class="text-xs text-orange-700 leading-snug">{{ _('If they save after you, your changes may be overwritten. Coordinate to avoid conflicts.') }}</p>
                 </div>
-                <button type="button" id="concurrent-users-dismiss" class="btn btn-close-icon flex-shrink-0" aria-label="{{ _('Dismiss warning') }}">
+                <button type="button" id="concurrent-users-dismiss" class="btn btn-close-icon flex-shrink-0" aria-label="{{ _('Dismiss warning')|forceescape }}">
                     <i class="fas fa-times text-xs"></i>
                 </button>
             </div>
@@ -2929,7 +2945,7 @@
              data-aes-id="{{ assignment_status.id }}"
              data-current-user-id="{{ current_user.id if current_user and current_user.is_authenticated else 0 }}"
              data-teams-icon-url="{{ static_url('images/teams-icon.svg') }}"
-             data-teams-chat-label="{{ _('Chat') }}"
+             data-teams-chat-label="{{ _('Chat')|forceescape }}"
              aria-live="polite"
              style="display:none;">
             {# Collapsed row: icons only (default) #}
@@ -2939,8 +2955,8 @@
                 <button type="button"
                         id="presence-expand-btn"
                         class="presence-chevron-btn"
-                        title="{{ _('Show editors') }}"
-                        aria-label="{{ _('Expand editors list') }}"
+                        title="{{ _('Show editors')|forceescape }}"
+                        aria-label="{{ _('Expand editors list')|forceescape }}"
                         aria-expanded="false"
                         aria-controls="presence-expanded-view">
                     <i class="fas fa-chevron-up text-xs"></i>
@@ -2954,8 +2970,8 @@
                     <button type="button"
                             id="presence-collapse-btn"
                             class="presence-chevron-btn"
-                            title="{{ _('Collapse') }}"
-                            aria-label="{{ _('Collapse editors list') }}"
+                            title="{{ _('Collapse')|forceescape }}"
+                            aria-label="{{ _('Collapse editors list')|forceescape }}"
                             aria-expanded="true"
                             aria-controls="presence-expanded-view">
                         <i class="fas fa-chevron-down text-xs"></i>
@@ -3061,7 +3077,7 @@
             function setSlow(){
                 try {
                     const detailEl = document.getElementById('entry-form-loading-detail');
-                    if (detailEl) detailEl.textContent = '{{ _("Still loading…") }}';
+                    if (detailEl) detailEl.textContent = {{ _("Still loading…")|tojson|safe }};
                     // Reload stays hidden until RELOAD_BUTTON_MIN_MS unless already shown.
                 } catch (e) { /* no-op */ }
             }
@@ -3071,7 +3087,7 @@
                     const uiEl = document.getElementById('entry-form-ui');
                     const loadingEl = document.getElementById('entry-form-loading');
                     // Never surface technical/module details to end users in the loading box.
-                    if (detailEl) detailEl.textContent = '{{ _("The form is taking longer than expected to load. Please reload the page.") }}';
+                    if (detailEl) detailEl.textContent = {{ _("The form is taking longer than expected to load. Please reload the page.")|tojson|safe }};
                     scheduleReloadButtonReveal();
                     // Keep UI hidden in error state, keep loader visible
                     if (uiEl) uiEl.style.display = 'none';
@@ -3176,7 +3192,8 @@
             ) | tojson }},
             "country_iso2": {{ (
                 assignment_status.country.iso2 if assignment_status and assignment_status.country and assignment_status.country.iso2 else ''
-            ) | tojson }}
+            ) | tojson }},
+            "template_id": {{ (template_id if template_id is defined else none) | tojson }}
         }
         </script>
         <script nonce="{{ csp_nonce() }}">
@@ -3276,7 +3293,7 @@
                     window.__clientLog && window.__clientLog('Showing offline notice');
                     offlineNotice.classList.remove('hidden');
                     if (offlineStatusText) {
-                        offlineStatusText.textContent = '{{ _("Manual save required") }}';
+                        offlineStatusText.textContent = {{ _("Manual save required")|tojson|safe }};
                     }
                 } else if (!isOffline) {
                     window.__clientLog && window.__clientLog('Hiding offline notice');
@@ -3286,16 +3303,16 @@
 
             function showReconnectingStatus() {
                 if (offlineStatusText) {
-                    offlineStatusText.innerHTML = '<i class="fas fa-sync-alt fa-spin mr-1"></i>{{ _("Reconnecting...") }}';
+                    offlineStatusText.innerHTML = '<i class="fas fa-sync-alt fa-spin mr-1"></i>' + {{ _("Reconnecting...")|tojson|safe }};
                 }
             }
 
             function showReconnectedStatus() {
                 if (offlineStatusText) {
-                    offlineStatusText.innerHTML = '<i class="fas fa-check mr-1"></i>{{ _("Reconnected!") }}';
+                    offlineStatusText.innerHTML = '<i class="fas fa-check mr-1"></i>' + {{ _("Reconnected!")|tojson|safe }};
                     setTimeout(() => {
                         if (offlineStatusText) {
-                            offlineStatusText.textContent = '{{ _("Manual save required") }}';
+                            offlineStatusText.textContent = {{ _("Manual save required")|tojson|safe }};
                         }
                     }, 3000);
                 }
@@ -3381,7 +3398,7 @@
                 if (document.body.dataset.formInitialized !== 'true') {
                     try {
                         if (window.__entryFormLoader && typeof window.__entryFormLoader.setError === 'function') {
-                            window.__entryFormLoader.setError('{{ _("Form initialization timeout - some modules may have failed to load") }}');
+                            window.__entryFormLoader.setError({{ _("Form initialization timeout - some modules may have failed to load")|tojson|safe }});
                         }
                     } catch (e) { /* no-op */ }
                 }
@@ -3481,7 +3498,7 @@
                     const timeSinceStart = Date.now() - this.checkStartTime;
                     if (!mainModuleExecuted && timeSinceStart > 45000) {
                         hasError = true;
-                        errorDetails.push('{{ _("Form initialization failed") }}');
+                        errorDetails.push({{ _("Form initialization failed")|tojson|safe }});
                     }
 
                     // Heuristic: only report missing matrix handler if it stays missing for a while.
@@ -3489,11 +3506,11 @@
                     const matrixHandlerMissingPersistent = hasMatrixContainers && !formInitialized && !matrixHandlerDefined && timeSinceStart > 12000;
                     if (matrixHandlerMissingPersistent) {
                         hasError = true;
-                        errorDetails.push('{{ _("Matrix handler not initialized") }}');
+                        errorDetails.push({{ _("Matrix handler not initialized")|tojson|safe }});
                     }
                     if (hasMatrixContainers && !formInitialized && matrixHandlerErrored) {
                         hasError = true;
-                        errorDetails.push('{{ _("Matrix handler not initialized") }}');
+                        errorDetails.push({{ _("Matrix handler not initialized")|tojson|safe }});
                     }
 
                     if (this.failedModules.length > 0) {
@@ -3502,14 +3519,14 @@
                             const match = path.match(/\/([^\/]+\.js)$/);
                             return match ? match[1] : path;
                         }).join(', ');
-                        errorDetails.push('{{ _("Failed modules") }}: ' + moduleNames);
+                        errorDetails.push({{ _("Failed modules")|tojson|safe }} + ': ' + moduleNames);
                     }
 
                     // If we have matrix containers but no handler after 3 seconds (and the form isn't initialized), that's an error.
                     if (hasMatrixContainers && !formInitialized && !matrixHandlerDefined && timeSinceStart > 45000) {
                         hasError = true;
                         if (!errorDetails.some(d => d.includes('Matrix'))) {
-                            errorDetails.push('{{ _("Matrix functionality unavailable") }}');
+                            errorDetails.push({{ _("Matrix functionality unavailable")|tojson|safe }});
                         }
                     }
 

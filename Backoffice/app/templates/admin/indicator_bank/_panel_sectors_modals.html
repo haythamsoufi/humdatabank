@@ -50,7 +50,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
-                                    <input type="text" name="icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                    <input type="text" name="icon_class" placeholder="{{ _('e.g., fas fa-home')|forceescape }}"
                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                                     <p class="text-xs text-gray-500 mt-1">{{ _('Used as fallback when no logo is uploaded') }}</p>
                                 </div>
@@ -108,7 +108,7 @@
                                                 class="btn btn-warning btn-sm js-sectorsub-auto-translate"
                                                 data-modal="editSectorModal"
                                                 data-primary-id="edit_sector_name"
-                                                title="{{ _('Automatically translate blank multilingual name fields from the primary name') }}">
+                                                title="{{ _('Automatically translate blank multilingual name fields from the primary name')|forceescape }}">
                                             <i class="fas fa-magic js-sectorsub-at-icon" aria-hidden="true"></i>
                                             <i class="fas fa-spinner fa-spin js-sectorsub-at-spinner hidden" aria-hidden="true"></i>
                                             <span class="js-sectorsub-at-label">{{ _('Auto Translate') }}</span>
@@ -134,7 +134,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
-                                    <input type="text" name="icon_class" id="edit_sector_icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                    <input type="text" name="icon_class" id="edit_sector_icon_class" placeholder="{{ _('e.g., fas fa-home')|forceescape }}"
                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                                     <p class="text-xs text-gray-500 mt-1">{{ _('Used as fallback when no logo is uploaded') }}</p>
                                 </div>
@@ -212,7 +212,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
-                                    <input type="text" name="icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                    <input type="text" name="icon_class" placeholder="{{ _('e.g., fas fa-home')|forceescape }}"
                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                                 </div>
                                 <div class="flex items-center">
@@ -279,7 +279,7 @@
                                                 class="btn btn-warning btn-sm js-sectorsub-auto-translate"
                                                 data-modal="editSubsectorModal"
                                                 data-primary-id="edit_subsector_name"
-                                                title="{{ _('Automatically translate blank multilingual name fields from the primary name') }}">
+                                                title="{{ _('Automatically translate blank multilingual name fields from the primary name')|forceescape }}">
                                             <i class="fas fa-magic js-sectorsub-at-icon" aria-hidden="true"></i>
                                             <i class="fas fa-spinner fa-spin js-sectorsub-at-spinner hidden" aria-hidden="true"></i>
                                             <span class="js-sectorsub-at-label">{{ _('Auto Translate') }}</span>
@@ -300,7 +300,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
-                                    <input type="text" name="icon_class" id="edit_subsector_icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                    <input type="text" name="icon_class" id="edit_subsector_icon_class" placeholder="{{ _('e.g., fas fa-home')|forceescape }}"
                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                                 </div>
                                 <div class="flex items-center">

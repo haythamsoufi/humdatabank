@@ -55,7 +55,7 @@
                               data-current-lang="en"
                               rows="20"
                               spellcheck="false"
-                              placeholder="{{ _('Enter Jinja2 template HTML here…') }}"></textarea>
+                              placeholder="{{ _('Enter Jinja2 template HTML here…')|forceescape }}"></textarea>
                 </div>
             </div>
             <div class="email-template-visual-pane hidden flex flex-col bg-white min-h-0">
@@ -65,7 +65,7 @@
                               data-email-visual-for="campaign-email-compose"
                               rows="1"
                               spellcheck="true"
-                              aria-label="{{ _('Visual email editor') }}"></textarea>
+                              aria-label="{{ _('Visual email editor')|forceescape }}"></textarea>
                 </div>
             </div>
         </div>

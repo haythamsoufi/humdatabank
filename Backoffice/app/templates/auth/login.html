@@ -550,16 +550,16 @@ body.modal-open {
                 </div>
                 <div class="grid grid-cols-1 gap-2">
                     {% if test_passwords.get('sys_manager') %}
-                    <button id="quickSystemManagerLogin" type="button" aria-label="{{ _('Quick login as a System Manager') }}" class="btn btn-block btn-purple">
+                    <button id="quickSystemManagerLogin" type="button" aria-label="{{ _('Quick login as a System Manager')|forceescape }}" class="btn btn-block btn-purple">
                         <i class="fa-solid fa-cogs"></i>
                         {{ _('Test as System Manager') }}
                     </button>
                     {% endif %}
-                    <button id="quickAdminLogin" type="button" aria-label="{{ _('Quick login as an Admin') }}" class="btn btn-block btn-dark">
+                    <button id="quickAdminLogin" type="button" aria-label="{{ _('Quick login as an Admin')|forceescape }}" class="btn btn-block btn-dark">
                         <i class="fa-solid fa-user-shield"></i>
                         {{ _('Test as an Admin') }}
                     </button>
-                    <button id="quickFocalLogin" type="button" aria-label="{{ _('Quick login as a Focal Point') }}" class="btn btn-block btn-primary">
+                    <button id="quickFocalLogin" type="button" aria-label="{{ _('Quick login as a Focal Point')|forceescape }}" class="btn btn-block btn-primary">
                         <i class="fa-solid fa-user"></i>
                         {{ _('Test as a Focal Point') }}
                     </button>
@@ -639,7 +639,7 @@ body.modal-open {
 <!-- Register Modal -->
 <div id="registerModal" class="fixed inset-0 hidden items-center justify-center bg-black/50">
   <div id="registerModalCard" class="bg-white w-full max-w-md rounded-md shadow-lg p-6 relative">
-    <button type="button" id="closeRegisterModal" class="absolute top-3 right-3 btn-close-icon text-gray-500 hover:text-gray-800" aria-label="{{ _('Close') }}"><i class="fa-solid fa-xmark"></i></button>
+    <button type="button" id="closeRegisterModal" class="absolute top-3 right-3 btn-close-icon text-gray-500 hover:text-gray-800" aria-label="{{ _('Close')|forceescape }}"><i class="fa-solid fa-xmark"></i></button>
     <h2 class="text-xl font-semibold mb-4">{{ _('Create your account') }}</h2>
     <form method="POST" action="{{ url_for('auth.register') }}" class="space-y-2">
       {% if register_form is defined and 'csrf_token' in register_form %}
@@ -687,7 +687,7 @@ body.modal-open {
 <!-- Forgot Password Modal -->
 <div id="forgotModal" class="fixed inset-0 hidden items-center justify-center bg-black/50">
   <div class="bg-white w-full max-w-md rounded-md shadow-lg p-6 relative">
-    <button type="button" id="closeForgotModal" class="absolute top-3 right-3 btn-close-icon text-gray-500 hover:text-gray-800" aria-label="{{ _('Close') }}"><i class="fa-solid fa-xmark"></i></button>
+    <button type="button" id="closeForgotModal" class="absolute top-3 right-3 btn-close-icon text-gray-500 hover:text-gray-800" aria-label="{{ _('Close')|forceescape }}"><i class="fa-solid fa-xmark"></i></button>
     <h2 class="text-xl font-semibold mb-2">{{ _('Forgot your password?') }}</h2>
     <p class="text-sm text-gray-600 mb-4">{{ _('Enter your email and we\'ll send you a link to reset your password.') }}</p>
     <form method="POST" action="{{ url_for('auth.forgot_password') }}" class="space-y-2">
@@ -1112,7 +1112,7 @@ function initRegisterCountrySelect() {
         $select.select2({
             dropdownParent: window.jQuery('#registerModal'),
             width: '100%',
-            placeholder: "{{ _('Select a country') }}",
+            placeholder: {{ _('Select a country')|tojson|safe }},
             dropdownCssClass: 'register-country-dropdown',
             minimumResultsForSearch: 0
         }).on('select2:open', function() {
@@ -1215,7 +1215,7 @@ function setupRegisterEmailCheck() {
         updateSubmitState();
         if (!value) return;
         if (!isLikelyValidEmail(value)) {
-            setFeedback("{{ _('Please enter a valid email address') }}", 'text-red-600');
+            setFeedback({{ _('Please enter a valid email address')|tojson|safe }}, 'text-red-600');
             return;
         }
         try {
@@ -1231,10 +1231,10 @@ function setupRegisterEmailCheck() {
             if (data && data.ok === true) {
                 if (data.exists) {
                     registerEmailExists = true;
-                    setFeedback("{{ _('This email is already registered. Try signing in or reset your password.') }}", 'text-red-600');
+                    setFeedback({{ _('This email is already registered. Try signing in or reset your password.')|tojson|safe }}, 'text-red-600');
                 } else {
                     registerEmailExists = false;
-                    setFeedback("{{ _('Great! This email is available.') }}", 'text-green-600');
+                    setFeedback({{ _('Great! This email is available.')|tojson|safe }}, 'text-green-600');
                 }
                 updateSubmitState();
             }
@@ -1276,11 +1276,11 @@ function setupRegisterEmailCheck() {
             passwordMatchFeedback.className = 'text-xs mt-1';
             registerPasswordsMatch = false;
         } else if (passwordValue && confirmValue && passwordValue === confirmValue) {
-            passwordMatchFeedback.textContent = "{{ _('Passwords match') }}";
+            passwordMatchFeedback.textContent = {{ _('Passwords match')|tojson|safe }};
             passwordMatchFeedback.className = 'text-xs mt-1 text-green-600';
             registerPasswordsMatch = true;
         } else {
-            passwordMatchFeedback.textContent = "{{ _('Passwords do not match') }}";
+            passwordMatchFeedback.textContent = {{ _('Passwords do not match')|tojson|safe }};
             passwordMatchFeedback.className = 'text-xs mt-1 text-red-600';
             registerPasswordsMatch = false;
         }
@@ -1316,7 +1316,7 @@ function setupRegisterEmailCheck() {
             if (registerEmailExists || !registerPasswordStrong || !registerPasswordsMatch) {
                 e.preventDefault();
                 if (registerEmailExists) {
-                    setFeedback("{{ _('This email is already registered. Try signing in or reset your password.') }}", 'text-red-600');
+                    setFeedback({{ _('This email is already registered. Try signing in or reset your password.')|tojson|safe }}, 'text-red-600');
                     emailInput.focus();
                 } else if (!registerPasswordStrong) {
                     passwordInput.focus();

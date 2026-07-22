@@ -114,7 +114,7 @@
                     <div class="mb-4">
                         <div class="flex items-center gap-2 flex-wrap mb-2">
                             <label for="{{ form.name.id }}" class="text-gray-700 text-sm font-semibold">{{ form.name.label.text }}</label>
-                            <button type="button" id="template-name-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Edit template name translations') }}" aria-label="{{ _('Translations') }}">
+                            <button type="button" id="template-name-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Edit template name translations')|forceescape }}" aria-label="{{ _('Translations')|forceescape }}">
                                 <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                             </button>
                         </div>
@@ -282,7 +282,7 @@
                         <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                             <div class="flex items-center gap-2 flex-wrap mb-2">
                                 <label class="text-sm font-medium text-gray-700">{{ _('Manage Pages') }}</label>
-                                <button type="button" id="page-translations-matrix-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Manage page translations') }}" aria-label="{{ _('Translations') }}">
+                                <button type="button" id="page-translations-matrix-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Manage page translations')|forceescape }}" aria-label="{{ _('Translations')|forceescape }}">
                                     <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                 </button>
                             </div>
@@ -293,12 +293,12 @@
                                         <i class="fas fa-grip-vertical"></i>
                                     </div>
                                     <input type="hidden" name="page_ids" value="{{ page.id }}">
-                                    <input type="text" name="page_names" value="{{ page.name }}" placeholder="{{ _('Page name') }}" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 w-full text-sm border-gray-300 rounded-md">
+                                    <input type="text" name="page_names" value="{{ page.name }}" placeholder="{{ _('Page name')|forceescape }}" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 w-full text-sm border-gray-300 rounded-md">
                                     <input type="hidden" name="page_orders" value="{{ page.order }}">
                                     <input type="hidden" name="page_name_translations" value="{{ page.name_translations|safe_json_attr if page.name_translations else '{}' }}" data-translations="{{ page.name_translations|safe_json_attr if page.name_translations else '{}' }}" data-page-name="{{ page.name }}">
-                                    <button type="button" class="move-up-btn text-gray-600 hover:text-gray-800 p-1" title="{{ _('Move Up') }}"><i class="fas fa-chevron-up w-4 h-4"></i></button>
-                                    <button type="button" class="move-down-btn text-gray-600 hover:text-gray-800 p-1" title="{{ _('Move Down') }}"><i class="fas fa-chevron-down w-4 h-4"></i></button>
-                                    <button type="button" class="remove-page-btn text-red-600 hover:text-red-800 p-1" title="{{ _('Remove Page') }}"><i class="fas fa-trash w-4 h-4"></i></button>
+                                    <button type="button" class="move-up-btn text-gray-600 hover:text-gray-800 p-1" title="{{ _('Move Up')|forceescape }}"><i class="fas fa-chevron-up w-4 h-4"></i></button>
+                                    <button type="button" class="move-down-btn text-gray-600 hover:text-gray-800 p-1" title="{{ _('Move Down')|forceescape }}"><i class="fas fa-chevron-down w-4 h-4"></i></button>
+                                    <button type="button" class="remove-page-btn text-red-600 hover:text-red-800 p-1" title="{{ _('Remove Page')|forceescape }}"><i class="fas fa-trash w-4 h-4"></i></button>
                                 </div>
                                 {% endfor %}
                             </div>

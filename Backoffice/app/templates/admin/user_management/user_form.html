@@ -165,7 +165,7 @@
                             <button type="button"
                                     id="user-profile-color-open"
                                     class="p-0 border-0 bg-transparent rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                                    title="{{ _('Choose profile colour') }}"
+                                    title="{{ _('Choose profile colour')|forceescape }}"
                                     aria-haspopup="dialog"
                                     aria-expanded="false"
                                     aria-controls="user-profile-color-modal">
@@ -932,7 +932,7 @@ window.userFormConfig = {
                             <input type="text"
                                    id="ns-structure-search"
                                    class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                   placeholder="{{ _('Search branches, sub-branches, or local units…') }}">
+                                   placeholder="{{ _('Search branches, sub-branches, or local units…')|forceescape }}">
                         </div>
                         <div>
                             <label class="block text-gray-700 text-sm font-semibold mb-2" for="ns-country-select">{{ _('Country') }}</label>
@@ -986,7 +986,7 @@ window.userFormConfig = {
                                     <input type="text"
                                            id="secretariat-divisions-search"
                                            class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                           placeholder="{{ _('Search divisions or departments…') }}">
+                                           placeholder="{{ _('Search divisions or departments…')|forceescape }}">
                                 </div>
                                 <div id="secretariat-divisions-container" class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm max-h-96 overflow-y-auto">
                                     <!-- Hierarchical Secretariat structure will be loaded here by JavaScript -->
@@ -1004,7 +1004,7 @@ window.userFormConfig = {
                                     <input type="text"
                                            id="secretariat-regions-search"
                                            class="shadow-sm appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 text-sm leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                           placeholder="{{ _('Search regional or cluster offices…') }}">
+                                           placeholder="{{ _('Search regional or cluster offices…')|forceescape }}">
                                 </div>
                                 <div id="secretariat-regions-container" class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm max-h-96 overflow-y-auto">
                                     <!-- Hierarchical Regions structure will be loaded here by JavaScript -->
@@ -1482,7 +1482,7 @@ window.userFormConfig = {
                     class="user-profile-color-swatch"
                     data-hex="{{ hex }}"
                     title="{{ hex }}"
-                    aria-label="{{ _('Select colour') }} {{ hex }}"
+                    aria-label="{{ _('Select colour')|forceescape }} {{ hex }}"
                     style="background-color:{{ hex }}; width:100%; padding-bottom:100%; border-radius:0.375rem; border:2px solid #e5e7eb; cursor:pointer; position:relative; display:block;"></button>
             {% endfor %}
         </div>

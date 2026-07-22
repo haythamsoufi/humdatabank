@@ -189,7 +189,7 @@
                 <div class="admin-panel-title-wrapper">
                     <h2 id="panelTitle" class="admin-panel-title text-xl font-bold text-white pl-2">{{ _('Admin Panel') }}</h2>
                 </div>
-                <button type="button" id="sidebarToggle" class="btn btn-icon btn-sm text-gray-300 border-0 shadow-none bg-transparent hover:bg-gray-700 hover:text-white" aria-expanded="true" aria-controls="adminSidebarNav" title="{{ _('Toggle Sidebar') }}">
+                <button type="button" id="sidebarToggle" class="btn btn-icon btn-sm text-gray-300 border-0 shadow-none bg-transparent hover:bg-gray-700 hover:text-white" aria-expanded="true" aria-controls="adminSidebarNav" title="{{ _('Toggle Sidebar')|forceescape }}">
                     <i class="fas fa-bars fa-fw h-6 w-6"></i>
                 </button>
             </div>
@@ -217,7 +217,7 @@
                             <span class="org-logo-placeholder" {% if _nav_logo %}style="display:none"{% endif %} aria-hidden="true">{{ (ORG_SHORT_NAME or ORG_NAME or 'DB')[:2] | upper }}</span>
                             <a href="{{ url_for('admin.admin_dashboard') if is_admin_user else url_for('main.dashboard') }}" class="nav-brand-title min-w-0 text-xl font-semibold text-white font-sans tracking-tight">{{ ORG_NAME }}</a>
                             {% if is_system_manager %}
-                            <span class="system-manager-badge ml-3 px-2.5 py-1 text-xs font-medium rounded-md text-blue-300" title="{{ _('System Manager') }}" aria-label="{{ _('System Manager') }}">
+                            <span class="system-manager-badge ml-3 px-2.5 py-1 text-xs font-medium rounded-md text-blue-300" title="{{ _('System Manager')|forceescape }}" aria-label="{{ _('System Manager')|forceescape }}">
                                 <i class="fas fa-shield-alt system-manager-icon" aria-hidden="true"></i>
                                 <span class="system-manager-label">{{ _('System Manager') }}</span>
                             </span>
@@ -225,12 +225,12 @@
                         </div>
                         {% if current_user.is_authenticated and is_assignment_user %}
                         <div class="hidden lg:flex nav-menu-group h-full">
-                            <a href="{{ url_for('main.dashboard') }}" class="nav-menu-button group{% if nav_dashboard_active %} active{% endif %}" title="{{ _('Dashboard') }}"{% if nav_dashboard_active %} aria-current="page"{% endif %}>
+                            <a href="{{ url_for('main.dashboard') }}" class="nav-menu-button group{% if nav_dashboard_active %} active{% endif %}" title="{{ _('Dashboard')|forceescape }}"{% if nav_dashboard_active %} aria-current="page"{% endif %}>
                                 {{ svg_icon('home', 'w-5 h-5 flex-shrink-0') }}
                                 <span class="nav-menu-button-label font-medium text-sm">{{ _('Dashboard') }}</span>
                             </a>
 
-                            <a href="{{ url_for('help_docs.index') }}" class="nav-menu-button group{% if nav_documentation_active %} active{% endif %}" title="{{ _('Documentation') }}"{% if nav_documentation_active %} aria-current="page"{% endif %}>
+                            <a href="{{ url_for('help_docs.index') }}" class="nav-menu-button group{% if nav_documentation_active %} active{% endif %}" title="{{ _('Documentation')|forceescape }}"{% if nav_documentation_active %} aria-current="page"{% endif %}>
                                 {{ svg_icon('book', 'w-5 h-5 flex-shrink-0') }}
                                 <span class="nav-menu-button-label font-medium text-sm">{{ _('Documentation') }}</span>
                             </a>
@@ -241,7 +241,7 @@
                     <div class="relative flex items-center justify-end space-x-4 nav-utilities">
                         <!-- Enhanced Language Selector - Hidden on mobile, visible on tablet and larger -->
                         <div class="language-selector-container hidden sm:block">
-                            <button id="language-selector-button" class="language-selector-button {% if SHOW_LANGUAGE_FLAGS %}flags-only{% endif %}" aria-label="{{ _('Language') }}" aria-expanded="false" aria-haspopup="true">
+                            <button id="language-selector-button" class="language-selector-button {% if SHOW_LANGUAGE_FLAGS %}flags-only{% endif %}" aria-label="{{ _('Language')|forceescape }}" aria-expanded="false" aria-haspopup="true">
                                 <div class="current-language">
                                     {% set current_lang = _ui_language %}
                                     {% if SHOW_LANGUAGE_FLAGS %}
@@ -272,7 +272,7 @@
                         {% if current_user.is_authenticated %}
                             <!-- Notifications Bell Button -->
                             <div class="relative">
-                                <button type="button" id="notifications-bell-button" class="btn btn-icon text-white border-0 shadow-none bg-transparent hover:bg-gray-700 relative" aria-label="{{ _('Notifications') }}">
+                                <button type="button" id="notifications-bell-button" class="btn btn-icon text-white border-0 shadow-none bg-transparent hover:bg-gray-700 relative" aria-label="{{ _('Notifications')|forceescape }}">
                                     <i class="fas fa-bell fa-xl"></i>
                                     <span id="notifications-badge" class="hidden absolute inline-flex items-center px-2 py-1 rounded-full text-xs font-bold leading-4 bg-red-600 text-white min-w-[1.25rem] h-5 justify-center notification-badge-anchor"></span>
                                 </button>
@@ -288,7 +288,7 @@
                                         </div>
                                     </div>
 
-                                    <div id="notifications-list" class="flex-1 overflow-y-auto min-h-0" data-empty-message="{{ _('No notifications') }}" aria-live="polite">
+                                    <div id="notifications-list" class="flex-1 overflow-y-auto min-h-0" data-empty-message="{{ _('No notifications')|forceescape }}" aria-live="polite">
                                         <!-- Notifications will be loaded here -->
                                     </div>
                                     <div id="notifications-footer" class="p-3 border-t border-gray-200 text-center bg-gray-50 flex-shrink-0">
@@ -357,7 +357,7 @@
                                             {% endif %}
                                         </div>
                                         <div class="alert-message">{{ message }}</div>
-                                        <button type="button" class="alert-close btn btn-close-icon" aria-label="{{ _('Close') }}">
+                                        <button type="button" class="alert-close btn btn-close-icon" aria-label="{{ _('Close')|forceescape }}">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                             </svg>
@@ -378,14 +378,14 @@
     </div>
 
     {% if current_user.is_authenticated and (is_admin_user or is_focal_point) %}
-    <button type="button" id="mobileMenuFAB" class="btn btn-icon btn-lg btn-dark shadow-lg" aria-label="{{ _('Open menu') }}" aria-expanded="false" aria-controls="mobileFloatingMenu">
+    <button type="button" id="mobileMenuFAB" class="btn btn-icon btn-lg btn-dark shadow-lg" aria-label="{{ _('Open menu')|forceescape }}" aria-expanded="false" aria-controls="mobileFloatingMenu">
         <i id="mobileMenuFABIcon" class="fas fa-bars text-xl"></i>
     </button>
     <div id="mobileMenuScrim"></div>
     <div id="mobileFloatingMenu" role="dialog" aria-modal="true" aria-labelledby="mobileMenuTitle">
         <div class="flex items-center justify-between p-4 border-b border-gray-700">
             <h2 id="mobileMenuTitle" class="text-lg font-semibold">{{ _('Menu') }}</h2>
-            <button type="button" id="mobileMenuCloseButton" class="btn btn-icon btn-sm text-gray-300 border-0 shadow-none bg-transparent hover:bg-gray-700 hover:text-white" aria-label="{{ _('Close menu') }}">
+            <button type="button" id="mobileMenuCloseButton" class="btn btn-icon btn-sm text-gray-300 border-0 shadow-none bg-transparent hover:bg-gray-700 hover:text-white" aria-label="{{ _('Close menu')|forceescape }}">
                 <i class="fas fa-times fa-fw h-6 w-6"></i>
             </button>
         </div>
@@ -422,16 +422,16 @@
                          {{ svg_icon('chevron-right', 'collapsable-icon w-4 h-4') }}
                     </div>
                     <div class="collapsable-content">
-                         <a href="{{ url_for('main.dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white{% if nav_dashboard_active %} active{% endif %}" title="{{ _('My Dashboard') }}"{% if nav_dashboard_active %} aria-current="page"{% endif %}>
+                         <a href="{{ url_for('main.dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white{% if nav_dashboard_active %} active{% endif %}" title="{{ _('My Dashboard')|forceescape }}"{% if nav_dashboard_active %} aria-current="page"{% endif %}>
                              {{ svg_icon('home', 'sidebar-icon w-6 h-6 mr-3') }}
                              <span class="sidebar-text">{{ _('Dashboard') }}</span>
                          </a>
-                        <a href="{{ url_for('main.manage_ns_hierarchy') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('NS Structure') }}">
+                        <a href="{{ url_for('main.manage_ns_hierarchy') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('NS Structure')|forceescape }}">
                              {{ svg_icon('sitemap', 'sidebar-icon w-6 h-6 mr-3') }}
                              <span class="sidebar-text">{{ _('NS Structure') }}</span>
                          </a>
 
-                        <a href="{{ url_for('help_docs.index') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white{% if nav_documentation_active %} active{% endif %}" title="{{ _('Documentation') }}"{% if nav_documentation_active %} aria-current="page"{% endif %}>
+                        <a href="{{ url_for('help_docs.index') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white{% if nav_documentation_active %} active{% endif %}" title="{{ _('Documentation')|forceescape }}"{% if nav_documentation_active %} aria-current="page"{% endif %}>
                              {{ svg_icon('book', 'sidebar-icon w-6 h-6 mr-3') }}
                              <span class="sidebar-text">{{ _('Documentation') }}</span>
                          </a>
@@ -470,7 +470,7 @@
 
     <!-- AI Chatbot (markup stays even when skip_layout_chatbot defers JS/CSS; FAB binds after lazy load) -->
     {% if current_user.is_authenticated and CHATBOT_ENABLED and current_user.chatbot_enabled and (not CHATBOT_ORG_ONLY or is_organization_email(current_user.email)) and user_has_ai_beta_access(current_user) %}
-    <button id="aiChatbotFAB" aria-label="{{ _('Open %(assistant)s', assistant=CHATBOT_NAME) if CHATBOT_NAME else _('Open AI Assistant') }}">
+    <button id="aiChatbotFAB" aria-label="{{ _('Open %(assistant)s', assistant=CHATBOT_NAME) if CHATBOT_NAME else _('Open AI Assistant')|forceescape }}">
         <span class="fab-icon-slot">
             <div class="robot-face">
                 <i class="fas fa-robot robot-icon"></i>
@@ -479,7 +479,7 @@
         <span class="fab-label">{{ CHATBOT_NAME or _('AI Assistant') }}</span>
     </button>
     <div id="aiChatWidget" role="dialog" aria-modal="true" aria-labelledby="chatTitle" data-immersive-url="{{ url_for('main.chat_immersive') }}">
-        <aside class="chat-floating-sidebar" id="chatFloatingSidebar" aria-label="{{ _('Conversations') }}">
+        <aside class="chat-floating-sidebar" id="chatFloatingSidebar" aria-label="{{ _('Conversations')|forceescape }}">
             <div class="chat-floating-sidebar-header">{{ _('Conversations') }}</div>
             <button type="button" class="chat-floating-new-chat" id="chatFloatingNewChat">
                 <i class="fas fa-plus"></i>
@@ -491,7 +491,7 @@
         </aside>
         <div class="chat-floating-main">
             <div class="chat-header">
-                <button class="chat-sidebar-toggle chat-sidebar-toggle--left" id="chatSidebarToggleBtn" aria-label="{{ _('Conversations') }}" title="{{ _('Conversations') }}">
+                <button class="chat-sidebar-toggle chat-sidebar-toggle--left" id="chatSidebarToggleBtn" aria-label="{{ _('Conversations')|forceescape }}" title="{{ _('Conversations')|forceescape }}">
                     <i class="fas fa-bars"></i>
                 </button>
                 <div class="chat-header-center">
@@ -499,17 +499,17 @@
                         <i class="fas fa-robot mr-2" aria-hidden="true"></i>
                         <span id="chatFloatingTitleLabel">{{ CHATBOT_NAME if CHATBOT_NAME else _('Assistant') }}</span>
                         {% if user_is_explicit_beta_tester(current_user) %}
-                        <span class="chat-beta-badge" title="{{ _('You have early beta access — thank you for helping us build this!') }}">Beta</span>
+                        <span class="chat-beta-badge" title="{{ _('You have early beta access — thank you for helping us build this!')|forceescape }}">Beta</span>
                         {% endif %}
                     </h3>
                     <div class="chat-header-buttons">
-                    <button type="button" class="chat-new-chat-btn" id="chatNewChatBtn" aria-label="{{ _('New chat') }}" title="{{ _('New chat') }}">
+                    <button type="button" class="chat-new-chat-btn" id="chatNewChatBtn" aria-label="{{ _('New chat')|forceescape }}" title="{{ _('New chat')|forceescape }}">
                         <i class="fas fa-plus"></i>
                     </button>
-                    <a href="{{ url_for('main.chat_immersive') }}" class="chat-immersive-btn" id="chatImmersiveBtn" aria-label="{{ _('Immersive view') }}" title="{{ _('Immersive view') }}" target="_blank" rel="noopener noreferrer">
+                    <a href="{{ url_for('main.chat_immersive') }}" class="chat-immersive-btn" id="chatImmersiveBtn" aria-label="{{ _('Immersive view')|forceescape }}" title="{{ _('Immersive view')|forceescape }}" target="_blank" rel="noopener noreferrer">
                         <i class="fas fa-expand"></i>
                     </a>
-                    <button class="chat-close" id="chatCloseBtn" aria-label="{{ _('Close chat') }}">
+                    <button class="chat-close" id="chatCloseBtn" aria-label="{{ _('Close chat')|forceescape }}">
                         <i class="fas fa-times"></i>
                     </button>
                     </div>
@@ -520,7 +520,7 @@
                 <div class="chat-messages" id="chatMessages" aria-live="polite">
                     <!-- Messages will be populated by JavaScript -->
                 </div>
-                <div class="chat-ai-notice-center" id="chatAiNoticeBlock" role="note" aria-label="{{ _('AI notice') }}">
+                <div class="chat-ai-notice-center" id="chatAiNoticeBlock" role="note" aria-label="{{ _('AI notice')|forceescape }}">
                     <div class="chat-ai-notice-block">
                         <p class="chat-privacy-notice chat-privacy-notice-emphasis">
                             {{ _("Don't share sensitive information. We use system traces and telemetry to improve the assistant.") }}
@@ -537,20 +537,20 @@
 
             <div class="chat-input-container">
                 <div class="chat-input-pill">
-                    <button type="button" class="chat-input-attach" aria-label="{{ _('Attach') }}" title="{{ _('Attach') }}" tabindex="-1">
+                    <button type="button" class="chat-input-attach" aria-label="{{ _('Attach')|forceescape }}" title="{{ _('Attach')|forceescape }}" tabindex="-1">
                         <i class="fas fa-paperclip" aria-hidden="true"></i>
                     </button>
                     <textarea
                         class="chat-input"
                         id="chatInput"
-                        placeholder="{{ _('Ask anything') }}"
+                        placeholder="{{ _('Ask anything')|forceescape }}"
                         maxlength="4000"
                         rows="1"
                     ></textarea>
-                    <button type="button" class="chat-input-mic" aria-label="{{ _('Voice input') }}" title="{{ _('Voice input') }}" tabindex="-1" disabled>
+                    <button type="button" class="chat-input-mic" aria-label="{{ _('Voice input')|forceescape }}" title="{{ _('Voice input')|forceescape }}" tabindex="-1" disabled>
                         <i class="fas fa-microphone" aria-hidden="true"></i>
                     </button>
-                    <button type="button" class="chat-send" id="chatSendBtn" aria-label="{{ _('Send') }}" title="{{ _('Send') }}">
+                    <button type="button" class="chat-send" id="chatSendBtn" aria-label="{{ _('Send')|forceescape }}" title="{{ _('Send')|forceescape }}">
                         <i class="fas fa-arrow-up" aria-hidden="true"></i>
                     </button>
                 </div>
@@ -561,7 +561,7 @@
     {% endif %}
 
     {% if TRANSLATION_REVIEW_ENABLED and translation_review_can_use|default(false) %}
-    <button id="translationReviewFAB" type="button" aria-label="{{ _('Translation review') }}" aria-pressed="{{ 'true' if translation_review_active else 'false' }}">
+    <button id="translationReviewFAB" type="button" aria-label="{{ _('Translation review')|forceescape }}" aria-pressed="{{ 'true' if translation_review_active else 'false' }}">
         <span class="tr-fab-icon-slot" aria-hidden="true">
             <i class="fas fa-language"></i>
         </span>

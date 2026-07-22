@@ -114,11 +114,11 @@
                     </div>
                     <div id="aiSearchInputShell" class="relative flex-1 flex items-center min-w-0 overflow-hidden rounded-full border-2 border-gray-300 bg-white shadow-sm transition-all duration-200 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
                         <input type="text" id="aiSearchQuery"
-                               placeholder="{{ _('Ask a question (AI will answer using the document library)...') }}"
+                               placeholder="{{ _('Ask a question (AI will answer using the document library)...')|forceescape }}"
                                class="flex-1 min-w-0 py-3 pl-4 pr-2 border-0 bg-transparent text-base focus:outline-none focus:ring-0">
                         <button type="submit" id="aiSearchBtn"
                                 class="btn btn-icon btn-sm btn-primary shrink-0 border-0 shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="{{ _('Send') }}">
+                                title="{{ _('Send')|forceescape }}">
                             <i class="fas fa-paper-plane text-lg" style="color: #2563eb !important;"></i>
                         </button>
                     </div>
@@ -274,14 +274,14 @@
                 <div id="uploadImportTabPanels" class="flex-1 min-h-0 flex flex-col">
                 <div id="uploadContent" class="tab-content p-6 flex flex-col flex-1 min-h-0 overflow-hidden" role="tabpanel" aria-labelledby="uploadTab" aria-hidden="false">
                     <form id="uploadForm" enctype="multipart/form-data">
-                        <label for="fileInput" class="upload-zone block w-full p-6 text-center rounded-lg cursor-pointer border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors" id="dropZone" role="button" tabindex="0" aria-label="{{ _('Select files to upload') }}">
+                        <label for="fileInput" class="upload-zone block w-full p-6 text-center rounded-lg cursor-pointer border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors" id="dropZone" role="button" tabindex="0" aria-label="{{ _('Select files to upload')|forceescape }}">
                             <i class="fas fa-file-upload text-3xl text-gray-400 mb-2"></i>
                             <p class="text-sm font-medium text-gray-700 mb-1">{{ _('Drag and drop files here, or click to select') }}</p>
                             <p class="text-xs text-gray-500">{{ _('Supported: PDF, Word, Excel, Text, Markdown, HTML') }}</p>
                             <input type="file" id="fileInput" name="file" class="sr-only" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.md,.html">
                         </label>
                         <div class="mt-4 flex flex-wrap items-center gap-3">
-                            <input type="text" name="title" id="docTitle" placeholder="{{ _('Document title (optional)') }}" class="flex-1 min-w-[200px] border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                            <input type="text" name="title" id="docTitle" placeholder="{{ _('Document title (optional)')|forceescape }}" class="flex-1 min-w-[200px] border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
                             <label class="flex items-center cursor-pointer">
                                 <input type="checkbox" name="is_public" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                                 <span class="ml-2 text-sm text-gray-600">{{ _('Public') }}</span>
@@ -306,7 +306,7 @@
                             {{ _('Import and process existing documents from the Document Management system') }}
                         </p>
                         <div class="flex gap-3 mb-4">
-                            <input type="text" id="importSearch" placeholder="{{ _('Search documents...') }}" class="flex-1 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                            <input type="text" id="importSearch" placeholder="{{ _('Search documents...')|forceescape }}" class="flex-1 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
                             <button type="button" id="importRefreshBtn" class="btn btn-secondary btn-sm">
                                 <i class="fas fa-sync-alt mr-2"></i> {{ _('Refresh') }}
                             </button>
@@ -353,13 +353,13 @@
                                                 <button type="button" id="ifrcTypeClearAll" class="btn btn-secondary btn-xs">{{ _('Clear') }}</button>
                                             </div>
                                         </div>
-                                        <div id="ifrcTypeFilterList" class="ifrc-type-filter-list p-2 space-y-1 text-sm" role="group" aria-label="{{ _('Document types') }}"></div>
+                                        <div id="ifrcTypeFilterList" class="ifrc-type-filter-list p-2 space-y-1 text-sm" role="group" aria-label="{{ _('Document types')|forceescape }}"></div>
                                     </div>
                                 </div>
                             </div>
                             <div class="min-w-0">
                                 <label class="block text-xs font-medium text-gray-700 mb-1">{{ _('Year') }}</label>
-                                <input type="text" id="ifrcYearFilter" placeholder="{{ _('e.g., 2023, 2024') }}" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                                <input type="text" id="ifrcYearFilter" placeholder="{{ _('e.g., 2023, 2024')|forceescape }}" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
                             </div>
                             <div class="min-w-0">
                                 <label class="block text-xs font-medium text-gray-700 mb-1">{{ _('Country') }}</label>
@@ -413,11 +413,11 @@
                     <i class="fas fa-redo"></i>
                     <span id="bulkReprocessBtnLabel">{{ _('Reprocess') }}</span>
                 </button>
-                <button type="button" id="bulkRedetectCountryBtn" class="btn btn-primary" disabled title="{{ _('Re-run country detection (no re-chunk)') }}">
+                <button type="button" id="bulkRedetectCountryBtn" class="btn btn-primary" disabled title="{{ _('Re-run country detection (no re-chunk)')|forceescape }}">
                     <i class="fas fa-globe-americas"></i>
                     <span id="bulkRedetectCountryBtnLabel">{{ _('Redetect country') }}</span>
                 </button>
-                <button type="button" id="bulkReprocessMetaBtn" class="btn btn-primary" disabled title="{{ _('Re-run metadata enrichment: date, language, category, quality, source org (no re-chunk)') }}">
+                <button type="button" id="bulkReprocessMetaBtn" class="btn btn-primary" disabled title="{{ _('Re-run metadata enrichment: date, language, category, quality, source org (no re-chunk)')|forceescape }}">
                     <i class="fas fa-tags"></i>
                     <span id="bulkReprocessMetaBtnLabel">{{ _('Reprocess metadata') }}</span>
                 </button>
@@ -461,7 +461,7 @@
             <option value="{{ la }}" {% if current_language == la %}selected{% endif %}>{{ la|upper }}</option>
             {% endfor %}
         </select>
-        <input type="text" name="q" value="{{ search_query or '' }}" placeholder="{{ _('Search title/filename...') }}" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5 w-48">
+        <input type="text" name="q" value="{{ search_query or '' }}" placeholder="{{ _('Search title/filename...')|forceescape }}" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5 w-48">
         <button type="submit" class="btn btn-primary">
             <i class="fas fa-filter mr-1"></i>{{ _('Apply') }}
         </button>

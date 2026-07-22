@@ -165,8 +165,8 @@
                     <button type="button"
                             id="custom-name-translations-btn"
                             class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0"
-                            title="{{ _('Add translations') }}"
-                            aria-label="{{ _('Add translations') }}">
+                            title="{{ _('Add translations')|forceescape }}"
+                            aria-label="{{ _('Add translations')|forceescape }}">
                         <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                     </button>
                     {% endif %}
@@ -213,7 +213,7 @@
             <div class="flex flex-col">
                 <label for="{{ form.data_owner_id.id }}" class="block text-gray-700 text-sm font-semibold mb-2 min-h-[2.75rem]">
                     {{ form.data_owner_id.label.text }}
-                    <span class="ml-1 text-gray-400" title="{{ _('The person accountable for data quality in this collection cycle. Defaults to the template owner.') }}">
+                    <span class="ml-1 text-gray-400" title="{{ _('The person accountable for data quality in this collection cycle. Defaults to the template owner.')|forceescape }}">
                         <i class="fas fa-info-circle text-xs"></i>
                     </span>
                 </label>
@@ -679,7 +679,7 @@
                                     <input type="text"
                                            id="secretariat-search"
                                            class="form-input w-full rounded-md border-gray-300"
-                                           placeholder="{{ _('Search divisions or departments...') }}">
+                                           placeholder="{{ _('Search divisions or departments...')|forceescape }}">
                                 </div>
                                 <div id="secretariat-hierarchy-container" class="bg-white p-4 rounded-md border border-gray-200 max-h-96 overflow-y-auto">
                                     <!-- Hierarchical Secretariat structure will be loaded here by JavaScript -->
@@ -697,7 +697,7 @@
                                     <input type="text"
                                            id="secretariat-regions-search"
                                            class="form-input w-full rounded-md border-gray-300"
-                                           placeholder="{{ _('Search regional or cluster offices...') }}">
+                                           placeholder="{{ _('Search regional or cluster offices...')|forceescape }}">
                                 </div>
                                 <div id="secretariat-regions-container" class="bg-white p-4 rounded-md border border-gray-200 max-h-96 overflow-y-auto">
                                     <!-- Hierarchical Regions structure will be loaded here by JavaScript -->
@@ -730,7 +730,7 @@
                         <input type="text"
                                id="ns-structure-search"
                                class="form-input w-full rounded-md border-gray-300"
-                               placeholder="{{ _('Search branches, sub-branches, or local units...') }}">
+                               placeholder="{{ _('Search branches, sub-branches, or local units...')|forceescape }}">
                     </div>
                     <div>
                         <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Country') }}</label>

@@ -144,7 +144,7 @@
                             {{ _('Submission status map') }}
                         </h3>
                     </div>
-                    <div id="vd-tracker-map" class="vd-tracker-map" role="img" aria-label="{{ _('World map coloured by FDRS submission status') }}"></div>
+                    <div id="vd-tracker-map" class="vd-tracker-map" role="img" aria-label="{{ _('World map coloured by FDRS submission status')|forceescape }}"></div>
                     <p id="vd-tracker-map-hint" class="hidden mt-2 text-xs text-ifrc-gray-500"></p>
                 </div>
                 <div class="vd-tracker-viz-chart">
@@ -164,7 +164,7 @@
                     </h3>
                 </div>
                 <div class="vd-tracker-legend-row mb-3">
-                    <div id="vd-tracker-legend" class="vd-tracker-legend" aria-label="{{ _('Legend') }}"></div>
+                    <div id="vd-tracker-legend" class="vd-tracker-legend" aria-label="{{ _('Legend')|forceescape }}"></div>
                     <div id="vd-tracker-col-vis" class="vd-tracker-col-vis"></div>
                 </div>
                 {{ ag_grid_container('validationTrackerGrid', loading_text=_('Loading tracker data…'), grid_height='520px', placeholder_id='vd-tracker-col-vis', include_card=false, show_placeholder=false) }}
@@ -187,7 +187,7 @@
                             <option value="">{{ _('Loading countries…') }}</option>
                         </select>
                     </div>
-                    <div class="vd-toolbar-options" role="group" aria-label="{{ _('View options') }}">
+                    <div class="vd-toolbar-options" role="group" aria-label="{{ _('View options')|forceescape }}">
                         <label class="vd-toggle">
                             <input type="checkbox" id="vd-show-historical">
                             <span>{{ _('Show last 3 years') }}</span>

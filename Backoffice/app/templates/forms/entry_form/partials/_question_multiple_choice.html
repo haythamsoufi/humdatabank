@@ -70,7 +70,7 @@
            id="other-text-{{ field.id }}"
            class="other-text-input mt-2 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md{% if not q_multi_has_other %} hidden{% endif %}"
            data-for-field="{{ field.id }}"
-           placeholder="{{ _('Please specify...') }}"
+           placeholder="{{ _('Please specify...')|forceescape }}"
            value="{{ _ns3.other_val }}"
            autocomplete="off"
            {% if not can_edit %}disabled{% endif %}>

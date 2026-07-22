@@ -180,6 +180,11 @@ export const MatrixItem = {
         if (searchPlaceholderTranslationsInput) searchPlaceholderTranslationsInput.value = '{}';
         if (rowTotalsCheckbox) rowTotalsCheckbox.checked = true;
         if (columnTotalsCheckbox) columnTotalsCheckbox.checked = true;
+        const rowTotalManualCheckbox = modalElement.querySelector('#matrix-row-total-manual-enabled');
+        const rowTotalValidationSelect = modalElement.querySelector('#matrix-row-total-validation');
+        if (rowTotalManualCheckbox) rowTotalManualCheckbox.checked = false;
+        if (rowTotalValidationSelect) rowTotalValidationSelect.value = 'none';
+        this.updateRowTotalOptionsVisibility(modalElement);
         if (autoLoadCheckbox) autoLoadCheckbox.checked = false;
         if (highlightManualRowsCheckbox) highlightManualRowsCheckbox.checked = false;
         if (legendTextInput) {
@@ -782,6 +787,8 @@ export const MatrixItem = {
     setupDisplayOptions(modalElement) {
         const rowTotalsCheckbox = Utils.getElementById('matrix-show-row-totals');
         const columnTotalsCheckbox = Utils.getElementById('matrix-show-column-totals');
+        const rowTotalManualCheckbox = Utils.getElementById('matrix-row-total-manual-enabled');
+        const rowTotalValidationSelect = Utils.getElementById('matrix-row-total-validation');
         const autoLoadCheckbox = Utils.getElementById('matrix-auto-load-entities');
         const autoLoadWrapper = Utils.getElementById('matrix-auto-load-entities-wrapper');
         const highlightManualRowsCheckbox = Utils.getElementById('matrix-highlight-manual-rows');
@@ -792,8 +799,26 @@ export const MatrixItem = {
 
         if (rowTotalsCheckbox) {
             if (!rowTotalsCheckbox._matrixConfigListenerAdded) {
-                rowTotalsCheckbox.addEventListener('change', () => this.updateConfig(modalElement));
+                rowTotalsCheckbox.addEventListener('change', () => {
+                    this.updateRowTotalOptionsVisibility(modalElement);
+                    this.updateConfig(modalElement);
+                });
                 rowTotalsCheckbox._matrixConfigListenerAdded = true;
+            }
+        }
+        if (rowTotalManualCheckbox) {
+            if (!rowTotalManualCheckbox._matrixConfigListenerAdded) {
+                rowTotalManualCheckbox.addEventListener('change', () => {
+                    this.updateRowTotalOptionsVisibility(modalElement);
+                    this.updateConfig(modalElement);
+                });
+                rowTotalManualCheckbox._matrixConfigListenerAdded = true;
+            }
+        }
+        if (rowTotalValidationSelect) {
+            if (!rowTotalValidationSelect._matrixConfigListenerAdded) {
+                rowTotalValidationSelect.addEventListener('change', () => this.updateConfig(modalElement));
+                rowTotalValidationSelect._matrixConfigListenerAdded = true;
             }
         }
         if (columnTotalsCheckbox) {
@@ -842,6 +867,35 @@ export const MatrixItem = {
 
         // Initialize legend hide button state
         this.initializeLegendHideButton(modalElement);
+        this.updateRowTotalOptionsVisibility(modalElement);
+    },
+
+    /**
+     * Show/hide manual row total sub-options based on Show Row Totals / Allow manual.
+     */
+    updateRowTotalOptionsVisibility(modalElement) {
+        const rowTotalsCheckbox = Utils.getElementById('matrix-show-row-totals');
+        const optionsWrapper = Utils.getElementById('matrix-row-total-options-wrapper');
+        const rowTotalManualCheckbox = Utils.getElementById('matrix-row-total-manual-enabled');
+        const validationWrapper = Utils.getElementById('matrix-row-total-validation-wrapper');
+        const showRowTotals = rowTotalsCheckbox ? rowTotalsCheckbox.checked : true;
+
+        if (optionsWrapper) {
+            if (showRowTotals) {
+                optionsWrapper.classList.remove('hidden');
+            } else {
+                optionsWrapper.classList.add('hidden');
+            }
+        }
+
+        if (validationWrapper) {
+            const manualEnabled = rowTotalManualCheckbox ? rowTotalManualCheckbox.checked : false;
+            if (showRowTotals && manualEnabled) {
+                validationWrapper.classList.remove('hidden');
+            } else {
+                validationWrapper.classList.add('hidden');
+            }
+        }
     },
 
     /**
@@ -1390,6 +1444,8 @@ export const MatrixItem = {
         });
         const showRowTotals = Utils.getElementById('matrix-show-row-totals')?.checked !== false;
         const showColumnTotals = Utils.getElementById('matrix-show-column-totals')?.checked !== false;
+        const rowTotalManualEnabled = Utils.getElementById('matrix-row-total-manual-enabled')?.checked === true;
+        const rowTotalValidation = Utils.getElementById('matrix-row-total-validation')?.value || 'none';
         const autoLoadEntities = Utils.getElementById('matrix-auto-load-entities')?.checked === true;
         const highlightManualRows = Utils.getElementById('matrix-highlight-manual-rows')?.checked === true;
         const legendText = Utils.getElementById('matrix-legend-text')?.value?.trim() || 'Manually added row';
@@ -1405,6 +1461,13 @@ export const MatrixItem = {
             row_mode: selectedMode,
             highlight_manual_rows: highlightManualRows
         };
+
+        if (showRowTotals) {
+            config.row_total_manual_enabled = rowTotalManualEnabled;
+            if (rowTotalManualEnabled) {
+                config.row_total_validation = rowTotalValidation;
+            }
+        }
 
         // Persist group label translations when groups are present
         if (Object.keys(column_groups).length > 0) {
@@ -1730,6 +1793,15 @@ export const MatrixItem = {
                 const legendHideInput = Utils.getElementById('matrix-legend-hide');
                 const legendHideBtn = Utils.getElementById('matrix-legend-hide-btn');
                 if (rowTotalsCheckbox) rowTotalsCheckbox.checked = matrixConfig.show_row_totals !== false;
+                const rowTotalManualCheckbox = Utils.getElementById('matrix-row-total-manual-enabled');
+                const rowTotalValidationSelect = Utils.getElementById('matrix-row-total-validation');
+                if (rowTotalManualCheckbox) {
+                    rowTotalManualCheckbox.checked = matrixConfig.row_total_manual_enabled === true;
+                }
+                if (rowTotalValidationSelect) {
+                    rowTotalValidationSelect.value = matrixConfig.row_total_validation || 'none';
+                }
+                this.updateRowTotalOptionsVisibility(modalElement);
                 if (columnTotalsCheckbox) columnTotalsCheckbox.checked = matrixConfig.show_column_totals !== false;
                 if (autoLoadCheckbox) autoLoadCheckbox.checked = matrixConfig.auto_load_entities === true;
                 if (highlightManualRowsCheckbox) highlightManualRowsCheckbox.checked = matrixConfig.highlight_manual_rows === true;

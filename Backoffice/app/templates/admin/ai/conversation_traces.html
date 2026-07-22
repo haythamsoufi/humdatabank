@@ -29,11 +29,11 @@
     <div class="mb-6 flex flex-wrap items-center gap-3">
         <code class="bg-gray-100 px-2 py-1 rounded font-mono text-sm break-all">{{ conversation_id }}</code>
         <span class="text-sm text-gray-500">{{ traces|length }} {{ _('exchange(s)') }}</span>
-        <button type="button" id="convCopyFull" class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy full thread (queries, answers, reasoning steps)') }}">
+        <button type="button" id="convCopyFull" class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy full thread (queries, answers, reasoning steps)')|forceescape }}">
             <i class="fas fa-copy mr-0.5" aria-hidden="true"></i>
             <span id="convCopyFullLabel">{{ _('Copy full') }}</span>
         </button>
-        <button type="button" id="convCopySummary" class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy summary (queries + answers + meta only)') }}">
+        <button type="button" id="convCopySummary" class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy summary (queries + answers + meta only)')|forceescape }}">
             <i class="fas fa-file-alt mr-0.5" aria-hidden="true"></i>
             <span id="convCopySummaryLabel">{{ _('Copy summary') }}</span>
         </button>
@@ -155,7 +155,7 @@
             <script type="application/json" id="conv-trace-{{ trace.id }}-Steps">{{ (trace.steps if trace.steps else []) | tojson }}</script>
             <div class="flex items-center justify-between mb-6">
                 <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-list-ol text-purple-500 mr-2"></i>{{ _('Reasoning Steps') }} ({{ trace.steps|length }})</h3>
-                <button type="button" class="js-conv-copy-ai-review inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-2 py-1" data-trace-id="{{ trace.id }}" title="{{ _('Copy full trace with metadata for AI review') }}">
+                <button type="button" class="js-conv-copy-ai-review inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-2 py-1" data-trace-id="{{ trace.id }}" title="{{ _('Copy full trace with metadata for AI review')|forceescape }}">
                     <i class="fas fa-robot mr-0.5" aria-hidden="true"></i>
                     <span class="js-conv-copy-ai-review-label">{{ _('Copy for AI Review') }}</span>
                 </button>
@@ -318,7 +318,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var text = lines.join('\n').trim();
             navigator.clipboard.writeText(text).then(function () {
                 var orig = label ? label.textContent : '';
-                if (label) label.textContent = '{{ _("Copied!") }}';
+                if (label) label.textContent = {{ _("Copied!")|tojson|safe }};
                 if (icon) icon.className = 'fas fa-check text-green-600 mr-0.5';
                 setTimeout(function () {
                     if (label) label.textContent = orig;
@@ -326,13 +326,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 }, 2000);
             }).catch(function () {
                 var orig = label ? label.textContent : '';
-                if (label) label.textContent = '{{ _("Copy failed") }}';
+                if (label) label.textContent = {{ _("Copy failed")|tojson|safe }};
                 setTimeout(function () { if (label) label.textContent = orig; }, 2000);
             });
         } catch (ex) {
             var lbl = btn.querySelector('.js-conv-copy-ai-review-label');
             var origTxt = lbl ? lbl.textContent : '';
-            if (lbl) lbl.textContent = '{{ _("Copy failed") }}';
+            if (lbl) lbl.textContent = {{ _("Copy failed")|tojson|safe }};
             setTimeout(function () { if (lbl) lbl.textContent = origTxt; }, 2000);
         }
     });
@@ -346,10 +346,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!pre) return;
         if (pre.classList.contains('hidden')) {
             pre.classList.remove('hidden');
-            btn.innerHTML = '<i class="fas fa-eye-slash mr-1"></i> {{ _("Hide") }}';
+            btn.innerHTML = '<i class="fas fa-eye-slash mr-1"></i> ' + {{ _("Hide")|tojson|safe }};
         } else {
             pre.classList.add('hidden');
-            btn.innerHTML = '<i class="fas fa-eye mr-1"></i> {{ _("Show") }}';
+            btn.innerHTML = '<i class="fas fa-eye mr-1"></i> ' + {{ _("Show")|tojson|safe }};
         }
     });
 
@@ -426,12 +426,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 var text = lines.join('\n').trim();
                 navigator.clipboard.writeText(text).then(function () {
-                    setFeedback(copyFullBtn, copyFullLabel, copyFullBtn.querySelector('i'), '{{ _("Copied!") }}', true);
+                    setFeedback(copyFullBtn, copyFullLabel, copyFullBtn.querySelector('i'), {{ _("Copied!")|tojson|safe }}, true);
                 }).catch(function () {
-                    setFeedback(copyFullBtn, copyFullLabel, copyFullBtn.querySelector('i'), '{{ _("Copy failed") }}', false);
+                    setFeedback(copyFullBtn, copyFullLabel, copyFullBtn.querySelector('i'), {{ _("Copy failed")|tojson|safe }}, false);
                 });
             } catch (e) {
-                setFeedback(copyFullBtn, copyFullLabel, copyFullBtn.querySelector('i'), '{{ _("Copy failed") }}', false);
+                setFeedback(copyFullBtn, copyFullLabel, copyFullBtn.querySelector('i'), {{ _("Copy failed")|tojson|safe }}, false);
             }
         });
     }
@@ -471,12 +471,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 var text = lines.join('\n').trim();
                 navigator.clipboard.writeText(text).then(function () {
-                    setFeedback(copySummaryBtn, copySummaryLabel, copySummaryBtn.querySelector('i'), '{{ _("Copied!") }}', true);
+                    setFeedback(copySummaryBtn, copySummaryLabel, copySummaryBtn.querySelector('i'), {{ _("Copied!")|tojson|safe }}, true);
                 }).catch(function () {
-                    setFeedback(copySummaryBtn, copySummaryLabel, copySummaryBtn.querySelector('i'), '{{ _("Copy failed") }}', false);
+                    setFeedback(copySummaryBtn, copySummaryLabel, copySummaryBtn.querySelector('i'), {{ _("Copy failed")|tojson|safe }}, false);
                 });
             } catch (e) {
-                setFeedback(copySummaryBtn, copySummaryLabel, copySummaryBtn.querySelector('i'), '{{ _("Copy failed") }}', false);
+                setFeedback(copySummaryBtn, copySummaryLabel, copySummaryBtn.querySelector('i'), {{ _("Copy failed")|tojson|safe }}, false);
             }
         });
     }

@@ -65,7 +65,7 @@
                         {{ item.category | replace('_', ' ') | title }}
                     </span>
                     {% if item.page_slot %}
-                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200 ml-1" title="{{ _('Page Slot') }}">
+                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200 ml-1" title="{{ _('Page Slot')|forceescape }}">
                         <i class="fas fa-map-pin mr-1"></i>{{ item.page_slot | replace('_', ' ') | title }}
                     </span>
                     {% endif %}
@@ -84,15 +84,15 @@
                 <td class="px-4 py-3 text-right">
                     <div class="flex items-center justify-end gap-2">
                         <button type="button" class="btn btn-primary btn-sm js-embed-edit" data-item-id="{{ item.id }}"
-                                title="{{ _('Edit') }}">
+                                title="{{ _('Edit')|forceescape }}">
                             <i class="fas fa-edit"></i> {{ _('Edit') }}
                         </button>
                         <button type="button" class="btn btn-primary btn-sm js-embed-preview" data-item-id="{{ item.id }}"
-                                title="{{ _('Preview') }}">
+                                title="{{ _('Preview')|forceescape }}">
                             <i class="fas fa-eye"></i>
                         </button>
                         <button type="button" class="btn btn-danger btn-sm js-embed-delete" data-item-id="{{ item.id }}"
-                                title="{{ _('Delete') }}">
+                                title="{{ _('Delete')|forceescape }}">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -122,12 +122,12 @@
 
     <div>
         <label for="embed-title" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Title') }} <span class="text-red-500">*</span></label>
-        <input type="text" id="embed-title" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="{{ _('e.g. ECHO Programmatic Partnership') }}">
+        <input type="text" id="embed-title" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="{{ _('e.g. ECHO Programmatic Partnership')|forceescape }}">
     </div>
 
     <div>
         <label for="embed-description" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Description') }}</label>
-        <textarea id="embed-description" rows="2" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="{{ _('Optional description...') }}"></textarea>
+        <textarea id="embed-description" rows="2" class="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="{{ _('Optional description...')|forceescape }}"></textarea>
     </div>
 
     <div class="grid grid-cols-2 gap-4">
@@ -164,7 +164,7 @@
 
     <div>
         <label for="embed-url" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Embed URL') }} <span class="text-red-500">*</span></label>
-        <textarea id="embed-url" rows="3" class="w-full border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="{{ _('Paste the view or embed URL (HTTPS only)') }}"></textarea>
+        <textarea id="embed-url" rows="3" class="w-full border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="{{ _('Paste the view or embed URL (HTTPS only)')|forceescape }}"></textarea>
         <p id="embed-url-hint" class="text-xs text-gray-400 mt-1"></p>
     </div>
 
@@ -311,7 +311,7 @@
     }
 
     function openCreateModal() {
-        document.getElementById('embed-modal-title').textContent = '{{ _("Add Embed Content") }}';
+        document.getElementById('embed-modal-title').textContent = {{ _("Add Embed Content")|tojson|safe }};
         document.getElementById('embed-id').value = '';
         document.getElementById('embed-title').value = '';
         document.getElementById('embed-description').value = '';
@@ -326,7 +326,7 @@
     }
 
     function openEditModal(id, title, description, category, pageSlot, embedUrl, embedType, aspectRatio, isActive) {
-        document.getElementById('embed-modal-title').textContent = '{{ _("Edit Embed Content") }}';
+        document.getElementById('embed-modal-title').textContent = {{ _("Edit Embed Content")|tojson|safe }};
         document.getElementById('embed-id').value = id;
         document.getElementById('embed-title').value = title || '';
         document.getElementById('embed-description').value = description || '';
@@ -359,7 +359,7 @@
         };
 
         if (!payload.title || !payload.embed_url) {
-            alert('{{ _("Title and Embed URL are required.") }}');
+            alert({{ _("Title and Embed URL are required.")|tojson|safe }});
             return;
         }
 
@@ -382,13 +382,13 @@
                 window.location.reload();
             } else {
                 if (saveBtn) saveBtn.disabled = false;
-                alert(data.error || data.message || '{{ _("An error occurred.") }}');
+                alert(data.error || data.message || {{ _("An error occurred.")|tojson|safe }});
             }
         })
         .catch(function(err) {
             if (saveBtn) saveBtn.disabled = false;
             console.error(err);
-            alert('{{ _("An error occurred.") }}');
+            alert({{ _("An error occurred.")|tojson|safe }});
         });
     }
 
@@ -408,7 +408,7 @@
     }
 
     function previewEmbed(url, title, embedType) {
-        document.getElementById('preview-modal-title').textContent = title || '{{ _("Preview") }}';
+        document.getElementById('preview-modal-title').textContent = title || {{ _("Preview")|tojson|safe }};
         var src = embedPreviewSrc(url, embedType);
         document.getElementById('preview-iframe').src = isAllowedEmbedPreviewUrl(src) ? src : 'about:blank';
         showModal('preview-modal');
@@ -444,13 +444,13 @@
                 window.location.reload();
             } else {
                 if (confirmBtn) confirmBtn.disabled = false;
-                alert(data.error || data.message || '{{ _("An error occurred.") }}');
+                alert(data.error || data.message || {{ _("An error occurred.")|tojson|safe }});
             }
         })
         .catch(function(err) {
             if (confirmBtn) confirmBtn.disabled = false;
             console.error(err);
-            alert('{{ _("An error occurred.") }}');
+            alert({{ _("An error occurred.")|tojson|safe }});
         });
     }
 

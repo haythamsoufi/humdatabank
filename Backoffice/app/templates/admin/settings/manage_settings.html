@@ -13,7 +13,7 @@
   <span>v{{ config.APP_VERSION }}</span>
   <button type="button" id="check-updates-btn"
           class="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-gray-300 text-gray-500 hover:text-blue-600 hover:border-blue-400 transition text-xs"
-          title="{{ _('Check for updates') }}">
+          title="{{ _('Check for updates')|forceescape }}">
     <i class="fas fa-sync-alt text-[10px]"></i>{{ _('Updates') }}
   </button>
 </span>
@@ -204,8 +204,8 @@
           <button type="button"
                   class="open-chip-translations-btn inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0"
                   data-list-id="{{ id }}"
-                  title="{{ _('Translations') }}"
-                  aria-label="{{ _('Translations') }}">
+                  title="{{ _('Translations')|forceescape }}"
+                  aria-label="{{ _('Translations')|forceescape }}">
             <i class="fas fa-language" aria-hidden="true"></i>
           </button>
         </div>
@@ -302,8 +302,8 @@
         <button type="button"
                 id="open-org-branding-translations-btn"
                 class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0"
-                title="{{ _('Manage Translations') }}"
-                aria-label="{{ _('Manage Translations') }}">
+                title="{{ _('Manage Translations')|forceescape }}"
+                aria-label="{{ _('Manage Translations')|forceescape }}">
           <i class="fas fa-language" aria-hidden="true"></i>
         </button>
       </div>
@@ -316,7 +316,7 @@
                  maxlength="200"
                  required
                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., Humanitarian Databank') }}" />
+                 placeholder="{{ _('e.g., Humanitarian Databank')|forceescape }}" />
           <input type="hidden"
                  id="organization-name-translations-input"
                  name="organization_name_translations"
@@ -330,7 +330,7 @@
                  value="{{ org_short_name_en_value or '' }}"
                  maxlength="100"
                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., IFRC') }}" />
+                 placeholder="{{ _('e.g., IFRC')|forceescape }}" />
           <input type="hidden"
                  id="organization-short-name-translations-input"
                  name="organization_short_name_translations"
@@ -352,7 +352,7 @@
                  maxlength="200"
                  required
                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., humdatabank.org') }}" />
+                 placeholder="{{ _('e.g., humdatabank.org')|forceescape }}" />
         </div>
         <div>
           <label class="block text-xs text-gray-500 mb-1">{{ _('Email Domain') }}</label>
@@ -361,7 +361,7 @@
                  value="{{ current_branding.get('organization_email_domain', '') }}"
                  maxlength="200"
                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., humdatabank.org') }}" />
+                 placeholder="{{ _('e.g., humdatabank.org')|forceescape }}" />
           <p class="text-xs text-gray-400 mt-1">{{ _('Falls back to organization domain if empty.') }}</p>
         </div>
         <div class="md:col-span-2">
@@ -372,7 +372,7 @@
                  maxlength="200"
                  autocomplete="email"
                  class="w-full max-w-xl rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., support@humdatabank.org') }}" />
+                 placeholder="{{ _('e.g., support@humdatabank.org')|forceescape }}" />
           <p class="text-xs text-gray-400 mt-1">{{ _('Optional. Shown in the Indicator Suggestion Confirmation email as the team_email template variable (contact link and footer). Also used as BCC on that message.') }}</p>
         </div>
       </div>
@@ -498,13 +498,13 @@
           <div class="flex items-center gap-2 flex-wrap">
             <label for="branding-logo-file"
                    class="btn btn-secondary btn-sm cursor-pointer inline-flex items-center"
-                   title="{{ _('Replace organization logo') if _lp else _('Upload organization logo') }}">
+                   title="{{ _('Replace organization logo') if _lp else _('Upload organization logo')|forceescape }}">
               <i class="fas fa-{{ 'sync-alt' if _lp else 'upload' }} mr-1.5"></i>{{ _('Replace') if _lp else _('Upload') }}
             </label>
             <span id="branding-logo-selected" class="file-selected-name" role="status" aria-live="polite">
               <i class="fas fa-paperclip text-gray-400" aria-hidden="true"></i>
               <span class="name-text"></span>
-              <button type="button" title="{{ _('Clear selection') }}" aria-label="{{ _('Clear selection') }}"><i class="fas fa-times" aria-hidden="true"></i></button>
+              <button type="button" title="{{ _('Clear selection')|forceescape }}" aria-label="{{ _('Clear selection')|forceescape }}"><i class="fas fa-times" aria-hidden="true"></i></button>
             </span>
           </div>
         </div>
@@ -543,13 +543,13 @@
           <div class="flex items-center gap-2 flex-wrap">
             <label for="branding-favicon-file"
                    class="btn btn-secondary btn-sm cursor-pointer inline-flex items-center"
-                   title="{{ _('Replace favicon') if _fp else _('Upload favicon') }}">
+                   title="{{ _('Replace favicon') if _fp else _('Upload favicon')|forceescape }}">
               <i class="fas fa-{{ 'sync-alt' if _fp else 'upload' }} mr-1.5"></i>{{ _('Replace') if _fp else _('Upload') }}
             </label>
             <span id="branding-favicon-selected" class="file-selected-name" role="status" aria-live="polite">
               <i class="fas fa-paperclip text-gray-400" aria-hidden="true"></i>
               <span class="name-text"></span>
-              <button type="button" title="{{ _('Clear selection') }}" aria-label="{{ _('Clear selection') }}"><i class="fas fa-times" aria-hidden="true"></i></button>
+              <button type="button" title="{{ _('Clear selection')|forceescape }}" aria-label="{{ _('Clear selection')|forceescape }}"><i class="fas fa-times" aria-hidden="true"></i></button>
             </span>
           </div>
         </div>
@@ -564,7 +564,7 @@
                maxlength="4"
                pattern="[0-9]{4}"
                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-               placeholder="{{ _('e.g., 2024') }}" />
+               placeholder="{{ _('e.g., 2024')|forceescape }}" />
         <p class="text-xs text-gray-400 mt-1">{{ _('Defaults to current year if empty.') }}</p>
       </div>
       <input type="hidden"
@@ -599,7 +599,7 @@
                  value="{{ current_branding.get('organization_logo_path', '') }}"
                  maxlength="200"
                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., logo.svg') }}" />
+                 placeholder="{{ _('e.g., logo.svg')|forceescape }}" />
         </div>
         <div>
           <label class="block text-xs text-gray-500 mb-1">{{ _('Favicon Path') }}</label>
@@ -608,7 +608,7 @@
                  value="{{ current_branding.get('organization_favicon_path', '') }}"
                  maxlength="200"
                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., favicon.svg') }}" />
+                 placeholder="{{ _('e.g., favicon.svg')|forceescape }}" />
         </div>
         <div>
           <label class="block text-xs text-gray-500 mb-1">{{ _('Copyright Year') }}</label>
@@ -618,7 +618,7 @@
                  maxlength="4"
                  pattern="[0-9]{4}"
                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., 2024') }}" />
+                 placeholder="{{ _('e.g., 2024')|forceescape }}" />
           <p class="text-xs text-gray-400 mt-1">{{ _('Defaults to current year if empty.') }}</p>
         </div>
       </div>
@@ -651,7 +651,7 @@
                  value="{{ current_branding.get('indicator_details_url_template', '') }}"
                  maxlength="500"
                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., https://example.org/{id}') }}" />
+                 placeholder="{{ _('e.g., https://example.org/{id}')|forceescape }}" />
           <p class="text-xs text-gray-400 mt-1">{{ _('Use {id} as placeholder for indicator bank id.') }}</p>
         </div>
         <div>
@@ -661,7 +661,7 @@
                  value="{{ current_branding.get('propose_new_indicator_url', '') }}"
                  maxlength="500"
                  class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-                 placeholder="{{ _('e.g., https://example.org/indicator-bank') }}" />
+                 placeholder="{{ _('e.g., https://example.org/indicator-bank')|forceescape }}" />
         </div>
       </div>
     </div>
@@ -973,12 +973,12 @@
               <label class="text-sm font-medium text-gray-700">{{ template.label }}</label>
               <div class="email-template-autotrans-wrap hidden max-w-full shrink-0"
                    data-template-key="{{ template.key }}"
-                   title="{{ _('Uses the English template text for this form as the source. Jinja variables like org_name are preserved.') }}">
+                   title="{{ _('Uses the English template text for this form as the source. Jinja variables like org_name are preserved.')|forceescape }}">
                 <button type="button"
                         class="btn btn-sm btn-warning email-template-autotrans-btn inline-flex items-center justify-center p-1.5"
                         data-template-key="{{ template.key }}"
-                        title="{{ _('Auto-translate from English') }}"
-                        aria-label="{{ _('Auto-translate from English') }}">
+                        title="{{ _('Auto-translate from English')|forceescape }}"
+                        aria-label="{{ _('Auto-translate from English')|forceescape }}">
                   <i class="fas fa-language text-sm" aria-hidden="true"></i>
                 </button>
               </div>
@@ -1001,11 +1001,11 @@
                 <button type="button"
                         class="btn btn-sm btn-primary email-template-test-send-btn inline-flex items-center gap-1.5 whitespace-nowrap"
                         data-template-key="{{ template.key }}"
-                        title="{{ _('Send a test email using the current template content.') }}">
+                        title="{{ _('Send a test email using the current template content.')|forceescape }}">
                   <i class="fas fa-paper-plane text-[10px]" aria-hidden="true"></i>{{ _('Send test email') }}
                 </button>
               </div>
-              <div class="inline-flex" role="group" aria-label="{{ _('Switch between HTML and visual editor') }}">
+              <div class="inline-flex" role="group" aria-label="{{ _('Switch between HTML and visual editor')|forceescape }}">
                 <div class="email-template-view-toggle inline-flex rounded-md border border-gray-200 overflow-hidden shadow-sm divide-x divide-gray-200" id="email-template-view-toggle-{{ template.key }}">
                   <button type="button"
                           class="email-template-mode-btn email-template-mode-edit-btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium min-w-[4.75rem] border-0 transition-colors bg-white text-blue-600 relative z-10"
@@ -1045,7 +1045,7 @@
                   data-current-lang="en"
                   rows="20"
                   spellcheck="false"
-                  placeholder="{{ _('Enter Jinja2 template HTML here...') }}">{{ current_email_templates.get(template.key, {}).get('en', '') }}</textarea>
+                  placeholder="{{ _('Enter Jinja2 template HTML here...')|forceescape }}">{{ current_email_templates.get(template.key, {}).get('en', '') }}</textarea>
               </div>
               <input type="hidden"
                      id="{{ template.key }}-translations"
@@ -1061,7 +1061,7 @@
                   data-email-visual-for="{{ template.key }}"
                   rows="1"
                   spellcheck="true"
-                  aria-label="{{ _('Visual email editor') }}"></textarea>
+                  aria-label="{{ _('Visual email editor')|forceescape }}"></textarea>
               </div>
             </div>
           </div>
@@ -1078,14 +1078,14 @@
         <div class="relative inline-block text-left"
              id="email-templates-seed-dropdown"
              role="group"
-             aria-label="{{ _('Default email templates') }}">
+             aria-label="{{ _('Default email templates')|forceescape }}">
           <button type="button"
                   id="email-templates-seed-toggle"
                   class="btn btn-sm btn-secondary inline-flex items-center gap-1.5"
                   aria-haspopup="true"
                   aria-expanded="false"
                   aria-controls="email-templates-seed-menu"
-                  title="{{ _('Fills empty template fields from this release, or replaces all with built-in defaults') }}">
+                  title="{{ _('Fills empty template fields from this release, or replaces all with built-in defaults')|forceescape }}">
             <i class="fas fa-layer-group text-[10px]" aria-hidden="true"></i>
             <span>{{ _('Default templates') }}</span>
             <i class="fas fa-chevron-down text-[9px] opacity-80" aria-hidden="true"></i>
@@ -1142,7 +1142,7 @@
             <select id="email-template-test-user-select"
                     class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
                     disabled
-                    aria-label="{{ _('Select user to receive test email') }}">
+                    aria-label="{{ _('Select user to receive test email')|forceescape }}">
               <option value="">{{ _('Select user…') }}</option>
               {% for u in email_test_user_options %}
               <option value="{{ u.id }}">{{ u.name }} ({{ u.email }})</option>
@@ -1203,8 +1203,8 @@
             <span class="mt-0.5 inline-flex min-w-[3rem] shrink-0 items-center justify-center rounded-full border px-2.5 py-1 text-xs font-semibold tabular-nums shadow-sm
                   {% if fv %}border-teal-600 bg-teal-600 text-white ring-1 ring-inset ring-white/25{% else %}border-amber-400 bg-amber-100 text-amber-950 ring-1 ring-inset ring-amber-500/15{% endif %}"
                   role="status"
-                  title="{{ _('Configured via deployment / Config.FEATURES') }}"
-                  aria-label="{{ flabel }}: {% if fv %}{{ _('On') }}{% else %}{{ _('Off') }}{% endif %}">
+                  title="{{ _('Configured via deployment / Config.FEATURES')|forceescape }}"
+                  aria-label="{{ flabel }}: {% if fv %}{{ _('On')|forceescape }}{% else %}{{ _('Off')|forceescape }}{% endif %}">
               {% if fv %}{{ _('On') }}{% else %}{{ _('Off') }}{% endif %}
             </span>
           </div>
@@ -1256,18 +1256,18 @@
 
       {% if f.env_only %}
         <input type="text" disabled readonly
-               placeholder="{{ _('Set via environment variable') }}"
+               placeholder="{{ _('Set via environment variable')|forceescape }}"
                class="w-full rounded-md border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed text-sm" />
         <p class="text-xs text-gray-400 mt-1">{{ _('Sensitive; not stored in database. Set in environment.') }}</p>
       {% elif f.type == 'password' %}
         <div class="flex gap-2 items-center">
           <input type="password" name="ai_{{ f.key }}"
-                 placeholder="{{ _('Enter new value…') if f.is_set else _('Not configured') }}"
+                 placeholder="{{ _('Enter new value…') if f.is_set else _('Not configured')|forceescape }}"
                  autocomplete="new-password"
                  class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm" />
           <button type="button"
                   class="ai-toggle-pw text-gray-400 hover:text-gray-600 transition"
-                  title="{{ _('Show/hide') }}">
+                  title="{{ _('Show/hide')|forceescape }}">
             <i class="fas fa-eye text-xs"></i>
           </button>
           {% if f.is_set %}
@@ -1329,7 +1329,7 @@
       <div class="flex items-center gap-3 ml-4 shrink-0">
         <button type="button" id="ai-reset-all"
                 class="text-xs text-red-500 hover:text-red-700 transition cursor-pointer select-none"
-                title="{{ _('Clear all database-saved AI settings and revert to defaults') }}">
+                title="{{ _('Clear all database-saved AI settings and revert to defaults')|forceescape }}">
           <i class="fas fa-undo mr-0.5"></i>{{ _('Reset to defaults') }}
         </button>
         <span class="text-gray-300">|</span>

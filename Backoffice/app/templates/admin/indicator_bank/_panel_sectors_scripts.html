@@ -598,7 +598,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showModal(editSectorModal);
             } catch (error) {
                 console.error('Error fetching sector data:', error);
-                if (window.showAlert) window.showAlert('{{ _("Failed to load sector data. Please try again.") }}', 'error');
+                if (window.showAlert) window.showAlert({{ _("Failed to load sector data. Please try again.")|tojson|safe }}, 'error');
                 else console.error('Failed to load sector data');
             }
         });
@@ -649,7 +649,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showModal(editSubsectorModal);
             } catch (error) {
                 console.error('Error fetching subsector data:', error);
-                if (window.showAlert) window.showAlert('{{ _("Failed to load subsector data. Please try again.") }}', 'error');
+                if (window.showAlert) window.showAlert({{ _("Failed to load subsector data. Please try again.")|tojson|safe }}, 'error');
                 else console.error('Failed to load subsector data');
             }
         });
@@ -705,9 +705,9 @@ document.addEventListener('DOMContentLoaded', function() {
             '    </div>',
             '  </div>',
             '  <div class="flex justify-end gap-3 mt-5">',
-            '    <button type="button" id="sdm-cancel" class="btn btn-sm btn-secondary">{{ _("Cancel") }}</button>',
+            '    <button type="button" id="sdm-cancel" class="btn btn-sm btn-secondary">' + {{ _("Cancel")|tojson|safe }} + '</button>',
             '    <button type="button" id="sdm-confirm" class="btn btn-sm btn-danger">',
-            '      <i class="fas fa-trash mr-1"></i>{{ _("Delete") }}',
+            '      <i class="fas fa-trash mr-1"></i>' + {{ _("Delete")|tojson|safe }},
             '    </button>',
             '  </div>',
             '</div>'
@@ -738,7 +738,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const match    = form.action.match(/\/(\d+)$/);
             if (!match) {
                 // no ID in URL — fall back to native confirm
-                if (confirm(form.dataset.confirm || '{{ _("Are you sure?") }}')) form.submit();
+                if (confirm(form.dataset.confirm || {{ _("Are you sure?")|tojson|safe }})) form.submit();
                 return;
             }
 
@@ -755,7 +755,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     subCount = d.subsector_count  || 0;
                 }
             } catch (_) {
-                if (confirm(form.dataset.confirm || '{{ _("Are you sure?") }}')) form.submit();
+                if (confirm(form.dataset.confirm || {{ _("Are you sure?")|tojson|safe }})) form.submit();
                 return;
             }
 
@@ -768,8 +768,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const confirmBtn = modal.querySelector('#sdm-confirm');
 
             titleEl.textContent = isSector
-                ? '{{ _("Delete sector") }} \u201c' + name + '\u201d?'
-                : '{{ _("Delete sub-sector") }} \u201c' + name + '\u201d?';
+                ? {{ _("Delete sector")|tojson|safe }} + ' \u201c' + name + '\u201d?'
+                : {{ _("Delete sub-sector")|tojson|safe }} + ' \u201c' + name + '\u201d?';
 
             blockBox.classList.add('hidden');
             warnBox.classList.add('hidden');
@@ -779,17 +779,17 @@ document.addEventListener('DOMContentLoaded', function() {
             if (isSector && subCount > 0) {
                 // Hard block — can't delete sector with sub-sectors
                 blockText.textContent = subCount === 1
-                    ? '{{ _("Cannot delete: remove the 1 sub-sector first.") }}'
-                    : '{{ _("Cannot delete: remove the") }} ' + subCount + ' {{ _("sub-sectors first.") }}';
+                    ? {{ _("Cannot delete: remove the 1 sub-sector first.")|tojson|safe }}
+                    : {{ _("Cannot delete: remove the")|tojson|safe }} + ' ' + subCount + ' ' + {{ _("sub-sectors first.")|tojson|safe }};
                 blockBox.classList.remove('hidden');
                 confirmBtn.disabled = true;
                 confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
             } else if (indCount > 0) {
                 // Soft warning — indicators will lose their reference
-                const thing = isSector ? '{{ _("sector") }}' : '{{ _("sub-sector") }}';
+                const thing = isSector ? {{ _("sector")|tojson|safe }} : {{ _("sub-sector")|tojson|safe }};
                 warnText.textContent = indCount === 1
-                    ? '{{ _("1 indicator references this") }} ' + thing + '. {{ _("Its sector reference will be cleared on deletion.") }}'
-                    : indCount + ' {{ _("indicators reference this") }} ' + thing + '. {{ _("Their sector references will be cleared on deletion.") }}';
+                    ? {{ _("1 indicator references this")|tojson|safe }} + ' ' + thing + '. ' + {{ _("Its sector reference will be cleared on deletion.")|tojson|safe }}
+                    : indCount + ' ' + {{ _("indicators reference this")|tojson|safe }} + ' ' + thing + '. ' + {{ _("Their sector references will be cleared on deletion.")|tojson|safe }};
                 warnBox.classList.remove('hidden');
             }
 
@@ -825,7 +825,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 btn.disabled = true;
                 const icon = document.createElement('i');
                 icon.className = 'fas fa-spinner fa-spin mr-2';
-                btn.replaceChildren(icon, document.createTextNode(' {{ _("Saving...") }}'));
+                btn.replaceChildren(icon, document.createTextNode(' ' + {{ _("Saving...")|tojson|safe }}));
             }
 
             try {
@@ -842,12 +842,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     window.location.reload();
                 } else {
                     const data = await response.json();
-                    if (window.showAlert) window.showAlert(data.message || '{{ _("An error occurred. Please try again.") }}', 'error');
+                    if (window.showAlert) window.showAlert(data.message || {{ _("An error occurred. Please try again.")|tojson|safe }}, 'error');
                     else console.error(data.message);
                 }
             } catch (error) {
                 console.error('Error submitting form:', error);
-                if (window.showAlert) window.showAlert('{{ _("Failed to submit form. Please try again.") }}', 'error');
+                if (window.showAlert) window.showAlert({{ _("Failed to submit form. Please try again.")|tojson|safe }}, 'error');
                 else console.error('Failed to submit form');
             } finally {
                 form.dataset.submitting = '0';

@@ -65,7 +65,7 @@
         {% set type_classes = 'bg-blue-50 text-blue-800 border-blue-200' %}
         {% set type_icon = 'fas fa-question-circle' %}
     {% elif type_key == 'unknown' %}
-        <span class="imputation-meta-badge imputation-meta-badge--empty px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-400 border-gray-200" title="{{ _('Type not set on this item') }}">
+        <span class="imputation-meta-badge imputation-meta-badge--empty px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-400 border-gray-200" title="{{ _('Type not set on this item')|forceescape }}">
             <i class="fas fa-question text-[10px]" aria-hidden="true"></i>
             <span class="imputation-meta-badge__label">{{ type_label }}</span>
         </span>
@@ -92,7 +92,7 @@
         {% set unit_label = _('No unit') %}
     {% endif %}
     {% if not raw_unit %}
-        <span class="imputation-meta-badge imputation-meta-badge--empty px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-400 border-gray-200" title="{{ _('No measurement unit') }}">
+        <span class="imputation-meta-badge imputation-meta-badge--empty px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-400 border-gray-200" title="{{ _('No measurement unit')|forceescape }}">
             <i class="fas fa-ban text-[10px]" aria-hidden="true"></i>
             <span class="imputation-meta-badge__label">{{ unit_label }}</span>
         </span>

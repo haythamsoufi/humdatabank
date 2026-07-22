@@ -347,7 +347,7 @@
                 labels: labels,
                 datasets: [
                     {
-                        label: '{{ _("Requests") }}',
+                        label: {{ _("Requests")|tojson|safe }},
                         data: requests,
                         backgroundColor: 'rgba(59,130,246,0.5)',
                         borderColor: 'rgb(59,130,246)',
@@ -355,7 +355,7 @@
                         order: 2
                     },
                     {
-                        label: '{{ _("Errors") }}',
+                        label: {{ _("Errors")|tojson|safe }},
                         data: errors,
                         backgroundColor: 'rgba(239,68,68,0.55)',
                         borderColor: 'rgb(239,68,68)',

@@ -99,14 +99,14 @@
                 <button type="button"
                         data-action="reload-all"
                         class="btn btn-primary"
-                        title="{{ _('Reload all plugins to detect changes') }}">
+                        title="{{ _('Reload all plugins to detect changes')|forceescape }}">
                     <i class="fas fa-sync-alt w-4 h-4 mr-2"></i>
                     {{ _('Reload All Plugins') }}
                 </button>
                 <button type="button"
                         data-action="scan-new"
                         class="btn btn-success"
-                        title="{{ _('Scan plugin directories for new plugins') }}">
+                        title="{{ _('Scan plugin directories for new plugins')|forceescape }}">
                     <i class="fas fa-search w-4 h-4 mr-2"></i>
                     {{ _('Scan for New Plugins') }}
                 </button>

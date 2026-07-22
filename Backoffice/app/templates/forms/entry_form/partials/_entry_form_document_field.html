@@ -101,12 +101,12 @@
                                             data-year="{{ doc.year or '' }}"
                                             data-is-public="{{ doc.is_public|lower }}"
                                             {% if field.config %}data-field-config='{{ field.config | tojson }}'{% endif %}
-                                            title="{{ _('Edit Document') }}"
-                                            aria-label="{{ _('Edit Document') }}">
+                                            title="{{ _('Edit Document')|forceescape }}"
+                                            aria-label="{{ _('Edit Document')|forceescape }}">
                                         <i class="fas fa-pen" aria-hidden="true"></i>
                                     </button>
                                     <input type="hidden" name="delete_document_{{ doc.id }}" id="delete_document_hidden_{{ doc.id }}" value="false">
-                                    <button type="button" class="btn btn-danger btn-icon btn-sm delete-document-btn" data-doc-id="{{ doc.id }}" title="{{ _('Delete Document') }}" aria-label="{{ _('Delete Document') }}" {% if not can_edit %}disabled{% endif %}>
+                                    <button type="button" class="btn btn-danger btn-icon btn-sm delete-document-btn" data-doc-id="{{ doc.id }}" title="{{ _('Delete Document')|forceescape }}" aria-label="{{ _('Delete Document')|forceescape }}" {% if not can_edit %}disabled{% endif %}>
                                         <i class="fas fa-trash-alt" aria-hidden="true"></i>
                                     </button>
                                 </div>
@@ -152,12 +152,12 @@
                                     data-year="{{ doc.year or '' }}"
                                     data-is-public="{{ doc.is_public|lower }}"
                                     {% if field.config %}data-field-config='{{ field.config | tojson }}'{% endif %}
-                                    title="{{ _('Edit Document') }}"
-                                    aria-label="{{ _('Edit Document') }}">
+                                    title="{{ _('Edit Document')|forceescape }}"
+                                    aria-label="{{ _('Edit Document')|forceescape }}">
                                 <i class="fas fa-pen" aria-hidden="true"></i>
                             </button>
                             <input type="hidden" name="delete_document_{{ doc.id }}" id="delete_document_hidden_{{ doc.id }}" value="false">
-                            <button type="button" class="btn btn-danger btn-icon btn-sm delete-document-btn" data-doc-id="{{ doc.id }}" title="{{ _('Delete Document') }}" aria-label="{{ _('Delete Document') }}" {% if not can_edit %}disabled{% endif %}>
+                            <button type="button" class="btn btn-danger btn-icon btn-sm delete-document-btn" data-doc-id="{{ doc.id }}" title="{{ _('Delete Document')|forceescape }}" aria-label="{{ _('Delete Document')|forceescape }}" {% if not can_edit %}disabled{% endif %}>
                                 <i class="fas fa-trash-alt" aria-hidden="true"></i>
                             </button>
                         </div>
@@ -193,7 +193,7 @@
                 data-has-existing="{{ 'true' if existing_docs else 'false' }}"
                 {% if field.config %}data-field-config='{{ field.config | tojson }}'{% endif %}
                 {% if field.config and field.config.max_documents %}data-max-documents="{{ field.config.max_documents }}"{% endif %}
-                title="{% if existing_docs %}{{ _('Add Another Document') }}{% else %}{{ _('Upload Document') }}{% endif %}">
+                title="{% if existing_docs %}{{ _('Add Another Document')|forceescape }}{% else %}{{ _('Upload Document')|forceescape }}{% endif %}">
             <i class="fas {% if existing_docs %}fa-plus{% else %}fa-upload{% endif %} text-lg" aria-hidden="true"></i>
             <span class="text-sm font-medium">{% if existing_docs %}{{ _('Add Another Document') }}{% else %}{{ _('Upload Document') }}{% endif %}</span>
         </button>

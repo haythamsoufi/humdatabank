@@ -84,7 +84,7 @@
     <div class="chat-immersive-beta-banner" id="chatImmersiveBetaBanner" role="banner">
         <i class="fas fa-flask" aria-hidden="true"></i>
         <span>{{ _("You're a beta tester — thank you for helping us improve this feature!") }}</span>
-        <button type="button" class="chat-immersive-beta-banner-close" id="chatImmersiveBetaBannerClose" aria-label="{{ _('Dismiss') }}" title="{{ _('Dismiss') }}">
+        <button type="button" class="chat-immersive-beta-banner-close" id="chatImmersiveBetaBannerClose" aria-label="{{ _('Dismiss')|forceescape }}" title="{{ _('Dismiss')|forceescape }}">
             <i class="fas fa-times" aria-hidden="true"></i>
         </button>
     </div>
@@ -113,23 +113,23 @@
         <!-- Sidebar: ChatGPT-style -->
         <aside class="chat-immersive-sidebar" id="chatImmersiveSidebar">
             <div class="chat-immersive-sidebar-header">
-                <a href="{{ url_for('main.dashboard') }}" class="chat-immersive-sidebar-user-link" aria-label="{{ _('Back to app') }}">
+                <a href="{{ url_for('main.dashboard') }}" class="chat-immersive-sidebar-user-link" aria-label="{{ _('Back to app')|forceescape }}">
                     {{ profile_icon(current_user, 'sm', false, false, false, 'chat-immersive-sidebar-profile') }}
                 </a>
                 <span class="chat-immersive-sidebar-user-name">{{ current_user.name or current_user.email }}</span>
-                <button type="button" class="chat-immersive-sidebar-toggle chat-immersive-sidebar-toggle-in" id="chatImmersiveSidebarToggle" aria-label="{{ _('Toggle sidebar') }}" title="{{ _('Toggle sidebar') }}">
+                <button type="button" class="chat-immersive-sidebar-toggle chat-immersive-sidebar-toggle-in" id="chatImmersiveSidebarToggle" aria-label="{{ _('Toggle sidebar')|forceescape }}" title="{{ _('Toggle sidebar')|forceescape }}">
                     <i class="fas fa-chevron-left chat-immersive-sidebar-icon-open" aria-hidden="true"></i>
                     <i class="fas fa-bars chat-immersive-sidebar-icon-closed" aria-hidden="true"></i>
                 </button>
             </div>
-            <button type="button" class="chat-immersive-new-chat" id="chatImmersiveNewChat" aria-label="{{ _('New chat') }}">
+            <button type="button" class="chat-immersive-new-chat" id="chatImmersiveNewChat" aria-label="{{ _('New chat')|forceescape }}">
                 <i class="fas fa-plus"></i>
                 <span>{{ _('New chat') }}</span>
             </button>
             <div class="chat-immersive-search-wrapper">
                 <div class="chat-immersive-search-inner">
                     <i class="fas fa-search chat-immersive-search-icon" aria-hidden="true"></i>
-                    <input type="search" id="chatImmersiveSearch" class="chat-immersive-search-input" placeholder="{{ _('Search conversations') }}" autocomplete="off" aria-label="{{ _('Search conversations') }}">
+                    <input type="search" id="chatImmersiveSearch" class="chat-immersive-search-input" placeholder="{{ _('Search conversations')|forceescape }}" autocomplete="off" aria-label="{{ _('Search conversations')|forceescape }}">
                 </div>
             </div>
             <div class="chat-immersive-chat-list-wrapper">
@@ -139,7 +139,7 @@
                 </ul>
             </div>
             <div class="chat-immersive-sidebar-footer">
-                <button type="button" class="chat-immersive-sidebar-link chat-immersive-clear-all" id="chatImmersiveClearAll" aria-label="{{ _('Clear all conversations') }}">
+                <button type="button" class="chat-immersive-sidebar-link chat-immersive-clear-all" id="chatImmersiveClearAll" aria-label="{{ _('Clear all conversations')|forceescape }}">
                     <i class="fas fa-trash"></i>
                     <span>{{ _('Clear all conversations') }}</span>
                 </button>
@@ -156,14 +156,14 @@
         <!-- Main chat area -->
         <main class="chat-immersive-main">
             <div class="chat-immersive-main-header">
-                <button type="button" id="chatImmersiveSidebarToggleMain" class="chat-immersive-sidebar-toggle chat-immersive-sidebar-toggle-main" aria-label="{{ _('Toggle sidebar') }}" title="{{ _('Toggle sidebar') }}">
+                <button type="button" id="chatImmersiveSidebarToggleMain" class="chat-immersive-sidebar-toggle chat-immersive-sidebar-toggle-main" aria-label="{{ _('Toggle sidebar')|forceescape }}" title="{{ _('Toggle sidebar')|forceescape }}">
                     <i class="fas fa-chevron-left chat-immersive-sidebar-icon-open" aria-hidden="true"></i>
                     <i class="fas fa-bars chat-immersive-sidebar-icon-closed" aria-hidden="true"></i>
                 </button>
                 <h2 class="chat-immersive-main-title" id="chatImmersiveCurrentTitle">{{ _('New chat') }}</h2>
                 <div class="chat-immersive-main-spacer"></div>
                 {% if user_is_explicit_beta_tester(current_user) %}
-                <div class="chat-immersive-beta-pill" title="{{ _('You have early beta access — thank you for helping us build this!') }}">
+                <div class="chat-immersive-beta-pill" title="{{ _('You have early beta access — thank you for helping us build this!')|forceescape }}">
                     <i class="fas fa-flask" aria-hidden="true"></i>
                     <span>{{ _('Beta') }}</span>
                 </div>
@@ -189,7 +189,7 @@
                                 <p class="chat-immersive-welcome-text">
                                     {{ _('How can I help you today?') }}
                                 </p>
-                                <div class="chat-ai-notice-block chat-ai-notice-block-immersive" id="chatAiNoticeBlock" role="note" aria-label="{{ _('AI notice') }}">
+                                <div class="chat-ai-notice-block chat-ai-notice-block-immersive" id="chatAiNoticeBlock" role="note" aria-label="{{ _('AI notice')|forceescape }}">
                                     <p class="chat-privacy-notice chat-privacy-notice-immersive">
                                         {{ _("Don't share sensitive information. We use system traces/telemetry to improve the assistant.") }}
                                     </p>
@@ -202,27 +202,27 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="chat-immersive-quick-prompts" id="chatImmersiveQuickPrompts" aria-label="{{ _('Example prompts') }}">
+                        <div class="chat-immersive-quick-prompts" id="chatImmersiveQuickPrompts" aria-label="{{ _('Example prompts')|forceescape }}">
                             <p class="chat-immersive-quick-prompts-label">{{ _('Try asking') }}</p>
                             <div class="chat-immersive-quick-prompts-list">
-                                <button type="button" class="chat-immersive-quick-prompt" data-prompt="{{ _('How many volunteers in Bangladesh?') }}">{{ _('How many volunteers in Bangladesh?') }}</button>
-                                <button type="button" class="chat-immersive-quick-prompt" data-prompt="{{ _('Volunteers in Syria over time') }}">{{ _('Volunteers in Syria over time') }}</button>
-                                <button type="button" class="chat-immersive-quick-prompt" data-prompt="{{ _('World heatmap of volunteers by country') }}">{{ _('World heatmap of volunteers by country') }}</button>
-                                <button type="button" class="chat-immersive-quick-prompt" data-prompt="{{ _('Number of branches in Kenya') }}">{{ _('Number of branches in Kenya') }}</button>
-                                <button type="button" class="chat-immersive-quick-prompt" data-prompt="{{ _('Staff and local units in Nigeria') }}">{{ _('Staff and local units in Nigeria') }}</button>
+                                <button type="button" class="chat-immersive-quick-prompt" data-prompt="{{ _('How many volunteers in Bangladesh?')|forceescape }}">{{ _('How many volunteers in Bangladesh?') }}</button>
+                                <button type="button" class="chat-immersive-quick-prompt" data-prompt="{{ _('Volunteers in Syria over time')|forceescape }}">{{ _('Volunteers in Syria over time') }}</button>
+                                <button type="button" class="chat-immersive-quick-prompt" data-prompt="{{ _('World heatmap of volunteers by country')|forceescape }}">{{ _('World heatmap of volunteers by country') }}</button>
+                                <button type="button" class="chat-immersive-quick-prompt" data-prompt="{{ _('Number of branches in Kenya')|forceescape }}">{{ _('Number of branches in Kenya') }}</button>
+                                <button type="button" class="chat-immersive-quick-prompt" data-prompt="{{ _('Staff and local units in Nigeria')|forceescape }}">{{ _('Staff and local units in Nigeria') }}</button>
                             </div>
                         </div>
                     </div>
                     <div class="chat-input-wrapper-immersive">
                         <div class="chat-input-container chat-immersive-input-container">
-                            <button type="button" class="chat-immersive-input-add" id="chatImmersiveAddBtn" aria-label="{{ _('Add') }}" title="{{ _('Add') }}" aria-disabled="true" disabled>
+                            <button type="button" class="chat-immersive-input-add" id="chatImmersiveAddBtn" aria-label="{{ _('Add')|forceescape }}" title="{{ _('Add')|forceescape }}" aria-disabled="true" disabled>
                                 <i class="fas fa-plus"></i>
                             </button>
                             <textarea
                                 class="chat-input chat-immersive-input"
                                 id="chatInput"
                                 dir="auto"
-                                placeholder="{{ _('Ask anything') }}"
+                                placeholder="{{ _('Ask anything')|forceescape }}"
                                 maxlength="4000"
                                 autocomplete="off"
                                 rows="1"
@@ -232,8 +232,8 @@
                                     id="chatImmersiveSourcesBtn"
                                     type="button"
                                     class="px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-150 ease-in-out rounded-md"
-                                    aria-label="{{ _('Configure data sources') }}"
-                                    title="{{ _('Configure data sources') }}"
+                                    aria-label="{{ _('Configure data sources')|forceescape }}"
+                                    title="{{ _('Configure data sources')|forceescape }}"
                                 >
                                     <i class="fas fa-sliders-h" aria-hidden="true"></i>
                                 </button>
@@ -256,7 +256,7 @@
                                     </label>
                                 </div>
                             </div>
-                            <button type="button" class="chat-send chat-immersive-send" id="chatSendBtn" aria-label="{{ _('Send') }}" title="{{ _('Send') }}" data-send-label="{{ _('Send') }}" data-stop-label="{{ _('Stop') }}">
+                            <button type="button" class="chat-send chat-immersive-send" id="chatSendBtn" aria-label="{{ _('Send')|forceescape }}" title="{{ _('Send')|forceescape }}" data-send-label="{{ _('Send')|forceescape }}" data-stop-label="{{ _('Stop')|forceescape }}">
                                 <i class="fas fa-arrow-up"></i>
                             </button>
                         </div>

@@ -164,9 +164,9 @@
                 <dt class="text-sm text-gray-500">{{ _('User rating') }}</dt>
                 <dd class="mt-1">
                     {% if trace.user_rating == 'like' %}
-                    <span class="inline-flex items-center text-green-700" title="{{ _('Like') }}"><i class="fas fa-thumbs-up mr-1"></i> {{ _('Like') }}</span>
+                    <span class="inline-flex items-center text-green-700" title="{{ _('Like')|forceescape }}"><i class="fas fa-thumbs-up mr-1"></i> {{ _('Like') }}</span>
                     {% elif trace.user_rating == 'dislike' %}
-                    <span class="inline-flex items-center text-red-700" title="{{ _('Dislike') }}"><i class="fas fa-thumbs-down mr-1"></i> {{ _('Dislike') }}</span>
+                    <span class="inline-flex items-center text-red-700" title="{{ _('Dislike')|forceescape }}"><i class="fas fa-thumbs-down mr-1"></i> {{ _('Dislike') }}</span>
                     {% else %}
                     <span class="text-gray-600">{{ trace.user_rating }}</span>
                     {% endif %}
@@ -331,21 +331,21 @@
         <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-list-ol text-purple-500 mr-2"></i>{{ _('Reasoning Steps') }}</h3>
         <div class="flex items-center gap-2">
             {% if trace.steps %}
-            <button type="button" id="{{ id_prefix }}CopyForAIReview" class="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy full trace with metadata for AI review') }}">
+            <button type="button" id="{{ id_prefix }}CopyForAIReview" class="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy full trace with metadata for AI review')|forceescape }}">
                 <i class="fas fa-robot mr-0.5" aria-hidden="true"></i>
                 <span id="{{ id_prefix }}CopyForAIReviewLabel">{{ _('Copy for AI Review') }}</span>
             </button>
-            <button type="button" id="{{ id_prefix }}CopySteps" class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy all steps with details') }}">
+            <button type="button" id="{{ id_prefix }}CopySteps" class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy all steps with details')|forceescape }}">
                 <i class="fas fa-copy mr-0.5" aria-hidden="true"></i>
                 <span id="{{ id_prefix }}CopyStepsLabel">{{ _('Copy') }}</span>
             </button>
-            <button type="button" id="{{ id_prefix }}CopyStepsSummarised" class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy all steps with observations limited to 30 lines each') }}">
+            <button type="button" id="{{ id_prefix }}CopyStepsSummarised" class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 rounded px-2 py-1" title="{{ _('Copy all steps with observations limited to 30 lines each')|forceescape }}">
                 <i class="fas fa-copy mr-0.5" aria-hidden="true"></i>
                 <span id="{{ id_prefix }}CopyStepsSummarisedLabel">{{ _('Copy Summarised') }}</span>
             </button>
             {% endif %}
             {% if has_observations %}
-            <button type="button" id="{{ id_prefix }}ExpandAllObservations" class="text-sm font-medium text-green-600 hover:text-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 rounded px-2 py-1" data-expand-label="{{ _('Expand all observations') }}" data-collapse-label="{{ _('Collapse all observations') }}">
+            <button type="button" id="{{ id_prefix }}ExpandAllObservations" class="text-sm font-medium text-green-600 hover:text-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 rounded px-2 py-1" data-expand-label="{{ _('Expand all observations')|forceescape }}" data-collapse-label="{{ _('Collapse all observations')|forceescape }}">
                 <i class="fas fa-chevron-down mr-1" id="{{ id_prefix }}ExpandCollapseIcon"></i>
                 <span id="{{ id_prefix }}ExpandCollapseLabel">{{ _('Expand all observations') }}</span>
             </button>

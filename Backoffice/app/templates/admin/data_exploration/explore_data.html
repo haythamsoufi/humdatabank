@@ -249,15 +249,15 @@
                             class="btn btn-purple"
                             style="border-right:1px solid rgba(168,85,247,0.4);"
                             disabled
-                            title="{{ _('Select one or more records to run AI validation') }}">
+                            title="{{ _('Select one or more records to run AI validation')|forceescape }}">
                         <i class="fas fa-magic mr-2"></i>{{ _('Run AI validation') }}
                     </button>
                     <div id="ai-validation-sources" class="relative flex">
                         <button id="ai-validation-sources-btn"
                                 type="button"
                                 class="btn btn-purple"
-                                aria-label="{{ _('Configure AI validation sources') }}"
-                                title="{{ _('Configure AI validation sources') }}">
+                                aria-label="{{ _('Configure AI validation sources')|forceescape }}"
+                                title="{{ _('Configure AI validation sources')|forceescape }}">
                             <i class="fas fa-sliders-h"></i>
                         </button>
                         <div id="ai-validation-sources-menu"
@@ -372,8 +372,8 @@
             <!-- Summary stats bar (5 cards) - Modern gradient design with inline styles for color compatibility -->
             <div id="disagg-stats-bar" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6" style="display: none;">
                 <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);"
-                     title="{{ _('Percentage of eligible indicators reported with sex, age, sex-and-age, matrix, or disability disaggregation. Based on all eligible indicators in the current filters.') }}"
-                     aria-label="{{ _('Disaggregation coverage: percentage of eligible indicators reported with disaggregation.') }}">
+                     title="{{ _('Percentage of eligible indicators reported with sex, age, sex-and-age, matrix, or disability disaggregation. Based on all eligible indicators in the current filters.')|forceescape }}"
+                     aria-label="{{ _('Disaggregation coverage: percentage of eligible indicators reported with disaggregation.')|forceescape }}">
                     <div class="flex items-center justify-between mb-2">
                         <i class="fas fa-chart-pie text-lg" style="color: rgba(255,255,255,0.7);"></i>
                         <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
@@ -385,8 +385,8 @@
                     <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Reported with disaggregation') }}</div>
                 </div>
                 <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);"
-                     title="{{ _('Number of indicators included in this analysis. Eligible indicators have people-oriented units or configured disaggregation options.') }}"
-                     aria-label="{{ _('Eligible indicators: count of indicators included in this analysis.') }}">
+                     title="{{ _('Number of indicators included in this analysis. Eligible indicators have people-oriented units or configured disaggregation options.')|forceescape }}"
+                     aria-label="{{ _('Eligible indicators: count of indicators included in this analysis.')|forceescape }}">
                     <div class="flex items-center justify-between mb-2">
                         <i class="fas fa-users text-lg" style="color: rgba(255,255,255,0.7);"></i>
                         <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
@@ -398,8 +398,8 @@
                     <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Indicators in scope') }}</div>
                 </div>
                 <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);"
-                     title="{{ _('Indicators with a single reported value but no disaggregation breakdown. These are reported, but not disaggregated.') }}"
-                     aria-label="{{ _('Total-only reporting: indicators with a value but without a disaggregation breakdown.') }}">
+                     title="{{ _('Indicators with a single reported value but no disaggregation breakdown. These are reported, but not disaggregated.')|forceescape }}"
+                     aria-label="{{ _('Total-only reporting: indicators with a value but without a disaggregation breakdown.')|forceescape }}">
                     <div class="flex items-center justify-between mb-2">
                         <i class="fas fa-crown text-lg" style="color: rgba(255,255,255,0.7);"></i>
                         <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
@@ -411,8 +411,8 @@
                     <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('Reported, not disaggregated') }}</div>
                 </div>
                 <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"
-                     title="{{ _('Expected indicators with no saved reported value. These appear when non-reported items are included for a bounded template, period, and country scope.') }}"
-                     aria-label="{{ _('Not reported: expected indicators with no saved reported value.') }}">
+                     title="{{ _('Expected indicators with no saved reported value. These appear when non-reported items are included for a bounded template, period, and country scope.')|forceescape }}"
+                     aria-label="{{ _('Not reported: expected indicators with no saved reported value.')|forceescape }}">
                     <div class="flex items-center justify-between mb-2">
                         <i class="fas fa-hand-holding-heart text-lg" style="color: rgba(255,255,255,0.7);"></i>
                         <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
@@ -424,8 +424,8 @@
                     <div class="text-sm mt-1" style="color: rgba(255,255,255,0.9);">{{ _('No reported value saved') }}</div>
                 </div>
                 <div class="rounded-xl p-4 shadow-lg text-white" style="background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);"
-                     title="{{ _('Percentage of eligible indicators that include age information, either age-only or combined sex-and-age disaggregation. Based on all eligible indicators in the current filters.') }}"
-                     aria-label="{{ _('Age breakdown coverage: percentage of eligible indicators with age or sex-and-age disaggregation.') }}">
+                     title="{{ _('Percentage of eligible indicators that include age information, either age-only or combined sex-and-age disaggregation. Based on all eligible indicators in the current filters.')|forceescape }}"
+                     aria-label="{{ _('Age breakdown coverage: percentage of eligible indicators with age or sex-and-age disaggregation.')|forceescape }}">
                     <div class="flex items-center justify-between mb-2">
                         <i class="fas fa-briefcase text-lg" style="color: rgba(255,255,255,0.7);"></i>
                         <span class="text-xs font-medium text-right cursor-help" style="color: rgba(255,255,255,0.8);">
@@ -555,7 +555,7 @@
                             <option value="">{{ _('Latest') }}</option>
                         </select>
                     </div>
-                    <button id="refresh-compliance-btn" class="px-3 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition duration-150 ease-in-out" title="{{ _('Refresh') }}">
+                    <button id="refresh-compliance-btn" class="px-3 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition duration-150 ease-in-out" title="{{ _('Refresh')|forceescape }}">
                         <i class="fas fa-sync-alt"></i>
                     </button>
                     <button id="download-compliance-btn" class="btn btn-success">
@@ -737,13 +737,13 @@
 
         const requestedTemplateId = String(templateId || getDisaggTemplateId()).trim();
         if (!requestedTemplateId) {
-            yearSelect.innerHTML = '<option value="">{{ _("No years") }}</option>';
+            yearSelect.innerHTML = '<option value="">' + {{ _("No years")|tojson|safe }} + '</option>';
             yearSelect.disabled = true;
             return;
         }
 
         yearSelect.disabled = true;
-        yearSelect.innerHTML = '<option value="">{{ _("Loading...") }}</option>';
+        yearSelect.innerHTML = '<option value="">' + {{ _("Loading...")|tojson|safe }} + '</option>';
 
         try {
             const response = await fetch(`/admin/data-exploration/assignment-filters?template_id=${encodeURIComponent(requestedTemplateId)}`, {
@@ -767,7 +767,7 @@
             const years = extractYearsFromPeriods(result.period_names || []);
             yearSelect.innerHTML = '';
             if (!years.length) {
-                yearSelect.innerHTML = '<option value="">{{ _("No years") }}</option>';
+                yearSelect.innerHTML = '<option value="">' + {{ _("No years")|tojson|safe }} + '</option>';
                 yearSelect.disabled = true;
                 return;
             }
@@ -788,7 +788,7 @@
             yearSelect.disabled = false;
         } catch (error) {
             console.error('Error loading disaggregation years:', error);
-            yearSelect.innerHTML = '<option value="">{{ _("Error loading years") }}</option>';
+            yearSelect.innerHTML = '<option value="">' + {{ _("Error loading years")|tojson|safe }} + '</option>';
             yearSelect.disabled = true;
         }
     }
@@ -1057,11 +1057,11 @@
         isDataLoading = loading;
         if (domCache.applyFiltersBtn) {
             if (loading) {
-                domCache.applyFiltersBtn.innerHTML = '<i class="fas fa-times mr-2"></i>{{ _("Cancel") }}';
+                domCache.applyFiltersBtn.innerHTML = '<i class="fas fa-times mr-2"></i>' + {{ _("Cancel")|tojson|safe }};
                 domCache.applyFiltersBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
                 domCache.applyFiltersBtn.classList.add('bg-red-600', 'hover:bg-red-700');
             } else {
-                domCache.applyFiltersBtn.innerHTML = '<i class="fas fa-download mr-2"></i>{{ _("Load Data") }}';
+                domCache.applyFiltersBtn.innerHTML = '<i class="fas fa-download mr-2"></i>' + {{ _("Load Data")|tojson|safe }};
                 domCache.applyFiltersBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
                 domCache.applyFiltersBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
             }
@@ -1165,15 +1165,15 @@
     let complianceGridApi = null;
 
     const COMPLIANCE_DOC_TYPE_LABELS = {
-        'Annual Report': '{{ _("Annual Report") }}',
-        'Audited Financial Statement': '{{ _("Audited Financial Statement") }}'
+        'Annual Report': {{ _("Annual Report")|tojson|safe }},
+        'Audited Financial Statement': {{ _("Audited Financial Statement")|tojson|safe }}
     };
     const DEFAULT_COMPLIANCE_DOC_TYPES = ['Annual Report', 'Audited Financial Statement'];
     const COMPLIANCE_DOC_STATUS_LABELS = {
-        missing: '{{ _("Missing") }}',
-        pending: '{{ _("Pending validation") }}',
-        approved: '{{ _("Approved") }}',
-        rejected: '{{ _("Rejected") }}'
+        missing: {{ _("Missing")|tojson|safe }},
+        pending: {{ _("Pending validation")|tojson|safe }},
+        approved: {{ _("Approved")|tojson|safe }},
+        rejected: {{ _("Rejected")|tojson|safe }}
     };
     const COMPLIANCE_YEAR_STORAGE_KEY = 'humdb_compliance_reference_year_v1';
 
@@ -1270,10 +1270,10 @@
         const dataNotAvailable = item.data_not_available || (item.data_status === 'data_not_available');
         const notApplicable = item.not_applicable || (item.data_status === 'not_applicable');
         if (dataNotAvailable) {
-            return '<span class="text-gray-500 italic">{{ _("Data Not Available") }}</span>';
+            return '<span class="text-gray-500 italic">' + {{ _("Data Not Available")|tojson|safe }} + '</span>';
         }
         if (notApplicable) {
-            return '<span class="text-gray-500 italic">{{ _("Not Applicable") }}</span>';
+            return '<span class="text-gray-500 italic">' + {{ _("Not Applicable")|tojson|safe }} + '</span>';
         }
 
         // Reported value first, then imputed value when main value is missing
@@ -1291,14 +1291,14 @@
         if (!isNaN(numValue) && isFinite(numValue)) {
             const formatted = numValue.toLocaleString();
             if (isImputed) {
-                return `<span class="font-semibold text-blue-600" title="{{ _('Imputed value') }}">${escapeHtml(formatted)} <span class="text-xs text-blue-500 font-normal">({{ _('imputed') }})</span></span>`;
+                return `<span class="font-semibold text-blue-600" title={{ _('Imputed value')|tojson|safe }}>${escapeHtml(formatted)} <span class="text-xs text-blue-500 font-normal">(` + {{ _('imputed')|tojson|safe }} + `)</span></span>`;
             }
             return `<span class="font-semibold text-blue-700">${formatted}</span>`;
         }
 
         // Non-numeric value, escape and display as-is
         if (isImputed) {
-            return `<span class="text-blue-600" title="{{ _('Imputed value') }}">${escapeHtml(String(displayValue))} <span class="text-xs text-blue-500 font-normal">({{ _('imputed') }})</span></span>`;
+            return `<span class="text-blue-600" title={{ _('Imputed value')|tojson|safe }}>${escapeHtml(String(displayValue))} <span class="text-xs text-blue-500 font-normal">(` + {{ _('imputed')|tojson|safe }} + `)</span></span>`;
         }
         return escapeHtml(String(displayValue));
     }
@@ -1601,9 +1601,9 @@
                             {{ _("More details") }}
                         </summary>
                         <div class="mt-2 pl-1 border-l-2 border-purple-200 space-y-2 text-gray-700">
-                            ${opinionDetails ? `<div><span class="font-semibold text-gray-800">{{ _("Detailed analysis") }}:</span> ${escapeHtml(opinionDetails)}</div>` : ''}
-                            ${decision ? `<div><span class="font-semibold text-gray-800">{{ _("Decision") }}:</span> <span class="font-mono text-purple-800">${escapeHtml(decision)}</span></div>` : ''}
-                            ${(basis && basis.length) ? `<div><span class="font-semibold text-gray-800">{{ _("Based on") }}:</span> ${basis.map(b => `<span class="inline-block mr-1 mt-0.5 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-purple-800">${escapeHtml(String(b))}</span>`).join('')}</div>` : ''}
+                            ${opinionDetails ? `<div><span class="font-semibold text-gray-800">` + {{ _("Detailed analysis")|tojson|safe }} + `:</span> ${escapeHtml(opinionDetails)}</div>` : ''}
+                            ${decision ? `<div><span class="font-semibold text-gray-800">` + {{ _("Decision")|tojson|safe }} + `:</span> <span class="font-mono text-purple-800">${escapeHtml(decision)}</span></div>` : ''}
+                            ${(basis && basis.length) ? `<div><span class="font-semibold text-gray-800">` + {{ _("Based on")|tojson|safe }} + `:</span> ${basis.map(b => `<span class="inline-block mr-1 mt-0.5 px-2 py-0.5 rounded-full bg-purple-50 border border-purple-200 text-purple-800">${escapeHtml(String(b))}</span>`).join('')}</div>` : ''}
                             ${(sources && sources.length) ? formatAiSourcesHtml(sources) : ''}
                         </div>
                     </details>
@@ -1624,9 +1624,9 @@
                         ${(uprTitle || (uprPage !== null && !Number.isNaN(uprPage)) || uprUrl) ? `
                             <div class="text-blue-800/80 mt-1">
                                 <span class="font-medium">{{ _("Source") }}:</span>
-                                ${uprTitle ? `<span>${escapeHtml(uprTitle)}</span>` : `<span>{{ _("UPR KPI card") }}</span>`}
-                                ${(uprPage !== null && !Number.isNaN(uprPage) && uprPage > 0) ? `<span> ({{ _("p.") }} ${escapeHtml(String(uprPage))})</span>` : ''}
-                                ${uprUrl ? `<span class="ml-2"><a class="underline" href="${escapeHtml(uprUrl)}" target="_blank" rel="noopener">{{ _("Open") }}</a></span>` : ''}
+                                ${uprTitle ? `<span>${escapeHtml(uprTitle)}</span>` : `<span>` + {{ _("UPR KPI card")|tojson|safe }} + `</span>`}
+                                ${(uprPage !== null && !Number.isNaN(uprPage) && uprPage > 0) ? `<span> (` + {{ _("p.")|tojson|safe }} + ` ${escapeHtml(String(uprPage))})</span>` : ''}
+                                ${uprUrl ? `<span class="ml-2"><a class="underline" href="${escapeHtml(uprUrl)}" target="_blank" rel="noopener">` + {{ _("Open")|tojson|safe }} + `</a></span>` : ''}
                             </div>
                         ` : ''}
                         <div class="mt-2">
@@ -1637,7 +1637,7 @@
                                 data-suggested-value="${escapeHtml(encodeURIComponent(JSON.stringify(suggestedValue)))}"
                                 data-suggested-disagg="${escapeHtml(encodeURIComponent(JSON.stringify(suggestedDisaggData)))}"
                                 ${hasImputed ? 'disabled' : ''}>
-                                <i class="fas fa-check mr-1"></i>${hasImputed ? '{{ _("Imputed") }}' : '{{ _("Apply as imputed value") }}'}
+                                <i class="fas fa-check mr-1"></i>${hasImputed ? {{ _("Imputed")|tojson|safe }} : {{ _("Apply as imputed value")|tojson|safe }}}
                             </button>
                         </div>
                     </div>
@@ -1712,7 +1712,7 @@
     const columnDefs = [
         {
             field: 'id',
-            headerName: '{{ _("ID") }}',
+            headerName: {{ _("ID")|tojson|safe }},
             width: 80,
             minWidth: 80,
             maxWidth: 120,
@@ -1734,7 +1734,7 @@
         },
         {
             field: 'template_name',
-            headerName: '{{ _("Template") }}',
+            headerName: {{ _("Template")|tojson|safe }},
             width: 250,
             minWidth: 200,
             maxWidth: 350,
@@ -1746,7 +1746,7 @@
         },
         {
             field: 'period_name',
-            headerName: '{{ _("Assignment Period") }}',
+            headerName: {{ _("Assignment Period")|tojson|safe }},
             width: 180,
             minWidth: 150,
             maxWidth: 250,
@@ -1759,7 +1759,7 @@
         },
         {
             field: 'country_name',
-            headerName: '{{ _("Country") }}',
+            headerName: {{ _("Country")|tojson|safe }},
             width: 200,
             minWidth: 150,
             maxWidth: 300,
@@ -1772,7 +1772,7 @@
         },
         {
             field: 'form_item_label',
-            headerName: '{{ _("Form Item") }}',
+            headerName: {{ _("Form Item")|tojson|safe }},
             width: 250,
             minWidth: 200,
             maxWidth: 350,
@@ -1787,7 +1787,7 @@
         },
         {
             field: 'answer_value',
-            headerName: '{{ _("Answer Value") }}',
+            headerName: {{ _("Answer Value")|tojson|safe }},
             width: 150,
             minWidth: 120,
             maxWidth: 200,
@@ -1813,7 +1813,7 @@
         },
         {
             field: 'disaggregation_data',
-            headerName: '{{ _("Disaggregation Data") }}',
+            headerName: {{ _("Disaggregation Data")|tojson|safe }},
             width: 300,
             minWidth: 250,
             maxWidth: 400,
@@ -1838,7 +1838,7 @@
         },
         {
             field: 'submission_type',
-            headerName: '{{ _("Submission Type") }}',
+            headerName: {{ _("Submission Type")|tojson|safe }},
             width: 200,
             minWidth: 160,
             maxWidth: 300,
@@ -1852,7 +1852,7 @@
         },
         {
             field: 'submitted_at',
-            headerName: '{{ _("Submitted At") }}',
+            headerName: {{ _("Submitted At")|tojson|safe }},
             width: 180,
             minWidth: 150,
             maxWidth: 250,
@@ -1875,7 +1875,7 @@
         {% if user_has_ai_beta_access(current_user) %}
         {
             field: 'ai_validation',
-            headerName: '{{ _("AI opinion") }}',
+            headerName: {{ _("AI opinion")|tojson|safe }},
             width: 320,
             minWidth: 260,
             maxWidth: 420,
@@ -1901,15 +1901,15 @@
         const periodHelp = domCache.assignmentFilterHelp;
         const countryHelp = domCache.countryFilterHelp;
         if (periodSelect) {
-            periodSelect.innerHTML = '<option value="">{{ _("All Periods") }}</option>';
+            periodSelect.innerHTML = '<option value="">' + {{ _("All Periods")|tojson|safe }} + '</option>';
             periodSelect.disabled = true;
         }
         if (countrySelect) {
-            countrySelect.innerHTML = '<option value="">{{ _("All Countries") }}</option>';
+            countrySelect.innerHTML = '<option value="">' + {{ _("All Countries")|tojson|safe }} + '</option>';
             countrySelect.disabled = true;
         }
-        if (periodHelp) periodHelp.textContent = '{{ _("Select a template first to load periods") }}';
-        if (countryHelp) countryHelp.textContent = '{{ _("Select a template first to load countries") }}';
+        if (periodHelp) periodHelp.textContent = {{ _("Select a template first to load periods")|tojson|safe }};
+        if (countryHelp) countryHelp.textContent = {{ _("Select a template first to load countries")|tojson|safe }};
     }
 
     // Load assignment periods and countries for the selected template
@@ -1928,8 +1928,8 @@
 
         periodSelect.disabled = true;
         countrySelect.disabled = true;
-        if (periodHelp) periodHelp.textContent = '{{ _("Loading periods...") }}';
-        if (countryHelp) countryHelp.textContent = '{{ _("Loading countries...") }}';
+        if (periodHelp) periodHelp.textContent = {{ _("Loading periods...")|tojson|safe }};
+        if (countryHelp) countryHelp.textContent = {{ _("Loading countries...")|tojson|safe }};
 
         try {
             const response = await fetch(`/admin/data-exploration/assignment-filters?template_id=${encodeURIComponent(requestedTemplateId)}`, {
@@ -1954,14 +1954,14 @@
             const currentTemplateId = String(domCache.templateFilter?.value || '').trim();
             if (currentTemplateId !== requestedTemplateId) return;
 
-            periodSelect.innerHTML = '<option value="">{{ _("All Periods") }}</option>';
+            periodSelect.innerHTML = '<option value="">' + {{ _("All Periods")|tojson|safe }} + '</option>';
             for (const p of periodNames) {
                 const opt = document.createElement('option');
                 opt.value = p;
                 opt.textContent = p;
                 periodSelect.appendChild(opt);
             }
-            countrySelect.innerHTML = '<option value="">{{ _("All Countries") }}</option>';
+            countrySelect.innerHTML = '<option value="">' + {{ _("All Countries")|tojson|safe }} + '</option>';
             for (const c of countries) {
                 const opt = document.createElement('option');
                 opt.value = c.id;
@@ -1970,13 +1970,13 @@
             }
             periodSelect.disabled = false;
             countrySelect.disabled = false;
-            if (periodHelp) periodHelp.textContent = periodNames.length ? `${periodNames.length} {{ _("periods") }}` : '{{ _("No periods for this template") }}';
-            if (countryHelp) countryHelp.textContent = countries.length ? `${countries.length} {{ _("countries") }}` : '{{ _("No countries for this template") }}';
+            if (periodHelp) periodHelp.textContent = periodNames.length ? `${periodNames.length} ' + {{ _("periods")|tojson|safe }} + '` : {{ _("No periods for this template")|tojson|safe }};
+            if (countryHelp) countryHelp.textContent = countries.length ? `${countries.length} ' + {{ _("countries")|tojson|safe }} + '` : {{ _("No countries for this template")|tojson|safe }};
         } catch (error) {
             console.error('Error loading assignment filters:', error);
             resetAssignmentFilters();
-            if (periodHelp) periodHelp.textContent = '{{ _("Error loading periods") }}';
-            if (countryHelp) countryHelp.textContent = '{{ _("Error loading countries") }}';
+            if (periodHelp) periodHelp.textContent = {{ _("Error loading periods")|tojson|safe }};
+            if (countryHelp) countryHelp.textContent = {{ _("Error loading countries")|tojson|safe }};
         }
     }
 
@@ -1992,17 +1992,17 @@
         window.__clientDebug && window.__clientDebug('[ExploreData] loadFormItems start', { requestSeq, templateId: requestedTemplateId });
 
         // Reset form item dropdown
-        formItemSelect.innerHTML = '<option value="">{{ _("All Form Items") }}</option>';
+        formItemSelect.innerHTML = '<option value="">' + {{ _("All Form Items")|tojson|safe }} + '</option>';
 
         if (!requestedTemplateId) {
             formItemSelect.disabled = true;
-            formItemHelpText.textContent = '{{ _("Select a template first to load form items") }}';
+            formItemHelpText.textContent = {{ _("Select a template first to load form items")|tojson|safe }};
             return;
         }
 
         // Show loading state
         formItemSelect.disabled = true;
-        formItemHelpText.textContent = '{{ _("Loading form items...") }}';
+        formItemHelpText.textContent = {{ _("Loading form items...")|tojson|safe }};
 
         try {
             const response = await fetch(`/admin/data-exploration/form-items?template_id=${encodeURIComponent(requestedTemplateId)}`, {
@@ -2022,14 +2022,14 @@
                 // Provide user-friendly error messages for common errors
                 if (response.status === 403) {
                     if (errorMessage.includes('no access to requested template')) {
-                        errorMessage = '{{ _("You do not have access to the selected template. Please select a different template.") }}';
+                        errorMessage = {{ _("You do not have access to the selected template. Please select a different template.")|tojson|safe }};
                     } else {
-                        errorMessage = '{{ _("Access denied. You do not have permission to access this resource.") }}';
+                        errorMessage = {{ _("Access denied. You do not have permission to access this resource.")|tojson|safe }};
                     }
                 } else if (response.status === 404) {
-                    errorMessage = '{{ _("The requested resource was not found.") }}';
+                    errorMessage = {{ _("The requested resource was not found.")|tojson|safe }};
                 } else if (response.status >= 500) {
-                    errorMessage = '{{ _("A server error occurred. Please try again later.") }}';
+                    errorMessage = {{ _("A server error occurred. Please try again later.")|tojson|safe }};
                 }
 
                 throw new Error(errorMessage);
@@ -2085,7 +2085,7 @@
                 const section = String(item?.section_name || '').trim();
                 if (parent && section) return `${parent} » ${section}`;
                 if (section) return section;
-                return '{{ _("Other") }}';
+                return {{ _("Other")|tojson|safe }};
             }
 
             // Group items by section/subsection (preserve API order)
@@ -2138,8 +2138,8 @@
 
             formItemSelect.disabled = false;
             formItemHelpText.textContent = seenIds.size > 0
-                ? `${seenIds.size} {{ _("form items loaded") }}`
-                : '{{ _("No form items found for this template") }}';
+                ? `${seenIds.size} ' + {{ _("form items loaded")|tojson|safe }} + '`
+                : {{ _("No form items found for this template")|tojson|safe }};
 
             window.__clientDebug && window.__clientDebug('[ExploreData] loadFormItems done', {
                 requestSeq,
@@ -2150,7 +2150,7 @@
         } catch (error) {
             console.error('Error loading form items:', error);
             formItemSelect.disabled = false;
-            formItemHelpText.textContent = '{{ _("Error loading form items") }}';
+            formItemHelpText.textContent = {{ _("Error loading form items")|tojson|safe }};
         }
     }
 
@@ -2305,7 +2305,7 @@
         if (includeNonReported) {
             if (!templateId || !periodName || !countryId) {
                 if (domCache.includeNonReportedHelp) {
-                    domCache.includeNonReportedHelp.textContent = '— {{ _("Select Period + Country to show missing items") }}';
+                    domCache.includeNonReportedHelp.textContent = '— ' + {{ _("Select Period + Country to show missing items")|tojson|safe }};
                 }
                 // Don't request include_non_reported when scope is not bounded (avoids huge/ambiguous expansions).
             } else {
@@ -2370,23 +2370,23 @@
                 result = await _cachedFetch(url, currentAbortController.signal);
             } catch (fetchErr) {
                 if (fetchErr && fetchErr.name === 'AbortError') throw fetchErr;
-                let errorMessage = (fetchErr && fetchErr.message) || '{{ _("An error occurred while loading data") }}';
+                let errorMessage = (fetchErr && fetchErr.message) || {{ _("An error occurred while loading data")|tojson|safe }};
                 const httpStatus = fetchErr && fetchErr.httpStatus;
                 if (httpStatus === 403) {
                     if (errorMessage.includes('no access to requested template')) {
-                        errorMessage = '{{ _("You do not have access to the selected template. Please select a different template.") }}';
+                        errorMessage = {{ _("You do not have access to the selected template. Please select a different template.")|tojson|safe }};
                         if (disaggOnly && domCache.disaggTemplateFilter) {
                             domCache.disaggTemplateFilter.selectedIndex = 0;
                         } else if (domCache.templateFilter) {
                             domCache.templateFilter.value = '';
                         }
                     } else {
-                        errorMessage = '{{ _("Access denied. You do not have permission to access this resource.") }}';
+                        errorMessage = {{ _("Access denied. You do not have permission to access this resource.")|tojson|safe }};
                     }
                 } else if (httpStatus === 404) {
-                    errorMessage = '{{ _("The requested resource was not found.") }}';
+                    errorMessage = {{ _("The requested resource was not found.")|tojson|safe }};
                 } else if (httpStatus >= 500) {
-                    errorMessage = '{{ _("A server error occurred. Please try again later.") }}';
+                    errorMessage = {{ _("A server error occurred. Please try again later.")|tojson|safe }};
                 }
                 throw new Error(errorMessage);
             }
@@ -2565,7 +2565,7 @@
 
             console.error('Error loading data:', error);
             if (domCache.errorText) {
-                domCache.errorText.textContent = error.message || '{{ _("An error occurred while loading data") }}';
+                domCache.errorText.textContent = error.message || {{ _("An error occurred while loading data")|tojson|safe }};
             }
             if (!disaggOnly) {
                 if (domCache.errorMessage) domCache.errorMessage.style.display = 'block';
@@ -2759,7 +2759,7 @@
         return [
             {
                 field: 'country_name',
-                headerName: '{{ _("Country") }}',
+                headerName: {{ _("Country")|tojson|safe }},
                 pinned: 'left',
                 width: 220,
                 minWidth: 180,
@@ -2771,7 +2771,7 @@
             ...periodGroups,
             {
                 field: 'is_compliant',
-                headerName: '{{ _("Compliance Status") }}',
+                headerName: {{ _("Compliance Status")|tojson|safe }},
                 pinned: 'right',
                 width: 170,
                 minWidth: 150,
@@ -2782,7 +2782,7 @@
                     return renderComplianceBadge(!!params.value);
                 },
                 filterValueGetter: function(params) {
-                    return params.data && params.data.is_compliant ? '{{ _("Compliant") }}' : '{{ _("Non-Compliant") }}';
+                    return params.data && params.data.is_compliant ? {{ _("Compliant")|tojson|safe }} : {{ _("Non-Compliant")|tojson|safe }};
                 },
                 cellClass: 'compliance-cell-center',
                 headerClass: 'compliance-header-center',
@@ -2920,7 +2920,7 @@
         } catch (error) {
             console.error('Error loading compliance data:', error);
             if (domCache.complianceErrorText) {
-                domCache.complianceErrorText.textContent = error.message || '{{ _("An error occurred while loading compliance data") }}';
+                domCache.complianceErrorText.textContent = error.message || {{ _("An error occurred while loading compliance data")|tojson|safe }};
             }
             if (domCache.complianceError) domCache.complianceError.style.display = 'block';
         } finally {
@@ -2943,7 +2943,7 @@
         }
 
         // Clear and rebuild options
-        yearFilter.innerHTML = '<option value="">{{ _("Latest") }}</option>';
+        yearFilter.innerHTML = '<option value="">' + {{ _("Latest")|tojson|safe }} + '</option>';
 
         for (const year of availableYears) {
             const option = document.createElement('option');
@@ -2975,7 +2975,7 @@
 
     // Render compliance status badge
     function renderComplianceBadge(isCompliant) {
-        const badgeText = isCompliant ? '{{ _("Compliant") }}' : '{{ _("Non-Compliant") }}';
+        const badgeText = isCompliant ? {{ _("Compliant")|tojson|safe }} : {{ _("Non-Compliant")|tojson|safe }};
         return StatusLabels.render(badgeText, isCompliant ? 'success' : 'danger');
     }
 
@@ -3006,13 +3006,13 @@
         const maxLines = 12;
         let bodyLines = countryLines.slice(0, maxLines).join('<br>');
         if (countryLines.length > maxLines) {
-            bodyLines += `<br>{{ _('and') }} ${countryLines.length - maxLines} {{ _('more') }}`;
+            bodyLines += `<br>` + {{ _('and')|tojson|safe }} + ` ${countryLines.length - maxLines} ` + {{ _('more')|tojson|safe }};
         }
 
         if (domCache.compliancePendingValidationTitle) {
             domCache.compliancePendingValidationTitle.textContent = count === 1
-                ? '{{ _("1 non-compliant country has compliance documents pending validation.") }}'
-                : String(count) + ' {{ _("non-compliant countries have compliance documents pending validation.") }}';
+                ? {{ _("1 non-compliant country has compliance documents pending validation.")|tojson|safe }}
+                : String(count) + ' ' + {{ _("non-compliant countries have compliance documents pending validation.")|tojson|safe }};
         }
         if (domCache.compliancePendingValidationBody) {
             domCache.compliancePendingValidationBody.innerHTML = `
@@ -3243,7 +3243,7 @@
 
                 const originalHtml = runAiBtn.innerHTML;
                 runAiBtn.disabled = true;
-                runAiBtn.innerHTML = `<i class=\"fas fa-spinner fa-spin mr-2\"></i>{{ _('Running…') }}`;
+                runAiBtn.innerHTML = `<i class=\"fas fa-spinner fa-spin mr-2\"></i>" + {{ _('Running…')|tojson|safe }} + "`;
 
                 try {
                     const batchSize = 200;
@@ -3336,7 +3336,7 @@
 
             btn.disabled = true;
             const originalHtml = btn.innerHTML;
-            btn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i>{{ _("Saving…") }}`;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i>' + {{ _("Saving…")|tojson|safe }} + '`;
             try {
                 const body = {};
                 if (!isVirtual) {
@@ -3383,7 +3383,7 @@
                 gridHelper.setRowData(rowData);
                 gridHelper.refresh();
 
-                btn.innerHTML = `<i class="fas fa-check mr-1"></i>{{ _("Imputed") }}`;
+                btn.innerHTML = `<i class="fas fa-check mr-1"></i>' + {{ _("Imputed")|tojson|safe }} + '`;
             } catch (e) {
                 console.error('Failed to apply imputed value:', e);
                 btn.innerHTML = originalHtml;
@@ -3424,11 +3424,11 @@
                 if (domCache.includeNonReportedCheckbox) domCache.includeNonReportedCheckbox.checked = false;
                 if (domCache.formItemFilter) {
                     domCache.formItemFilter.value = '';
-                    domCache.formItemFilter.innerHTML = '<option value="">{{ _("All Form Items") }}</option>';
+                    domCache.formItemFilter.innerHTML = '<option value="">' + {{ _("All Form Items")|tojson|safe }} + '</option>';
                     domCache.formItemFilter.disabled = true;
                 }
                 if (domCache.formItemHelpText) {
-                    domCache.formItemHelpText.textContent = '{{ _("Select a template first to load form items") }}';
+                    domCache.formItemHelpText.textContent = {{ _("Select a template first to load form items")|tojson|safe }};
                 }
                 // Clear parameters from URL
                 applyParamsToUrl({ template_id: '', period_name: '', country_id: '', item_id: '', tab: '', include_non_reported: '' });
@@ -3467,7 +3467,7 @@
                     domCache.disaggInitialPrompt.innerHTML = `
                         <div class="text-center py-12 text-gray-500">
                             <i class="fas fa-chart-pie text-4xl mb-4"></i>
-                            <p class="text-lg font-medium mb-2">{{ _('No data loaded yet') }}</p>
+                            <p class="text-lg font-medium mb-2">" + {{ _('No data loaded yet')|tojson|safe }} + "</p>
                             <p class="text-sm">{{ _('Select a template above to analyze eligible disaggregation indicators.') }}</p>
                         </div>
                     `;

@@ -341,6 +341,18 @@ class FormValidator {
         // Validate validation conditions
         this.validateValidationConditions();
 
+        // Matrix row-total vs breakdown (strict / partial modes block submit)
+        if (window.matrixHandler && typeof window.matrixHandler.validateRowTotalConflicts === 'function') {
+            if (!window.matrixHandler.validateRowTotalConflicts()) {
+                this.errors.push({
+                    field: null,
+                    container: null,
+                    message: 'One or more matrix row totals conflict with their breakdown sums.',
+                    type: 'row_total'
+                });
+            }
+        }
+
         return this.errors.length === 0;
     }
 

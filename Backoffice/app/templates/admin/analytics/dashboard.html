@@ -169,7 +169,7 @@
             {% if device_dist_total > 0 %}
             <div class="grid grid-cols-1 lg:grid-cols-5 gap-5 lg:gap-6 lg:items-start">
                 <div class="lg:col-span-2 device-dist-chart-wrap">
-                    <canvas id="deviceChart" aria-label="{{ _('Device distribution chart') }}"></canvas>
+                    <canvas id="deviceChart" aria-label="{{ _('Device distribution chart')|forceescape }}"></canvas>
                 </div>
                 <div class="lg:col-span-3 space-y-2.5 min-w-0">
                     {% for row in device_dist_rows %}

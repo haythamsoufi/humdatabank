@@ -149,7 +149,7 @@
                 </h2>
                 <div class="flex items-center">
                     {{ status_label(sectors|length ~ ' ' ~ (_('sector') if sectors|length == 1 else _('sectors')), 'info') }}
-                    <button class="new-sector-btn add-button purple" title="{{ _('Add New Sector') }}">
+                    <button class="new-sector-btn add-button purple" title="{{ _('Add New Sector')|forceescape }}">
                         <i class="fas fa-plus"></i>
                     </button>
                 </div>
@@ -182,13 +182,13 @@
                             </div>
 
                             <div class="flex space-x-2">
-                                <button class="edit-sector-btn text-blue-600 hover:text-blue-800 transition-colors" data-sector-id="{{ sector.id }}" title="{{ _('Edit') }}">
+                                <button class="edit-sector-btn text-blue-600 hover:text-blue-800 transition-colors" data-sector-id="{{ sector.id }}" title="{{ _('Edit')|forceescape }}">
                                     <i class="fas fa-pen"></i>
                                 </button>
                                 <form method="POST" action="{{ url_for('system_admin.delete_sector', sector_id=sector.id) }}"
-                                      class="inline delete-sector-form" data-confirm="{{ _('Are you sure you want to delete this sector?') }}" data-confirm-danger="true">
+                                      class="inline delete-sector-form" data-confirm="{{ _('Are you sure you want to delete this sector?')|forceescape }}" data-confirm-danger="true">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button type="submit" class="text-red-600 hover:text-red-800 transition-colors" title="{{ _('Delete') }}">
+                                    <button type="submit" class="text-red-600 hover:text-red-800 transition-colors" title="{{ _('Delete')|forceescape }}">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </form>
@@ -216,7 +216,7 @@
                 </h2>
                 <div class="flex items-center">
                     {{ status_label(subsectors|length ~ ' ' ~ (_('sub-sector') if subsectors|length == 1 else _('sub-sectors')), 'info') }}
-                    <button class="new-subsector-btn add-button indigo" title="{{ _('Add New Sub-Sector') }}">
+                    <button class="new-subsector-btn add-button indigo" title="{{ _('Add New Sub-Sector')|forceescape }}">
                         <i class="fas fa-plus"></i>
                     </button>
                 </div>
@@ -245,13 +245,13 @@
                             </div>
 
                             <div class="flex space-x-2">
-                                <button class="edit-subsector-btn text-blue-600 hover:text-blue-800 transition-colors" data-subsector-id="{{ subsector.id }}" title="{{ _('Edit') }}">
+                                <button class="edit-subsector-btn text-blue-600 hover:text-blue-800 transition-colors" data-subsector-id="{{ subsector.id }}" title="{{ _('Edit')|forceescape }}">
                                     <i class="fas fa-pen"></i>
                                 </button>
                                 <form method="POST" action="{{ url_for('system_admin.delete_subsector', subsector_id=subsector.id) }}"
-                                      class="inline delete-subsector-form" data-confirm="{{ _('Are you sure you want to delete this sub-sector?') }}" data-confirm-danger="true">
+                                      class="inline delete-subsector-form" data-confirm="{{ _('Are you sure you want to delete this sub-sector?')|forceescape }}" data-confirm-danger="true">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button type="submit" class="text-red-600 hover:text-red-800 transition-colors" title="{{ _('Delete') }}">
+                                    <button type="submit" class="text-red-600 hover:text-red-800 transition-colors" title="{{ _('Delete')|forceescape }}">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </form>
@@ -411,7 +411,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
-                                    <input type="text" name="icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                    <input type="text" name="icon_class" placeholder="{{ _('e.g., fas fa-home')|forceescape }}"
                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                                     <p class="text-xs text-gray-500 mt-1">{{ _('Used as fallback when no logo is uploaded') }}</p>
                                 </div>
@@ -475,7 +475,7 @@
                                                 class="btn btn-warning btn-sm js-sectorsub-auto-translate"
                                                 data-modal="editSectorModal"
                                                 data-primary-id="edit_sector_name"
-                                                title="{{ _('Automatically translate blank multilingual name fields from the primary name') }}">
+                                                title="{{ _('Automatically translate blank multilingual name fields from the primary name')|forceescape }}">
                                             <i class="fas fa-magic js-sectorsub-at-icon" aria-hidden="true"></i>
                                             <i class="fas fa-spinner fa-spin js-sectorsub-at-spinner hidden" aria-hidden="true"></i>
                                             <span class="js-sectorsub-at-label">{{ _('Auto Translate') }}</span>
@@ -503,7 +503,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
-                                    <input type="text" name="icon_class" id="edit_sector_icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                    <input type="text" name="icon_class" id="edit_sector_icon_class" placeholder="{{ _('e.g., fas fa-home')|forceescape }}"
                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                                     <p class="text-xs text-gray-500 mt-1">{{ _('Used as fallback when no logo is uploaded') }}</p>
                                 </div>
@@ -588,7 +588,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
-                                    <input type="text" name="icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                    <input type="text" name="icon_class" placeholder="{{ _('e.g., fas fa-home')|forceescape }}"
                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                                 </div>
                                 <div class="flex items-center">
@@ -661,7 +661,7 @@
                                                 class="btn btn-warning btn-sm js-sectorsub-auto-translate"
                                                 data-modal="editSubsectorModal"
                                                 data-primary-id="edit_subsector_name"
-                                                title="{{ _('Automatically translate blank multilingual name fields from the primary name') }}">
+                                                title="{{ _('Automatically translate blank multilingual name fields from the primary name')|forceescape }}">
                                             <i class="fas fa-magic js-sectorsub-at-icon" aria-hidden="true"></i>
                                             <i class="fas fa-spinner fa-spin js-sectorsub-at-spinner hidden" aria-hidden="true"></i>
                                             <span class="js-sectorsub-at-label">{{ _('Auto Translate') }}</span>
@@ -684,7 +684,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Icon Class') }}</label>
-                                    <input type="text" name="icon_class" id="edit_subsector_icon_class" placeholder="{{ _('e.g., fas fa-home') }}"
+                                    <input type="text" name="icon_class" id="edit_subsector_icon_class" placeholder="{{ _('e.g., fas fa-home')|forceescape }}"
                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                                 </div>
                                 <div class="flex items-center">
@@ -1172,7 +1172,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showModal(editSectorModal);
             } catch (error) {
                 console.error('Error fetching sector data:', error);
-                if (window.showAlert) window.showAlert('{{ _("Failed to load sector data. Please try again.") }}', 'error');
+                if (window.showAlert) window.showAlert({{ _("Failed to load sector data. Please try again.")|tojson|safe }}, 'error');
                 else console.error('Failed to load sector data');
             }
         });
@@ -1218,7 +1218,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showModal(editSubsectorModal);
             } catch (error) {
                 console.error('Error fetching subsector data:', error);
-                if (window.showAlert) window.showAlert('{{ _("Failed to load subsector data. Please try again.") }}', 'error');
+                if (window.showAlert) window.showAlert({{ _("Failed to load subsector data. Please try again.")|tojson|safe }}, 'error');
                 else console.error('Failed to load subsector data');
             }
         });
@@ -1271,12 +1271,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     window.location.reload();
                 } else {
                     const data = await response.json();
-                    if (window.showAlert) window.showAlert(data.message || '{{ _("An error occurred. Please try again.") }}', 'error');
+                    if (window.showAlert) window.showAlert(data.message || {{ _("An error occurred. Please try again.")|tojson|safe }}, 'error');
                     else console.error(data.message);
                 }
             } catch (error) {
                 console.error('Error submitting form:', error);
-                if (window.showAlert) window.showAlert('{{ _("Failed to submit form. Please try again.") }}', 'error');
+                if (window.showAlert) window.showAlert({{ _("Failed to submit form. Please try again.")|tojson|safe }}, 'error');
                 else console.error('Failed to submit form');
             }
         });

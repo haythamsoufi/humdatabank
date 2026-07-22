@@ -179,7 +179,7 @@
     const columnDefs = [
         {
             field: 'created_at',
-            headerName: '{{ _("Date") }}',
+            headerName: {{ _("Date")|tojson|safe }},
             width: 180,
             minWidth: 150,
             maxWidth: 250,
@@ -189,7 +189,7 @@
         },
         {
             field: 'indicator_bank_id',
-            headerName: '{{ _("Indicator ID") }}',
+            headerName: {{ _("Indicator ID")|tojson|safe }},
             width: 120,
             minWidth: 80,
             maxWidth: 150,
@@ -205,7 +205,7 @@
         },
         {
             field: 'name',
-            headerName: '{{ _("Indicator Name") }}',
+            headerName: {{ _("Indicator Name")|tojson|safe }},
             width: 250,
             minWidth: 200,
             maxWidth: 400,
@@ -214,7 +214,7 @@
         },
         {
             field: 'change_type',
-            headerName: '{{ _("Change Type") }}',
+            headerName: {{ _("Change Type")|tojson|safe }},
             width: 150,
             minWidth: 120,
             maxWidth: 200,
@@ -227,7 +227,7 @@
         },
         {
             field: 'changed_by',
-            headerName: '{{ _("Changed By") }}',
+            headerName: {{ _("Changed By")|tojson|safe }},
             width: 200,
             minWidth: 150,
             maxWidth: 300,
@@ -240,14 +240,14 @@
                     emailField: 'changed_by_email',
                     activeField: 'changed_by_active',
                     profileColorField: 'changed_by_profile_color',
-                    fallbackLabel: '{{ _("Unknown User") }}',
+                    fallbackLabel: {{ _("Unknown User")|tojson|safe }},
                     showEmail: false
                 });
             }
         },
         {
             field: 'change_description',
-            headerName: '{{ _("Changes") }}',
+            headerName: {{ _("Changes")|tojson|safe }},
             width: 400,
             minWidth: 300,
             maxWidth: 600,

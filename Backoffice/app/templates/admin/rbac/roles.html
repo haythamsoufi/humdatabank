@@ -87,7 +87,7 @@
                                         <a
                                             href="{{ url_for('rbac_management.edit_role', role_id=role.id) }}"
                                             class="text-blue-600 hover:text-blue-900"
-                                            title="{{ _('Edit') }}"
+                                            title="{{ _('Edit')|forceescape }}"
                                         >
                                             <i class="fas fa-pen fa-fw"></i>
                                         </a>
@@ -95,13 +95,13 @@
                                             method="POST"
                                             action="{{ url_for('rbac_management.delete_role', role_id=role.id) }}"
                                             class="inline-block"
-                                            data-confirm="{{ _('Delete role') }} {{ role.name|e }}?"
+                                            data-confirm="{{ _('Delete role')|forceescape }} {{ role.name|e }}?"
                                         >
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button
                                                 type="submit"
                                                 class="text-red-600 hover:text-red-900"
-                                                title="{{ _('Delete') }}"
+                                                title="{{ _('Delete')|forceescape }}"
                                             >
                                                 <i class="fas fa-trash fa-fw"></i>
                                             </button>

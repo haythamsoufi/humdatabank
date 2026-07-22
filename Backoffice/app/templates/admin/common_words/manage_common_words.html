@@ -338,7 +338,7 @@
                                     <textarea id="edit_meaning_{{ code }}"
                                               name="meaning_{{ code }}"
                                               rows="3"
-                                              placeholder="{{ _('Enter translation') }}"
+                                              placeholder="{{ _('Enter translation')|forceescape }}"
                                               {% if code in ['ar','fa','he','ur'] %}dir="rtl"{% endif %}
                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
                                 </div>
@@ -525,7 +525,7 @@
                 submitBtn.disabled = true;
                 submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
                 submitBtn.dataset.originalHtml = submitBtn.innerHTML;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>{{ _("Saving...") }}';
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>' + {{ _("Saving...")|tojson|safe }};
             }
 
             fetch(url, {
@@ -909,9 +909,9 @@
                 const form = this;
                 function doSubmit() { form.submit(); }
                 if (window.showDangerConfirmation) {
-                    window.showDangerConfirmation(confirmMsg, doSubmit, null, '{{ _("Delete") }}', '{{ _("Cancel") }}', '{{ _("Delete Common Word?") }}');
+                    window.showDangerConfirmation(confirmMsg, doSubmit, null, {{ _("Delete")|tojson|safe }}, {{ _("Cancel")|tojson|safe }}, {{ _("Delete Common Word?")|tojson|safe }});
                 } else if (window.showConfirmation) {
-                    window.showConfirmation(confirmMsg, doSubmit, null, '{{ _("Delete") }}', '{{ _("Cancel") }}', '{{ _("Delete Common Word?") }}');
+                    window.showConfirmation(confirmMsg, doSubmit, null, {{ _("Delete")|tojson|safe }}, {{ _("Cancel")|tojson|safe }}, {{ _("Delete Common Word?")|tojson|safe }});
                 } else {
                     doSubmit();
                 }

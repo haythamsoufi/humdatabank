@@ -144,7 +144,7 @@ const FETCH_CLIENT = (window.getApiFetch && window.getApiFetch()) || window.apiF
 
 document.getElementById('autoQueueBtn').addEventListener('click', async function() {
     this.disabled = true;
-    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> {{ _("Queueing...") }}';
+    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + {{ _("Queueing...")|tojson|safe }};
     try {
         const resp = await FETCH_CLIENT(AUTO_QUEUE_URL, {
             method: 'POST',
@@ -153,16 +153,16 @@ document.getElementById('autoQueueBtn').addEventListener('click', async function
         });
         const data = await resp.json();
         if (data.success) {
-            alert('{{ _("Queued") }} ' + (data.queued || 0) + ' {{ _("traces for review.") }}');
+            alert({{ _("Queued")|tojson|safe }} + ' ' + (data.queued || 0) + ' ' + {{ _("traces for review.")|tojson|safe }});
             window.location.reload();
         } else {
-            alert('{{ _("Failed to auto-queue.") }}');
+            alert({{ _("Failed to auto-queue.")|tojson|safe }});
         }
     } catch(e) {
-        alert('{{ _("Error: ") }}' + e.message);
+        alert({{ _("Error: ")|tojson|safe }} + e.message);
     } finally {
         this.disabled = false;
-        this.innerHTML = '<i class="fas fa-robot"></i> {{ _("Auto-Queue Low-Quality") }}';
+        this.innerHTML = '<i class="fas fa-robot"></i> ' + {{ _("Auto-Queue Low-Quality")|tojson|safe }};
     }
 });
 </script>

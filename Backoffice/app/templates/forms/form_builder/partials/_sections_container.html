@@ -85,7 +85,7 @@
                         <button type="button"
                                 class="page-toggle-btn inline-flex items-center gap-2 text-sm font-medium text-amber-800 hover:text-amber-900 focus:outline-none focus:underline transition-colors"
                                 data-page-id="{{ page_id }}"
-                                title="{{ _('Toggle sections visibility') }}">
+                                title="{{ _('Toggle sections visibility')|forceescape }}">
                             <i class="fas fa-chevron-down w-4 h-4 transition-transform duration-200"></i>
                             <span>{{ _('Hide Sections') }}</span>
                         </button>
@@ -102,7 +102,7 @@
         <div class="p-6">
             <div class="section-header-row flex justify-between items-center mb-4 pb-4 border-b">
                 <div class="flex items-center section-header-banner cursor-pointer flex-1 min-w-0">
-                    <button type="button" class="section-toggle fb-icon-btn fb-icon-btn--neutral flex-shrink-0 mr-2" aria-expanded="true" title="{{ _('Collapse section') }}">
+                    <button type="button" class="section-toggle fb-icon-btn fb-icon-btn--neutral flex-shrink-0 mr-2" aria-expanded="true" title="{{ _('Collapse section')|forceescape }}">
                         <i class="fas fa-chevron-down w-4 h-4 transition-transform duration-200"></i>
                     </button>
                     <div class="flex items-center">
@@ -129,23 +129,23 @@
                         <form action="{{ url_for('form_builder.unarchive_section', section_id=item_s_f.section.id) }}" method="POST" class="inline-block">
                             <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                             <input type="hidden" name="version_id" value="{{ active_version_id }}">
-                            <button type="submit" class="fb-icon-btn fb-icon-btn--success" title="{{ _('Unarchive Section') }}">
+                            <button type="submit" class="fb-icon-btn fb-icon-btn--success" title="{{ _('Unarchive Section')|forceescape }}">
                                 <i class="fas fa-undo w-4 h-4"></i>
                             </button>
                         </form>
                     {% else %}
-                    <button type="button" class="add-item-to-section-btn fb-icon-btn fb-icon-btn--success" title="{{ _('Add Item') }}"
+                    <button type="button" class="add-item-to-section-btn fb-icon-btn fb-icon-btn--success" title="{{ _('Add Item')|forceescape }}"
                             data-section-id="{{ item_s_f.section.id }}"
                             data-section-name="{{ item_s_f.section.name | e }}">
                         <i class="fas fa-plus w-4 h-4"></i>
                     </button>
-                    <button type="button" class="add-subsection-btn fb-icon-btn fb-icon-btn--primary" title="{{ _('Add Subsection') }}"
+                    <button type="button" class="add-subsection-btn fb-icon-btn fb-icon-btn--primary" title="{{ _('Add Subsection')|forceescape }}"
                             data-section-id="{{ item_s_f.section.id }}"
                             data-section-order="{{ item_s_f.section.order }}"
                             data-page-id="{{ item_s_f.section.page_id or '' }}">
                         <i class="fas fa-indent w-4 h-4"></i>
                     </button>
-                    <button type="button" class="edit-section-btn fb-icon-btn fb-icon-btn--primary" title="{{ _('Edit Section') }}"
+                    <button type="button" class="edit-section-btn fb-icon-btn fb-icon-btn--primary" title="{{ _('Edit Section')|forceescape }}"
                             data-section-id="{{ item_s_f.section.id }}"
                             data-section-name="{{ item_s_f.section.name | e }}"
                             data-section-order="{{ item_s_f.section.order }}"
@@ -163,10 +163,10 @@
                               data-relevance-condition='{{ (item_s_f.section.relevance_condition | tojson | e) if item_s_f.section.relevance_condition else "" }}'>
                         <i class="fas fa-pen w-4 h-4"></i>
                     </button>
-                    <form action="{{ url_for('form_builder.duplicate_template_section', section_id=item_s_f.section.id) }}" method="POST" class="inline-block duplicate-section-form" data-confirm-message="{{ _('Duplicate this section? This will copy the section, all sub-sections, and their items.') }}">
+                    <form action="{{ url_for('form_builder.duplicate_template_section', section_id=item_s_f.section.id) }}" method="POST" class="inline-block duplicate-section-form" data-confirm-message="{{ _('Duplicate this section? This will copy the section, all sub-sections, and their items.')|forceescape }}">
                         <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                         <input type="hidden" name="version_id" value="{{ active_version_id }}">
-                        <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Section') }}">
+                        <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Section')|forceescape }}">
                             <i class="fas fa-copy w-4 h-4"></i>
                         </button>
                     </form>
@@ -174,10 +174,10 @@
                    {% set _sec_count = section_data_counts.get(current_section_id, 0) if section_data_counts is defined else 0 %}
                    {% set _has_child_sections = current_section_id in sub_sections_by_parent %}
                    {% set _child_sections_count = sub_sections_by_parent[current_section_id]|length if _has_child_sections else 0 %}
-                   <form action="{{ url_for('form_builder.delete_template_section', section_id=current_section_id) }}" method="POST" class="inline-block delete-section-form" data-data-count="{{ _sec_count }}" data-item-type="section" data-confirm-message="{% if _sec_count > 0 %}{{ _('This section contains %(count)s saved data entries.', count=_sec_count) }}{% else %}{{ _('Are you sure you want to delete this section and all its contents?') }}{% endif %}"{% if _has_child_sections %} data-has-child-sections="true" data-child-sections-count="{{ _child_sections_count }}"{% endif %}>
+                   <form action="{{ url_for('form_builder.delete_template_section', section_id=current_section_id) }}" method="POST" class="inline-block delete-section-form" data-data-count="{{ _sec_count }}" data-item-type="section" data-confirm-message="{% if _sec_count > 0 %}{{ _('This section contains %(count)s saved data entries.', count=_sec_count)|forceescape }}{% else %}{{ _('Are you sure you want to delete this section and all its contents?')|forceescape }}{% endif %}"{% if _has_child_sections %} data-has-child-sections="true" data-child-sections-count="{{ _child_sections_count }}"{% endif %}>
                         <input id="section-csrf_token-{{ current_section_id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                         <input type="hidden" name="delete_data" value="true">
-                        <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Delete Section') }}">
+                        <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Delete Section')|forceescape }}">
                             <i class="fas fa-trash-alt w-4 h-4"></i>
                         </button>
                     </form>
@@ -279,7 +279,7 @@
                         {% if is_subsection_archived %}data-archived="true"{% endif %}>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700 w-1/16 subsection-header-banner-cell">
                             <div class="fb-table-order-cell">
-                                <button type="button" class="subsection-toggle fb-icon-btn fb-icon-btn--neutral flex-shrink-0" aria-expanded="true" title="{{ _('Collapse subsection') }}">
+                                <button type="button" class="subsection-toggle fb-icon-btn fb-icon-btn--neutral flex-shrink-0" aria-expanded="true" title="{{ _('Collapse subsection')|forceescape }}">
                                     <i class="fas fa-chevron-down w-4 h-4 transition-transform duration-200"></i>
                                 </button>
                                 <span class="fb-table-order-number">{{ item_instance.display_order.split('.')[-1] }}</span>
@@ -310,17 +310,17 @@
                                     <form action="{{ url_for('form_builder.unarchive_section', section_id=item_instance.id) }}" method="POST" class="inline-block">
                                         <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                         <input type="hidden" name="version_id" value="{{ active_version_id }}">
-                                        <button type="submit" class="fb-icon-btn fb-icon-btn--success" title="{{ _('Unarchive Sub-section') }}">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--success" title="{{ _('Unarchive Sub-section')|forceescape }}">
                                             <i class="fas fa-undo w-3 h-3"></i>
                                         </button>
                                     </form>
                                 {% else %}
-                                <button type="button" class="add-item-to-section-btn fb-icon-btn fb-icon-btn--success" title="{{ _('Add Item to Sub-section') }}"
+                                <button type="button" class="add-item-to-section-btn fb-icon-btn fb-icon-btn--success" title="{{ _('Add Item to Sub-section')|forceescape }}"
                                         data-section-id="{{ item_instance.id }}"
                                         data-section-name="{{ item_instance.name | e }}">
                                     <i class="fas fa-plus w-3 h-3"></i>
                                 </button>
-                                <button type="button" class="edit-section-btn fb-icon-btn fb-icon-btn--primary" title="{{ _('Edit Sub-section') }}"
+                                <button type="button" class="edit-section-btn fb-icon-btn fb-icon-btn--primary" title="{{ _('Edit Sub-section')|forceescape }}"
                                         data-section-id="{{ item_instance.id }}"
                                         data-section-name="{{ item_instance.name | e }}"
                                         data-section-order="{{ item_instance.order }}"
@@ -339,18 +339,18 @@
                                           data-relevance-condition='{{ (item_instance.relevance_condition | tojson | e) if item_instance.relevance_condition else "" }}'>
                                     <i class="fas fa-pencil-alt w-3 h-3"></i>
                                 </button>
-                                <form action="{{ url_for('form_builder.duplicate_template_section', section_id=item_instance.id) }}" method="POST" class="inline-block duplicate-section-form" data-confirm-message="{{ _('Duplicate this sub-section? This will copy the sub-section along with all of its items.') }}">
+                                <form action="{{ url_for('form_builder.duplicate_template_section', section_id=item_instance.id) }}" method="POST" class="inline-block duplicate-section-form" data-confirm-message="{{ _('Duplicate this sub-section? This will copy the sub-section along with all of its items.')|forceescape }}">
                                     <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                     <input type="hidden" name="version_id" value="{{ active_version_id }}">
-                                    <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Sub-section') }}">
+                                    <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Sub-section')|forceescape }}">
                                         <i class="fas fa-copy w-3 h-3"></i>
                                     </button>
                                 </form>
                                 {% set _sub_sec_count = section_data_counts.get(item_instance.id, 0) if section_data_counts is defined else 0 %}
-                                <form action="{{ url_for('form_builder.delete_template_section', section_id=item_instance.id) }}" method="POST" class="inline-block delete-section-form" data-data-count="{{ _sub_sec_count }}" data-item-type="sub-section" data-confirm-message="{% if _sub_sec_count > 0 %}{{ _('This sub-section contains %(count)s saved data entries.', count=_sub_sec_count) }}{% else %}{{ _('Are you sure you want to delete this sub-section and all its contents?') }}{% endif %}">
+                                <form action="{{ url_for('form_builder.delete_template_section', section_id=item_instance.id) }}" method="POST" class="inline-block delete-section-form" data-data-count="{{ _sub_sec_count }}" data-item-type="sub-section" data-confirm-message="{% if _sub_sec_count > 0 %}{{ _('This sub-section contains %(count)s saved data entries.', count=_sub_sec_count)|forceescape }}{% else %}{{ _('Are you sure you want to delete this sub-section and all its contents?')|forceescape }}{% endif %}">
                                     <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                     <input type="hidden" name="delete_data" value="true">
-                                    <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Delete Sub-section') }}">
+                                    <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Delete Sub-section')|forceescape }}">
                                         <i class="fas fa-trash w-3 h-3"></i>
                                     </button>
                                 </form>
@@ -399,7 +399,7 @@
                                 </div>
                             </td>
                             {% set _display_item_id = item_instance.id %}
-                            <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/2" title="{{ _('Item ID') }}: {{ _display_item_id }}">
+                            <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/2" title="{{ _('Item ID')|forceescape }}: {{ _display_item_id }}">
                             {% set _item_type_icon = {
                                 'indicator': 'fas fa-chart-bar text-purple-600',
                                 'question': 'fas fa-question-circle text-green-600',
@@ -584,12 +584,12 @@
                                     <form action="{{ url_for('form_builder.unarchive_item', item_id=item_instance.id) }}" method="POST" class="inline-block">
                                         <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                         <input type="hidden" name="version_id" value="{{ active_version_id }}">
-                                        <button type="submit" class="fb-icon-btn fb-icon-btn--success" title="{{ _('Unarchive Item') }}">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--success" title="{{ _('Unarchive Item')|forceescape }}">
                                             <i class="fas fa-undo w-4 h-4"></i>
                                         </button>
                                     </form>
                                 {% elif item_type == 'indicator' %}
-                                    <button type="button" class="edit-indicator-btn fb-icon-btn fb-icon-btn--purple" title="{{ _('Edit Indicator') }}"
+                                    <button type="button" class="edit-indicator-btn fb-icon-btn fb-icon-btn--purple" title="{{ _('Edit Indicator')|forceescape }}"
                                             data-indicator-id="{{ item_instance.id }}"
                                             data-indicator-order="{{ item_instance.order }}"
                                             data-indicator-bank-id="{{ item_instance.indicator_bank_id }}"
@@ -617,24 +617,24 @@
                                             data-config='{{ (item_instance.config | tojson | e) if item_instance.config else "{}" }}'>
                                         <i class="fas fa-pen w-4 h-4"></i>
                                     </button>
-                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this indicator? This will create a copy with the same calculations and settings.') }}">
+                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this indicator? This will create a copy with the same calculations and settings.')|forceescape }}">
                                         <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                         <input type="hidden" name="version_id" value="{{ active_version_id }}">
-                                        <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Indicator') }}">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Indicator')|forceescape }}">
                                             <i class="fas fa-copy w-4 h-4"></i>
                                         </button>
                                     </form>
                                    {% set _del_item_id = item_instance.id %}
                                    {% set _item_count = item_data_counts.get(_del_item_id, 0) if item_data_counts is defined else 0 %}
-                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-indicator-form" data-data-count="{{ _item_count }}" data-item-type="indicator" data-confirm-message="{% if _item_count > 0 %}{{ _('This item has %(count)s saved data entries.', count=_item_count) }}{% else %}{{ _('Are you sure you want to delete this indicator instance?') }}{% endif %}">
+                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-indicator-form" data-data-count="{{ _item_count }}" data-item-type="indicator" data-confirm-message="{% if _item_count > 0 %}{{ _('This item has %(count)s saved data entries.', count=_item_count)|forceescape }}{% else %}{{ _('Are you sure you want to delete this indicator instance?')|forceescape }}{% endif %}">
                                         <input id="section-csrf_token-indicator-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                         <input type="hidden" name="delete_data" value="true">
-                                        <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Remove Indicator') }}">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Remove Indicator')|forceescape }}">
                                             <i class="fas fa-times w-4 h-4"></i>
                                         </button>
                                     </form>
                                 {% elif item_type == 'question' %}
-                                    <button type="button" class="edit-question-btn fb-icon-btn fb-icon-btn--success" title="{{ _('Edit Question') }}"
+                                    <button type="button" class="edit-question-btn fb-icon-btn fb-icon-btn--success" title="{{ _('Edit Question')|forceescape }}"
                                             data-question-id="{{ item_instance.id }}"
                                             data-question-order="{{ item_instance.order }}"
                                             data-current-section-id="{{ item_data.parent_subsection_id if is_subsection_item else item_s_f.section.id }}"
@@ -665,24 +665,24 @@
                                             data-config='{{ (item_instance.config | tojson | e) if item_instance.config else "{}" }}'>
                                         <i class="fas fa-pen w-4 h-4"></i>
                                     </button>
-                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this question? This will copy its options, logic, and translations.') }}">
+                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this question? This will copy its options, logic, and translations.')|forceescape }}">
                                         <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                         <input type="hidden" name="version_id" value="{{ active_version_id }}">
-                                        <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Question') }}">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Question')|forceescape }}">
                                             <i class="fas fa-copy w-4 h-4"></i>
                                         </button>
                                     </form>
                                    {% set _del_item_id = item_instance.id %}
                                    {% set _item_count = item_data_counts.get(_del_item_id, 0) if item_data_counts is defined else 0 %}
-                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-question-form" data-data-count="{{ _item_count }}" data-item-type="question" data-confirm-message="{% if _item_count > 0 %}{{ _('This item has %(count)s saved data entries.', count=_item_count) }}{% else %}{{ _('Are you sure you want to delete this question?') }}{% endif %}">
+                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-question-form" data-data-count="{{ _item_count }}" data-item-type="question" data-confirm-message="{% if _item_count > 0 %}{{ _('This item has %(count)s saved data entries.', count=_item_count)|forceescape }}{% else %}{{ _('Are you sure you want to delete this question?')|forceescape }}{% endif %}">
                                         <input id="section-csrf_token-question-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                         <input type="hidden" name="delete_data" value="true">
-                                        <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Remove Question') }}">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Remove Question')|forceescape }}">
                                             <i class="fas fa-times w-4 h-4"></i>
                                         </button>
                                     </form>
                                 {% elif item_type == 'document' %}
-                                    <button type="button" class="edit-document-field-btn fb-icon-btn fb-icon-btn--primary" title="{{ _('Edit Document Field') }}"
+                                    <button type="button" class="edit-document-field-btn fb-icon-btn fb-icon-btn--primary" title="{{ _('Edit Document Field')|forceescape }}"
                                             data-document-field-id="{{ item_instance.id }}"
                                             data-document-field-label="{{ item_instance.label | e }}"
                                             data-document-field-order="{{ item_instance.order }}"
@@ -698,24 +698,24 @@
                                             data-config='{{ (item_instance.config | tojson | e) if item_instance.config else "{}" }}'>
                                         <i class="fas fa-pen w-4 h-4"></i>
                                     </button>
-                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this document field? This will copy its upload configuration and permissions.') }}">
+                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this document field? This will copy its upload configuration and permissions.')|forceescape }}">
                                         <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                         <input type="hidden" name="version_id" value="{{ active_version_id }}">
-                                        <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Document Field') }}">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Document Field')|forceescape }}">
                                             <i class="fas fa-copy w-4 h-4"></i>
                                         </button>
                                     </form>
                                    {% set _del_item_id = item_instance.id %}
                                    {% set _item_count = item_data_counts.get(_del_item_id, 0) if item_data_counts is defined else 0 %}
-                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-document-field-form" data-data-count="{{ _item_count }}" data-item-type="document field" data-confirm-message="{% if _item_count > 0 %}{{ _('This item has %(count)s saved data entries.', count=_item_count) }}{% else %}{{ _('Are you sure you want to delete this document field and any associated uploaded documents?') }}{% endif %}">
+                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-document-field-form" data-data-count="{{ _item_count }}" data-item-type="document field" data-confirm-message="{% if _item_count > 0 %}{{ _('This item has %(count)s saved data entries.', count=_item_count)|forceescape }}{% else %}{{ _('Are you sure you want to delete this document field and any associated uploaded documents?')|forceescape }}{% endif %}">
                                         <input id="section-csrf_token-document-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                         <input type="hidden" name="delete_data" value="true">
-                                        <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Remove Document Field') }}">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Remove Document Field')|forceescape }}">
                                             <i class="fas fa-times w-4 h-4"></i>
                                         </button>
                                     </form>
                                 {% elif item_type == 'matrix' %}
-                                    <button type="button" class="edit-matrix-item-btn fb-icon-btn fb-icon-btn--warning" title="{{ _('Edit Matrix') }}"
+                                    <button type="button" class="edit-matrix-item-btn fb-icon-btn fb-icon-btn--warning" title="{{ _('Edit Matrix')|forceescape }}"
                                             data-matrix-item-id="{{ item_instance.id }}"
                                             data-matrix-item-label="{{ item_instance.label | e }}"
                                             data-matrix-item-description="{{ item_instance.description | default('', true) | e }}"
@@ -731,24 +731,24 @@
                                             data-description-translations='{{ (item_instance.description_translations | tojson | e) if item_instance.description_translations else "{}" }}'>
                                         <i class="fas fa-pen w-4 h-4"></i>
                                     </button>
-                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this matrix? This will copy all rows, columns, and validation rules.') }}">
+                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this matrix? This will copy all rows, columns, and validation rules.')|forceescape }}">
                                         <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                         <input type="hidden" name="version_id" value="{{ active_version_id }}">
-                                        <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Matrix') }}">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Matrix')|forceescape }}">
                                             <i class="fas fa-copy w-4 h-4"></i>
                                         </button>
                                     </form>
                                    {% set _del_item_id = item_instance.id %}
                                    {% set _item_count = item_data_counts.get(_del_item_id, 0) if item_data_counts is defined else 0 %}
-                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-matrix-item-form" data-data-count="{{ _item_count }}" data-item-type="matrix" data-confirm-message="{% if _item_count > 0 %}{{ _('This item has %(count)s saved data entries.', count=_item_count) }}{% else %}{{ _('Are you sure you want to delete this matrix table?') }}{% endif %}">
+                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-matrix-item-form" data-data-count="{{ _item_count }}" data-item-type="matrix" data-confirm-message="{% if _item_count > 0 %}{{ _('This item has %(count)s saved data entries.', count=_item_count)|forceescape }}{% else %}{{ _('Are you sure you want to delete this matrix table?')|forceescape }}{% endif %}">
                                         <input id="section-csrf_token-matrix-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                         <input type="hidden" name="delete_data" value="true">
-                                        <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Remove Matrix') }}">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Remove Matrix')|forceescape }}">
                                             <i class="fas fa-times w-4 h-4"></i>
                                         </button>
                                     </form>
                                 {% elif item_type == 'image' %}
-                                    <button type="button" class="edit-image-item-btn fb-icon-btn fb-icon-btn--success" title="{{ _('Edit Image') }}"
+                                    <button type="button" class="edit-image-item-btn fb-icon-btn fb-icon-btn--success" title="{{ _('Edit Image')|forceescape }}"
                                             data-image-item-id="{{ item_instance.id }}"
                                             data-image-item-label="{{ item_instance.label | e }}"
                                             data-image-item-description="{{ item_instance.description | default('', true) | e }}"
@@ -763,24 +763,24 @@
                                             data-description-translations='{{ (item_instance.description_translations | tojson | e) if item_instance.description_translations else "{}" }}'>
                                         <i class="fas fa-pen w-4 h-4"></i>
                                     </button>
-                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this image item?') }}">
+                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this image item?')|forceescape }}">
                                         <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                         <input type="hidden" name="version_id" value="{{ active_version_id }}">
-                                        <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Image') }}">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Image')|forceescape }}">
                                             <i class="fas fa-copy w-4 h-4"></i>
                                         </button>
                                     </form>
                                    {% set _del_item_id = item_instance.id %}
                                    {% set _item_count = item_data_counts.get(_del_item_id, 0) if item_data_counts is defined else 0 %}
-                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-image-item-form" data-data-count="{{ _item_count }}" data-item-type="image" data-confirm-message="{{ _('Are you sure you want to delete this image item?') }}">
+                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-image-item-form" data-data-count="{{ _item_count }}" data-item-type="image" data-confirm-message="{{ _('Are you sure you want to delete this image item?')|forceescape }}">
                                         <input id="section-csrf_token-image-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                         <input type="hidden" name="delete_data" value="true">
-                                        <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Remove Image') }}">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Remove Image')|forceescape }}">
                                             <i class="fas fa-times w-4 h-4"></i>
                                         </button>
                                     </form>
                                 {% elif item_type == 'plugin' %}
-                                    <button type="button" class="edit-plugin-item-btn fb-icon-btn fb-icon-btn--warning" title="{{ _('Edit Plugin Item') }}"
+                                    <button type="button" class="edit-plugin-item-btn fb-icon-btn fb-icon-btn--warning" title="{{ _('Edit Plugin Item')|forceescape }}"
                                             data-plugin-item-id="{{ item_instance.id }}"
                                             data-plugin-item-type="{{ item_instance.item_type }}"
                                             data-plugin-item-label="{{ item_instance.label | e }}"
@@ -801,19 +801,19 @@
                                             data-plugin-config='{{ (item_instance.config.plugin_config | tojson | e) if item_instance.config and item_instance.config.plugin_config else "{}" }}'>
                                         <i class="fas fa-pen w-4 h-4"></i>
                                     </button>
-                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this plugin item? This will copy its configuration and logic.') }}">
+                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this plugin item? This will copy its configuration and logic.')|forceescape }}">
                                         <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                         <input type="hidden" name="version_id" value="{{ active_version_id }}">
-                                        <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Plugin Item') }}">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Plugin Item')|forceescape }}">
                                             <i class="fas fa-copy w-4 h-4"></i>
                                         </button>
                                     </form>
                                    {% set _del_item_id = item_instance.id %}
                                    {% set _item_count = item_data_counts.get(_del_item_id, 0) if item_data_counts is defined else 0 %}
-                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-plugin-item-form" data-data-count="{{ _item_count }}" data-item-type="plugin item" data-confirm-message="{% if _item_count > 0 %}{{ _('This item has %(count)s saved data entries.', count=_item_count) }}{% else %}{{ _('Are you sure you want to delete this plugin item?') }}{% endif %}">
+                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-plugin-item-form" data-data-count="{{ _item_count }}" data-item-type="plugin item" data-confirm-message="{% if _item_count > 0 %}{{ _('This item has %(count)s saved data entries.', count=_item_count)|forceescape }}{% else %}{{ _('Are you sure you want to delete this plugin item?')|forceescape }}{% endif %}">
                                         <input id="section-csrf_token-plugin-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                         <input type="hidden" name="delete_data" value="true">
-                                        <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Remove Plugin Item') }}">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Remove Plugin Item')|forceescape }}">
                                             <i class="fas fa-times w-4 h-4"></i>
                                         </button>
                                     </form>

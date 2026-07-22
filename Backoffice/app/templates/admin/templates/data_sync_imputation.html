@@ -579,7 +579,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return { cancelled: true };
                 }
                 if (!data.success) {
-                    throw new Error(data.error || '{{ _("Failed to load template") }}');
+                    throw new Error(data.error || {{ _("Failed to load template")|tojson|safe }});
                 }
                 applyTemplateContext(data);
                 history.replaceState(null, '', templateApiUrl(TEMPLATE_API_URLS.view, templateId));
@@ -602,14 +602,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const previousTemplateId = String(currentTemplateId);
             const proceed = () => {
                 loadTemplateContext(templateId).catch(error => {
-                    showSaveMessage(error.message || '{{ _("Failed to load template") }}', 'error');
+                    showSaveMessage(error.message || {{ _("Failed to load template")|tojson|safe }}, 'error');
                     templateSelector.value = previousTemplateId;
                 });
             };
 
             if (pendingChanges.size > 0) {
                 showConfirmation(
-                    '{{ _("You have unsaved imputation method changes. Switch template anyway?") }}',
+                    {{ _("You have unsaved imputation method changes. Switch template anyway?")|tojson|safe }},
                     proceed,
                     () => { templateSelector.value = previousTemplateId; }
                 );
@@ -776,11 +776,11 @@ document.addEventListener('DOMContentLoaded', function() {
             window.previewGridApi.setGridOption('rowData', []);
         }
         showPreviewEmpty();
-        previewCountryFilter.innerHTML = '<option value="">{{ _("All Countries") }}</option>';
-        previewItemFilter.innerHTML = '<option value="">{{ _("All Items") }}</option>';
+        previewCountryFilter.innerHTML = '<option value="">' + {{ _("All Countries")|tojson|safe }} + '</option>';
+        previewItemFilter.innerHTML = '<option value="">' + {{ _("All Items")|tojson|safe }} + '</option>';
         previewTypeFilter.value = '';
-        previewYearInput.innerHTML = '<option value="">{{ _("Loading…") }}</option>';
-        previewSourcePeriodSelect.innerHTML = '<option value="">{{ _("Loading…") }}</option>';
+        previewYearInput.innerHTML = '<option value="">' + {{ _("Loading…")|tojson|safe }} + '</option>';
+        previewSourcePeriodSelect.innerHTML = '<option value="">' + {{ _("Loading…")|tojson|safe }} + '</option>';
         loadAvailablePeriods();
     }
 
@@ -1299,12 +1299,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const dataSyncProgressCount = document.getElementById('data-sync-progress-count');
 
     const SYNC_STATUS_LABELS = {
-        0: '{{ _("Not filled") }}',
-        100: '{{ _("Saved") }}',
-        200: '{{ _("Reopened") }}',
-        300: '{{ _("Submitted") }}',
-        400: '{{ _("Validated") }}',
-        500: '{{ _("Published") }}'
+        0: {{ _("Not filled")|tojson|safe }},
+        100: {{ _("Saved")|tojson|safe }},
+        200: {{ _("Reopened")|tojson|safe }},
+        300: {{ _("Submitted")|tojson|safe }},
+        400: {{ _("Validated")|tojson|safe }},
+        500: {{ _("Published")|tojson|safe }}
     };
 
     let dataSyncStatusUrlTemplate = TEMPLATE_API_URLS.dataSyncStatus;
@@ -1360,29 +1360,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function dataSyncBoolIcon(isTrue) {
         if (isTrue) {
-            return '<span class="inline-flex items-center text-green-600" aria-label="{{ _("Yes") }}"><i class="fas fa-check-circle" aria-hidden="true"></i></span>';
+            return '<span class="inline-flex items-center text-green-600" aria-label="' + {{ _("Yes")|tojson|safe }} + '"><i class="fas fa-check-circle" aria-hidden="true"></i></span>';
         }
-        return '<span class="inline-flex items-center text-gray-400" aria-label="{{ _("No") }}"><i class="fas fa-times-circle" aria-hidden="true"></i></span>';
+        return '<span class="inline-flex items-center text-gray-400" aria-label="' + {{ _("No")|tojson|safe }} + '"><i class="fas fa-times-circle" aria-hidden="true"></i></span>';
     }
 
     function renderDataSyncConfigSummary(params) {
         if (!dataSyncConfigSummaryBody) return;
 
-        const yearsDisplay = params.years || '{{ _("Default (2010–2024)") }}';
+        const yearsDisplay = params.years || {{ _("Default (2010–2024)")|tojson|safe }};
         const batchDisplay = params.batchSize !== null && !isNaN(params.batchSize)
             ? String(params.batchSize)
-            : '{{ _("Default (1000)") }}';
+            : {{ _("Default (1000)")|tojson|safe }};
         const statusLabels = (params.reportedStates || [])
             .map(function (code) { return SYNC_STATUS_LABELS[code] || String(code); })
             .join(', ');
 
         const rows = [
-            { label: '{{ _("Years") }}', value: yearsDisplay },
-            { label: '{{ _("Batch size") }}', value: batchDisplay },
-            { label: '{{ _("Data status") }}', value: statusLabels || '-' },
-            { label: '{{ _("Dry run") }}', value: dataSyncBoolIcon(params.dryRun), html: true, inline: true },
-            { label: '{{ _("Test mode") }}', value: dataSyncBoolIcon(params.test), html: true, inline: true },
-            { label: '{{ _("Cached imputed values") }}', value: dataSyncBoolIcon(params.imputedUseCache), html: true, inline: true }
+            { label: {{ _("Years")|tojson|safe }}, value: yearsDisplay },
+            { label: {{ _("Batch size")|tojson|safe }}, value: batchDisplay },
+            { label: {{ _("Data status")|tojson|safe }}, value: statusLabels || '-' },
+            { label: {{ _("Dry run")|tojson|safe }}, value: dataSyncBoolIcon(params.dryRun), html: true, inline: true },
+            { label: {{ _("Test mode")|tojson|safe }}, value: dataSyncBoolIcon(params.test), html: true, inline: true },
+            { label: {{ _("Cached imputed values")|tojson|safe }}, value: dataSyncBoolIcon(params.imputedUseCache), html: true, inline: true }
         ];
 
         dataSyncConfigSummaryBody.innerHTML = rows.map(function (row) {
@@ -1422,7 +1422,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function resetDataSyncRunButton() {
         if (!dataSyncRunBtn || !dataSyncRunBtnText) return;
         dataSyncRunBtn.disabled = false;
-        dataSyncRunBtnText.textContent = '{{ _("Run Sync") }}';
+        dataSyncRunBtnText.textContent = {{ _("Run Sync")|tojson|safe }};
         const spinIcon = dataSyncRunBtn.querySelector('i.fa-spinner');
         if (spinIcon) spinIcon.remove();
         if (!dataSyncRunBtn.querySelector('i.fa-sync-alt')) {
@@ -1434,14 +1434,14 @@ document.addEventListener('DOMContentLoaded', function() {
         dataSyncStopRequested = false;
         if (!dataSyncStopBtn || !dataSyncStopBtnText) return;
         dataSyncStopBtn.disabled = false;
-        dataSyncStopBtnText.textContent = '{{ _("Stop sync") }}';
+        dataSyncStopBtnText.textContent = {{ _("Stop sync")|tojson|safe }};
     }
 
     function setDataSyncStopping() {
         dataSyncStopRequested = true;
         if (!dataSyncStopBtn || !dataSyncStopBtnText) return;
         dataSyncStopBtn.disabled = true;
-        dataSyncStopBtnText.textContent = '{{ _("Stopping...") }}';
+        dataSyncStopBtnText.textContent = {{ _("Stopping...")|tojson|safe }};
     }
 
     function showDataSyncDone() {
@@ -1500,9 +1500,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     const stats = job.stats || {};
                     let msg = `Loaded: ${stats.loaded || 0}, Skipped: ${stats.skipped || 0}, Inserted: ${stats.inserted || 0}, Updated: ${stats.updated || 0}, Errors: ${stats.errors || 0}`;
                     if (job.download_ready && job.download_url) {
-                        msg += `\n\n{{ _("Preview Excel ready:") }} `;
+                        msg += `\n\n` + {{ _("Preview Excel ready:")|tojson|safe }} + ` `;
                         const safeUrl = isSafeHref(job.download_url) ? escapeHtmlAttr(job.download_url) : '#';
-                        dataSyncResultText.innerHTML = `${msg.replace(/\n/g, '<br>')}<a class="text-purple-700 underline" href="${safeUrl}">{{ _("Download") }}</a>`;
+                        dataSyncResultText.innerHTML = `${msg.replace(/\n/g, '<br>')}<a class="text-purple-700 underline" href="${safeUrl}">` + {{ _("Download")|tojson|safe }} + `</a>`;
                     } else {
                         dataSyncResultText.textContent = msg;
                     }
@@ -1513,7 +1513,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (job.status === 'failed') {
                     stopDataSyncPolling();
                     dataSyncResult.classList.remove('hidden');
-                    dataSyncResultText.textContent = job.error || '{{ _("Sync failed") }}';
+                    dataSyncResultText.textContent = job.error || {{ _("Sync failed")|tojson|safe }};
                     dataSyncResultText.className = 'text-sm text-red-700';
                     showDataSyncDone();
                     return;
@@ -1521,7 +1521,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (job.status === 'cancelled') {
                     stopDataSyncPolling();
                     dataSyncResult.classList.remove('hidden');
-                    dataSyncResultText.textContent = job.error || '{{ _("Sync cancelled.") }}';
+                    dataSyncResultText.textContent = job.error || {{ _("Sync cancelled.")|tojson|safe }};
                     dataSyncResultText.className = 'text-sm text-amber-700';
                     showDataSyncDone();
                     return;
@@ -1536,7 +1536,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(err => {
                 stopDataSyncPolling();
                 dataSyncResult.classList.remove('hidden');
-                dataSyncResultText.textContent = err.message || '{{ _("Request failed") }}';
+                dataSyncResultText.textContent = err.message || {{ _("Request failed")|tojson|safe }};
                 dataSyncResultText.className = 'text-sm text-red-700';
                 showDataSyncDone();
             });
@@ -1588,13 +1588,13 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
             .then(function(result) {
                 if (!result.ok || !(result.data && result.data.success)) {
-                    throw new Error((result.data && result.data.error) || '{{ _("Failed to stop sync") }}');
+                    throw new Error((result.data && result.data.error) || {{ _("Failed to stop sync")|tojson|safe }});
                 }
             })
             .catch(function(err) {
                 resetDataSyncStopButton();
                 dataSyncResult.classList.remove('hidden');
-                dataSyncResultText.textContent = err.message || '{{ _("Failed to stop sync") }}';
+                dataSyncResultText.textContent = err.message || {{ _("Failed to stop sync")|tojson|safe }};
                 dataSyncResultText.className = 'text-sm text-red-700';
             });
         });
@@ -1623,7 +1623,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (params.batchSizeRawTrim) {
                 if (isNaN(params.batchSize) || params.batchSize < 100) {
                     dataSyncResult.classList.remove('hidden');
-                    dataSyncResultText.textContent = '{{ _("Invalid batch size. Please enter a number >= 100 (or leave empty).") }}';
+                    dataSyncResultText.textContent = {{ _("Invalid batch size. Please enter a number >= 100 (or leave empty).")|tojson|safe }};
                     dataSyncResultText.className = 'text-sm text-red-700';
                     return;
                 }
@@ -1631,7 +1631,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (!params.reportedStates.length) {
                 dataSyncResult.classList.remove('hidden');
-                dataSyncResultText.textContent = '{{ _("Select at least one data status to include.") }}';
+                dataSyncResultText.textContent = {{ _("Select at least one data status to include.")|tojson|safe }};
                 dataSyncResultText.className = 'text-sm text-red-700';
                 return;
             }
@@ -1640,9 +1640,9 @@ document.addEventListener('DOMContentLoaded', function() {
             renderDataSyncConfigSummary(params);
             setDataSyncUIMode('running');
             if (dataSyncProgress) dataSyncProgress.classList.remove('hidden');
-            setDataSyncProgress(0, 'starting', '{{ _("Starting...") }}', 0, null);
+            setDataSyncProgress(0, 'starting', {{ _("Starting...")|tojson|safe }}, 0, null);
             dataSyncRunBtn.disabled = true;
-            dataSyncRunBtnText.textContent = '{{ _("Running...") }}';
+            dataSyncRunBtnText.textContent = {{ _("Running...")|tojson|safe }};
             dataSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-spinner fa-spin mr-2"></i>');
             const iconEl = dataSyncRunBtn.querySelector('i.fa-sync-alt');
             if (iconEl) iconEl.remove();
@@ -1672,14 +1672,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 var ok = result.ok;
                 var data = result.data || {};
                 if (!ok || !data.success || !data.job_id) {
-                    throw new Error(data.error || '{{ _("Sync failed") }}');
+                    throw new Error(data.error || {{ _("Sync failed")|tojson|safe }});
                 }
                 dataSyncActiveJobId = data.job_id;
                 pollDataSyncStatus();
             })
             .catch(function(err) {
                 dataSyncResult.classList.remove('hidden');
-                dataSyncResultText.textContent = err.message || '{{ _("Request failed") }}';
+                dataSyncResultText.textContent = err.message || {{ _("Request failed")|tojson|safe }};
                 dataSyncResultText.className = 'text-sm text-red-700';
                 showDataSyncDone();
             });

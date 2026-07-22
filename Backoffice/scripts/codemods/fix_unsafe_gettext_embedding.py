@@ -19,7 +19,7 @@ GETTEXT_CALL = re.compile(
     r"\b_\(|gettext\s*\(|ngettext\s*\(|pgettext\s*\(|npgettext\s*\(",
     re.IGNORECASE,
 )
-SAFE_FILTER = re.compile(r"\|\s*(?:tojson|forceescape|e)\b")
+SAFE_FILTER = re.compile(r"\|\s*(?:tojson|forceescape|e|js)\b")
 JINJA_EXPR = re.compile(r"\{\{(.*?)\}\}", re.DOTALL)
 
 SCRIPT_BLOCK = re.compile(
@@ -90,51 +90,126 @@ def _fix_attribute_value(value: str) -> str:
     return JINJA_EXPR.sub(repl, value)
 
 
-def _fix_script_block(script: str) -> str:
-    result = script
-    for quote in ("'", '"'):
-        pattern = re.compile(
-            rf"{re.escape(quote)}(?:[^\\{quote}]|\\.)*{re.escape(quote)}",
-            re.DOTALL,
-        )
+def _skip_jinja_block(text: str, start: int) -> int:
+    """Return index after ``}}`` starting at ``{{`` (start points at first ``{``)."""
+    if text[start : start + 2] != "{{":
+        return start + 1
+    depth = 0
+    i = start + 2
+    n = len(text)
+    while i < n:
+        if text[i : i + 2] == "{{":
+            depth += 1
+            i += 2
+        elif text[i : i + 2] == "}}":
+            if depth == 0:
+                return i + 2
+            depth -= 1
+            i += 2
+        else:
+            i += 1
+    return n
 
-        def repl(match: re.Match[str]) -> str:
-            literal = match.group(0)
-            if "{{" not in literal:
-                return literal
-            return _fix_js_quoted_literal(literal, quote)
 
-        result = pattern.sub(repl, result)
-    return result
+def _find_js_string_literals(line: str) -> list[tuple[int, int, str]]:
+    """Find JS string/template literal spans, treating ``{{ }}`` as opaque."""
+    segments: list[tuple[int, int, str]] = []
+    i = 0
+    n = len(line)
+    while i < n:
+        ch = line[i]
+        if ch in ("'", '"', "`"):
+            quote = ch
+            start = i
+            i += 1
+            while i < n:
+                if line[i] == "\\":
+                    i += 2
+                    continue
+                if line[i : i + 2] == "{{":
+                    i = _skip_jinja_block(line, i)
+                    continue
+                if line[i] == quote:
+                    segments.append((start, i + 1, quote))
+                    i += 1
+                    break
+                i += 1
+        else:
+            i += 1
+    return segments
+
+
+def _fix_js_line(line: str) -> tuple[str, bool]:
+    """Fix unsafe gettext inside quoted literals on a single line."""
+    segments = _find_js_string_literals(line)
+    if not segments:
+        return line, False
+
+    changed = False
+    parts: list[str] = []
+    cursor = 0
+    for start, end, quote in segments:
+        parts.append(line[cursor:start])
+        literal = line[start:end]
+        if _quoted_literal_has_unsafe_gettext(literal):
+            fixed = _fix_js_quoted_literal(literal, quote)
+            if fixed != literal:
+                changed = True
+            parts.append(fixed)
+        else:
+            parts.append(literal)
+        cursor = end
+    parts.append(line[cursor:])
+    return "".join(parts), changed
+
+
+def _quoted_literal_has_unsafe_gettext(literal: str) -> bool:
+    if "{{" not in literal or "}}" not in literal:
+        return False
+    for match in JINJA_EXPR.finditer(literal):
+        if _is_unsafe_gettext_expr(match.group(1)):
+            return True
+    return False
+
+
+def _fix_script_block(script: str) -> tuple[str, int]:
+    lines = script.split("\n")
+    out: list[str] = []
+    changes = 0
+    for line in lines:
+        fixed_line, changed = _fix_js_line(line)
+        if changed:
+            changes += 1
+        out.append(fixed_line)
+    return "\n".join(out), changes
 
 
 def fix_template(text: str) -> tuple[str, int]:
-    changes = 0
+    total_changes = 0
 
     def script_repl(match: re.Match[str]) -> str:
-        nonlocal changes
+        nonlocal total_changes
         open_tag, body, close_tag = match.group(1), match.group(2), match.group(3)
-        fixed_body = _fix_script_block(body)
-        if fixed_body != body:
-            changes += 1
+        fixed_body, changes = _fix_script_block(body)
+        total_changes += changes
         return open_tag + fixed_body + close_tag
 
     updated = SCRIPT_BLOCK.sub(script_repl, text)
 
     def attr_repl(match: re.Match[str]) -> str:
-        nonlocal changes
+        nonlocal total_changes
         value = match.group("value")
         fixed_value = _fix_attribute_value(value)
         if fixed_value == value:
             return match.group(0)
-        changes += 1
+        total_changes += 1
         return (
             f"{match.group('prefix')}{match.group('quote')}"
             f"{fixed_value}{match.group('quote')}"
         )
 
     updated = ATTR_VALUE.sub(attr_repl, updated)
-    return updated, changes
+    return updated, total_changes
 
 
 def main() -> int:

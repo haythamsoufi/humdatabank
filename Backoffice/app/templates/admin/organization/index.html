@@ -172,7 +172,7 @@
                 <div class="flex items-center gap-2 flex-wrap min-w-0">
                     <h3 class="text-lg font-semibold text-gray-800">{{ _('Secretariat Divisions') }}</h3>
                     {% if can_manage_org %}
-                        <button type="button" class="auto-translate-secretariat-btn btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" data-entity-type="secretariat_divisions" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
+                        <button type="button" class="auto-translate-secretariat-btn btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" data-entity-type="secretariat_divisions" title="{{ _('Auto Translate All')|forceescape }}" aria-label="{{ _('Auto Translate All')|forceescape }}">
                             <i class="fas fa-language text-sm" aria-hidden="true"></i>
                         </button>
                     {% endif %}
@@ -203,7 +203,7 @@
                 <div class="flex items-center gap-2 flex-wrap min-w-0">
                     <h3 class="text-lg font-semibold text-gray-800">{{ _('Secretariat Departments') }}</h3>
                     {% if can_manage_org %}
-                        <button type="button" class="auto-translate-secretariat-btn btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" data-entity-type="secretariat_departments" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
+                        <button type="button" class="auto-translate-secretariat-btn btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" data-entity-type="secretariat_departments" title="{{ _('Auto Translate All')|forceescape }}" aria-label="{{ _('Auto Translate All')|forceescape }}">
                             <i class="fas fa-language text-sm" aria-hidden="true"></i>
                         </button>
                     {% endif %}
@@ -234,7 +234,7 @@
                 <div class="flex items-center gap-2 flex-wrap min-w-0">
                     <h3 class="text-lg font-semibold text-gray-800">{{ _('Secretariat Regional Offices') }}</h3>
                     {% if can_manage_org %}
-                        <button type="button" class="auto-translate-secretariat-btn btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" data-entity-type="secretariat_regions" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
+                        <button type="button" class="auto-translate-secretariat-btn btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" data-entity-type="secretariat_regions" title="{{ _('Auto Translate All')|forceescape }}" aria-label="{{ _('Auto Translate All')|forceescape }}">
                             <i class="fas fa-language text-sm" aria-hidden="true"></i>
                         </button>
                     {% endif %}
@@ -265,7 +265,7 @@
                 <div class="flex items-center gap-2 flex-wrap min-w-0">
                     <h3 class="text-lg font-semibold text-gray-800">{{ _('Secretariat Cluster Offices') }}</h3>
                     {% if can_manage_org %}
-                        <button type="button" class="auto-translate-secretariat-btn btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" data-entity-type="secretariat_clusters" title="{{ _('Auto Translate All') }}" aria-label="{{ _('Auto Translate All') }}">
+                        <button type="button" class="auto-translate-secretariat-btn btn btn-sm btn-warning inline-flex items-center justify-center p-1.5 shrink-0" data-entity-type="secretariat_clusters" title="{{ _('Auto Translate All')|forceescape }}" aria-label="{{ _('Auto Translate All')|forceescape }}">
                             <i class="fas fa-language text-sm" aria-hidden="true"></i>
                         </button>
                     {% endif %}
@@ -415,7 +415,7 @@ try {
             fds_member_profile_color: {{ ((country.fds_member_user.profile_color if country.fds_member_user and country.fds_member_user.profile_color else '') or '')|tojson|safe }},
             edit_url: {{ (('/admin/countries/' ~ country.id ~ '/data') if can_manage_countries else '')|tojson|safe }},
             delete_url: {{ ((url_for(delete_endpoint_name if delete_endpoint_name is defined else 'system_admin.delete_country', country_id=country.id)) if can_manage_countries else '')|tojson|safe }},
-            delete_confirm: "{{ _('Are you sure you want to delete this country? This action cannot be undone and may fail if the country is in use.') }}"
+            delete_confirm: {{ _('Are you sure you want to delete this country? This action cannot be undone and may fail if the country is in use.')|tojson|safe }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
@@ -706,7 +706,7 @@ try {
             part_of: {{ (ns.part_of or [])|tojson|safe }},
             edit_url: "{{ url_for('organization.edit_national_society', ns_id=ns.id) if can_manage_org else '' }}",
             delete_url: "{{ url_for('organization.delete_national_society', ns_id=ns.id) if can_manage_org else '' }}",
-            delete_confirm: "{{ _('Are you sure you want to delete this National Society?') }}"
+            delete_confirm: {{ _('Are you sure you want to delete this National Society?')|tojson|safe }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
@@ -1325,7 +1325,7 @@ try {
             display_order: {{ division.display_order or 0 }},
             edit_url: "{{ url_for('organization.edit_secretariat_division', division_id=division.id) if can_manage_org else '' }}",
             delete_url: "{{ url_for('organization.delete_secretariat_division', division_id=division.id) if can_manage_org else '' }}",
-            delete_confirm: "{{ _('Are you sure you want to delete this division? All departments in this division will also be deleted.') }}"
+            delete_confirm: {{ _('Are you sure you want to delete this division? All departments in this division will also be deleted.')|tojson|safe }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
@@ -1375,7 +1375,7 @@ try {
         // Other columns
         {
             field: 'description',
-            headerName: '{{ _("Description") }}',
+            headerName: {{ _("Description")|tojson|safe }},
             width: 300,
             minWidth: 250,
             maxWidth: 400,
@@ -1405,7 +1405,7 @@ try {
         },
         {
             field: 'is_active',
-            headerName: '{{ _("Status") }}',
+            headerName: {{ _("Status")|tojson|safe }},
             width: 120,
             minWidth: 100,
             maxWidth: 150,
@@ -1483,7 +1483,7 @@ try {
             display_order: {{ department.display_order or 0 }},
             edit_url: "{{ url_for('organization.edit_secretariat_department', department_id=department.id) if can_manage_org else '' }}",
             delete_url: "{{ url_for('organization.delete_secretariat_department', department_id=department.id) if can_manage_org else '' }}",
-            delete_confirm: "{{ _('Are you sure you want to delete this department?') }}"
+            delete_confirm: {{ _('Are you sure you want to delete this department?')|tojson|safe }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
@@ -1555,7 +1555,7 @@ try {
         },
         {
             field: 'description',
-            headerName: '{{ _("Description") }}',
+            headerName: {{ _("Description")|tojson|safe }},
             width: 300,
             minWidth: 250,
             maxWidth: 400,
@@ -1571,7 +1571,7 @@ try {
         },
         {
             field: 'is_active',
-            headerName: '{{ _("Status") }}',
+            headerName: {{ _("Status")|tojson|safe }},
             width: 120,
             minWidth: 100,
             maxWidth: 150,
@@ -1652,7 +1652,7 @@ try {
             display_order: {{ region.display_order or 0 }},
             edit_url: "{{ url_for('organization.edit_secretariat_regional_office', region_id=region.id) if can_manage_org else '' }}",
             delete_url: "{{ url_for('organization.delete_secretariat_regional_office', region_id=region.id) if can_manage_org else '' }}",
-            delete_confirm: "{{ _('Are you sure you want to delete this regional office? All cluster offices under it will also be deleted.') }}"
+            delete_confirm: {{ _('Are you sure you want to delete this regional office? All cluster offices under it will also be deleted.')|tojson|safe }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
@@ -1731,7 +1731,7 @@ try {
         // Other columns
         {
             field: 'description',
-            headerName: '{{ _("Description") }}',
+            headerName: {{ _("Description")|tojson|safe }},
             width: 300,
             minWidth: 250,
             maxWidth: 400,
@@ -1747,7 +1747,7 @@ try {
         },
         {
             field: 'is_active',
-            headerName: '{{ _("Status") }}',
+            headerName: {{ _("Status")|tojson|safe }},
             width: 120,
             minWidth: 100,
             maxWidth: 150,
@@ -1825,7 +1825,7 @@ try {
             display_order: {{ cluster.display_order or 0 }},
             edit_url: "{{ url_for('organization.edit_secretariat_cluster_office', cluster_id=cluster.id) if can_manage_org else '' }}",
             delete_url: "{{ url_for('organization.delete_secretariat_cluster_office', cluster_id=cluster.id) if can_manage_org else '' }}",
-            delete_confirm: "{{ _('Are you sure you want to delete this cluster office?') }}"
+            delete_confirm: {{ _('Are you sure you want to delete this cluster office?')|tojson|safe }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
@@ -1887,7 +1887,7 @@ try {
         },
         {
             field: 'description',
-            headerName: '{{ _("Description") }}',
+            headerName: {{ _("Description")|tojson|safe }},
             width: 300,
             minWidth: 250,
             maxWidth: 400,
@@ -1903,7 +1903,7 @@ try {
         },
         {
             field: 'is_active',
-            headerName: '{{ _("Status") }}',
+            headerName: {{ _("Status")|tojson|safe }},
             width: 120,
             minWidth: 100,
             maxWidth: 150,

@@ -253,10 +253,10 @@
     };
 
     const statusLabel = function(status) {
-        if (status === 'completed') return '{{ _("Completed") }}';
-        if (status === 'error') return '{{ _("Error") }}';
-        if (status === 'cost_limit_exceeded') return '{{ _("Cost Limit") }}';
-        if (status === 'max_iterations_exceeded') return '{{ _("Max Iterations") }}';
+        if (status === 'completed') return {{ _("Completed")|tojson|safe }};
+        if (status === 'error') return {{ _("Error")|tojson|safe }};
+        if (status === 'cost_limit_exceeded') return {{ _("Cost Limit")|tojson|safe }};
+        if (status === 'max_iterations_exceeded') return {{ _("Max Iterations")|tojson|safe }};
         return toTitleCaseLabel(status);
     };
 
@@ -276,10 +276,10 @@
 
     // Column definitions for ag-grid
     const columnDefs = [
-        { field: 'id', headerName: '{{ _("ID") }}', width: 90, minWidth: 80, maxWidth: 120, filter: 'agNumberColumnFilter', sortable: true, cellClass: 'font-mono', wrapText: false, autoHeight: false, cellStyle: { 'white-space': 'nowrap' } },
+        { field: 'id', headerName: {{ _("ID")|tojson|safe }}, width: 90, minWidth: 80, maxWidth: 120, filter: 'agNumberColumnFilter', sortable: true, cellClass: 'font-mono', wrapText: false, autoHeight: false, cellStyle: { 'white-space': 'nowrap' } },
         {
             field: 'query',
-            headerName: '{{ _("Query") }}',
+            headerName: {{ _("Query")|tojson|safe }},
             flex: 1,
             minWidth: 180,
             filter: 'agTextColumnFilter',
@@ -308,7 +308,7 @@
         },
         {
             field: 'user_display',
-            headerName: '{{ _("User") }}',
+            headerName: {{ _("User")|tojson|safe }},
             width: 180,
             minWidth: 140,
             filter: 'customSetFilter',
@@ -322,14 +322,14 @@
                     titleField: 'user_title',
                     activeField: 'user_active',
                     profileColorField: 'user_profile_color',
-                    fallbackLabel: '{{ _("Unknown User") }}',
+                    fallbackLabel: {{ _("Unknown User")|tojson|safe }},
                     showEmail: false
                 });
             }
         },
         {
             field: 'tools_used',
-            headerName: '{{ _("Tools") }}',
+            headerName: {{ _("Tools")|tojson|safe }},
             width: 200,
             minWidth: 140,
             filter: 'agTextColumnFilter',
@@ -358,7 +358,7 @@
         },
         {
             field: 'status',
-            headerName: '{{ _("Status") }}',
+            headerName: {{ _("Status")|tojson|safe }},
             width: 160,
             minWidth: 130,
             filter: 'customSetFilter',
@@ -373,7 +373,7 @@
         },
         {
             field: 'user_rating',
-            headerName: '{{ _("Rating") }}',
+            headerName: {{ _("Rating")|tojson|safe }},
             width: 120,
             minWidth: 110,
             filter: 'customSetFilter',
@@ -385,14 +385,14 @@
                 const r = params.value;
                 if (!r || r === '') return '<span class="text-gray-400">—</span>';
                 const safe = String(r).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                if (r === 'like') return '<span class="inline-flex items-center text-green-700" title="{{ _("Like") }}"><i class="fas fa-thumbs-up mr-1"></i> {{ _("Like") }}</span>';
-                if (r === 'dislike') return '<span class="inline-flex items-center text-red-700" title="{{ _("Dislike") }}"><i class="fas fa-thumbs-down mr-1"></i> {{ _("Dislike") }}</span>';
+                if (r === 'like') return '<span class="inline-flex items-center text-green-700" title="' + {{ _("Like")|tojson|safe }} + '"><i class="fas fa-thumbs-up mr-1"></i> ' + {{ _("Like")|tojson|safe }} + '</span>';
+                if (r === 'dislike') return '<span class="inline-flex items-center text-red-700" title="' + {{ _("Dislike")|tojson|safe }} + '"><i class="fas fa-thumbs-down mr-1"></i> ' + {{ _("Dislike")|tojson|safe }} + '</span>';
                 return '<span class="text-gray-600">' + safe + '</span>';
             }
         },
         {
             field: 'llm_quality_verdict',
-            headerName: '{{ _("LLM Quality") }}',
+            headerName: {{ _("LLM Quality")|tojson|safe }},
             width: 140,
             minWidth: 140,
             filter: 'customSetFilter',
@@ -406,14 +406,14 @@
                 var needsReview = params.data && params.data.llm_needs_review;
                 if ((!verdict || verdict === '') && score == null) return '<span class="text-gray-400">—</span>';
                 if (verdict) html += StatusLabels.renderGenericStatus(verdict, toTitleCaseLabel(verdict));
-                if (needsReview) html += ' <i class="fas fa-flag text-amber-500 ml-1" title="{{ _("Flagged for review") }}"></i>';
+                if (needsReview) html += ' <i class="fas fa-flag text-amber-500 ml-1" title="' + {{ _("Flagged for review")|tojson|safe }} + '"></i>';
                 return '<div class="flex items-center gap-1">' + html + '</div>';
             }
         },
-        { field: 'actual_iterations', headerName: '{{ _("Steps") }}', width: 90, minWidth: 75, filter: 'agNumberColumnFilter', sortable: true, valueFormatter: function(p) { return p.value != null ? p.value : 0; } },
+        { field: 'actual_iterations', headerName: {{ _("Steps")|tojson|safe }}, width: 90, minWidth: 75, filter: 'agNumberColumnFilter', sortable: true, valueFormatter: function(p) { return p.value != null ? p.value : 0; } },
         {
             field: 'total_cost_usd',
-            headerName: '{{ _("Cost") }}',
+            headerName: {{ _("Cost")|tojson|safe }},
             width: 100,
             minWidth: 90,
             filter: 'agNumberColumnFilter',
@@ -425,7 +425,7 @@
         },
         {
             field: 'execution_time_ms',
-            headerName: '{{ _("Time") }}',
+            headerName: {{ _("Time")|tojson|safe }},
             width: 90,
             minWidth: 80,
             filter: 'agNumberColumnFilter',
@@ -434,7 +434,7 @@
         },
         {
             field: 'created_at',
-            headerName: '{{ _("Created") }}',
+            headerName: {{ _("Created")|tojson|safe }},
             width: 130,
             minWidth: 125,
             filter: 'agDateColumnFilter',
@@ -496,7 +496,7 @@
     const conversationColumnDefs = [
         {
             colId: 'conversation_primary',
-            headerName: '{{ _("Conversation") }}',
+            headerName: {{ _("Conversation")|tojson|safe }},
             flex: 1,
             minWidth: 200,
             filter: 'agTextColumnFilter',
@@ -546,7 +546,7 @@
         },
         {
             field: 'trace_count',
-            headerName: '{{ _("Messages") }}',
+            headerName: {{ _("Messages")|tojson|safe }},
             width: 110,
             minWidth: 90,
             filter: 'agNumberColumnFilter',
@@ -555,7 +555,7 @@
         },
         {
             field: 'first_query_preview',
-            headerName: '{{ _("First query") }}',
+            headerName: {{ _("First query")|tojson|safe }},
             flex: 1.2,
             minWidth: 200,
             filter: 'agTextColumnFilter',
@@ -578,7 +578,7 @@
         },
         {
             field: 'activity_range',
-            headerName: '{{ _("Date range") }}',
+            headerName: {{ _("Date range")|tojson|safe }},
             width: 220,
             minWidth: 160,
             filter: 'agTextColumnFilter',
@@ -587,7 +587,7 @@
         },
         {
             field: 'total_cost_usd',
-            headerName: '{{ _("Total cost") }}',
+            headerName: {{ _("Total cost")|tojson|safe }},
             width: 120,
             minWidth: 100,
             filter: 'agNumberColumnFilter',
@@ -662,11 +662,11 @@
         if (n > 0) {
             bulkBar.classList.remove('hidden');
             bulkBar.classList.add('flex');
-            countEl.textContent = n + ' {{ _("selected") }}';
+            countEl.textContent = n + ' ' + {{ _("selected")|tojson|safe }};
         } else {
             bulkBar.classList.add('hidden');
             bulkBar.classList.remove('flex');
-            countEl.textContent = '0 {{ _("selected") }}';
+            countEl.textContent = '0 ' + {{ _("selected")|tojson|safe }};
         }
     }
 
@@ -680,7 +680,7 @@
         var snapshot = gridHelper.getSelectionSnapshot('id');
         var ids = (snapshot && snapshot.selectedIds) ? snapshot.selectedIds : [];
         if (ids.length === 0) return;
-        var msg = '{{ _("Are you sure you want to delete") }} ' + ids.length + ' {{ _("selected trace(s)? This cannot be undone.") }}';
+        var msg = {{ _("Are you sure you want to delete")|tojson|safe }} + ' ' + ids.length + ' ' + {{ _("selected trace(s)? This cannot be undone.")|tojson|safe }};
         var doDelete = function() {
             var csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
             var fetchFn = (window.getFetch && window.getFetch()) || fetch;
@@ -693,16 +693,16 @@
                   if (result.ok && result.data && result.data.deleted !== undefined) {
                       window.location.reload();
                   } else {
-                      var m = (result.data && result.data.message) || '{{ _("Failed to delete traces.") }}';
+                      var m = (result.data && result.data.message) || {{ _("Failed to delete traces.")|tojson|safe }};
                       if (window.showAlert) window.showAlert(m, 'error');
                   }
               })
               .catch(function() {
-                  if (window.showAlert) window.showAlert('{{ _("Request failed.") }}', 'error');
+                  if (window.showAlert) window.showAlert({{ _("Request failed.")|tojson|safe }}, 'error');
               });
         };
         if (window.showConfirmation) {
-            window.showConfirmation(msg, doDelete, function() {}, '{{ _("Delete") }}', '{{ _("Cancel") }}', '{{ _("Delete selected traces") }}');
+            window.showConfirmation(msg, doDelete, function() {}, {{ _("Delete")|tojson|safe }}, {{ _("Cancel")|tojson|safe }}, {{ _("Delete selected traces")|tojson|safe }});
         } else if (window.confirm(msg)) {
             doDelete();
         }

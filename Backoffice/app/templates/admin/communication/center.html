@@ -157,7 +157,7 @@
                             <div class="relative">
                                 <input type="text"
                                        id="admin-notification-user-search"
-                                       placeholder="{{ _('Search by name or email...') }}"
+                                       placeholder="{{ _('Search by name or email...')|forceescape }}"
                                        class="form-input w-full"
                                        autocomplete="off">
                                 <div id="admin-notification-user-results" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
@@ -301,28 +301,28 @@
                                     <div class="draggable-user-type px-3 py-2 bg-green-100 text-green-800 rounded-lg cursor-move border border-green-300 hover:bg-green-200 transition-colors"
                                          draggable="true"
                                          data-user-type="non_organization"
-                                         data-user-type-label="{{ _('External') }}">
+                                         data-user-type-label="{{ _('External')|forceescape }}">
                                         <i class="fas fa-globe mr-1"></i>
                                         <span>{{ _('External') }}</span>
                                     </div>
                                     <div class="draggable-user-type px-3 py-2 bg-purple-100 text-purple-800 rounded-lg cursor-move border border-purple-300 hover:bg-purple-200 transition-colors"
                                          draggable="true"
                                          data-user-type="focal_point"
-                                         data-user-type-label="{{ _('Focal Points') }}">
+                                         data-user-type-label="{{ _('Focal Points')|forceescape }}">
                                         <i class="fas fa-user-tie mr-1"></i>
                                         <span>{{ _('Focal Points') }}</span>
                                     </div>
                                     <div class="draggable-user-type px-3 py-2 bg-red-100 text-red-800 rounded-lg cursor-move border border-red-300 hover:bg-red-200 transition-colors"
                                          draggable="true"
                                          data-user-type="admin"
-                                         data-user-type-label="{{ _('Admins') }}">
+                                         data-user-type-label="{{ _('Admins')|forceescape }}">
                                         <i class="fas fa-user-shield mr-1"></i>
                                         <span>{{ _('Admins') }}</span>
                                     </div>
                                     <div class="draggable-user-type px-3 py-2 bg-orange-100 text-orange-800 rounded-lg cursor-move border border-orange-300 hover:bg-orange-200 transition-colors"
                                          draggable="true"
                                          data-user-type="system_manager"
-                                         data-user-type-label="{{ _('System Managers') }}">
+                                         data-user-type-label="{{ _('System Managers')|forceescape }}">
                                         <i class="fas fa-user-cog mr-1"></i>
                                         <span>{{ _('System Managers') }}</span>
                                     </div>
@@ -492,7 +492,7 @@
                                 <div id="redirect-custom-url-group" class="redirect-group hidden">
                                     <input type="text"
                                            id="admin-notification-redirect-url"
-                                           placeholder="{{ _('e.g., /forms/assignment/123') }}"
+                                           placeholder="{{ _('e.g., /forms/assignment/123')|forceescape }}"
                                            class="form-input w-full">
                                 </div>
                             </div>
@@ -510,7 +510,7 @@
                         <div class="flex flex-wrap items-center gap-2">
                             {% if not campaigns %}
                             <span class="inline-flex"
-                                  title="{{ _('No saved campaigns yet. Compose a message and use Save as Campaign, or open the Campaigns tab to create one.') }}">
+                                  title="{{ _('No saved campaigns yet. Compose a message and use Save as Campaign, or open the Campaigns tab to create one.')|forceescape }}">
                                 <button type="button"
                                         id="open-load-campaign-modal"
                                         class="btn btn-secondary inline-flex items-center gap-2 pointer-events-none"
@@ -528,7 +528,7 @@
                                 {{ _('Load from campaign') }}
                             </button>
                             {% endif %}
-                            <button type="button" id="clear-send-form" class="btn btn-secondary hidden" title="{{ _('Clear load campaign selection') }}">
+                            <button type="button" id="clear-send-form" class="btn btn-secondary hidden" title="{{ _('Clear load campaign selection')|forceescape }}">
                                 {{ _('Clear') }}
                             </button>
                         </div>
@@ -603,7 +603,7 @@
                             <div class="flex flex-wrap gap-1.5 mb-2" id="title-channel-badges"></div>
                             <input type="text"
                                    id="admin-notification-title"
-                                   placeholder="{{ _('e.g., Reporting period now open') }}"
+                                   placeholder="{{ _('e.g., Reporting period now open')|forceescape }}"
                                    class="form-input w-full"
                                    maxlength="100"
                                    required>
@@ -632,7 +632,7 @@
                             </label>
                             <p class="text-xs text-gray-500 mb-2" id="message-field-hint"></p>
                             <textarea id="admin-notification-message"
-                                      placeholder="{{ _('Short summary shown in the app and on devices…') }}"
+                                      placeholder="{{ _('Short summary shown in the app and on devices…')|forceescape }}"
                                       class="form-textarea w-full"
                                       rows="4"
                                       maxlength="500"
@@ -680,7 +680,7 @@
                                 </label>
                                 <input type="text"
                                        id="admin-notification-tags"
-                                       placeholder="{{ _('e.g., urgent, action-required') }}"
+                                       placeholder="{{ _('e.g., urgent, action-required')|forceescape }}"
                                        class="form-input w-full">
                             </div>
                         </div>
@@ -753,7 +753,7 @@
                             <input type="text"
                                    id="campaign-edit-name"
                                    name="campaign-edit-name"
-                                   placeholder="{{ _('e.g., Monthly Newsletter, System Maintenance') }}"
+                                   placeholder="{{ _('e.g., Monthly Newsletter, System Maintenance')|forceescape }}"
                                    class="form-input w-full"
                                    maxlength="255"
                                    aria-required="true">
@@ -775,7 +775,7 @@
                             {{ _('Description') }} <span class="text-xs font-normal text-gray-500">({{ _('Optional') }})</span>
                         </label>
                         <textarea id="campaign-edit-description"
-                                  placeholder="{{ _('Optional description of this campaign') }}"
+                                  placeholder="{{ _('Optional description of this campaign')|forceescape }}"
                                   class="form-textarea w-full"
                                   rows="3"></textarea>
                     </div>
@@ -839,7 +839,7 @@
                 <i class="fas fa-users mr-2 text-blue-600"></i>
                 {{ _('Bulk User Selection') }}
             </h3>
-            <button type="button" id="close-bulk-selection" class="btn btn-close-icon" aria-label="{{ _('Close') }}">
+            <button type="button" id="close-bulk-selection" class="btn btn-close-icon" aria-label="{{ _('Close')|forceescape }}">
                 <i class="fas fa-times text-xl"></i>
             </button>
         </div>
@@ -854,7 +854,7 @@
                     </label>
                     <input type="text"
                            id="bulk-search-users"
-                           placeholder="{{ _('Search by name, email, or title...') }}"
+                           placeholder="{{ _('Search by name, email, or title...')|forceescape }}"
                            class="form-input w-full">
                     <p class="text-xs text-gray-500 mt-1">{{ _('Search across user names, emails, and titles') }}</p>
                 </div>
@@ -1151,7 +1151,7 @@
                 <i class="fas fa-mobile-alt mr-2 text-blue-600"></i>
                 {{ _('Device Status Details') }}
             </h3>
-            <button type="button" id="close-device-status-modal" class="btn btn-close-icon" aria-label="{{ _('Close') }}">
+            <button type="button" id="close-device-status-modal" class="btn btn-close-icon" aria-label="{{ _('Close')|forceescape }}">
                 <i class="fas fa-times text-xl"></i>
             </button>
         </div>
@@ -1177,7 +1177,7 @@
                 <i class="fas fa-users mr-2 text-blue-600"></i>
                 {{ _('Campaign Recipients') }}
             </h3>
-            <button type="button" id="close-campaign-recipients-modal" class="btn btn-close-icon" aria-label="{{ _('Close') }}">
+            <button type="button" id="close-campaign-recipients-modal" class="btn btn-close-icon" aria-label="{{ _('Close')|forceescape }}">
                 <i class="fas fa-times text-xl"></i>
             </button>
         </div>
@@ -1189,7 +1189,7 @@
             </label>
             <input type="text"
                    id="recipients-search"
-                   placeholder="{{ _('Search by name or email...') }}"
+                   placeholder="{{ _('Search by name or email...')|forceescape }}"
                    class="form-input w-full">
         </div>
 
@@ -1224,7 +1224,7 @@
                 <i class="fas fa-folder-open mr-2 text-blue-600"></i>
                 {{ _('Load from campaign') }}
             </h3>
-            <button type="button" id="close-load-campaign-modal" class="btn btn-close-icon" aria-label="{{ _('Close') }}">
+            <button type="button" id="close-load-campaign-modal" class="btn btn-close-icon" aria-label="{{ _('Close')|forceescape }}">
                 <i class="fas fa-times text-xl"></i>
             </button>
         </div>
@@ -1275,7 +1275,7 @@
                 <i class="fas fa-calendar-alt mr-2 text-blue-600"></i>
                 {{ _('Save as Campaign') }}
             </h3>
-            <button type="button" id="close-campaign-modal" class="btn btn-close-icon" aria-label="{{ _('Close') }}">
+            <button type="button" id="close-campaign-modal" class="btn btn-close-icon" aria-label="{{ _('Close')|forceescape }}">
                 <i class="fas fa-times text-xl"></i>
             </button>
         </div>
@@ -1288,7 +1288,7 @@
                 </label>
                 <input type="text"
                        id="campaign-modal-name"
-                       placeholder="{{ _('e.g., Monthly Newsletter, System Maintenance') }}"
+                       placeholder="{{ _('e.g., Monthly Newsletter, System Maintenance')|forceescape }}"
                        class="form-input w-full"
                        maxlength="255"
                        required>
@@ -1300,7 +1300,7 @@
                     {{ _('Description') }} <span class="text-xs font-normal text-gray-500">({{ _('Optional') }})</span>
                 </label>
                 <textarea id="campaign-modal-description"
-                          placeholder="{{ _('Optional description of this campaign') }}"
+                          placeholder="{{ _('Optional description of this campaign')|forceescape }}"
                           class="form-textarea w-full"
                           rows="3"></textarea>
             </div>

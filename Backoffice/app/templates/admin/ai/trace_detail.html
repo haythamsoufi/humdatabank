@@ -84,14 +84,14 @@ function toggleInput(btn) {
     if (!pre) { return; }
     if (pre.classList.contains('hidden')) {
         pre.classList.remove('hidden');
-        btn.innerHTML = '<i class="fas fa-eye-slash mr-1"></i> {{ _("Hide") }}';
+        btn.innerHTML = '<i class="fas fa-eye-slash mr-1"></i> ' + {{ _("Hide")|tojson|safe }};
         // Log after layout recalculates (so widths are correct).
         // eslint-disable-next-line no-console
         window.__clientWarn && window.__clientWarn('[trace_wrap] toggleInput show clicked');
         requestAnimationFrame(function () { logJsonPreMetrics(pre, 'tool_usage_show'); });
     } else {
         pre.classList.add('hidden');
-        btn.innerHTML = '<i class="fas fa-eye mr-1"></i> {{ _("Show") }}';
+        btn.innerHTML = '<i class="fas fa-eye mr-1"></i> ' + {{ _("Show")|tojson|safe }};
     }
 }
 
@@ -405,9 +405,9 @@ function traceFormatResponseSources(container) {
             expandRow.className = 'chat-sources-expand-row';
             expandRow.setAttribute('role', 'button');
             expandRow.setAttribute('tabIndex', '0');
-            expandRow.setAttribute('aria-label', '{{ _("Show more sources") }}');
+            expandRow.setAttribute('aria-label', {{ _("Show more sources")|tojson|safe }});
             var moreCount = sourceLines.length - DEFAULT_VISIBLE_SOURCES;
-            var showMoreSourcesLabel = '{{ _("Show") }} ' + moreCount + ' {{ _("more sources") }}';
+            var showMoreSourcesLabel = {{ _("Show")|tojson|safe }} + ' ' + moreCount + ' ' + {{ _("more sources")|tojson|safe }};
             expandRow.innerHTML = '<span class="chat-sources-expand-label">' + showMoreSourcesLabel + '</span> <i class="fas fa-chevron-down chat-sources-expand-icon" aria-hidden="true"></i>';
             expandRow.addEventListener('click', function() {
                 bodyEl.querySelectorAll('.chat-source-line-hidden').forEach(function(el) { el.classList.remove('chat-source-line-hidden'); });
@@ -443,11 +443,11 @@ function traceCollapseLongTables(container) {
         expandTr.className = 'chat-ai-table-expand-row';
         expandTr.setAttribute('role', 'button');
         expandTr.setAttribute('tabIndex', '0');
-        expandTr.setAttribute('aria-label', '{{ _("Show more rows") }}');
+        expandTr.setAttribute('aria-label', {{ _("Show more rows")|tojson|safe }});
         var expandTd = document.createElement('td');
         expandTd.colSpan = colCount;
         var moreCount = trs.length - DEFAULT_VISIBLE_ROWS;
-        var expandRowsLabel = '{{ _("Show") }} ' + moreCount + ' {{ _("more rows") }}';
+        var expandRowsLabel = {{ _("Show")|tojson|safe }} + ' ' + moreCount + ' ' + {{ _("more rows")|tojson|safe }};
         expandTd.innerHTML = '<span class="chat-ai-table-expand-label">' + expandRowsLabel + '</span> <i class="fas fa-chevron-down chat-ai-table-expand-icon" aria-hidden="true"></i>';
         expandTr.appendChild(expandTd);
         tbody.appendChild(expandTr);
@@ -630,12 +630,12 @@ document.addEventListener('DOMContentLoaded', function () {
     function copyToClipboardWithFeedback(text, btn, labelEl) {
         navigator.clipboard.writeText(text).then(function () {
             var orig = labelEl.textContent;
-            labelEl.textContent = '{{ _("Copied!") }}';
+            labelEl.textContent = {{ _("Copied!")|tojson|safe }};
             btn.querySelector('i').className = 'fas fa-check text-green-600';
             setTimeout(function () { labelEl.textContent = orig; btn.querySelector('i').className = btn.dataset.iconClass || 'fas fa-copy'; }, 2000);
         }).catch(function () {
-            labelEl.textContent = '{{ _("Copy failed") }}';
-            setTimeout(function () { labelEl.textContent = labelEl.dataset.origText || '{{ _("Copy") }}'; }, 2000);
+            labelEl.textContent = {{ _("Copy failed")|tojson|safe }};
+            setTimeout(function () { labelEl.textContent = labelEl.dataset.origText || {{ _("Copy")|tojson|safe }}; }, 2000);
         });
     }
 
@@ -818,8 +818,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 var text = lines.join('\n').trim();
                 copyToClipboardWithFeedback(text, copyAIBtn, copyAILabel);
             } catch (e) {
-                copyAILabel.textContent = '{{ _("Copy failed") }}';
-                setTimeout(function () { copyAILabel.textContent = '{{ _("Copy for AI Review") }}'; }, 2000);
+                copyAILabel.textContent = {{ _("Copy failed")|tojson|safe }};
+                setTimeout(function () { copyAILabel.textContent = {{ _("Copy for AI Review")|tojson|safe }}; }, 2000);
             }
         });
     }
@@ -836,8 +836,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!text) { text = 'No steps to copy.'; }
                 copyToClipboardWithFeedback(text, copyStepsBtn, copyStepsLabel);
             } catch (e) {
-                copyStepsLabel.textContent = '{{ _("Copy failed") }}';
-                setTimeout(function () { copyStepsLabel.textContent = '{{ _("Copy") }}'; }, 2000);
+                copyStepsLabel.textContent = {{ _("Copy failed")|tojson|safe }};
+                setTimeout(function () { copyStepsLabel.textContent = {{ _("Copy")|tojson|safe }}; }, 2000);
             }
         });
     }
@@ -854,8 +854,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!text) { text = 'No steps to copy.'; }
                 copyToClipboardWithFeedback(text, copySummarisedBtn, copySummarisedLabel);
             } catch (e) {
-                copySummarisedLabel.textContent = '{{ _("Copy failed") }}';
-                setTimeout(function () { copySummarisedLabel.textContent = '{{ _("Copy Summarised") }}'; }, 2000);
+                copySummarisedLabel.textContent = {{ _("Copy failed")|tojson|safe }};
+                setTimeout(function () { copySummarisedLabel.textContent = {{ _("Copy Summarised")|tojson|safe }}; }, 2000);
             }
         });
     }
@@ -922,9 +922,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 expandRow.type = 'button';
                 expandRow.className = 'trace-final-answer-expand-row w-full text-left border-0';
                 expandRow.setAttribute('aria-expanded', 'false');
-                expandRow.setAttribute('aria-label', '{{ _("Show more") }}');
-                var showMoreLabel = '{{ _("Show more") }}';
-                var showLessLabel = '{{ _("Show less") }}';
+                expandRow.setAttribute('aria-label', {{ _("Show more")|tojson|safe }});
+                var showMoreLabel = {{ _("Show more")|tojson|safe }};
+                var showLessLabel = {{ _("Show less")|tojson|safe }};
                 expandRow.innerHTML = '<span class="trace-final-answer-expand-label">' + showMoreLabel + '</span> <i class="fas fa-chevron-down trace-final-answer-expand-icon" aria-hidden="true"></i>';
                 expandRow.addEventListener('click', function () {
                     var isCollapsed = wrapper.classList.toggle('trace-final-answer-collapsed');

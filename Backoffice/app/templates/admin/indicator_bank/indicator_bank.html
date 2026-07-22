@@ -246,50 +246,50 @@
 
 {% block content %}
 <!-- Hidden elements for JavaScript translations -->
-<div id="export-message" data-message="{{ _('Please select at least one indicator to export.') }}" style="display: none;"></div>
+<div id="export-message" data-message="{{ _('Please select at least one indicator to export.')|forceescape }}" style="display: none;"></div>
 <div id="js-translations" style="display: none;"
-     data-enter-name="{{ _('Please enter a name.') }}"
-     data-save-success="{{ _('Sectors and subsectors have been saved successfully!') }}"
-     data-extract-error="{{ _('Error: Could not extract indicator IDs. Please try again or contact support.') }}"
-     data-upload-excel="{{ _('Please upload an Excel file (.xlsx or .xls)') }}"
-     data-file-input-changed="{{ _('File input changed') }}"
-     data-no-file-selected="{{ _('No file selected') }}"
-     data-starting-import="{{ _('Starting import...') }}"
-     data-adding-drag-highlight="{{ _('Adding drag highlight') }}"
-     data-removing-drag-highlight="{{ _('Removing drag highlight') }}"
-     data-file-dropped="{{ _('File dropped') }}"
-     data-invalid-file-type="{{ _('Invalid file type dropped') }}"
-     data-form-created="{{ _('Form created and appended, submitting...') }}"
-     data-form-cleaned="{{ _('Form cleaned up') }}"
-     data-click-drag-import="{{ _('Click or drag Excel file here to import') }}"
-     data-importing="{{ _('Importing') }}"
-     data-import-success="{{ _('Import successful!') }}"
-     data-import-failed="{{ _('Import failed:') }}"
-     data-unknown-error="{{ _('Unknown error') }}"
-     data-health="{{ _('Health') }}"
-     data-education="{{ _('Education') }}"
-     data-water-sanitation="{{ _('Water & Sanitation') }}"
-     data-shelter="{{ _('Shelter') }}"
-     data-food-security="{{ _('Food Security') }}"
-     data-primary-healthcare="{{ _('Primary Healthcare') }}"
-     data-mental-health="{{ _('Mental Health') }}"
-     data-basic-education="{{ _('Basic Education') }}"
-     data-adult-literacy="{{ _('Adult Literacy') }}"
-     data-water-quality="{{ _('Water Quality') }}"
-     data-hygiene-promotion="{{ _('Hygiene Promotion') }}"
-     data-new-sector="{{ _('New Sector') }}"
-     data-new-subsector="{{ _('New Subsector') }}"
-     data-edit="{{ _('Edit') }}"
-     data-delete="{{ _('Delete') }}"
-     data-are-you-sure-delete="{{ _('Are you sure you want to delete this') }}"
-     data-sector="{{ _('sector') }}"
-     data-subsector="{{ _('subsector') }}"
-     data-question-mark="{{ _('?') }}"
-     data-id="{{ _('ID') }}"
-     data-search="{{ _('Search') }}"
-     data-search-definition="{{ _('Search Definition') }}"
-     data-refresh-page="{{ _('Refresh Page') }}"
-     data-try-again="{{ _('Try Again') }}">
+     data-enter-name="{{ _('Please enter a name.')|forceescape }}"
+     data-save-success="{{ _('Sectors and subsectors have been saved successfully!')|forceescape }}"
+     data-extract-error="{{ _('Error: Could not extract indicator IDs. Please try again or contact support.')|forceescape }}"
+     data-upload-excel="{{ _('Please upload an Excel file (.xlsx or .xls)')|forceescape }}"
+     data-file-input-changed="{{ _('File input changed')|forceescape }}"
+     data-no-file-selected="{{ _('No file selected')|forceescape }}"
+     data-starting-import="{{ _('Starting import...')|forceescape }}"
+     data-adding-drag-highlight="{{ _('Adding drag highlight')|forceescape }}"
+     data-removing-drag-highlight="{{ _('Removing drag highlight')|forceescape }}"
+     data-file-dropped="{{ _('File dropped')|forceescape }}"
+     data-invalid-file-type="{{ _('Invalid file type dropped')|forceescape }}"
+     data-form-created="{{ _('Form created and appended, submitting...')|forceescape }}"
+     data-form-cleaned="{{ _('Form cleaned up')|forceescape }}"
+     data-click-drag-import="{{ _('Click or drag Excel file here to import')|forceescape }}"
+     data-importing="{{ _('Importing')|forceescape }}"
+     data-import-success="{{ _('Import successful!')|forceescape }}"
+     data-import-failed="{{ _('Import failed:')|forceescape }}"
+     data-unknown-error="{{ _('Unknown error')|forceescape }}"
+     data-health="{{ _('Health')|forceescape }}"
+     data-education="{{ _('Education')|forceescape }}"
+     data-water-sanitation="{{ _('Water & Sanitation')|forceescape }}"
+     data-shelter="{{ _('Shelter')|forceescape }}"
+     data-food-security="{{ _('Food Security')|forceescape }}"
+     data-primary-healthcare="{{ _('Primary Healthcare')|forceescape }}"
+     data-mental-health="{{ _('Mental Health')|forceescape }}"
+     data-basic-education="{{ _('Basic Education')|forceescape }}"
+     data-adult-literacy="{{ _('Adult Literacy')|forceescape }}"
+     data-water-quality="{{ _('Water Quality')|forceescape }}"
+     data-hygiene-promotion="{{ _('Hygiene Promotion')|forceescape }}"
+     data-new-sector="{{ _('New Sector')|forceescape }}"
+     data-new-subsector="{{ _('New Subsector')|forceescape }}"
+     data-edit="{{ _('Edit')|forceescape }}"
+     data-delete="{{ _('Delete')|forceescape }}"
+     data-are-you-sure-delete="{{ _('Are you sure you want to delete this')|forceescape }}"
+     data-sector="{{ _('sector')|forceescape }}"
+     data-subsector="{{ _('subsector')|forceescape }}"
+     data-question-mark="{{ _('?')|forceescape }}"
+     data-id="{{ _('ID')|forceescape }}"
+     data-search="{{ _('Search')|forceescape }}"
+     data-search-definition="{{ _('Search Definition')|forceescape }}"
+     data-refresh-page="{{ _('Refresh Page')|forceescape }}"
+     data-try-again="{{ _('Try Again')|forceescape }}">
 </div>
 
 {% set pending_suggestions_count = pending_suggestions_count | default(0) %}
@@ -317,7 +317,7 @@
     <button type="button"
             class="professional-action-btn professional-action-btn-blue"
             id="actions-dropdown-btn"
-            title="{{ _('Additional actions') }}"
+            title="{{ _('Additional actions')|forceescape }}"
             aria-haspopup="true"
             aria-expanded="false">
         <i class="fas fa-cogs"></i>
@@ -349,14 +349,14 @@
         {% if can_edit_indicators %}
             <div class="action-dropdown-divider"></div>
             <button type="button" id="sync-remote-indicatorbank-btn" class="action-dropdown-item" role="menuitem"
-                    title="{{ _('Sync indicators from the external IFRC Indicator Bank') }}">
+                    title="{{ _('Sync indicators from the external IFRC Indicator Bank')|forceescape }}">
                 <i class="fas fa-sync-alt text-gray-600"></i>
                 <span>{{ _('Sync from IFRC Indicator Bank') }}</span>
             </button>
         {% endif %}
         {% if can_edit_indicators %}
             <button type="button" id="auto-translate-all-btn" class="action-dropdown-item" role="menuitem"
-                    title="{{ _('Auto-translate all blank indicator names to all languages') }}">
+                    title="{{ _('Auto-translate all blank indicator names to all languages')|forceescape }}">
                 <i class="fas fa-magic text-indigo-600"></i>
                 <span>{{ _('Auto Translate All') }}</span>
             </button>
@@ -444,7 +444,7 @@
             <i class="fas fa-download mr-2"></i>{{ _('All Indicators') }}
         </button>
         <button id="export-selected-btn" type="button" class="btn btn-success excel-io-modal__btn" disabled
-                title="{{ _('Select one or more indicators in the table first') }}">
+                title="{{ _('Select one or more indicators in the table first')|forceescape }}">
             <i class="fas fa-check-square mr-2"></i>{{ _('Selected Indicators') }}
         </button>
     </div>
@@ -498,7 +498,7 @@
 <!-- Styled Confirm/Alert Modal (consistent with entry form modals) -->
 <div id="styled-message-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center px-4">
     <div class="relative mx-auto w-full max-w-lg bg-white rounded-lg shadow-xl">
-        <button type="button" id="styled-message-close" class="absolute top-3 right-3 btn-close-icon text-gray-400 hover:text-gray-600" aria-label="{{ _('Close modal') }}">
+        <button type="button" id="styled-message-close" class="absolute top-3 right-3 btn-close-icon text-gray-400 hover:text-gray-600" aria-label="{{ _('Close modal')|forceescape }}">
             <i class="fas fa-times w-6 h-6"></i>
         </button>
         <div class="px-6 pt-6 pb-4">
@@ -1037,7 +1037,7 @@
                     const safeConfirm = String(deleteConfirm || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                     html += '<form action="' + deleteUrl + '" method="POST" class="inline-block delete-indicator-form" data-confirm="' + safeConfirm + '">';
                     html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
-                    html += '<button type="submit" title="' + escapeHtmlAttr({{ _("Delete")|js }}) + '" class="text-gray-500 hover:text-red-600 transition-colors"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '<button type="submit" title="' + escapeHtmlAttr(' + {{ _("Delete")|js|tojson|safe }} + ') + '" class="text-gray-500 hover:text-red-600 transition-colors"><i class="fas fa-trash fa-fw"></i></button>';
                     html += '</form>';
                 }
                 html += '</div>';
@@ -1207,7 +1207,7 @@
             : selectedLanguages.filter(lang => counts[lang] > 0);
 
         if (!window.gridApi) {
-            window.autoTranslateModal.logProgress({{ _("Grid not initialized")|js }}, 'error');
+            window.autoTranslateModal.logProgress(' + {{ _("Grid not initialized")|js|tojson|safe }} + ', 'error');
             return;
         }
 
@@ -1259,7 +1259,7 @@
         });
 
         if (indicatorsToTranslate.length === 0) {
-            window.autoTranslateModal.logProgress({{ _("No indicators found that need translation")|js }}, 'info');
+            window.autoTranslateModal.logProgress(' + {{ _("No indicators found that need translation")|js|tojson|safe }} + ', 'info');
             window.autoTranslateModal.translationState.isRunning = false;
             jQuery('#auto-translate-pause-btn').addClass('hidden');
             jQuery('#auto-translate-resume-btn').addClass('hidden');
@@ -1272,7 +1272,7 @@
         window.autoTranslateModal.updateProgress();
 
         // Log the start of the translation process
-        window.autoTranslateModal.logProgress(`{{ _("Starting") }} ${indicatorsToTranslate.length} {{ _("translations...") }}`, 'info');
+        window.autoTranslateModal.logProgress(`' + {{ _("Starting")|tojson|safe }} + ' ${indicatorsToTranslate.length} ' + {{ _("translations...")|tojson|safe }} + '`, 'info');
 
         // Process indicators one by one
         processNextIndicator(indicatorsToTranslate, 0, languagesNeedingTranslation, selectedService);
@@ -1282,7 +1282,7 @@
     function processNextIndicator(indicators, index, selectedLanguages, selectedService) {
         if (index >= indicators.length || window.autoTranslateModal.translationState.shouldStop) {
             window.autoTranslateModal.translationState.isRunning = false;
-            window.autoTranslateModal.logProgress({{ _("Translation completed!")|js }}, 'success');
+            window.autoTranslateModal.logProgress(' + {{ _("Translation completed!")|js|tojson|safe }} + ', 'success');
             jQuery('#auto-translate-pause-btn').addClass('hidden');
             jQuery('#auto-translate-resume-btn').addClass('hidden');
             jQuery('#auto-translate-stop-btn').addClass('hidden');
@@ -1410,21 +1410,21 @@
 
                         // Create a descriptive message showing what was translated
                         let translationTypes = [];
-                        if (indicator.needsNameTranslation) translationTypes.push({{ _("name")|js }});
-                        if (indicator.needsDefinitionTranslation) translationTypes.push({{ _("definition")|js }});
+                        if (indicator.needsNameTranslation) translationTypes.push(' + {{ _("name")|js|tojson|safe }} + ');
+                        if (indicator.needsDefinitionTranslation) translationTypes.push(' + {{ _("definition")|js|tojson|safe }} + ');
 
                         const translationTypeText = translationTypes.join(' + ');
-                        window.autoTranslateModal.logProgress(`{{ _("✓") }} ${indicator.id} → ${indicator.language} (${translationTypeText})`, 'success');
+                        window.autoTranslateModal.logProgress(`' + {{ _("✓")|tojson|safe }} + ' ${indicator.id} → ${indicator.language} (${translationTypeText})`, 'success');
                     } else {
                         window.autoTranslateModal.translationState.errorCount++;
 
                         // Create a descriptive error message showing what was being translated
                         let translationTypes = [];
-                        if (indicator.needsNameTranslation) translationTypes.push({{ _("name")|js }});
-                        if (indicator.needsDefinitionTranslation) translationTypes.push({{ _("definition")|js }});
+                        if (indicator.needsNameTranslation) translationTypes.push(' + {{ _("name")|js|tojson|safe }} + ');
+                        if (indicator.needsDefinitionTranslation) translationTypes.push(' + {{ _("definition")|js|tojson|safe }} + ');
 
                         const translationTypeText = translationTypes.join(' + ');
-                        const errorMsg = `{{ _("Failed to save") }} ${indicator.id} → ${indicator.language} (${translationTypeText}): ${saveData.message || 'Unknown error'}`;
+                        const errorMsg = `' + {{ _("Failed to save")|tojson|safe }} + ' ${indicator.id} → ${indicator.language} (${translationTypeText}): ${saveData.message || 'Unknown error'}`;
                         window.autoTranslateModal.translationState.errors.push(errorMsg);
                         window.autoTranslateModal.logProgress(errorMsg, 'error');
                     }
@@ -1456,11 +1456,11 @@
 
                     // Create a descriptive error message showing what was being translated
                     let translationTypes = [];
-                    if (indicator.needsNameTranslation) translationTypes.push({{ _("name")|js }});
-                    if (indicator.needsDefinitionTranslation) translationTypes.push({{ _("definition")|js }});
+                    if (indicator.needsNameTranslation) translationTypes.push(' + {{ _("name")|js|tojson|safe }} + ');
+                    if (indicator.needsDefinitionTranslation) translationTypes.push(' + {{ _("definition")|js|tojson|safe }} + ');
 
                     const translationTypeText = translationTypes.join(' + ');
-                    const errorMsg = `{{ _("Network error saving") }} ${indicator.id} → ${indicator.language} (${translationTypeText}): ${saveError.message}`;
+                    const errorMsg = `' + {{ _("Network error saving")|tojson|safe }} + ' ${indicator.id} → ${indicator.language} (${translationTypeText}): ${saveError.message}`;
                     window.autoTranslateModal.translationState.errors.push(errorMsg);
                     window.autoTranslateModal.logProgress(errorMsg, 'error');
                     window.autoTranslateModal.updateProgress();
@@ -1472,11 +1472,11 @@
 
                 // Create a descriptive error message showing what was being translated
                 let translationTypes = [];
-                if (indicator.needsNameTranslation) translationTypes.push({{ _("name")|js }});
-                if (indicator.needsDefinitionTranslation) translationTypes.push({{ _("definition")|js }});
+                if (indicator.needsNameTranslation) translationTypes.push(' + {{ _("name")|js|tojson|safe }} + ');
+                if (indicator.needsDefinitionTranslation) translationTypes.push(' + {{ _("definition")|js|tojson|safe }} + ');
 
                 const translationTypeText = translationTypes.join(' + ');
-                const errorMsg = `{{ _("Failed to translate") }} ${indicator.id} → ${indicator.language} (${translationTypeText}): ${data.message || 'Unknown error'}`;
+                const errorMsg = `' + {{ _("Failed to translate")|tojson|safe }} + ' ${indicator.id} → ${indicator.language} (${translationTypeText}): ${data.message || 'Unknown error'}`;
                 window.autoTranslateModal.translationState.errors.push(errorMsg);
                 window.autoTranslateModal.logProgress(errorMsg, 'error');
                 window.autoTranslateModal.updateProgress();
@@ -1490,11 +1490,11 @@
 
             // Create a descriptive error message showing what was being translated
             let translationTypes = [];
-            if (indicator.needsNameTranslation) translationTypes.push({{ _("name")|js }});
-            if (indicator.needsDefinitionTranslation) translationTypes.push({{ _("definition")|js }});
+            if (indicator.needsNameTranslation) translationTypes.push(' + {{ _("name")|js|tojson|safe }} + ');
+            if (indicator.needsDefinitionTranslation) translationTypes.push(' + {{ _("definition")|js|tojson|safe }} + ');
 
             const translationTypeText = translationTypes.join(' + ');
-            const errorMsg = `{{ _("Network error") }} ${indicator.id} → ${indicator.language} (${translationTypeText}): ${error.message}`;
+            const errorMsg = `' + {{ _("Network error")|tojson|safe }} + ' ${indicator.id} → ${indicator.language} (${translationTypeText}): ${error.message}`;
             window.autoTranslateModal.translationState.errors.push(errorMsg);
             window.autoTranslateModal.logProgress(errorMsg, 'error');
             window.autoTranslateModal.updateProgress();
@@ -2162,7 +2162,7 @@
 
             // Confirm before deleting indicators (POST form)
             $(document).on('submit', '.delete-indicator-form', function(e) {
-                const msg = $(this).data('confirm') || {{ _("Are you sure you want to delete this indicator?")|js }};
+                const msg = $(this).data('confirm') || ' + {{ _("Are you sure you want to delete this indicator?")|js|tojson|safe }} + ';
                 const $form = $(this);
                 if ($form.data('confirmed') === true) {
                     return true;

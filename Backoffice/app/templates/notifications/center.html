@@ -115,7 +115,7 @@
                 <label for="tags-filter" class="block text-sm font-medium text-gray-700 mb-1">
                     {{ _('Tags') }}
                 </label>
-                <input type="text" id="tags-filter" placeholder="{{ _('e.g., urgent, action-required') }}"
+                <input type="text" id="tags-filter" placeholder="{{ _('e.g., urgent, action-required')|forceescape }}"
                        class="form-input w-full">
                 <p class="text-xs text-gray-500 mt-1">{{ _('Comma-separated tags') }}</p>
             </div>
@@ -138,7 +138,7 @@
                 <label for="search-filter" class="block text-sm font-medium text-gray-700 mb-1">
                     {{ _('Search') }}
                 </label>
-                <input type="text" id="search-filter" placeholder="{{ _('Search notifications...') }}"
+                <input type="text" id="search-filter" placeholder="{{ _('Search notifications...')|forceescape }}"
                        class="form-input w-full">
             </div>
         </div>

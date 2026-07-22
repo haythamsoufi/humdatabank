@@ -79,7 +79,7 @@
             {% if draft and confidence != 'orphaned' %}
             <div class="field-mapping-actions mt-2">
                 <label class="text-xs font-medium text-gray-600">{{ _('Change link') }}</label>
-                <select class="shadow-sm border-gray-300 rounded-md py-1.5" data-published-key-select aria-label="{{ _('Link to published field') }}">
+                <select class="shadow-sm border-gray-300 rounded-md py-1.5" data-published-key-select aria-label="{{ _('Link to published field')|forceescape }}">
                     <option value="">{{ _('Choose published field…') }}</option>
                     {% for pi in published_picker %}
                     <option value="{{ pi.stable_key }}" {% if pub and pi.stable_key == pub.stable_key %}selected{% endif %}>
@@ -152,7 +152,7 @@
             {% endif %}
             {% if draft and confidence != 'orphaned' %}
             <div class="field-mapping-actions mt-2">
-                <select class="shadow-sm border-gray-300 rounded-md py-1.5 w-full" data-published-key-select aria-label="{{ _('Link to published section') }}">
+                <select class="shadow-sm border-gray-300 rounded-md py-1.5 w-full" data-published-key-select aria-label="{{ _('Link to published section')|forceescape }}">
                     <option value="">{{ _('Choose published section…') }}</option>
                     {% for ps in published_picker %}
                     <option value="{{ ps.stable_key }}">{{ ps.name }}</option>
@@ -188,7 +188,7 @@
     <form method="POST" action="{{ deploy_form_action }}" class="inline-block">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="version_id" value="{{ draft_version.id }}">
-        <button type="submit" class="professional-action-btn professional-action-btn-green" title="{{ _('Publish this draft and remap submission data') }}">
+        <button type="submit" class="professional-action-btn professional-action-btn-green" title="{{ _('Publish this draft and remap submission data')|forceescape }}">
             <i class="fas fa-rocket" aria-hidden="true"></i>
             <span>{{ _('Deploy draft') }}</span>
         </button>
@@ -299,7 +299,7 @@
         {% endcall %}
 
         {# Status filters #}
-        <div class="flex flex-wrap gap-2 my-4" id="field-mapping-filters" role="group" aria-label="{{ _('Filter by status') }}">
+        <div class="flex flex-wrap gap-2 my-4" id="field-mapping-filters" role="group" aria-label="{{ _('Filter by status')|forceescape }}">
             <button type="button" class="btn btn-secondary btn-sm field-mapping-filter-btn is-active" data-filter="all">{{ _('All') }}</button>
             <button type="button" class="btn btn-secondary btn-sm field-mapping-filter-btn" data-filter="needs_review">{{ _('Needs review') }}</button>
             <button type="button" class="btn btn-secondary btn-sm field-mapping-filter-btn" data-filter="exact">{{ _('Linked') }}</button>

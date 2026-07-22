@@ -992,8 +992,11 @@ def dashboard():
         except Exception as dq_err:
             current_app.logger.warning("Failed to load data quality templates: %s", dq_err)
 
-    # Pop the profile-completion flag set at login (re-evaluated on every login)
+    # Pop the profile-completion flag set at login (re-evaluated on every login).
+    # Skip while the user has no approved entity access yet (still on request-access flow).
     show_profile_completion = session.pop('prompt_profile_completion', False)
+    if show_profile_completion and not user_entities:
+        show_profile_completion = False
 
     return render_template("core/dashboard.html",
                        user=current_user,

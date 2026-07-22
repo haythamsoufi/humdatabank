@@ -173,10 +173,10 @@
 
         return '<form action="' + params.data.status_update_url + '" method="POST" class="status-update-form">' +
             '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">' +
-            '<select name="status" data-confirm-message="{{ _("Are you sure you want to update the status?") }}" class="status-select rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm ' + colorClass + '">' +
-            '<option value="pending" ' + (status === 'pending' ? 'selected' : '') + ' class="text-yellow-600">{{ _('Pending') }}</option>' +
-            '<option value="approved" ' + (status === 'approved' ? 'selected' : '') + ' class="text-green-600">{{ _('Approved') }}</option>' +
-            '<option value="rejected" ' + (status === 'rejected' ? 'selected' : '') + ' class="text-red-600">{{ _('Rejected') }}</option>' +
+            '<select name="status" data-confirm-message="' + {{ _("Are you sure you want to update the status?")|tojson|safe }} + '" class="status-select rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 text-sm ' + colorClass + '">' +
+            '<option value="pending" ' + (status === 'pending' ? 'selected' : '') + ' class="text-yellow-600">' + {{ _('Pending')|tojson|safe }} + '</option>' +
+            '<option value="approved" ' + (status === 'approved' ? 'selected' : '') + ' class="text-green-600">' + {{ _('Approved')|tojson|safe }} + '</option>' +
+            '<option value="rejected" ' + (status === 'rejected' ? 'selected' : '') + ' class="text-red-600">' + {{ _('Rejected')|tojson|safe }} + '</option>' +
             '</select>' +
             '</form>';
     }
@@ -185,7 +185,7 @@
     const columnDefs = [
         {
             field: 'submitted_at',
-            headerName: '{{ _("Submitted At") }}',
+            headerName: {{ _("Submitted At")|tojson|safe }},
             width: 180,
             minWidth: 150,
             maxWidth: 250,
@@ -195,7 +195,7 @@
         },
         {
             field: 'submitter_name',
-            headerName: '{{ _("Contact Name") }}',
+            headerName: {{ _("Contact Name")|tojson|safe }},
             width: 200,
             minWidth: 150,
             maxWidth: 300,
@@ -204,7 +204,7 @@
         },
         {
             field: 'submitter_email',
-            headerName: '{{ _("Contact Email") }}',
+            headerName: {{ _("Contact Email")|tojson|safe }},
             width: 250,
             minWidth: 200,
             maxWidth: 350,
@@ -213,7 +213,7 @@
         },
         {
             field: 'country_name',
-            headerName: '{{ _("Country") }}',
+            headerName: {{ _("Country")|tojson|safe }},
             width: 200,
             minWidth: 150,
             maxWidth: 300,
@@ -222,7 +222,7 @@
         }{% if not assignment %},
         {
             field: 'assignment_period',
-            headerName: '{{ _("Assignment") }}',
+            headerName: {{ _("Assignment")|tojson|safe }},
             width: 200,
             minWidth: 150,
             maxWidth: 300,
@@ -231,7 +231,7 @@
         },
         {
             field: 'template_name',
-            headerName: '{{ _("Template") }}',
+            headerName: {{ _("Template")|tojson|safe }},
             width: 250,
             minWidth: 200,
             maxWidth: 400,
@@ -240,7 +240,7 @@
         }{% endif %},
         {
             field: 'status',
-            headerName: '{{ _("Status") }}',
+            headerName: {{ _("Status")|tojson|safe }},
             width: 150,
             minWidth: 120,
             maxWidth: 200,
@@ -252,7 +252,7 @@
         },
         {
             field: 'actions',
-            headerName: '{{ _("Actions") }}',
+            headerName: {{ _("Actions")|tojson|safe }},
             width: 200,
             minWidth: 150,
             maxWidth: 250,
@@ -265,16 +265,16 @@
                 const deleteUrl = params.data.delete_url || '#';
                 const deleteConfirm = params.data.delete_confirm || '';
                 let html = '<div class="flex items-center justify-center gap-3">';
-                html += '<a href="' + viewUrl + '" class="text-blue-600 hover:text-blue-900" title="{{ _("View") }}"><i class="fas fa-eye fa-fw"></i></a>';
-                html += '<a href="' + editUrl + '" class="text-green-600 hover:text-green-900" title="{{ _("Edit") }}"><i class="fas fa-pen fa-fw"></i></a>';
+                html += '<a href="' + viewUrl + '" class="text-blue-600 hover:text-blue-900" title="' + {{ _("View")|tojson|safe }} + '"><i class="fas fa-eye fa-fw"></i></a>';
+                html += '<a href="' + editUrl + '" class="text-green-600 hover:text-green-900" title="' + {{ _("Edit")|tojson|safe }} + '"><i class="fas fa-pen fa-fw"></i></a>';
                 {% if not assignment %}
                 if (params.data.has_assignment) {
-                    html += '<a href="' + (params.data.view_assignment_url || '#') + '" class="text-purple-600 hover:text-purple-900" title="{{ _("View Assignment Submissions") }}"><i class="fas fa-tasks fa-fw"></i></a>';
+                    html += '<a href="' + (params.data.view_assignment_url || '#') + '" class="text-purple-600 hover:text-purple-900" title="' + {{ _("View Assignment Submissions")|tojson|safe }} + '"><i class="fas fa-tasks fa-fw"></i></a>';
                 }
                 {% endif %}
                 html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/'/g, "\\'") + '" data-confirm-danger="true">';
                 html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
-                html += '<button type="submit" class="text-red-600 hover:text-red-900 delete-submission-btn" title="{{ _("Delete") }}" data-confirm="' + deleteConfirm.replace(/'/g, "\\'") + '"><i class="fas fa-trash fa-fw"></i></button>';
+                html += '<button type="submit" class="text-red-600 hover:text-red-900 delete-submission-btn" title="' + {{ _("Delete")|tojson|safe }} + '" data-confirm="' + deleteConfirm.replace(/'/g, "\\'") + '"><i class="fas fa-trash fa-fw"></i></button>';
                 html += '</form>';
                 html += '</div>';
                 return html;
@@ -300,8 +300,8 @@
     // Handle copy URL functionality (only relevant for single assignment view)
     $(document).on('click', '.copy-url-btn', function() {
         const url = $(this).data('copy-url');
-        const successMessage = $(this).data('success-message') || '{{ _("Public URL copied to clipboard!") }}';
-        const errorMessage = $(this).data('error-message') || '{{ _("Failed to copy URL. Please try again.") }}';
+        const successMessage = $(this).data('success-message') || {{ _("Public URL copied to clipboard!")|tojson|safe }};
+        const errorMessage = $(this).data('error-message') || {{ _("Failed to copy URL. Please try again.")|tojson|safe }};
 
         navigator.clipboard.writeText(url).then(function() {
             if (typeof Utils !== 'undefined' && Utils.showSuccess) {
@@ -327,7 +327,7 @@
     $(document).on('change', '.status-select', function() {
         const select = this;
         const form = $(select).closest('form');
-        const message = $(select).data('confirm-message') || '{{ _("Are you sure you want to update the status?") }}';
+        const message = $(select).data('confirm-message') || {{ _("Are you sure you want to update the status?")|tojson|safe }};
         const previousValue = $(select).data('previous-value') || select.value;
 
         function doStatusUpdate() {
@@ -379,7 +379,7 @@
             select.value = previousValue;
         }
         if (window.showConfirmation) {
-            window.showConfirmation(message, doStatusUpdate, onCancel, '{{ _("Confirm") }}', '{{ _("Cancel") }}', '{{ _("Update Status?") }}');
+            window.showConfirmation(message, doStatusUpdate, onCancel, {{ _("Confirm")|tojson|safe }}, {{ _("Cancel")|tojson|safe }}, {{ _("Update Status?")|tojson|safe }});
         } else {
             window.__clientWarn && window.__clientWarn('Confirmation dialog not available');
             onCancel();

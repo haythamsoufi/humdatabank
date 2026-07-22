@@ -6,7 +6,7 @@
         </p>
 
 <div class="overflow-x-auto border rounded-md">
-            <table class="min-w-full divide-y divide-gray-200" role="table" aria-label="{{ _('Template Variables') }}">
+            <table class="min-w-full divide-y divide-gray-200" role="table" aria-label="{{ _('Template Variables')|forceescape }}">
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Variable Name') }}</th>
@@ -24,7 +24,7 @@
 </div>
 
 <div class="flex justify-end space-x-3 mt-4">
-            <button type="button" id="add-variable-btn" class="btn btn-primary" aria-label="{{ _('Add Variable') }}">
+            <button type="button" id="add-variable-btn" class="btn btn-primary" aria-label="{{ _('Add Variable')|forceescape }}">
                 <i class="fas fa-plus w-4 h-4 mr-2"></i>
                 {{ _('Add Variable') }}
             </button>

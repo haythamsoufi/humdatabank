@@ -42,11 +42,11 @@
 
     {% if matrix_is_prefilled %}
         <div class="flex items-center justify-end mb-2">
-            <span title="{{ _('This matrix is prefilled') }}">{{ status_label_for_data_flag('prefilled') }}</span>
+            <span title="{{ _('This matrix is prefilled')|forceescape }}">{{ status_label_for_data_flag('prefilled') }}</span>
         </div>
     {% elif matrix_is_imputed %}
         <div class="flex items-center justify-end mb-2">
-            <span title="{{ _('This matrix is imputed') }}">{{ status_label_for_data_flag('imputed') }}</span>
+            <span title="{{ _('This matrix is imputed')|forceescape }}">{{ status_label_for_data_flag('imputed') }}</span>
         </div>
     {% endif %}
 
@@ -59,10 +59,12 @@
     {% if (matrix_rows and matrix_columns) or is_advanced_mode %}
         {% set show_row_totals = matrix_config.get('show_row_totals', true) %}
         {% set show_column_totals = matrix_config.get('show_column_totals', true) %}
+        {% set row_total_manual = matrix_config.get('row_total_manual_enabled', false) %}
+        {% set row_total_validation = matrix_config.get('row_total_validation', 'none') %}
         <div class="matrix-table-scroll overflow-x-auto">
         <table class="min-w-full border-collapse border border-gray-300 text-xs"
                role="table"
-               aria-label="{{ _('Data matrix for') }} {{ field.display_label or field.label }}">
+               aria-label="{{ _('Data matrix for')|forceescape }} {{ field.display_label or field.label }}">
             <thead>
                 {# Detect whether any column belongs to a group #}
                 {% set _has_groups = namespace(value=false) %}
@@ -188,6 +190,29 @@
                 {% endif %}
             </thead>
             <tbody id="matrix-tbody-{{ field.id }}">
+                {% if show_column_totals %}
+                    <tr role="row" class="matrix-column-totals-row">
+                        <td class="border border-gray-300 bg-gray-100 font-medium text-gray-700"
+                            role="rowheader"
+                            scope="row">{{ _('Total') }}</td>
+                        {% for column in matrix_columns %}
+                            {% set column_name = column.name if column.name else column %}
+                            <td class="border border-gray-300 px-2 py-1 bg-gray-100" role="gridcell">
+                                <span class="matrix-column-total inline-block w-full px-2 py-1 text-center text-sm font-medium"
+                                      data-column="{{ column_name }}"
+                                      data-column-type="{{ column.type if column.type else 'number' }}"
+                                      aria-label="{{ _('Total for column')|forceescape }} {{ column_name }}">0</span>
+                            </td>
+                        {% endfor %}
+                        {% if show_row_totals %}
+                            <td class="border border-gray-300 px-2 py-1 bg-orange-100" role="gridcell">
+                                <span class="matrix-grand-total inline-block w-full px-2 py-1 text-center text-sm font-bold"
+                                      data-field-id="{{ field.id }}"
+                                      aria-label="{{ _('Grand total for matrix')|forceescape }} {{ _matrix_label }}">0</span>
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% endif %}
                 {% if is_advanced_mode %}
                     {# Advanced mode: dynamic rows will be added here by JavaScript #}
                 {% else %}
@@ -239,7 +264,7 @@
                                                    value="1"
                                                    {% if cell_value == '1' or cell_value == 1 %}checked{% endif %}
                                                    class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto {% if variable_readonly %}opacity-50{% endif %}"
-                                                   aria-label="{{ _('Variable tick for') }} {{ row_display }} {{ _('and') }} {{ column_name }}"
+                                                   aria-label="{{ _('Variable tick for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
                                                    {% if variable_readonly %}readonly{% endif %}
                                                    {% if not can_edit %}disabled{% endif %}>
                                         {% else %}
@@ -255,7 +280,7 @@
                                                    data-variable-readonly="{{ 'true' if variable_readonly else 'false' }}"
                                                    value="{{ cell_value }}"
                                                    class="w-full px-2 py-1 border-0 {% if variable_readonly %}bg-gray-100{% endif %} focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                                   aria-label="{{ _('Variable value for') }} {{ row_display }} {{ _('and') }} {{ column_name }}"
+                                                   aria-label="{{ _('Variable value for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
                                                    min="0"
                                                    step="0.01"
                                                    {% if variable_readonly %}readonly{% endif %}
@@ -271,7 +296,7 @@
                                                value="1"
                                                {% if cell_value == '1' or cell_value == 1 %}checked{% endif %}
                                                class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto"
-                                               aria-label="{{ _('Tick for') }} {{ row_display }} {{ _('and') }} {{ column_name }}"
+                                               aria-label="{{ _('Tick for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
                                                {% if not can_edit %}disabled{% endif %}>
                                     {% else %}
                                         <input type="number"
@@ -282,7 +307,7 @@
                                                data-column-type="number"
                                                value="{{ cell_value }}"
                                                class="w-full px-2 py-1 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                               aria-label="{{ _('Value for') }} {{ row_display }} {{ _('and') }} {{ column_name }}"
+                                               aria-label="{{ _('Value for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
                                                min="0"
                                                step="0.01"
                                                {% if not can_edit %}disabled{% endif %}>
@@ -291,37 +316,44 @@
                             {% endfor %}
                             {% if show_row_totals %}
                                 <td class="border border-gray-300 px-2 py-1 bg-gray-100" role="gridcell">
-                                    <span class="matrix-row-total inline-block w-full px-2 py-1 text-center text-sm font-medium"
-                                          data-row="{{ row_id }}"
-                                          data-row-id="{{ row_id }}"
-                                          aria-label="{{ _('Total for row') }} {{ row_display }}">0</span>
+                                    {% if row_total_manual %}
+                                        {% set total_cell_key = row_id ~ '_Total' %}
+                                        {% set total_cell_value = existing_matrix_data.get(total_cell_key, '') if existing_matrix_data else '' %}
+                                        {% set total_display = '' %}
+                                        {% if total_cell_value is mapping and (total_cell_value.get('modified') is not none or total_cell_value.get('original') is not none) %}
+                                            {% set total_display = total_cell_value.get('modified') if total_cell_value.get('modified') not in (none, '') else total_cell_value.get('original') %}
+                                        {% elif total_cell_value not in (none, '') %}
+                                            {% set total_display = total_cell_value %}
+                                        {% endif %}
+                                        <div class="flex items-center w-full gap-1.5 px-1">
+                                            <input type="number"
+                                                   class="row-total-input flex-1 min-w-0 px-1 py-1 border-0 bg-transparent focus:outline-none focus:ring-2 focus:ring-orange-500 text-center text-sm font-medium"
+                                                   data-row="{{ row_id }}"
+                                                   data-row-id="{{ row_id }}"
+                                                   data-column="Total"
+                                                   data-cell-key="{{ total_cell_key }}"
+                                                   data-is-row-total="true"
+                                                   data-row-total-validation="{{ row_total_validation }}"
+                                                   value="{{ total_display }}"
+                                                   min="0"
+                                                   step="0.01"
+                                                   aria-label="{{ _('Total for row')|forceescape }} {{ row_display }}"
+                                                   {% if not can_edit %}disabled{% endif %}>
+                                            <span class="row-total-conflict hidden shrink-0 flex items-center justify-center mr-1.5 pointer-events-none"
+                                                  aria-hidden="true">
+                                                <svg class="row-total-conflict-icon h-5 w-5 text-amber-400" width="20" height="20" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+                                            </span>
+                                        </div>
+                                    {% else %}
+                                        <span class="matrix-row-total inline-block w-full px-2 py-1 text-center text-sm font-medium"
+                                              data-row="{{ row_id }}"
+                                              data-row-id="{{ row_id }}"
+                                              aria-label="{{ _('Total for row')|forceescape }} {{ row_display }}">0</span>
+                                    {% endif %}
                                 </td>
                             {% endif %}
                         </tr>
                     {% endfor %}
-                {% endif %}
-                {% if show_column_totals %}
-                    <tr role="row">
-                        <td class="border border-gray-300 bg-gray-100 font-medium text-gray-700"
-                            role="rowheader"
-                            scope="row">{{ _('Total') }}</td>
-                        {% for column in matrix_columns %}
-                            {% set column_name = column.name if column.name else column %}
-                            <td class="border border-gray-300 px-2 py-1 bg-gray-100" role="gridcell">
-                                <span class="matrix-column-total inline-block w-full px-2 py-1 text-center text-sm font-medium"
-                                      data-column="{{ column_name }}"
-                                      data-column-type="{{ column.type if column.type else 'number' }}"
-                                      aria-label="{{ _('Total for column') }} {{ column_name }}">0</span>
-                            </td>
-                        {% endfor %}
-                        {% if show_row_totals %}
-                            <td class="border border-gray-300 px-2 py-1 bg-orange-100" role="gridcell">
-                                <span class="matrix-grand-total inline-block w-full px-2 py-1 text-center text-sm font-bold"
-                                      data-field-id="{{ field.id }}"
-                                      aria-label="{{ _('Grand total for matrix') }} {{ _matrix_label }}">0</span>
-                            </td>
-                        {% endif %}
-                    </tr>
                 {% endif %}
 
                 {# Add row search interface as last row for advanced mode #}
@@ -380,7 +412,7 @@
 
 {# Data Availability Options for Matrix #}
 {% if can_edit and (field.config.allow_data_not_available or field.config.allow_not_applicable) %}
-    <div class="mt-3 flex items-center justify-end gap-4 text-sm" role="group" aria-label="{{ _('Data availability options') }}">
+    <div class="mt-3 flex items-center justify-end gap-4 text-sm" role="group" aria-label="{{ _('Data availability options')|forceescape }}">
         {% if field.config.allow_data_not_available %}
             <label class="inline-flex items-center">
                 <input type="checkbox"

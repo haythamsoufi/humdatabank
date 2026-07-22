@@ -22,7 +22,7 @@
 {%- endmacro %}
 
 {% macro upr_country_reporting_excel_workflow() -%}
-<div class="upr-excel-workflow" role="region" aria-label="{{ _('How to use UPR Country Reporting Excel') }}">
+<div class="upr-excel-workflow" role="region" aria-label="{{ _('How to use UPR Country Reporting Excel')|forceescape }}">
     <p class="text-sm font-medium text-gray-800 m-0 mb-1">{{ _('How it works') }}</p>
     <p class="text-xs text-gray-600 mb-3 leading-relaxed m-0">{{ _('Bulk-edit this assignment in Excel, load the file back here, then save when you are ready.') }}</p>
     <ol class="space-y-3 list-none p-0 m-0">

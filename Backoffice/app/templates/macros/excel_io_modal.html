@@ -125,7 +125,7 @@
 
     {% elif layout == 'tabs' %}
     <div class="excel-io-tabs">
-        <div class="excel-io-tabs__bar" role="tablist" aria-label="{{ _('Import or export') }}">
+        <div class="excel-io-tabs__bar" role="tablist" aria-label="{{ _('Import or export')|forceescape }}">
             {% if show_export %}
             <button type="button"
                     class="excel-io-tabs__btn {% if default_tab == 'export' %}excel-io-tabs__btn--active{% endif %}"

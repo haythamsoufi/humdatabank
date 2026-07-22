@@ -71,7 +71,7 @@ Parameters:
 
 {# Profile Icon Button - For clickable profile icons #}
 {% macro profile_icon_button(user, size='md', class='', button_class='') %}
-    <button class="profile-icon-button {{ button_class }}" aria-label="{{ _('User Profile') }}">
+    <button class="profile-icon-button {{ button_class }}" aria-label="{{ _('User Profile')|forceescape }}">
         {{ profile_icon(user, size, false, false, false, class) }}
     </button>
 {% endmacro %}

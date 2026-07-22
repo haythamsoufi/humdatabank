@@ -45,7 +45,7 @@
                 <label for="ppa_prefix" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Path prefix (optional)') }}</label>
                 <input type="text" name="path_prefix" id="ppa_prefix" value="{{ filters.path_prefix or '' }}"
                        class="form-input w-full border-gray-300 rounded-md text-sm font-mono text-xs"
-                       placeholder="{{ _('e.g. /admin') }}" autocomplete="off">
+                       placeholder="{{ _('e.g. /admin')|forceescape }}" autocomplete="off">
             </div>
             <div class="flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-primary">
@@ -82,7 +82,7 @@
                     <tr>
                         <th scope="col" class="px-4 py-2 text-left font-semibold text-gray-700">{{ _('Path') }}</th>
                         <th scope="col" class="px-4 py-2 text-right font-semibold text-gray-700 w-32">{{ _('Total views') }}</th>
-                        <th scope="col" class="px-4 py-2 text-right font-semibold text-gray-700 w-40" title="{{ _('Sessions where this path had at least one hit') }}">{{ _('Sessions with path') }}</th>
+                        <th scope="col" class="px-4 py-2 text-right font-semibold text-gray-700 w-40" title="{{ _('Sessions where this path had at least one hit')|forceescape }}">{{ _('Sessions with path') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 bg-white">

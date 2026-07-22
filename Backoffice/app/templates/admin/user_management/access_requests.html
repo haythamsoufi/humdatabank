@@ -292,7 +292,7 @@
             {{ _('Each FDS member receives at most one digest per day when they have pending requests.') }}
           </span>
         </div>
-        <label class="relative inline-flex shrink-0 items-center cursor-pointer select-none mt-0.5" title="{{ _('Send daily digest emails') }}">
+        <label class="relative inline-flex shrink-0 items-center cursor-pointer select-none mt-0.5" title="{{ _('Send daily digest emails')|forceescape }}">
           <input type="checkbox"
                  name="fds_access_request_digest_enabled"
                  value="1"
@@ -372,7 +372,7 @@
 
     <form method="POST"
           action="{{ url_for('user_management.send_access_requests_digest_now') }}"
-          data-confirm="{{ _('Send digest emails now to all FDS members with pending requests? Manual sends ignore the daily schedule and once-per-day limit.') }}">
+          data-confirm="{{ _('Send digest emails now to all FDS members with pending requests? Manual sends ignore the daily schedule and once-per-day limit.')|forceescape }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button type="submit" class="btn btn-secondary w-full">
         <i class="fas fa-paper-plane mr-1.5"></i>{{ _('Send digest now') }}

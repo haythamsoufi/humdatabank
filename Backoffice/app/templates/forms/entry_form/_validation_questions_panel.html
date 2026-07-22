@@ -24,7 +24,7 @@
             </details>
             {% endif %}
             <textarea class="form-textarea w-full border rounded p-2 text-sm validation-answer-input" rows="2"
-                      placeholder="{{ _('Your answer…') }}"></textarea>
+                      placeholder="{{ _('Your answer…')|forceescape }}"></textarea>
             <button type="button" class="btn btn-primary btn-sm mt-2 validation-answer-submit"
                     data-question-id="{{ q.id }}">{{ _('Submit answer') }}</button>
         </div>

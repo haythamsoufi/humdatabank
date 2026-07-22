@@ -3,14 +3,14 @@
     <div class="item-modal-panel relative p-6 border w-full max-w-xl shadow-xl rounded-lg bg-white">
         <div class="item-modal-header-actions">
             <button type="button" id="item-modal-fill-toggle" class="btn btn-close-icon" aria-pressed="false"
-                    data-label-expand="{{ _('Expand to fill content area') }}"
-                    data-label-compress="{{ _('Exit fill content area') }}"
-                    title="{{ _('Expand to fill content area') }}"
-                    aria-label="{{ _('Expand to fill content area') }}">
+                    data-label-expand="{{ _('Expand to fill content area')|forceescape }}"
+                    data-label-compress="{{ _('Exit fill content area')|forceescape }}"
+                    title="{{ _('Expand to fill content area')|forceescape }}"
+                    aria-label="{{ _('Expand to fill content area')|forceescape }}">
                 <i class="fas fa-expand w-5 h-5" aria-hidden="true"></i>
                 <i class="fas fa-compress w-5 h-5" aria-hidden="true"></i>
             </button>
-            <button type="button" class="btn btn-close-icon close-modal" aria-label="{{ _('Close modal') }}"><i class="fas fa-times w-6 h-6" aria-hidden="true"></i></button>
+            <button type="button" class="btn btn-close-icon close-modal" aria-label="{{ _('Close modal')|forceescape }}"><i class="fas fa-times w-6 h-6" aria-hidden="true"></i></button>
         </div>
         <h3 id="item-modal-title" class="text-xl font-semibold mb-5 text-gray-800 flex items-center modal-title pr-20">
             <i class="fas fa-plus-circle w-6 h-6 mr-2 text-green-600"></i>
@@ -86,17 +86,17 @@
                         <div class="mb-4">
                             <div class="flex items-center gap-2 flex-wrap mb-2">
                                 <label for="item-indicator-label" class="text-gray-700 text-sm font-semibold">{{ _('Custom Label (Optional)') }}</label>
-                                <button type="button" id="indicator-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations') }}" aria-label="{{ _('Add translations') }}">
+                                <button type="button" id="indicator-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
                                     <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                 </button>
                             </div>
-                            <textarea data-field-type="label" id="item-indicator-label" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="2" placeholder="{{ _('Override label (leave empty to use indicator bank name)') }}" autocomplete="off"></textarea>
+                            <textarea data-field-type="label" id="item-indicator-label" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="2" placeholder="{{ _('Override label (leave empty to use indicator bank name)')|forceescape }}" autocomplete="off"></textarea>
                             <p class="mt-1 text-xs text-gray-500">{{ _('Leave empty to use the indicator bank name.') }}</p>
                         </div>
 
                         <div class="mb-4">
                             <label for="item-indicator-definition" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Custom Definition (Optional)') }}</label>
-                            <textarea id="item-indicator-definition" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Override definition (leave empty to use indicator bank definition)') }}"></textarea>
+                            <textarea id="item-indicator-definition" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Override definition (leave empty to use indicator bank definition)')|forceescape }}"></textarea>
                             <p class="mt-1 text-xs text-gray-500">{{ _('Leave empty to use the indicator bank definition.') }}</p>
                         </div>
 
@@ -108,7 +108,7 @@
                                    id="item-indicator-default-value"
                                    data-enable-variables="true"
                                    class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                                   placeholder="{{ _('e.g., 123 or [some_variable]') }}"
+                                   placeholder="{{ _('e.g., 123 or [some_variable]')|forceescape }}"
                                    autocomplete="off">
                             <p class="mt-1 text-xs text-gray-500">
                                 {{ _('You can enter a value or use a template variable like [variable_name]. For disaggregated indicators, this applies to Total mode only.') }}
@@ -124,7 +124,7 @@
                         </div>
                         <div class="mb-6 hidden" id="add_item_indicator_age_groups_config_wrapper">
                             <label for="add_item_modal_indicator_age_groups_input" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Age Groups (comma-separated)') }}</label>
-                            <input type="text" name="age_groups_config" id="add_item_modal_indicator_age_groups_input" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g., 0-4,5-9,10-14,15+') }}">
+                            <input type="text" name="age_groups_config" id="add_item_modal_indicator_age_groups_input" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g., 0-4,5-9,10-14,15+')|forceescape }}">
                             <p class="mt-1 text-xs text-gray-500">{{ _('Leave empty for defaults. Only if unit is \'People\' & age disaggregation is allowed.') }}</p>
                         </div>
                     </div>
@@ -144,7 +144,7 @@
                             </div>
                             <div>
                                 <label for="item-question-unit" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Unit') }}</label>
-                                <input type="text" name="unit" id="item-question-unit" class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g., People, %, Items, Days') }}">
+                                <input type="text" name="unit" id="item-question-unit" class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g., People, %, Items, Days')|forceescape }}">
                             </div>
                         </div>
 
@@ -153,9 +153,9 @@
                                 <label for="item-question-label"
                                        id="item-question-label-caption"
                                        class="text-gray-700 text-sm font-semibold"
-                                       data-default-text="{{ _('Question Text') }}"
-                                       data-blank-text="{{ _('Heading') }}">{{ _('Question Text') }}</label>
-                                <button type="button" id="question-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations') }}" aria-label="{{ _('Add translations') }}">
+                                       data-default-text="{{ _('Question Text')|forceescape }}"
+                                       data-blank-text="{{ _('Heading')|forceescape }}">{{ _('Question Text') }}</label>
+                                <button type="button" id="question-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
                                     <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                 </button>
                             </div>
@@ -163,9 +163,9 @@
                                       id="item-question-label"
                                       class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
                                       rows="3"
-                                      data-default-placeholder="{{ _('Enter question text') }}"
-                                      data-blank-placeholder="{{ _('Optional heading shown in bold') }}"
-                                      placeholder="{{ _('Enter question text') }}"
+                                      data-default-placeholder="{{ _('Enter question text')|forceescape }}"
+                                      data-blank-placeholder="{{ _('Optional heading shown in bold')|forceescape }}"
+                                      placeholder="{{ _('Enter question text')|forceescape }}"
                                       autocomplete="off"></textarea>
                         </div>
 
@@ -174,15 +174,15 @@
                             <label for="item-question-definition"
                                    id="item-question-definition-caption"
                                    class="block text-gray-700 text-sm font-semibold mb-2"
-                                   data-default-text="{{ _('Definition') }}"
-                                   data-blank-text="{{ _('Body text') }}">{{ _('Definition') }}</label>
+                                   data-default-text="{{ _('Definition')|forceescape }}"
+                                   data-blank-text="{{ _('Body text')|forceescape }}">{{ _('Definition') }}</label>
 
                             {# Rich-text toolbar – shown only when question_type == blank #}
                             <div id="blank-body-toolbar"
                                  class="hidden flex flex-wrap items-center gap-1 mb-1.5 px-1.5 py-1 border border-gray-200 rounded-md bg-gray-50"
-                                 aria-label="{{ _('Formatting toolbar') }}">
-                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 font-bold text-sm text-gray-700 transition-colors" data-cmd="bold" title="{{ _('Bold') }}" aria-label="{{ _('Bold') }}">B</button>
-                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 italic text-sm text-gray-700 transition-colors" data-cmd="italic" title="{{ _('Italic') }}" aria-label="{{ _('Italic') }}">I</button>
+                                 aria-label="{{ _('Formatting toolbar')|forceescape }}">
+                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 font-bold text-sm text-gray-700 transition-colors" data-cmd="bold" title="{{ _('Bold')|forceescape }}" aria-label="{{ _('Bold')|forceescape }}">B</button>
+                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 italic text-sm text-gray-700 transition-colors" data-cmd="italic" title="{{ _('Italic')|forceescape }}" aria-label="{{ _('Italic')|forceescape }}">I</button>
                                 <span class="h-4 border-l border-gray-300 mx-0.5" aria-hidden="true"></span>
                                 {# Colour split-button (Word-style): left half applies current colour, right half opens picker #}
                                 <div class="relative flex rounded overflow-visible" id="blank-body-color-wrapper">
@@ -190,8 +190,8 @@
                                     <button type="button"
                                             id="blank-body-color-apply"
                                             class="body-fmt-btn flex flex-col items-center justify-center px-1.5 h-7 rounded-l hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 text-sm font-bold text-gray-700 transition-colors"
-                                            title="{{ _('Apply colour') }}"
-                                            aria-label="{{ _('Apply text colour') }}">
+                                            title="{{ _('Apply colour')|forceescape }}"
+                                            aria-label="{{ _('Apply text colour')|forceescape }}">
                                         <span id="blank-body-color-letter" class="leading-none select-none" style="color:#374151">A</span>
                                         <span id="blank-body-color-bar" class="block w-4 h-[3px] rounded-sm mt-0.5" style="background:#374151"></span>
                                     </button>
@@ -199,8 +199,8 @@
                                     <button type="button"
                                             id="blank-body-color-trigger"
                                             class="body-fmt-btn flex items-center justify-center w-4 h-7 rounded-r hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 transition-colors"
-                                            title="{{ _('Choose text colour') }}"
-                                            aria-label="{{ _('Choose text colour') }}"
+                                            title="{{ _('Choose text colour')|forceescape }}"
+                                            aria-label="{{ _('Choose text colour')|forceescape }}"
                                             aria-haspopup="true"
                                             aria-expanded="false">
                                         <i class="fas fa-chevron-down text-[9px] text-gray-400" aria-hidden="true"></i>
@@ -209,7 +209,7 @@
                                     <div id="blank-body-color-dropdown"
                                          class="hidden absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-2"
                                          role="menu"
-                                         aria-label="{{ _('Choose text colour') }}">
+                                         aria-label="{{ _('Choose text colour')|forceescape }}">
                                         {% set _colors = [
                                             ('#374151', _('Dark (default)')),
                                             ('#dc2626', _('Red')),
@@ -234,10 +234,10 @@
                                     </div>
                                 </div>
                                 <span class="h-4 border-l border-gray-300 mx-0.5" aria-hidden="true"></span>
-                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 text-gray-500 transition-colors" data-cmd="createLink" title="{{ _('Insert link') }}" aria-label="{{ _('Insert link') }}">
+                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 text-gray-500 transition-colors" data-cmd="createLink" title="{{ _('Insert link')|forceescape }}" aria-label="{{ _('Insert link')|forceescape }}">
                                     <i class="fas fa-link text-xs" aria-hidden="true"></i>
                                 </button>
-                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 text-gray-500 transition-colors" data-cmd="removeFormat" title="{{ _('Clear formatting') }}" aria-label="{{ _('Clear formatting') }}">
+                                <button type="button" class="body-fmt-btn flex items-center justify-center w-7 h-7 rounded hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-green-400 text-gray-500 transition-colors" data-cmd="removeFormat" title="{{ _('Clear formatting')|forceescape }}" aria-label="{{ _('Clear formatting')|forceescape }}">
                                     <i class="fas fa-eraser text-xs" aria-hidden="true"></i>
                                 </button>
                             </div>
@@ -262,8 +262,8 @@
                                  class="hidden shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 block w-full sm:text-sm border border-gray-300 rounded-md px-2.5 py-2 min-h-[4.5rem] blank-body-editor"
                                  contenteditable="true"
                                  spellcheck="true"
-                                 data-blank-placeholder="{{ _('Text shown below the heading') }}"
-                                 aria-label="{{ _('Body text') }}"
+                                 data-blank-placeholder="{{ _('Text shown below the heading')|forceescape }}"
+                                 aria-label="{{ _('Body text')|forceescape }}"
                                  aria-multiline="true"
                                  role="textbox"></div>
 
@@ -271,9 +271,9 @@
                             <textarea id="item-question-definition"
                                       class="shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md"
                                       rows="3"
-                                      data-default-placeholder="{{ _('Detailed definition/description of this question') }}"
-                                      data-blank-placeholder="{{ _('Text shown below the heading') }}"
-                                      placeholder="{{ _('Detailed definition/description of this question') }}"></textarea>
+                                      data-default-placeholder="{{ _('Detailed definition/description of this question')|forceescape }}"
+                                      data-blank-placeholder="{{ _('Text shown below the heading')|forceescape }}"
+                                      placeholder="{{ _('Detailed definition/description of this question')|forceescape }}"></textarea>
                         </div>
 
                         <!-- Options Source - Hidden by default -->
@@ -295,7 +295,7 @@
                         <div id="item-question-options-container" class="mb-6 hidden">
                             <div class="flex items-center gap-2 flex-wrap mb-2">
                                 <label class="text-gray-700 text-sm font-semibold">{{ _('Question Options') }}</label>
-                                <button type="button" id="question-options-translations-matrix-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Manage option translations') }}" aria-label="{{ _('Translations') }}">
+                                <button type="button" id="question-options-translations-matrix-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Manage option translations')|forceescape }}" aria-label="{{ _('Translations')|forceescape }}">
                                     <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                 </button>
                             </div>
@@ -313,17 +313,17 @@
                             <!-- Hidden template for new option -->
                             <template id="item-question-option-template">
                                 <div class="option-row flex items-center space-x-2">
-                                    <input type="text" class="option-text shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Enter option text') }}">
-                                    <button type="button" class="move-up-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Up') }}">
+                                    <input type="text" class="option-text shadow-sm focus:ring-green-500 focus:border-green-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Enter option text')|forceescape }}">
+                                    <button type="button" class="move-up-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Up')|forceescape }}">
                                         <i class="fas fa-arrow-up w-4 h-4"></i>
                                     </button>
-                                    <button type="button" class="move-down-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Down') }}">
+                                    <button type="button" class="move-down-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Down')|forceescape }}">
                                         <i class="fas fa-arrow-down w-4 h-4"></i>
                                     </button>
-                                    <button type="button" class="remove-option-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Option') }}">
+                                    <button type="button" class="remove-option-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Option')|forceescape }}">
                                         <i class="fas fa-trash w-4 h-4"></i>
                                     </button>
-                                    <button type="button" class="add-option-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-green-300" title="{{ _('Add Option') }}">
+                                    <button type="button" class="add-option-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-green-300" title="{{ _('Add Option')|forceescape }}">
                                         <i class="fas fa-plus w-4 h-4"></i>
                                     </button>
                                 </div>
@@ -369,7 +369,7 @@
                                 <input type="checkbox" id="item-question-allow-other" name="allow_other"
                                        class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500 shrink-0">
                                 <span class="text-sm text-gray-700 font-medium">{{ _('Allow "Other" option') }}</span>
-                                <span class="custom-info-tooltip shrink-0 cursor-help" aria-label="{{ _('Help') }}">
+                                <span class="custom-info-tooltip shrink-0 cursor-help" aria-label="{{ _('Help')|forceescape }}">
                                     <i class="fas fa-info-circle text-gray-400" aria-hidden="true"></i>
                                     <span class="tooltip-text">{{ _('Adds an "Other (please specify)" entry to the list. Users can type a custom value that is stored as their answer.') }}</span>
                                 </span>
@@ -393,11 +393,11 @@
                         <div class="mb-4">
                             <div class="flex items-center gap-2 flex-wrap mb-2">
                                 <label for="item-document-label" class="text-gray-700 text-sm font-semibold">{{ _('Document Label') }}</label>
-                                <button type="button" id="document-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations') }}" aria-label="{{ _('Add translations') }}">
+                                <button type="button" id="document-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
                                     <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                 </button>
                             </div>
-                            <input type="text" data-field-type="label" id="item-document-label" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Document Label') }}" required>
+                            <input type="text" data-field-type="label" id="item-document-label" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Document Label')|forceescape }}" required>
                         </div>
 
                         <!-- Optional Document Type -->
@@ -413,7 +413,7 @@
 
                         <div class="mb-4">
                             <label for="item-document-description" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Description (Optional)') }}</label>
-                            <textarea data-field-type="description" id="item-document-description" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Description (Optional)') }}"></textarea>
+                            <textarea data-field-type="description" id="item-document-description" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Description (Optional)')|forceescape }}"></textarea>
                         </div>
 
                         <div class="mb-4">
@@ -421,7 +421,7 @@
                                 {{ _('Maximum Documents Allowed') }}
                                 <span class="ml-1 text-gray-500 text-xs font-normal">({{ _('Leave empty for unlimited') }})</span>
                             </label>
-                            <input type="number" id="item-document-max-documents" name="max_documents" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" min="1" placeholder="{{ _('Unlimited') }}">
+                            <input type="number" id="item-document-max-documents" name="max_documents" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" min="1" placeholder="{{ _('Unlimited')|forceescape }}">
                         </div>
 
                         {# Document Field Display Options #}
@@ -610,16 +610,16 @@
                         <div class="mb-4">
                             <div class="flex items-center gap-2 flex-wrap mb-2">
                                 <label for="item-matrix-label" class="text-gray-700 text-sm font-semibold">{{ _('Matrix Title') }}</label>
-                                <button type="button" id="matrix-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations') }}" aria-label="{{ _('Add translations') }}">
+                                <button type="button" id="matrix-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
                                     <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                 </button>
                             </div>
-                            <input type="text" data-field-type="label" id="item-matrix-label" class="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Matrix Title') }}">
+                            <input type="text" data-field-type="label" id="item-matrix-label" class="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Matrix Title')|forceescape }}">
                         </div>
 
                         <div class="mb-4">
                             <label for="item-matrix-description" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Description (Optional)') }}</label>
-                            <textarea data-field-type="description" id="item-matrix-description" class="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Description (Optional)') }}"></textarea>
+                            <textarea data-field-type="description" id="item-matrix-description" class="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Description (Optional)')|forceescape }}"></textarea>
                         </div>
 
                         {# Matrix Configuration — Row setup + Display Options. Stays in the
@@ -648,7 +648,7 @@
                             <div id="matrix-manual-rows-section" class="mb-4">
                                 <div class="flex items-center gap-2 flex-wrap mb-2">
                                     <label class="text-gray-700 text-sm font-semibold">{{ _('Row Headers') }}</label>
-                                    <button type="button" id="matrix-row-headers-translations-matrix-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Manage row header translations') }}" aria-label="{{ _('Translations') }}">
+                                    <button type="button" id="matrix-row-headers-translations-matrix-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Manage row header translations')|forceescape }}" aria-label="{{ _('Translations')|forceescape }}">
                                         <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                     </button>
                                 </div>
@@ -705,7 +705,7 @@
                                 <div class="mt-4">
                                     <div class="flex items-center gap-2 flex-wrap mb-2">
                                         <label for="matrix-search-placeholder" class="text-gray-700 text-sm font-semibold">{{ _('Search Placeholder Text') }}</label>
-                                        <button type="button" id="matrix-search-placeholder-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations') }}" aria-label="{{ _('Add translations') }}">
+                                        <button type="button" id="matrix-search-placeholder-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
                                             <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                         </button>
                                     </div>
@@ -713,7 +713,7 @@
                                            id="matrix-search-placeholder"
                                            name="matrix_search_placeholder"
                                            class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                                           placeholder="{{ _('Search and select a row to add...') }}"
+                                           placeholder="{{ _('Search and select a row to add...')|forceescape }}"
                                            value="{{ _('Search and select a row to add...') }}">
                                     <input type="hidden" id="matrix-search-placeholder-translations" value="{}">
                                     <p class="mt-1 text-xs text-gray-500">{{ _('Customize the placeholder text shown in the search input when users add rows.') }}</p>
@@ -737,10 +737,27 @@
                             <div class="mb-4">
                                 <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Display Options') }}</label>
                                 <div class="space-y-2">
-                                    <label class="inline-flex items-center">
-                                        <input type="checkbox" id="matrix-show-row-totals" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
-                                        <span class="ml-2 text-sm text-gray-700">{{ _('Show Row Totals') }}</span>
-                                    </label>
+                                    <div>
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="matrix-show-row-totals" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
+                                            <span class="ml-2 text-sm text-gray-700">{{ _('Show Row Totals') }}</span>
+                                        </label>
+                                        <div id="matrix-row-total-options-wrapper" class="ml-6 mt-2 space-y-2 border-l-2 border-orange-200 pl-3">
+                                            <label class="inline-flex items-center">
+                                                <input type="checkbox" id="matrix-row-total-manual-enabled" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+                                                <span class="ml-2 text-sm text-gray-700">{{ _('Allow manual row total entry') }}</span>
+                                            </label>
+                                            <p class="text-xs text-gray-500">{{ _('When enabled, users can override the calculated row total. Breakdown vs total conflicts can be flagged or block submission.') }}</p>
+                                            <div id="matrix-row-total-validation-wrapper" class="hidden">
+                                                <label for="matrix-row-total-validation" class="block text-xs font-medium text-gray-600 mb-1">{{ _('Total vs breakdown validation') }}</label>
+                                                <select id="matrix-row-total-validation" class="w-full max-w-md px-2 py-1.5 border border-gray-300 rounded-md text-sm">
+                                                    <option value="none">{{ _('Informational only (flag conflicts, allow save)') }}</option>
+                                                    <option value="partial">{{ _('Partial breakdown OK (manual total must be ≥ breakdown sum)') }}</option>
+                                                    <option value="strict">{{ _('Strict (manual total must equal breakdown sum; blocks submit)') }}</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <label class="inline-flex items-center">
                                         <input type="checkbox" id="matrix-show-column-totals" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
                                         <span class="ml-2 text-sm text-gray-700">{{ _('Show Column Totals') }}</span>
@@ -757,18 +774,18 @@
                                         <div class="flex items-center justify-between mb-1">
                                             <div class="flex items-center gap-2 flex-wrap min-w-0">
                                                 <label class="text-sm font-medium text-gray-700">{{ _('Legend Text') }}</label>
-                                                <button type="button" id="matrix-legend-text-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations') }}" aria-label="{{ _('Add translations') }}">
+                                                <button type="button" id="matrix-legend-text-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
                                                     <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                                 </button>
                                             </div>
                                             <div class="flex items-center space-x-2 shrink-0">
-                                                <button type="button" id="matrix-legend-hide-btn" class="text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:underline inline-flex items-center" title="{{ _('Legend is shown — click to hide') }}">
+                                                <button type="button" id="matrix-legend-hide-btn" class="text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:underline inline-flex items-center" title="{{ _('Legend is shown — click to hide')|forceescape }}">
                                                     <i class="fas fa-eye w-4 h-4 mr-1"></i>
                                                     <span>{{ _('Legend shown') }}</span>
                                                 </button>
                                             </div>
                                         </div>
-                                        <input type="text" id="matrix-legend-text" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="{{ _('Manually added row') }}" value="{{ _('Manually added row') }}">
+                                        <input type="text" id="matrix-legend-text" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="{{ _('Manually added row')|forceescape }}" value="{{ _('Manually added row') }}">
                                         <input type="hidden" id="matrix-legend-text-translations" value="{}">
                                         <input type="hidden" id="matrix-legend-hide" value="false">
                                         <p class="text-xs text-gray-500 mt-1">{{ _('Text to display in the legend when manually added rows are highlighted') }}</p>
@@ -783,7 +800,7 @@
                         <div id="matrix-columns-section" class="mb-4">
                             <div class="flex items-center gap-2 flex-wrap mb-2">
                                 <label class="text-gray-700 text-sm font-semibold">{{ _('Column Codes') }}</label>
-                                <button type="button" id="matrix-column-headers-translations-matrix-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Manage column header translations') }}" aria-label="{{ _('Translations') }}">
+                                <button type="button" id="matrix-column-headers-translations-matrix-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Manage column header translations')|forceescape }}" aria-label="{{ _('Translations')|forceescape }}">
                                     <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                 </button>
                             </div>
@@ -810,15 +827,15 @@
                         {# Hidden template for matrix row #}
                         <template id="matrix-row-template">
                             <div class="matrix-row flex items-center space-x-2">
-                                <input type="text" class="row-text shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Enter row header') }}" data-field-type="label">
+                                <input type="text" class="row-text shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Enter row header')|forceescape }}" data-field-type="label">
                                 <input type="hidden" class="row-name-translations" value="{}">
-                                <button type="button" class="move-row-up-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Up') }}">
+                                <button type="button" class="move-row-up-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Up')|forceescape }}">
                                     <i class="fas fa-arrow-up w-4 h-4"></i>
                                 </button>
-                                <button type="button" class="move-row-down-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Down') }}">
+                                <button type="button" class="move-row-down-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300" title="{{ _('Move Down')|forceescape }}">
                                     <i class="fas fa-arrow-down w-4 h-4"></i>
                                 </button>
-                                <button type="button" class="remove-row-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Row') }}">
+                                <button type="button" class="remove-row-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Row')|forceescape }}">
                                     <i class="fas fa-trash w-4 h-4"></i>
                                 </button>
                             </div>
@@ -828,10 +845,10 @@
                         <template id="matrix-column-template">
                             <div class="matrix-column">
                                 <div class="flex items-center gap-2 flex-wrap">
-                                    <span class="matrix-drag-handle inline-flex items-center justify-center p-1 text-gray-300 hover:text-gray-500 shrink-0 select-none" style="cursor:grab;" title="{{ _('Drag to reorder') }}" draggable="false">
+                                    <span class="matrix-drag-handle inline-flex items-center justify-center p-1 text-gray-300 hover:text-gray-500 shrink-0 select-none" style="cursor:grab;" title="{{ _('Drag to reorder')|forceescape }}" draggable="false">
                                         <i class="fas fa-grip-vertical"></i>
                                     </span>
-                                    <input type="text" class="column-text shadow-sm focus:ring-orange-500 focus:border-orange-500 flex-1 min-w-[120px] sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g. total_beneficiaries') }}">
+                                    <input type="text" class="column-text shadow-sm focus:ring-orange-500 focus:border-orange-500 flex-1 min-w-[120px] sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g. total_beneficiaries')|forceescape }}">
                                     <input type="hidden" class="column-name-translations" value="{}">
                                     <select class="column-type shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-28 shrink-0 sm:text-sm border-gray-300 rounded-md">
                                         <option value="number">{{ _('Number') }}</option>
@@ -849,7 +866,7 @@
                                         <label class="flex items-center text-xs text-gray-600 whitespace-nowrap column-variable-save-value-label" style="display: none;">
                                             <input type="checkbox" class="column-variable-save-value mr-1" checked>
                                             <span>{{ _('Save value') }}</span>
-                                            <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help') }}">
+                                            <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help')|forceescape }}">
                                                 <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
                                                 <span class="tooltip-text">{{ _('When checked, the variable column value is saved with the form and restored when the form is reopened. When unchecked, the value is always resolved fresh from the variable (e.g. template variable) and not stored.') }}</span>
                                             </span>
@@ -859,7 +876,7 @@
                                             <span>{{ _('Read-only') }}</span>
                                         </label>
                                     </div>
-                                    <button type="button" class="remove-column-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300 shrink-0 ml-auto" title="{{ _('Remove Column') }}">
+                                    <button type="button" class="remove-column-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300 shrink-0 ml-auto" title="{{ _('Remove Column')|forceescape }}">
                                         <i class="fas fa-trash w-4 h-4"></i>
                                     </button>
                                 </div>
@@ -870,13 +887,13 @@
                         <template id="matrix-group-template">
                             <div class="matrix-group border border-indigo-200 rounded-md">
                                 <div class="matrix-group-header flex items-center gap-2 px-2 py-1.5 bg-indigo-50 rounded-t-md">
-                                    <span class="matrix-drag-handle inline-flex items-center gap-0.5 text-indigo-400 hover:text-indigo-600 shrink-0 select-none" style="cursor:grab;" title="{{ _('Drag to reorder group') }}" draggable="false">
+                                    <span class="matrix-drag-handle inline-flex items-center gap-0.5 text-indigo-400 hover:text-indigo-600 shrink-0 select-none" style="cursor:grab;" title="{{ _('Drag to reorder group')|forceescape }}" draggable="false">
                                         <i class="fas fa-grip-vertical text-xs"></i>
                                         <i class="fas fa-layer-group text-xs"></i>
                                     </span>
-                                    <input type="text" class="group-label-text shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Group label, e.g. Male') }}">
+                                    <input type="text" class="group-label-text shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Group label, e.g. Male')|forceescape }}">
                                     <input type="hidden" class="group-label-translations" value="{}">
-                                    <button type="button" class="remove-group-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Group') }}">
+                                    <button type="button" class="remove-group-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300" title="{{ _('Remove Group')|forceescape }}">
                                         <i class="fas fa-trash w-4 h-4"></i>
                                     </button>
                                 </div>
@@ -899,15 +916,15 @@
                         <div class="mb-4">
                             <div class="flex items-center gap-2 flex-wrap mb-2">
                                 <label for="item-image-caption" class="text-gray-700 text-sm font-semibold">{{ _('Caption (optional)') }}</label>
-                                <button type="button" id="image-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations') }}" aria-label="{{ _('Add translations') }}">
+                                <button type="button" id="image-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
                                     <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                 </button>
                             </div>
-                            <input type="text" data-field-type="label" id="item-image-caption" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Caption shown below the image') }}">
+                            <input type="text" data-field-type="label" id="item-image-caption" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Caption shown below the image')|forceescape }}">
                         </div>
                         <div class="mb-4">
                             <label for="item-image-alt" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Alt text (optional)') }}</label>
-                            <textarea data-field-type="description" id="item-image-alt" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="2" placeholder="{{ _('Describe the image for screen readers') }}"></textarea>
+                            <textarea data-field-type="description" id="item-image-alt" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="2" placeholder="{{ _('Describe the image for screen readers')|forceescape }}"></textarea>
                         </div>
                         <div class="mb-4 grid grid-cols-2 gap-4">
                             <div>
@@ -943,7 +960,7 @@
                                     </label>
                                 </div>
                                 <div id="item-image-upload-block">
-                                    <button type="button" id="item-image-paste-zone" class="item-image-paste-zone inline-flex items-center gap-1.5 px-3 py-1.5 mb-3 text-sm font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-md hover:bg-teal-100 focus:outline-none focus:ring-2 focus:ring-teal-400" title="{{ _('Paste a screenshot from the clipboard (Ctrl+V)') }}" aria-label="{{ _('Paste image') }}">
+                                    <button type="button" id="item-image-paste-zone" class="item-image-paste-zone inline-flex items-center gap-1.5 px-3 py-1.5 mb-3 text-sm font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-md hover:bg-teal-100 focus:outline-none focus:ring-2 focus:ring-teal-400" title="{{ _('Paste a screenshot from the clipboard (Ctrl+V)')|forceescape }}" aria-label="{{ _('Paste image')|forceescape }}">
                                         <i class="fas fa-paste w-4 h-4" aria-hidden="true"></i>
                                         <span>{{ _('Paste') }}</span>
                                     </button>
@@ -978,7 +995,7 @@
                             {# Section — left column; label and dropdown on one line #}
                             <div class="flex items-center gap-2 min-w-0">
                                 <label for="item-section-select" class="shrink-0 w-20 text-sm font-semibold text-gray-700">{{ _('Section') }}</label>
-                                <select id="item-section-select" class="flex-1 min-w-0 py-1.5 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md" required aria-label="{{ _('Section') }}">
+                                <select id="item-section-select" class="flex-1 min-w-0 py-1.5 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300 rounded-md" required aria-label="{{ _('Section')|forceescape }}">
                                     <option value="">{{ _('Select a section...') }}</option>
                                 </select>
                             </div>
@@ -1000,7 +1017,7 @@
                             <div class="flex items-center gap-2 min-w-0">
                                 <label for="item-order" class="shrink-0 w-20 text-sm font-semibold text-gray-700">{{ _('Order') }}</label>
                                 <input type="number" name="order" id="item-order" class="w-20 shrink-0 shadow-sm focus:ring-blue-500 focus:border-blue-500 py-1.5 sm:text-sm border-gray-300 rounded-md [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="4.1" step="0.1" min="0">
-                                <span class="custom-info-tooltip shrink-0" aria-label="{{ _('Help') }}">
+                                <span class="custom-info-tooltip shrink-0" aria-label="{{ _('Help')|forceescape }}">
                                     <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
                                     <span class="tooltip-text">{{ _('Use section-relative ordering (e.g., if this is section 4, use 4.1, 4.2, 4.3)') }}</span>
                                 </span>
@@ -1010,7 +1027,7 @@
                                 <label for="item-modal-stable-key" class="shrink-0 w-20 text-sm font-semibold text-gray-700">{{ _('Field ID') }}</label>
                                 <input type="text" id="item-modal-stable-key" readonly class="flex-1 min-w-0 shadow-sm bg-gray-50 text-gray-600 py-1.5 sm:text-sm border-gray-300 rounded-md font-mono text-xs" aria-readonly="true">
                                 <span id="item-modal-identity-status" class="hidden shrink-0 text-xs font-medium px-2 py-0.5 rounded-full" aria-live="polite"></span>
-                                <button type="button" id="item-modal-stable-key-copy" class="btn btn-secondary btn-sm shrink-0" title="{{ _('Copy field identity') }}">{{ _('Copy') }}</button>
+                                <button type="button" id="item-modal-stable-key-copy" class="btn btn-secondary btn-sm shrink-0" title="{{ _('Copy field identity')|forceescape }}">{{ _('Copy') }}</button>
                             </div>
 
                             {# Privacy — right column; populated by JS #}
@@ -1130,7 +1147,7 @@
 
                         <div class="mt-4">
                             <label for="item-validation-message" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Validation Message') }}</label>
-                            <textarea name="validation_message" id="item-validation-message" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="2" placeholder="{{ _('Message to show if validation fails') }}"></textarea>
+                            <textarea name="validation_message" id="item-validation-message" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="2" placeholder="{{ _('Message to show if validation fails')|forceescape }}"></textarea>
                             <p class="mt-1 text-xs text-gray-500">{{ _('Message to display to the user if the validation rule is not met.') }}</p>
                         </div>
                     </div>

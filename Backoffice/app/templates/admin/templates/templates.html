@@ -144,7 +144,7 @@
     const columnDefs = [
         {
             field: 'name',
-            headerName: '{{ _("Name") }}',
+            headerName: {{ _("Name")|tojson|safe }},
             width: 300,
             minWidth: 200,
             maxWidth: 500,
@@ -160,14 +160,14 @@
                 }
                 const editUrl = params.data.edit_url || '';
                 if (editUrl) {
-                    return '<a href="' + editUrl + '" class="text-blue-600 hover:text-blue-900 hover:underline" title="{{ _("Edit Template") }}">' + name + '</a>';
+                    return '<a href="' + editUrl + '" class="text-blue-600 hover:text-blue-900 hover:underline" title="' + {{ _("Edit Template")|tojson|safe }} + '">' + name + '</a>';
                 }
                 return '<span class="text-gray-900">' + name + '</span>';
             }
         },
         {
             field: 'add_to_self_report',
-            headerName: '{{ _("Self-Report") }}',
+            headerName: {{ _("Self-Report")|tojson|safe }},
             width: 150,
             minWidth: 120,
             maxWidth: 200,
@@ -179,7 +179,7 @@
         },
         {
             field: 'version_count',
-            headerName: '{{ _("Versions") }}',
+            headerName: {{ _("Versions")|tojson|safe }},
             width: 120,
             minWidth: 100,
             maxWidth: 150,
@@ -189,7 +189,7 @@
         },
         {
             field: 'status',
-            headerName: '{{ _("Status") }}',
+            headerName: {{ _("Status")|tojson|safe }},
             width: 150,
             minWidth: 120,
             maxWidth: 200,
@@ -200,7 +200,7 @@
         },
         {
             field: 'template_access',
-            headerName: '{{ _("Template access") }}',
+            headerName: {{ _("Template access")|tojson|safe }},
             width: 280,
             minWidth: 220,
             maxWidth: 420,
@@ -242,7 +242,7 @@
         },
         {
             field: 'created_at',
-            headerName: '{{ _("Created At") }}',
+            headerName: {{ _("Created At")|tojson|safe }},
             width: 180,
             minWidth: 150,
             maxWidth: 250,
@@ -252,7 +252,7 @@
         },
         {
             field: 'actions',
-            headerName: '{{ _("Actions") }}',
+            headerName: {{ _("Actions")|tojson|safe }},
             width: 200,
             minWidth: 150,
             maxWidth: 250,
@@ -264,17 +264,17 @@
                 const data = params.data;
                 let html = '<div class="flex items-center justify-center gap-2">';
                 if (data.edit_url) {
-                    html += '<a href="' + data.edit_url + '" class="text-blue-600 hover:text-blue-900" title="{{ _("Edit") }}"><i class="fas fa-pen fa-fw"></i></a>';
+                    html += '<a href="' + data.edit_url + '" class="text-blue-600 hover:text-blue-900" title="' + {{ _("Edit")|tojson|safe }} + '"><i class="fas fa-pen fa-fw"></i></a>';
                 }
                 if (data.duplicate_url) {
                     html += '<form action="' + data.duplicate_url + '" method="POST" class="inline-block" data-confirm="' + data.duplicate_confirm.replace(/'/g, "\\'") + '">';
                     html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
-                    html += '<button type="submit" class="text-gray-600 hover:text-gray-900" title="{{ _("Duplicate") }}"><i class="fas fa-copy fa-fw"></i></button>';
+                    html += '<button type="submit" class="text-gray-600 hover:text-gray-900" title="' + {{ _("Duplicate")|tojson|safe }} + '"><i class="fas fa-copy fa-fw"></i></button>';
                     html += '</form>';
                 }
-                html += '<a href="' + data.preview_url + '" target="_blank" class="text-green-600 hover:text-green-900" title="{{ _("Preview Template") }}"><i class="fas fa-eye fa-fw"></i></a>';
+                html += '<a href="' + data.preview_url + '" target="_blank" class="text-green-600 hover:text-green-900" title="' + {{ _("Preview Template")|tojson|safe }} + '"><i class="fas fa-eye fa-fw"></i></a>';
                 if (data.delete_url && data.delete_info_url) {
-                    html += '<button type="button" class="text-red-600 hover:text-red-900 delete-template-btn" title="{{ _("Delete") }}" data-template-id="' + data.id + '" data-template-name="' + (data.name || '').replace(/'/g, "\\'") + '" data-delete-url="' + data.delete_url + '" data-delete-info-url="' + data.delete_info_url + '"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '<button type="button" class="text-red-600 hover:text-red-900 delete-template-btn" title="' + {{ _("Delete")|tojson|safe }} + '" data-template-id="' + data.id + '" data-template-name="' + (data.name || '').replace(/'/g, "\\'") + '" data-delete-url="' + data.delete_url + '" data-delete-info-url="' + data.delete_info_url + '"><i class="fas fa-trash fa-fw"></i></button>';
                 }
                 html += '</div>';
                 return html;

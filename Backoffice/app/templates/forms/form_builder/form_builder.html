@@ -61,7 +61,7 @@
 {# Build title with version button inline #}
 {% if active_version_number %}
     {% set version_btn_html %}
-        <button type="button" id="versions-modal-btn" class="btn btn-secondary btn-sm inline-flex items-center ml-3" title="{{ _('Manage template versions') }}">
+        <button type="button" id="versions-modal-btn" class="btn btn-secondary btn-sm inline-flex items-center ml-3" title="{{ _('Manage template versions')|forceescape }}">
             <i class="fas fa-code-branch w-3 h-3 mr-1.5"></i>{{ _('Version') }} {{ active_version_number }}
         </button>
     {% endset %}
@@ -489,7 +489,7 @@
         </button>
         {% if has_archived_items %}
         <div class="inline-flex items-center">
-            <button type="button" id="toggle-archived-items-btn" class="group relative inline-flex items-center px-4 py-2.5 transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 bg-gradient-to-r from-gray-50 to-gray-100" data-hide-text="{{ _('Hide Archived Items/Sections') }}" data-show-text="{{ _('Show Archived Items/Sections') }}" aria-label="{{ _('Toggle archived items') }}">
+            <button type="button" id="toggle-archived-items-btn" class="group relative inline-flex items-center px-4 py-2.5 transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 bg-gradient-to-r from-gray-50 to-gray-100" data-hide-text="{{ _('Hide Archived Items/Sections')|forceescape }}" data-show-text="{{ _('Show Archived Items/Sections')|forceescape }}" aria-label="{{ _('Toggle archived items')|forceescape }}">
                 <div class="flex items-center space-x-3">
                     <div class="relative flex items-center justify-center w-5 h-5">
                         <i id="toggle-archived-icon" class="fas fa-eye-slash text-gray-500 transition-all duration-300 ease-in-out transform relative z-10"></i>
@@ -509,18 +509,18 @@
         <button type="button"
                 id="toggle-all-pages-btn"
                 class="inline-flex items-center py-1.5 text-gray-600 text-sm font-medium hover:text-gray-900 transition-colors focus:outline-none focus:underline disabled:opacity-50 disabled:cursor-not-allowed"
-                data-collapse-text="{{ _('Collapse all pages') }}"
-                data-expand-text="{{ _('Expand all pages') }}"
-                title="{{ _('Collapse/expand all pages') }}">
+                data-collapse-text="{{ _('Collapse all pages')|forceescape }}"
+                data-expand-text="{{ _('Expand all pages')|forceescape }}"
+                title="{{ _('Collapse/expand all pages')|forceescape }}">
             <i class="fas fa-angle-double-up w-4 h-4 mr-1.5"></i>
             <span class="toggle-all-pages-text">{{ _('Collapse all pages') }}</span>
         </button>
         <button type="button"
                 id="toggle-all-sections-btn"
                 class="inline-flex items-center py-1.5 text-gray-600 text-sm font-medium hover:text-gray-900 transition-colors focus:outline-none focus:underline disabled:opacity-50 disabled:cursor-not-allowed"
-                data-collapse-text="{{ _('Collapse all sections') }}"
-                data-expand-text="{{ _('Expand all sections') }}"
-                title="{{ _('Collapse/expand all sections and sub-sections') }}">
+                data-collapse-text="{{ _('Collapse all sections')|forceescape }}"
+                data-expand-text="{{ _('Expand all sections')|forceescape }}"
+                title="{{ _('Collapse/expand all sections and sub-sections')|forceescape }}">
             <i class="fas fa-angle-double-up w-4 h-4 mr-1.5"></i>
             <span class="toggle-all-sections-text">{{ _('Collapse all sections') }}</span>
         </button>
@@ -1071,7 +1071,7 @@
 
             setTimeout(() => {
                 if (!isReady() && detailEl) {
-                    detailEl.textContent = '{{ _("Still loading…") }}';
+                    detailEl.textContent = {{ _("Still loading…")|tojson|safe }};
                 }
             }, 15000);
 

@@ -218,7 +218,7 @@
             <button id="run-missing-btn" class="btn secondary" type="button" style="border-radius: 10px 0 0 10px;">{{ _('Run validations (not run)') }}</button>
             <details id="ai-validation-sources-details" style="position: relative; padding: 0; margin-left: -1px;">
                 <summary class="btn secondary"
-                         title="{{ _('Configure AI validation sources') }}"
+                         title="{{ _('Configure AI validation sources')|forceescape }}"
                          style="display:inline-flex; align-items:center; justify-content:center; padding: 8px 10px; border-radius: 0 10px 10px 0;">
                     <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                         <path fill="currentColor" d="M10 6H3v2h7V6zm11 0h-7v2h7V6zM3 18h11v-2H3v2zm18 0h-3v-2h3v2zM3 12h3v-2H3v2zm18 0H10v-2h11v2z"/>
@@ -303,17 +303,17 @@
      data-cancel-url="{{ cancel_url }}"
      data-run-id="{{ run_id }}"
      data-csrf-token="{{ csrf_token() }}"
-     data-label-not-run="{{ _('not run')|capitalize }}"
-     data-label-failed="{{ _('failed')|capitalize }}"
-     data-label-good="{{ _('good')|capitalize }}"
-     data-label-discrepancy="{{ _('discrepancy')|capitalize }}"
-     data-label-uncertain="{{ _('uncertain')|capitalize }}"
-     data-label-running="{{ _('running')|capitalize }}"
-     data-label-done="{{ _('Done') }}"
-     data-label-cancelling="{{ _('Cancelling…') }}"
-     data-label-cancelled="{{ _('Cancelled') }}"
-     data-label-cancel-failed="{{ _('Cancel failed (connection issue).') }}"
-     data-label-connection-lost="{{ _('Connection lost. Please keep this window open and try again.') }}">
+     data-label-not-run="{{ _('not run')|capitalize|forceescape }}"
+     data-label-failed="{{ _('failed')|capitalize|forceescape }}"
+     data-label-good="{{ _('good')|capitalize|forceescape }}"
+     data-label-discrepancy="{{ _('discrepancy')|capitalize|forceescape }}"
+     data-label-uncertain="{{ _('uncertain')|capitalize|forceescape }}"
+     data-label-running="{{ _('running')|capitalize|forceescape }}"
+     data-label-done="{{ _('Done')|forceescape }}"
+     data-label-cancelling="{{ _('Cancelling…')|forceescape }}"
+     data-label-cancelled="{{ _('Cancelled')|forceescape }}"
+     data-label-cancel-failed="{{ _('Cancel failed (connection issue).')|forceescape }}"
+     data-label-connection-lost="{{ _('Connection lost. Please keep this window open and try again.')|forceescape }}">
 </div>
 
 <script src="{{ url_for('static', filename='js/forms/validation-summary-progress.js') }}"></script>

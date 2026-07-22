@@ -130,8 +130,8 @@
       <div class="section-title">
         <span>{{ _('Labels') }}</span>
         <button type="button" class="spef-auto-translate-btn js-spef-auto-translate"
-                title="{{ _('Auto-translate the English label to all blank language fields') }}"
-                aria-label="{{ _('Auto Translate') }}">
+                title="{{ _('Auto-translate the English label to all blank language fields')|forceescape }}"
+                aria-label="{{ _('Auto Translate')|forceescape }}">
           <i class="fas fa-magic" aria-hidden="true"></i>
           {{ _('Auto Translate') }}
         </button>

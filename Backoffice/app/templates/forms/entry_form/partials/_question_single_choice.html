@@ -35,7 +35,7 @@
        {% if q_single_allow_other %}data-allow-other="true"{% endif %}
        {% if q_single_allow_other and q_single_max_other > 0 %}data-max-other-entries="{{ q_single_max_other }}"{% endif %}
        {% if field.lookup_list_id %}data-options-source="calculated" data-lookup-list-id="{{ field.lookup_list_id }}" data-display-column="{{ field.list_display_column }}" data-list-filters='{{ field.list_filters_json|tojson|e if field.list_filters_json else "[]" }}' data-plugin-config='{{ ((field.config or {}).get("question_plugin_config") | tojson | e) if field.config else "{}" }}'{% else %}data-options-source="manual"{% endif %}
-       class="{{ select_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value') }}"{% elif is_imputed %}title="{{ _('This is an imputed value') }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
+       class="{{ select_classes }}" {% if is_prefilled %}title="{{ _('This is a prefilled value')|forceescape }}"{% elif is_imputed %}title="{{ _('This is an imputed value')|forceescape }}"{% endif %} {% if not can_edit %}disabled{% endif %}>
     <option value="">{{ _('Select...') }}</option>
     {% if not field.lookup_list_id %}
         {% for option in field.options %}
@@ -55,7 +55,7 @@
            id="other-text-{{ field.id }}"
            class="other-text-input mt-2 block w-full shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm border-gray-300 rounded-md{% if not _ns.q_single_is_other %} hidden{% endif %}"
            data-for-field="{{ field.id }}"
-           placeholder="{{ _('Please specify...') }}"
+           placeholder="{{ _('Please specify...')|forceescape }}"
            value="{{ current_q_single if _ns.q_single_is_other else '' }}"
            autocomplete="off"
            {% if not can_edit %}disabled{% endif %}>

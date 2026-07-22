@@ -299,12 +299,12 @@ document.addEventListener('DOMContentLoaded', function () {
         previewSummaryEl.classList.remove('hidden');
         previewSummaryEl.innerHTML = data.success
           ? renderPreviewSummary(data)
-          : '<p class="text-red-600">' + escapeHtml(data.message || '{{ _("Preview failed") }}') + '</p>';
+          : '<p class="text-red-600">' + escapeHtml(data.message || {{ _("Preview failed")|tojson|safe }}) + '</p>';
       })
       .catch(function (err) {
         previewLoaded = false;
         previewSummaryEl.classList.remove('hidden');
-        previewSummaryEl.innerHTML = '<p class="text-red-600">' + escapeHtml(err.message || '{{ _("Preview failed") }}') + '</p>';
+        previewSummaryEl.innerHTML = '<p class="text-red-600">' + escapeHtml(err.message || {{ _("Preview failed")|tojson|safe }}) + '</p>';
       })
       .finally(function () {
         previewLoading = false;
@@ -328,14 +328,14 @@ document.addEventListener('DOMContentLoaded', function () {
   // ── Configure preview ────────────────────────────────────────────────────
 
   function renderPreviewSummary(data) {
-    var html = '<p><strong>{{ _("Transformed form_data rows") }}:</strong> ' + data.transformed_rows + '</p>'
-             + '<p><strong>{{ _("Countries with data") }}:</strong> ' + data.countries + '</p>';
+    var html = '<p><strong>' + {{ _("Transformed form_data rows")|tojson|safe }} + ':</strong> ' + data.transformed_rows + '</p>'
+             + '<p><strong>' + {{ _("Countries with data")|tojson|safe }} + ':</strong> ' + data.countries + '</p>';
     if (data.warning_count) {
       var warnLabel = String(data.warning_count);
       if (data.warning_unique_count && data.warning_unique_count !== data.warning_count) {
-        warnLabel += ' (' + data.warning_unique_count + ' {{ _("unique") }})';
+        warnLabel += ' (' + data.warning_unique_count + ' ' + {{ _("unique")|tojson|safe }} + ')';
       }
-      html += '<p class="text-amber-700"><strong>{{ _("Warnings") }}:</strong> ' + warnLabel + '</p>'
+      html += '<p class="text-amber-700"><strong>' + {{ _("Warnings")|tojson|safe }} + ':</strong> ' + warnLabel + '</p>'
             + '<div class="max-h-72 overflow-y-auto mt-2 border border-amber-200 rounded-md bg-amber-50 p-3">'
             + '<ul class="list-disc ml-5 space-y-1 text-amber-900 text-sm">'
             + (data.warnings || []).map(function (w) { return '<li>' + escapeHtml(w) + '</li>'; }).join('')
@@ -392,7 +392,7 @@ document.addEventListener('DOMContentLoaded', function () {
                   + ', Errors: '    + (stats.errors   || 0);
           if (job.download_ready && job.download_url) {
             msg += ' <a class="text-purple-700 underline" href="'
-                 + escapeHtml(job.download_url) + '">{{ _("Download preview Excel") }}</a>';
+                 + escapeHtml(job.download_url) + '">' + {{ _("Download preview Excel")|tojson|safe }} + '</a>';
           }
           document.getElementById('import-result').innerHTML = '<p class="text-green-700">' + msg + '</p>';
           doneActions.classList.remove('hidden');
@@ -425,20 +425,20 @@ document.addEventListener('DOMContentLoaded', function () {
   function buildUprWorkbookPreviewHtml(preview) {
     var lines = [];
     var parts = [];
-    if (preview.total_rows != null) parts.push(escapeHtml(String(preview.total_rows)) + ' {{ _("rows") }}');
-    if (preview.countries   != null) parts.push(escapeHtml(String(preview.countries)) + ' {{ _("countries") }}');
+    if (preview.total_rows != null) parts.push(escapeHtml(String(preview.total_rows)) + ' ' + {{ _("rows")|tojson|safe }});
+    if (preview.countries   != null) parts.push(escapeHtml(String(preview.countries)) + ' ' + {{ _("countries")|tojson|safe }});
     if (parts.length) lines.push('<p class="' + DZ + '__preview-line">' + parts.join(' &middot; ') + '</p>');
     var roundGroups = [
-      { label: '{{ _("Planning") }}', key: 'planning_rounds' },
-      { label: '{{ _("AR") }}',       key: 'ar_rounds' },
-      { label: '{{ _("UPR Country Reporting") }}', key: 'myr_rounds' }
+      { label: {{ _("Planning")|tojson|safe }}, key: 'planning_rounds' },
+      { label: {{ _("AR")|tojson|safe }},       key: 'ar_rounds' },
+      { label: {{ _("UPR Country Reporting")|tojson|safe }}, key: 'myr_rounds' }
     ];
     roundGroups.forEach(function (g) {
       var rr = preview[g.key];
       if (rr && rr.length) {
         lines.push(
           '<p class="' + DZ + '__preview-line">'
-          + '<span class="' + DZ + '__preview-meta-label">' + escapeHtml(g.label) + ' {{ _("rounds") }}: </span>'
+          + '<span class="' + DZ + '__preview-meta-label">' + escapeHtml(g.label) + ' ' + {{ _("rounds")|tojson|safe }} + ': </span>'
           + '<span class="' + DZ + '__preview-meta-value">' + escapeHtml(rr.join(', ')) + '</span>'
           + '</p>'
         );
@@ -447,7 +447,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (preview.sections && preview.sections.length) {
       lines.push(
         '<p class="' + DZ + '__preview-line">'
-        + '<span class="' + DZ + '__preview-meta-label">{{ _("Sections") }}: </span>'
+        + '<span class="' + DZ + '__preview-meta-label">' + {{ _("Sections")|tojson|safe }} + ': </span>'
         + '<span class="' + DZ + '__preview-meta-value">' + escapeHtml(preview.sections.join(', ')) + '</span>'
         + '</p>'
       );
@@ -455,7 +455,7 @@ document.addEventListener('DOMContentLoaded', function () {
     return '<div class="' + DZ + '__preview">'
          + '<p class="' + DZ + '__preview-line ' + DZ + '__preview-line--success">'
          + '<i class="fas fa-check-circle" aria-hidden="true"></i>'
-         + '<span>{{ _("Valid UPR workbook") }}</span></p>'
+         + '<span>' + {{ _("Valid UPR workbook")|tojson|safe }} + '</span></p>'
          + lines.join('')
          + '</div>';
   }
@@ -468,10 +468,10 @@ document.addEventListener('DOMContentLoaded', function () {
         csrfToken:             csrfToken,
         maxSizeBytes:          80 * 1024 * 1024,
         buildValidPreviewHtml: buildUprWorkbookPreviewHtml,
-        invalidFileTypeLabel:  '{{ _("Please upload a valid Excel file (.xlsx or .xls)") }}',
-        maxSizeLabel:          '{{ _("File is too large (max 80 MB)") }}',
-        validationFailedLabel: '{{ _("Validation failed. Please choose a different file.") }}',
-        networkErrorLabel:     '{{ _("Could not reach the server. Please try again.") }}',
+        invalidFileTypeLabel:  {{ _("Please upload a valid Excel file (.xlsx or .xls)")|tojson|safe }},
+        maxSizeLabel:          {{ _("File is too large (max 80 MB)")|tojson|safe }},
+        validationFailedLabel: {{ _("Validation failed. Please choose a different file.")|tojson|safe }},
+        networkErrorLabel:     {{ _("Could not reach the server. Please try again.")|tojson|safe }},
 
         onReset: function () {
           analyzeLoaded = false;
@@ -500,7 +500,7 @@ document.addEventListener('DOMContentLoaded', function () {
           }
 
           // Step A: upload
-          setPending('{{ _("Uploading…") }}');
+          setPending({{ _("Uploading…")|tojson|safe }});
           var fd = new FormData();
           fd.append('file', file);
 
@@ -510,18 +510,18 @@ document.addEventListener('DOMContentLoaded', function () {
               if (!uploadData.success) {
                 renderValidationStatus({
                   valid: false,
-                  message: uploadData.message || '{{ _("Upload failed") }}'
+                  message: uploadData.message || {{ _("Upload failed")|tojson|safe }}
                 });
                 return;
               }
 
               // Step B: analyze
-              setPending('{{ _("Analyzing workbook\u2026") }}');
+              setPending({{ _("Analyzing workbook\u2026")|tojson|safe }});
               return postJSON(analyzeUrl, {}).then(function (aData) {
                 if (!aData.success) {
                   renderValidationStatus({
                     valid: false,
-                    message: aData.message || '{{ _("Analysis failed. Check that the file contains the UPR Data sheet.") }}'
+                    message: aData.message || {{ _("Analysis failed. Check that the file contains the UPR Data sheet.")|tojson|safe }}
                   });
                   return;
                 }
@@ -533,7 +533,7 @@ document.addEventListener('DOMContentLoaded', function () {
             .catch(function (err) {
               renderValidationStatus({
                 valid: false,
-                message: err.message || '{{ _("Upload failed") }}'
+                message: err.message || {{ _("Upload failed")|tojson|safe }}
               });
             });
         }

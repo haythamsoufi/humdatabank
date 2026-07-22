@@ -263,21 +263,21 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                      data-entity-id="{{ resource.id if resource else '' }}"
                      data-entity-type="resource"
                      data-language-code="en"
-                     data-i18n-generating="{{ _('Generating...') }}"
-                     data-i18n-generating-thumb="{{ _('Generating thumbnail...') }}"
-                     data-i18n-generate-pdf-thumb="{{ _('Generate PDF Thumbnail') }}"
-                     data-i18n-regenerate-thumb="{{ _('Regenerate Thumbnail') }}"
-                     data-i18n-delete-confirm="{{ _('Are you sure you want to delete the thumbnail? This action cannot be undone.') }}"
-                     data-i18n-deleting="{{ _('Deleting...') }}"
-                     data-i18n-deleting-thumb="{{ _('Deleting thumbnail...') }}"
-                     data-i18n-deleted-success="{{ _('Thumbnail deleted successfully!') }}"
-                     data-i18n-generated-success="{{ _('Thumbnail generated successfully!') }}"
-                     data-i18n-error-prefix="{{ _('Error:') }}"
-                     data-i18n-network-error="{{ _('Network error occurred') }}"
-                     data-i18n-generated-automatically="{{ _('Generated automatically') }}"
-                     data-i18n-current-thumbnail="{{ _('Current thumbnail:') }}"
-                     data-i18n-delete-label="{{ _('Delete') }}"
-                     data-i18n-to-replace="{{ _('To replace the current thumbnail, choose a new image below.') }}">
+                     data-i18n-generating="{{ _('Generating...')|forceescape }}"
+                     data-i18n-generating-thumb="{{ _('Generating thumbnail...')|forceescape }}"
+                     data-i18n-generate-pdf-thumb="{{ _('Generate PDF Thumbnail')|forceescape }}"
+                     data-i18n-regenerate-thumb="{{ _('Regenerate Thumbnail')|forceescape }}"
+                     data-i18n-delete-confirm="{{ _('Are you sure you want to delete the thumbnail? This action cannot be undone.')|forceescape }}"
+                     data-i18n-deleting="{{ _('Deleting...')|forceescape }}"
+                     data-i18n-deleting-thumb="{{ _('Deleting thumbnail...')|forceescape }}"
+                     data-i18n-deleted-success="{{ _('Thumbnail deleted successfully!')|forceescape }}"
+                     data-i18n-generated-success="{{ _('Thumbnail generated successfully!')|forceescape }}"
+                     data-i18n-error-prefix="{{ _('Error:')|forceescape }}"
+                     data-i18n-network-error="{{ _('Network error occurred')|forceescape }}"
+                     data-i18n-generated-automatically="{{ _('Generated automatically')|forceescape }}"
+                     data-i18n-current-thumbnail="{{ _('Current thumbnail:')|forceescape }}"
+                     data-i18n-delete-label="{{ _('Delete')|forceescape }}"
+                     data-i18n-to-replace="{{ _('To replace the current thumbnail, choose a new image below.')|forceescape }}">
 
                     <div class="flex items-center gap-2 mb-3">
                         <i class="fas fa-image text-gray-400"></i>
@@ -341,7 +341,7 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                                     <i class="fas fa-magic mr-1.5"></i>
                                     <span id="generate-text-en"
                                           data-thumbnail-btn-text="generate"
-                                          data-default-text="{{ _('Generate from PDF') }}">{{ _('Generate from PDF') }}</span>
+                                          data-default-text="{{ _('Generate from PDF')|forceescape }}">{{ _('Generate from PDF') }}</span>
                                 </button>
                             </div>
                         {% endif %}
@@ -437,21 +437,21 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                              data-entity-id="{{ resource.id if resource else '' }}"
                              data-entity-type="resource"
                              data-language-code="{{ lang_code }}"
-                             data-i18n-generating="{{ _('Generating...') }}"
-                             data-i18n-generating-thumb="{{ _('Generating thumbnail...') }}"
-                             data-i18n-generate-pdf-thumb="{{ _('Generate PDF Thumbnail') }}"
-                             data-i18n-regenerate-thumb="{{ _('Regenerate Thumbnail') }}"
-                             data-i18n-delete-confirm="{{ _('Are you sure you want to delete the thumbnail? This action cannot be undone.') }}"
-                             data-i18n-deleting="{{ _('Deleting...') }}"
-                             data-i18n-deleting-thumb="{{ _('Deleting thumbnail...') }}"
-                             data-i18n-deleted-success="{{ _('Thumbnail deleted successfully!') }}"
-                             data-i18n-generated-success="{{ _('Thumbnail generated successfully!') }}"
-                             data-i18n-error-prefix="{{ _('Error:') }}"
-                             data-i18n-network-error="{{ _('Network error occurred') }}"
-                             data-i18n-generated-automatically="{{ _('Generated automatically') }}"
-                             data-i18n-current-thumbnail="{{ _('Current thumbnail:') }}"
-                             data-i18n-delete-label="{{ _('Delete') }}"
-                             data-i18n-to-replace="{{ _('To replace the current thumbnail, choose a new image below.') }}">
+                             data-i18n-generating="{{ _('Generating...')|forceescape }}"
+                             data-i18n-generating-thumb="{{ _('Generating thumbnail...')|forceescape }}"
+                             data-i18n-generate-pdf-thumb="{{ _('Generate PDF Thumbnail')|forceescape }}"
+                             data-i18n-regenerate-thumb="{{ _('Regenerate Thumbnail')|forceescape }}"
+                             data-i18n-delete-confirm="{{ _('Are you sure you want to delete the thumbnail? This action cannot be undone.')|forceescape }}"
+                             data-i18n-deleting="{{ _('Deleting...')|forceescape }}"
+                             data-i18n-deleting-thumb="{{ _('Deleting thumbnail...')|forceescape }}"
+                             data-i18n-deleted-success="{{ _('Thumbnail deleted successfully!')|forceescape }}"
+                             data-i18n-generated-success="{{ _('Thumbnail generated successfully!')|forceescape }}"
+                             data-i18n-error-prefix="{{ _('Error:')|forceescape }}"
+                             data-i18n-network-error="{{ _('Network error occurred')|forceescape }}"
+                             data-i18n-generated-automatically="{{ _('Generated automatically')|forceescape }}"
+                             data-i18n-current-thumbnail="{{ _('Current thumbnail:')|forceescape }}"
+                             data-i18n-delete-label="{{ _('Delete')|forceescape }}"
+                             data-i18n-to-replace="{{ _('To replace the current thumbnail, choose a new image below.')|forceescape }}">
 
                             <div class="flex items-center gap-2 mb-3">
                                 <i class="fas fa-image text-gray-400"></i>
@@ -520,7 +520,7 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
                                             <i class="fas fa-magic mr-1.5"></i>
                                             <span id="generate-text-{{ lang_code }}"
                                                   data-thumbnail-btn-text="generate"
-                                                  data-default-text="{{ _('Generate from PDF') }}">{{ _('Generate from PDF') }}</span>
+                                                  data-default-text="{{ _('Generate from PDF')|forceescape }}">{{ _('Generate from PDF') }}</span>
                                         </button>
                                     </div>
                                 {% endif %}

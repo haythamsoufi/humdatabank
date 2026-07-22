@@ -132,7 +132,7 @@
                 submitBtn.disabled = true;
                 submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
                 submitBtn.dataset.originalHtml = submitBtn.innerHTML;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>{{ _("Saving...") }}';
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>' + {{ _("Saving...")|tojson|safe }};
             }
 
             fetch(url, {
@@ -482,9 +482,9 @@
                 const restoreBtn = () => { if (submitBtn) submitBtn.disabled = false; };
                 function doSubmit() { form.submit(); }
                 if (window.showDangerConfirmation) {
-                    window.showDangerConfirmation(confirmMsg, doSubmit, restoreBtn, '{{ _("Delete") }}', '{{ _("Cancel") }}', '{{ _("Delete Common Word?") }}');
+                    window.showDangerConfirmation(confirmMsg, doSubmit, restoreBtn, {{ _("Delete")|tojson|safe }}, {{ _("Cancel")|tojson|safe }}, {{ _("Delete Common Word?")|tojson|safe }});
                 } else if (window.showConfirmation) {
-                    window.showConfirmation(confirmMsg, doSubmit, restoreBtn, '{{ _("Delete") }}', '{{ _("Cancel") }}', '{{ _("Delete Common Word?") }}');
+                    window.showConfirmation(confirmMsg, doSubmit, restoreBtn, {{ _("Delete")|tojson|safe }}, {{ _("Cancel")|tojson|safe }}, {{ _("Delete Common Word?")|tojson|safe }});
                 } else {
                     doSubmit();
                 }

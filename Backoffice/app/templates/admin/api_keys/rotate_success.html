@@ -105,8 +105,8 @@
     async function copyKey() {
         if (!input) return;
         var text = input.value;
-        var copiedLabel = '{{ _("Copied!") }}';
-        var copyLabel = '{{ _("Copy") }}';
+        var copiedLabel = {{ _("Copied!")|tojson|safe }};
+        var copyLabel = {{ _("Copy")|tojson|safe }};
 
         try {
             if (navigator.clipboard && navigator.clipboard.writeText) {

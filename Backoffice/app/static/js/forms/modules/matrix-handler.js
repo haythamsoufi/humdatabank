@@ -53,10 +53,366 @@ function __cellValueToNumber(value) {
         return isFinite(num) ? num : 0;
     };
     if (typeof value === 'object' && value.original !== undefined) {
-        const display = value.modified != null ? value.modified : value.original;
+        if (value.isModified) {
+            return toUnformattedNumber(value.modified != null ? value.modified : '');
+        }
+        const display = value.modified != null && value.modified !== '' ? value.modified : value.original;
         return toUnformattedNumber(display);
     }
     return toUnformattedNumber(value);
+}
+
+/** Reserved column name for persisted manual/auto row totals. */
+const ROW_TOTAL_COLUMN_NAME = 'Total';
+
+function __isRowTotalCellKey(key) {
+    return typeof key === 'string' && key.endsWith(`_${ROW_TOTAL_COLUMN_NAME}`);
+}
+
+function __rowTotalCellKey(rowId) {
+    return `${rowId}_${ROW_TOTAL_COLUMN_NAME}`;
+}
+
+function __rowTotalManualEnabled(config) {
+    return __configFlag(config?.row_total_manual_enabled, false);
+}
+
+function __rowTotalValidation(config) {
+    const mode = config?.row_total_validation;
+    if (mode === 'strict' || mode === 'partial') return mode;
+    return 'none';
+}
+
+function __parseRowTotalManualValue(raw) {
+    if (raw == null || raw === '') return null;
+    const plain = (typeof window !== 'undefined' && typeof window.__numericUnformat === 'function')
+        ? window.__numericUnformat(String(raw))
+        : String(raw);
+    const num = Number(plain);
+    return Number.isFinite(num) ? num : null;
+}
+
+function __rowTotalConflictType(autoSum, manualVal, validation) {
+    const manual = __parseRowTotalManualValue(manualVal);
+    if (manual == null) return null;
+    const auto = Number(autoSum) || 0;
+    if (validation === 'strict' && manual !== auto) return 'error';
+    if (validation === 'partial' && manual < auto) return 'error';
+    if (manual !== auto) return 'warning';
+    return null;
+}
+
+function __rowTotalConflictMessage(manualVal, autoSum) {
+    return `Manual total ${__formatInteger(manualVal)} differs from breakdown sum ${__formatInteger(autoSum)}`;
+}
+
+const __ROW_TOTAL_CONFLICT_INDICATOR_BASE =
+    'row-total-conflict shrink-0 flex items-center justify-center mr-1.5 pointer-events-none';
+
+const __ROW_TOTAL_INPUT_WRAPPER_CLASS = 'flex items-center w-full gap-1.5 px-1';
+const __ROW_TOTAL_INPUT_CLASS =
+    'row-total-input flex-1 min-w-0 px-1 py-1 border-0 bg-transparent focus:outline-none focus:ring-2 focus:ring-orange-500 text-center text-sm font-medium';
+
+function __rowTotalConflictIndicatorSvg(variant) {
+    const colorClass = variant === 'error' ? 'text-red-400' : 'text-amber-400';
+    return `<svg class="row-total-conflict-icon h-5 w-5 ${colorClass}" width="20" height="20" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>`;
+}
+
+function __createRowTotalConflictIndicator() {
+    const indicator = document.createElement('span');
+    indicator.className = `${__ROW_TOTAL_CONFLICT_INDICATOR_BASE} hidden`;
+    indicator.setAttribute('aria-hidden', 'true');
+    indicator.innerHTML = __rowTotalConflictIndicatorSvg('warning');
+    return indicator;
+}
+
+function __syncRowTotalConflictIndicator(indicator, conflictType, msg) {
+    if (!indicator) return;
+    if (conflictType) {
+        indicator.className = __ROW_TOTAL_CONFLICT_INDICATOR_BASE;
+        indicator.innerHTML = __rowTotalConflictIndicatorSvg(conflictType === 'error' ? 'error' : 'warning');
+        indicator.removeAttribute('title');
+        indicator.removeAttribute('aria-hidden');
+        indicator.setAttribute('role', 'img');
+        indicator.setAttribute('aria-label', msg);
+    } else {
+        indicator.className = `${__ROW_TOTAL_CONFLICT_INDICATOR_BASE} hidden`;
+        indicator.innerHTML = __rowTotalConflictIndicatorSvg('warning');
+        indicator.removeAttribute('title');
+        indicator.removeAttribute('aria-label');
+        indicator.removeAttribute('role');
+        indicator.setAttribute('aria-hidden', 'true');
+    }
+}
+
+function __teardownRowTotalConflictTooltip(cell) {
+    if (!cell) return;
+    const tooltipId = cell._rowTotalTooltipId;
+    if (tooltipId) {
+        document.getElementById(tooltipId)?.remove();
+    }
+    if (cell._rowTotalTooltipHideTimeout) {
+        clearTimeout(cell._rowTotalTooltipHideTimeout);
+        cell._rowTotalTooltipHideTimeout = null;
+    }
+    const trigger = cell._rowTotalTooltipTrigger || cell;
+    ['_rowTotalTooltipMouseEnter', '_rowTotalTooltipMouseMove', '_rowTotalTooltipMouseLeave'].forEach((key) => {
+        const handler = trigger[key];
+        if (handler) {
+            trigger.removeEventListener('mouseenter', handler);
+            trigger.removeEventListener('mousemove', handler);
+            trigger.removeEventListener('mouseleave', handler);
+            delete trigger[key];
+        }
+    });
+    if (cell._rowTotalTooltipScrollHandler) {
+        window.removeEventListener('scroll', cell._rowTotalTooltipScrollHandler, true);
+        delete cell._rowTotalTooltipScrollHandler;
+    }
+    delete cell._rowTotalTooltipId;
+    delete cell._rowTotalTooltipTrigger;
+    delete cell._rowTotalInput;
+    delete cell._rowTotalAutoSum;
+    delete cell._rowTotalManualVal;
+    delete cell._rowTotalValidation;
+    delete cell._rowTotalConflictType;
+    delete cell._rowTotalConflictMessage;
+}
+
+function __applyRowTotalTooltipStyles(el) {
+    el.style.cssText = `
+        position: fixed;
+        padding: 8px 12px;
+        background-color: #333;
+        color: white;
+        border-radius: 4px;
+        font-size: 12px;
+        white-space: normal;
+        z-index: 10000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        max-width: 280px;
+    `;
+}
+
+function __populateRowTotalConflictTooltip(tooltip, cell) {
+    if (!tooltip || !cell) return;
+    const input = cell._rowTotalInput;
+    const autoSum = cell._rowTotalAutoSum;
+    const manualVal = cell._rowTotalManualVal;
+    const conflictType = cell._rowTotalConflictType;
+    const cellKey = input?.getAttribute('data-cell-key') || '';
+    const rowId = input?.getAttribute('data-row-id') || '';
+
+    tooltip.replaceChildren();
+
+    const title = document.createElement('div');
+    title.style.fontWeight = 'bold';
+    title.style.marginBottom = '4px';
+    title.textContent = conflictType === 'error' ? 'Total mismatch' : 'Manual total';
+
+    const summaryRow = document.createElement('div');
+    summaryRow.style.lineHeight = '1.4';
+    summaryRow.style.marginBottom = '2px';
+
+    const manualLine = document.createElement('div');
+    manualLine.textContent = `Manual total: ${__formatInteger(manualVal)}`;
+
+    const breakdownLine = document.createElement('div');
+    breakdownLine.textContent = `Breakdown sum: ${__formatInteger(autoSum)}`;
+
+    summaryRow.append(manualLine, breakdownLine);
+
+    const restoreRow = document.createElement('div');
+    restoreRow.style.marginTop = '6px';
+    restoreRow.style.paddingTop = '4px';
+    restoreRow.style.borderTop = '1px solid rgba(255,255,255,0.3)';
+    const restoreBtn = document.createElement('button');
+    restoreBtn.type = 'button';
+    restoreBtn.className = 'row-total-restore';
+    restoreBtn.setAttribute('data-cell-key', cellKey);
+    restoreBtn.setAttribute('data-row-id', rowId);
+    restoreBtn.setAttribute('aria-label', 'Restore to calculated');
+    restoreBtn.style.cssText = 'background:#555;color:white;border:none;border-radius:3px;padding:4px 8px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;';
+    restoreBtn.textContent = '↩ Restore to calculated';
+    restoreBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof window.matrixHandler?.handleRowTotalRestore === 'function') {
+            window.matrixHandler.handleRowTotalRestore(restoreBtn);
+        }
+        const currentTooltip = cell._rowTotalTooltipId ? document.getElementById(cell._rowTotalTooltipId) : null;
+        if (currentTooltip) {
+            currentTooltip.style.opacity = '0';
+            currentTooltip.style.pointerEvents = 'none';
+        }
+    });
+    restoreRow.appendChild(restoreBtn);
+    tooltip.append(title, summaryRow, restoreRow);
+}
+
+function __positionRowTotalConflictTooltip(tooltip, anchorEl) {
+    if (!tooltip || !anchorEl || !anchorEl.isConnected) return;
+    const anchorRect = anchorEl.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+
+    let top = anchorRect.top - tooltipRect.height - 8;
+    let left = anchorRect.left + (anchorRect.width / 2) - (tooltipRect.width / 2);
+
+    if (left < 10) {
+        left = 10;
+    } else if (left + tooltipRect.width > window.innerWidth - 10) {
+        left = window.innerWidth - tooltipRect.width - 10;
+    }
+    if (top < 10) {
+        top = anchorRect.bottom + 8;
+    }
+
+    tooltip.style.top = `${top}px`;
+    tooltip.style.left = `${left}px`;
+}
+
+function __setupRowTotalConflictTooltip(cell, input) {
+    if (!cell || !input) return;
+
+    const cellKey = input.getAttribute('data-cell-key') || 'unknown';
+    const tooltipId = `row-total-tooltip-${cellKey}`;
+    cell._rowTotalTooltipId = tooltipId;
+    cell._rowTotalTooltipTrigger = cell;
+    cell._rowTotalInput = input;
+
+    let tooltip = document.getElementById(tooltipId);
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = tooltipId;
+        tooltip.className = 'row-total-conflict-tooltip';
+        __applyRowTotalTooltipStyles(tooltip);
+        if (!tooltip._rowTotalTooltipListenersAttached) {
+            tooltip._rowTotalTooltipListenersAttached = true;
+            tooltip._rowTotalCell = cell;
+            tooltip.addEventListener('mouseenter', () => {
+                if (cell._rowTotalTooltipHideTimeout) {
+                    clearTimeout(cell._rowTotalTooltipHideTimeout);
+                    cell._rowTotalTooltipHideTimeout = null;
+                }
+            });
+            tooltip.addEventListener('mouseleave', () => {
+                tooltip.style.opacity = '0';
+                tooltip.style.pointerEvents = 'none';
+            });
+        }
+        document.body.appendChild(tooltip);
+    }
+
+    const updateTooltip = () => {
+        if (!cell.isConnected || !input.isConnected) return;
+        __populateRowTotalConflictTooltip(tooltip, cell);
+        __positionRowTotalConflictTooltip(tooltip, cell);
+    };
+
+    const mouseEnterHandler = () => {
+        if (!cell.isConnected) return;
+        if (cell._rowTotalTooltipHideTimeout) {
+            clearTimeout(cell._rowTotalTooltipHideTimeout);
+            cell._rowTotalTooltipHideTimeout = null;
+        }
+        updateTooltip();
+        tooltip.style.opacity = '1';
+        tooltip.style.pointerEvents = 'auto';
+    };
+    const mouseMoveHandler = () => {
+        if (!cell.isConnected) return;
+        if (tooltip.style.opacity === '1') {
+            updateTooltip();
+        }
+    };
+    const mouseLeaveHandler = () => {
+        if (!cell.isConnected) return;
+        if (cell._rowTotalTooltipHideTimeout) clearTimeout(cell._rowTotalTooltipHideTimeout);
+        cell._rowTotalTooltipHideTimeout = setTimeout(() => {
+            cell._rowTotalTooltipHideTimeout = null;
+            const currentTooltip = document.getElementById(tooltipId);
+            if (currentTooltip) {
+                currentTooltip.style.opacity = '0';
+                currentTooltip.style.pointerEvents = 'none';
+            }
+        }, 150);
+    };
+
+    cell._rowTotalTooltipMouseEnter = mouseEnterHandler;
+    cell._rowTotalTooltipMouseMove = mouseMoveHandler;
+    cell._rowTotalTooltipMouseLeave = mouseLeaveHandler;
+    cell.addEventListener('mouseenter', mouseEnterHandler);
+    cell.addEventListener('mousemove', mouseMoveHandler);
+    cell.addEventListener('mouseleave', mouseLeaveHandler);
+
+    const scrollHandler = () => {
+        if (!cell.isConnected) {
+            window.removeEventListener('scroll', scrollHandler, true);
+            delete cell._rowTotalTooltipScrollHandler;
+            return;
+        }
+        const currentTooltip = document.getElementById(tooltipId);
+        if (currentTooltip && currentTooltip.style.opacity === '1') {
+            updateTooltip();
+        }
+    };
+    window.addEventListener('scroll', scrollHandler, true);
+    cell._rowTotalTooltipScrollHandler = scrollHandler;
+}
+
+function __syncRowTotalCellHighlight(cell, highlighted) {
+    if (!cell) return;
+    cell.classList.toggle('bg-orange-50', !!highlighted);
+    cell.classList.toggle('bg-gray-100', !highlighted);
+}
+
+function __updateRowTotalConflict(input, autoSum, manualVal, validation, isManuallyModified = false) {
+    if (!input) return null;
+    const cell = input.closest('td') || input.parentElement;
+    let indicator = cell?.querySelector('.row-total-conflict');
+    if (!indicator && cell) {
+        const wrapper = input.parentElement;
+        if (wrapper) {
+            indicator = __createRowTotalConflictIndicator();
+            wrapper.appendChild(indicator);
+        }
+    }
+    const conflictType = __rowTotalConflictType(autoSum, manualVal, validation);
+    const shouldHighlight = !!isManuallyModified || !!conflictType;
+
+    input.classList.remove('border-orange-400', 'border-red-500', 'ring-1', 'ring-orange-300', 'ring-red-300');
+    __syncRowTotalCellHighlight(cell, shouldHighlight);
+    cell.classList.toggle('cursor-help', !!conflictType);
+    if (conflictType) {
+        const msg = __rowTotalConflictMessage(manualVal, autoSum);
+        __syncRowTotalConflictIndicator(indicator, conflictType, msg, input);
+        cell._rowTotalAutoSum = autoSum;
+        cell._rowTotalManualVal = manualVal;
+        cell._rowTotalValidation = validation;
+        cell._rowTotalConflictType = conflictType;
+        cell._rowTotalConflictMessage = msg;
+        if (!cell._rowTotalTooltipId) {
+            __setupRowTotalConflictTooltip(cell, input);
+        } else {
+            cell._rowTotalInput = input;
+            cell._rowTotalTooltipTrigger = cell;
+            const tooltip = document.getElementById(cell._rowTotalTooltipId);
+            if (tooltip && tooltip.style.opacity === '1') {
+                __populateRowTotalConflictTooltip(tooltip, cell);
+                __positionRowTotalConflictTooltip(tooltip, cell);
+            }
+        }
+        input.classList.add(conflictType === 'error' ? 'border-red-500' : 'border-orange-400');
+        input.classList.add(conflictType === 'error' ? 'ring-red-300' : 'ring-orange-300', 'ring-1');
+    } else {
+        cell.classList.remove('cursor-help');
+        __syncRowTotalConflictIndicator(indicator, null, '', input);
+        __teardownRowTotalConflictTooltip(cell);
+    }
+    return conflictType;
 }
 
 /**
@@ -470,6 +826,10 @@ class MatrixHandler {
                 e.stopPropagation();
                 this.handleRemoveRowClick(e.target.closest('.remove-matrix-row-btn'));
             }
+            if (e.target.closest('.row-total-restore')) {
+                e.preventDefault();
+                this.handleRowTotalRestore(e.target.closest('.row-total-restore'));
+            }
             if (e.target.closest('.matrix-search-option')) {
                 this.selectRowOption(e.target.closest('.matrix-search-option'));
             }
@@ -642,6 +1002,12 @@ class MatrixHandler {
             } else {
                 // For static matrices, restore cell values directly
                 this.restoreStaticMatrixValues(fieldId);
+                // Resolve variable columns on load (read-only/closed forms need this too)
+                if (this._matrixHasVariableColumns(matrixConfig)) {
+                    matrixPromises.push(
+                        Promise.resolve().then(() => this.resolveVariablesForAllRows(fieldId))
+                    );
+                }
             }
 
             // Apply highlighting for non-list_library or when auto-load is not enabled
@@ -653,6 +1019,11 @@ class MatrixHandler {
 
             // Note: Event listeners are handled via event delegation in setupEventListeners
             // No need to add per-input listeners to avoid duplicate event firing
+
+            const tbody = container.querySelector('tbody');
+            if (tbody) {
+                this._ensureTotalsRowAtTop(tbody);
+            }
 
             debugLog('matrix-handler', `Initialized matrix for field ${fieldId}`, config);
         });
@@ -781,8 +1152,26 @@ class MatrixHandler {
         const cellKey = input.dataset.cellKey;
         const columnType = input.dataset.columnType || 'number';
         const isVariable = columnType === 'variable';
+        const isRowTotal = input.dataset.isRowTotal === 'true';
 
         debugLog('matrix-handler', `updateMatrixData for field ${fieldId}: cellKey="${cellKey}", columnType="${columnType}", input.value="${input.value}", input.type="${input.type}"`);
+
+        if (isRowTotal && cellKey) {
+            const autoSum = parseFloat(input.getAttribute('data-original-value')) || 0;
+            const manualRaw = input.value;
+            const manualNum = __parseRowTotalManualValue(manualRaw);
+            const isModified = manualNum != null && manualNum !== autoSum;
+            matrix.data[cellKey] = {
+                original: autoSum,
+                modified: isModified ? manualNum : '',
+                isModified: isModified
+            };
+            __updateRowTotalConflict(input, autoSum, isModified ? manualNum : '', __rowTotalValidation(matrix.config), isModified);
+            if (matrix.hiddenField) {
+                matrix.hiddenField.value = __serializeMatrixData(matrix.data);
+            }
+            return;
+        }
 
         // For variable columns, check if value should be saved
         if (isVariable) {
@@ -964,6 +1353,8 @@ class MatrixHandler {
         const columns = config.columns || [];
         const showRowTotals = config.show_row_totals !== false; // Default to true
         const showColumnTotals = config.show_column_totals !== false; // Default to true
+        const rowTotalManual = __rowTotalManualEnabled(config);
+        const rowTotalValidation = __rowTotalValidation(config);
 
         debugLog('matrix-handler', `Calculating totals for matrix ${fieldId}`, { rows, columns, showRowTotals, showColumnTotals, data });
         debugLog('matrix-handler', `Matrix data keys:`, Object.keys(data));
@@ -1003,21 +1394,63 @@ class MatrixHandler {
                 });
 
                 // Find row total element by row ID (standardized)
-                const totalElement = container.querySelector(`.matrix-row-total[data-row-id="${rowId}"]`);
-                debugLog('matrix-handler', `Looking for row total element with selector: .matrix-row-total[data-row-id="${rowId}"]`);
-                debugLog('matrix-handler', `Found element:`, totalElement);
-                if (totalElement) {
-                    const newValue = __formatInteger(rowTotal);
-                    totalElement.textContent = newValue;
-                    totalElement.style.display = 'block';
-                    totalElement.style.visibility = 'visible';
+                const totalCellKey = __rowTotalCellKey(rowId);
+                if (rowTotalManual) {
+                    const stored = data[totalCellKey];
+                    let newCell;
+                    if (stored && typeof stored === 'object' && stored.original !== undefined) {
+                        newCell = {
+                            original: rowTotal,
+                            modified: stored.isModified ? stored.modified : '',
+                            isModified: !!stored.isModified
+                        };
+                    } else if (stored != null && stored !== '') {
+                        newCell = {
+                            original: rowTotal,
+                            modified: stored,
+                            isModified: true
+                        };
+                    } else {
+                        newCell = {
+                            original: rowTotal,
+                            modified: '',
+                            isModified: false
+                        };
+                    }
+                    data[totalCellKey] = newCell;
 
-                    // Announce to screen readers
-                    this.announceTotalUpdate(fieldId, 'row', newValue, row);
-
-                    debugLog('matrix-handler', `Set row total for ${row} (ID: ${rowId}) = ${rowTotal}`);
+                    const totalInput = container.querySelector(`input.row-total-input[data-cell-key="${totalCellKey}"]`);
+                    if (totalInput) {
+                        const displayVal = newCell.isModified && newCell.modified !== ''
+                            ? newCell.modified
+                            : rowTotal;
+                        totalInput.value = displayVal !== '' && displayVal != null ? __formatInteger(displayVal) : '';
+                        totalInput.setAttribute('data-original-value', String(rowTotal));
+                        __updateRowTotalConflict(
+                            totalInput,
+                            rowTotal,
+                            newCell.isModified ? newCell.modified : '',
+                            rowTotalValidation,
+                            newCell.isModified
+                        );
+                    }
                 } else {
-                    debugLog('matrix-handler', `Row total element not found for ${row} (ID: ${rowId})`);
+                    const totalElement = container.querySelector(`.matrix-row-total[data-row-id="${rowId}"]`);
+                    debugLog('matrix-handler', `Looking for row total element with selector: .matrix-row-total[data-row-id="${rowId}"]`);
+                    debugLog('matrix-handler', `Found element:`, totalElement);
+                    if (totalElement) {
+                        const newValue = __formatInteger(rowTotal);
+                        totalElement.textContent = newValue;
+                        totalElement.style.display = 'block';
+                        totalElement.style.visibility = 'visible';
+
+                        // Announce to screen readers
+                        this.announceTotalUpdate(fieldId, 'row', newValue, row);
+
+                        debugLog('matrix-handler', `Set row total for ${row} (ID: ${rowId}) = ${rowTotal}`);
+                    } else {
+                        debugLog('matrix-handler', `Row total element not found for ${row} (ID: ${rowId})`);
+                    }
                 }
             });
         }
@@ -1027,8 +1460,8 @@ class MatrixHandler {
             // Build a map of column values for efficient lookup
             const columnValuesMap = new Map();
             Object.keys(data).forEach((key) => {
-                // Skip metadata fields
-                if (key.startsWith('_')) {
+                // Skip metadata fields and persisted row-total cells (avoid double-counting)
+                if (key.startsWith('_') || __isRowTotalCellKey(key)) {
                     return;
                 }
 
@@ -1092,8 +1525,8 @@ class MatrixHandler {
             let grandTotal = 0;
             // Skip metadata fields when calculating grand total
             Object.entries(data).forEach(([key, value]) => {
-                if (key.startsWith('_')) {
-                    return; // Skip metadata fields
+                if (key.startsWith('_') || __isRowTotalCellKey(key)) {
+                    return;
                 }
                 grandTotal += __cellValueToNumber(value);
             });
@@ -1502,8 +1935,95 @@ class MatrixHandler {
             } else {
                 this.clearMatrixError(fieldId);
             }
+
+            if (__rowTotalManualEnabled(matrix.config)) {
+                if (!this.validateRowTotalConflictsForMatrix(fieldId)) {
+                    allValid = false;
+                }
+            }
         });
 
+        return allValid;
+    }
+
+    /**
+     * Validate row-total conflicts for a single matrix field.
+     */
+    validateRowTotalConflictsForMatrix(fieldId) {
+        const matrix = this.matrices.get(fieldId);
+        if (!matrix || !matrix.container.isConnected) return true;
+        if (!__rowTotalManualEnabled(matrix.config)) return true;
+
+        const validation = __rowTotalValidation(matrix.config);
+        const inputs = matrix.container.querySelectorAll('input.row-total-input');
+        let matrixValid = true;
+
+        inputs.forEach((input) => {
+            const autoSum = parseFloat(input.getAttribute('data-original-value')) || 0;
+            const stored = matrix.data[input.dataset.cellKey];
+            const manualVal = (stored && typeof stored === 'object' && stored.isModified)
+                ? stored.modified
+                : input.value;
+            const isManuallyModified = !!(stored && typeof stored === 'object' && stored.isModified);
+            const conflictType = __updateRowTotalConflict(input, autoSum, manualVal, validation, isManuallyModified);
+            if (conflictType === 'error') {
+                matrixValid = false;
+            }
+        });
+
+        if (!matrixValid) {
+            const msg = validation === 'partial'
+                ? 'One or more manual row totals are lower than the breakdown sum.'
+                : 'One or more row totals do not match their breakdown sums. Correct the totals or use “Restore to calculated”.';
+            this.showMatrixError(fieldId, msg);
+        }
+
+        return matrixValid;
+    }
+
+    /**
+     * Restore a manual row total to the auto-calculated breakdown sum.
+     */
+    handleRowTotalRestore(button) {
+        const cellKey = button.getAttribute('data-cell-key');
+        if (!cellKey) return;
+
+        let container = button.closest('.matrix-container');
+        let input = container?.querySelector(`input.row-total-input[data-cell-key="${cellKey}"]`);
+        if (!input) {
+            input = document.querySelector(`input.row-total-input[data-cell-key="${cellKey}"]`);
+            container = input?.closest('.matrix-container');
+        }
+        const fieldId = container?.dataset?.fieldId;
+        if (!fieldId || !input) return;
+
+        const matrix = this.matrices.get(fieldId);
+        if (!matrix) return;
+
+        const autoSum = parseFloat(input.getAttribute('data-original-value')) || 0;
+        input.value = autoSum ? __formatInteger(autoSum) : '';
+        matrix.data[cellKey] = {
+            original: autoSum,
+            modified: '',
+            isModified: false
+        };
+        __updateRowTotalConflict(input, autoSum, '', __rowTotalValidation(matrix.config), false);
+        if (matrix.hiddenField) {
+            matrix.hiddenField.value = __serializeMatrixData(matrix.data);
+        }
+    }
+
+    /**
+     * Validate row-total vs breakdown conflicts across all matrices.
+     */
+    validateRowTotalConflicts() {
+        let allValid = true;
+        this.matrices.forEach((matrix, fieldId) => {
+            if (!__rowTotalManualEnabled(matrix.config)) return;
+            if (!this.validateRowTotalConflictsForMatrix(fieldId)) {
+                allValid = false;
+            }
+        });
         return allValid;
     }
 
@@ -2389,30 +2909,51 @@ class MatrixHandler {
             totalCell.className = 'border border-gray-300 px-2 py-1 bg-gray-100';
             totalCell.setAttribute('role', 'gridcell');
 
-            const totalSpan = document.createElement('span');
-            totalSpan.className = 'matrix-row-total inline-block w-full px-2 py-1 text-center text-sm font-medium';
-            totalSpan.setAttribute('data-row', rowLabel);
-            totalSpan.setAttribute('data-row-id', finalRowId);
-            totalSpan.setAttribute('aria-label', `Total for row ${rowLabel}`);
-            totalSpan.textContent = '0';
+            if (__rowTotalManualEnabled(matrixInfo.config)) {
+                const totalCellKey = __rowTotalCellKey(finalRowId);
+                const wrapper = document.createElement('div');
+                wrapper.className = __ROW_TOTAL_INPUT_WRAPPER_CLASS;
 
-            totalCell.appendChild(totalSpan);
+                const totalInput = document.createElement('input');
+                totalInput.type = 'number';
+                totalInput.className = __ROW_TOTAL_INPUT_CLASS;
+                totalInput.setAttribute('data-row', rowLabel);
+                totalInput.setAttribute('data-row-id', finalRowId);
+                totalInput.setAttribute('data-column', ROW_TOTAL_COLUMN_NAME);
+                totalInput.setAttribute('data-cell-key', totalCellKey);
+                totalInput.setAttribute('data-is-row-total', 'true');
+                totalInput.setAttribute('data-row-total-validation', __rowTotalValidation(matrixInfo.config));
+                totalInput.setAttribute('data-original-value', '0');
+                totalInput.setAttribute('aria-label', `Total for row ${rowLabel}`);
+                totalInput.min = '0';
+                totalInput.step = '0.01';
+
+                const indicator = __createRowTotalConflictIndicator();
+
+                wrapper.appendChild(totalInput);
+                wrapper.appendChild(indicator);
+                totalCell.appendChild(wrapper);
+            } else {
+                const totalSpan = document.createElement('span');
+                totalSpan.className = 'matrix-row-total inline-block w-full px-2 py-1 text-center text-sm font-medium';
+                totalSpan.setAttribute('data-row', rowLabel);
+                totalSpan.setAttribute('data-row-id', finalRowId);
+                totalSpan.setAttribute('aria-label', `Total for row ${rowLabel}`);
+                totalSpan.textContent = '0';
+                totalCell.appendChild(totalSpan);
+            }
+
             row.appendChild(totalCell);
         }
 
-        // Insert row before search interface, totals row, or at end
-        const searchInterface = tbody.querySelector('.matrix-add-row-interface');
-        const totalsRow = tbody.querySelector('tr .matrix-column-total')?.closest('tr');
-
-        if (searchInterface) {
-            // Insert before search interface (last row)
-            tbody.insertBefore(row, searchInterface);
-        } else if (totalsRow) {
-            // Insert before totals row
-            tbody.insertBefore(row, totalsRow);
+        // Insert data rows after the totals row (always first) and before the search bar when present
+        const insertBefore = this._getMatrixDataRowInsertBefore(tbody);
+        if (insertBefore) {
+            tbody.insertBefore(row, insertBefore);
         } else {
             tbody.appendChild(row);
         }
+        this._ensureTotalsRowAtTop(tbody);
 
         // Update totals and hidden data
         this.calculateMatrixTotals(fieldIdStr);
@@ -2798,7 +3339,6 @@ class MatrixHandler {
                 const saveValue = input.getAttribute('data-variable-save-value') === 'true';
                 const matrix = this.matrices.get(fieldId);
 
-
                 // Check if there's a saved value and if it's been modified by the user
                 let hasSavedValue = false;
                 let savedIsModified = false;
@@ -2833,6 +3373,7 @@ class MatrixHandler {
                             // For number inputs, set value
                             input.value = savedDisplayValue;
                             input.setAttribute('data-original-value', savedOriginalValue);
+                            if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
                         }
 
                         // Update visual indicator
@@ -2926,9 +3467,61 @@ class MatrixHandler {
     }
 
     /**
+     * Return true when matrix config defines at least one variable column.
+     * @param {Object} matrixConfig
+     * @returns {boolean}
+     */
+    _matrixHasVariableColumns(matrixConfig) {
+        return (matrixConfig?.columns || []).some((col) =>
+            typeof col === 'object' && (col.is_variable === true || col.type === 'variable'));
+    }
+
+    /**
+     * Return the column-totals row in a matrix tbody, if present.
+     * @param {HTMLTableSectionElement} tbody
+     * @returns {HTMLTableRowElement|null}
+     */
+    _getMatrixTotalsRow(tbody) {
+        if (!tbody) return null;
+        return tbody.querySelector('.matrix-column-totals-row')
+            || tbody.querySelector('tr .matrix-column-total')?.closest('tr')
+            || null;
+    }
+
+    /**
+     * Keep the column-totals row as the first row in tbody (below thead).
+     * @param {HTMLTableSectionElement} tbody
+     */
+    _ensureTotalsRowAtTop(tbody) {
+        const totalsRow = this._getMatrixTotalsRow(tbody);
+        if (totalsRow && tbody.firstElementChild !== totalsRow) {
+            tbody.insertBefore(totalsRow, tbody.firstElementChild);
+        }
+    }
+
+    /**
+     * Where new data/group rows should be inserted: before the add-row search bar, or append.
+     * @param {HTMLTableSectionElement} tbody
+     * @returns {HTMLElement|null} insertBefore target, or null to appendChild
+     */
+    _getMatrixDataRowInsertBefore(tbody) {
+        if (!tbody) return null;
+        return tbody.querySelector('.matrix-add-row-interface');
+    }
+
+    /**
      * Get assignment entity status ID from form context
      */
     getAssignmentEntityStatusId() {
+        const jsContext = document.getElementById('entry-form-js-context');
+        if (jsContext?.dataset?.assignmentEntityStatusId) {
+            const value = parseInt(jsContext.dataset.assignmentEntityStatusId, 10);
+            if (!isNaN(value)) {
+                debugLog('matrix-handler', '[VARIABLE RESOLUTION] Found assignment_entity_status_id from entry-form-js-context', { value });
+                return value;
+            }
+        }
+
         // Try to get from hidden input or data attribute
         const hiddenInput = document.querySelector('input[name="assignment_entity_status_id"]');
         if (hiddenInput) {
@@ -3005,6 +3598,24 @@ class MatrixHandler {
      * Get template ID from form context
      */
     getTemplateId() {
+        const jsContext = document.getElementById('entry-form-js-context');
+        if (jsContext?.dataset?.templateId) {
+            const value = parseInt(jsContext.dataset.templateId, 10);
+            if (!isNaN(value)) {
+                debugLog('matrix-handler', '[VARIABLE RESOLUTION] Found template_id from entry-form-js-context', { value });
+                return value;
+            }
+        }
+
+        const metaTemplateId = window.metadataContext && window.metadataContext.template_id;
+        if (metaTemplateId !== undefined && metaTemplateId !== null && metaTemplateId !== '') {
+            const value = parseInt(metaTemplateId, 10);
+            if (!isNaN(value)) {
+                debugLog('matrix-handler', '[VARIABLE RESOLUTION] Found template_id from metadataContext', { value });
+                return value;
+            }
+        }
+
         // Try to get from hidden input or data attribute
         const hiddenInput = document.querySelector('input[name="template_id"]');
         if (hiddenInput && hiddenInput.value) {
@@ -4908,8 +5519,7 @@ class MatrixHandler {
             return;
         }
 
-        const searchInterface = tbody.querySelector('.matrix-add-row-interface');
-        const totalsRow = tbody.querySelector('tr .matrix-column-total')?.closest('tr');
+        const insertBefore = this._getMatrixDataRowInsertBefore(tbody);
         const groupByColumn = matrix.config?.group_by_column;
         const groupTableEnabled = matrix.config?.group_table_enabled !== false;
         const effectiveGroupByColumn = (groupByColumn && groupTableEnabled) ? groupByColumn : null;
@@ -4953,16 +5563,15 @@ class MatrixHandler {
                         }
                         icon.classList.toggle('rotate-180');
                     });
-                    if (searchInterface) tbody.insertBefore(headerRow, searchInterface);
-                    else if (totalsRow) tbody.insertBefore(headerRow, totalsRow);
+                    if (insertBefore) tbody.insertBefore(headerRow, insertBefore);
                     else tbody.appendChild(headerRow);
                 }
             }
-            if (searchInterface) tbody.insertBefore(row, searchInterface);
-            else if (totalsRow) tbody.insertBefore(row, totalsRow);
+            if (insertBefore) tbody.insertBefore(row, insertBefore);
             else tbody.appendChild(row);
         });
 
+        this._ensureTotalsRowAtTop(tbody);
         this.applyManualRowHighlighting(fieldId);
         debugLog('matrix-handler', `Sorted ${dataRows.length} rows for matrix ${fieldId}${effectiveGroupByColumn ? ' with grouping by ' + effectiveGroupByColumn : ''}`);
     }

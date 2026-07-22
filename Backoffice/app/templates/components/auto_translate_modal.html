@@ -329,7 +329,7 @@ Usage:
 <div id="auto-translate-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
     <div id="auto-translate-modal-panel" class="autotrans-compact bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col transform transition-all">
         <!-- Header — draggable; grab handle communicated via cursor -->
-        <div id="auto-translate-modal-header" title="{{ _('Drag to move') }}">
+        <div id="auto-translate-modal-header" title="{{ _('Drag to move')|forceescape }}">
             <!-- Title + description; right-padding clears the icon buttons -->
             <div style="padding-right: 6.5rem;">
                 <h3 class="autotrans-modal-header-title">
@@ -351,12 +351,12 @@ Usage:
             <div id="auto-translate-modal-header-actions" class="autotrans-header-actions">
                 <button type="button" id="minimize-auto-translate-modal-btn"
                         class="autotrans-header-action-btn autotrans-header-action-btn--minimize"
-                        aria-label="{{ _('Minimize') }}" title="{{ _('Minimize — translation keeps running in background') }}">
+                        aria-label="{{ _('Minimize')|forceescape }}" title="{{ _('Minimize — translation keeps running in background')|forceescape }}">
                     <i class="fas fa-minus" aria-hidden="true"></i>
                 </button>
                 <button type="button" id="close-auto-translate-modal-btn"
                         class="autotrans-header-action-btn autotrans-header-action-btn--close"
-                        aria-label="{{ _('Close') }}" title="{{ _('Close') }}">
+                        aria-label="{{ _('Close')|forceescape }}" title="{{ _('Close')|forceescape }}">
                     <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>
@@ -546,7 +546,7 @@ Usage:
                 <span id="mini-banner-percent">0%</span>
                 <button type="button" id="restore-auto-translate-modal-btn"
                         class="btn-close-icon"
-                        aria-label="{{ _('Restore') }}" title="{{ _('Restore') }}">
+                        aria-label="{{ _('Restore')|forceescape }}" title="{{ _('Restore')|forceescape }}">
                     <i class="fas fa-expand-alt" style="font-size: 0.65rem;"></i>
                 </button>
             </div>

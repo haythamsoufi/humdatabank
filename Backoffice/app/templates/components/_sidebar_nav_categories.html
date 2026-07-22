@@ -10,56 +10,56 @@
     </div>
     <div class="collapsable-content">
         {% if can_access_dashboard %}
-        <a href="{{ url_for('main.dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Dashboard') }}">
+        <a href="{{ url_for('main.dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Dashboard')|forceescape }}">
             {{ svg_icon('home', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Dashboard') }}</span>
         </a>
         {% endif %}
         {# Admin Dashboard - requires admin.analytics.view #}
         {% if is_system_manager or has_permission('admin.analytics.view') %}
-        <a href="{{ url_for('admin.admin_dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Admin Dashboard') }}">
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Admin Dashboard')|forceescape }}">
             {{ svg_icon('dashboard', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Admin Dashboard') }}</span>
         </a>
         {% endif %}
         {# Document Management - requires admin.documents.manage #}
         {% if is_system_manager or has_permission('admin.documents.manage') %}
-        <a href="{{ url_for('content_management.manage_documents') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Document Management') }}">
+        <a href="{{ url_for('content_management.manage_documents') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Document Management')|forceescape }}">
             {{ svg_icon('document-text', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Document Management') }}</span>
         </a>
         {% endif %}
         {# Translation Management - requires admin.translations.manage #}
         {% if is_system_manager or has_permission('admin.translations.manage') %}
-        <a href="{{ url_for('utilities.manage_translations') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Translation Management') }}">
+        <a href="{{ url_for('utilities.manage_translations') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Translation Management')|forceescape }}">
             {{ svg_icon('language', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Translation Management') }}</span>
         </a>
         {% endif %}
         {# Plugin Management - requires admin.plugins.manage #}
         {% if is_system_manager or has_permission('admin.plugins.manage') %}
-        <a href="{{ url_for('admin.plugin_management') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Plugin Management') }}">
+        <a href="{{ url_for('admin.plugin_management') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Plugin Management')|forceescape }}">
             {{ svg_icon('puzzle-piece', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Plugin Management') }}</span>
         </a>
         {% endif %}
         {# System Configuration - requires admin.settings.manage #}
         {% if is_system_manager or has_permission('admin.settings.manage') %}
-        <a href="{{ url_for('settings.manage_settings') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('System Configuration') }}">
+        <a href="{{ url_for('settings.manage_settings') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('System Configuration')|forceescape }}">
             {{ svg_icon('cog', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('System Configuration') }}</span>
         </a>
         {% endif %}
         {# Communication Center - requires admin.communication.manage #}
         {% if is_system_manager or has_permission('admin.communication.manage') %}
-        <a href="{{ url_for('admin_communication.communication_center') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Communication Center') }}">
+        <a href="{{ url_for('admin_communication.communication_center') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Communication Center')|forceescape }}">
             {{ svg_icon('paper-plane', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Communication Center') }}</span>
         </a>
         {% endif %}
         {# Documentation / Onboarding (file-based docs under Backoffice/docs/workflows) #}
         {% if is_system_manager or has_permission('admin.docs.view') %}
-        <a href="{{ url_for('admin_docs.index') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Documentation') }}">
+        <a href="{{ url_for('admin_docs.index') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Documentation')|forceescape }}">
             {{ svg_icon('book', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Documentation') }}</span>
         </a>
@@ -79,11 +79,11 @@
         {{ svg_icon('chevron-right', 'collapsable-icon w-4 h-4') }}
     </div>
     <div class="collapsable-content">
-        <a href="{{ url_for('user_management.manage_users') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Manage Users') }}{% if can_review_access_requests and pending_access_requests_count > 0 %} — {{ pending_access_requests_count }} {{ _('pending access requests') }}{% endif %}">
+        <a href="{{ url_for('user_management.manage_users') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Manage Users')|forceescape }}{% if can_review_access_requests and pending_access_requests_count > 0 %} — {{ pending_access_requests_count }} {{ _('pending access requests')|forceescape }}{% endif %}">
             {{ svg_icon('users', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Manage Users') }}</span>
             {% if can_review_access_requests and pending_access_requests_count > 0 %}
-            <span class="sidebar-item-badge" aria-label="{{ ngettext('%(num)d pending access request', '%(num)d pending access requests', pending_access_requests_count) }}">{{ pending_access_requests_count }}</span>
+            <span class="sidebar-item-badge" aria-label="{{ ngettext('%(num)d pending access request', '%(num)d pending access requests', pending_access_requests_count)|forceescape }}">{{ pending_access_requests_count }}</span>
             {% endif %}
         </a>
     </div>
@@ -106,31 +106,31 @@
     </div>
     <div class="collapsable-content">
         {% if is_system_manager or has_permission('admin.templates.view') %}
-        <a href="{{ url_for('form_builder.manage_templates') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Manage Templates') }}">
+        <a href="{{ url_for('form_builder.manage_templates') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Manage Templates')|forceescape }}">
             {{ svg_icon('document', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Manage Templates') }}</span>
         </a>
         {% endif %}
         {% if is_system_manager or has_permission('admin.assignments.view') %}
-        <a href="{{ url_for('assignment_management.manage_assignments') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Manage Assignments') }}">
+        <a href="{{ url_for('assignment_management.manage_assignments') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Manage Assignments')|forceescape }}">
             {{ svg_icon('tasks', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Manage Assignments') }}</span>
         </a>
         {% endif %}
         {% if can_access_data_explorer %}
-        <a href="{{ url_for('data_exploration.explore_data') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Explore Data') }}">
+        <a href="{{ url_for('data_exploration.explore_data') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Explore Data')|forceescape }}">
             {{ svg_icon('explore-data', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Explore Data') }}</span>
         </a>
         {% endif %}
         {% if can_access_validation_dashboard %}
-        <a href="{{ url_for('admin.validation_dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Validation Dashboard') }}">
+        <a href="{{ url_for('admin.validation_dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Validation Dashboard')|forceescape }}">
             <i class="fas fa-chart-line sidebar-icon w-6 h-6 mr-3 text-center"></i>
             <span class="sidebar-text">{{ _('Validation Dashboard') }}</span>
         </a>
         {% endif %}
         {% if can_access_validation_questions %}
-        <a href="{{ url_for('admin.validation_questions_admin') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Validation Questions') }}">
+        <a href="{{ url_for('admin.validation_questions_admin') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Validation Questions')|forceescape }}">
             <i class="fas fa-clipboard-question sidebar-icon w-6 h-6 mr-3 text-center"></i>
             <span class="sidebar-text">{{ _('Validation Questions') }}</span>
         </a>
@@ -150,11 +150,11 @@
     <div class="collapsable-content">
         {# Manage Resources - requires admin.resources.manage #}
         {% if can_manage_resources %}
-        <a href="{{ url_for('content_management.manage_resources') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Manage Resources') }}">
+        <a href="{{ url_for('content_management.manage_resources') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Manage Resources')|forceescape }}">
             {{ svg_icon('folder-open', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Manage Resources') }}</span>
         </a>
-        <a href="{{ url_for('embed_management.manage_embed_content') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Embed Content') }}">
+        <a href="{{ url_for('embed_management.manage_embed_content') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Embed Content')|forceescape }}">
             <i class="fas fa-code sidebar-icon w-6 h-6 mr-3 text-center"></i>
             <span class="sidebar-text">{{ _('Embed Content') }}</span>
         </a>
@@ -172,13 +172,13 @@
     </div>
     <div class="collapsable-content">
          {% if is_system_manager or has_permission('admin.organization.manage') or has_permission('admin.countries.view') %}
-         <a href="{{ url_for('organization.index') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Organizational Structure') }}">
+         <a href="{{ url_for('organization.index') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Organizational Structure')|forceescape }}">
             {{ svg_icon('sitemap', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Organizational Structure') }}</span>
         </a>
         {% endif %}
          {% if is_system_manager or has_permission('admin.indicator_bank.view') %}
-         <a href="{{ url_for('system_admin.manage_indicator_bank') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Indicator Bank') }}">
+         <a href="{{ url_for('system_admin.manage_indicator_bank') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Indicator Bank')|forceescape }}">
             {{ svg_icon('book', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Indicator Bank') }}</span>
         </a>
@@ -201,37 +201,37 @@
     </div>
     <div class="collapsable-content">
          {% if has_analytics_item %}
-         <a href="{{ url_for('analytics.analytics_dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('User Analytics Dashboard') }}">
+         <a href="{{ url_for('analytics.analytics_dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('User Analytics Dashboard')|forceescape }}">
             {{ svg_icon('chart', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('User Analytics') }}</span>
         </a>
          {% endif %}
          {% if has_audit_item %}
-        <a href="{{ url_for('analytics.audit_trail') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Audit Trail') }}">
+        <a href="{{ url_for('analytics.audit_trail') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Audit Trail')|forceescape }}">
             {{ svg_icon('history', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Audit Trail') }}</span>
         </a>
          {% endif %}
          {% if has_security_item %}
-         <a href="{{ url_for('security.security_dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Security Dashboard') }}">
+         <a href="{{ url_for('security.security_dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Security Dashboard')|forceescape }}">
             {{ svg_icon('shield', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Security Dashboard') }}</span>
         </a>
          {% endif %}
          {% if has_governance_item %}
-         <a href="{{ url_for('governance_dashboard.governance_dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Governance Dashboard') }}">
+         <a href="{{ url_for('governance_dashboard.governance_dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Governance Dashboard')|forceescape }}">
             <i class="fas fa-balance-scale sidebar-icon w-6 h-6 mr-3 text-center"></i>
             <span class="sidebar-text">{{ _('Governance') }}</span>
         </a>
          {% endif %}
          {% if has_api_item %}
-         <a href="{{ url_for('api_management.api_management') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('API Management') }}">
+         <a href="{{ url_for('api_management.api_management') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('API Management')|forceescape }}">
             {{ svg_icon('api', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('API Management') }}</span>
         </a>
          {% endif %}
          {% if has_analytics_item %}
-         <a href="{{ url_for('monitoring.system_monitoring') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('System Monitoring') }}">
+         <a href="{{ url_for('monitoring.system_monitoring') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('System Monitoring')|forceescape }}">
             {{ svg_icon('server', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('System Monitoring') }}</span>
         </a>
@@ -249,15 +249,15 @@
          {{ svg_icon('chevron-right', 'collapsable-icon w-4 h-4') }}
     </div>
     <div class="collapsable-content">
-        <a href="{{ url_for('ai_management.ai_dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('AI Dashboard') }}">
+        <a href="{{ url_for('ai_management.ai_dashboard') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('AI Dashboard')|forceescape }}">
             <i class="fas fa-robot sidebar-icon w-6 h-6 mr-3 text-center"></i>
             <span class="sidebar-text">{{ _('AI Dashboard') }}</span>
         </a>
-        <a href="{{ url_for('ai_management.document_library') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('AI Knowledge Base') }}">
+        <a href="{{ url_for('ai_management.document_library') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('AI Knowledge Base')|forceescape }}">
             <i class="fas fa-brain sidebar-icon w-6 h-6 mr-3 text-center"></i>
             <span class="sidebar-text">{{ _('Knowledge Base') }}</span>
         </a>
-        <a href="{{ url_for('ai_management.reasoning_traces') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Reasoning Traces') }}">
+        <a href="{{ url_for('ai_management.reasoning_traces') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Reasoning Traces')|forceescape }}">
             <i class="fas fa-project-diagram sidebar-icon w-6 h-6 mr-3 text-center"></i>
             <span class="sidebar-text">{{ _('Reasoning Traces') }}</span>
         </a>

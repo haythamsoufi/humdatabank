@@ -25,30 +25,30 @@
                             <div class="font-semibold text-gray-800 inline-flex items-center gap-2">
                                 <span class="leading-none">V{{ v.version_number or 'N/A' }}</span>
                                 {% if is_active %}
-                                <i class="fas fa-check-circle w-4 h-4 text-blue-600 flex-shrink-0" title="{{ _('Currently viewing/editing this version') }}" aria-label="{{ _('Currently viewing/editing this version') }}"></i>
+                                <i class="fas fa-check-circle w-4 h-4 text-blue-600 flex-shrink-0" title="{{ _('Currently viewing/editing this version')|forceescape }}" aria-label="{{ _('Currently viewing/editing this version')|forceescape }}"></i>
                                 {% else %}
                                 <form method="GET" action="{{ url_for('form_builder.edit_template', template_id=template.id) }}" class="inline-flex items-center">
                                     <input type="hidden" name="version_id" value="{{ v.id }}">
-                                    <button type="submit" class="fb-icon-btn fb-icon-btn--primary" title="{{ _('Switch to this version') }}" aria-label="{{ _('Switch to this version') }}">
+                                    <button type="submit" class="fb-icon-btn fb-icon-btn--primary" title="{{ _('Switch to this version')|forceescape }}" aria-label="{{ _('Switch to this version')|forceescape }}">
                                         <i class="fas fa-external-link-alt w-4 h-4"></i>
                                     </button>
                                 </form>
                                 {% endif %}
                                 {# Preview this version #}
-                                <a href="{{ url_for('forms.preview_template', template_id=template.id) }}?version_id={{ v.id }}" target="_blank" class="fb-icon-btn fb-icon-btn--neutral" title="{{ _('Preview') }}" aria-label="{{ _('Preview version') }}">
+                                <a href="{{ url_for('forms.preview_template', template_id=template.id) }}?version_id={{ v.id }}" target="_blank" class="fb-icon-btn fb-icon-btn--neutral" title="{{ _('Preview')|forceescape }}" aria-label="{{ _('Preview version')|forceescape }}">
                                     <i class="fas fa-eye w-4 h-4"></i>
                                 </a>
                                 {% if not is_published %}
                                 <a href="{{ url_for('form_builder.field_mapping_review', template_id=template.id, version_id=v.id) }}"
                                    class="fb-icon-btn fb-icon-btn--neutral"
-                                   title="{{ _('Review field mapping') }}"
-                                   aria-label="{{ _('Review field mapping') }}">
+                                   title="{{ _('Review field mapping')|forceescape }}"
+                                   aria-label="{{ _('Review field mapping')|forceescape }}">
                                     <i class="fas fa-link w-4 h-4"></i>
                                 </a>
                                 <form method="POST" action="{{ url_for('form_builder.deploy_template_version', template_id=template.id) }}" class="inline-flex items-center deploy-version-form-{{ v.id }}">
                                     <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
                                     <input type="hidden" name="version_id" value="{{ v.id }}">
-                                    <button type="button" class="deploy-version-btn-{{ v.id }} fb-icon-btn fb-icon-btn--success" title="{{ _('Deploy Version') }}" aria-label="{{ _('Deploy Version') }}">
+                                    <button type="button" class="deploy-version-btn-{{ v.id }} fb-icon-btn fb-icon-btn--success" title="{{ _('Deploy Version')|forceescape }}" aria-label="{{ _('Deploy Version')|forceescape }}">
                                         <i class="fas fa-rocket w-4 h-4"></i>
                                     </button>
                                 </form>
@@ -56,7 +56,7 @@
                                 {% if not is_published %}
                                 <form method="POST" action="{{ url_for('form_builder.delete_template_version', template_id=template.id, version_id=v.id) }}" class="inline-flex items-center delete-version-form-{{ v.id }}">
                                     <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
-                                    <button type="button" class="delete-version-btn-{{ v.id }} fb-icon-btn fb-icon-btn--danger" title="{{ _('Delete Version') }}" aria-label="{{ _('Delete Version') }}">
+                                    <button type="button" class="delete-version-btn-{{ v.id }} fb-icon-btn fb-icon-btn--danger" title="{{ _('Delete Version')|forceescape }}" aria-label="{{ _('Delete Version')|forceescape }}">
                                         <i class="fas fa-trash-alt w-4 h-4"></i>
                                     </button>
                                 </form>
@@ -87,16 +87,16 @@
                                        id="version-note-input-{{ v.id }}"
                                        name="comment"
                                        rows="1"
-                                       placeholder="{{ _('Version note (optional)') }}"
+                                       placeholder="{{ _('Version note (optional)')|forceescape }}"
                                        class="version-note-input shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md resize-y overflow-y-auto max-h-32"
                                        data-version-id="{{ v.id }}"
                                        data-original-value="{{ v.comment or '' }}"
-                                       aria-label="{{ _('Version note') }}">{{ v.comment or '' }}</textarea>
+                                       aria-label="{{ _('Version note')|forceescape }}">{{ v.comment or '' }}</textarea>
                                 <button type="submit"
                                         id="version-note-save-btn-{{ v.id }}"
                                         class="version-note-save-btn fb-icon-btn fb-icon-btn--primary hidden mt-1"
-                                        title="{{ _('Save Note') }}"
-                                        aria-label="{{ _('Save Note') }}">
+                                        title="{{ _('Save Note')|forceescape }}"
+                                        aria-label="{{ _('Save Note')|forceescape }}">
                                     <i class="fas fa-save w-4 h-4"></i>
                                 </button>
                             </form>
@@ -125,7 +125,7 @@
                 <input type="hidden" name="source_version_id" id="create-version-source-id" value="{{ active_version_id }}">
                 <button type="submit"
                         class="btn btn-success {% if has_draft %}opacity-50 cursor-not-allowed pointer-events-none{% endif %}"
-                        {% if has_draft %}disabled aria-disabled="true" title="{{ _('A draft version already exists. Open or discard it before creating a new version.') }}"{% endif %}>
+                        {% if has_draft %}disabled aria-disabled="true" title="{{ _('A draft version already exists. Open or discard it before creating a new version.')|forceescape }}"{% endif %}>
                     <i class="fas fa-plus w-4 h-4 mr-2"></i>{{ _('Add New Version') }}
                 </button>
             </form>

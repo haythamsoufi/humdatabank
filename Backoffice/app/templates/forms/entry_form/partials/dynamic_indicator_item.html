@@ -153,16 +153,16 @@
                     <button type="button"
                             class="w-5 h-5 flex items-center justify-center text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors propose-changes-btn"
                             data-indicator-id="{{ field.source_indicator_from_bank.id if field.source_indicator_from_bank else '' }}"
-                            data-indicator-name="{{ field_display_label or field_label or _('Unknown Indicator') }}"
-                            title="{{ _('Propose changes to this indicator') }}">
+                            data-indicator-name="{{ field_display_label or field_label or _('Unknown Indicator')|forceescape }}"
+                            title="{{ _('Propose changes to this indicator')|forceescape }}">
                         <i class="fas fa-lightbulb text-xs"></i>
                     </button>
                     {% endif %}
                     <button type="button"
                             class="w-5 h-5 flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors delete-dynamic-indicator-btn"
                             data-assignment-id="{{ field.dynamic_assignment_id }}"
-                            data-indicator-name="{{ field_display_label or field_label or _('Unknown Indicator') }}"
-                            title="{{ _('Remove this indicator') }}">
+                            data-indicator-name="{{ field_display_label or field_label or _('Unknown Indicator')|forceescape }}"
+                            title="{{ _('Remove this indicator')|forceescape }}">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>

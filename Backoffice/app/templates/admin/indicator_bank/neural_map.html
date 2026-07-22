@@ -175,16 +175,16 @@
             <button data-dim="3d" class="active">3D</button>
         </div>
         <div class="emb-sep"></div>
-        <label title="{{ _('How to project high-dimensional embeddings onto the screen') }}">{{ _('Projection') }}</label>
-        <select id="emb-method" title="{{ _('PCA: fast overview preserving overall spread. t-SNE: slower but groups similar indicators closer together.') }}"><option value="pca" selected title="{{ _('Fast overview — preserves the overall spread of indicators') }}">PCA</option><option value="tsne" title="{{ _('Slower but groups similar indicators closer together — better for spotting clusters') }}">t-SNE</option></select>
+        <label title="{{ _('How to project high-dimensional embeddings onto the screen')|forceescape }}">{{ _('Projection') }}</label>
+        <select id="emb-method" title="{{ _('PCA: fast overview preserving overall spread. t-SNE: slower but groups similar indicators closer together.')|forceescape }}"><option value="pca" selected title="{{ _('Fast overview — preserves the overall spread of indicators')|forceescape }}">PCA</option><option value="tsne" title="{{ _('Slower but groups similar indicators closer together — better for spotting clusters')|forceescape }}">t-SNE</option></select>
         <div class="emb-sep"></div>
         <label>{{ _('Search') }}</label>
-        <input type="text" id="emb-search" placeholder="{{ _('Filter…') }}">
+        <input type="text" id="emb-search" placeholder="{{ _('Filter…')|forceescape }}">
         <div class="emb-sep"></div>
         <label>{{ _('Probe') }}</label>
-        <input type="text" id="emb-probe-input" placeholder="{{ _('Test a query…') }}" style="width:180px">
-        <button type="button" id="emb-probe-btn" class="emb-btn emb-btn-icon" title="{{ _('Embed query and place on map') }}" style="width:auto;padding:0.25rem 0.5rem"><i class="fas fa-crosshairs"></i></button>
-        <button type="button" id="emb-probe-clear" class="emb-btn emb-btn-icon" title="{{ _('Clear probe') }}" style="display:none;width:auto;padding:0.25rem 0.5rem"><i class="fas fa-times"></i></button>
+        <input type="text" id="emb-probe-input" placeholder="{{ _('Test a query…')|forceescape }}" style="width:180px">
+        <button type="button" id="emb-probe-btn" class="emb-btn emb-btn-icon" title="{{ _('Embed query and place on map')|forceescape }}" style="width:auto;padding:0.25rem 0.5rem"><i class="fas fa-crosshairs"></i></button>
+        <button type="button" id="emb-probe-clear" class="emb-btn emb-btn-icon" title="{{ _('Clear probe')|forceescape }}" style="display:none;width:auto;padding:0.25rem 0.5rem"><i class="fas fa-times"></i></button>
         <div class="emb-sep"></div>
         <label>{{ _('Color') }}</label>
         <select id="emb-color-by">
@@ -199,8 +199,8 @@
         <div class="emb-sep"></div>
         <button type="button" id="emb-load" class="emb-btn emb-btn-primary">{{ _('Load') }}</button>
         {# ── icon buttons ── #}
-        <button type="button" id="emb-reset" class="emb-btn emb-btn-icon" title="{{ _('Reset camera') }}"><i class="fas fa-sync-alt"></i></button>
-        <button type="button" id="emb-auto-rotate" class="emb-btn emb-btn-icon active" title="{{ _('Auto-rotate (3D)') }}"><i class="fas fa-redo"></i></button>
+        <button type="button" id="emb-reset" class="emb-btn emb-btn-icon" title="{{ _('Reset camera')|forceescape }}"><i class="fas fa-sync-alt"></i></button>
+        <button type="button" id="emb-auto-rotate" class="emb-btn emb-btn-icon active" title="{{ _('Auto-rotate (3D)')|forceescape }}"><i class="fas fa-redo"></i></button>
         <div class="emb-sep"></div>
         {# ── theme toggle ── #}
         <div class="emb-toggle-group" id="emb-theme-toggle">
@@ -208,10 +208,10 @@
             <button data-theme="light"><i class="fas fa-sun"></i></button>
         </div>
         {# ── fullscreen ── #}
-        <button type="button" id="emb-fullscreen" class="emb-btn emb-btn-icon" title="{{ _('Fullscreen') }}"><i class="fas fa-expand"></i></button>
+        <button type="button" id="emb-fullscreen" class="emb-btn emb-btn-icon" title="{{ _('Fullscreen')|forceescape }}"><i class="fas fa-expand"></i></button>
         <div class="emb-sep"></div>
         {# ── guide ── #}
-        <button type="button" id="emb-guide-btn" class="emb-btn" style="font-size:0.7rem;gap:0.25rem" title="{{ _('How does this work?') }}"><i class="fas fa-question-circle"></i> {{ _('How does this work?') }}</button>
+        <button type="button" id="emb-guide-btn" class="emb-btn" style="font-size:0.7rem;gap:0.25rem" title="{{ _('How does this work?')|forceescape }}"><i class="fas fa-question-circle"></i> {{ _('How does this work?') }}</button>
     </div>
 
     <div class="emb-guide" id="emb-guide" style="display:none;margin-bottom:0.5rem;padding:1rem 1.25rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:0.82rem;color:#334155;line-height:1.65">

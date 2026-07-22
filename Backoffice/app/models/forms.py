@@ -659,7 +659,7 @@ class DataEntryMixin:
       for writes — never mutate ``disagg_data`` in-place.
     """
 
-    value = db.Column(db.String(255), nullable=True)
+    value = db.Column(db.Text(), nullable=True)
     # IMPORTANT: store Python None as SQL NULL (not JSON literal `null`)
     disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
     disagg_type = db.Column(db.String(20), nullable=True)
@@ -670,15 +670,18 @@ class DataEntryMixin:
 
     @staticmethod
     def _coerce_scalar_text_value(value):
-        """Normalize auxiliary scalar values to the same storage shape as ``value``."""
+        """Normalize auxiliary scalar values to the same storage shape as ``value``.
+
+        The underlying columns are TEXT (unbounded), so no length cap is enforced
+        here. Structured dict payloads must still go through ``set_disaggregated_data``
+        so the disagg_data JSON column is used correctly.
+        """
         if value is None:
             return None
         if isinstance(value, str):
             text = value.strip()
             if not text or text.lower() in ('none', 'null', 'undefined'):
                 return None
-            if len(text) > 255:
-                raise ValueError("Scalar form value exceeds 255 characters")
             return text
         if isinstance(value, bool):
             text = 'true' if value else 'false'
@@ -690,8 +693,6 @@ class DataEntryMixin:
             raise ValueError("Structured form payloads must use a disaggregation data column")
         else:
             text = str(value)
-        if len(text) > 255:
-            raise ValueError("Scalar form value exceeds 255 characters")
         return text
 
     @staticmethod
@@ -842,10 +843,10 @@ class FormData(DataEntryMixin, db.Model):
     assignment_entity_status_id = db.Column(db.Integer, db.ForeignKey('assignment_entity_status.id'), nullable=True)
     public_submission_id = db.Column(db.Integer, db.ForeignKey('public_submission.id'), nullable=True)
     form_item_id = db.Column(db.Integer, db.ForeignKey('form_item.id'), nullable=False)
-    prefilled_value = db.Column(db.String(255), nullable=True)
+    prefilled_value = db.Column(db.Text(), nullable=True)
     # Prefilled values can also include a disaggregation/matrix JSON payload that corresponds to disagg_data
     prefilled_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
-    imputed_value = db.Column(db.String(255), nullable=True)
+    imputed_value = db.Column(db.Text(), nullable=True)
     # Imputed values can also include a disaggregation/matrix JSON payload that corresponds to disagg_data
     imputed_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
     imputed_numeric_value = db.Column(db.Float, nullable=True)
@@ -974,9 +975,9 @@ class DynamicIndicatorData(DataEntryMixin, db.Model):
     order = db.Column(db.Float, nullable=False, default=0)
     added_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     added_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    prefilled_value = db.Column(db.String(255), nullable=True)
+    prefilled_value = db.Column(db.Text(), nullable=True)
     prefilled_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
-    imputed_value = db.Column(db.String(255), nullable=True)
+    imputed_value = db.Column(db.Text(), nullable=True)
     imputed_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
     imputed_numeric_value = db.Column(db.Float, nullable=True)
     created_at = db.Column(db.DateTime, nullable=True)
@@ -1138,9 +1139,9 @@ class RepeatGroupData(DataEntryMixin, db.Model):
     # Unified relationship - primary approach
     form_item = db.relationship('FormItem', foreign_keys=[form_item_id], overlaps="repeat_data_entries")
     repeat_instance = relationship('RepeatGroupInstance', overlaps="data_entries")
-    prefilled_value = db.Column(db.String(255), nullable=True)
+    prefilled_value = db.Column(db.Text(), nullable=True)
     prefilled_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
-    imputed_value = db.Column(db.String(255), nullable=True)
+    imputed_value = db.Column(db.Text(), nullable=True)
     imputed_disagg_data = db.Column(db.JSON(none_as_null=True), nullable=True)
     imputed_numeric_value = db.Column(db.Float, nullable=True)
     created_at = db.Column(db.DateTime, nullable=True)

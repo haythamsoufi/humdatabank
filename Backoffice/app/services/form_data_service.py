@@ -25,7 +25,7 @@ from app.models import (
 from contextlib import suppress
 from app.services.monitoring.debug import (
     debug_manager, performance_monitor, debug_request_info,
-    debug_database_query, log_user_action, format_error_context
+    debug_database_query, log_user_action
 )
 from app.services.form_processing_service import (
     FormItemProcessor,
@@ -354,16 +354,13 @@ class FormDataService:
         except Exception as e:
             cls._rollback_transaction("form_submission_error")
 
-            # Enhanced error logging with context
-            error_context = {
-                'action': action,
-                'sections_count': len(all_sections),
-                'assignment_id': assignment_entity_status.id,
-                'user_id': current_user.id if current_user.is_authenticated else None
-            }
-
-            error_msg = format_error_context(e, error_context)
-            logger.error(f"Form submission error: {error_msg}")
+            current_app.logger.exception(
+                "Form submission failed for assignment %s (action=%s, sections=%s, user_id=%s)",
+                assignment_entity_status.id,
+                action,
+                len(all_sections),
+                current_user.id if current_user.is_authenticated else None,
+            )
 
             # Log user action for audit
             log_user_action(
@@ -375,7 +372,8 @@ class FormDataService:
             error_result = {
                 'success': False,
                 'field_changes': field_changes_tracker,
-                'validation_errors': [f"An error occurred while processing the form. Please try again."]
+                'validation_errors': [f"An error occurred while processing the form. Please try again."],
+                'internal_error': True,
             }
             return error_result
 

@@ -967,6 +967,8 @@ function initializeItemManagement() {
             if (matrixBtn) {
                 e.preventDefault();
                 const dataset = matrixBtn.dataset;
+                const rootConfig = dataset.config ? JSON.parse(dataset.config) : {};
+                const matrixConfig = dataset.matrixConfig ? JSON.parse(dataset.matrixConfig) : { type: 'matrix', rows: [], columns: [] };
                 const itemData = {
                     id: dataset.matrixItemId,
                     label: dataset.matrixItemLabel,
@@ -980,7 +982,10 @@ function initializeItemManagement() {
                     privacy: dataset.privacy,
                     label_translations: JSON.parse(dataset.labelTranslations || '{}'),
                     description_translations: JSON.parse(dataset.descriptionTranslations || '{}'),
-                    config: dataset.matrixConfig ? JSON.parse(dataset.matrixConfig) : { type: 'matrix', rows: [], columns: [] }
+                    config: {
+                        ...rootConfig,
+                        matrix_config: matrixConfig,
+                    }
                 };
                 ItemModal.showEditModal(dataset.matrixItemId, 'matrix', itemData);
             }

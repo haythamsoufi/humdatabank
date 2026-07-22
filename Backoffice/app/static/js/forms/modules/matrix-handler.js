@@ -38,6 +38,49 @@ function __formatNumberForDisplay(value) {
     }
 }
 
+function __parseCarryForwardRef(container) {
+    const raw = container?.getAttribute?.('data-carry-forward-ref');
+    if (!raw) return null;
+    try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function __normalizeMatrixCellValue(value) {
+    if (value === null || value === undefined || value === '') return '';
+    if (typeof value === 'object') {
+        if (value.modified !== undefined && value.modified !== null && value.modified !== '') {
+            return __normalizeMatrixCellValue(value.modified);
+        }
+        if (value.original !== undefined && value.original !== null && value.original !== '') {
+            return __normalizeMatrixCellValue(value.original);
+        }
+        return '';
+    }
+    if (typeof value === 'boolean') return value ? '1' : '0';
+    const str = String(value).trim();
+    if (str === 'true') return '1';
+    if (str === 'false') return '0';
+    return str;
+}
+
+function __matrixCellValuesMatch(currentValue, referenceValue) {
+    return __normalizeMatrixCellValue(currentValue) === __normalizeMatrixCellValue(referenceValue);
+}
+
+function __inputValueForMatrixCompare(input) {
+    if (!input) return '';
+    if (input.type === 'checkbox') {
+        return input.checked ? '1' : '0';
+    }
+    return (typeof window.__numericUnformat === 'function')
+        ? window.__numericUnformat(String(input.value || ''))
+        : String(input.value || '').trim().replace(/,/g, '');
+}
+
 /** Coerce a stored cell value to a number for totals (handles variable column { original, modified } objects). */
 function __cellValueToNumber(value) {
     if (value == null || value === '') return 0;
@@ -661,6 +704,7 @@ class MatrixHandler {
             const existingData = this.parseExistingData(container);
 
             const matrixInfo = { container, config: matrixConfig, data: existingData };
+            matrixInfo.carryForwardRef = __parseCarryForwardRef(container);
             this.matrices.set(fieldId, matrixInfo);
             return matrixInfo;
         } catch (e) {
@@ -972,7 +1016,8 @@ class MatrixHandler {
                 container,
                 config: matrixConfig,
                 data: existingData,
-                hiddenField: hiddenField
+                hiddenField: hiddenField,
+                carryForwardRef: __parseCarryForwardRef(container),
             });
 
             // For advanced mode matrices, restore dynamic rows from saved data
@@ -989,6 +1034,7 @@ class MatrixHandler {
                             setTimeout(() => {
                                 this.autoLoadEntities(fieldId).then(() => {
                                     this.applyManualRowHighlighting(fieldId);
+                                    this.applyPrefilledCellHighlighting(fieldId);
                                     resolve();
                                 }).catch((err) => {
                                     debugError('matrix-handler', 'autoLoadEntities failed', err);
@@ -1005,15 +1051,20 @@ class MatrixHandler {
                 // Resolve variable columns on load (read-only/closed forms need this too)
                 if (this._matrixHasVariableColumns(matrixConfig)) {
                     matrixPromises.push(
-                        Promise.resolve().then(() => this.resolveVariablesForAllRows(fieldId))
+                        Promise.resolve()
+                            .then(() => this.resolveVariablesForAllRows(fieldId))
+                            .then(() => this.applyPrefilledCellHighlighting(fieldId))
                     );
+                } else {
+                    this.applyPrefilledCellHighlighting(fieldId);
                 }
             }
 
-            // Apply highlighting for non-list_library or when auto-load is not enabled
-            if (matrixConfig.row_mode !== 'list_library' || !__configFlag(matrixConfig.auto_load_entities, false)) {
+            // Apply highlighting for static matrices only; list_library restores in restoreDynamicRows
+            if (matrixConfig.row_mode !== 'list_library') {
                 setTimeout(() => {
                     this.applyManualRowHighlighting(fieldId);
+                    this.applyPrefilledCellHighlighting(fieldId);
                 }, 50);
             }
 
@@ -1127,6 +1178,7 @@ class MatrixHandler {
                 // Double-check matrix still exists before calculating
                 if (this.matrices.has(fieldId) && this.matrices.get(fieldId).container.isConnected) {
                     this.calculateMatrixTotals(fieldId);
+                    this.applyPrefilledCellHighlighting(fieldId);
                 }
             });
         }, this.DEBOUNCE_DELAY));
@@ -4555,6 +4607,7 @@ class MatrixHandler {
 
         // Recalculate totals after restoring values
         this.calculateMatrixTotals(fieldId);
+        this.applyPrefilledCellHighlighting(fieldId);
     }
 
     /**
@@ -4670,6 +4723,8 @@ class MatrixHandler {
 
                 // Check for and highlight duplicates
                 this.applyDuplicateEntityHighlighting(fieldId);
+
+                this.applyPrefilledCellHighlighting(fieldId);
 
                 // Update legend visibility after restoration
                 this.updateLegendVisibility(fieldId);
@@ -5649,6 +5704,116 @@ class MatrixHandler {
     }
 
     /**
+     * Highlight individual matrix cells that contain prefilled/carry-forward values.
+     */
+    applyPrefilledCellHighlighting(fieldId) {
+        const matrix = this.matrices.get(fieldId);
+        if (!matrix || !matrix.container) {
+            return;
+        }
+
+        const container = matrix.container;
+        if (container.getAttribute('data-highlight-prefilled-cells') !== 'true') {
+            return;
+        }
+
+        const carryForwardRef = matrix.carryForwardRef || __parseCarryForwardRef(container);
+        matrix.carryForwardRef = carryForwardRef;
+        const hasCarryForwardRef = carryForwardRef && Object.keys(carryForwardRef).length > 0;
+
+        const prefilledTitle = container.getAttribute('data-prefilled-cell-title')
+            || 'This is a prefilled value';
+
+        const inputs = container.querySelectorAll('input[data-cell-key]');
+        if (inputs.length === 0) {
+            this.updateLegendVisibility(fieldId);
+            return;
+        }
+
+        const clearPrefilledHighlight = (input) => {
+            const cell = input.closest('td');
+            if (input.type === 'checkbox') {
+                input.classList.remove('ring-2', 'ring-yellow-300');
+                if (cell) cell.classList.remove('bg-yellow-100');
+            } else {
+                input.classList.remove('bg-yellow-100', 'border', 'border-yellow-300', 'rounded-sm');
+                if (cell) cell.classList.remove('bg-yellow-100');
+                if (!input.classList.contains('border-0')) {
+                    input.classList.add('border-0');
+                }
+            }
+            input.removeAttribute('title');
+        };
+
+        const applyPrefilledHighlight = (input) => {
+            const cell = input.closest('td');
+            if (input.type === 'checkbox') {
+                input.classList.add('ring-2', 'ring-yellow-300');
+                if (cell) cell.classList.add('bg-yellow-100');
+            } else {
+                input.classList.remove('bg-transparent', 'border-0');
+                input.classList.add('bg-yellow-100', 'border', 'border-yellow-300', 'rounded-sm');
+                if (cell) cell.classList.add('bg-yellow-100');
+            }
+            if (!input.disabled && !input.hasAttribute('readonly')) {
+                input.setAttribute('title', prefilledTitle);
+            }
+        };
+
+        inputs.forEach((input) => {
+            if (input.getAttribute('data-variable-readonly') === 'true') {
+                return;
+            }
+
+            const cellKey = input.getAttribute('data-cell-key');
+            if (hasCarryForwardRef) {
+                if (!cellKey || !Object.prototype.hasOwnProperty.call(carryForwardRef, cellKey)) {
+                    clearPrefilledHighlight(input);
+                    return;
+                }
+                const currentValue = __inputValueForMatrixCompare(input);
+                if (!__matrixCellValuesMatch(currentValue, carryForwardRef[cellKey])) {
+                    clearPrefilledHighlight(input);
+                    return;
+                }
+                applyPrefilledHighlight(input);
+                return;
+            }
+
+            let hasValue = false;
+            if (input.type === 'checkbox') {
+                hasValue = input.checked;
+            } else {
+                hasValue = String(input.value || '').trim() !== '';
+            }
+
+            if (!hasValue) {
+                clearPrefilledHighlight(input);
+                return;
+            }
+
+            applyPrefilledHighlight(input);
+        });
+
+        this.updateLegendVisibility(fieldId);
+    }
+
+    _matrixHasPrefilledCellHighlights(container) {
+        if (!container) return false;
+        return Array.from(container.querySelectorAll('input[data-cell-key]')).some((input) => {
+            if (input.getAttribute('data-variable-readonly') === 'true') {
+                return false;
+            }
+            const cell = input.closest('td');
+            return Boolean(
+                cell?.classList.contains('bg-yellow-100')
+                || input.classList.contains('bg-yellow-100')
+                || input.classList.contains('ring-yellow-300')
+            );
+        });
+    }
+
+    /**
      * Apply beige highlighting to manually added row headers based on config
      */
     applyManualRowHighlighting(fieldId) {
@@ -5710,34 +5875,19 @@ class MatrixHandler {
 
         const autoLoadEnabled = __configFlag(matrix.config.auto_load_entities, false);
         const highlightManualRows = __configFlag(matrix.config.highlight_manual_rows, autoLoadEnabled);
-        if (!highlightManualRows) {
-            // Hide legend if highlighting is disabled
-            const legend = matrix.container.querySelector('.matrix-legend');
-            if (legend) {
-                legend.style.display = 'none';
-            }
-            return;
-        }
-
-        // Check if legend should be hidden
         const legendHide = __configFlag(matrix.config.legend_hide, false);
-        if (legendHide) {
-            // Hide legend if configured to be hidden
-            const legend = matrix.container.querySelector('.matrix-legend');
-            if (legend) {
-                legend.style.display = 'none';
-            }
-            return;
-        }
 
-        // Check if there are any highlighted rows (manual or duplicate)
         const highlightedRows = matrix.container.querySelectorAll('tr.matrix-data-row td.matrix-manual-row-header');
         const duplicateRows = matrix.container.querySelectorAll('tr.matrix-data-row td.matrix-duplicate-row-header');
         const hasHighlightedRows = highlightedRows.length > 0;
         const hasDuplicateRows = duplicateRows.length > 0;
+        const hasPrefilledCells = this._matrixHasPrefilledCellHighlights(matrix.container);
+        const prefilledLegendEnabled = matrix.container.getAttribute('data-highlight-prefilled-cells') === 'true';
 
-        // Show legend if there are any highlights or duplicates
-        const shouldShowLegend = hasHighlightedRows || hasDuplicateRows;
+        const shouldShowManualLegend = highlightManualRows && !legendHide && hasHighlightedRows;
+        const shouldShowDuplicateLegend = highlightManualRows && !legendHide && hasDuplicateRows;
+        const shouldShowPrefilledLegend = prefilledLegendEnabled && hasPrefilledCells;
+        const shouldShowLegend = shouldShowManualLegend || shouldShowDuplicateLegend || shouldShowPrefilledLegend;
 
         // Get or create legend element
         let legend = matrix.container.querySelector('.matrix-legend');
@@ -5746,38 +5896,50 @@ class MatrixHandler {
             legend.className = 'matrix-legend mb-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs';
             legend.style.display = 'none';
 
-            // Insert legend before the table
             const table = matrix.container.querySelector('table');
             if (table) {
                 table.parentNode.insertBefore(legend, table);
             } else {
-                // If no table yet, append to container
                 matrix.container.insertBefore(legend, matrix.container.firstChild);
             }
         }
 
-        // Clear existing legend content
         legend.replaceChildren();
 
-        // Create legend items container
         const legendItemsContainer = document.createElement('div');
         legendItemsContainer.className = 'flex flex-col gap-2';
 
-        // Add beige legend item if there are manually added rows
-        if (hasHighlightedRows) {
+        if (shouldShowPrefilledLegend) {
+            const legendItem = document.createElement('div');
+            legendItem.className = 'flex items-center space-x-2';
+
+            const legendColor = document.createElement('div');
+            legendColor.className = 'w-4 h-4 border border-yellow-300 rounded bg-yellow-100';
+            legendColor.setAttribute('aria-label', 'Yellow highlight color for prefilled values');
+
+            const legendTextSpan = document.createElement('span');
+            legendTextSpan.className = 'text-gray-700 matrix-legend-text';
+            legendTextSpan.textContent = matrix.container.getAttribute('data-prefilled-legend-text')
+                || 'Prefilled value';
+
+            legendItem.appendChild(legendColor);
+            legendItem.appendChild(legendTextSpan);
+            legendItemsContainer.appendChild(legendItem);
+        }
+
+        if (shouldShowManualLegend) {
             const legendItem = document.createElement('div');
             legendItem.className = 'flex items-center space-x-2';
 
             const legendColor = document.createElement('div');
             legendColor.className = 'w-4 h-4 border border-gray-300 rounded';
-            legendColor.style.backgroundColor = '#f5f5dc'; // Beige color
+            legendColor.style.backgroundColor = '#f5f5dc';
             legendColor.setAttribute('aria-label', 'Beige highlight color');
 
             const legendTextSpan = document.createElement('span');
             legendTextSpan.className = 'text-gray-700 matrix-legend-text';
             let legendText = matrix.config.legend_text || 'Manually added row';
 
-            // Try to get translated version if translations exist
             if (matrix.config.legend_text_translations) {
                 const currentLanguage = this.getCurrentLanguage();
                 if (currentLanguage && matrix.config.legend_text_translations[currentLanguage]) {
@@ -5791,14 +5953,13 @@ class MatrixHandler {
             legendItemsContainer.appendChild(legendItem);
         }
 
-        // Add red legend item if there are duplicate entities
-        if (hasDuplicateRows) {
+        if (shouldShowDuplicateLegend) {
             const legendItem = document.createElement('div');
             legendItem.className = 'flex items-center space-x-2';
 
             const legendColor = document.createElement('div');
             legendColor.className = 'w-4 h-4 border border-gray-300 rounded';
-            legendColor.style.backgroundColor = '#ffcccc'; // Light red color
+            legendColor.style.backgroundColor = '#ffcccc';
             legendColor.setAttribute('aria-label', 'Red highlight color for duplicates');
 
             const legendTextSpan = document.createElement('span');
@@ -5811,17 +5972,12 @@ class MatrixHandler {
         }
 
         legend.appendChild(legendItemsContainer);
-
-        // Show or hide legend based on whether there are highlighted rows or duplicates
-        if (shouldShowLegend) {
-            legend.style.display = 'block';
-        } else {
-            legend.style.display = 'none';
-        }
+        legend.style.display = shouldShowLegend ? 'block' : 'none';
 
         debugLog('matrix-handler', `Updated legend visibility for matrix ${fieldId}: ${shouldShowLegend ? 'shown' : 'hidden'}`, {
             hasHighlightedRows,
-            hasDuplicateRows
+            hasDuplicateRows,
+            hasPrefilledCells,
         });
     }
 

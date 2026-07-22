@@ -4,6 +4,7 @@ import { ImageItem } from '../items/image.js';
 import { QuestionItem } from '../items/question.js';
 import { IndicatorItem } from '../items/indicator.js';
 import { DocumentItem } from '../items/document.js';
+import { populateCarryForwardFields } from './carry-forward.js';
 
 function parseBool(val) {
     return val === true || val === 'true' || val === 1 || val === '1';
@@ -365,6 +366,8 @@ export const FormPopulationMixin = {
         if (allowOver100Checkbox) {
             allowOver100Checkbox.checked = allowOver100;
         }
+
+        populateCarryForwardFields(this.modalElement, itemData);
 
         const sectionIdInput = this.modalElement.querySelector('#item-modal-section-id');
         const itemIdInput = this.modalElement.querySelector('#item-modal-id');

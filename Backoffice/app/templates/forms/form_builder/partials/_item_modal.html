@@ -1107,6 +1107,30 @@
                                 <p class="mt-1 ml-6 text-xs text-gray-500">{{ _('In repeat sections, shows the dropdown in the entry header instead of as a separate field.') }}</p>
                             </div>
 
+                            {# Carry-forward from previous reporting round — all data-entry item types #}
+                            <div id="item-carry-forward-row" class="item-properties-cell col-span-2">
+                                <label class="inline-flex items-center gap-2 text-gray-700 text-sm">
+                                    <input type="checkbox" id="item-carry-forward" name="carry_forward" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+                                    <span>{{ _('Carry forward from previous round') }}</span>
+                                </label>
+                                <p class="mt-1 text-xs text-gray-500">{{ _('When empty in a new reporting round, prefill this field from a configured prior data source for the same entity.') }}</p>
+                                <div id="item-carry-forward-sources-wrapper" class="hidden mt-3 space-y-2">
+                                    <div class="flex flex-col gap-1">
+                                        <label for="item-carry-forward-priority" class="text-xs font-medium text-gray-700">{{ _('Resolution priority') }}</label>
+                                        <select id="item-carry-forward-priority" name="carry_forward_priority" class="max-w-md py-1.5 shadow-sm focus:ring-orange-500 focus:border-orange-500 sm:text-sm border-gray-300 rounded-md">
+                                            <option value="source">{{ _('By source order (first source with data wins)') }}</option>
+                                            <option value="assignment">{{ _('By assignment date (most recent submission wins)') }}</option>
+                                        </select>
+                                    </div>
+                                    <p id="item-carry-forward-priority-help" class="text-xs text-gray-500">{{ _('Data sources:') }}</p>
+                                    <div id="item-carry-forward-sources-list" class="space-y-2"></div>
+                                    <button type="button" id="item-carry-forward-add-source" class="text-xs text-orange-600 hover:underline">
+                                        + {{ _('Add data source') }}
+                                    </button>
+                                    <input type="hidden" id="item-carry-forward-sources-json" name="carry_forward_sources" value="[]">
+                                </div>
+                            </div>
+
                             {# Plugin options will be dynamically added here by the item modal #}
                         </div>
 

@@ -234,9 +234,25 @@
         {% set all_keys_string = existing_data.keys() | join(',') %}
         {% set has_prefilled_values = '_is_prefilled' in all_keys_string %}
         {% set has_imputed_values = '_is_imputed' in all_keys_string %}
+        {% set has_carry_forward = '_is_carry_forward' in all_keys_string %}
 
-        {# Show prefilled values notice if any exist #}
-        {% if has_prefilled_values %}
+        {# Show carry-forward notice when values were loaded from a prior reporting round #}
+        {% if has_carry_forward %}
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 mb-6" role="alert">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-history text-yellow-600 mt-1"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="font-medium">{{ _('Carry-forward data') }}</p>
+                        <p class="text-sm mt-1">{{ _('Some fields show data carried forward from a configured prior data source (highlighted in yellow). Please review and update any figures that have changed before saving.') }}</p>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        {# Show prefilled values notice if any exist (excluding carry-forward-only banner above) #}
+        {% if has_prefilled_values and not has_carry_forward %}
             <div class="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 mb-6" role="alert">
                 <div class="flex items-start">
                     <div class="flex-shrink-0">
@@ -3902,12 +3918,12 @@
 
             function getTooltipAnchor(target) {
                 if (!target) return null;
-                // Case 1: classic prefilled styling
+                // Readonly/disabled prefilled fields only — not editable carry-forward matrices.
                 var prefilledEl = target.closest('.bg-yellow-100, .bg-yellow-50, [data-prefilled]');
-                if (prefilledEl && (prefilledEl.disabled || prefilledEl.hasAttribute('readonly') || prefilledEl.closest('[data-prefilled]'))) {
+                if (prefilledEl && (prefilledEl.disabled || prefilledEl.hasAttribute('readonly'))) {
                     return prefilledEl;
                 }
-                // Case 2: matrix variable readonly (grey) cells
+                // Matrix variable readonly (grey) cells
                 var readonlyVarInput = target.closest('input[data-variable-readonly="true"]');
                 if (readonlyVarInput) {
                     return readonlyVarInput;

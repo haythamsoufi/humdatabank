@@ -21,8 +21,9 @@ export const PropertiesMixin = {
         const requiredRow = this.modalElement.querySelector('#item-required')?.closest('.item-properties-cell');
         const dnaRow = this.modalElement.querySelector('#item-allow-data-not-available')?.closest('.item-properties-cell');
         const naRow = this.modalElement.querySelector('#item-allow-not-applicable')?.closest('.item-properties-cell');
+        const carryForwardRow = this.modalElement.querySelector('#item-carry-forward-row');
 
-        [privacyField, requiredRow, dnaRow, naRow].forEach((el) => {
+        [privacyField, requiredRow, dnaRow, naRow, carryForwardRow].forEach((el) => {
             if (!el) return;
             el.style.display = hide ? 'none' : '';
         });
@@ -31,8 +32,9 @@ export const PropertiesMixin = {
         const dnaCheckbox = this.modalElement.querySelector('#item-allow-data-not-available');
         const naCheckbox = this.modalElement.querySelector('#item-allow-not-applicable');
         const privacySelect = this.modalElement.querySelector('#item-privacy-select');
+        const carryForwardCheckbox = this.modalElement.querySelector('#item-carry-forward');
 
-        [requiredCheckbox, dnaCheckbox, naCheckbox].forEach((el) => {
+        [requiredCheckbox, dnaCheckbox, naCheckbox, carryForwardCheckbox].forEach((el) => {
             if (!el) return;
             if (hide) {
                 el.checked = false;

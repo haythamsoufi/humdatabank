@@ -16,6 +16,10 @@ import { FormSubmitMixin } from './form-submit.js';
 import { ItemTypeUIMixin } from './item-type-ui.js';
 import { FormPopulationMixin } from './form-population.js';
 import { ValidationMixin } from './validation.js';
+import {
+    resetCarryForwardState,
+    setupCarryForwardListeners,
+} from './carry-forward.js';
 
 export const ItemModal = {
     currentMode: 'add', // 'add' or 'edit'
@@ -154,6 +158,8 @@ export const ItemModal = {
         this.setupVariableAutocomplete();
         this.setupSectionSelector();
         this.cacheRuleToggleDefaults();
+        this.modalElement = this.modalElement || Utils.getElementById('item-modal');
+        setupCarryForwardListeners(this.modalElement);
     },
 
     showAddModal: function(sectionId, sectionName, itemType = 'indicator', optionalInitialQuestionType = null) {
@@ -325,6 +331,7 @@ export const ItemModal = {
         if (this.formElement) {
             this.formElement.reset();
         }
+        try { resetCarryForwardState(this.modalElement); } catch (_e) {}
         try { QuestionItem.resetOptionsState(this.modalElement); } catch (_e) {}
     },
 

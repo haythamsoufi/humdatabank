@@ -546,7 +546,7 @@ def seed_rbac_permissions_and_roles(*, use_advisory_lock: bool = True) -> Dict[s
                         FROM pg_index i
                         JOIN pg_attribute a
                           ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
-                        WHERE i.indrelid = :table_name::regclass
+                        WHERE i.indrelid = CAST(:table_name AS regclass)
                           AND i.indisunique
                           AND i.indnatts = 1
                           AND a.attname = :col_name

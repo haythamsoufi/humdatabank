@@ -3,6 +3,7 @@ import { MatrixItem } from '../items/matrix.js';
 import { ImageItem } from '../items/image.js';
 import { DocumentItem } from '../items/document.js';
 import { PluginItem } from '../items/plugin.js';
+import { serializeCarryForwardSources } from './carry-forward.js';
 
 export const FormSubmitMixin = {
     /**
@@ -49,6 +50,12 @@ export const FormSubmitMixin = {
         this.handleFormValidation(form);
         this.syncUIToShared();
         this.ensureCanonicalSharedFieldNames(form);
+
+        try {
+            if (this.modalElement) {
+                serializeCarryForwardSources(this.modalElement);
+            }
+        } catch (_e) {}
 
         try {
             if (this.modalElement) {

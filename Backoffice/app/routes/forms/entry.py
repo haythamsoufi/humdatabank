@@ -460,6 +460,37 @@ def handle_assignment_form(aes_id):
     )
     _entry_lap("existing_data_load")
 
+    from app.services.carry_forward_service import CarryForwardService
+
+    cf_items = CarryForwardService.iter_carry_forward_items(all_sections)
+    if cf_items:
+        try:
+            cf_results = CarryForwardService.resolve_for_aes(assignment_entity_status, cf_items)
+            for item_id, result in cf_results.items():
+                field_key = f'field_value[{item_id}]'
+                if field_key in existing_data_processed:
+                    continue
+                existing_data_processed[field_key] = (
+                    result['disagg_data'] if result.get('is_matrix') else result.get('value')
+                )
+                existing_data_processed[f'{field_key}_is_prefilled'] = True
+                existing_data_processed[f'{field_key}_is_carry_forward'] = True
+
+            cf_refs = CarryForwardService.resolve_references_for_aes(
+                assignment_entity_status, cf_items
+            )
+            for item_id, result in cf_refs.items():
+                ref_data = (
+                    result['disagg_data'] if result.get('is_matrix') else result.get('value')
+                )
+                if ref_data is None:
+                    continue
+                existing_data_processed[f'field_value[{item_id}]_carry_forward_ref'] = ref_data
+                existing_data_processed[f'field_value[{item_id}]_is_carry_forward'] = True
+        except Exception as e:
+            current_app.logger.warning("Carry-forward resolution failed for AES %s: %s", aes_id, e)
+    _entry_lap("carry_forward")
+
     for section in all_sections:
         for field in getattr(section, 'fields_ordered', []):
             if not field or not hasattr(field, 'id'):
@@ -763,6 +794,8 @@ def handle_assignment_form(aes_id):
                     for error in submission_result['validation_errors']:
                         flash(error, "danger")
                     if is_ajax:
+                        if submission_result.get('internal_error'):
+                            return json_server_error(GENERIC_ERROR_MESSAGE, success=False)
                         msg = '; '.join(submission_result['validation_errors'])
                         return json_bad_request(msg, success=False)
                     else:

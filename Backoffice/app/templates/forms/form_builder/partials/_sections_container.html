@@ -727,6 +727,7 @@
                                             data-current-section-id="{{ item_instance.section_id if item_instance.section_id else (item_data.parent_subsection_id if is_subsection_item else item_s_f.section.id) }}"
                                             data-privacy="{{ item_instance.privacy | default('ifrc_network') }}"
                                             data-matrix-config='{{ (item_instance.config.matrix_config | tojson | e) if item_instance.config and item_instance.config.matrix_config else "{\"type\": \"matrix\", \"rows\": [], \"columns\": []}" }}'
+                                            data-config='{{ (item_instance.config | tojson | e) if item_instance.config else "{}" }}'
                                             data-label-translations='{{ (item_instance.label_translations | tojson | e) if item_instance.label_translations else "{}" }}'
                                             data-description-translations='{{ (item_instance.description_translations | tojson | e) if item_instance.description_translations else "{}" }}'>
                                         <i class="fas fa-pen w-4 h-4"></i>

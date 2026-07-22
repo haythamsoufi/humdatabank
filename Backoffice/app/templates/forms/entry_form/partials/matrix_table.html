@@ -5,6 +5,11 @@
 {% set existing_matrix_data = existing_data.get('field_value[' ~ field.id ~ ']') %}
 {% set matrix_is_prefilled = existing_data.get('field_value[' ~ field.id ~ ']_is_prefilled', false) %}
 {% set matrix_is_imputed = existing_data.get('field_value[' ~ field.id ~ ']_is_imputed', false) %}
+{% set matrix_is_carry_forward = existing_data.get('field_value[' ~ field.id ~ ']_is_carry_forward', false) %}
+{% set matrix_carry_forward_ref = existing_data.get('field_value[' ~ field.id ~ ']_carry_forward_ref') %}
+{% set matrix_has_carry_forward_ref = matrix_carry_forward_ref is mapping and matrix_carry_forward_ref|length > 0 %}
+{% set matrix_highlight_prefilled_cells = (matrix_is_prefilled or matrix_has_carry_forward_ref) and not matrix_is_imputed %}
+{% set _matrix_prefilled_title = _('This is a prefilled value')|forceescape %}
 {% set matrix_config = field.config.matrix_config if field.config and field.config.matrix_config else (field.config if field.config and field.config.get('rows') else {'type': 'matrix', 'rows': [], 'columns': []}) %}
 {% set is_advanced_mode = matrix_config.get('row_mode') == 'list_library' %}
 {# Use resolved matrix rows if available (with variables replaced), otherwise use original rows #}
@@ -31,20 +36,20 @@
     {% set _matrix_label = field.display_label or field.label %}
 {% endif %}
 
-<div class="matrix-container disaggregation-inputs{% if matrix_is_prefilled %} bg-yellow-50 border border-yellow-300 rounded-md p-2{% elif matrix_is_imputed %} bg-blue-50 border border-blue-300 rounded-md p-2{% endif %}"
+<div class="matrix-container disaggregation-inputs{% if matrix_is_imputed %} bg-blue-50 border border-blue-300 rounded-md p-2{% endif %}"
      data-field-id="{{ field.id }}"
      data-matrix-config='{{ matrix_config | tojson }}'
-     {% if matrix_is_prefilled %}data-prefilled="true"{% endif %}
+     {% if matrix_highlight_prefilled_cells %}data-highlight-prefilled-cells="true"{% endif %}
+     {% if matrix_is_carry_forward or matrix_has_carry_forward_ref %}data-carry-forward="true"{% endif %}
+     {% if matrix_has_carry_forward_ref %}data-carry-forward-ref='{{ matrix_carry_forward_ref | tojson }}'{% endif %}
+     {% if matrix_highlight_prefilled_cells %}data-prefilled-cell-title="{{ _matrix_prefilled_title }}"{% endif %}
+     {% if matrix_highlight_prefilled_cells %}data-prefilled-legend-text="{{ _('Prefilled value')|forceescape }}"{% endif %}
      role="group"
      aria-labelledby="field-{{ field.id }}"
      aria-describedby="matrix-error-{{ field.id }}"
      style="position: relative; overflow: visible;">
 
-    {% if matrix_is_prefilled %}
-        <div class="flex items-center justify-end mb-2">
-            <span title="{{ _('This matrix is prefilled')|forceescape }}">{{ status_label_for_data_flag('prefilled') }}</span>
-        </div>
-    {% elif matrix_is_imputed %}
+    {% if matrix_is_imputed %}
         <div class="flex items-center justify-end mb-2">
             <span title="{{ _('This matrix is imputed')|forceescape }}">{{ status_label_for_data_flag('imputed') }}</span>
         </div>
@@ -245,7 +250,15 @@
                                 {# Use row_id as the stable key (rowId_columnName format) #}
                                 {% set cell_key = row_id ~ '_' ~ column_name %}
                                 {% set cell_value = existing_matrix_data.get(cell_key, '') if existing_matrix_data else '' %}
-                                <td class="border border-gray-300 px-2 py-1{% if column_type == 'tick' %} text-center{% endif %}" role="gridcell">
+                                {% set _cell_prefill = namespace(has_value=false) %}
+                                {% if matrix_highlight_prefilled_cells and not matrix_has_carry_forward_ref and not (is_variable and (column.variable_readonly if column.variable_readonly is defined else True)) %}
+                                    {% if cell_value is mapping and (cell_value.get('modified') not in (none, '') or cell_value.get('original') not in (none, '')) %}
+                                        {% set _cell_prefill.has_value = true %}
+                                    {% elif cell_value is not mapping and cell_value not in (none, '') %}
+                                        {% set _cell_prefill.has_value = true %}
+                                    {% endif %}
+                                {% endif %}
+                                <td class="border border-gray-300 px-2 py-1{% if column_type == 'tick' %} text-center{% endif %}{% if _cell_prefill.has_value %} bg-yellow-100{% endif %}" role="gridcell">
                                     {% if is_variable and column_variable %}
                                         {# Variable column - type can be number or tick, will be resolved via JavaScript with row entity context #}
                                         {% set variable_readonly = column.variable_readonly if column.variable_readonly is defined else True %}
@@ -263,8 +276,9 @@
                                                    data-variable-readonly="{{ 'true' if variable_readonly else 'false' }}"
                                                    value="1"
                                                    {% if cell_value == '1' or cell_value == 1 %}checked{% endif %}
-                                                   class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto {% if variable_readonly %}opacity-50{% endif %}"
+                                                   class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto {% if variable_readonly %}opacity-50{% endif %}{% if _cell_prefill.has_value %} ring-2 ring-yellow-300{% endif %}"
                                                    aria-label="{{ _('Variable tick for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
+                                                   {% if _cell_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% endif %}
                                                    {% if variable_readonly %}readonly{% endif %}
                                                    {% if not can_edit %}disabled{% endif %}>
                                         {% else %}
@@ -279,8 +293,9 @@
                                                    data-variable-save-value="{{ 'true' if variable_save_value else 'false' }}"
                                                    data-variable-readonly="{{ 'true' if variable_readonly else 'false' }}"
                                                    value="{{ cell_value }}"
-                                                   class="w-full px-2 py-1 border-0 {% if variable_readonly %}bg-gray-100{% endif %} focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                   class="w-full px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500{% if _cell_prefill.has_value %} bg-yellow-100 border border-yellow-300 rounded-sm{% elif variable_readonly %} border-0 bg-gray-100{% else %} border-0{% endif %}"
                                                    aria-label="{{ _('Variable value for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
+                                                   {% if _cell_prefill.has_value and can_edit and not variable_readonly %}title="{{ _matrix_prefilled_title }}"{% endif %}
                                                    min="0"
                                                    step="0.01"
                                                    {% if variable_readonly %}readonly{% endif %}
@@ -295,8 +310,9 @@
                                                data-column-type="tick"
                                                value="1"
                                                {% if cell_value == '1' or cell_value == 1 %}checked{% endif %}
-                                               class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto"
+                                               class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto{% if _cell_prefill.has_value %} ring-2 ring-yellow-300{% endif %}"
                                                aria-label="{{ _('Tick for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
+                                               {% if _cell_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% endif %}
                                                {% if not can_edit %}disabled{% endif %}>
                                     {% else %}
                                         <input type="number"
@@ -306,8 +322,9 @@
                                                data-cell-key="{{ cell_key }}"
                                                data-column-type="number"
                                                value="{{ cell_value }}"
-                                               class="w-full px-2 py-1 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                               class="w-full px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500{% if _cell_prefill.has_value %} bg-yellow-100 border border-yellow-300 rounded-sm{% else %} border-0{% endif %}"
                                                aria-label="{{ _('Value for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
+                                               {% if _cell_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% endif %}
                                                min="0"
                                                step="0.01"
                                                {% if not can_edit %}disabled{% endif %}>
@@ -319,25 +336,29 @@
                                     {% if row_total_manual %}
                                         {% set total_cell_key = row_id ~ '_Total' %}
                                         {% set total_cell_value = existing_matrix_data.get(total_cell_key, '') if existing_matrix_data else '' %}
-                                        {% set total_display = '' %}
+                                        {% set _total_prefill = namespace(display='', has_value=false) %}
                                         {% if total_cell_value is mapping and (total_cell_value.get('modified') is not none or total_cell_value.get('original') is not none) %}
-                                            {% set total_display = total_cell_value.get('modified') if total_cell_value.get('modified') not in (none, '') else total_cell_value.get('original') %}
+                                            {% set _total_prefill.display = total_cell_value.get('modified') if total_cell_value.get('modified') not in (none, '') else total_cell_value.get('original') %}
                                         {% elif total_cell_value not in (none, '') %}
-                                            {% set total_display = total_cell_value %}
+                                            {% set _total_prefill.display = total_cell_value %}
+                                        {% endif %}
+                                        {% if matrix_highlight_prefilled_cells and not matrix_has_carry_forward_ref and _total_prefill.display not in (none, '') %}
+                                            {% set _total_prefill.has_value = true %}
                                         {% endif %}
                                         <div class="flex items-center w-full gap-1.5 px-1">
                                             <input type="number"
-                                                   class="row-total-input flex-1 min-w-0 px-1 py-1 border-0 bg-transparent focus:outline-none focus:ring-2 focus:ring-orange-500 text-center text-sm font-medium"
+                                                   class="row-total-input flex-1 min-w-0 px-1 py-1 focus:outline-none focus:ring-2 focus:ring-orange-500 text-center text-sm font-medium{% if _total_prefill.has_value %} bg-yellow-100 border border-yellow-300 rounded-sm{% else %} border-0 bg-transparent{% endif %}"
                                                    data-row="{{ row_id }}"
                                                    data-row-id="{{ row_id }}"
                                                    data-column="Total"
                                                    data-cell-key="{{ total_cell_key }}"
                                                    data-is-row-total="true"
                                                    data-row-total-validation="{{ row_total_validation }}"
-                                                   value="{{ total_display }}"
+                                                   value="{{ _total_prefill.display }}"
                                                    min="0"
                                                    step="0.01"
                                                    aria-label="{{ _('Total for row')|forceescape }} {{ row_display }}"
+                                                   {% if _total_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% endif %}
                                                    {% if not can_edit %}disabled{% endif %}>
                                             <span class="row-total-conflict hidden shrink-0 flex items-center justify-center mr-1.5 pointer-events-none"
                                                   aria-hidden="true">

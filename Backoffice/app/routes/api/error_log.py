@@ -14,6 +14,7 @@ SECURITY: This endpoint is public but protected by:
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from typing import Optional
 
@@ -39,6 +40,18 @@ from app.services.monitoring.worker_investigation import (
 from app.extensions import limiter
 
 PLATFORM_ERROR_DIAGNOSTICS_MAX_CONTEXT_BYTES = 12000
+
+# Platform 5xx errors are client-reported and can burst heavily during an
+# incident (many browser tabs/users hitting the same outage simultaneously).
+# Each report already creates a SecurityEvent row; without a cooldown, each
+# one would ALSO trigger a separate admin alert email (RBAC lookup + a
+# background thread blocking on the mail API for up to its timeout). Cap
+# email alerts to at most one per event type per window; the DB record and
+# CRITICAL log line are still written for every report. See the 2026-07-22
+# platform-502 + email-timeout incident.
+PLATFORM_ERROR_ALERT_COOLDOWN_SECONDS = int(
+    os.environ.get('PLATFORM_ERROR_ALERT_COOLDOWN_SECONDS', '600')
+)
 
 
 def _strip_control_chars(value: Optional[str], *, max_len: int) -> Optional[str]:
@@ -244,7 +257,8 @@ def log_platform_error():
                 severity=severity,
                 description=description,
                 context_data=context_data,
-                user_id=None  # resolved from session when the reporter is authenticated
+                user_id=None,  # resolved from session when the reporter is authenticated
+                alert_cooldown_seconds=PLATFORM_ERROR_ALERT_COOLDOWN_SECONDS,
             )
         except Exception as log_error:
             # If database logging fails, still log to application logs

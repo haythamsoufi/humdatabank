@@ -71,10 +71,11 @@ def _format_request_context(
 
 def _append_pool_stats(message: str) -> str:
     with suppress(Exception):
-        from app import db
+        from app.services.monitoring.request_pressure import get_db_pool_stats
 
-        pool = db.engine.pool
-        message += f' | db_pool_out={pool.checkedout()}/{pool.size()}'
+        stats = get_db_pool_stats()
+        if 'error' not in stats:
+            message += f" | db_pool_out={stats['checked_out']}/{stats['size']}"
     return message
 
 

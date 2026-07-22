@@ -375,9 +375,9 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
         'notification.admin_message.message': _notification_msgid('You have received an admin message'),
 
         # Account welcome (title/message from email template metadata when provided)
-        'notification.account_welcome.title': _notification_msgid('Welcome to %(org_name)s!'),
+        'notification.account_welcome.title': _notification_msgid('Welcome to the %(org_name)s!'),
         'notification.account_welcome.message': _notification_msgid(
-            "Welcome to %(org_name)s! Your account has been created. Open your dashboard to get started, "
+            "Welcome to the %(org_name)s! Your account has been created. Open your dashboard to get started, "
             "review assignments, and use Documentation from the main navigation for guides."
         ),
 
@@ -427,7 +427,8 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
 
             # Normalize and validate locale
             if locale_to_use:
-                supported_langs = current_app.config.get('LANGUAGES', [])
+                from config import Config as _Cfg
+                supported_langs = current_app.config.get('SUPPORTED_LANGUAGES', _Cfg.LANGUAGES)
                 # First, check if the locale is already in the supported languages
                 if locale_to_use not in supported_langs:
                     # Try to find a matching language (e.g., 'fr' matches 'fr_FR' or vice versa)
@@ -487,6 +488,14 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
             if params and isinstance(params, dict):
                 # Filter out internal params (prefixed with _)
                 format_params = {k: v for k, v in params.items() if not (isinstance(k, str) and k.startswith('_'))}
+                # Re-resolve org_name fresh for the viewer's locale so locale-specific org names
+                # work correctly and the name isn't stale from notification creation time.
+                if 'org_name' in format_params:
+                    try:
+                        from app.utils.organization_helpers import get_org_name as _get_org_name
+                        format_params['org_name'] = _get_org_name(locale=locale_to_use or 'en')
+                    except Exception:
+                        pass  # keep the stored value as fallback
                 if format_params:
                     try:
                         # Prefer .format() for {name} placeholders (avoids gettext % escaping issues)

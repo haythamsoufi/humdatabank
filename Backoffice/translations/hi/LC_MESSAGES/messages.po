@@ -22592,13 +22592,13 @@ msgstr ""
 
 #: app/services/notification/core.py:372
 #, python-format
-msgid "Welcome to %(org_name)s!"
+msgid "Welcome to the %(org_name)s!"
 msgstr ""
 
 #: app/services/notification/core.py:374
 #, python-format
 msgid ""
-"Welcome to %(org_name)s! Your account has been created. Open your "
+"Welcome to the %(org_name)s! Your account has been created. Open your "
 "dashboard to get started, review assignments, and use Documentation from "
 "the main navigation for guides."
 msgstr ""

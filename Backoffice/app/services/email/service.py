@@ -805,6 +805,93 @@ def send_security_alert(subject=None, event_type=None, severity=None, descriptio
         return False
 
 
+def _build_welcome_email_i18n(locale: str, user_name: str, org_name: str) -> dict:
+    """Return all translated prose strings needed for the welcome email template.
+
+    Strings are resolved under *locale* via Flask-Babel's gettext so that the
+    email body matches the user's stored preferred_language.  Falls back through
+    English and then to plain f-strings so email delivery is never blocked.
+    """
+    from flask_babel import force_locale, gettext as _g
+
+    def _make() -> dict:
+        return {
+            # subject and heading share the same msgid (already translated in all .po files)
+            'subject': _g('Welcome to the %(org_name)s!', org_name=org_name),
+            'heading': _g('Welcome to the %(org_name)s!', org_name=org_name),
+            'greeting': _g('Hello %(user_name)s,', user_name=user_name),
+            'intro': _g(
+                "Welcome to %(org_name)s! We're excited to have you on board.",
+                org_name=org_name,
+            ),
+            # "Getting Started" already translated in all .po files
+            'getting_started_title': _g('Getting Started'),
+            'getting_started_intro': _g(
+                'Your account has been successfully created. To get started:'
+            ),
+            'step_1': _g('Log in and open your dashboard'),
+            'step_2': _g('Review your assignments and reporting tasks'),
+            'step_3': _g(
+                "If you don't yet see the countries you need, request access from your dashboard"
+            ),
+            'dashboard_btn': _g('Go to Dashboard'),
+            'docs_title': _g('Documentation'),
+            'docs_body': _g(
+                'After you sign in, open Documentation from the main navigation.'
+                ' It includes getting-started guides and step-by-step user guides'
+                ' for assignments, data entry, and reporting workflows.'
+            ),
+            'docs_btn': _g('Open documentation'),
+            'help_title': _g('Need Help?'),
+            'help_body': _g(
+                "If you have any questions or need assistance, please don't hesitate"
+                ' to contact your system administrator or support team.'
+            ),
+            'closing': _g('We look forward to working with you!'),
+            'regards': _g('Best regards,'),
+            'team': _g('%(org_name)s Team', org_name=org_name),
+            'footer_note': _g('This is an automated welcome email.'),
+        }
+
+    try:
+        with force_locale(locale):
+            return _make()
+    except Exception:
+        # fall back to English
+        try:
+            with force_locale('en'):
+                return _make()
+        except Exception:
+            return {
+                'subject': f'Welcome to the {org_name}!',
+                'heading': f'Welcome to the {org_name}!',
+                'greeting': f'Hello {user_name},',
+                'intro': f"Welcome to {org_name}! We're excited to have you on board.",
+                'getting_started_title': 'Getting Started',
+                'getting_started_intro': 'Your account has been successfully created. To get started:',
+                'step_1': 'Log in and open your dashboard',
+                'step_2': 'Review your assignments and reporting tasks',
+                'step_3': "If you don't yet see the countries you need, request access from your dashboard",
+                'dashboard_btn': 'Go to Dashboard',
+                'docs_title': 'Documentation',
+                'docs_body': (
+                    'After you sign in, open Documentation from the main navigation.'
+                    ' It includes getting-started guides and step-by-step user guides'
+                    ' for assignments, data entry, and reporting workflows.'
+                ),
+                'docs_btn': 'Open documentation',
+                'help_title': 'Need Help?',
+                'help_body': (
+                    "If you have any questions or need assistance, please don't hesitate"
+                    ' to contact your system administrator or support team.'
+                ),
+                'closing': 'We look forward to working with you!',
+                'regards': 'Best regards,',
+                'team': f'{org_name} Team',
+                'footer_note': 'This is an automated welcome email.',
+            }
+
+
 def _create_welcome_notification(user, org_name: str):
     """Create the in-app welcome notification linked to the welcome email."""
     from app.models.enums import NotificationType
@@ -851,12 +938,24 @@ def send_welcome_email(user, existing_log=None):
         # because they are essential onboarding communications that users need to receive
         # when they first register. Users can disable future emails via their preferences.
 
+        # Determine the user's preferred locale so the email body matches their language.
+        from app.i18n import resolve_supported_language
+        _raw_locale = getattr(user, 'preferred_language', None) or 'en'
+        locale = resolve_supported_language(_raw_locale) or 'en'
+
         base_url = current_app.config.get('BASE_URL', 'http://localhost:5000').rstrip("/")
         dashboard_url = f"{base_url}/"
         notifications_url = f"{base_url}/notifications"
         documentation_url = f"{base_url}/help/docs/"
-        org_name = get_org_name()
+        # Resolve org name in the user's locale (supports locale-specific org names)
+        org_name = get_org_name(locale=locale)
         copyright_year = get_org_copyright_year()
+
+        # Derive display name before i18n so the greeting is personalised
+        user_name = user.name if user.name else user.email.split('@')[0]
+
+        # Build all locale-aware prose strings for the email template
+        t = _build_welcome_email_i18n(locale, user_name, org_name)
 
         # Get email template from database or use default
         default_template = """
@@ -865,7 +964,7 @@ def send_welcome_email(user, existing_log=None):
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Welcome to {{ org_name }}</title>
+            <title>{{ t.heading }}</title>
             <style>
                 body { margin: 0; padding: 0; background: #eef2f7; color: #1f2937;
                   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -895,58 +994,55 @@ def send_welcome_email(user, existing_log=None):
             <div class="email-outer">
                 <div class="email-card">
                     <div class="email-header">
-                        <h1>Welcome to {{ org_name }}!</h1>
+                        <h1>{{ t.heading }}</h1>
                     </div>
                     <div class="email-body">
-                        <p>Hello {{ user_name }},</p>
-                        <p>Welcome to {{ org_name }}! We're excited to have you on board.</p>
+                        <p>{{ t.greeting }}</p>
+                        <p>{{ t.intro }}</p>
                         <div class="section">
-                            <h3>Getting Started</h3>
-                            <p>Your account has been successfully created. To get started:</p>
+                            <h3>{{ t.getting_started_title }}</h3>
+                            <p>{{ t.getting_started_intro }}</p>
                             <ul>
-                                <li>Log in and open your dashboard</li>
-                                <li>Review your assignments and reporting tasks</li>
-                                <li>If you don't yet see the countries you need, request access from your dashboard</li>
+                                <li>{{ t.step_1 }}</li>
+                                <li>{{ t.step_2 }}</li>
+                                <li>{{ t.step_3 }}</li>
                             </ul>
-                            <a href="{{ dashboard_url }}" class="action-button">Go to Dashboard</a>
+                            <a href="{{ dashboard_url }}" class="action-button">{{ t.dashboard_btn }}</a>
                         </div>
                         <div class="section">
-                            <h3>Documentation</h3>
-                            <p>
-                                After you sign in, open <strong>Documentation</strong> from the main navigation.
-                                It includes getting-started guides and step-by-step user guides for assignments,
-                                data entry, and reporting workflows.
-                            </p>
-                            <a href="{{ documentation_url }}" class="action-button">Open documentation</a>
+                            <h3>{{ t.docs_title }}</h3>
+                            <p>{{ t.docs_body }}</p>
+                            <a href="{{ documentation_url }}" class="action-button">{{ t.docs_btn }}</a>
                         </div>
                         <div class="section">
-                            <h3>Need Help?</h3>
-                            <p>If you have any questions or need assistance, please don't hesitate to contact your system administrator or support team.</p>
+                            <h3>{{ t.help_title }}</h3>
+                            <p>{{ t.help_body }}</p>
                         </div>
-                        <p>We look forward to working with you!</p>
-                        <p>Best regards,<br>{{ org_name }} Team</p>
+                        <p>{{ t.closing }}</p>
+                        <p>{{ t.regards }}<br>{{ t.team }}</p>
                     </div>
                     <div class="email-footer">
                         <p>&copy; {{ copyright_year }} {{ org_name }}. All rights reserved.</p>
-                        <p>This is an automated welcome email.</p>
+                        <p>{{ t.footer_note }}</p>
                     </div>
                 </div>
             </div>
         </body>
         </html>
         """
-        # Load template from database with fallback to default
-        html_template = get_email_template('email_template_welcome', default_template)
+        # Load template from database — fetch the per-language version when the admin
+        # has provided one; falls back to English then to the built-in default_template.
+        html_template = get_email_template('email_template_welcome', default_template, language=locale)
 
-        # Prepare context
-        user_name = user.name if user.name else user.email.split('@')[0]
+        # Prepare context — t carries all locale-aware prose for the template
         context = {
             'user_name': user_name,
             'dashboard_url': dashboard_url,
             'notifications_url': notifications_url,
             'documentation_url': documentation_url,
             'org_name': org_name,
-            'copyright_year': copyright_year
+            'copyright_year': copyright_year,
+            't': t,
         }
 
         # Render email content
@@ -959,7 +1055,7 @@ def send_welcome_email(user, existing_log=None):
 
         log = existing_log
         if not log:
-            log = log_email_attempt(notification_id, user.id, user.email, f"Welcome to {org_name}")
+            log = log_email_attempt(notification_id, user.id, user.email, t['subject'])
         elif notification_id and not log.notification_id:
             log.notification_id = notification_id
             db.session.commit()
@@ -967,7 +1063,7 @@ def send_welcome_email(user, existing_log=None):
         # Send email
         try:
             success = send_email(
-                subject=f"Welcome to {org_name}",
+                subject=t['subject'],
                 recipients=[user.email],
                 html=html_content,
                 sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config.get('MAIL_DEFAULT_SENDER'))

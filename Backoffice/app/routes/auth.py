@@ -689,6 +689,15 @@ def azure_callback():
             user.name = display_name
         elif given_name or family_name:
             user.name = f"{(given_name or '').strip()} {(family_name or '').strip()}".strip()
+        # Persist the language the user was browsing in so that session.clear()
+        # (called below to prevent session fixation) does not erase their preference.
+        # This ensures welcome notifications and future emails render in their language.
+        _reg_lang = session.get('language')
+        if _reg_lang:
+            from app.i18n import resolve_supported_language
+            _resolved_lang = resolve_supported_language(_reg_lang)
+            if _resolved_lang:
+                user.preferred_language = _resolved_lang
         db.session.add(user)
         try:
             db.session.flush()

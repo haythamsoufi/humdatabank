@@ -168,6 +168,16 @@ class WebSocketManager:
 
             user_connections[ws] = None
 
+            # Best-effort OS thread id (matches /proc/<pid>/task/<tid> on Linux) so
+            # external diagnostics (check_gunicorn_pressure.py) can tell "this OS
+            # thread is serving a long-lived WebSocket" apart from an idle pool
+            # thread or one stuck elsewhere. Available on Python 3.8+; None is a
+            # safe fallback everywhere else.
+            try:
+                native_id = threading.get_native_id()
+            except Exception:
+                native_id = None
+
             with self._metadata_lock:
                 self._connection_metadata[ws] = {
                     'user_id': user_id,
@@ -175,6 +185,7 @@ class WebSocketManager:
                     'created_at': time.time(),
                     'last_activity': time.time(),
                     'message_count': 0,
+                    'native_id': native_id,
                 }
             self._channel_counts[channel] = self._channel_count_unlocked(channel) + 1
 
@@ -233,11 +244,25 @@ class WebSocketManager:
         """
         Return a diagnostics snapshot of current WebSocket connection pressure on
         this worker process, for use in platform-error diagnostics and health checks.
+
+        Includes per-connection age/idle info and OS thread ids so external
+        diagnostics can (a) tell a genuinely stuck WS connection apart from a
+        normal long-lived one, and (b) attribute a specific OS thread (nlwp entry
+        in /proc) to "serving a WebSocket" rather than counting it as untracked.
         """
+        now = time.time()
         with self._lock:
             total = sum(len(conns) for conns in self._connections.values())
             user_count = len(self._connections)
             by_channel = dict(self._channel_counts)
+        with self._metadata_lock:
+            metas = list(self._connection_metadata.values())
+
+        idle_ages = [now - float(m.get('last_activity', now)) for m in metas]
+        conn_ages = [now - float(m.get('created_at', now)) for m in metas]
+        native_ids = [m['native_id'] for m in metas if m.get('native_id') is not None]
+        stale_after = _env_int('WS_IDLE_STALE_S', 180)
+        idle_stale_count = sum(1 for age in idle_ages if age >= stale_after)
 
         budget = self.max_total_connections
         pct_used = round((total / budget) * 100) if budget else 0
@@ -249,6 +274,11 @@ class WebSocketManager:
             'distinct_users': user_count,
             'by_channel': by_channel,
             'channel_budgets': dict(self.channel_budgets),
+            'oldest_connection_age_s': round(max(conn_ages), 1) if conn_ages else 0,
+            'max_idle_s': round(max(idle_ages), 1) if idle_ages else 0,
+            'idle_stale_count': idle_stale_count,
+            'idle_stale_after_s': stale_after,
+            'native_ids': native_ids,
         }
 
     def update_activity(self, ws) -> None:

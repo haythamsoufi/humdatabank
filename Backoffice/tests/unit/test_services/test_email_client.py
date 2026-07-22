@@ -58,6 +58,15 @@ def email_app_prod(email_app):
     return email_app
 
 
+@pytest.fixture(autouse=True)
+def _reset_email_circuit_breaker():
+    """Circuit-breaker state is process-global; keep tests independent of order/history."""
+    from app.services.email.client import _email_api_circuit_breaker
+    _email_api_circuit_breaker.reset()
+    yield
+    _email_api_circuit_breaker.reset()
+
+
 # ---------------------------------------------------------------------------
 # _b64_utf8
 # ---------------------------------------------------------------------------
@@ -841,3 +850,109 @@ class TestSendViaIfrc:
         bcc_decoded = base64.b64decode(payload["BccAsBase64"]).decode("utf-8")
         assert "a@x.com" in bcc_decoded
         assert "b@x.com" in bcc_decoded
+
+
+# ---------------------------------------------------------------------------
+# Email API circuit breaker (opens after consecutive no-response failures)
+# ---------------------------------------------------------------------------
+
+class TestEmailApiCircuitBreaker:
+    def _mock_success_response(self):
+        resp = MagicMock()
+        resp.status_code = 202
+        resp.text = '"some-guid-1234"'
+        resp.headers = {}
+        resp.content = b'"some-guid-1234"'
+        resp.history = []
+        resp.url = "https://email-api.example.com/send?apiKey=***"
+        return resp
+
+    def _timeout_call(self, email_app):
+        import requests
+        with patch("app.services.email.client.requests.post",
+                   side_effect=requests.exceptions.ReadTimeout("timed out")):
+            with email_app.app_context():
+                failure = []
+                ok = send_email("subj", ["r@x.com"], "<p>hi</p>", _failure_info=failure)
+        return ok, failure
+
+    def test_stays_closed_below_threshold(self, email_app):
+        """Two consecutive timeouts (threshold is 3) should not open the breaker."""
+        import requests
+
+        for _ in range(2):
+            ok, failure = self._timeout_call(email_app)
+            assert ok is False
+            assert failure[-1]["code"] == "email_api_request_error"
+
+        # Third call still attempts the network request (breaker closed) — a
+        # success response should go through and reset the failure counter.
+        resp = self._mock_success_response()
+        with patch("app.services.email.client.requests.post", return_value=resp) as mock_post:
+            with email_app.app_context():
+                ok = send_email("subj", ["r@x.com"], "<p>hi</p>")
+        assert ok is True
+        mock_post.assert_called_once()
+
+    def test_opens_after_consecutive_failures_and_short_circuits(self, email_app):
+        """After failure_threshold consecutive timeouts, further calls skip the network entirely."""
+        for _ in range(3):
+            ok, failure = self._timeout_call(email_app)
+            assert ok is False
+
+        # Breaker should now be open: no network call attempted, fails fast instead.
+        with patch("app.services.email.client.requests.post") as mock_post:
+            with email_app.app_context():
+                failure = []
+                ok = send_email("subj", ["r@x.com"], "<p>hi</p>", _failure_info=failure)
+        assert ok is False
+        assert failure[-1]["code"] == "email_api_circuit_breaker_open"
+        mock_post.assert_not_called()
+
+    def test_success_resets_failure_counter(self, email_app):
+        """A successful send in between failures prevents the breaker from opening."""
+        ok, _ = self._timeout_call(email_app)
+        assert ok is False
+
+        resp = self._mock_success_response()
+        with patch("app.services.email.client.requests.post", return_value=resp):
+            with email_app.app_context():
+                ok = send_email("subj", ["r@x.com"], "<p>hi</p>")
+        assert ok is True
+
+        # Two more consecutive failures (would have opened the breaker if the
+        # success above hadn't reset the counter) still leave it closed.
+        for _ in range(2):
+            ok, _ = self._timeout_call(email_app)
+            assert ok is False
+
+        resp2 = self._mock_success_response()
+        with patch("app.services.email.client.requests.post", return_value=resp2) as mock_post:
+            with email_app.app_context():
+                ok = send_email("subj", ["r@x.com"], "<p>hi</p>")
+        assert ok is True
+        mock_post.assert_called_once()
+
+    def test_half_open_trial_after_open_window_elapses(self, email_app):
+        """After the open window, exactly one trial call is let through."""
+        from app.services.email.client import _email_api_circuit_breaker
+
+        for _ in range(3):
+            ok, _ = self._timeout_call(email_app)
+            assert ok is False
+
+        with patch("app.services.email.client.requests.post") as mock_post:
+            with email_app.app_context():
+                ok = send_email("subj", ["r@x.com"], "<p>hi</p>")
+        assert ok is False
+        mock_post.assert_not_called()
+
+        # Simulate the open window having elapsed.
+        _email_api_circuit_breaker._opened_at -= 1000
+
+        resp = self._mock_success_response()
+        with patch("app.services.email.client.requests.post", return_value=resp) as mock_post:
+            with email_app.app_context():
+                ok = send_email("subj", ["r@x.com"], "<p>hi</p>")
+        assert ok is True
+        mock_post.assert_called_once()

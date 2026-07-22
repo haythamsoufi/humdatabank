@@ -71,6 +71,10 @@ _fs_write_lock = threading.Lock()
 _fs_last_write_mono = 0.0
 _fs_dirty = False
 
+# ── DB pool stats (context-independent once resolved) ─────────────────────────
+
+_cached_db_pool: Any = None
+
 
 def _get_redis() -> Any:
     """Return a shared Redis client, or None if Redis is unconfigured/unavailable."""
@@ -151,6 +155,56 @@ def _fs_worker_path(pid: int) -> Optional[str]:
     return os.path.join(base, f'{pid}.json')
 
 
+def get_db_pool_stats() -> Dict[str, Any]:
+    """Return ``{'size', 'checked_in', 'checked_out', 'overflow'}`` for the app's
+    default SQLAlchemy engine pool, or ``{'error': ...}`` if unavailable.
+
+    Flask-SQLAlchemy's ``db.engine`` needs an *active Flask app context* (it
+    resolves via ``current_app``); calling it with none raises
+    ``RuntimeError: Working outside of application context`` immediately.
+    Most callers here run from before/after_request hooks where that's true,
+    but ``dump_inflight_on_abort`` (below) runs from Gunicorn's ``worker_abort``
+    hook with **no** Flask context at all. Before this cache existed, that made
+    DB-pool numbers silently disappear (the bare ``except Exception`` this used
+    to be wrapped in swallowed the RuntimeError) at exactly the moment they're
+    most useful — explaining *why* a worker got stuck/killed. See
+    ``docs/runbooks/incidents/gateway-504-worker-saturation.md`` ("DB pool 5/5
+    checked out" contributing to a 2026-07-09 worker-saturation incident).
+
+    The ``Pool`` object itself needs no app context once obtained (it's a
+    plain SQLAlchemy object, not a Flask-SQLAlchemy proxy), so we resolve it
+    once via ``db.engine.pool`` — which will succeed the first time this is
+    called from a real request — and reuse that reference afterwards
+    regardless of app context. This app currently uses a single default bind
+    (no ``SQLALCHEMY_BINDS``); if that changes, this would need to report per-
+    bind stats.
+    """
+    global _cached_db_pool
+    try:
+        # Always prefer a *fresh* lookup when an app context is available: the
+        # pool object can legitimately change (e.g. engine recreated/disposed),
+        # and tests patch ``db.engine.pool`` directly, which a stale cached
+        # reference would silently ignore forever.
+        from app import db
+        pool = db.engine.pool
+        _cached_db_pool = pool  # refresh the no-context fallback while we can
+    except Exception:
+        # No app context right now (e.g. the Gunicorn worker_abort hook) - fall
+        # back to the last pool object we successfully resolved, if any.
+        pool = _cached_db_pool
+    if pool is None:
+        return {'error': 'unavailable (no cached engine reference yet)'}
+    try:
+        return {
+            'size': pool.size(),
+            'checked_out': pool.checkedout(),
+            'checked_in': pool.checkedin(),
+            'overflow': pool.overflow(),
+        }
+    except Exception:
+        return {'error': 'unavailable'}
+
+
 def _fs_build_payload(pid: int) -> Dict[str, Any]:
     now = time.time()
     with _lock:
@@ -168,6 +222,7 @@ def _fs_build_payload(pid: int) -> Dict[str, Any]:
             'started_at': started,
             'elapsed_s': round(now - started, 1),
             'pid': entry.get('pid', pid),
+            'native_id': entry.get('native_id'),
         })
     inflight_rows.sort(key=lambda r: -r['elapsed_s'])
 
@@ -176,16 +231,7 @@ def _fs_build_payload(pid: int) -> Dict[str, Any]:
         from app.utils.ws_manager import ws_manager
         ws_pool = ws_manager.snapshot()
 
-    db_pool: Dict[str, Any] = {}
-    with suppress(Exception):
-        from app import db
-        pool = db.engine.pool
-        db_pool = {
-            'size': pool.size(),
-            'checked_out': pool.checkedout(),
-            'checked_in': pool.checkedin(),
-            'overflow': pool.overflow(),
-        }
+    db_pool: Dict[str, Any] = get_db_pool_stats()
 
     return {
         'pid': pid,
@@ -305,6 +351,7 @@ def _fs_get_cross_worker_inflight(
                         'elapsed_s': round(elapsed, 1),
                         'stale': elapsed >= stale_threshold,
                         'pid': entry.get('pid', pid),
+                        'native_id': entry.get('native_id'),
                         'source': 'fs',
                     })
     return results
@@ -346,6 +393,7 @@ def _redis_push_inflight(pid: int, request_id: int, entry: Dict[str, Any]) -> No
             'endpoint': entry.get('endpoint'),
             'started_at': entry.get('started_at'),
             'pid': pid,
+            'native_id': entry.get('native_id'),
         })
         rc.hset(key, request_id, payload)
         rc.expire(key, _REDIS_INFLIGHT_TTL)
@@ -431,6 +479,7 @@ def _redis_get_cross_worker_inflight(
                             'elapsed_s': round(elapsed, 1),
                             'stale': elapsed >= stale_threshold,
                             'pid': pid,
+                            'native_id': entry.get('native_id'),
                         })
     return results
 
@@ -496,9 +545,14 @@ def register_inflight(
     """Register an in-flight request; returns a handle for unregister."""
     request_id = _next_id()
     pid = os.getpid()
+    try:
+        native_id = threading.get_native_id()
+    except Exception:
+        native_id = None
     entry = {
         'id': request_id,
         'pid': pid,
+        'native_id': native_id,
         'method': method,
         'path': path,
         'endpoint': endpoint,
@@ -601,6 +655,7 @@ def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[st
             'elapsed_s': round(elapsed, 1),
             'stale': is_stale,
             'pid': entry.get('pid'),
+            'native_id': entry.get('native_id'),
         })
 
     # Stale / longest-running first so truncation keeps the most useful rows.
@@ -619,19 +674,7 @@ def snapshot_inflight(*, stale_after_seconds: Optional[float] = None) -> Dict[st
     if not recent_aborts:
         recent_aborts = _fs_get_aborted_workers()
 
-    pool_stats: Dict[str, Any] = {}
-    try:
-        from app import db
-
-        pool = db.engine.pool
-        pool_stats = {
-            'size': pool.size(),
-            'checked_out': pool.checkedout(),
-            'checked_in': pool.checkedin(),
-            'overflow': pool.overflow(),
-        }
-    except Exception:
-        pool_stats = {'error': 'unavailable'}
+    pool_stats: Dict[str, Any] = get_db_pool_stats()
 
     thread_count = None
     try:
@@ -790,6 +833,7 @@ def reset_for_tests() -> None:
     """Clear registry state (tests only)."""
     global _next_request_id, _fs_dir_resolved, _fs_mirror_disabled
     global _fs_last_write_mono, _fs_dirty, _redis_available, _redis_client
+    global _cached_db_pool
     with _lock:
         _next_request_id = 0
         _inflight.clear()
@@ -801,3 +845,6 @@ def reset_for_tests() -> None:
     _fs_dirty = False
     _redis_available = None
     _redis_client = None
+    # Different tests spin up different Flask apps (different engines); a pool
+    # object cached from a torn-down app's engine would be stale/wrong.
+    _cached_db_pool = None

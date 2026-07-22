@@ -443,6 +443,88 @@ class TestSendSecurityAlert:
         kwargs = mock_send.call_args[1]
         assert kwargs["timestamp"] == "2026-01-01 12:00:00"
 
+    def test_no_cooldown_by_default_sends_every_time(self, app, db_session):
+        """Backwards compatibility: omitting alert_cooldown_seconds never throttles."""
+        from app.services.security.monitoring import SecurityMonitor
+
+        event = _make_security_event(event_type="uncapped_event", severity="high")
+
+        with app.app_context():
+            with patch.object(
+                SecurityMonitor,
+                "_get_active_system_manager_emails",
+                return_value=["manager@ifrc.org"],
+            ), patch("app.services.email.service.send_security_alert", return_value=True) as mock_send:
+                SecurityMonitor._send_security_alert(event)
+                SecurityMonitor._send_security_alert(event)
+                SecurityMonitor._send_security_alert(event)
+
+        assert mock_send.call_count == 3
+
+    def test_cooldown_suppresses_repeat_alert_emails(self, app, db_session):
+        """Repeated calls within the cooldown window send at most one alert email."""
+        from app.services.security.monitoring import SecurityMonitor
+        from app.services.security import alert_cooldown
+
+        alert_cooldown.reset_for_tests()
+        event = _make_security_event(event_type="cooldown_event", severity="high")
+
+        with app.app_context():
+            with patch.object(
+                SecurityMonitor,
+                "_get_active_system_manager_emails",
+                return_value=["manager@ifrc.org"],
+            ), patch("app.services.email.service.send_security_alert", return_value=True) as mock_send, \
+                 patch("app.services.security.monitoring.current_app.logger") as mock_logger:
+                for _ in range(5):
+                    SecurityMonitor._send_security_alert(event, alert_cooldown_seconds=600)
+
+        mock_send.assert_called_once()
+        # The CRITICAL log line must still fire every time, even when the email
+        # is suppressed, so incident timelines stay complete.
+        assert mock_logger.critical.call_count == 5
+        alert_cooldown.reset_for_tests()
+
+    def test_cooldown_does_not_affect_different_event_types(self, app, db_session):
+        from app.services.security.monitoring import SecurityMonitor
+        from app.services.security import alert_cooldown
+
+        alert_cooldown.reset_for_tests()
+        event_a = _make_security_event(event_type="cooldown_event_a", severity="high")
+        event_b = _make_security_event(event_type="cooldown_event_b", severity="high")
+
+        with app.app_context():
+            with patch.object(
+                SecurityMonitor,
+                "_get_active_system_manager_emails",
+                return_value=["manager@ifrc.org"],
+            ), patch("app.services.email.service.send_security_alert", return_value=True) as mock_send:
+                SecurityMonitor._send_security_alert(event_a, alert_cooldown_seconds=600)
+                SecurityMonitor._send_security_alert(event_b, alert_cooldown_seconds=600)
+
+        assert mock_send.call_count == 2
+        alert_cooldown.reset_for_tests()
+
+    def test_log_security_event_passes_cooldown_through(self, app, db_session):
+        from app.services.security.monitoring import SecurityMonitor
+        from app.services.security import alert_cooldown
+
+        alert_cooldown.reset_for_tests()
+        with app.app_context():
+            with patch("app.services.security.monitoring.has_request_context", return_value=False):
+                with patch.object(SecurityMonitor, "_send_security_alert") as mock_alert:
+                    SecurityMonitor.log_security_event(
+                        event_type="platform_502_bad_gateway",
+                        severity="high",
+                        description="x",
+                        notify_admins=True,
+                        alert_cooldown_seconds=600,
+                    )
+            mock_alert.assert_called_once()
+            _, kwargs = mock_alert.call_args
+            assert kwargs.get("alert_cooldown_seconds") == 600
+        alert_cooldown.reset_for_tests()
+
 
 # ===========================================================================
 # SecurityMonitor.check_suspicious_activity
@@ -845,6 +927,7 @@ class TestConvenienceFunctions:
             {"k": "v"},
             user_id=5,
             notify_admins=False,
+            alert_cooldown_seconds=None,
         )
 
     def test_check_security_thresholds_delegates(self, app, db_session):

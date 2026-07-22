@@ -140,18 +140,21 @@ class SystemMonitor:
             return {'error': 'An error occurred.'}
 
     def get_database_pool_stats(self) -> Dict[str, Any]:
-        """Get database connection pool statistics."""
+        """Get database connection pool statistics.
+
+        Delegates to ``request_pressure.get_db_pool_stats()``, which caches the
+        underlying SQLAlchemy ``Pool`` object after its first successful
+        resolution so pool stats stay available even when called with no active
+        Flask app context (``db.engine`` alone requires one and raises
+        ``RuntimeError`` otherwise).
+        """
         try:
-            from app import db
+            from app.services.monitoring.request_pressure import get_db_pool_stats
 
-            pool = db.engine.pool
-
-            return {
-                'size': pool.size(),
-                'checked_in': pool.checkedin(),
-                'checked_out': pool.checkedout(),
-                'overflow': pool.overflow(),
-            }
+            stats = get_db_pool_stats()
+            if 'error' in stats:
+                return {'error': 'An error occurred.'}
+            return stats
         except Exception as e:
             if self.logger:
                 self.logger.warning(f"Failed to get database pool stats: {e}")

@@ -23346,13 +23346,13 @@ msgstr "مرحبا بك في"
 
 #: app/services/notification/core.py:372
 #, python-format
-msgid "Welcome to %(org_name)s!"
+msgid "Welcome to the %(org_name)s!"
 msgstr "مرحبا بكم في %(org_name)s!"
 
 #: app/services/notification/core.py:374
 #, python-format
 msgid ""
-"Welcome to %(org_name)s! Your account has been created. Open your dashboard "
+"Welcome to the %(org_name)s! Your account has been created. Open your dashboard "
 "to get started, review assignments, and use Documentation from the main "
 "navigation for guides."
 msgstr ""
@@ -24942,3 +24942,66 @@ msgstr "⚠️ انسخ هذا المفتاح الآن - لن يعرض مرة أ
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:1013
 msgid "✓"
 msgstr "✓"
+
+#: app/services/email/service.py
+#, python-format
+msgid "Hello %(user_name)s,"
+msgstr "مرحباً %(user_name)s،"
+
+#: app/services/email/service.py
+#, python-format
+msgid "Welcome to %(org_name)s! We're excited to have you on board."
+msgstr "مرحباً بك في %(org_name)s! يسعدنا انضمامك إلينا."
+
+#: app/services/email/service.py
+msgid "Your account has been successfully created. To get started:"
+msgstr "تم إنشاء حسابك بنجاح. للبدء:"
+
+#: app/services/email/service.py
+msgid "Log in and open your dashboard"
+msgstr "سجّل الدخول وافتح لوحة التحكم"
+
+#: app/services/email/service.py
+msgid "Review your assignments and reporting tasks"
+msgstr "راجع مهامك وتقاريرك"
+
+#: app/services/email/service.py
+msgid "If you don't yet see the countries you need, request access from your dashboard"
+msgstr "إذا لم تتمكن من رؤية الدول التي تحتاجها، اطلب الوصول من لوحة التحكم"
+
+#: app/services/email/service.py
+msgid "Go to Dashboard"
+msgstr "انتقل إلى لوحة التحكم"
+
+#: app/services/email/service.py
+msgid "After you sign in, open Documentation from the main navigation. It includes getting-started guides and step-by-step user guides for assignments, data entry, and reporting workflows."
+msgstr "بعد تسجيل الدخول، افتح قسم التوثيق من القائمة الرئيسية. يتضمن أدلة البدء السريع وأدلة المستخدم خطوة بخطوة للمهام وإدخال البيانات وسير عمل الإبلاغ."
+
+#: app/services/email/service.py
+msgid "Open documentation"
+msgstr "فتح التوثيق"
+
+#: app/services/email/service.py
+msgid "Need Help?"
+msgstr "هل تحتاج مساعدة؟"
+
+#: app/services/email/service.py
+msgid "If you have any questions or need assistance, please don't hesitate to contact your system administrator or support team."
+msgstr "إذا كان لديك أي أسئلة أو تحتاج إلى مساعدة، فلا تتردد في التواصل مع مدير النظام أو فريق الدعم."
+
+#: app/services/email/service.py
+msgid "We look forward to working with you!"
+msgstr "نتطلع إلى العمل معك!"
+
+#: app/services/email/service.py
+msgid "Best regards,"
+msgstr "مع أطيب التحيات،"
+
+#: app/services/email/service.py
+#, python-format
+msgid "%(org_name)s Team"
+msgstr "فريق %(org_name)s"
+
+#: app/services/email/service.py
+msgid "This is an automated welcome email."
+msgstr "هذا بريد إلكتروني ترحيبي تلقائي."

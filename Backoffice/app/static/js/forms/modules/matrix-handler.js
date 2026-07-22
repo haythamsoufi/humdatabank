@@ -187,6 +187,54 @@ function __serializeMatrixData(data) {
     return Object.keys(sanitized).length > 0 ? JSON.stringify(sanitized) : '';
 }
 
+function __getMatrixColumnNames(config) {
+    const columns = config?.columns || [];
+    return columns
+        .map((column) => (typeof column === 'object' ? column.name : column))
+        .filter(Boolean);
+}
+
+/**
+ * Parse a matrix cell key (rowId_columnName) using configured column names.
+ * Column names may contain underscores/spaces, so naive split('_') is unsafe.
+ */
+function __parseMatrixCellKey(cellKey, config) {
+    if (!cellKey || String(cellKey).startsWith('_')) return null;
+
+    const key = String(cellKey);
+    const columnNames = __getMatrixColumnNames(config);
+    if (columnNames.length) {
+        const sortedNames = [...columnNames].sort((a, b) => b.length - a.length);
+        for (const columnName of sortedNames) {
+            const suffix = `_${columnName}`;
+            if (key.endsWith(suffix) && key.length > suffix.length) {
+                return {
+                    rowId: key.slice(0, -suffix.length),
+                    columnName,
+                };
+            }
+        }
+        return null;
+    }
+
+    const lastUnderscore = key.lastIndexOf('_');
+    if (lastUnderscore <= 0) return null;
+    return {
+        rowId: key.slice(0, lastUnderscore),
+        columnName: key.slice(lastUnderscore + 1),
+    };
+}
+
+// A given matrix's row-search dropdown always queries the same lookup list with the
+// same filters/plugin context, so the underlying row set does not change while the
+// entry form page is open. We fetch the full set once per unique config (see
+// _fetchMatrixSearchOptionsCached) and then filter/exclude locally on every dropdown
+// open, keystroke, and row selection instead of re-hitting /forms/matrix/search-rows.
+const MATRIX_SEARCH_OPTIONS_FETCH_LIMIT = 5000;
+// Cap on how many matching rows we render in the dropdown at once (mirrors the
+// server's previous default limit so very large lookup lists don't flood the DOM).
+const MATRIX_SEARCH_OPTIONS_DISPLAY_LIMIT = 500;
+
 class MatrixHandler {
     constructor() {
         this.matrices = new Map();
@@ -202,6 +250,10 @@ class MatrixHandler {
         this.pendingVariableResolution = new Map(); // Track fieldIds with pending variable resolution
         this.variableResolutionDebounceTimers = new Map(); // Debounce timers for batch variable resolution
         this.batchOperationsInProgress = new Set(); // Track fieldIds currently in batch operations (restore/auto-load)
+        // Cache of in-flight/resolved /forms/matrix/search-rows option lists, keyed by
+        // lookup_list_id + display_column + filters + plugin_config + assignment context.
+        // See _fetchMatrixSearchOptionsCached().
+        this.matrixSearchOptionsCache = new Map();
 
         // Initialization diagnostics/state (used by the entry form loader heuristics)
         this.__initState = {
@@ -980,17 +1032,16 @@ class MatrixHandler {
                     return;
                 }
 
-                // Keys are in format: "rowId_columnName" (standardized to ID-only)
-                const lastUnderscore = key.lastIndexOf('_');
-                if (lastUnderscore > 0) {
-                    const columnName = key.substring(lastUnderscore + 1);
-                    const value = data[key] || 0;
+                const parsed = __parseMatrixCellKey(key, config);
+                if (!parsed) return;
 
-                    if (!columnValuesMap.has(columnName)) {
-                        columnValuesMap.set(columnName, []);
-                    }
-                    columnValuesMap.get(columnName).push(value);
+                const { columnName } = parsed;
+                const value = data[key] || 0;
+
+                if (!columnValuesMap.has(columnName)) {
+                    columnValuesMap.set(columnName, []);
                 }
+                columnValuesMap.get(columnName).push(value);
             });
 
             columns.forEach((column, colIndex) => {
@@ -1753,19 +1804,98 @@ class MatrixHandler {
     }
 
     /**
-     * Search list options via API
+     * Build a stable cache key for a matrix search-row lookup configuration.
+     * Same lookup_list_id + display_column + filters + plugin/assignment context
+     * always returns the same underlying rows for the lifetime of the page.
+     */
+    _buildMatrixSearchCacheKey(lookupListId, displayColumn, filters, pluginConfig, assignmentEntityStatusId) {
+        return JSON.stringify({
+            l: lookupListId,
+            d: displayColumn,
+            f: filters || [],
+            p: pluginConfig || null,
+            a: assignmentEntityStatusId || null,
+            lang: this.getCurrentLanguage()
+        });
+    }
+
+    /**
+     * Fetch (once) and cache the full set of matrix search-row options for a given
+     * lookup configuration. Subsequent dropdown opens, keystrokes, and row selections
+     * for the same fieldId/lookup config reuse this cached list and filter/exclude
+     * locally instead of re-hitting /forms/matrix/search-rows every time.
+     */
+    async _fetchMatrixSearchOptionsCached(lookupListId, displayColumn, filters, pluginConfig, assignmentEntityStatusId) {
+        const cacheKey = this._buildMatrixSearchCacheKey(lookupListId, displayColumn, filters, pluginConfig, assignmentEntityStatusId);
+
+        if (this.matrixSearchOptionsCache.has(cacheKey)) {
+            return this.matrixSearchOptionsCache.get(cacheKey);
+        }
+
+        const fetchPromise = (async () => {
+            const csrfToken = this.getCsrfToken();
+            if (!csrfToken) {
+                throw new Error('CSRF_TOKEN_MISSING');
+            }
+
+            const requestBody = {
+                lookup_list_id: lookupListId,
+                display_column: displayColumn,
+                filters: filters || [],
+                search_term: '',
+                existing_rows: [],
+                // Fetch the whole list once; search/exclusion happens client-side from the cache.
+                limit: MATRIX_SEARCH_OPTIONS_FETCH_LIMIT
+            };
+
+            if (assignmentEntityStatusId) {
+                requestBody.assignment_entity_status_id = assignmentEntityStatusId;
+            }
+            if (pluginConfig) {
+                requestBody.plugin_config = pluginConfig;
+            }
+
+            const response = await _mhFetch('/forms/matrix/search-rows', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                throw (window.httpErrorSync && window.httpErrorSync(response)) || new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(data.message || 'Error loading options');
+            }
+
+            return Array.isArray(data.options) ? data.options : [];
+        })();
+
+        // Cache the in-flight promise immediately so concurrent callers (e.g. a
+        // focus event and an input event firing back-to-back) share one request.
+        this.matrixSearchOptionsCache.set(cacheKey, fetchPromise);
+
+        try {
+            return await fetchPromise;
+        } catch (error) {
+            // Don't cache failures — allow retry on the next interaction.
+            this.matrixSearchOptionsCache.delete(cacheKey);
+            throw error;
+        }
+    }
+
+    /**
+     * Search list options via API (cached — see _fetchMatrixSearchOptionsCached)
      */
     async searchListOptions(fieldId, lookupListId, displayColumn, filters, searchTerm) {
         if (!lookupListId || !displayColumn) {
             debugError('matrix-handler', 'Missing required parameters for search', { lookupListId, displayColumn });
             this.showDropdownMessage(fieldId, 'Matrix configuration is incomplete');
-            return;
-        }
-
-        const csrfToken = this.getCsrfToken();
-        if (!csrfToken) {
-            debugError('matrix-handler', 'CSRF token missing for API request');
-            this.showDropdownMessage(fieldId, 'Authentication error. Please refresh the page.');
             return;
         }
 
@@ -1804,47 +1934,31 @@ class MatrixHandler {
 
             const pluginConfig = (matrix && matrix.config && matrix.config.plugin_config) ? matrix.config.plugin_config : null;
 
-            const requestBody = {
-                lookup_list_id: lookupListId,
-                display_column: displayColumn,
-                filters: filters,
-                search_term: searchTerm,
-                existing_rows: this.getExistingRows(fieldId)
-            };
+            // Fetched once per lookup_list_id/display_column/filters/plugin combination
+            // and reused for every keystroke, dropdown open, and row selection below.
+            const allOptions = await this._fetchMatrixSearchOptionsCached(
+                lookupListId, displayColumn, filters, pluginConfig, assignmentEntityStatusId
+            );
 
-            // Include assignment_entity_status_id if available (for country filtering)
-            if (assignmentEntityStatusId) {
-                requestBody.assignment_entity_status_id = assignmentEntityStatusId;
-            }
+            // Apply the same exclusion/search-term rules the server used to apply,
+            // but locally against the cached option list.
+            const existingRows = this.getExistingRows(fieldId);
+            const normalizedSearchTerm = (searchTerm || '').trim().toLowerCase();
 
-            // Include plugin_config if available (for plugin-specific filtering)
-            if (pluginConfig) {
-                requestBody.plugin_config = pluginConfig;
-            }
+            const filteredOptions = allOptions.filter((option) => {
+                const rowValue = String(option?.value ?? '');
+                if (!rowValue || existingRows.includes(rowValue)) return false;
+                if (normalizedSearchTerm && !rowValue.toLowerCase().includes(normalizedSearchTerm)) return false;
+                return true;
+            }).slice(0, MATRIX_SEARCH_OPTIONS_DISPLAY_LIMIT);
 
-            const response = await _mhFetch('/forms/matrix/search-rows', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken
-                },
-                body: JSON.stringify(requestBody)
-            });
-
-            if (!response.ok) {
-                throw (window.httpErrorSync && window.httpErrorSync(response)) || new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            if (data.success) {
-                this.renderSearchResults(fieldId, data.options);
-            } else {
-                const errorMsg = data.message || 'Error loading options';
-                debugError('matrix-handler', 'API returned error:', errorMsg);
-                this.showDropdownMessage(fieldId, errorMsg);
-            }
+            this.renderSearchResults(fieldId, filteredOptions);
         } catch (error) {
+            if (error && error.message === 'CSRF_TOKEN_MISSING') {
+                debugError('matrix-handler', 'CSRF token missing for API request');
+                this.showDropdownMessage(fieldId, 'Authentication error. Please refresh the page.');
+                return;
+            }
             debugError('matrix-handler', 'Error searching list options:', error);
             this.showDropdownMessage(fieldId, 'Error loading options. Please try again.');
         }
@@ -3061,14 +3175,9 @@ class MatrixHandler {
                         return;
                     }
 
-                    // Check if this cell key belongs to the removed row
-                    const parts = cellKey.split('_');
-                    if (parts.length >= 2) {
-                        const cellRowId = parts.slice(0, -1).join('_'); // Rejoin in case row ID contains underscores
-                        // Match by row ID only (standardized)
-                        if (cellRowId === String(rowId)) {
-                            cellKeysToRemove.push(cellKey);
-                        }
+                    const parsed = __parseMatrixCellKey(cellKey, matrix.config);
+                    if (parsed && parsed.rowId === String(rowId)) {
+                        cellKeysToRemove.push(cellKey);
                     }
                 });
 
@@ -3162,31 +3271,30 @@ class MatrixHandler {
                 return;
             }
 
-            const parts = cellKey.split('_');
-            if (parts.length >= 2) {
-                // Rejoin all parts except the last one as the row ID
-                const rowId = parts.slice(0, -1).join('_');
-                const columnName = parts[parts.length - 1];
+            const parsed = __parseMatrixCellKey(cellKey, config);
+            if (!parsed) {
+                return;
+            }
 
-                // Verify this column exists in the configuration
-                const columnExists = config.columns && config.columns.some(column => {
-                    const configColumnName = typeof column === 'object' ? column.name : column;
-                    return configColumnName === columnName;
-                });
+            const { rowId, columnName } = parsed;
 
-                if (columnExists) {
-                    if (!rowInfoMap.has(rowId)) {
-                        // All cell keys are now ID-based (standardized)
-                        rowInfoMap.set(rowId, {
-                            rowId: rowId,
-                            rowName: null, // Will be resolved from lookup list if needed
-                            cellKeys: [],
-                            values: {}
-                        });
-                    }
-                    rowInfoMap.get(rowId).cellKeys.push(cellKey);
-                    rowInfoMap.get(rowId).values[cellKey] = data[cellKey];
+            // Verify this column exists in the configuration
+            const columnExists = config.columns && config.columns.some(column => {
+                const configColumnName = typeof column === 'object' ? column.name : column;
+                return configColumnName === columnName;
+            });
+
+            if (columnExists) {
+                if (!rowInfoMap.has(rowId)) {
+                    rowInfoMap.set(rowId, {
+                        rowId: rowId,
+                        rowName: null, // Will be resolved from lookup list if needed
+                        cellKeys: [],
+                        values: {}
+                    });
                 }
+                rowInfoMap.get(rowId).cellKeys.push(cellKey);
+                rowInfoMap.get(rowId).values[cellKey] = data[cellKey];
             }
         });
 
@@ -3623,22 +3731,18 @@ class MatrixHandler {
         const columns = config.columns || [];
 
         rowInfo.cellKeys.forEach(cellKey => {
-            // Cell keys are already in format: rowId_columnName (standardized)
-            // Verify the cell key matches the row ID
-            const parts = cellKey.split('_');
-            if (parts.length < 2) {
+            const parsed = __parseMatrixCellKey(cellKey, config);
+            if (!parsed) {
                 debugWarn('matrix-handler', `Invalid cell key format: ${cellKey}`);
                 return;
             }
 
-            const cellRowId = parts.slice(0, -1).join('_');
+            const { rowId: cellRowId, columnName } = parsed;
             if (cellRowId !== rowId) {
                 debugWarn('matrix-handler', `Cell key row ID mismatch: expected ${rowId}, got ${cellRowId}`);
                 return;
             }
 
-            // Check if this is a variable column
-            const columnName = parts[parts.length - 1];
             const column = columns.find(col => {
                 const colName = typeof col === 'object' ? col.name : col;
                 return colName === columnName;
@@ -3750,13 +3854,12 @@ class MatrixHandler {
                 return;
             }
 
-            // Parse cell key to get column name
-            const parts = cellKey.split('_');
-            if (parts.length < 2) {
+            const parsed = __parseMatrixCellKey(cellKey, config);
+            if (!parsed) {
                 return;
             }
 
-            const columnName = parts[parts.length - 1];
+            const { columnName } = parsed;
             const column = columns.find(col => {
                 const colName = typeof col === 'object' ? col.name : col;
                 return colName === columnName;

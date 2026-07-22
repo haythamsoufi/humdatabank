@@ -32,7 +32,8 @@ class SecurityMonitor:
     @staticmethod
     def log_security_event(event_type: str, severity: str, description: str,
                           context_data: Optional[Dict] = None, user_id: Optional[int] = None,
-                          notify_admins: bool = True):
+                          notify_admins: bool = True,
+                          alert_cooldown_seconds: Optional[float] = None):
         """
         Log a security event.
 
@@ -43,6 +44,14 @@ class SecurityMonitor:
             context_data: Additional context data
             user_id: Associated user ID
             notify_admins: If True, send email for high/critical (set False to avoid loops when email itself fails)
+            alert_cooldown_seconds: When set, at most one alert email is sent per this many
+                seconds for a given ``event_type`` (shared across Gunicorn workers via Redis
+                when configured, per-process otherwise). The SecurityEvent DB record is still
+                created and CRITICAL-logged every call — only the outbound email (which spawns
+                a background thread and can block up to the mail-API timeout) is throttled.
+                Use this for event types that can occur in rapid bursts during an incident
+                (e.g. platform 5xx reports) to avoid an alert-email flood. Omit/None preserves
+                the previous behaviour of emailing on every high/critical event.
         """
         try:
             client_info = SecurityMonitor._get_client_info()
@@ -72,7 +81,7 @@ class SecurityMonitor:
 
             # Send alert if severity is high or critical
             if notify_admins and severity in ['high', 'critical']:
-                SecurityMonitor._send_security_alert(security_event)
+                SecurityMonitor._send_security_alert(security_event, alert_cooldown_seconds=alert_cooldown_seconds)
 
         except Exception as e:
             current_app.logger.error(f"Failed to log security event: {e}")
@@ -123,14 +132,39 @@ class SecurityMonitor:
         return [m.email for m in managers if m.email]
 
     @staticmethod
-    def _send_security_alert(event: SecurityEvent):
-        """Send security alert for high-severity events."""
+    def _send_security_alert(event: SecurityEvent, alert_cooldown_seconds: Optional[float] = None):
+        """Send security alert for high-severity events.
+
+        Args:
+            event: The SecurityEvent that triggered this alert.
+            alert_cooldown_seconds: When set, the CRITICAL log line below is always
+                emitted, but the admin-email dispatch (RBAC lookup + background thread +
+                outbound mail-API call) is skipped if an alert for this ``event.event_type``
+                was already sent within the last ``alert_cooldown_seconds``. Prevents an
+                email flood — and the RBAC/DB query + background-thread churn that comes
+                with it — when the same event type fires many times in a short burst
+                (e.g. a platform 502/503/504 storm reported by many browser tabs).
+        """
         try:
-            # Log to application log with high priority
+            # Log to application log with high priority — always, even when the
+            # email below is suppressed by cooldown, so incident timelines stay complete.
             current_app.logger.critical(
                 f"SECURITY ALERT: {event.event_type} - {event.severity.upper()} - {event.description} "
                 f"(IP: {event.ip_address}, User: {event.user_id})"
             )
+
+            if alert_cooldown_seconds:
+                from app.services.security.alert_cooldown import should_send_alert
+
+                cooldown_key = f"event_type:{event.event_type}"
+                if not should_send_alert(cooldown_key, alert_cooldown_seconds):
+                    current_app.logger.info(
+                        "Security alert email suppressed by cooldown for event_type=%s "
+                        "(window=%ss) — event above was still logged/recorded.",
+                        event.event_type,
+                        alert_cooldown_seconds,
+                    )
+                    return
 
             manager_emails = SecurityMonitor._get_active_system_manager_emails()
             if not manager_emails:
@@ -402,10 +436,11 @@ security_monitor = SecurityMonitor()
 # Convenience functions
 def log_security_event(event_type: str, severity: str, description: str,
                       context_data: Optional[Dict] = None, user_id: Optional[int] = None,
-                      notify_admins: bool = True):
+                      notify_admins: bool = True, alert_cooldown_seconds: Optional[float] = None):
     """Log a security event."""
     security_monitor.log_security_event(
-        event_type, severity, description, context_data, user_id=user_id, notify_admins=notify_admins
+        event_type, severity, description, context_data, user_id=user_id, notify_admins=notify_admins,
+        alert_cooldown_seconds=alert_cooldown_seconds,
     )
 
 def check_security_thresholds():

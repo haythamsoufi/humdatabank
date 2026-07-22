@@ -337,7 +337,12 @@ class Config:
     # Keep this well below PostgreSQL's max_connections.
     # Azure PostgreSQL Flexible Server max_connections varies by tier
     # (e.g. 50 for B1ms, 100 for B2s, 200 for GP-2vCore).
-    # Default here: 3 workers × (5 + 10) = 45 connections — safe for most tiers.
+    # Default here: 3 workers × (5 + 20) = 75 connections — safe for most tiers.
+    # max_overflow default raised 10 -> 20 (2026-07-22, platform-502-db-pool-alert-storm
+    # incident): matches azure-deploy.ps1's original provisioning intent
+    # (POOL_SIZE=10/MAX_OVERFLOW=20) and gives more per-worker burst headroom before a
+    # single worker's pool saturates. Overflow connections are opened on demand and
+    # closed when idle, so raising the ceiling costs nothing at rest.
     # Override via env vars to tune per environment.
     # pool_timeout < GUNICORN_TIMEOUT (25 s) so waiting for a slot fails fast.
     SQLALCHEMY_ENGINE_OPTIONS = {
@@ -345,7 +350,7 @@ class Config:
         # recycle connections periodically to avoid stale connections on some providers
         "pool_recycle": int(os.environ.get("SQLALCHEMY_POOL_RECYCLE", "300")),
         "pool_size": int(os.environ.get("SQLALCHEMY_POOL_SIZE", "5")),
-        "max_overflow": int(os.environ.get("SQLALCHEMY_MAX_OVERFLOW", "10")),
+        "max_overflow": int(os.environ.get("SQLALCHEMY_MAX_OVERFLOW", "20")),
         # Stop waiting for a pool slot well before Gunicorn's 25 s kill timeout.
         "pool_timeout": int(os.environ.get("SQLALCHEMY_POOL_TIMEOUT", "15")),
         "echo": False,
@@ -1173,7 +1178,16 @@ class ProductionConfig(Config):
 
     # Connection pool — keep totals below PostgreSQL max_connections.
     # total max = GUNICORN_WORKERS × (SQLALCHEMY_POOL_SIZE + SQLALCHEMY_MAX_OVERFLOW)
-    # With 3 workers and defaults below: 3 × (5 + 10) = 45 connections.
+    # With 3 workers and defaults below: 3 × (5 + 20) = 75 connections.
+    # (Prod currently overrides SQLALCHEMY_POOL_SIZE=10 via App Settings, giving
+    # 3 × (10 + 20) = 90 — still well under Azure PostgreSQL Flexible Server's
+    # max_connections=250. See docs/handovers/2026-07-22-platform-502-db-pool-alert-storm-incident.md.)
+    #
+    # max_overflow default raised 10 -> 20 (2026-07-22): matches azure-deploy.ps1's
+    # original provisioning intent (POOL_SIZE=10/MAX_OVERFLOW=20) and gives more
+    # per-worker burst headroom before a single worker's pool saturates. Overflow
+    # connections are opened on demand and closed when idle, so raising the ceiling
+    # costs nothing at rest.
     #
     # connect_timeout:   abort TCP handshake that hangs (e.g. private-endpoint warming up).
     # statement_timeout: kill runaway queries before they exhaust the pool and cause 504s.
@@ -1187,7 +1201,7 @@ class ProductionConfig(Config):
         "pool_pre_ping": True,
         "pool_recycle": int(os.environ.get("SQLALCHEMY_POOL_RECYCLE", "300")),
         "pool_size": int(os.environ.get("SQLALCHEMY_POOL_SIZE", "5")),
-        "max_overflow": int(os.environ.get("SQLALCHEMY_MAX_OVERFLOW", "10")),
+        "max_overflow": int(os.environ.get("SQLALCHEMY_MAX_OVERFLOW", "20")),
         "pool_timeout": int(os.environ.get("SQLALCHEMY_POOL_TIMEOUT", "15")),
         "connect_args": {
             "connect_timeout": int(os.environ.get("DB_CONNECT_TIMEOUT", "10")),

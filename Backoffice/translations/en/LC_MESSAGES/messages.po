@@ -23491,17 +23491,17 @@ msgstr "Welcome to"
 
 #: app/services/notification/core.py:372
 #, python-format
-msgid "Welcome to %(org_name)s!"
-msgstr "Welcome to %(org_name)s!"
+msgid "Welcome to the %(org_name)s!"
+msgstr "Welcome to the %(org_name)s!"
 
 #: app/services/notification/core.py:374
 #, python-format
 msgid ""
-"Welcome to %(org_name)s! Your account has been created. Open your dashboard "
+"Welcome to the %(org_name)s! Your account has been created. Open your dashboard "
 "to get started, review assignments, and use Documentation from the main "
 "navigation for guides."
 msgstr ""
-"Welcome to %(org_name)s! Your account has been created. Open your dashboard "
+"Welcome to the %(org_name)s! Your account has been created. Open your dashboard "
 "to get started, review assignments, and use Documentation from the main "
 "navigation for guides."
 
@@ -25118,3 +25118,66 @@ msgstr "⚠️ Copy this key now - it will not be shown again!"
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:1013
 msgid "✓"
 msgstr "✓"
+
+#: app/services/email/service.py
+#, python-format
+msgid "Hello %(user_name)s,"
+msgstr "Hello %(user_name)s,"
+
+#: app/services/email/service.py
+#, python-format
+msgid "Welcome to %(org_name)s! We're excited to have you on board."
+msgstr "Welcome to %(org_name)s! We're excited to have you on board."
+
+#: app/services/email/service.py
+msgid "Your account has been successfully created. To get started:"
+msgstr "Your account has been successfully created. To get started:"
+
+#: app/services/email/service.py
+msgid "Log in and open your dashboard"
+msgstr "Log in and open your dashboard"
+
+#: app/services/email/service.py
+msgid "Review your assignments and reporting tasks"
+msgstr "Review your assignments and reporting tasks"
+
+#: app/services/email/service.py
+msgid "If you don't yet see the countries you need, request access from your dashboard"
+msgstr "If you don't yet see the countries you need, request access from your dashboard"
+
+#: app/services/email/service.py
+msgid "Go to Dashboard"
+msgstr "Go to Dashboard"
+
+#: app/services/email/service.py
+msgid "After you sign in, open Documentation from the main navigation. It includes getting-started guides and step-by-step user guides for assignments, data entry, and reporting workflows."
+msgstr "After you sign in, open Documentation from the main navigation. It includes getting-started guides and step-by-step user guides for assignments, data entry, and reporting workflows."
+
+#: app/services/email/service.py
+msgid "Open documentation"
+msgstr "Open documentation"
+
+#: app/services/email/service.py
+msgid "Need Help?"
+msgstr "Need Help?"
+
+#: app/services/email/service.py
+msgid "If you have any questions or need assistance, please don't hesitate to contact your system administrator or support team."
+msgstr "If you have any questions or need assistance, please don't hesitate to contact your system administrator or support team."
+
+#: app/services/email/service.py
+msgid "We look forward to working with you!"
+msgstr "We look forward to working with you!"
+
+#: app/services/email/service.py
+msgid "Best regards,"
+msgstr "Best regards,"
+
+#: app/services/email/service.py
+#, python-format
+msgid "%(org_name)s Team"
+msgstr "%(org_name)s Team"
+
+#: app/services/email/service.py
+msgid "This is an automated welcome email."
+msgstr "This is an automated welcome email."

@@ -22502,13 +22502,13 @@ msgstr ""
 
 #: app/services/notification/core.py:372
 #, python-format
-msgid "Welcome to %(org_name)s!"
+msgid "Welcome to the %(org_name)s!"
 msgstr ""
 
 #: app/services/notification/core.py:374
 #, python-format
 msgid ""
-"Welcome to %(org_name)s! Your account has been created. Open your "
+"Welcome to the %(org_name)s! Your account has been created. Open your "
 "dashboard to get started, review assignments, and use Documentation from "
 "the main navigation for guides."
 msgstr ""
@@ -24055,3 +24055,65 @@ msgstr ""
 msgid "✓"
 msgstr ""
 
+#: app/services/email/service.py
+#, python-format
+msgid "Hello %(user_name)s,"
+msgstr ""
+
+#: app/services/email/service.py
+#, python-format
+msgid "Welcome to %(org_name)s! We're excited to have you on board."
+msgstr ""
+
+#: app/services/email/service.py
+msgid "Your account has been successfully created. To get started:"
+msgstr ""
+
+#: app/services/email/service.py
+msgid "Log in and open your dashboard"
+msgstr ""
+
+#: app/services/email/service.py
+msgid "Review your assignments and reporting tasks"
+msgstr ""
+
+#: app/services/email/service.py
+msgid "If you don't yet see the countries you need, request access from your dashboard"
+msgstr ""
+
+#: app/services/email/service.py
+msgid "Go to Dashboard"
+msgstr ""
+
+#: app/services/email/service.py
+msgid "After you sign in, open Documentation from the main navigation. It includes getting-started guides and step-by-step user guides for assignments, data entry, and reporting workflows."
+msgstr ""
+
+#: app/services/email/service.py
+msgid "Open documentation"
+msgstr ""
+
+#: app/services/email/service.py
+msgid "Need Help?"
+msgstr ""
+
+#: app/services/email/service.py
+msgid "If you have any questions or need assistance, please don't hesitate to contact your system administrator or support team."
+msgstr ""
+
+#: app/services/email/service.py
+msgid "We look forward to working with you!"
+msgstr ""
+
+#: app/services/email/service.py
+msgid "Best regards,"
+msgstr ""
+
+#: app/services/email/service.py
+#, python-format
+msgid "%(org_name)s Team"
+msgstr ""
+
+#: app/services/email/service.py
+msgid "This is an automated welcome email."
+msgstr ""

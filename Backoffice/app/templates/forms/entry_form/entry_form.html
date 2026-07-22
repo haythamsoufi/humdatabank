@@ -107,7 +107,7 @@
                                 <span class="mx-2">•</span>
                                 <span class="font-medium mr-1">{{ _('Status:') }}</span>
                                 {% set aes_status = assignment_status.status.value if assignment_status.status is not none and assignment_status.status.value is defined else assignment_status.status %}
-                                {{ assignment_status_pipeline_badge(assignment_status.status, assignment_status.is_closed|default(false), translation_key if translation_key is defined else 'en', assignment_status.entity_status if assignment_status.entity_status is defined else none) }}
+                                {{ assignment_status_pipeline_badge(assignment_status.status, assignment_status.is_closed|default(false), translation_key if translation_key is defined else 'en', assignment_status) }}
                                 {# Completion rate is loaded asynchronously after page init to keep it off the critical render path. #}
                                 {% if assignment_entity_status_id_for_rate is defined and assignment_entity_status_id_for_rate %}
                                 <span class="mx-2">•</span>

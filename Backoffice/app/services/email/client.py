@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import threading
 import time
 import requests
 from requests import Response
@@ -8,6 +9,77 @@ from typing import Iterable, Optional, List, Tuple
 from flask import current_app
 from app.services.email.protection import _is_production_flask_config
 from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+
+# At most one alert email for a repeated 'email_delivery_failure' event within
+# this many seconds (see the recursive-alert note next to its log_security_event call).
+EMAIL_DELIVERY_FAILURE_ALERT_COOLDOWN_SECONDS = int(
+    os.environ.get('EMAIL_DELIVERY_FAILURE_ALERT_COOLDOWN_SECONDS', '600')
+)
+
+
+class _EmailApiCircuitBreaker:
+    """Fail-fast breaker for the outbound IFRC Email API.
+
+    ``requests.post(..., timeout=15)`` blocks its calling thread for up to 15s on
+    every timeout/connection failure. During an IFRC outage, many independent
+    callers (security alerts, notifications, password resets, ...) each pay that
+    full 15s penalty — the 2026-07-22 incident logged a dozen+ overlapping 15s
+    blocks within a few seconds. This breaker opens after ``failure_threshold``
+    *consecutive* no-response failures (timeouts/connection errors — NOT ordinary
+    HTTP error responses, which return quickly and aren't the resource problem)
+    and short-circuits new attempts for ``open_seconds`` so they fail in
+    microseconds instead of 15s. After the open window, exactly one "trial" call
+    is let through (half-open): success closes the breaker, failure re-opens it.
+
+    Deliberately process-local (no Redis): each Gunicorn worker protects its own
+    threads independently, and a bad trial call in one worker shouldn't keep the
+    breaker open fleet-wide once the upstream API actually recovers.
+    """
+
+    def __init__(self, failure_threshold: int = 3, open_seconds: float = 60.0):
+        self._failure_threshold = failure_threshold
+        self._open_seconds = open_seconds
+        self._lock = threading.Lock()
+        self._consecutive_failures = 0
+        self._opened_at: Optional[float] = None
+        self._trial_in_flight = False
+
+    def allow_request(self) -> bool:
+        with self._lock:
+            if self._opened_at is None:
+                return True
+            if (time.monotonic() - self._opened_at) < self._open_seconds:
+                return False
+            if self._trial_in_flight:
+                return False
+            self._trial_in_flight = True
+            return True
+
+    def record_success(self) -> None:
+        with self._lock:
+            self._consecutive_failures = 0
+            self._opened_at = None
+            self._trial_in_flight = False
+
+    def record_failure(self) -> None:
+        with self._lock:
+            self._trial_in_flight = False
+            self._consecutive_failures += 1
+            if self._consecutive_failures >= self._failure_threshold and self._opened_at is None:
+                self._opened_at = time.monotonic()
+
+    def reset(self) -> None:
+        """Test hook — clears all breaker state."""
+        with self._lock:
+            self._consecutive_failures = 0
+            self._opened_at = None
+            self._trial_in_flight = False
+
+
+_email_api_circuit_breaker = _EmailApiCircuitBreaker(
+    failure_threshold=int(os.environ.get('EMAIL_API_BREAKER_FAILURE_THRESHOLD', '3')),
+    open_seconds=float(os.environ.get('EMAIL_API_BREAKER_OPEN_SECONDS', '60')),
+)
 
 # Response headers logged to help IT compare edge/WAF/proxy vs origin (values truncated).
 _EMAIL_API_LOG_RESPONSE_HEADER_EXACT = frozenset(
@@ -161,12 +233,18 @@ def _maybe_record_email_delivery_failure(
         if ex:
             ctx["response_excerpt"] = str(ex)[:500]
 
+        # Cooldown-gated: without this, every failed transactional email during an
+        # outbound-mail-API outage (timeouts, 5xx, etc.) would each spawn their own
+        # admin alert email — the alert path itself uses the same slow/failing API,
+        # compounding the outage with more blocked background threads. See the
+        # 2026-07-22 platform-502 + email-timeout incident.
         SecurityMonitor.log_security_event(
             event_type="email_delivery_failure",
             severity="high",
             description=desc,
             context_data=ctx,
             notify_admins=True,
+            alert_cooldown_seconds=EMAIL_DELIVERY_FAILURE_ALERT_COOLDOWN_SECONDS,
         )
     except Exception as e:
         current_app.logger.error(
@@ -402,6 +480,17 @@ def _send_via_ifrc(
     Envelope shape follows :func:`_ifrc_envelope_to_cc_bcc` (single recipient in To,
     or noreply To + Bcc for bulk, including mixed Cc/Bcc).
     """
+    if not _email_api_circuit_breaker.allow_request():
+        current_app.logger.warning(
+            "Email API circuit breaker open — skipping outbound call to the IFRC Email API "
+            "without a network attempt (recent consecutive timeouts/connection errors). "
+            "A single trial request will be allowed through automatically once the open "
+            "window elapses."
+        )
+        if _failure_info is not None:
+            _failure_info.append({"code": "email_api_circuit_breaker_open"})
+        return False
+
     api_key = current_app.config.get("EMAIL_API_KEY")
     api_url_base = (current_app.config.get("EMAIL_API_URL") or "").strip()
 
@@ -556,6 +645,10 @@ def _send_via_ifrc(
         _t_req_start = time.perf_counter()
         resp = requests.post(effective_url, headers=headers, json=payload, timeout=15)
         elapsed_ms = (time.perf_counter() - _t_req_start) * 1000.0
+        # Any HTTP response (even an error status) means the API is reachable —
+        # only no-response failures (timeouts/connection errors, caught below)
+        # count against the circuit breaker.
+        _email_api_circuit_breaker.record_success()
 
         final_redacted = _redact_email_api_url_for_logs(getattr(resp, "url", "") or "")
         redirect_hops = len(getattr(resp, "history", None) or [])
@@ -683,6 +776,10 @@ def _send_via_ifrc(
             _failure_info.append(fail)
         return False
     except Exception as e:
+        # No HTTP response at all (timeout, connection error, DNS failure, ...) —
+        # this is the expensive, thread-blocking failure mode the circuit breaker
+        # exists to short-circuit on repeated occurrence.
+        _email_api_circuit_breaker.record_failure()
         err_url = redacted_url or _redact_email_api_url_for_logs(api_url_base)
         current_app.logger.error(
             "Email API request failed (no HTTP response) | redacted_url=%s | error=%s",

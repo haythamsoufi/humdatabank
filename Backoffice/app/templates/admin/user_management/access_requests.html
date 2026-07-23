@@ -1145,6 +1145,9 @@
             return;
         }
         AgGridHelper.pinActionsColumn(api, columnOrder, helper && helper.columnVisibilityManager);
+        if (typeof AgGridHelper.syncActionsColumnLayout === 'function' && typeof api.getColumnDefs === 'function') {
+            AgGridHelper.syncActionsColumnLayout(api.getColumnDefs(), api);
+        }
         if (typeof AgGridHelper.enforceColumnMinWidths === 'function') {
             AgGridHelper.enforceColumnMinWidths(api);
         }
@@ -1160,6 +1163,7 @@
                 width: 120,
                 minWidth: 100,
                 maxWidth: 150,
+                hide: true,
                 filter: 'agNumberColumnFilter',
                 sortable: true,
                 wrapText: false,
@@ -1209,6 +1213,7 @@
                 width: 120,
                 minWidth: 100,
                 maxWidth: 150,
+                hide: true,
                 filter: 'agNumberColumnFilter',
                 sortable: true,
                 wrapText: false,

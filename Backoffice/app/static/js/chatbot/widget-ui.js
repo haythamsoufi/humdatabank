@@ -364,8 +364,12 @@ export const WidgetUiMixin = {
         try { localStorage.removeItem('chatbot_fab_pos'); } catch (_) {}
     },
     /**
-     * Nudge the FAB upward when it covers actionable controls (e.g. Save/Cancel at page bottom).
+     * Nudge the FAB upward when it covers primary page actions (Save/Cancel/Submit at page bottom).
      * Re-checks on scroll, resize, and DOM changes; returns to default when clear.
+     *
+     * Blocking controls (worth jumping): design-system CTAs (.btn-primary, .btn-success, …),
+     * submit inputs, entry-form #fab-menu actions, or explicit data-fab-overlap-block.
+     * Generic buttons, ghost toggles, and [role="button"] disclosure headers are ignored.
      *
      * Stabilization rules (prevents up/down bouncing):
      * - Never remeasure while an avoidance transition is in flight (rest-rect math is wrong mid-tween).
@@ -411,46 +415,61 @@ export const WidgetUiMixin = {
 
         const isExcluded = (el) => {
             if (!el || fab === el || fab.contains(el)) return true;
-            return !!el.closest('#aiChatbotFAB, #aiChatWidget, #mobileMenuFAB, .flash-messages, .flash-messages-wrapper');
+            return !!el.closest(
+                '#aiChatbotFAB, #aiChatWidget, #mobileMenuFAB, #chatbot-ai-hover-menu, '
+                + '.flash-messages, .flash-messages-wrapper'
+            );
         };
 
-        /** Form builder secondary controls (row icons, collapse/hide toggles) — not primary .btn CTAs. */
         const resolveControl = (el) => {
             if (!el) return null;
             if (el.matches('button, a, input[type="submit"], input[type="button"], [role="button"]')) return el;
             return el.closest('button, a, input[type="submit"], input[type="button"], [role="button"]');
         };
 
-        const isIgnorableIconControl = (el) => {
-            const control = resolveControl(el);
-            if (!control) return false;
-            if (control.classList.contains('fb-icon-btn') || control.closest('.fb-icon-btn')) return true;
-            if (control.matches('#toggle-all-pages-btn, #toggle-all-sections-btn, .page-toggle-btn')) return true;
-            if (control.closest('#form-builder-ui') && control.matches('button, a') && !control.classList.contains('btn')) {
-                return true;
-            }
-            return false;
-        };
+        /** Matches components.css semantic CTA variants — not .btn-ghost / bare buttons. */
+        const FAB_CTA_SELECTOR = [
+            '.btn-primary',
+            '.btn-success',
+            '.btn-danger',
+            '.btn-secondary',
+            '.btn-warning',
+            '.btn-purple',
+            '.btn-dark',
+        ].join(', ');
+        const FAB_CTA_LINK_SELECTOR = FAB_CTA_SELECTOR.split(', ').map((s) => 'a' + s).join(', ');
 
-        const isActionableControl = (el) => {
+        const isFabBlockingControl = (el) => {
             const control = resolveControl(el);
             if (!control || isExcluded(control) || !control.isConnected) return false;
-            if (isIgnorableIconControl(control)) return false;
+
+            if (control.closest('[data-fab-overlap-ignore]') || control.hasAttribute('data-fab-overlap-ignore')) {
+                return false;
+            }
+            if (control.classList.contains('fab-overlap-ignore')) return false;
+
+            // Form-builder chrome (row icons, page/section collapse) — not bottom-bar CTAs
+            if (control.classList.contains('fb-icon-btn') || control.closest('.fb-icon-btn')) return false;
+            if (control.matches('#toggle-all-pages-btn, #toggle-all-sections-btn, .page-toggle-btn')) return false;
+            if (control.closest('#form-builder-ui') && control.matches('button, a') && !control.classList.contains('btn')) {
+                return false;
+            }
+
             const style = window.getComputedStyle(control);
             if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
             const rect = control.getBoundingClientRect();
             if (rect.width < 4 || rect.height < 4) return false;
+            if (control.matches(':disabled, [disabled], [aria-disabled="true"]')) return false;
 
-            const tag = control.tagName;
-            if (tag === 'BUTTON' && !control.disabled) return true;
-            if (tag === 'INPUT') {
-                const type = (control.type || '').toLowerCase();
-                if ((type === 'submit' || type === 'button') && !control.disabled) return true;
+            if (control.hasAttribute('data-fab-overlap-block') || control.closest('[data-fab-overlap-block]')) {
+                return true;
             }
-            if (tag === 'A' && control.classList.contains('btn')) return true;
-            if (control.getAttribute('role') === 'button'
-                && !control.hasAttribute('disabled')
-                && control.getAttribute('aria-disabled') !== 'true') return true;
+            if (control.matches('input[type="submit"]')) return true;
+            // Entry-form mobile Save/Submit/Pin stack (round FAB menu; no .btn-* classes)
+            if (control.closest('#fab-menu')) return true;
+            if (control.matches(FAB_CTA_SELECTOR)) return true;
+            if (control.matches(FAB_CTA_LINK_SELECTOR)) return true;
+
             return false;
         };
 
@@ -501,7 +520,7 @@ export const WidgetUiMixin = {
                     for (const x of sampleXs) {
                         if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) continue;
                         for (const el of document.elementsFromPoint(x, y)) {
-                            if (!isActionableControl(el)) continue;
+                            if (!isFabBlockingControl(el)) continue;
                             const control = resolveControl(el);
                             if (!control || seen.has(control)) break;
                             const controlRect = control.getBoundingClientRect();

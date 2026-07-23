@@ -189,6 +189,10 @@
         this.checkboxWidthTimeout = null;
         this.columnFitTimeout = null;
         this.resultCountElement = null;
+        /** When set, overrides rowData.length for the result-count label (server-paginated grids). */
+        this._resultCountTotal = (config.resultCountTotal != null && !isNaN(config.resultCountTotal))
+            ? Number(config.resultCountTotal)
+            : null;
         this._suppressFilterPersistence = false;
         // Track whether we've already called sizeColumnsToFit().
         // Repeated calls (e.g., after height recalculation) can effectively "fight" user-driven column resizing
@@ -430,6 +434,10 @@
             merged.domLayout = 'autoHeight';
         }
 
+        if (merged.pagination === false) {
+            merged.suppressPaginationPanel = true;
+        }
+
         // When the grid body reaches its scroll limit, continue scrolling the page (or nearest scroll parent).
         var userOnGridReady = merged.onGridReady;
         merged.onGridReady = function(params) {
@@ -629,6 +637,10 @@
                 } else if (this.gridApi && this.gridApi.columnApi) {
                     this.columnApi = this.gridApi.columnApi;
                 }
+            }
+
+            if (gridOptions.pagination === false && this.gridDiv && this.gridDiv.classList) {
+                this.gridDiv.classList.add('ag-grid-external-pagination');
             }
 
             // Initialize Column Visibility Manager
@@ -1258,6 +1270,151 @@
     };
 
     /**
+     * True when an element is the title/meta block beside a grid toolbar (not the actions column).
+     * @param {Element} el
+     * @returns {boolean}
+     */
+    AgGridHelper.isGridHeaderMetaElement = function(el) {
+        if (!el || !el.getAttribute) {
+            return false;
+        }
+        if (el.getAttribute('role') === 'dialog' || el.classList.contains('modal-backdrop')) {
+            return false;
+        }
+        if (el.classList && el.classList.contains('ag-grid-header-actions')) {
+            return false;
+        }
+        try {
+            if (window.getComputedStyle(el).position === 'fixed') {
+                return false;
+            }
+        } catch (e) { /* ignore */ }
+        if (el.matches && el.matches('[data-ag-grid-title-group], h1, h2, h3, h4')) {
+            return true;
+        }
+        if (el.querySelector && el.querySelector('[data-ag-grid-title-group], h1, h2, h3, h4')) {
+            return true;
+        }
+        if (el.querySelector && el.querySelector('label') && el.querySelector('p')) {
+            return true;
+        }
+        return false;
+    };
+
+    /**
+     * Resolve the column-visibility placeholder for this grid instance.
+     * @param {AgGridHelper} helper
+     * @returns {HTMLElement|null}
+     */
+    AgGridHelper.resolveColumnVisibilityPlaceholder = function(helper) {
+        if (!helper) {
+            return null;
+        }
+        const columnVisibilityOptions = helper.config.columnVisibilityOptions || {};
+        const configuredPlaceholderId = columnVisibilityOptions.buttonPlaceholderId;
+        const gridPlaceholderId = helper.gridDiv && helper.gridDiv.getAttribute('data-placeholder-id');
+        const placeholderId = configuredPlaceholderId || gridPlaceholderId || 'column-visibility-button-placeholder';
+
+        let placeholder = placeholderId ? document.getElementById(placeholderId) : null;
+        if (!placeholder && helper.gridDiv) {
+            let searchContainer = helper.gridDiv.parentElement;
+            while (searchContainer && searchContainer !== document.body) {
+                placeholder = searchContainer.querySelector(
+                    '[id*="column-visibility-button-placeholder"], [id*="-colvis"], [id*="col-vis"]'
+                );
+                if (placeholder) {
+                    break;
+                }
+                searchContainer = searchContainer.parentElement;
+            }
+        }
+        return placeholder;
+    };
+
+    /**
+     * Put title/meta, record count, and column-visibility controls on one toolbar row.
+     * @param {AgGridHelper} helper
+     * @param {HTMLElement} [countEl]
+     * @returns {Object|null}
+     */
+    AgGridHelper.normalizeGridHeaderLayout = function(helper, countEl) {
+        const placeholder = AgGridHelper.resolveColumnVisibilityPlaceholder(helper);
+        if (!placeholder || !placeholder.parentElement) {
+            return null;
+        }
+
+        const placeholderParent = placeholder.parentElement;
+        let headerRow = placeholderParent;
+
+        if (placeholderParent.parentElement) {
+            const outer = placeholderParent.parentElement;
+            const hasMetaSibling = Array.prototype.some.call(outer.children || [], function(child) {
+                return child !== placeholderParent && AgGridHelper.isGridHeaderMetaElement(child);
+            });
+            if (outer.classList && outer.classList.contains('ag-grid-header-toolbar')) {
+                headerRow = outer;
+            } else if (hasMetaSibling || (outer.children && outer.children.length > 1)) {
+                headerRow = outer;
+            }
+        }
+
+        headerRow.classList.add('ag-grid-header-toolbar');
+
+        let metaEl = null;
+        Array.prototype.some.call(headerRow.children || [], function(child) {
+            if (child === placeholderParent) {
+                return false;
+            }
+            if (AgGridHelper.isGridHeaderMetaElement(child)) {
+                metaEl = child;
+                return true;
+            }
+            return false;
+        });
+        if (metaEl) {
+            metaEl.classList.add('ag-grid-header-meta');
+        }
+
+        placeholderParent.classList.add('ag-grid-header-actions');
+        if (placeholderParent.classList) {
+            placeholderParent.classList.add('ag-grid-toolbar-row');
+        }
+
+        if (countEl) {
+            const gridId = helper.config.containerId;
+            Array.prototype.forEach.call(
+                document.querySelectorAll('.ag-grid-result-count[data-grid-id="' + gridId + '"]'),
+                function(el) {
+                    if (el !== countEl) {
+                        el.remove();
+                    }
+                }
+            );
+
+            const countMount = metaEl || placeholderParent;
+            let mounted = countMount.querySelector('.ag-grid-result-count[data-grid-id="' + gridId + '"]');
+            if (mounted && mounted !== countEl) {
+                mounted.remove();
+            }
+            if (metaEl) {
+                if (countEl.parentElement !== metaEl) {
+                    metaEl.appendChild(countEl);
+                }
+            } else if (countEl.parentElement !== placeholderParent || countEl.nextElementSibling !== placeholder) {
+                placeholderParent.insertBefore(countEl, placeholder);
+            }
+        }
+
+        return {
+            headerRow: headerRow,
+            metaEl: metaEl,
+            placeholder: placeholder,
+            placeholderParent: placeholderParent,
+            countEl: countEl || null
+        };
+    };
+
+    /**
      * Initialize a live result-count label above the grid.
      */
     AgGridHelper.prototype.initializeResultCount = function() {
@@ -1272,155 +1429,10 @@
         this.resultCountElement = countEl;
 
         const insertResultCount = function() {
-            let placeholder = null;
-            const columnVisibilityOptions = self.config.columnVisibilityOptions || {};
-            const configuredPlaceholderId = columnVisibilityOptions.buttonPlaceholderId;
-            const gridPlaceholderId = self.gridDiv && self.gridDiv.getAttribute('data-placeholder-id');
-            const placeholderId = configuredPlaceholderId || gridPlaceholderId || 'column-visibility-button-placeholder';
-
-            function isResultCountTitleGroup(el) {
-                if (!el || !el.querySelector) {
-                    return false;
-                }
-                // Tab-local modals (e.g. SP/EF edit) sit beside the grid and contain an h3 title.
-                if (el.getAttribute('role') === 'dialog' || el.classList.contains('modal-backdrop')) {
-                    return false;
-                }
-                try {
-                    if (window.getComputedStyle(el).position === 'fixed') {
-                        return false;
-                    }
-                } catch (e) { /* ignore */ }
-                // matches() covers data-ag-grid-title-group (or headings) on the element itself;
-                // querySelector() only finds those markers on descendants.
-                return !!(el.matches && el.matches('h1, h2, h3, h4, [data-ag-grid-title-group]')) ||
-                    !!el.querySelector('h1, h2, h3, h4, [data-ag-grid-title-group]');
-            }
-
-            function isColvisOnlyWrapper(parent, ph) {
-                return !!(parent && ph && parent !== ph &&
-                    parent.children && parent.children.length === 1 &&
-                    parent.firstElementChild === ph);
-            }
-
-            function ensureGridToolbarRow(el) {
-                if (el && el.classList) {
-                    el.classList.add('ag-grid-toolbar-row');
-                }
-            }
-
-            function looksLikeToolbarRow(el) {
-                if (!el || !el.classList) {
-                    return false;
-                }
-                if (el.classList.contains('ag-grid-toolbar-row')) {
-                    return true;
-                }
-                if (el.querySelector('button, .btn, [role="toolbar"]')) {
-                    return true;
-                }
-                const cls = el.className || '';
-                return /(?:^|\s)(?:flex|toolbar|justify-|items-center|gap-)/.test(cls);
-            }
-
-            function mountResultCountInPlaceholder(ph) {
-                const existing = ph.querySelector('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]');
-                if (existing) {
-                    self.resultCountElement = existing;
-                    return true;
-                }
-                ensureGridToolbarRow(ph);
-                ph.insertBefore(countEl, ph.firstChild);
+            const layout = AgGridHelper.normalizeGridHeaderLayout(self, countEl);
+            if (layout && layout.countEl) {
+                self.resultCountElement = layout.countEl;
                 return true;
-            }
-
-            if (placeholderId) {
-                placeholder = document.getElementById(placeholderId);
-            }
-
-            if (!placeholder && self.gridDiv) {
-                let searchContainer = self.gridDiv.parentElement;
-                while (searchContainer && searchContainer !== document.body) {
-                    placeholder = searchContainer.querySelector('[id*="column-visibility-button-placeholder"]');
-                    if (placeholder) break;
-                    searchContainer = searchContainer.parentElement;
-                }
-            }
-
-            if (placeholder && placeholder.parentElement) {
-                const placeholderParent = placeholder.parentElement;
-                const headerRow = placeholderParent.parentElement;
-                let titleGroup = null;
-
-                if (headerRow && headerRow !== document.body) {
-                    Array.prototype.forEach.call(headerRow.children || [], function(child) {
-                        if (child.getAttribute && child.getAttribute('role') === 'dialog') {
-                            const misplaced = child.querySelector('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]');
-                            if (misplaced) {
-                                misplaced.remove();
-                            }
-                        }
-                    });
-                    Array.prototype.some.call(headerRow.children || [], function(child) {
-                        if (child === placeholderParent || !child.querySelector) {
-                            return false;
-                        }
-                        if (isResultCountTitleGroup(child)) {
-                            titleGroup = child;
-                            return true;
-                        }
-                        return false;
-                    });
-                }
-
-                if (titleGroup) {
-                    if (headerRow) {
-                        Array.prototype.forEach.call(
-                            headerRow.querySelectorAll('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]'),
-                            function(el) {
-                                if (!titleGroup.contains(el)) {
-                                    el.remove();
-                                }
-                            }
-                        );
-                    }
-                    const existing = titleGroup.querySelector('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]');
-                    if (existing) {
-                        self.resultCountElement = existing;
-                        return true;
-                    }
-                    titleGroup.appendChild(countEl);
-                    return true;
-                }
-
-                // Drop legacy placements (sibling of toolbar wrapper, legend row, etc.).
-                if (headerRow) {
-                    Array.prototype.forEach.call(
-                        headerRow.querySelectorAll('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]'),
-                        function(el) {
-                            if (!placeholder.contains(el)) {
-                                el.remove();
-                            }
-                        }
-                    );
-                } else if (placeholderParent) {
-                    Array.prototype.forEach.call(
-                        placeholderParent.querySelectorAll('.ag-grid-result-count[data-grid-id="' + self.config.containerId + '"]'),
-                        function(el) {
-                            if (!placeholder.contains(el)) {
-                                el.remove();
-                            }
-                        }
-                    );
-                }
-
-                // Keep count beside the Columns button in every template variant.
-                if (isColvisOnlyWrapper(placeholderParent, placeholder)) {
-                    ensureGridToolbarRow(placeholderParent);
-                } else if (placeholderParent !== placeholder && looksLikeToolbarRow(placeholderParent)) {
-                    ensureGridToolbarRow(placeholderParent);
-                }
-                return mountResultCountInPlaceholder(placeholder);
             }
 
             if (self.gridDiv && self.gridDiv.parentElement) {
@@ -1431,7 +1443,7 @@
                     return true;
                 }
                 const countRow = document.createElement('div');
-                countRow.className = 'ag-grid-result-count-row ag-grid-toolbar-row';
+                countRow.className = 'ag-grid-result-count-row ag-grid-toolbar-row ag-grid-header-toolbar';
                 countRow.appendChild(countEl);
                 parent.insertBefore(countRow, self.gridDiv);
                 return true;
@@ -1463,6 +1475,19 @@
     };
 
     /**
+     * Override total row count for the result-count label (e.g. server-side pagination).
+     * @param {number|null} total - Total matching rows from the server, or null to clear
+     */
+    AgGridHelper.prototype.setResultCountTotal = function(total) {
+        if (total == null || isNaN(total)) {
+            this._resultCountTotal = null;
+        } else {
+            this._resultCountTotal = Number(total);
+        }
+        this.updateResultCount();
+    };
+
+    /**
      * Update the live result-count label.
      */
     AgGridHelper.prototype.updateResultCount = function() {
@@ -1477,9 +1502,12 @@
             displayedCount = this.config.rowData.length;
         }
 
-        const totalCount = Array.isArray(this.config.rowData)
-            ? this.config.rowData.length
-            : displayedCount;
+        let totalCount = displayedCount;
+        if (this._resultCountTotal != null && !isNaN(this._resultCountTotal)) {
+            totalCount = this._resultCountTotal;
+        } else if (Array.isArray(this.config.rowData)) {
+            totalCount = this.config.rowData.length;
+        }
 
         const showingText = this.getTranslation('showing', 'Showing');
         const ofText = this.getTranslation('of', 'of');
@@ -2088,6 +2116,7 @@
                         apiToUse.sizeColumnsToFit();
                         self._hasSizedColumnsToFit = true;
                         AgGridHelper.enforceColumnMinWidths(apiToUse);
+                        AgGridHelper.syncActionsColumnLayout(self.config.columnDefs, apiToUse);
                     }
                 } catch (e) {
                     // Non-fatal
@@ -2972,6 +3001,7 @@
                         apiToUse.sizeColumnsToFit();
                         self._hasSizedColumnsToFit = true;
                         AgGridHelper.enforceColumnMinWidths(apiToUse);
+                        AgGridHelper.syncActionsColumnLayout(self.config.columnDefs, apiToUse);
                     }
                 } catch (e) {
                     // Non-fatal
@@ -3023,6 +3053,8 @@
         try {
             apiToUse.sizeColumnsToFit();
             this._hasSizedColumnsToFit = true;
+            AgGridHelper.enforceColumnMinWidths(apiToUse);
+            AgGridHelper.syncActionsColumnLayout(this.config.columnDefs, apiToUse);
         } catch (e) {
             // Non-fatal
         }
@@ -4213,10 +4245,11 @@
         }
         columnDefs.forEach(function(colDef) {
             var meta = AgGridHelper.getColDefHelperMeta(colDef);
-            if (!AgGridHelper.isActionsColumn(colDef) || meta.actionsMobileWrapped || meta.skipMobileActionsOverflow) {
+            if (!AgGridHelper.isActionsColumn(colDef) || meta.actionsMobileWrapped) {
                 return;
             }
-            if (typeof AgGridRenderers !== 'undefined' &&
+            if (!meta.skipMobileActionsOverflow &&
+                typeof AgGridRenderers !== 'undefined' &&
                 typeof AgGridRenderers.wrapActionsCellRenderer === 'function' &&
                 colDef.cellRenderer) {
                 colDef.cellRenderer = AgGridRenderers.wrapActionsCellRenderer(colDef.cellRenderer);
@@ -4227,6 +4260,15 @@
             }
             AgGridHelper.applyActionsColumnMobileWidths([colDef]);
         });
+    };
+
+    /**
+     * Re-apply mobile/desktop actions column widths (after pinActionsColumn, sizeColumnsToFit, etc.).
+     * @param {Array} columnDefs
+     * @param {Object} [gridApi]
+     */
+    AgGridHelper.syncActionsColumnLayout = function(columnDefs, gridApi) {
+        AgGridHelper.applyActionsColumnMobileWidths(columnDefs, gridApi);
     };
 
     /**
@@ -4274,6 +4316,7 @@
                 colDef.width = 40;
                 colDef.minWidth = 40;
                 colDef.maxWidth = 44;
+                colDef.suppressSizeToFit = true;
             } else {
                 if (meta.actionsDesktopHeaderName !== undefined) {
                     colDef.headerName = meta.actionsDesktopHeaderName;
@@ -4612,8 +4655,12 @@
         columns.forEach(function(col) {
             var def = col.getColDef();
             var minW;
-            if (AgGridHelper.isActionsColumn(def) && !AgGridHelper.isCoarsePointerDevice()) {
-                minW = AgGridHelper.getActionsColumnDesktopMinWidth(def);
+            if (AgGridHelper.isActionsColumn(def)) {
+                if (AgGridHelper.isCoarsePointerDevice()) {
+                    minW = Math.min(def.minWidth || 40, 44);
+                } else {
+                    minW = AgGridHelper.getActionsColumnDesktopMinWidth(def);
+                }
             } else {
                 minW = def.minWidth || def.width;
             }
@@ -4698,6 +4745,9 @@
                 applyOrder: mergedOrder.length > 0
             });
             AgGridHelper.ensureSelectionColumnFirst(gridApi, gridDiv);
+            if (typeof gridApi.getColumnDefs === 'function') {
+                AgGridHelper.syncActionsColumnLayout(gridApi.getColumnDefs(), gridApi);
+            }
         } catch (e) {
             console.warn('AgGridHelper: Could not pin actions column:', e);
         }

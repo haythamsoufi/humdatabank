@@ -12,27 +12,81 @@
   - csrf_token: CSRF token for form
 #}
 
+{% set entity_type_order = ['country', 'national_society', 'ns_branch', 'ns_subbranch', 'ns_localunit', 'division', 'department', 'regional_office', 'cluster_office'] %}
+{% set all_entity_types = user_entities | map(attribute='entity_type') | unique | list %}
+{% set single_entity_type_mode = all_entity_types | length == 1 %}
+{% set sole_entity_type = all_entity_types[0] if single_entity_type_mode else '' %}
+
+{% set field_label = _('Entity') %}
+{% set search_placeholder = _('Search entities...') %}
+{% set show_list_label = _('Show entities') %}
+{% set no_results_message = _('No entities found matching your search.') %}
+
+{% if single_entity_type_mode %}
+    {% if sole_entity_type == 'country' %}
+        {% set field_label = _('Country') %}
+        {% set search_placeholder = _('Search countries...') %}
+        {% set show_list_label = _('Show countries') %}
+        {% set no_results_message = _('No countries found matching your search.') %}
+    {% elif sole_entity_type == 'national_society' %}
+        {% set field_label = _('National Society') %}
+        {% set search_placeholder = _('Search national societies...') %}
+        {% set show_list_label = _('Show national societies') %}
+        {% set no_results_message = _('No national societies found matching your search.') %}
+    {% elif sole_entity_type == 'ns_branch' %}
+        {% set field_label = _('NS Branch') %}
+        {% set search_placeholder = _('Search NS branches...') %}
+        {% set show_list_label = _('Show NS branches') %}
+        {% set no_results_message = _('No NS branches found matching your search.') %}
+    {% elif sole_entity_type == 'ns_subbranch' %}
+        {% set field_label = _('NS Sub-branch') %}
+        {% set search_placeholder = _('Search NS sub-branches...') %}
+        {% set show_list_label = _('Show NS sub-branches') %}
+        {% set no_results_message = _('No NS sub-branches found matching your search.') %}
+    {% elif sole_entity_type == 'ns_localunit' %}
+        {% set field_label = _('NS Local Unit') %}
+        {% set search_placeholder = _('Search NS local units...') %}
+        {% set show_list_label = _('Show NS local units') %}
+        {% set no_results_message = _('No NS local units found matching your search.') %}
+    {% elif sole_entity_type == 'division' %}
+        {% set field_label = _('Division') %}
+        {% set search_placeholder = _('Search divisions...') %}
+        {% set show_list_label = _('Show divisions') %}
+        {% set no_results_message = _('No divisions found matching your search.') %}
+    {% elif sole_entity_type == 'department' %}
+        {% set field_label = _('Department') %}
+        {% set search_placeholder = _('Search departments...') %}
+        {% set show_list_label = _('Show departments') %}
+        {% set no_results_message = _('No departments found matching your search.') %}
+    {% else %}
+        {% set field_label = sole_entity_type | replace('_', ' ') | title %}
+        {% set search_placeholder = _('Search %(label)s...', label=field_label) %}
+        {% set show_list_label = _('Show %(label)s', label=field_label) %}
+        {% set no_results_message = _('No %(label)s found matching your search.', label=field_label) %}
+    {% endif %}
+{% endif %}
+
 <div class="enhanced-search-dropdown relative">
     <div class="flex items-center gap-2">
-        <label for="entity_search_input" class="control-label flex-shrink-0">{{ _('Entity') }}:</label>
+        <label for="entity_search_input" class="control-label flex-shrink-0">{{ field_label }}:</label>
         <div class="relative">
             <input type="text"
                    id="entity_search_input"
-                   placeholder="{{ _('Search entities...')|forceescape }}"
+                   placeholder="{{ search_placeholder|forceescape }}"
                    class="block w-64 py-2 px-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                    autocomplete="off">
             <div class="absolute inset-y-0 right-0 flex items-center pr-2">
                 <button type="button"
-                        id="entity_clear_search"
-                        class="text-gray-400 hover:text-gray-600 mr-1 hidden"
-                        title="{{ _('Clear search')|forceescape }}">
+                        id="entity_toggle_dropdown"
+                        class="text-gray-400 hover:text-gray-600"
+                        title="{{ show_list_label|forceescape }}"
+                        aria-label="{{ show_list_label|forceescape }}"
+                        aria-expanded="false"
+                        aria-controls="entity_search_dropdown">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                     </svg>
                 </button>
-                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                </svg>
             </div>
         </div>
     </div>
@@ -48,10 +102,51 @@
     {# Dropdown with search results #}
     <div id="entity_search_dropdown" class="absolute z-50 w-96 max-w-screen-sm mt-1 bg-white border border-gray-300 rounded-md shadow-lg hidden max-h-96 overflow-y-auto overflow-x-hidden">
         <div id="entity_search_list" class="py-1">
-            {# Define entity type order and labels #}
-            {% set entity_type_order = ['country', 'national_society', 'ns_branch', 'ns_subbranch', 'ns_localunit', 'division', 'department', 'regional_office', 'cluster_office'] %}
+            {% if single_entity_type_mode %}
+                {# Flat list when every accessible entity is the same type #}
+                {% set sorted_entities = [] %}
+                {% for entity_item in user_entities %}
+                    {% set entity = entity_item.entity %}
+                    {% set entity_type = entity_item.entity_type %}
+                    {% set entity_id = entity_item.entity_id %}
+                    {% set entity_name = entity_item.display_name|default('', true) or EntityService.get_localized_entity_name(entity_type, entity_id, include_hierarchy=True) %}
+                    {% set country_ns_name = get_localized_national_society_name(entity) if entity_type == 'country' else '' %}
+                    {% set __ = sorted_entities.append({
+                        'entity': entity,
+                        'entity_type': entity_type,
+                        'entity_id': entity_id,
+                        'entity_name': entity_name,
+                        'entity_search_text': entity_name ~ ' ' ~ country_ns_name
+                    }) %}
+                {% endfor %}
+                {% set sorted_entities = sorted_entities | sort(attribute='entity_name') %}
+                {% for entity_data in sorted_entities %}
+                    {% set entity_type = entity_data.entity_type %}
+                    {% set entity_id = entity_data.entity_id %}
+                    {% set entity_name = entity_data.entity_name %}
+                    {% set entity_search_text = entity_data.entity_search_text %}
+                    {% set is_selected = selected_entity_type == entity_type and selected_entity_id == entity_id %}
 
-            {# Display groups in predefined order #}
+                    <div class="dropdown-option px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-900 cursor-pointer flex items-start justify-between"
+                         data-item-id="{{ entity_type }}:{{ entity_id }}"
+                         data-item-name="{{ entity_name }}"
+                         data-search-text="{{ entity_search_text }}"
+                         data-item-type="{{ entity_type }}"
+                         {% if is_selected %}data-selected="true"{% endif %}>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-medium text-gray-900 whitespace-normal break-words item-name">
+                                {{ entity_name }}
+                            </div>
+                        </div>
+                        {% if is_selected %}
+                            <svg class="h-4 w-4 text-blue-600 flex-shrink-0 ml-2 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% else %}
+            {# Display groups in predefined order when the user has multiple entity types #}
             {% for entity_type in entity_type_order %}
                 {% set entities_in_type = user_entities | selectattr('entity_type', 'equalto', entity_type) | list %}
                 {% if entities_in_type | length > 0 %}
@@ -224,13 +319,14 @@
                     </div>
                 {% endif %}
             {% endfor %}
+            {% endif %}
         </div>
         <div id="entity_no_results" class="px-3 py-2 text-sm text-gray-500 hidden">
             <div class="text-center py-2">
                 <svg class="mx-auto h-6 w-6 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                 </svg>
-                {{ _('No entities found matching your search.') }}
+                {{ no_results_message }}
             </div>
         </div>
     </div>
@@ -243,7 +339,7 @@
     const searchDropdown = document.getElementById('entity_search_dropdown');
     const searchList = document.getElementById('entity_search_list');
     const noResults = document.getElementById('entity_no_results');
-    const clearBtn = document.getElementById('entity_clear_search');
+    const toggleBtn = document.getElementById('entity_toggle_dropdown');
     const searchForm = document.getElementById('entity_search_form');
     const searchSelect = document.getElementById('entity_search_select');
 
@@ -340,47 +436,52 @@
             searchList.classList.remove('hidden');
         }
 
-        // Show/hide clear button
-        if (query) {
-            clearBtn.classList.remove('hidden');
-        } else {
-            clearBtn.classList.add('hidden');
+        autoHighlightSearchResult(query);
+    });
+
+    function getVisibleOptions() {
+        return Array.from(searchList.querySelectorAll('.dropdown-option')).filter(function(opt) {
+            const group = opt.closest('.entity-group-items');
+            const groupCollapsed = group && group.classList.contains('hidden');
+            return opt.style.display !== 'none' && !groupCollapsed;
+        });
+    }
+
+    function updateHighlight(visibleOptions) {
+        visibleOptions.forEach(function(opt, idx) {
+            if (idx === highlightedIndex) {
+                opt.classList.add('bg-blue-100');
+            } else {
+                opt.classList.remove('bg-blue-100');
+            }
+        });
+        if (highlightedIndex >= 0 && visibleOptions[highlightedIndex]) {
+            visibleOptions[highlightedIndex].scrollIntoView({ block: 'nearest' });
         }
-    });
+    }
 
-    // Clear search
-    clearBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        e.preventDefault();
-        // Clear the input value
-        searchInput.value = '';
-        // Explicitly show all options and group headers
-        const options = searchList.querySelectorAll('.dropdown-option');
-        const groupHeaders = searchList.querySelectorAll('.entity-group-header');
+    // After typing, highlight the first visible match so Enter can select it immediately
+    function autoHighlightSearchResult(query) {
+        const visibleOptions = getVisibleOptions();
+        if (query && visibleOptions.length > 0) {
+            highlightedIndex = 0;
+            updateHighlight(visibleOptions);
+        } else if (!query) {
+            highlightedIndex = -1;
+            highlightSelectedEntity();
+        } else {
+            highlightedIndex = -1;
+            visibleOptions.forEach(function(opt) {
+                opt.classList.remove('bg-blue-100');
+            });
+        }
+    }
 
-        options.forEach(function(option) {
-            option.style.display = '';
-            // Remove any highlight classes
-            option.classList.remove('bg-blue-100');
-        });
-
-        groupHeaders.forEach(function(header) {
-            header.style.display = '';
-        });
-
-        // Hide no results message and show list
-        noResults.classList.add('hidden');
-        searchList.classList.remove('hidden');
-
-        // Hide clear button
-        clearBtn.classList.add('hidden');
-
-        // Reset keyboard navigation
-        highlightedIndex = -1;
-
-        // Focus the input
-        searchInput.focus();
-    });
+    function setDropdownExpanded(isExpanded) {
+        if (toggleBtn) {
+            toggleBtn.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        }
+    }
 
     // Function to position dropdown to avoid right edge
     function positionDropdown() {
@@ -409,20 +510,122 @@
         }
     }
 
-    // Show dropdown on focus
-    searchInput.addEventListener('focus', function() {
-        if (searchInput.value.trim()) {
-            searchInput.dispatchEvent(new Event('input'));
+    // Show all entities (no search filter) so the full list is available
+    function showAllOptions() {
+        const options = searchList.querySelectorAll('.dropdown-option');
+        const groupHeaders = searchList.querySelectorAll('.entity-group-header');
+
+        options.forEach(function(option) {
+            option.style.display = '';
+            option.classList.remove('bg-blue-100');
+        });
+
+        groupHeaders.forEach(function(header) {
+            header.style.display = '';
+            const container = header.nextElementSibling && header.nextElementSibling.classList.contains('entity-group-items')
+                ? header.nextElementSibling
+                : null;
+            if (!container) return;
+            // Restore collapsed state from a prior search expansion
+            if (container.dataset.wasCollapsed) {
+                container.classList.add('hidden');
+                const chev = header.querySelector('.chevron-icon');
+                if (chev) chev.classList.add('rotate-180');
+                header.setAttribute('aria-expanded', 'false');
+                delete container.dataset.wasCollapsed;
+            }
+        });
+
+        noResults.classList.add('hidden');
+        searchList.classList.remove('hidden');
+        highlightedIndex = -1;
+    }
+
+    // Highlight the currently selected entity in the open list
+    function highlightSelectedEntity() {
+        searchList.querySelectorAll('.dropdown-option').forEach(function(opt) {
+            opt.classList.remove('bg-blue-100');
+        });
+        const selected = searchList.querySelector('.dropdown-option[data-selected="true"]');
+        if (selected) {
+            selected.classList.add('bg-blue-100');
         }
+        return selected;
+    }
+
+    // Expand the selected entity's group (if collapsed) and scroll it to the middle of the list
+    function scrollToSelectedEntity() {
+        const selected = highlightSelectedEntity();
+        if (!selected) return;
+
+        const group = selected.closest('.entity-group-items');
+        if (group && group.classList.contains('hidden')) {
+            group.classList.remove('hidden');
+            const header = group.previousElementSibling;
+            if (header && header.classList.contains('entity-group-header')) {
+                const chev = header.querySelector('.chevron-icon');
+                if (chev) chev.classList.remove('rotate-180');
+                header.setAttribute('aria-expanded', 'true');
+            }
+        }
+
+        const container = searchDropdown;
+        const containerRect = container.getBoundingClientRect();
+        const selectedRect = selected.getBoundingClientRect();
+        const relativeTop = selectedRect.top - containerRect.top + container.scrollTop;
+        const scrollTarget = relativeTop - (container.clientHeight / 2) + (selected.offsetHeight / 2);
+        container.scrollTop = Math.max(0, scrollTarget);
+    }
+
+    function restoreSelectedEntityLabel() {
+        searchInput.value = selectedEntityName || '';
+        showAllOptions();
+    }
+
+    function openDropdownWithSelection() {
+        // Clear text so the user can type a new search immediately
+        searchInput.value = '';
+        showAllOptions();
+        searchDropdown.scrollTop = 0;
         searchDropdown.classList.remove('hidden');
-        // Position dropdown after it's shown
-        setTimeout(positionDropdown, 0);
+        setDropdownExpanded(true);
+        setTimeout(function() {
+            positionDropdown();
+            scrollToSelectedEntity();
+        }, 0);
+    }
+
+    // Open dropdown via chevron button
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            searchInput.focus();
+            openDropdownWithSelection();
+        });
+    }
+
+    // Show full list on focus (do not filter by the selected entity name)
+    searchInput.addEventListener('focus', function() {
+        openDropdownWithSelection();
     });
 
-    // Hide dropdown when clicking outside
+    // Re-open full list on click if already focused (e.g. after Escape closed it)
+    searchInput.addEventListener('click', function() {
+        if (searchDropdown.classList.contains('hidden')) {
+            openDropdownWithSelection();
+        }
+    });
+
+    // Hide dropdown when clicking outside; restore selected entity label if search was abandoned
     document.addEventListener('click', function(e) {
-        if (!searchInput.contains(e.target) && !searchDropdown.contains(e.target)) {
-            searchDropdown.classList.add('hidden');
+        const clickedToggle = toggleBtn && toggleBtn.contains(e.target);
+        if (!searchInput.contains(e.target) && !searchDropdown.contains(e.target) && !clickedToggle) {
+            if (!searchDropdown.classList.contains('hidden')) {
+                searchDropdown.classList.add('hidden');
+                setDropdownExpanded(false);
+                restoreSelectedEntityLabel();
+            }
         }
     });
 
@@ -468,42 +671,35 @@
         searchForm.submit();
     });
 
-    // Keyboard navigation
-    const options = Array.from(searchList.querySelectorAll('.dropdown-option:not([style*="display: none"])'));
-
     searchInput.addEventListener('keydown', function(e) {
-        const visibleOptions = Array.from(searchList.querySelectorAll('.dropdown-option')).filter(function(opt) {
-            const group = opt.closest('.entity-group-items');
-            const groupCollapsed = group && group.classList.contains('hidden');
-            return opt.style.display !== 'none' && !groupCollapsed;
-        });
+        const visibleOptions = getVisibleOptions();
 
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            highlightedIndex = Math.min(highlightedIndex + 1, visibleOptions.length - 1);
+            if (visibleOptions.length === 0) return;
+            if (highlightedIndex < 0) {
+                highlightedIndex = 0;
+            } else {
+                highlightedIndex = Math.min(highlightedIndex + 1, visibleOptions.length - 1);
+            }
             updateHighlight(visibleOptions);
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            highlightedIndex = Math.max(highlightedIndex - 1, -1);
+            if (visibleOptions.length === 0) return;
+            highlightedIndex = Math.max(highlightedIndex - 1, 0);
             updateHighlight(visibleOptions);
-        } else if (e.key === 'Enter' && highlightedIndex >= 0) {
+        } else if (e.key === 'Enter') {
+            if (visibleOptions.length === 0) return;
             e.preventDefault();
-            visibleOptions[highlightedIndex].click();
+            const index = highlightedIndex >= 0 ? highlightedIndex : 0;
+            visibleOptions[index].click();
         } else if (e.key === 'Escape') {
             searchDropdown.classList.add('hidden');
+            setDropdownExpanded(false);
             highlightedIndex = -1;
+            restoreSelectedEntityLabel();
         }
     });
-
-    function updateHighlight(visibleOptions) {
-        visibleOptions.forEach(function(opt, idx) {
-            if (idx === highlightedIndex) {
-                opt.classList.add('bg-blue-100');
-            } else {
-                opt.classList.remove('bg-blue-100');
-            }
-        });
-    }
 
     // Reposition dropdown on window resize if it's visible
     window.addEventListener('resize', function() {

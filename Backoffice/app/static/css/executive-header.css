@@ -1035,8 +1035,10 @@
     }
 
     .executive-page-header .title-section {
-        justify-content: center;
-        text-align: center;
+        justify-content: flex-start;
+        text-align: start;
+        align-items: center;
+        gap: 0.75rem;
     }
 
     .executive-page-header .brand-icon {
@@ -1087,12 +1089,20 @@
 
 @media (max-width: 640px) {
     .executive-page-header .title-section {
-        flex-direction: column;
-        gap: 0.75rem;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.625rem;
     }
 
     .executive-page-header .title-text-group {
-        text-align: center;
+        text-align: start;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .executive-page-header .title-with-info {
+        justify-content: flex-start;
     }
 }
 

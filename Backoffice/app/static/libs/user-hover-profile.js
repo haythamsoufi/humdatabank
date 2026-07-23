@@ -3,6 +3,8 @@
  * Any element with class .ag-user-hover-trigger (tables, dashboard, etc.) shows
  * a user profile popup on hover/click. Configure via window.UserHoverProfileConfig.
  *
+ * When UserHoverProfileConfig.canLinkUserDetails is true (users with admin.users.edit),
+ * .ag-user-hover-name and .profile-icon inside triggers are auto-linked to user details.
  * Security (PRAUDIT Finding #1, fixed Apr 2026): prefers data-user-external-id and
  * external_ids= on GET /api/users/profile-summary; server rejects arbitrary user_ids
  * for non-privileged callers. See Backoffice/docs/security/pentest-praudit-20260430-response.md §1.
@@ -363,13 +365,172 @@
         popupEl.style.boxShadow = theme.popupShadow || '0 10px 30px rgba(0,0,0,0.25)';
     }
 
+    function canLinkUserDetails() {
+        var config = window.UserHoverProfileConfig || {};
+        return config.canLinkUserDetails === true && !!config.userDetailUrlPattern;
+    }
+
     function getUserDetailUrl(profile) {
+        if (!canLinkUserDetails()) return null;
         var config = window.UserHoverProfileConfig || {};
         var pattern = config.userDetailUrlPattern;
         if (!pattern) return null;
         var userId = profile && profile.id;
         if (userId === null || userId === undefined || userId === '') return null;
         return pattern.replace('{id}', encodeURIComponent(String(userId)));
+    }
+
+    function hasUserDetailUrlPattern() {
+        return canLinkUserDetails();
+    }
+
+    function getDetailUrlForTrigger(trigger) {
+        if (!trigger) return null;
+        var inlineProfile = parseInlineProfile(trigger);
+        var userId = inlineProfile.id !== undefined && inlineProfile.id !== null && inlineProfile.id !== ''
+            ? inlineProfile.id
+            : trigger.getAttribute('data-user-id');
+        return getUserDetailUrl({ id: userId });
+    }
+
+    function isInsideDetailLink(element) {
+        return !!(element && element.closest && element.closest('a.ag-user-hover-name[href], a.ag-user-hover-avatar-link[href]'));
+    }
+
+    function convertToDetailLink(element, detailUrl, className, ariaLabel) {
+        if (!element || !detailUrl || isInsideDetailLink(element)) return null;
+        if (element.tagName === 'A' && element.getAttribute('href')) return element;
+
+        var link = document.createElement('a');
+        link.href = detailUrl;
+        link.className = className;
+        if (element.className) {
+            element.className.split(/\s+/).forEach(function(cls) {
+                if (cls && cls !== className) {
+                    link.classList.add(cls);
+                }
+            });
+        }
+        if (element.getAttribute('style')) {
+            link.setAttribute('style', element.getAttribute('style'));
+        }
+        if (ariaLabel) {
+            link.setAttribute('aria-label', ariaLabel);
+        }
+        while (element.firstChild) {
+            link.appendChild(element.firstChild);
+        }
+        if (element.parentNode) {
+            element.parentNode.replaceChild(link, element);
+        }
+        return link;
+    }
+
+    function wrapInDetailLink(element, detailUrl, className, ariaLabel) {
+        if (!element || !detailUrl || isInsideDetailLink(element)) return null;
+        var link = document.createElement('a');
+        link.href = detailUrl;
+        link.className = className;
+        if (ariaLabel) {
+            link.setAttribute('aria-label', ariaLabel);
+        }
+        if (element.parentNode) {
+            element.parentNode.insertBefore(link, element);
+            link.appendChild(element);
+        }
+        return link;
+    }
+
+    function enhanceTriggerDetailLinks(trigger) {
+        if (!trigger || trigger.getAttribute('data-user-hover-detail-enhanced') === 'true') {
+            return;
+        }
+
+        var detailUrl = getDetailUrlForTrigger(trigger);
+        if (!detailUrl) {
+            return;
+        }
+
+        var enhanced = false;
+
+        if (!trigger.querySelector('.ag-user-hover-name') && !trigger.querySelector('.profile-icon')) {
+            var plainText = (trigger.textContent || '').trim();
+            if (plainText && !trigger.querySelector('a, button, input, select, textarea')) {
+                var nameLink = document.createElement('a');
+                nameLink.href = detailUrl;
+                nameLink.className = 'ag-user-hover-name';
+                while (trigger.firstChild) {
+                    nameLink.appendChild(trigger.firstChild);
+                }
+                trigger.appendChild(nameLink);
+                enhanced = true;
+            }
+        } else {
+            trigger.querySelectorAll('.ag-user-hover-name').forEach(function(nameEl) {
+                if (convertToDetailLink(nameEl, detailUrl, 'ag-user-hover-name')) {
+                    enhanced = true;
+                }
+            });
+        }
+
+        trigger.querySelectorAll('.profile-icon').forEach(function(iconEl) {
+            if (wrapInDetailLink(iconEl, detailUrl, 'ag-user-hover-avatar-link', 'View user details')) {
+                enhanced = true;
+            }
+        });
+
+        if (enhanced) {
+            trigger.setAttribute('data-user-hover-detail-enhanced', 'true');
+        }
+    }
+
+    function enhanceUserHoverDetailLinks(root) {
+        if (!hasUserDetailUrlPattern()) {
+            return;
+        }
+
+        root = root || document;
+        if (!root.querySelectorAll) {
+            return;
+        }
+
+        root.querySelectorAll('.ag-user-hover-trigger').forEach(function(trigger) {
+            enhanceTriggerDetailLinks(trigger);
+        });
+    }
+
+    var detailLinkEnhanceTimer = null;
+    function scheduleDetailLinkEnhancement(root) {
+        clearTimeout(detailLinkEnhanceTimer);
+        detailLinkEnhanceTimer = setTimeout(function() {
+            enhanceUserHoverDetailLinks(root || document);
+        }, 50);
+    }
+
+    function setupDetailLinkEnhancement() {
+        if (!hasUserDetailUrlPattern()) {
+            return;
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                enhanceUserHoverDetailLinks(document);
+            });
+        } else {
+            enhanceUserHoverDetailLinks(document);
+        }
+
+        if (typeof MutationObserver !== 'undefined' && document.body) {
+            var observer = new MutationObserver(function(mutations) {
+                var shouldEnhance = mutations.some(function(mutation) {
+                    return mutation.addedNodes && mutation.addedNodes.length;
+                });
+                if (shouldEnhance) {
+                    scheduleDetailLinkEnhancement(document);
+                }
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        }
     }
 
     function buildPopupHtml(profile) {
@@ -458,13 +619,6 @@
             html += '<a href="' + escapeHtml(teamsDeepLink) + '" data-teams-web-link="' + escapeHtml(teamsWebLink) + '" class="ag-user-teams-link" title="Teams Chat" aria-label="Teams Chat" style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid #bfdbfe;border-radius:9999px;background:#eff6ff;color:#1d4ed8;font-size:13px;text-decoration:none;">';
             html += '<span aria-hidden="true" style="display:block;width:14px;height:14px;background-image:url(\'/static/images/teams-icon.svg\');background-repeat:no-repeat;background-position:center;background-size:contain;"></span>';
             html += '</a>';
-
-            var detailUrl = getUserDetailUrl(profile);
-            if (detailUrl) {
-                html += '<a href="' + escapeHtml(detailUrl) + '" title="User Details" aria-label="User Details" style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid #93c5fd;border-radius:9999px;background:#eff6ff;color:#2563eb;font-size:13px;text-decoration:none;margin-left:auto;">';
-                html += '<i class="fas fa-user-cog" aria-hidden="true"></i>';
-                html += '</a>';
-            }
 
             html += '</div>';
         }
@@ -585,6 +739,12 @@
                 return;
             }
 
+            var nameLink = event.target && event.target.closest ? event.target.closest('a.ag-user-hover-name[href], a.ag-user-hover-avatar-link[href]') : null;
+            if (nameLink) {
+                hidePopup();
+                return;
+            }
+
             var trigger = getClosestTrigger(event.target);
             if (!trigger) {
                 if (popupEl && popupEl.style.display !== 'none') {
@@ -614,10 +774,12 @@
     }
 
     setupListeners();
+    setupDetailLinkEnhancement();
 
     window.UserHoverProfiles = {
         hide: hidePopup,
-        cacheProfile: cacheProfile
+        cacheProfile: cacheProfile,
+        enhanceDetailLinks: enhanceUserHoverDetailLinks
     };
 
     /* Backward compatibility */

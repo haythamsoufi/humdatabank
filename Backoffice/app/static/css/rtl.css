@@ -154,6 +154,27 @@ html[dir="rtl"] #aiChatWidget {
         left: 1rem !important;
         right: 1rem !important;
     }
+
+    /* RTL mobile side drawer */
+    html[dir="rtl"] #mobileFloatingMenu {
+        left: auto;
+        right: 0;
+        border-right: none;
+        border-left: 1px solid rgba(255, 255, 255, 0.06);
+        box-shadow: -8px 0 32px rgba(0, 0, 0, 0.35);
+        transform: translateX(105%);
+    }
+
+    html[dir="rtl"] #mobileFloatingMenu.menu-open {
+        transform: translateX(0);
+    }
+
+    html[dir="rtl"] #mobileFloatingMenuNav .sidebar-item-container.active {
+        border-left: none;
+        border-right: 3px solid #f56565;
+        padding-left: 0.75rem;
+        padding-right: calc(0.75rem - 3px);
+    }
 }
 
 /* RTL Support for Language Selector */

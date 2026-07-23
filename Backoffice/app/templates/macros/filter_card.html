@@ -1,5 +1,5 @@
 {#
-  Reusable analytics filter-card wrapper.
+  Reusable analytics filter-card wrapper (collapsible; collapsed by default).
 
   Usage (call-block pattern):
     {% from "macros/filter_card.html" import filter_card %}
@@ -11,17 +11,39 @@
         </div>
     {% endcall %}
 
+  Optional expanded=true keeps the pane open on first paint (e.g. server-known active filters).
+  Without expanded, JS expands automatically when form fields have values.
+
   The caller block includes all filter fields AND the submit / clear-filters
   row so each template retains full control over column spans and layout.
 #}
 
-{% macro filter_card(title="Filters", method="GET", grid_cols="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5", action=none, form_id=none) %}
-<div class="bg-gray-50 p-4 sm:p-6 rounded-lg shadow mb-8">
-    <h5 class="text-xl font-semibold text-gray-700 mb-4 flex items-center">
-        <i class="fas fa-filter mr-2"></i> {{ title }}
-    </h5>
-    <form method="{{ method }}" class="grid {{ grid_cols }} gap-4 items-end"{% if action %} action="{{ action }}"{% endif %}{% if form_id %} id="{{ form_id }}"{% endif %}>
-        {{ caller() }}
-    </form>
+{% macro filter_card(title="Filters", method="GET", grid_cols="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5", action=none, form_id=none, expanded=none) %}
+{% set card_expanded = expanded if expanded is not none else false %}
+<div class="analytics-filter-card bg-gray-50 rounded-lg shadow mb-8 overflow-hidden"
+     data-filter-card-expanded="{{ 'true' if card_expanded else 'false' }}">
+    <div class="flex items-center justify-between gap-3 px-4 py-2.5 sm:px-6 sm:py-3 border-b border-gray-200">
+        <h5 class="text-sm font-medium text-gray-700 flex items-center gap-2 min-w-0 m-0">
+            <i class="fas fa-filter text-xs text-gray-500 shrink-0" aria-hidden="true"></i>
+            <span class="truncate">{{ title }}</span>
+        </h5>
+        <button type="button"
+                class="analytics-filter-card-toggle inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white hover:bg-gray-100 border border-gray-300 rounded transition-colors shrink-0"
+                aria-expanded="{{ 'true' if card_expanded else 'false' }}"
+                aria-controls="{{ (form_id or 'analytics-filter-form') ~ '-body' }}"
+                data-show-label="{{ _('Show filters')|forceescape }}"
+                data-hide-label="{{ _('Hide filters')|forceescape }}"
+                title="{{ _('Expand or collapse filters')|forceescape }}">
+            <span class="analytics-filter-card-toggle-label">{% if card_expanded %}{{ _('Hide filters') }}{% else %}{{ _('Show filters') }}{% endif %}</span>
+            <i class="analytics-filter-card-toggle-icon fas fa-chevron-down transition-transform {% if card_expanded %}rotate-180{% endif %}"></i>
+        </button>
+    </div>
+    <div id="{{ (form_id or 'analytics-filter-form') ~ '-body' }}"
+         class="analytics-filter-card-body p-4 sm:p-6 pt-4 sm:pt-4{% if not card_expanded %} hidden{% endif %}">
+        <form method="{{ method }}" class="grid {{ grid_cols }} gap-4 items-end"{% if action %} action="{{ action }}"{% endif %}{% if form_id %} id="{{ form_id }}"{% endif %}>
+            {{ caller() }}
+        </form>
+    </div>
 </div>
+<script src="{{ static_url('js/core/filter-card.js') }}" defer></script>
 {% endmacro %}

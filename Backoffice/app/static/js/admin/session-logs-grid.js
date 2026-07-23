@@ -207,12 +207,19 @@
             '<i class="fas fa-sign-out-alt mr-1"></i>' + esc(logoutLabel) + '</button>';
     }
 
-    function applySessionLogsColumnOrder(api, visibilityManager) {
+    function syncSessionActionsColumnLayout(gridApi, columnDefs) {
+        if (typeof AgGridHelper !== 'undefined' && typeof AgGridHelper.syncActionsColumnLayout === 'function') {
+            AgGridHelper.syncActionsColumnLayout(columnDefs, gridApi);
+        }
+    }
+
+    function applySessionLogsColumnOrder(api, visibilityManager, columnDefs) {
         if (!api || typeof AgGridHelper === 'undefined' || typeof AgGridHelper.pinActionsColumn !== 'function') {
             return;
         }
         try {
             AgGridHelper.pinActionsColumn(api, SESSION_LOGS_COLUMN_ORDER, visibilityManager);
+            syncSessionActionsColumnLayout(api, columnDefs);
         } catch (e) {
             if (window.__clientWarn) window.__clientWarn('session logs column order', e);
         }
@@ -227,6 +234,7 @@
                 width: 110,
                 minWidth: 88,
                 maxWidth: 140,
+                hide: true,
                 filter: 'agNumberColumnFilter',
                 sortable: true,
                 cellClass: 'text-xs text-gray-800 tabular-nums',
@@ -440,6 +448,9 @@
                 sortable: false,
                 filter: false,
                 lockVisible: true,
+                suppressSizeToFit: true,
+                cellClass: 'session-log-actions-cell',
+                headerClass: 'session-log-actions-header',
                 context: {
                     __agGridHelper: {
                         skipMobileActionsOverflow: true
@@ -452,55 +463,11 @@
         ];
     }
 
-    function updatePaginationUi(state) {
-        var el = document.getElementById('session-logs-pagination');
-        if (!el) return;
-        var prev = document.getElementById('session-logs-page-prev');
-        var next = document.getElementById('session-logs-page-next');
-        var label = document.getElementById('session-logs-page-label');
-        var total = state.totalRows != null ? state.totalRows : 0;
-        var pages = state.totalPages != null ? state.totalPages : 0;
-        var page = state.currentPage != null ? state.currentPage : 1;
-
-        if (label) {
-            var tr = window.SESSION_LOGS_TRANSLATIONS || {};
-            if (total === 0) {
-                label.textContent = tr.noRows || '0 sessions';
-            } else {
-                label.textContent = (tr.pageOfTotal || 'Page {page} of {pages} ({total} total)')
-                    .replace('{page}', String(page))
-                    .replace('{pages}', String(Math.max(pages, 1)))
-                    .replace('{total}', String(total));
-            }
-        }
-        if (prev) {
-            prev.disabled = page <= 1 || total === 0;
-            prev.classList.toggle('opacity-50', page <= 1 || total === 0);
-        }
-        if (next) {
-            next.disabled = total === 0 || pages <= 0 || page >= pages;
-            next.classList.toggle('opacity-50', total === 0 || pages <= 0 || page >= pages);
-        }
-    }
-
-    function replaceUrlPage(page) {
-        try {
-            var u = new URL(window.location.href);
-            if (page <= 1) {
-                u.searchParams.delete('page');
-            } else {
-                u.searchParams.set('page', String(page));
-            }
-            window.history.replaceState({}, '', u.pathname + u.search + u.hash);
-        } catch (e) {
-            if (window.__clientWarn) window.__clientWarn('session logs replaceState failed', e);
-        }
-    }
-
-    async function fetchSessionPage(config, page) {
+    async function fetchSessionPage(config, page, perPage) {
         var sp = new URLSearchParams(window.location.search);
+        sp.delete('page');
         sp.set('page', String(page));
-        sp.set('per_page', String(config.perPage));
+        sp.set('per_page', String(perPage != null ? perPage : (config.fetchPerPage || 100)));
         var base = config.apiUrl;
         if (base.indexOf('?') !== -1) {
             base = base.split('?')[0];
@@ -518,6 +485,29 @@
             throw new Error((data && data.message) || 'Request failed');
         }
         return data;
+    }
+
+    async function fetchAllSessionRows(config) {
+        var perPage = Math.min(config.fetchPerPage || 100, 100);
+        var page = 1;
+        var allItems = [];
+        var totalPages = 1;
+
+        while (page <= totalPages) {
+            var payload = await fetchSessionPage(config, page, perPage);
+            var items = payload.items || [];
+            allItems = allItems.concat(items);
+            totalPages = payload.pages != null ? payload.pages : 1;
+            if (items.length === 0) {
+                break;
+            }
+            page += 1;
+            if (page > 1000) {
+                break;
+            }
+        }
+
+        return allItems;
     }
 
     function submitForceLogout(sessionId, config) {
@@ -559,35 +549,19 @@
         }
 
         var t = window.SESSION_LOGS_TRANSLATIONS || {};
-        var loadingEl = document.getElementById('sessionLogs-loading');
+        var loadingEl = document.getElementById('sessionLogsGrid-loading');
         var gridHost = document.getElementById('sessionLogsGrid');
         if (!gridHost) return;
 
-        var sp = new URLSearchParams(window.location.search);
-        var initialPage = parseInt(sp.get('page') || '1', 10);
-        if (isNaN(initialPage) || initialPage < 1) initialPage = 1;
-
-        var state = {
-            currentPage: initialPage,
-            totalPages: 0,
-            totalRows: 0,
-            gridHelper: null,
-            gridApi: null,
-            gridInitialized: false
-        };
-
-        function onPaginationClick(delta) {
-            var next = state.currentPage + delta;
-            if (next < 1 || (state.totalPages > 0 && next > state.totalPages)) return;
-            state.currentPage = next;
-            replaceUrlPage(next);
-            loadAndRender();
+        try {
+            var uClean = new URL(window.location.href);
+            if (uClean.searchParams.has('page')) {
+                uClean.searchParams.delete('page');
+                window.history.replaceState({}, '', uClean.pathname + uClean.search + uClean.hash);
+            }
+        } catch (ePage) {
+            if (window.__clientWarn) window.__clientWarn('session logs page param cleanup', ePage);
         }
-
-        var prevBtn = document.getElementById('session-logs-page-prev');
-        var nextBtn = document.getElementById('session-logs-page-next');
-        if (prevBtn) prevBtn.addEventListener('click', function() { onPaginationClick(-1); });
-        if (nextBtn) nextBtn.addEventListener('click', function() { onPaginationClick(1); });
 
         gridHost.addEventListener('click', function(ev) {
             var pathBtn = ev.target && ev.target.closest ? ev.target.closest('.session-path-breakdown-btn') : null;
@@ -619,66 +593,47 @@
         async function loadAndRender() {
             if (loadingEl) loadingEl.style.display = 'flex';
             try {
-                var payload = await fetchSessionPage(config, state.currentPage);
-                var items = payload.items || [];
-                state.totalPages = payload.pages != null ? payload.pages : 0;
-                state.totalRows = payload.total != null ? payload.total : items.length;
-                if (payload.page != null) state.currentPage = payload.page;
-
+                var items = await fetchAllSessionRows(config);
                 var rowData = items.map(mapRow);
+                var columnDefs = buildColumnDefs(t, config);
 
-                if (state.gridInitialized) {
-                    var api = state.gridApi || (state.gridHelper && state.gridHelper.gridApi);
-                    if (api && typeof api.setGridOption === 'function') {
-                        api.setGridOption('rowData', rowData);
-                    }
-                } else {
-                    state.gridInitialized = true;
-                    state.gridHelper = new AgGridHelper({
-                        containerId: 'sessionLogsGrid',
-                        templateId: 'admin-session-logs',
-                        columnDefs: buildColumnDefs(t, config),
-                        rowData: rowData,
-                        options: {
-                            pagination: false,
-                            getRowClass: function(params) {
-                                if (params.data && params.data.is_active) return 'session-log-row--active';
-                                return '';
-                            },
-                            onGridSizeChanged: function(ev) {
-                                if (ev && ev.api && typeof ev.api.sizeColumnsToFit === 'function') {
-                                    ev.api.sizeColumnsToFit({ defaultMinWidth: 80 });
-                                }
+                var result = AgGridHelper.create('sessionLogsGrid', 'admin-session-logs', columnDefs, rowData, {
+                    autoShow: true,
+                    gridOptions: {
+                        getRowClass: function(params) {
+                            if (params.data && params.data.is_active) return 'session-log-row--active';
+                            return '';
+                        },
+                        onGridSizeChanged: function(ev) {
+                            if (ev && ev.api && typeof ev.api.sizeColumnsToFit === 'function') {
+                                ev.api.sizeColumnsToFit({ defaultMinWidth: 80 });
                             }
-                        },
-                        heightOptions: {
-                            minHeight: 600,
-                            maxHeight: 600,
-                            minRowsToShow: 1,
-                            viewportOffset: 0
-                        },
-                        columnVisibilityOptions: {
-                            enableExport: false,
-                            enableReset: true,
-                            buttonPlaceholderId: 'session-logs-column-visibility-placeholder'
+                            syncSessionActionsColumnLayout(ev && ev.api, columnDefs);
                         }
-                    });
-                    state.gridApi = state.gridHelper.initialize();
-                    if (!state.gridApi && typeof state.gridHelper.initializeAsync === 'function') {
-                        try {
-                            state.gridApi = await state.gridHelper.initializeAsync(5000);
-                        } catch (e2) {
-                            console.error('Session logs grid async init failed', e2);
-                        }
+                    },
+                    height: {
+                        minHeight: 600,
+                        maxHeight: 600,
+                        minRowsToShow: 1,
+                        viewportOffset: 0
+                    },
+                    columnVisibility: {
+                        enableExport: false,
+                        enableReset: true
+                    },
+                    onReady: function(api, helper) {
+                        applySessionLogsColumnOrder(
+                            api,
+                            helper && helper.columnVisibilityManager,
+                            columnDefs
+                        );
                     }
-                    applySessionLogsColumnOrder(state.gridApi, state.gridHelper && state.gridHelper.columnVisibilityManager);
-                }
-
-                updatePaginationUi(state);
+                });
+                window.sessionLogsGridApi = result.api;
+                window.sessionLogsGridHelper = result.helper;
             } catch (err) {
                 console.error('Session logs grid:', err);
                 window.alert((t.loadError || 'Could not load session logs.') + (err && err.message ? ' ' + err.message : ''));
-            } finally {
                 if (loadingEl) loadingEl.style.display = 'none';
             }
         }

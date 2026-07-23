@@ -2121,7 +2121,7 @@
                                                               data-user-id="{{ activity.user.id }}"
                                                               data-user-external-id="{{ activity.user.external_id|string if activity.user.external_id else '' }}"
                                                               data-user-email="{{ activity.user.email }}">
-                                                            {{ activity.user.name or activity.user.email.split('@')[0] }}
+                                                        <span class="ag-user-hover-name">{{ activity.user.name or activity.user.email.split('@')[0] }}</span>
                                                         </span>
                                                     {% else %}
                                                         {{ _('Unknown User') }}
@@ -2365,8 +2365,12 @@
                             {{ get_localized_national_society_name(selected_country) }}
                         {% endif %}
                     </h2>
-                    {# Check if either list of focal points is not empty #}
-                    {% if ns_focal_points or org_focal_points %}
+                    {% set country_fds_member = selected_country.fds_member_user if selected_country and selected_country.fds_member_user else none %}
+                    {% set org_focal_point_ids = org_focal_points | map(attribute='id') | list %}
+                    {% set show_fds_member = country_fds_member and country_fds_member.id not in org_focal_point_ids %}
+                    {% set has_org_focal_section = org_focal_points or show_fds_member %}
+                    {# Check if either list of focal points (or assigned FDS member) is not empty #}
+                    {% if ns_focal_points or has_org_focal_section %}
                         {# National Society Focal Points #}
                         {% if ns_focal_points %}
                             <h3 class="text-lg font-semibold text-gray-800 mb-2">{{ _('National Society Focal Points') }}</h3>
@@ -2388,7 +2392,7 @@
                                                           data-user-id="{{ fp.id }}"
                                                           data-user-external-id="{{ fp.external_id|string if fp.external_id else '' }}"
                                                           data-user-email="{{ fp.email }}">
-                                                        {{ fp.name if fp.name else fp.email }}
+                                                        <span class="ag-user-hover-name">{{ fp.name if fp.name else fp.email }}</span>
                                                     </span>
                                                 </p>
                                                 {% if fp.title %}<p class="text-sm text-gray-600">{{ fp.title }}</p>{% endif %}
@@ -2416,56 +2420,112 @@
                         {% endif %}
 
                         {# Add a separator if both NS and secretariat lists exist #}
-                        {% if ns_focal_points and org_focal_points %}
+                        {% if ns_focal_points and has_org_focal_section %}
                             <div class="border-b border-red-500 w-full my-4"></div>
                         {% endif %}
 
-                        {# Organization Focal Points #}
-                        {% if org_focal_points %}
-                            <h3 class="text-lg font-semibold text-gray-800 mb-2">{{ ORG_SHORT_NAME }} {{ _('Focal Points') }}</h3>
-                            <ul class="divide-y divide-gray-200">
-                                {% for fp in org_focal_points %}
-                                    <li class="py-3 flex justify-between items-center">
-                                        <div class="flex items-center flex-1">
-                                            {# Profile Icon - Using macro to support profile pictures #}
-                                            <div class="ag-user-hover-trigger"
-                                                 data-user-id="{{ fp.id }}"
-                                                 data-user-external-id="{{ fp.external_id|string if fp.external_id else '' }}"
-                                                 data-user-email="{{ fp.email }}">
-                                                {{ profile_icon(fp, 'md', false, false, false, 'mr-3') }}
-                                            </div>
-                                            {# User Information #}
-                                            <div class="flex flex-col min-w-0 flex-1">
-                                                <p class="text-md font-semibold text-gray-800">
-                                                    <span class="ag-user-hover-trigger"
-                                                          data-user-id="{{ fp.id }}"
-                                                          data-user-external-id="{{ fp.external_id|string if fp.external_id else '' }}"
-                                                          data-user-email="{{ fp.email }}">
-                                                        {{ fp.name if fp.name else fp.email }}
-                                                    </span>
-                                                </p>
-                                                {% if fp.title %}<p class="text-sm text-gray-600">{{ fp.title }}</p>{% endif %}
-                                                <p class="text-sm text-gray-600">{{ fp.email }}</p>
-                                            </div>
-                                        </div>
-                                        {# Contact links #}
-                                        {% if fp.email %}
-                                            <div class="flex items-center ml-4 gap-2">
-                                                <a href="mailto:{{ fp.email }}" class="text-blue-600 hover:text-blue-800" title="{{ _('Email')|forceescape }} {{ fp.name if fp.name else fp.email }}">
-                                                    <i class="fas fa-envelope"></i>
-                                                </a>
-                                                <a href="msteams:/l/chat/0/0?users={{ fp.email|urlencode }}"
-                                                   data-teams-web-link="https://teams.microsoft.com/l/chat/0/0?users={{ fp.email|urlencode }}"
-                                                   class="ag-user-teams-link inline-flex items-center justify-center"
-                                                   title="{{ _('Teams Chat')|forceescape }} {{ fp.name if fp.name else fp.email }}"
-                                                   aria-label="{{ _('Teams Chat')|forceescape }}">
-                                                    <img src="{{ static_url('images/teams-icon.svg') }}" alt="" aria-hidden="true" class="w-4 h-4">
-                                                </a>
-                                            </div>
-                                        {% endif %}
-                                    </li>
-                                {% endfor %}
-                            </ul>
+                        {# Organization group (focal points + optional FDS member) #}
+                        {% if has_org_focal_section %}
+                            <h3 class="text-lg font-semibold text-gray-800 mb-3">{{ ORG_SHORT_NAME }}</h3>
+                            <div class="ml-1 pl-4 border-l-2 border-gray-200 space-y-4">
+                                {% if org_focal_points %}
+                                    <div>
+                                        <h4 class="text-base font-semibold text-gray-700 mb-2">{{ _('Focal Points') }}</h4>
+                                        <ul class="divide-y divide-gray-200">
+                                            {% for fp in org_focal_points %}
+                                                <li class="py-3 flex justify-between items-center">
+                                                    <div class="flex items-center flex-1">
+                                                        {# Profile Icon - Using macro to support profile pictures #}
+                                                        <div class="ag-user-hover-trigger"
+                                                             data-user-id="{{ fp.id }}"
+                                                             data-user-external-id="{{ fp.external_id|string if fp.external_id else '' }}"
+                                                             data-user-email="{{ fp.email }}">
+                                                            {{ profile_icon(fp, 'md', false, false, false, 'mr-3') }}
+                                                        </div>
+                                                        {# User Information #}
+                                                        <div class="flex flex-col min-w-0 flex-1">
+                                                            <p class="text-md font-semibold text-gray-800">
+                                                                <span class="ag-user-hover-trigger"
+                                                                      data-user-id="{{ fp.id }}"
+                                                                      data-user-external-id="{{ fp.external_id|string if fp.external_id else '' }}"
+                                                                      data-user-email="{{ fp.email }}">
+                                                                    <span class="ag-user-hover-name">{{ fp.name if fp.name else fp.email }}</span>
+                                                                </span>
+                                                            </p>
+                                                            {% if fp.title %}<p class="text-sm text-gray-600">{{ fp.title }}</p>{% endif %}
+                                                            <p class="text-sm text-gray-600">{{ fp.email }}</p>
+                                                        </div>
+                                                    </div>
+                                                    {# Contact links #}
+                                                    {% if fp.email %}
+                                                        <div class="flex items-center ml-4 gap-2">
+                                                            <a href="mailto:{{ fp.email }}" class="text-blue-600 hover:text-blue-800" title="{{ _('Email')|forceescape }} {{ fp.name if fp.name else fp.email }}">
+                                                                <i class="fas fa-envelope"></i>
+                                                            </a>
+                                                            <a href="msteams:/l/chat/0/0?users={{ fp.email|urlencode }}"
+                                                               data-teams-web-link="https://teams.microsoft.com/l/chat/0/0?users={{ fp.email|urlencode }}"
+                                                               class="ag-user-teams-link inline-flex items-center justify-center"
+                                                               title="{{ _('Teams Chat')|forceescape }} {{ fp.name if fp.name else fp.email }}"
+                                                               aria-label="{{ _('Teams Chat')|forceescape }}">
+                                                                <img src="{{ static_url('images/teams-icon.svg') }}" alt="" aria-hidden="true" class="w-4 h-4">
+                                                            </a>
+                                                        </div>
+                                                    {% endif %}
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% endif %}
+                                {% if show_fds_member %}
+                                    {% set fds = country_fds_member %}
+                                    <div>
+                                        <h4 class="text-base font-semibold text-gray-700 mb-2 inline-flex items-center gap-1.5">
+                                            {{ _('FDS Member') }}
+                                            <i class="fas fa-info-circle text-gray-400 text-sm cursor-help shrink-0"
+                                               title="{{ _('FDS: Federation Wide Data Systems')|forceescape }}"
+                                               aria-label="{{ _('FDS: Federation Wide Data Systems')|forceescape }}"></i>
+                                        </h4>
+                                        <ul class="divide-y divide-gray-200">
+                                            <li class="py-3 flex justify-between items-center">
+                                                <div class="flex items-center flex-1">
+                                                    <div class="ag-user-hover-trigger"
+                                                         data-user-id="{{ fds.id }}"
+                                                         data-user-external-id="{{ fds.external_id|string if fds.external_id else '' }}"
+                                                         data-user-email="{{ fds.email }}">
+                                                        {{ profile_icon(fds, 'md', false, false, false, 'mr-3') }}
+                                                    </div>
+                                                    <div class="flex flex-col min-w-0 flex-1">
+                                                        <p class="text-md font-semibold text-gray-800">
+                                                            <span class="ag-user-hover-trigger"
+                                                                  data-user-id="{{ fds.id }}"
+                                                                  data-user-external-id="{{ fds.external_id|string if fds.external_id else '' }}"
+                                                                  data-user-email="{{ fds.email }}">
+                                                                <span class="ag-user-hover-name">{{ fds.name if fds.name else fds.email }}</span>
+                                                            </span>
+                                                        </p>
+                                                        {% if fds.title %}<p class="text-sm text-gray-600">{{ fds.title }}</p>{% endif %}
+                                                        <p class="text-sm text-gray-600">{{ fds.email }}</p>
+                                                    </div>
+                                                </div>
+                                                {% if fds.email %}
+                                                    <div class="flex items-center ml-4 gap-2">
+                                                        <a href="mailto:{{ fds.email }}" class="text-blue-600 hover:text-blue-800" title="{{ _('Email')|forceescape }} {{ fds.name if fds.name else fds.email }}">
+                                                            <i class="fas fa-envelope"></i>
+                                                        </a>
+                                                        <a href="msteams:/l/chat/0/0?users={{ fds.email|urlencode }}"
+                                                           data-teams-web-link="https://teams.microsoft.com/l/chat/0/0?users={{ fds.email|urlencode }}"
+                                                           class="ag-user-teams-link inline-flex items-center justify-center"
+                                                           title="{{ _('Teams Chat')|forceescape }} {{ fds.name if fds.name else fds.email }}"
+                                                           aria-label="{{ _('Teams Chat')|forceescape }}">
+                                                            <img src="{{ static_url('images/teams-icon.svg') }}" alt="" aria-hidden="true" class="w-4 h-4">
+                                                        </a>
+                                                    </div>
+                                                {% endif %}
+                                            </li>
+                                        </ul>
+                                    </div>
+                                {% endif %}
+                            </div>
                         {% endif %}
                     {% else %}
                         <div class="text-center py-4">
@@ -2906,9 +2966,6 @@
 <link rel="stylesheet" href="{{ static_url('css/dashboard.css') }}">
 {# Include Chart.js library #}
 <script src="{{ static_url('libs/chart.umd.min.js') }}"></script>
-<link rel="stylesheet" href="{{ static_url('libs/user-hover-profile.css') }}">
-<script src="{{ static_url('libs/profile-initials.js') }}"></script>
-<script src="{{ static_url('libs/user-hover-profile.js') }}"></script>
 
 {# Include Enhanced Search Dropdown Component #}
 <link rel="stylesheet" href="{{ static_url('css/enhanced-search-dropdown.css') }}">

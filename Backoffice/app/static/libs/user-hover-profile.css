@@ -14,11 +14,17 @@
     display: inline-flex;
     flex-direction: column;
     min-width: 0;
+}
+
+.user-hover-details-enabled a.ag-user-hover-name,
+.user-hover-details-enabled a.ag-user-hover-avatar-link {
     cursor: pointer;
 }
 
-.ag-user-hover-trigger:hover .ag-user-hover-name {
+.user-hover-details-enabled .ag-user-hover-trigger:hover a.ag-user-hover-name,
+.user-hover-details-enabled a.ag-user-hover-name:hover {
     text-decoration: underline;
+    color: #2563eb;
 }
 
 .ag-user-hover-name {
@@ -119,4 +125,20 @@
 .ag-user-hover-label {
     color: #6b7280;
     font-weight: 600;
+}
+
+a.ag-user-hover-name {
+    color: inherit;
+    text-decoration: none;
+}
+
+a.ag-user-hover-avatar-link {
+    display: inline-flex;
+    text-decoration: none;
+    color: inherit;
+    border-radius: 9999px;
+}
+
+.user-hover-details-enabled a.ag-user-hover-avatar-link:hover {
+    opacity: 0.85;
 }

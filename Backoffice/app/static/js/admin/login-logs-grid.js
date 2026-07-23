@@ -379,6 +379,12 @@
                     if (api && typeof api.setGridOption === 'function') {
                         api.setGridOption('rowData', rowData);
                     }
+                    if (state.gridHelper) {
+                        state.gridHelper.config.rowData = rowData;
+                        if (typeof state.gridHelper.setResultCountTotal === 'function') {
+                            state.gridHelper.setResultCountTotal(state.totalRows);
+                        }
+                    }
                 } else {
                     state.gridInitialized = true;
                     state.gridHelper = new AgGridHelper({
@@ -388,6 +394,7 @@
                         rowData: rowData,
                         options: {
                             pagination: false,
+                            suppressPaginationPanel: true,
                             getRowClass: function(params) {
                                 if (params.data && params.data.is_suspicious) return 'login-log-row--suspicious';
                                 return '';
@@ -417,6 +424,9 @@
                         } catch (e2) {
                             console.error('Login logs grid async init failed', e2);
                         }
+                    }
+                    if (state.gridHelper && typeof state.gridHelper.setResultCountTotal === 'function') {
+                        state.gridHelper.setResultCountTotal(state.totalRows);
                     }
                 }
 

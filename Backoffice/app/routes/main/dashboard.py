@@ -845,6 +845,11 @@ def dashboard():
 
             # NEW: Fetch and categorize focal points for the selected context (only if country is known)
             if selected_country is not None:
+                selected_country = (
+                    Country.query.options(joinedload(Country.fds_member_user))
+                    .filter_by(id=selected_country.id)
+                    .first()
+                )
                 all_focal_points_for_country = (
                     User.query
                     .join(UserEntityPermission, User.id == UserEntityPermission.user_id)

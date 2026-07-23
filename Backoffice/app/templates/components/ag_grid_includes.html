@@ -37,7 +37,6 @@ Optionally call ag_grid_css() in the head block to preload custom CSS earlier
 <link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-set-filter-community.css') }}">
 <link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-column-visibility-manager.css') }}">
 <link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-grid-common-styles.css') }}">
-<link rel="stylesheet" href="{{ static_url('libs/user-hover-profile.css') }}">
 {% endmacro %}
 
 {# AG Grid JS includes (and custom CSS) - call in extra_js block #}
@@ -46,16 +45,13 @@ Optionally call ag_grid_css() in the head block to preload custom CSS earlier
 <link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-set-filter-community.css') }}">
 <link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-column-visibility-manager.css') }}">
 <link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-grid-common-styles.css') }}">
-<link rel="stylesheet" href="{{ static_url('libs/user-hover-profile.css') }}">
 <script src="{{ static_url('libs/ag-grid/ag-grid-community.min.js') }}"></script>
 <script src="{{ static_url('libs/ag-grid/ag-set-filter-community.js') }}"></script>
 <script src="{{ static_url('libs/ag-grid/ag-column-visibility-manager.js') }}"></script>
 <script src="{{ static_url('libs/ag-grid/ag-grid-helper.js') }}"></script>
 {# DateTimeUtils must load before cell-renderers so renderers can use it #}
 <script src="{{ static_url('js/lib/datetime-utils.js') }}"></script>
-<script src="{{ static_url('libs/profile-initials.js') }}"></script>
 <script src="{{ static_url('libs/ag-grid/ag-grid-cell-renderers.js') }}"></script>
-<script src="{{ static_url('libs/user-hover-profile.js') }}"></script>
 {% include "components/ag_grid_i18n_js.html" %}
 {% endmacro %}
 
@@ -79,8 +75,10 @@ Parameters:
 {% set grid_style = 'width: 100%;' ~ (' height: ' ~ grid_height ~ ';' if grid_height else '') %}
 {% if include_card %}<div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative {{ card_classes }}">{% endif %}
     {% if show_placeholder %}
-    <div class="flex justify-end items-center mb-4">
-        <div id="{{ placeholder }}"></div>
+    <div class="ag-grid-header-toolbar mb-4">
+        <div class="ag-grid-header-actions flex justify-end items-center">
+            <div id="{{ placeholder }}"></div>
+        </div>
     </div>
     {% endif %}
     {% if show_loading_overlay %}

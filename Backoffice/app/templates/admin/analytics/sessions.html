@@ -1,6 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "macros/filter_card.html" import filter_card %}
-{% from "components/ag_grid_includes.html" import ag_grid_loading %}
+{% from "components/ag_grid_includes.html" import ag_grid_container %}
 
 {% from "components/_page_header.html" import page_header %}
 {% block title %}{{ _('Session Logs') }} - {{ _('Admin Panel') }}{% endblock %}
@@ -11,7 +11,7 @@
     .ag-row.session-log-row--active {
         background-color: #ecfdf5 !important;
     }
-    .admin-sessions-logs-wrap .relative {
+    .admin-sessions-logs-wrap {
         min-height: 600px;
     }
     /* Compact pinned actions column on phones */
@@ -97,36 +97,8 @@
         </div>
     {% endcall %}
 
-    <div class="admin-sessions-logs-container bg-white shadow-md border border-gray-200 admin-sessions-logs-wrap">
-        <div class="p-6">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-4">
-                <div class="min-w-0 flex-1" data-ag-grid-title-group>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('User sessions') }}</label>
-                    <p class="text-xs text-gray-500">
-                        {{ _('Browse sessions with sortable columns and filters. Pagination matches your current filter query.') }}
-                    </p>
-                </div>
-                <div class="flex flex-shrink-0 justify-end sm:pt-0.5">
-                    <div id="session-logs-column-visibility-placeholder"></div>
-                </div>
-            </div>
-
-            <div class="relative">
-                {{ ag_grid_loading('sessionLogs', loading_text=_('Loading sessions…')) }}
-                <div id="sessionLogsGrid" class="ag-theme-alpine" style="width: 100%; height: 600px;"
-                     data-placeholder-id="session-logs-column-visibility-placeholder"></div>
-            </div>
-
-            <div id="session-logs-pagination" class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200 pt-4">
-                <button type="button" id="session-logs-page-prev" class="btn btn-secondary btn-sm order-2 sm:order-1">
-                    <i class="fas fa-chevron-left mr-1"></i>{{ _('Previous') }}
-                </button>
-                <span id="session-logs-page-label" class="text-sm text-gray-600 order-1 sm:order-2 text-center"></span>
-                <button type="button" id="session-logs-page-next" class="btn btn-secondary btn-sm order-3">
-                    {{ _('Next') }}<i class="fas fa-chevron-right ml-1"></i>
-                </button>
-            </div>
-        </div>
+    <div class="admin-sessions-logs-wrap relative">
+        {{ ag_grid_container('sessionLogsGrid', loading_text=_('Loading sessions…'), grid_height='600px') }}
     </div>
 </div>
 {% endblock %}
@@ -137,7 +109,7 @@
 <script src="{{ static_url('js/admin/session-logs-grid.js') }}"></script>
 {% set session_logs_grid_bootstrap = {
     'apiUrl': url_for('admin_analytics_api.session_logs_list_api'),
-    'perPage': 50,
+    'fetchPerPage': 100,
     'endSessionUrlTemplate': url_for('analytics.end_session', session_id='SESSION_ID_PLACEHOLDER'),
     'confirmForceLogout': _('Are you sure you want to force logout this user? They will be logged out on their next request.'),
     'auditTrailUrl': url_for('analytics.audit_trail'),
@@ -164,7 +136,6 @@
         'actions': _('Actions'),
         'forceLogout': _('Force logout'),
         'sessionEnded': _('Session ended'),
-        'pageOfTotal': _('Page {page} of {pages} ({total} total)'),
         'noRows': _('No sessions'),
         'loadError': _('Could not load session logs.'),
         'openActivitiesInAudit': _('Open activities in audit trail'),

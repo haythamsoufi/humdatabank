@@ -551,7 +551,29 @@ html[dir="rtl"] .ag-actions-overflow-menu {
     display: none !important;
 }
 
+/* Server/API paginated grids (session logs, login logs, …) use their own footer */
+.ag-grid-external-pagination .ag-paging-panel,
+.ag-paging-panel.ag-hidden {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    visibility: hidden !important;
+    border: none !important;
+}
+
 @media (max-width: 768px) {
+    /* Compact actions column: cap pinned-right pane width (cells alone are not enough) */
+    .ag-pinned-right-cols-container,
+    .ag-pinned-right-header {
+        flex: 0 0 2.75rem !important;
+        width: 2.75rem !important;
+        min-width: 2.75rem !important;
+        max-width: 2.75rem !important;
+    }
+
     /* Compact actions column: minimal header chrome, no pinned-right seam */
     .ag-pinned-right-header {
         border-left: none !important;
@@ -601,12 +623,12 @@ html[dir="rtl"] .ag-actions-overflow-menu {
         padding-right: 0 !important;
     }
 
-    /* Pagination: avoid broken word-wrapping on narrow screens */
-    .ag-theme-alpine .ag-paging-panel,
-    .ag-theme-balham .ag-paging-panel,
-    .ag-theme-quartz .ag-paging-panel,
-    .ag-theme-material .ag-paging-panel,
-    .ag-paging-panel {
+    /* Pagination: avoid broken word-wrapping on narrow screens (not hidden / external pager) */
+    .ag-theme-alpine:not(.ag-grid-external-pagination) .ag-paging-panel:not(.ag-hidden),
+    .ag-theme-balham:not(.ag-grid-external-pagination) .ag-paging-panel:not(.ag-hidden),
+    .ag-theme-quartz:not(.ag-grid-external-pagination) .ag-paging-panel:not(.ag-hidden),
+    .ag-theme-material:not(.ag-grid-external-pagination) .ag-paging-panel:not(.ag-hidden),
+    .ag-root-wrapper:not(.ag-grid-external-pagination) .ag-paging-panel:not(.ag-hidden) {
         display: flex !important;
         flex-wrap: wrap !important;
         align-items: center !important;
@@ -617,12 +639,24 @@ html[dir="rtl"] .ag-actions-overflow-menu {
         gap: 4px 10px !important;
     }
 
-    .ag-paging-panel > * {
+    .ag-grid-external-pagination .ag-paging-panel,
+    .ag-paging-panel.ag-hidden {
+        display: none !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+        visibility: hidden !important;
+        border: none !important;
+    }
+
+    .ag-paging-panel:not(.ag-hidden) > * {
         margin: 0 !important;
     }
 
     .ag-paging-page-size {
-        flex: 1 1 100%;
+        flex: 0 1 auto !important;
         display: flex !important;
         align-items: center !important;
         gap: 6px !important;
@@ -638,7 +672,13 @@ html[dir="rtl"] .ag-actions-overflow-menu {
         white-space: nowrap !important;
         font-size: 0.75rem !important;
         line-height: 1.25 !important;
-        gap: 2px !important;
+        gap: 4px !important;
+        flex-shrink: 0 !important;
+    }
+
+    .ag-paging-row-summary-panel-number,
+    .ag-paging-number {
+        flex-shrink: 0 !important;
     }
 
     /* Row count is enough on phones; "Page 1 of 1" wraps awkwardly */

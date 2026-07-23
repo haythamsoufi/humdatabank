@@ -396,7 +396,7 @@
             }
 
             var html = '<div class="ag-user-hover-cell" style="display:flex;width:100%;max-width:100%;min-width:0;overflow:hidden;box-sizing:border-box;">';
-            html += '<span class="ag-user-hover-trigger" style="display:flex;flex:1 1 0%;flex-direction:column;min-width:0;max-width:100%;overflow:hidden;cursor:pointer;"';
+            html += '<span class="ag-user-hover-trigger" style="display:flex;flex:1 1 0%;flex-direction:column;min-width:0;max-width:100%;overflow:hidden;"';
             if (userId !== null && userId !== undefined && userId !== '') {
                 html += ' data-user-id="' + escapeHtmlAttr(userId) + '"';
             }
@@ -493,7 +493,7 @@
             var emailPad = '1.75rem';
 
             var html = '<div class="ag-user-hover-cell" style="display:flex;width:100%;max-width:100%;min-width:0;overflow:hidden;box-sizing:border-box;">';
-            html += '<span class="ag-user-hover-trigger" style="display:flex;flex:1 1 0%;flex-direction:column;gap:4px;min-width:0;max-width:100%;overflow:hidden;cursor:pointer;"';
+            html += '<span class="ag-user-hover-trigger" style="display:flex;flex:1 1 0%;flex-direction:column;gap:4px;min-width:0;max-width:100%;overflow:hidden;"';
             if (userId !== null && userId !== undefined && userId !== '') {
                 html += ' data-user-id="' + escapeHtmlAttr(userId) + '"';
             }
@@ -653,7 +653,7 @@
                 width: options.width || 80,
                 minWidth: options.minWidth || 80,
                 maxWidth: options.maxWidth || 120,
-                lockVisible: options.lockVisible !== false,
+                hide: options.hide !== false,
                 filter: 'agNumberColumnFilter',
                 sortable: true
             };

@@ -437,7 +437,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Mobile FAB and Floating Menu Logic ---
+    // --- Mobile FAB and side drawer menu ---
     const mobileMenuFAB = document.getElementById('mobileMenuFAB');
     const mobileMenuFABIcon = document.getElementById('mobileMenuFABIcon');
     const mobileFloatingMenu = document.getElementById('mobileFloatingMenu');
@@ -465,6 +465,10 @@ document.addEventListener('DOMContentLoaded', function() {
             mobileMenuScrim.classList.toggle('scrim-visible', isOpen);
             mobileMenuFAB.classList.toggle('fab-active', isOpen);
             if(mobileMenuFAB) mobileMenuFAB.setAttribute('aria-expanded', isOpen.toString());
+            if (!isOpen) {
+                mobileFloatingMenu.classList.remove('mobile-menu-dragging');
+                mobileFloatingMenu.style.removeProperty('transform');
+            }
 
             if (isOpen) {
                 if(mobileMenuFABIcon) {
@@ -489,6 +493,81 @@ document.addEventListener('DOMContentLoaded', function() {
                 setTimeout(() => toggleMobileMenu(false), 100);
             });
         });
+
+        const mobileLanguageBtn = document.getElementById('mobileLanguageMenuButton');
+        const mobileLanguageModalEl = document.getElementById('mobileLanguageModal');
+        if (mobileLanguageBtn && mobileLanguageModalEl && window.ModalUtils) {
+            const languageModal = window.ModalUtils.makeModal(mobileLanguageModalEl, {
+                closeSelector: '.close-modal',
+                onOpen: function() {
+                    mobileLanguageBtn.setAttribute('aria-expanded', 'true');
+                },
+                onClose: function() {
+                    mobileLanguageBtn.setAttribute('aria-expanded', 'false');
+                }
+            });
+            mobileLanguageBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                languageModal.openModal();
+            });
+            mobileLanguageModalEl.querySelectorAll('.mobile-language-modal-option').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    languageModal.closeModal();
+                });
+            });
+        }
+
+        // Swipe toward edge to dismiss (side drawer)
+        let dragStartX = 0;
+        let dragCurrentX = 0;
+        let dragActive = false;
+
+        const isRtl = () => document.documentElement.getAttribute('dir') === 'rtl';
+
+        const onDragStart = (clientX) => {
+            if (!window.matchMedia('(max-width: 768px)').matches) return;
+            if (!mobileFloatingMenu.classList.contains('menu-open')) return;
+            dragActive = true;
+            dragStartX = clientX;
+            dragCurrentX = clientX;
+            mobileFloatingMenu.classList.add('mobile-menu-dragging');
+        };
+
+        const onDragMove = (clientX) => {
+            if (!dragActive) return;
+            dragCurrentX = clientX;
+            const rtl = isRtl();
+            const delta = rtl ? (dragCurrentX - dragStartX) : (dragStartX - dragCurrentX);
+            const offset = Math.max(0, Math.min(delta, mobileFloatingMenu.offsetWidth));
+            mobileFloatingMenu.style.transform = rtl
+                ? 'translateX(' + offset + 'px)'
+                : 'translateX(-' + offset + 'px)';
+        };
+
+        const onDragEnd = () => {
+            if (!dragActive) return;
+            dragActive = false;
+            mobileFloatingMenu.classList.remove('mobile-menu-dragging');
+            mobileFloatingMenu.style.removeProperty('transform');
+            const rtl = isRtl();
+            const shouldClose = rtl
+                ? (dragCurrentX - dragStartX) > 72
+                : (dragStartX - dragCurrentX) > 72;
+            if (shouldClose) toggleMobileMenu(false);
+        };
+
+        mobileFloatingMenu.addEventListener('touchstart', (e) => {
+            if (e.touches.length !== 1) return;
+            onDragStart(e.touches[0].clientX);
+        }, { passive: true });
+
+        mobileFloatingMenu.addEventListener('touchmove', (e) => {
+            if (!dragActive || e.touches.length !== 1) return;
+            onDragMove(e.touches[0].clientX);
+        }, { passive: true });
+
+        mobileFloatingMenu.addEventListener('touchend', onDragEnd, { passive: true });
+        mobileFloatingMenu.addEventListener('touchcancel', onDragEnd, { passive: true });
     }
 
     // --- Sidebar Scroll Position Management ---

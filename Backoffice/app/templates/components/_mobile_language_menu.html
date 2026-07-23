@@ -1,0 +1,47 @@
+{% from "components/_svg_icons.html" import svg_icon %}
+{% from "macros/modal_shell.html" import modal_shell %}
+
+{% macro mobile_language_nav_button() %}
+{% set current_lang = current_ui_language() %}
+{% set current_lang_name = (language_native_name(current_lang) or LANGUAGE_DISPLAY_NAMES.get(current_lang) or ALL_LANGUAGES_DISPLAY_NAMES.get(current_lang) or current_lang.upper()) %}
+<div class="mobile-language-menu-section">
+    <button type="button"
+            id="mobileLanguageMenuButton"
+            class="mobile-language-menu-btn"
+            aria-haspopup="dialog"
+            aria-controls="mobileLanguageModal"
+            aria-expanded="false">
+        <span class="mobile-language-menu-btn__icon" aria-hidden="true">
+            {{ svg_icon('language', 'w-5 h-5') }}
+        </span>
+        <span class="mobile-language-menu-btn__body">
+            <span class="mobile-language-menu-btn__label">{{ _('Language') }}</span>
+            <span class="mobile-language-menu-btn__value" title="{{ current_lang_name|forceescape }}">{{ current_lang_name }}</span>
+        </span>
+        <i class="fas fa-chevron-right mobile-language-menu-btn__chevron" aria-hidden="true"></i>
+    </button>
+</div>
+{% endmacro %}
+
+{% macro mobile_language_modal() %}
+{% set current_lang = current_ui_language() %}
+{% call modal_shell('mobileLanguageModal', _('Choose language'), max_width='max-w-sm', z_index=1200, content_class='p-0') %}
+<ul class="mobile-language-modal-list divide-y divide-gray-100 -mx-2">
+    {% for code in SUPPORTED_LANGUAGES %}
+        {% set code_norm = (code|string|lower|replace('-', '_')) %}
+        {% set code_base = (code_norm.split('_')[0] if code_norm else code) %}
+        {% set lang_name = (language_native_name(code_base) or LANGUAGE_DISPLAY_NAMES.get(code_base) or ALL_LANGUAGES_DISPLAY_NAMES.get(code_base) or code_base.upper()) %}
+        <li>
+            <a href="{{ url_for('main.set_language', language=code_base) }}"
+               class="mobile-language-modal-option language-option flex items-center gap-3 px-3 py-3 text-sm text-gray-700 hover:bg-gray-50 {% if current_lang == code_base %}active{% endif %}"
+               {% if current_lang == code_base %}aria-current="true"{% endif %}>
+                {% if SHOW_LANGUAGE_FLAGS %}
+                <img src="{{ url_for('main.language_flag_svg', language=code_base) }}" alt="" class="inline-block w-6 h-6 shrink-0" loading="lazy" decoding="async">
+                {% endif %}
+                <span class="min-w-0 flex-1">{{ lang_name }}</span>
+            </a>
+        </li>
+    {% endfor %}
+</ul>
+{% endcall %}
+{% endmacro %}

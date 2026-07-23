@@ -276,7 +276,7 @@
 
     // Column definitions for ag-grid
     const columnDefs = [
-        { field: 'id', headerName: {{ _("ID")|tojson|safe }}, width: 90, minWidth: 80, maxWidth: 120, filter: 'agNumberColumnFilter', sortable: true, cellClass: 'font-mono', wrapText: false, autoHeight: false, cellStyle: { 'white-space': 'nowrap' } },
+        { field: 'id', headerName: {{ _("ID")|tojson|safe }}, width: 90, minWidth: 80, maxWidth: 120, hide: true, filter: 'agNumberColumnFilter', sortable: true, cellClass: 'font-mono', wrapText: false, autoHeight: false, cellStyle: { 'white-space': 'nowrap' } },
         {
             field: 'query',
             headerName: {{ _("Query")|tojson|safe }},

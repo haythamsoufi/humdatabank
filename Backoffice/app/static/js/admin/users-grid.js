@@ -211,7 +211,7 @@
             field: 'id',
             headerName: t.id_e369853d,
             width: 80, minWidth: 80, maxWidth: 120,
-            lockVisible: true,
+            hide: true,
             filter: 'agNumberColumnFilter', sortable: true,
             sort: 'asc', sortIndex: 0,
             wrapText: false, autoHeight: false,

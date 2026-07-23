@@ -1,5 +1,6 @@
 {% from "components/_svg_icons.html" import svg_icon %}
 {% from "components/_profile_icon.html" import profile_icon, profile_icon_button, profile_icon_tooltip %}
+{% from "components/_mobile_language_menu.html" import mobile_language_nav_button, mobile_language_modal %}
 {% set _ui_language = current_ui_language() %}
 <!DOCTYPE html>
 <html lang="{{ _ui_language }}"{% if mobile_app_embedded|default(false) %} data-mobile-app="true" class="mobile-app mobile-app-embedded"{% endif %}>
@@ -180,7 +181,8 @@
 {% set nav_documentation_active = request.endpoint and request.endpoint.startswith('help_docs.') %}
 {# Use centralized is_admin_user helper from AuthorizationService #}
 {% set is_admin_user = is_admin_user() %}
-<body class="bg-gray-100 font-sans {% if is_focal_point %}focal-point{% endif %}{% if show_staging_banner %} has-staging-banner{% endif %}" data-language="{{ _ui_language }}">
+{% set can_manage_users = is_system_manager or has_permission('admin.users.edit') %}
+<body class="bg-gray-100 font-sans {% if is_focal_point %}focal-point{% endif %}{% if show_staging_banner %} has-staging-banner{% endif %}{% if can_manage_users %} user-hover-details-enabled{% endif %}" data-language="{{ _ui_language }}">
     {% include 'components/_staging_environment_banner.html' %}
     <div class="flex h-screen staging-app-shell">
         {% if is_admin_user %}
@@ -383,7 +385,7 @@
     </button>
     <div id="mobileMenuScrim"></div>
     <div id="mobileFloatingMenu" role="dialog" aria-modal="true" aria-labelledby="mobileMenuTitle">
-        <div class="flex items-center justify-between p-4 border-b border-gray-700">
+        <div class="mobile-menu-header flex items-center justify-between">
             <h2 id="mobileMenuTitle" class="text-lg font-semibold">{{ _('Menu') }}</h2>
             <button type="button" id="mobileMenuCloseButton" class="btn btn-icon btn-sm text-gray-300 border-0 shadow-none bg-transparent hover:bg-gray-700 hover:text-white" aria-label="{{ _('Close menu')|forceescape }}">
                 <i class="fas fa-times fa-fw h-6 w-6"></i>
@@ -394,25 +396,7 @@
                 {% if is_admin_user %}
                 {% include 'components/_sidebar_nav_categories.html' with context %}
 
-                {# Mobile Language Selector for Admin #}
-                <div class="space-y-2 mt-4" data-category="language">
-                    <div class="collapsable-category-title">
-                         <h3 class="sidebar-section-title">{{ _('Language') }}</h3>
-                         {{ svg_icon('chevron-right', 'collapsable-icon w-4 h-4') }}
-                    </div>
-                    <div class="collapsable-content">
-                        {% for code in SUPPORTED_LANGUAGES %}
-                            {% set code_norm = (code|string|lower|replace('-', '_')) %}
-                            {% set code_base = (code_norm.split('_')[0] if code_norm else code) %}
-                            <a href="{{ url_for('main.set_language', language=code_base) }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white {% if _ui_language == code_base %}active{% endif %}" title="{{ (language_native_name(code_base) or LANGUAGE_DISPLAY_NAMES.get(code_base) or ALL_LANGUAGES_DISPLAY_NAMES.get(code_base) or code_base.upper()) }}">
-                                {% if SHOW_LANGUAGE_FLAGS %}
-                                <img src="{{ url_for('main.language_flag_svg', language=code_base) }}" alt="" class="inline-block w-6 h-6 mr-3 align-text-bottom" loading="lazy" decoding="async">
-                                {% endif %}
-                                <span class="sidebar-text">{{ (language_native_name(code_base) or LANGUAGE_DISPLAY_NAMES.get(code_base) or ALL_LANGUAGES_DISPLAY_NAMES.get(code_base) or code_base.upper()) }}</span>
-                            </a>
-                        {% endfor %}
-                    </div>
-                </div>
+                {{ mobile_language_nav_button() }}
                 {% else %}
                 {# Mobile Menu - Assignment Roles (Viewer/Editor&Submitter/Approver) #}
                 {% if is_assignment_user %}
@@ -440,25 +424,7 @@
                 </div>
                 {% endif %}
 
-                {# Mobile Language Selector #}
-                <div class="space-y-2 mt-4" data-category="language">
-                    <div class="collapsable-category-title">
-                         <h3 class="sidebar-section-title">{{ _('Language') }}</h3>
-                         {{ svg_icon('chevron-right', 'collapsable-icon w-4 h-4') }}
-                    </div>
-                    <div class="collapsable-content">
-                        {% for code in SUPPORTED_LANGUAGES %}
-                            {% set code_norm = (code|string|lower|replace('-', '_')) %}
-                            {% set code_base = (code_norm.split('_')[0] if code_norm else code) %}
-                            <a href="{{ url_for('main.set_language', language=code_base) }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white {% if _ui_language == code_base %}active{% endif %}" title="{{ (language_native_name(code_base) or LANGUAGE_DISPLAY_NAMES.get(code_base) or ALL_LANGUAGES_DISPLAY_NAMES.get(code_base) or code_base.upper()) }}">
-                                {% if SHOW_LANGUAGE_FLAGS %}
-                                <img src="{{ url_for('main.language_flag_svg', language=code_base) }}" alt="" class="inline-block w-6 h-6 mr-3 align-text-bottom" loading="lazy" decoding="async">
-                                {% endif %}
-                                <span class="sidebar-text">{{ (language_native_name(code_base) or LANGUAGE_DISPLAY_NAMES.get(code_base) or ALL_LANGUAGES_DISPLAY_NAMES.get(code_base) or code_base.upper()) }}</span>
-                            </a>
-                        {% endfor %}
-                    </div>
-                </div>
+                {{ mobile_language_nav_button() }}
                 {% endif %}
             {% endblock %}
         </nav>
@@ -466,6 +432,7 @@
              {{ _('Powered by') }} <a href="https://github.com/haythamsoufi/humdatabank" target="_blank" rel="noopener noreferrer" class="text-blue-300 hover:text-blue-200 underline transition-colors duration-150">{{ _('Humanitarian Databank') }} <i class="fas fa-external-link-alt text-xs ml-1" aria-hidden="true"></i></a>
         </div>
     </div>
+    {{ mobile_language_modal() }}
     {% endif %}
 
     <!-- AI Chatbot (markup stays even when skip_layout_chatbot defers JS/CSS; FAB binds after lazy load) -->
@@ -624,13 +591,18 @@
     {% endif %}
 
     {# Global config for user hover profile popups #}
-    {% set can_manage_users = is_system_manager or has_permission('admin.users.edit') %}
-    {% if can_manage_users %}
     <script nonce="{{ csp_nonce() }}">
     window.UserHoverProfileConfig = window.UserHoverProfileConfig || {};
+    window.UserHoverProfileConfig.canLinkUserDetails = {{ can_manage_users|tojson|safe }};
+    {% if can_manage_users %}
     window.UserHoverProfileConfig.userDetailUrlPattern = {{ url_for('user_management.edit_user', user_id=0)|replace('0', '{id}')|tojson|safe }};
-    </script>
     {% endif %}
+    </script>
+
+    {# User hover profile popups + detail links (global) #}
+    <link rel="stylesheet" href="{{ static_url('libs/user-hover-profile.css') }}">
+    <script src="{{ static_url('libs/profile-initials.js') }}"></script>
+    <script src="{{ static_url('libs/user-hover-profile.js') }}"></script>
 
     {# Centralized AG Grid i18n for all pages (used by ag-grid helper/libs when loaded) #}
     {% include "components/ag_grid_i18n_js.html" %}

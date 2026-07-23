@@ -7,6 +7,62 @@
  * with Backoffice .btn / theme), including pages that do not wrap the grid in .sharp-ui.
  */
 
+/* Unified grid header: title/meta + record count + column controls on one row */
+.ag-grid-header-toolbar {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+}
+
+.ag-grid-header-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.ag-grid-header-meta > label,
+.ag-grid-header-meta > h1,
+.ag-grid-header-meta > h2,
+.ag-grid-header-meta > h3,
+.ag-grid-header-meta > h4,
+.ag-grid-header-meta > p {
+    margin-top: 0;
+}
+
+.ag-grid-header-meta > p {
+    margin-bottom: 0;
+}
+
+.ag-grid-header-meta .ag-grid-result-count {
+    display: block;
+    min-height: 0;
+    padding: 0;
+    margin: 0.25rem 0 0;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    font-weight: 500;
+    color: #6b7280;
+}
+
+.ag-grid-header-actions {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+    flex: 0 0 auto !important;
+    margin-inline-start: auto !important;
+    min-width: 0;
+}
+
+.ag-grid-header-actions [id*="column-visibility-button-placeholder"],
+.ag-grid-header-actions [id*="-colvis"],
+.ag-grid-header-actions [id*="col-vis"] {
+    justify-content: flex-end !important;
+}
+
 /* Placeholders — any id containing column-visibility-button-placeholder */
 [id*="column-visibility-button-placeholder"],
 #column-visibility-button-placeholder,
@@ -38,10 +94,10 @@
     min-height: 30px;
     padding: 6px 0;
     margin: 0;
-    font-size: 13px;
+    font-size: 0.75rem;
     line-height: 1.25;
-    font-weight: 600;
-    color: #374151;
+    font-weight: 500;
+    color: #6b7280;
     white-space: nowrap;
     font-family: inherit;
 }
@@ -51,13 +107,14 @@ h1 .ag-grid-result-count,
 h2 .ag-grid-result-count,
 h3 .ag-grid-result-count,
 h4 .ag-grid-result-count {
-    display: inline;
+    display: block;
     min-height: 0;
     padding: 0;
-    margin-left: 4px;
-    font-size: inherit;
-    font-weight: inherit;
-    color: inherit;
+    margin: 0.125rem 0 0;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    font-weight: 500;
+    color: #6b7280;
 }
 
 .ag-grid-result-count-row {
@@ -564,6 +621,22 @@ button.ag-clear-filters-button i {
         right: 10px;
         left: 10px;
         max-width: none;
+    }
+
+    .ag-grid-header-toolbar {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+
+    .ag-grid-header-meta {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .ag-grid-header-actions {
+        flex-shrink: 0 !important;
     }
 
     .ag-grid-toolbar-row,

@@ -599,33 +599,6 @@ def handle_assignment_form(aes_id):
                     except Exception as e:
                         current_app.logger.debug("Default value parsing failed: %s", e)
 
-                if resolved_variables:
-                    label_text = getattr(field, 'label', '') or ''
-                    desc_text = getattr(field, 'definition', '') or getattr(field, 'description', '') or ''
-                    combined_text = f"{label_text} {desc_text}"
-
-                    variable_pattern = r'\[(\w+)\]'
-                    matches = re.findall(variable_pattern, combined_text)
-
-                    if matches:
-                        for var_name in matches:
-                            if var_name in resolved_variables:
-                                var_value = resolved_variables[var_name]
-                                if var_value is not None and str(var_value).strip():
-                                    try:
-                                        num_value = float(var_value)
-                                        existing_data_processed[field_key] = num_value
-
-                                        existing_data_processed[f'{field_key}_is_prefilled'] = True
-                                        if template_version and template_version.variables:
-                                            var_config = template_version.variables.get(var_name, {})
-                                            if var_config.get('is_readonly', False):
-                                                existing_data_processed[f'{field_key}_is_readonly'] = True
-
-                                        break
-                                    except (ValueError, TypeError):
-                                        continue
-
     _entry_lap("default_values")
 
     repeat_instances = RepeatGroupInstance.query.filter_by(

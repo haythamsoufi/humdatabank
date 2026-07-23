@@ -526,6 +526,11 @@ function __savedVariableCellIsUserModified(savedValue) {
     return savedValue !== null && typeof savedValue === 'object' && savedValue.isModified === true;
 }
 
+/** Legacy lookup mirror blob that should refresh from source when lookup changes (not user submissions). */
+function __savedVariableCellIsStaleLookupMirror(savedValue) {
+    return savedValue !== null && typeof savedValue === 'object' && savedValue.isModified !== true;
+}
+
 function __formatLookupValueForInput(inputType, lookupValue) {
     if (inputType === 'checkbox') {
         return (lookupValue === '1' || lookupValue === 1 || lookupValue === true || lookupValue === 'true') ? '1' : '0';
@@ -3237,7 +3242,7 @@ class MatrixHandler {
                 : lookupValue;
             const staleUnmodifiedSave = hasSaved
                 && lookupValue !== ''
-                && !__savedVariableCellIsUserModified(savedRaw)
+                && __savedVariableCellIsStaleLookupMirror(savedRaw)
                 && __variableCellDiffersFromLookup(lookupValue, savedScalar, input.type);
 
             if (hasSaved && !staleUnmodifiedSave) {
@@ -4352,7 +4357,7 @@ class MatrixHandler {
 
                 if (isVariable) {
                     displayValue = __getSavedMatrixCellScalar(value);
-                    updatedMatrix.data[cellKey] = displayValue;
+                    updatedMatrix.data[cellKey] = value;
                 } else {
                     updatedMatrix.data[cellKey] = value;
                 }

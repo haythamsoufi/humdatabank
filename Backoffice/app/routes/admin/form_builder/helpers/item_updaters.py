@@ -770,24 +770,32 @@ def _update_item_config(form_item, form, request_form):
         current_app.logger.debug("form_item privacy parse failed: %s", e)
         form_item.config['privacy'] = 'ifrc_network'
 
-    form_item.config['carry_forward'] = 'carry_forward' in request_form
-    carry_forward_sources_raw = request_form.get('carry_forward_sources', '[]')
-    try:
-        parsed_sources = json.loads(carry_forward_sources_raw) if carry_forward_sources_raw else []
-    except (json.JSONDecodeError, TypeError):
-        parsed_sources = []
-    normalized_sources = []
+    carry_forward_enabled = 'carry_forward' in request_form
+    form_item.config['carry_forward'] = carry_forward_enabled
+
     from app.services.carry_forward_service import CarryForwardService
 
-    if isinstance(parsed_sources, list):
-        for source in parsed_sources:
-            normalized = CarryForwardService.normalize_source_for_storage(source)
-            if normalized:
-                normalized_sources.append(normalized)
-    form_item.config['carry_forward_sources'] = normalized_sources
+    if carry_forward_enabled:
+        carry_forward_sources_raw = request_form.get('carry_forward_sources', '[]')
+        try:
+            parsed_sources = json.loads(carry_forward_sources_raw) if carry_forward_sources_raw else []
+        except (json.JSONDecodeError, TypeError):
+            parsed_sources = []
+        normalized_sources = []
+        if isinstance(parsed_sources, list):
+            for source in parsed_sources:
+                normalized = CarryForwardService.normalize_source_for_storage(source)
+                if normalized:
+                    normalized_sources.append(normalized)
+        form_item.config['carry_forward_sources'] = normalized_sources
 
-    priority_raw = request_form.get('carry_forward_priority', 'source')
-    form_item.config['carry_forward_priority'] = CarryForwardService.normalize_priority_for_storage(priority_raw)
+        priority_raw = request_form.get('carry_forward_priority', 'source')
+        form_item.config['carry_forward_priority'] = (
+            CarryForwardService.normalize_priority_for_storage(priority_raw)
+        )
+    else:
+        form_item.config.pop('carry_forward_sources', None)
+        form_item.config.pop('carry_forward_priority', None)
 
 
 def _update_plugin_fields(plugin_item, form, request_form):

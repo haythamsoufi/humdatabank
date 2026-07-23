@@ -139,14 +139,31 @@ export function renderCarryForwardSources(modalElement, sources) {
             list.appendChild(buildCarryForwardSourceRow(source));
         });
     }
-    serializeCarryForwardSources(modalElement);
+    const checkbox = modalElement.querySelector('#item-carry-forward');
+    const hidden = modalElement.querySelector('#item-carry-forward-sources-json');
+    if (checkbox?.checked) {
+        serializeCarryForwardSources(modalElement);
+    } else if (hidden) {
+        hidden.value = '[]';
+    }
 }
 
 export function serializeCarryForwardSources(modalElement) {
     if (!modalElement) return '[]';
     const hidden = modalElement.querySelector('#item-carry-forward-sources-json');
+    const checkbox = modalElement.querySelector('#item-carry-forward');
+    if (!hidden) return '[]';
+
+    if (checkbox && !checkbox.checked) {
+        hidden.value = '[]';
+        return '[]';
+    }
+
     const list = modalElement.querySelector('#item-carry-forward-sources-list');
-    if (!hidden || !list) return '[]';
+    if (!list) {
+        hidden.value = '[]';
+        return '[]';
+    }
 
     const sources = [];
     list.querySelectorAll('.carry-forward-source-row').forEach((row) => {
@@ -239,7 +256,6 @@ export function setupCarryForwardListeners(modalElement) {
             serializeCarryForwardSources(modalElement);
         });
     }
-
     if (addBtn && list) {
         addBtn.addEventListener('click', () => {
             list.appendChild(buildCarryForwardSourceRow({}));

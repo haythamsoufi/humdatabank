@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>IFRC Humanitarian Databank - Login Hero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy: #011E41;
+    --navy-deep: #010f22;
+    --red: #C8102E;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; height:100%; background: var(--navy); overflow:hidden; }
+  .hero{
+    position: relative;
+    display: flex;
+    width: 100%;
+    height: 100vh;
+    min-height: 480px;
+    background: radial-gradient(130% 150% at 20% 30%, var(--navy) 0%, var(--navy-deep) 100%);
+    font-family: 'Montserrat', sans-serif;
+    overflow: hidden;
+  }
+  canvas#net{ position:absolute; inset:0; width:100%; height:100%; display:block; z-index:1; }
+  canvas#fx{ position:absolute; inset:0; width:100%; height:100%; display:block; z-index:2; pointer-events:none; }
+  .grid-overlay{
+    position:absolute; inset:0; z-index:1;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 64px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 64px);
+    opacity: 0.5;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    will-change: transform;
+  }
+  .content{
+    position: relative;
+    z-index: 3;
+    height: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 6vh clamp(5vw, 8vw, 12vw);
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+    will-change: transform;
+  }
+  .content > .logo-wrap,
+  .content > .stat-chip,
+  .content > h1.headline,
+  .content > p.subcopy{
+    width: min(580px, 100%);
+  }
+
+  .login-panel{
+    position: relative;
+    z-index: 3;
+    flex: 0 0 400px;
+    height: 100%;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 48px 44px;
+    box-shadow: -18px 0 44px rgba(0,0,0,0.28);
+    opacity: 0;
+    transform: translateX(36px);
+    will-change: transform, opacity;
+  }
+  .login-panel.in{ animation: panelIn 0.48s cubic-bezier(0.16,1,0.3,1) forwards; }
+  @keyframes panelIn{ to{ opacity: 1; transform: translateX(0); } }
+
+  .panel-mark{ font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; color: var(--red); text-transform: uppercase; margin-bottom: 18px; }
+  .panel-title{ margin: 0 0 6px; font-size: 1.4rem; font-weight: 700; color: var(--navy); }
+  .panel-lead{ margin: 0 0 30px; font-size: 0.88rem; color: #6b7280; line-height: 1.5; }
+
+  .lang-switch{
+    position: absolute; top: 18px; right: 20px; z-index: 4;
+    display: flex; align-items: center; gap: 2px;
+    font-size: 0.72rem; font-weight: 600; color: #9aa3af;
+  }
+  .lang-switch button{
+    background: none; border: none; cursor: pointer; padding: 3px 7px; border-radius: 5px;
+    font-family: inherit; font-size: inherit; font-weight: inherit; color: inherit;
+  }
+  .lang-switch button.active{ color: var(--navy); background: #f1f2f4; }
+  .lang-switch span.sep{ color: #d7dbe0; }
+
+  .btn-login{
+    width: 100%; padding: 13px 18px; background: var(--red); color: #fff;
+    border: none; border-radius: 8px; font-family: inherit; font-weight: 600;
+    font-size: 0.98rem; cursor: pointer; transition: background 0.2s ease, transform 0.15s ease;
+  }
+  .btn-login:hover{ background: #a80d26; }
+  .btn-login:active{ transform: scale(0.98); }
+  .btn-login.pulse{ animation: btnPulse 1.5s ease-out 0.35s 2; }
+  @keyframes btnPulse{
+    0%{ box-shadow: 0 0 0 0 rgba(200,16,46,0.5); }
+    70%{ box-shadow: 0 0 0 14px rgba(200,16,46,0); }
+    100%{ box-shadow: 0 0 0 0 rgba(200,16,46,0); }
+  }
+
+  @media (max-width: 900px){
+    .login-panel{ flex-basis: 320px; padding: 36px 28px; }
+  }
+  .logo-wrap{
+    position: relative;
+    width: 100px;
+    height: 100px;
+    margin-bottom: 34px;
+    opacity: 0;
+    will-change: transform, opacity;
+  }
+  .logo-wrap.settled{ animation: breathe 4.5s ease-in-out infinite; }
+  .logo-halo{ display: none; }
+  .logo-badge{
+    position:relative; width: 100px; height: 100px; border-radius: 50%;
+    background: #fff; display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+  }
+  .logo-badge svg{ width: 62%; height: 62%; }
+
+  h1.headline{
+    color: #fff; font-weight: 700; font-size: clamp(1.6rem, 3vw, 2.4rem);
+    line-height: 1.22; margin: 0 0 28px 0; text-shadow: 0 2px 18px rgba(0,0,0,0.45);
+    display: flex; flex-wrap: wrap; gap: 0 0.32em;
+  }
+  h1.headline .w{ display:inline-block; opacity:0; transform: translateY(26px); }
+  .stat-chip{
+    display: inline-flex; align-items: center; gap: 8px;
+    margin: 2px 0 18px 0; padding: 6px 14px 6px 12px;
+    border-radius: 999px; background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18); color: rgba(255,255,255,0.92);
+    font-size: 0.8rem; font-weight: 600; letter-spacing: 0.01em;
+    opacity: 0; transform: translateY(10px) scale(0.96);
+  }
+  .stat-chip .dot{ width: 6px; height: 6px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
+  .stat-chip.in{ animation: chipIn 0.36s cubic-bezier(0.16,1,0.3,1) forwards; }
+  @keyframes chipIn{ to{ opacity: 1; transform: translateY(0) scale(1); } }
+  p.subcopy{
+    color: rgba(255,255,255,0.9); font-weight: 400; font-size: clamp(0.92rem, 1.3vw, 1.05rem);
+    line-height: 1.55; max-width: 46ch; margin: 0; text-shadow: 0 1px 12px rgba(0,0,0,0.4);
+    opacity: 0; transform: translateY(18px);
+  }
+  p.subcopy.in{ animation: subFade 0.42s cubic-bezier(0.16,1,0.3,1) forwards; }
+
+  @keyframes breathe{ 0%,100%{ transform: scale(1); } 50%{ transform: scale(1.02); } }
+  @keyframes wordIn{ to{ opacity:1; transform: translateY(0); } }
+  @keyframes subFade{ to{ opacity:1; transform: translateY(0); } }
+
+  @media (prefers-reduced-motion: reduce){
+    canvas#net, canvas#fx{ display:none; }
+    .grid-overlay{ opacity: 0.3; }
+    .logo-wrap{ opacity:1 !important; transform:none !important; }
+    .logo-wrap.settled{ animation:none; }
+    .logo-halo{ display:none; }
+    h1.headline .w{ opacity:1 !important; transform:none !important; }
+    p.subcopy{ opacity:1 !important; transform:none !important; }
+    .login-panel{ opacity:1 !important; transform:none !important; }
+    .btn-login.pulse{ animation:none !important; box-shadow:none !important; }
+    .stat-chip{ opacity:1 !important; transform:none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="hero" id="hero">
+  <canvas id="net"></canvas>
+  <canvas id="fx"></canvas>
+  <div class="grid-overlay"></div>
+  <div class="content">
+    <div class="logo-wrap" id="logoWrap">
+      <div class="logo-halo" id="logoHalo"></div>
+      <div class="logo-badge">
+        <svg viewBox="0 0 369.08 352.26" xmlns="http://www.w3.org/2000/svg">
+          <polygon fill="#C8102E" points="103.34,103.35 103.34,61.14 139.51,61.14 139.51,103.35 139.50,103.37 181.71,103.37 181.71,139.54 139.50,139.54 139.51,139.53 139.51,181.73 103.34,181.73 103.34,139.53 103.34,139.55 61.14,139.55 61.14,103.37 103.34,103.37"/>
+          <path fill="#C8102E" d="m 237.67,120.8 c 0,-28.109997 22.79,-50.889997 50.89,-50.889997 6.26,0 12.25,1.13 17.79,3.2 -10.41,-8.24 -23.56,-13.16 -37.87,-13.16 -33.73,0 -61.07,27.35 -61.07,61.069997 0,33.73 27.34,61.07 61.07,61.07 14.78,0 28.34,-5.25 38.91,-13.99 -5.83,2.32 -12.18,3.6 -18.82,3.6 -28.11,-0.01 -50.9,-22.8 -50.9,-50.9"/>
+          <path fill="#333132" d="m 277.93,292.31 c 6.3,0 12.01,-1.11 17.14,-3.32 5.12,-2.21 9.42,-5.44 12.88,-9.66 l -10.8,-9.97 c -4.92,5.75 -11.01,8.62 -18.28,8.62 -4.5,0 -8.52,-0.99 -12.05,-2.96 -3.53,-1.97 -6.28,-4.73 -8.26,-8.26 -1.97,-3.53 -2.96,-7.55 -2.96,-12.05 0,-4.5 0.99,-8.52 2.96,-12.05 1.97,-3.53 4.73,-6.28 8.26,-8.26 3.53,-1.97 7.55,-2.96 12.05,-2.96 7.27,0 13.36,2.84 18.28,8.52 l 10.8,-9.97 c -3.46,-4.16 -7.74,-7.34 -12.83,-9.56 -5.09,-2.21 -10.79,-3.32 -17.09,-3.32 -7.48,0 -14.22,1.61 -20.2,4.83 -5.99,3.22 -10.7,7.69 -14.13,13.4 -3.43,5.71 -5.14,12.17 -5.14,19.37 0,7.2 1.72,13.66 5.14,19.37 3.43,5.71 8.14,10.18 14.13,13.4 5.99,3.22 12.69,4.83 20.1,4.83 m -67.21,-47.57 c 0,4.02 -1.32,7.13 -3.95,9.35 -2.63,2.22 -6.48,3.32 -11.53,3.32 h -13.71 v -25.35 h 13.71 c 5.06,0 8.9,1.09 11.53,3.27 2.63,2.19 3.95,5.32 3.95,9.41 m 18.39,46.32 -16.31,-23.37 c 4.78,-2.08 8.47,-5.07 11.06,-8.99 2.6,-3.91 3.89,-8.57 3.89,-13.97 0,-5.4 -1.28,-10.08 -3.84,-14.03 -2.56,-3.95 -6.22,-6.99 -10.96,-9.14 -4.74,-2.15 -10.34,-3.22 -16.78,-3.22 h -31.48 v 72.72 h 16.83 V 270.8 h 14.65 0.83 l 14.02,20.26 z m -78.95,-59.21 v -13.5 H 95.209997 v 72.72 H 112.04 v -26.49 h 33.66 v -13.5 h -33.66 v -19.22 h 38.12 z m -89.020003,59.21 h 16.83 v -72.72 h -16.83 z"/>
+        </svg>
+      </div>
+    </div>
+    <div class="stat-chip" id="statChip"><span class="dot"></span><span id="statNum">190</span><span id="statSuffix">+ National Societies. One Databank.</span></div>
+    <h1 class="headline" id="headline"></h1>
+    <p class="subcopy" id="subcopy">The one and only system for reporting data to IFRC. Say goodbye to scattered Excel files, KoBo forms, multiple platforms, and logins, everything is now centralized and streamlined here.</p>
+  </div>
+
+  <div class="login-panel" id="loginPanel">
+    <div class="lang-switch" id="langSwitch">
+      <button data-lang="en" class="active">EN</button><span class="sep">/</span>
+      <button data-lang="fr">FR</button><span class="sep">/</span>
+      <button data-lang="es">ES</button><span class="sep">/</span>
+      <button data-lang="ar">AR</button>
+    </div>
+    <div class="panel-mark">IFRC Humanitarian Databank</div>
+    <h2 class="panel-title">Sign in</h2>
+    <p class="panel-lead">Use your National Society or IFRC single sign-on account to continue.</p>
+    <button class="btn-login" id="btnLogin" type="button">Log in with SSO</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---- translations ----
+  var translations = {
+    en: {
+      headline: "Welcome to the Humanitarian Databank",
+      subcopy: "The one and only system for reporting data to IFRC. Say goodbye to scattered Excel files, KoBo forms, multiple platforms, and logins, everything is now centralized and streamlined here.",
+      mark: "IFRC Humanitarian Databank",
+      title: "Sign in",
+      lead: "Use your National Society or IFRC single sign-on account to continue.",
+      button: "Log in with SSO",
+      statSuffix: "+ National Societies. One Databank."
+    },
+    fr: {
+      headline: "Bienvenue sur la Banque de donnees humanitaires",
+      subcopy: "Le systeme unique pour transmettre vos donnees a la FICR. Fini les fichiers Excel eparpilles, les formulaires KoBo, les multiples plateformes et identifiants, tout est desormais centralise et simplifie ici.",
+      mark: "Banque de donnees humanitaires FICR",
+      title: "Connexion",
+      lead: "Utilisez votre compte de connexion unique de la Societe nationale ou de la FICR pour continuer.",
+      button: "Se connecter via SSO",
+      statSuffix: "+ Societes nationales. Une seule banque de donnees."
+    },
+    es: {
+      headline: "Bienvenido al Banco de Datos Humanitarios",
+      subcopy: "El unico sistema para reportar datos a la FICR. Di adios a los archivos de Excel dispersos, los formularios KoBo, multiples plataformas e inicios de sesion, ahora todo esta centralizado y simplificado aqui.",
+      mark: "Banco de Datos Humanitarios FICR",
+      title: "Iniciar sesion",
+      lead: "Usa tu cuenta de inicio de sesion unico de la Sociedad Nacional o la FICR para continuar.",
+      button: "Iniciar sesion con SSO",
+      statSuffix: "+ Sociedades Nacionales. Un solo Banco de Datos."
+    },
+    ar: {
+      headline: "مرحبا بكم في بنك البيانات الإنسانية",
+      subcopy: "النظام الوحيد لإرسال البيانات إلى الاتحاد الدولي. لا مزيد من ملفات إكسل المتناثرة، واستمارات كوبو، والمنصات المتعددة، وحسابات الدخول المتفرقة، كل شيء الآن مركزي وموحد هنا.",
+      mark: "بنك البيانات الإنسانية للاتحاد الدولي",
+      title: "تسجيل الدخول",
+      lead: "استخدم حساب الدخول الموحد الخاص بجمعيتك الوطنية أو الاتحاد الدولي للمتابعة.",
+      button: "تسجيل الدخول عبر SSO",
+      statSuffix: "+ جمعية وطنية. بنك بيانات واحد."
+    }
+  };
+  var currentLang = 'en';
+  var contentEl = document.querySelector('.content');
+  var headlineEl = document.getElementById('headline');
+
+  function buildHeadlineWords(text, animate){
+    headlineEl.innerHTML = '';
+    text.split(' ').forEach(function(w, i){
+      var span = document.createElement('span');
+      span.className = 'w';
+      span.textContent = w;
+      if(animate && !reduced){
+        span.style.animation = 'wordIn 0.39s cubic-bezier(0.16,1,0.3,1) forwards';
+        span.style.animationDelay = (3.65 + i*0.035) + 's';
+      } else {
+        span.style.opacity = 1;
+      }
+      headlineEl.appendChild(span);
+    });
+  }
+  buildHeadlineWords(translations.en.headline, true);
+
+  function setLanguage(lang){
+    if(lang === currentLang) return;
+    currentLang = lang;
+    var tr = translations[lang];
+    document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
+    contentEl.style.opacity = '0.25';
+    setTimeout(function(){
+      buildHeadlineWords(tr.headline, false);
+      document.getElementById('subcopy').textContent = tr.subcopy;
+      document.querySelector('.panel-mark').textContent = tr.mark;
+      document.querySelector('.panel-title').textContent = tr.title;
+      document.querySelector('.panel-lead').textContent = tr.lead;
+      document.getElementById('btnLogin').textContent = tr.button;
+      document.getElementById('statSuffix').textContent = tr.statSuffix;
+      contentEl.style.opacity = '1';
+    }, 180);
+    document.querySelectorAll('.lang-switch button').forEach(function(b){
+      b.classList.toggle('active', b.dataset.lang === lang);
+    });
+  }
+  document.querySelectorAll('.lang-switch button').forEach(function(b){
+    b.addEventListener('click', function(){ setLanguage(b.dataset.lang); });
+  });
+
+  document.getElementById('btnLogin').addEventListener('click', function(){
+    // Replace with your real SSO entry point, e.g.:
+    // window.location.href = 'https://sso.ifrc.org/login?redirect_uri=' + encodeURIComponent(window.location.href);
+    console.log('Redirect to SSO login here.');
+  });
+
+  if(reduced){
+    document.getElementById('subcopy').classList.add('in');
+    document.getElementById('statChip').classList.add('in');
+    return;
+  }
+
+  var statNumEl = document.getElementById('statNum');
+  statNumEl.textContent = '0';
+  function animateCount(el, to, dur){
+    var t0 = performance.now();
+    function tick(now){
+      var p = Math.min(1, (now - t0) / dur);
+      var eased = 1 - Math.pow(1-p, 2);
+      el.textContent = Math.round(eased * to);
+      if(p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  document.getElementById('subcopy').style.animationDelay = '3.85s';
+  setTimeout(function(){ document.getElementById('subcopy').classList.add('in'); }, 3850);
+  setTimeout(function(){
+    document.getElementById('statChip').classList.add('in');
+    animateCount(statNumEl, 190, 450);
+  }, 4050);
+  setTimeout(function(){
+    document.getElementById('loginPanel').classList.add('in');
+    document.getElementById('btnLogin').classList.add('pulse');
+  }, 4250);
+
+  var net = document.getElementById('net'), fx = document.getElementById('fx');
+  var nctx = net.getContext('2d'), fctx = fx.getContext('2d');
+  var hero = document.getElementById('hero');
+  var logoWrap = document.getElementById('logoWrap');
+  var W, H, DPR = Math.min(window.devicePixelRatio||1, 2);
+  var restRect, restCenter, dx, dy, bigScale, bigDiameter;
+  var LINK_DIST = 200;
+
+  function panelWidth(){
+    var panel = document.getElementById('loginPanel');
+    return panel ? panel.offsetWidth : 400;
+  }
+  function netWidth(){ return Math.max(320, W - panelWidth()); }
+  function netCenter(){ return { x: netWidth() / 2, y: H * 0.5 }; }
+
+  function seedIntroNodes(){
+    var nw = netWidth();
+    var count = Math.min(28, Math.max(18, Math.round((nw * H) / 32000)));
+    LINK_DIST = Math.min(160, Math.max(95, Math.min(nw, H) * 0.16));
+    nodes.length = 0;
+    for(var i=0; i<count; i++){
+      nodes.push({
+        x: Math.random()*nw, y: Math.random()*H,
+        vx:(Math.random()-0.5)*0.32, vy:(Math.random()-0.5)*0.32,
+        r: 1.1+Math.random()*1.2
+      });
+    }
+  }
+
+  function seedNodes(){
+    var nw = netWidth();
+    var pad = 18;
+    var count = Math.min(80, Math.max(45, Math.round((nw * H) / 10500)));
+    LINK_DIST = Math.min(520, Math.max(300, Math.min(nw, H) * 0.52));
+    var cols = Math.max(6, Math.ceil(Math.sqrt(count * nw / H)));
+    var rows = Math.ceil(count / cols);
+    var cellW = (nw - pad * 2) / cols;
+    var cellH = (H - pad * 2) / rows;
+    nodes.length = 0;
+    var i = 0;
+    for(var row=0; row<rows && i<count; row++){
+      for(var col=0; col<cols && i<count; col++){
+        nodes.push({
+          x: pad + col*cellW + cellW*0.5 + (Math.random()-0.5)*cellW*0.7,
+          y: pad + row*cellH + cellH*0.5 + (Math.random()-0.5)*cellH*0.7,
+          vx:(Math.random()-0.5)*0.38, vy:(Math.random()-0.5)*0.38,
+          r: 1+Math.random()*1.4
+        });
+        i++;
+      }
+    }
+  }
+
+  function seedFrags(){
+    var nw = netWidth();
+    frags.length = 0;
+    for(var f=0; f<28; f++){
+      frags.push({
+        x: Math.random()*nw, y: Math.random()*H,
+        type: FRAG_TYPES[f%FRAG_TYPES.length],
+        targetAlpha: 0.35+Math.random()*0.25,
+        flick: Math.random()*Math.PI*2,
+        size: 24+Math.random()*10
+      });
+    }
+  }
+
+  var nodes = [];
+  var frags = [];
+  var FRAG_TYPES = ['excel','excel','kobo','kobo','excel','kobo','lock','cloud','mail','doc'];
+  var ripples = [];
+  var burstRings = [];
+
+  function resize(){
+    W = hero.clientWidth; H = hero.clientHeight;
+    [net, fx].forEach(function(c){
+      c.width = W*DPR; c.height = H*DPR; c.style.width = W+'px'; c.style.height = H+'px';
+    });
+    nctx.setTransform(DPR,0,0,DPR,0,0);
+    fctx.setTransform(DPR,0,0,DPR,0,0);
+    var prevTransform = logoWrap.style.transform;
+    logoWrap.style.transform = '';
+    restRect = logoWrap.getBoundingClientRect();
+    var heroRect = hero.getBoundingClientRect();
+    restCenter = { x: restRect.left - heroRect.left + restRect.width/2, y: restRect.top - heroRect.top + restRect.height/2 };
+    bigDiameter = Math.min(netWidth(), H) * 0.30;
+    bigScale = bigDiameter / restRect.width;
+    var nc = netCenter();
+    dx = nc.x - restCenter.x;
+    dy = (H*0.42) - restCenter.y;
+    logoWrap.style.transform = prevTransform;
+    seedIntroNodes();
+    seedFrags();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  var mouse = {x:W/2, y:H/2, active:false};
+  var parTX = 0, parTY = 0, parTargetX = 0, parTargetY = 0;
+  var gridOverlayEl = document.querySelector('.grid-overlay');
+  hero.addEventListener('mousemove', function(e){
+    var r = hero.getBoundingClientRect();
+    mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; mouse.active = true;
+    parTargetX = (mouse.x / r.width - 0.5) * 2;
+    parTargetY = (mouse.y / r.height - 0.5) * 2;
+  });
+  hero.addEventListener('mouseleave', function(){ mouse.active = false; parTargetX = 0; parTargetY = 0; });
+  hero.addEventListener('click', function(e){
+    var r = hero.getBoundingClientRect();
+    ripples.push({x: e.clientX-r.left, y: e.clientY-r.top, r:0, alpha:0.6});
+  });
+
+  // ---- timeline (ms) ----
+  var T_FRAG_END   = 1500;
+  var T_CONV_END   = 2900;
+  var T_BURST_END  = 3100;
+  var T_GLIDE_END  = 3900;
+  var startTime = performance.now();
+  function ease(t){ return 1 - Math.pow(1-t, 3); } // cubic ease-out
+  function easeInOut(t){ return t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; }
+  function overshoot(t){ // back ease-out for the burst pop
+    var c1=1.7, c3=c1+1;
+    return 1 + c3*Math.pow(t-1,3) + c1*Math.pow(t-1,2);
+  }
+
+  function overshoot(t){ // back ease-out for the burst pop
+    var c1=1.7, c3=c1+1;
+    return 1 + c3*Math.pow(t-1,3) + c1*Math.pow(t-1,2);
+  }
+
+  var BRAND_ICONS = {};
+  function loadBrandIcon(name, svg){
+    var img = new Image();
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    BRAND_ICONS[name] = img;
+  }
+  loadBrandIcon('excel',
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">' +
+    '<path fill="#217346" d="M10 8h46l30 30v50H10V8z"/>' +
+    '<path fill="#33a357" d="M56 8v30h30"/>' +
+    '<path fill="#fff" d="M28 30h10l6 9.5L50 30h10L52 48l8 18H50l-6-9.5L38 66H28l8-18-8-18z"/>' +
+    '</svg>');
+  loadBrandIcon('kobo',
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">' +
+    '<rect width="96" height="96" rx="18" fill="#FFC200"/>' +
+    '<text x="48" y="42" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-size="28" fill="#222">KoBo</text>' +
+    '<text x="48" y="66" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="600" font-size="15" fill="#222">Toolbox</text>' +
+    '</svg>');
+
+  function drawFragIcon(fr, alpha){
+    nctx.save(); nctx.globalAlpha = alpha;
+    var s = fr.size, x = fr.x, y = fr.y;
+    var brand = BRAND_ICONS[fr.type];
+    var usedBrand = false;
+
+    if(brand && brand.complete && brand.naturalWidth && (fr.type === 'excel' || fr.type === 'kobo')){
+      var dim = s * 1.25;
+      nctx.drawImage(brand, x, y, dim, dim);
+      usedBrand = true;
+    } else if(fr.type === 'excel'){
+      // stylized spreadsheet: rounded body, grid of cells, green tab accent
+      nctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      roundRect(x, y, s*1.15, s, 3); nctx.stroke();
+      nctx.beginPath(); nctx.moveTo(x, y+s*0.36); nctx.lineTo(x+s*1.15, y+s*0.36); nctx.stroke();
+      nctx.beginPath(); nctx.moveTo(x, y+s*0.68); nctx.lineTo(x+s*1.15, y+s*0.68); nctx.stroke();
+      nctx.beginPath(); nctx.moveTo(x+s*0.38, y); nctx.lineTo(x+s*0.38, y+s); nctx.stroke();
+      nctx.beginPath(); nctx.moveTo(x+s*0.76, y); nctx.lineTo(x+s*0.76, y+s); nctx.stroke();
+      nctx.fillStyle = 'rgba(140,205,160,0.75)';
+      nctx.fillRect(x-3, y-3, s*0.34, s*0.24);
+    } else if(fr.type === 'kobo'){
+      nctx.lineWidth = 1.1;
+      nctx.strokeStyle = 'rgba(150,190,230,0.75)';
+      roundRect(x, y, s*0.62, s*1.15, 4); nctx.stroke();
+      nctx.beginPath(); nctx.moveTo(x+s*0.14, y+s*0.22); nctx.lineTo(x+s*0.48, y+s*0.22); nctx.stroke();
+      nctx.beginPath(); nctx.moveTo(x+s*0.14, y+s*0.42); nctx.lineTo(x+s*0.48, y+s*0.42); nctx.stroke();
+      nctx.beginPath(); nctx.moveTo(x+s*0.14, y+s*0.62); nctx.lineTo(x+s*0.4, y+s*0.62); nctx.stroke();
+      nctx.beginPath(); nctx.arc(x+s*0.31, y+s*0.9, s*0.1, 0, Math.PI*2); nctx.stroke();
+    } else if(fr.type === 'lock'){
+      nctx.lineWidth = 1.1;
+      nctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      roundRect(x, y+s*0.42, s*0.8, s*0.58, 2); nctx.stroke();
+      nctx.beginPath(); nctx.arc(x+s*0.4, y+s*0.42, s*0.28, Math.PI, 0); nctx.stroke();
+      nctx.beginPath(); nctx.arc(x+s*0.4, y+s*0.72, 1.6, 0, Math.PI*2); nctx.fillStyle='rgba(255,255,255,0.6)'; nctx.fill();
+    } else if(fr.type === 'cloud'){
+      // disconnected platform / cloud
+      nctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      nctx.beginPath();
+      nctx.arc(x+s*0.28, y+s*0.55, s*0.28, Math.PI*0.5, Math.PI*1.6);
+      nctx.arc(x+s*0.6, y+s*0.32, s*0.24, Math.PI*1.1, Math.PI*2.05);
+      nctx.arc(x+s*0.92, y+s*0.55, s*0.24, Math.PI*1.4, Math.PI*0.55);
+      nctx.lineTo(x+s*0.28, y+s*0.82);
+      nctx.stroke();
+    } else if(fr.type === 'mail'){
+      // envelope: yet another separate system/inbox
+      nctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      nctx.strokeRect(x, y, s*1.1, s*0.75);
+      nctx.beginPath(); nctx.moveTo(x, y); nctx.lineTo(x+s*0.55, y+s*0.45); nctx.lineTo(x+s*1.1, y); nctx.stroke();
+    } else {
+      // generic duplicate document
+      nctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      nctx.beginPath();
+      nctx.moveTo(x, y); nctx.lineTo(x+s*0.7, y); nctx.lineTo(x+s*0.9, y+s*0.22); nctx.lineTo(x+s*0.9, y+s*1.05); nctx.lineTo(x, y+s*1.05); nctx.closePath();
+      nctx.stroke();
+      nctx.beginPath(); nctx.moveTo(x+s*0.15, y+s*0.4); nctx.lineTo(x+s*0.7, y+s*0.4); nctx.stroke();
+      nctx.beginPath(); nctx.moveTo(x+s*0.15, y+s*0.62); nctx.lineTo(x+s*0.6, y+s*0.62); nctx.stroke();
+    }
+    var LABELS = {excel:'Excel', kobo:'KoBo', lock:'Login', cloud:'Platform', mail:'Inbox', doc:'File'};
+    if(!usedBrand){
+      nctx.fillStyle = 'rgba(255,255,255,0.85)';
+      nctx.font = '9px Montserrat, sans-serif';
+      nctx.textAlign = 'left';
+      nctx.fillText(LABELS[fr.type] || '', x, y + s + 12);
+    }
+    nctx.restore();
+  }
+
+  function roundRect(x, y, w, h, r){
+    nctx.beginPath();
+    nctx.moveTo(x+r, y);
+    nctx.arcTo(x+w, y, x+w, y+h, r);
+    nctx.arcTo(x+w, y+h, x, y+h, r);
+    nctx.arcTo(x, y+h, x, y, r);
+    nctx.arcTo(x, y, x+w, y, r);
+    nctx.closePath();
+  }
+
+  function drawNetworkLinks(linkDist, maxLinks, lineAlpha){
+    if(maxLinks <= 0) return;
+    var drawn = {};
+    for(var a=0; a<nodes.length; a++){
+      var neighbors = [];
+      for(var b=0; b<nodes.length; b++){
+        if(b===a) continue;
+        var ddx = nodes[a].x-nodes[b].x, ddy = nodes[a].y-nodes[b].y;
+        var dist = Math.sqrt(ddx*ddx+ddy*ddy);
+        if(dist < linkDist) neighbors.push({b:b, dist:dist});
+      }
+      neighbors.sort(function(x,y){ return x.dist-y.dist; });
+      var added = 0;
+      for(var ni=0; ni<neighbors.length && added < maxLinks; ni++){
+        var b = neighbors[ni].b;
+        var key = a < b ? a+'_'+b : b+'_'+a;
+        if(drawn[key]) continue;
+        drawn[key] = 1;
+        var dist = neighbors[ni].dist;
+        nctx.strokeStyle = 'rgba(255,255,255,'+(lineAlpha*(1-dist/linkDist))+')';
+        nctx.lineWidth = 0.65;
+        nctx.beginPath();
+        nctx.moveTo(nodes[a].x, nodes[a].y);
+        nctx.lineTo(nodes[b].x, nodes[b].y);
+        nctx.stroke();
+        added++;
+      }
+    }
+  }
+
+  function phaseOf(t){
+    if(t < T_FRAG_END) return 'fragment';
+    if(t < T_CONV_END) return 'converge';
+    if(t < T_BURST_END) return 'burst';
+    if(t < T_GLIDE_END) return 'glide';
+    return 'hold';
+  }
+
+  var settledApplied = false;
+  var holdSpread = false;
+
+  function step(now){
+    var t = now - startTime;
+    var phase = phaseOf(t);
+
+    parTX += (parTargetX - parTX) * 0.06;
+    parTY += (parTargetY - parTY) * 0.06;
+    contentEl.style.transform = 'translate('+(parTX*16)+'px,'+(parTY*12)+'px)';
+    gridOverlayEl.style.transform = 'translate('+(parTX*6)+'px,'+(parTY*5)+'px)';
+
+    var trailing = (phase === 'converge' || phase === 'burst');
+    if(trailing){
+      nctx.fillStyle = 'rgba(1,20,45,0.22)';
+      nctx.fillRect(0,0,W,H);
+    } else {
+      nctx.clearRect(0,0,W,H);
+    }
+    fctx.clearRect(0,0,W,H);
+
+    // ---- camera punch-in during convergence ----
+    var zoom = 1;
+    if(phase === 'converge'){
+      var cp = (t - T_FRAG_END) / (T_CONV_END - T_FRAG_END);
+      zoom = 1 + 0.05 * Math.sin(cp * Math.PI); // ramps up then eases back by end
+    }
+    nctx.save();
+    nctx.translate(W/2, H/2); nctx.scale(zoom, zoom); nctx.translate(-W/2, -H/2);
+    nctx.translate(parTX*10, parTY*8);
+
+    // ---- fragments ----
+    var fragFade = 0;
+    if(phase === 'fragment'){
+      fragFade = Math.min(1, Math.max(0, (t - 120) / 400));
+    } else if(phase === 'converge'){
+      var convT = (t - T_FRAG_END) / (T_CONV_END - T_FRAG_END);
+      if(convT < 0.5) fragFade = 1;
+      else fragFade = Math.max(0, 1 - (convT - 0.5) / 0.38);
+    }
+    if(fragFade > 0){
+      frags.forEach(function(fr){
+        fr.flick += 0.03;
+        drawFragIcon(fr, fr.targetAlpha * fragFade * (0.7+0.3*Math.sin(fr.flick)));
+      });
+      nctx.strokeStyle = 'rgba(255,255,255,0.12)'; nctx.lineWidth = 0.6;
+      for(var fi=0; fi<frags.length-1; fi+=3){
+        if(Math.sin(fi*1.7 + t*0.002) > 0.3){
+          nctx.globalAlpha = fragFade;
+          nctx.beginPath(); nctx.moveTo(frags[fi].x, frags[fi].y); nctx.lineTo(frags[(fi+1)%frags.length].x, frags[(fi+1)%frags.length].y); nctx.stroke();
+          nctx.globalAlpha = 1;
+        }
+      }
+    }
+
+    var nw = netWidth();
+    var nc = netCenter();
+    var convergeP = (phase === 'converge') ? (t-T_FRAG_END)/(T_CONV_END-T_FRAG_END) : 0;
+    var glideT = (phase === 'glide')
+      ? easeInOut(Math.min(1, (t - T_BURST_END) / (T_GLIDE_END - T_BURST_END)))
+      : 0;
+
+    // ---- network ----
+    var focal = (phase==='hold' || phase==='glide') ? null : nc;
+    var netAlpha = 1, pull = 0;
+    if(phase === 'fragment') netAlpha = Math.min(1, t/T_FRAG_END) * 0.3;
+    else if(phase === 'converge') netAlpha = Math.max(0, 0.42 * (1 - ease(Math.min(1, convergeP * 1.15))));
+    else if(phase === 'burst') netAlpha = 0;
+    else if(phase === 'glide') netAlpha = 0.32 + 0.1 * glideT;
+    else netAlpha = 0.42;
+
+    if(phase === 'converge') pull = ease(convergeP) * 2.4;
+    else if(phase === 'burst') pull = 0.8;
+
+    if((phase === 'glide' && glideT > 0.08) || (phase === 'hold' && !holdSpread)){
+      seedNodes();
+      holdSpread = true;
+    }
+
+    nodes.forEach(function(n){
+      n.x += n.vx; n.y += n.vy;
+      if(n.x < 0 || n.x > nw){ n.vx *= -1; n.x = Math.max(0, Math.min(nw, n.x)); }
+      if(n.y < 0 || n.y > H){ n.vy *= -1; n.y = Math.max(0, Math.min(H, n.y)); }
+      if(pull > 0 && focal){
+        n.x += (focal.x-n.x)*0.006*pull;
+        n.y += (focal.y-n.y)*0.006*pull;
+      } else if(phase === 'hold'){
+        var cdx = n.x - nc.x, cdy = n.y - nc.y, cd = Math.sqrt(cdx*cdx + cdy*cdy) || 1;
+        var spreadR = Math.min(nw, H) * 0.28;
+        if(cd < spreadR){
+          n.vx += (cdx / cd) * 0.018;
+          n.vy += (cdy / cd) * 0.018;
+        }
+      }
+      if(mouse.active && phase !== 'burst' && phase !== 'converge'){
+        var mdx = mouse.x-n.x, mdy = mouse.y-n.y, d = Math.sqrt(mdx*mdx+mdy*mdy);
+        if(d < 200){ n.x += mdx*0.0024; n.y += mdy*0.0024; }
+      }
+      n.vx *= 0.998;
+      n.vy *= 0.998;
+    });
+
+    if(netAlpha > 0.01){
+      nctx.globalAlpha = netAlpha;
+      var linkDist = LINK_DIST;
+      var maxLinks = 0;
+      var lineAlpha = 0.4;
+      if(phase === 'hold' || phase === 'glide'){
+        maxLinks = 3;
+        lineAlpha = 0.42;
+      } else if(phase === 'fragment'){
+        maxLinks = 2;
+        linkDist = Math.min(LINK_DIST, 130);
+        lineAlpha = 0.32;
+      } else if(phase === 'converge' && convergeP < 0.35){
+        maxLinks = 1;
+        linkDist = Math.min(LINK_DIST, 90) * (1 - convergeP);
+        lineAlpha = 0.22 * (1 - convergeP);
+      }
+      drawNetworkLinks(linkDist, maxLinks, lineAlpha);
+      nctx.fillStyle = 'rgba(255,255,255,0.75)';
+      nctx.shadowBlur = 0;
+      nodes.forEach(function(n){ nctx.beginPath(); nctx.arc(n.x,n.y,n.r,0,Math.PI*2); nctx.fill(); });
+      nctx.globalAlpha = 1;
+    }
+    nctx.restore();
+
+    if(phase === 'burst'){
+      var bp = (t - T_CONV_END) / (T_BURST_END - T_CONV_END);
+      if(burstRings.length === 0){
+        burstRings.push({delay:0},{delay:50},{delay:100});
+        burstRings.forEach(function(r){ r.born = t; });
+      }
+      var flashAlpha = Math.max(0, 0.5 - bp*1.2);
+      fctx.fillStyle = 'rgba(255,255,255,'+flashAlpha+')';
+      fctx.fillRect(0,0,W,H);
+      burstRings.forEach(function(r){
+        var age = t - r.born;
+        if(age < 0) return;
+        var rr = age * 0.85;
+        var ra = Math.max(0, 0.55 - age/380);
+        if(ra <= 0) return;
+        fctx.beginPath(); fctx.arc(nc.x, H*0.42, rr, 0, Math.PI*2);
+        fctx.strokeStyle = 'rgba(200,16,46,'+ra+')'; fctx.lineWidth = 2;
+        fctx.stroke();
+      });
+    } else if(phase !== 'hold' && phase !== 'glide'){
+      burstRings = [];
+    }
+
+    for(var ri=ripples.length-1; ri>=0; ri--){
+      var rp = ripples[ri]; rp.r += 2.2; rp.alpha -= 0.012;
+      if(rp.alpha<=0){ ripples.splice(ri,1); continue; }
+      fctx.beginPath(); fctx.arc(rp.x, rp.y, rp.r, 0, Math.PI*2);
+      fctx.strokeStyle = 'rgba(255,255,255,'+rp.alpha+')'; fctx.lineWidth = 1.4; fctx.stroke();
+    }
+
+    // ---- logo motion: hidden -> big center burst -> glide to rest slot ----
+    if(phase === 'fragment' || phase === 'converge'){
+      logoWrap.style.opacity = 0;
+      logoWrap.style.transform = 'translate('+dx+'px,'+dy+'px) scale(0.3)';
+    } else if(phase === 'burst'){
+      var burstT = Math.min(1, (t - T_CONV_END) / 220);
+      var s = 0.3 + (bigScale - 0.3) * overshoot(burstT);
+      logoWrap.style.opacity = Math.min(1, burstT*2.2);
+      logoWrap.style.transform = 'translate('+dx+'px,'+dy+'px) scale('+s+')';
+    } else if(phase === 'glide'){
+      var gT = glideT;
+      var gx = dx * (1-gT), gy = dy * (1-gT);
+      var gs = bigScale + (1-bigScale) * gT;
+      logoWrap.style.opacity = 1;
+      logoWrap.style.transform = 'translate('+gx+'px,'+gy+'px) scale('+gs+')';
+    } else {
+      logoWrap.style.transform = 'translate(0,0) scale(1)';
+      logoWrap.style.opacity = 1;
+      if(!settledApplied){
+        logoWrap.classList.add('settled');
+        settledApplied = true;
+      }
+    }
+
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+})();
+</script>
+</body>
+</html>

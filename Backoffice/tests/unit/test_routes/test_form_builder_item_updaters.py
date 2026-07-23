@@ -888,6 +888,42 @@ class TestUpdateItemConfig:
         assert item.config['indirect_reach'] is True
         assert item.config['privacy'] == 'public'
 
+    def test_carry_forward_disabled_strips_sources_and_priority(self, app):
+        from app.models import FormItem
+        item = FormItem(item_type='indicator', section_id=1, template_id=1, version_id=1,
+                        label='I', type='number', order=1)
+        item.config = {
+            'carry_forward': True,
+            'carry_forward_sources': [{'template_id': '__current__', 'item_id': '__current__'}],
+            'carry_forward_priority': 'assignment',
+        }
+        form = _make_form_with_config()
+        _update_item_config(item, form, {
+            'carry_forward_sources': json.dumps([
+                {'template_id': '__current__', 'item_id': '__current__'},
+            ]),
+            'carry_forward_priority': 'assignment',
+        })
+        assert item.config['carry_forward'] is False
+        assert 'carry_forward_sources' not in item.config
+        assert 'carry_forward_priority' not in item.config
+
+    def test_carry_forward_enabled_persists_sources_and_priority(self, app):
+        from app.models import FormItem
+        item = FormItem(item_type='indicator', section_id=1, template_id=1, version_id=1,
+                        label='I', type='number', order=1)
+        item.config = {}
+        form = _make_form_with_config()
+        sources = [{'template_id': 22, 'item_id': 1314}]
+        _update_item_config(item, form, {
+            'carry_forward': 'on',
+            'carry_forward_sources': json.dumps(sources),
+            'carry_forward_priority': 'assignment',
+        })
+        assert item.config['carry_forward'] is True
+        assert item.config['carry_forward_sources'] == sources
+        assert item.config['carry_forward_priority'] == 'assignment'
+
 
 # ---------------------------------------------------------------------------
 # _update_plugin_fields

@@ -158,6 +158,17 @@ pnpm-debug.log*
 /app.db
 *.zip
 
+# Browser HAR captures (may contain session cookies and auth headers)
+*.har
+
+# Local prod log extraction scratch space
+_prod_logs_temp/
+
+# Local test / probe scratch output
+Backoffice/_nav_test.txt
+Backoffice/pytest_wds_out.txt
+staging_pressure_out.txt
+
 # Windows-specific problematic files
 nul
 *.nul
@@ -167,3 +178,6 @@ MobileApp/android/key.properties
 # Emergency Operations plugin — server-side data cache (can be large, regenerated via admin refresh)
 Backoffice/plugins/emergency_operations/data/appeals_cache.json
 Backoffice/plugins/emergency_operations/data/appeals_cache.tmp
+
+# Azure load test run artifacts (downloaded engine logs, run details, prod webapp dumps)
+Backoffice/azure/loadtest/logs/

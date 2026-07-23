@@ -1,8 +1,0 @@
-ERROR: the following arguments are required: --test-id/-t
-
-Examples from AI knowledge base:
-az load test-run list --load-test-resource sample-alt-resource --resource-group sample-rg --test-id sample-test-id
-List all tests runs in a test.
-
-https://aka.ms/cli_ref
-Read more about the command in reference docs

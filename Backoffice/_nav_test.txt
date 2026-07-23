@@ -1,8 +1,0 @@
-CAT data-reporting -> Отчетность по данным
-  GRP _root -> Обзор
-CAT getting-started -> Начало
-  GRP _root -> Обзор
-CAT common -> Общие
-  GRP common -> Общие
-CAT admin -> Администратор
-  GRP tools-settings -> Инструменты и настройки

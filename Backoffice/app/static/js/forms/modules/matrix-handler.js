@@ -507,47 +507,99 @@ function __normalizeVariableCompareValue(value) {
     return (typeof window.__numericUnformat === 'function') ? window.__numericUnformat(s) : s.replace(/,/g, '');
 }
 
-function __computeVariableIsModified(currentValue, originalValue, inputType) {
-    if (inputType === 'checkbox') {
-        const originalChecked = originalValue === '1' || originalValue === 1 || originalValue === 'true';
-        const currentChecked = currentValue === '1' || currentValue === 1 || currentValue === true;
-        if (__isEmptyVariableValue(originalValue)) return currentChecked;
-        return currentChecked !== originalChecked;
+function __getSavedMatrixCellScalar(savedValue) {
+    if (savedValue === null || savedValue === undefined) return '';
+    if (typeof savedValue === 'object') {
+        if (savedValue.modified !== undefined && savedValue.modified !== null) {
+            return savedValue.modified;
+        }
+        if (savedValue.original !== undefined && savedValue.original !== null) {
+            return savedValue.original;
+        }
+        return '';
     }
-    const normCurrent = __normalizeVariableCompareValue(currentValue);
-    const normOriginal = __normalizeVariableCompareValue(originalValue);
-    if (normOriginal === '' && normCurrent !== '') return true;
-    return normOriginal !== '' && normCurrent !== normOriginal;
+    return savedValue;
 }
 
-/**
- * Build a variable-column cell payload for persistence, or null when the cell should be omitted.
- */
-function __buildVariableCellPayload(inputType, originalValue, modifiedValue, isModified, preservedOriginal = null) {
-    const origSource = preservedOriginal != null ? preservedOriginal : originalValue;
+/** Saved variable matrix cell explicitly overridden by the user (legacy { isModified } format). */
+function __savedVariableCellIsUserModified(savedValue) {
+    return savedValue !== null && typeof savedValue === 'object' && savedValue.isModified === true;
+}
+
+function __formatLookupValueForInput(inputType, lookupValue) {
     if (inputType === 'checkbox') {
-        const original = __toVariableTickValue(origSource);
-        const modified = __toVariableTickValue(modifiedValue);
-        if (!isModified && __isEmptyVariableValue(original) && __isEmptyVariableValue(modified)) {
-            return null;
-        }
-        return { original, modified, isModified: !!isModified };
+        return (lookupValue === '1' || lookupValue === 1 || lookupValue === true || lookupValue === 'true') ? '1' : '0';
     }
-    const original = __normalizeVariableNumericValue(origSource);
-    const modified = __normalizeVariableNumericValue(modifiedValue);
-    if (!isModified && __isEmptyVariableValue(original) && __isEmptyVariableValue(modified)) {
+    return lookupValue !== null && lookupValue !== undefined ? String(lookupValue) : '';
+}
+
+function __formatSavedScalarForInput(inputType, savedScalar) {
+    if (inputType === 'checkbox') {
+        return (savedScalar === '1' || savedScalar === 1 || savedScalar === true || savedScalar === 'true') ? '1' : '0';
+    }
+    return savedScalar !== null && savedScalar !== undefined ? String(savedScalar) : '';
+}
+
+function __persistVariableCellScalar(rawValue) {
+    if (rawValue === null || rawValue === undefined) return '';
+    const trimmed = String(rawValue).trim();
+    if (trimmed === '') return '';
+    return __normalizeVariableCompareValue(trimmed);
+}
+
+function __variableCellDiffersFromLookup(lookupValue, savedValue, inputType) {
+    if (inputType === 'checkbox') {
+        const lookupNorm = __formatSavedScalarForInput('checkbox', lookupValue);
+        if (lookupNorm === '') return false;
+        const savedNorm = __formatSavedScalarForInput('checkbox', savedValue);
+        return lookupNorm !== savedNorm;
+    }
+    const lookupNorm = __normalizeVariableCompareValue(lookupValue);
+    if (lookupNorm === '') return false;
+    const savedNorm = __normalizeVariableCompareValue(savedValue);
+    return lookupNorm !== savedNorm;
+}
+
+function __resolveMatrixLocalizedLabel(config, flatKey, translationsKey, defaultText) {
+    let tk = 'en';
+    const langMeta = document.documentElement.getAttribute('lang');
+    if (langMeta) tk = langMeta.split('-')[0];
+    const translations = config?.[translationsKey];
+    if (translations && typeof translations === 'object') {
+        const localized = translations[tk] || translations.en;
+        if (localized && String(localized).trim()) return String(localized).trim();
+    }
+    const flat = config?.[flatKey];
+    if (flat && String(flat).trim()) return String(flat).trim();
+    return defaultText;
+}
+
+function __storedRowTotalManualScalar(stored) {
+    if (stored === null || stored === undefined || stored === '') return null;
+    if (typeof stored === 'object') {
+        if (stored.isModified && stored.modified !== '' && stored.modified != null) {
+            return __parseRowTotalManualValue(stored.modified);
+        }
         return null;
     }
-    return { original, modified, isModified: !!isModified };
+    return __parseRowTotalManualValue(stored);
 }
 
-function __applyVariableCellToMatrix(matrix, cellKey, inputType, originalValue, modifiedValue, isModified, preservedOriginal = null) {
-    const payload = __buildVariableCellPayload(inputType, originalValue, modifiedValue, isModified, preservedOriginal);
-    if (payload) {
-        matrix.data[cellKey] = payload;
-    } else if (matrix.data[cellKey] !== undefined) {
-        delete matrix.data[cellKey];
-    }
+function __computedRowTotalFromData(data, rowId, columns) {
+    let rowTotal = 0;
+    (columns || []).forEach((column) => {
+        const columnName = typeof column === 'object' ? column.name : column;
+        const cellKey = `${rowId}_${columnName}`;
+        rowTotal += __cellValueToNumber(data[cellKey]);
+    });
+    return rowTotal;
+}
+
+function __effectiveRowTotalValue(data, rowId, columns, rowTotalManual) {
+    const computed = __computedRowTotalFromData(data, rowId, columns);
+    if (!rowTotalManual) return computed;
+    const manualScalar = __storedRowTotalManualScalar(data[__rowTotalCellKey(rowId)]);
+    return manualScalar != null ? manualScalar : computed;
 }
 
 /**
@@ -612,6 +664,16 @@ function __parseMatrixCellKey(cellKey, config) {
                     columnName,
                 };
             }
+        }
+        // Row total column is rendered when show_row_totals is on but not listed in config.columns.
+        const totalSuffix = `_${ROW_TOTAL_COLUMN_NAME}`;
+        if (__configFlag(config?.show_row_totals, true)
+            && key.endsWith(totalSuffix)
+            && key.length > totalSuffix.length) {
+            return {
+                rowId: key.slice(0, -totalSuffix.length),
+                columnName: ROW_TOTAL_COLUMN_NAME,
+            };
         }
         return null;
     }
@@ -705,6 +767,7 @@ class MatrixHandler {
 
             const matrixInfo = { container, config: matrixConfig, data: existingData };
             matrixInfo.carryForwardRef = __parseCarryForwardRef(container);
+            matrixInfo.lookupRefs = {};
             this.matrices.set(fieldId, matrixInfo);
             return matrixInfo;
         } catch (e) {
@@ -1018,6 +1081,7 @@ class MatrixHandler {
                 data: existingData,
                 hiddenField: hiddenField,
                 carryForwardRef: __parseCarryForwardRef(container),
+                lookupRefs: {},
             });
 
             // For advanced mode matrices, restore dynamic rows from saved data
@@ -1210,15 +1274,14 @@ class MatrixHandler {
 
         if (isRowTotal && cellKey) {
             const autoSum = parseFloat(input.getAttribute('data-original-value')) || 0;
-            const manualRaw = input.value;
-            const manualNum = __parseRowTotalManualValue(manualRaw);
-            const isModified = manualNum != null && manualNum !== autoSum;
-            matrix.data[cellKey] = {
-                original: autoSum,
-                modified: isModified ? manualNum : '',
-                isModified: isModified
-            };
-            __updateRowTotalConflict(input, autoSum, isModified ? manualNum : '', __rowTotalValidation(matrix.config), isModified);
+            const manualNum = __parseRowTotalManualValue(input.value);
+            const isConflict = manualNum != null && manualNum !== autoSum;
+            if (isConflict) {
+                matrix.data[cellKey] = manualNum;
+            } else if (matrix.data[cellKey] !== undefined) {
+                delete matrix.data[cellKey];
+            }
+            __updateRowTotalConflict(input, autoSum, isConflict ? manualNum : '', __rowTotalValidation(matrix.config), isConflict);
             if (matrix.hiddenField) {
                 matrix.hiddenField.value = __serializeMatrixData(matrix.data);
             }
@@ -1241,64 +1304,17 @@ class MatrixHandler {
         // Handle different input types
         let value;
         if (input.type === 'checkbox') {
-            // Handle tick columns (both regular and variable tick)
             value = input.checked ? 1 : 0;
-
-            // For variable tick columns, also handle modification tracking
-            if (isVariable) {
-                const originalValueAttr = input.getAttribute('data-original-value');
-                const originalValue = originalValueAttr !== null ? originalValueAttr : '';
-                const valueStr = input.checked ? '1' : '0';
-                const isModified = __computeVariableIsModified(valueStr, originalValue, 'checkbox');
-
-                debugLog('matrix-handler', `Variable tick modification check: checked=${input.checked}, original="${originalValue}", isModified=${isModified}`);
-
-                // Update visual indicator (always call to ensure styling is correct)
-                this.updateVariableModificationIndicator(input, isModified, originalValue);
-
-                if (cellKey) {
-                    const existingData = matrix.data[cellKey];
-                    const preservedOriginal = (existingData && typeof existingData === 'object' && existingData.original !== undefined)
-                        ? existingData.original
-                        : null;
-                    __applyVariableCellToMatrix(
-                        matrix,
-                        cellKey,
-                        'checkbox',
-                        originalValue,
-                        valueStr,
-                        isModified,
-                        preservedOriginal
-                    );
-                }
+            if (isVariable && cellKey) {
+                matrix.data[cellKey] = input.checked ? '1' : '0';
+                this.applyVariableLookupComparisonForInput(fieldId, input);
             }
         } else if (isVariable) {
             const rawValue = String(input.value || '').trim();
             value = rawValue;
-
-            const originalValueAttr = input.getAttribute('data-original-value');
-            const originalValue = originalValueAttr !== null ? originalValueAttr : '';
-            const isModified = __computeVariableIsModified(rawValue, originalValue, input.type);
-
-            debugLog('matrix-handler', `Variable modification check: value="${rawValue}", original="${originalValue}", isModified=${isModified}`);
-
-            // Update visual indicator (always call to ensure styling is correct)
-            this.updateVariableModificationIndicator(input, isModified, originalValue);
-
             if (cellKey) {
-                const existingData = matrix.data[cellKey];
-                const preservedOriginal = (existingData && typeof existingData === 'object' && existingData.original !== undefined)
-                    ? existingData.original
-                    : null;
-                __applyVariableCellToMatrix(
-                    matrix,
-                    cellKey,
-                    input.type,
-                    originalValue,
-                    rawValue,
-                    isModified,
-                    preservedOriginal
-                );
+                matrix.data[cellKey] = __persistVariableCellScalar(rawValue);
+                this.applyVariableLookupComparisonForInput(fieldId, input);
             }
         } else {
             const rawString = (window.__numericUnformat ? window.__numericUnformat(input.value) : String(input.value || ''));
@@ -1449,41 +1465,20 @@ class MatrixHandler {
                 const totalCellKey = __rowTotalCellKey(rowId);
                 if (rowTotalManual) {
                     const stored = data[totalCellKey];
-                    let newCell;
-                    if (stored && typeof stored === 'object' && stored.original !== undefined) {
-                        newCell = {
-                            original: rowTotal,
-                            modified: stored.isModified ? stored.modified : '',
-                            isModified: !!stored.isModified
-                        };
-                    } else if (stored != null && stored !== '') {
-                        newCell = {
-                            original: rowTotal,
-                            modified: stored,
-                            isModified: true
-                        };
-                    } else {
-                        newCell = {
-                            original: rowTotal,
-                            modified: '',
-                            isModified: false
-                        };
-                    }
-                    data[totalCellKey] = newCell;
+                    const manualScalar = __storedRowTotalManualScalar(stored);
+                    const displayVal = manualScalar != null ? manualScalar : rowTotal;
 
                     const totalInput = container.querySelector(`input.row-total-input[data-cell-key="${totalCellKey}"]`);
                     if (totalInput) {
-                        const displayVal = newCell.isModified && newCell.modified !== ''
-                            ? newCell.modified
-                            : rowTotal;
                         totalInput.value = displayVal !== '' && displayVal != null ? __formatInteger(displayVal) : '';
                         totalInput.setAttribute('data-original-value', String(rowTotal));
+                        const isConflict = manualScalar != null && manualScalar !== rowTotal;
                         __updateRowTotalConflict(
                             totalInput,
                             rowTotal,
-                            newCell.isModified ? newCell.modified : '',
+                            isConflict ? manualScalar : '',
                             rowTotalValidation,
-                            newCell.isModified
+                            isConflict
                         );
                     }
                 } else {
@@ -1575,13 +1570,21 @@ class MatrixHandler {
         // Calculate grand total (only if both row and column totals are shown)
         if (showRowTotals && showColumnTotals) {
             let grandTotal = 0;
-            // Skip metadata fields when calculating grand total
-            Object.entries(data).forEach(([key, value]) => {
-                if (key.startsWith('_') || __isRowTotalCellKey(key)) {
-                    return;
-                }
-                grandTotal += __cellValueToNumber(value);
-            });
+            if (rowTotalManual) {
+                // Manual row totals may differ from column sums — grand total = sum of effective row totals.
+                rows.forEach((row) => {
+                    const rowId = rowIdMap.get(row);
+                    if (!rowId) return;
+                    grandTotal += __effectiveRowTotalValue(data, rowId, columns, true);
+                });
+            } else {
+                Object.entries(data).forEach(([key, value]) => {
+                    if (key.startsWith('_') || __isRowTotalCellKey(key)) {
+                        return;
+                    }
+                    grandTotal += __cellValueToNumber(value);
+                });
+            }
 
             const grandTotalElement = container.querySelector('.matrix-grand-total');
             if (grandTotalElement) {
@@ -2013,11 +2016,10 @@ class MatrixHandler {
         inputs.forEach((input) => {
             const autoSum = parseFloat(input.getAttribute('data-original-value')) || 0;
             const stored = matrix.data[input.dataset.cellKey];
-            const manualVal = (stored && typeof stored === 'object' && stored.isModified)
-                ? stored.modified
-                : input.value;
-            const isManuallyModified = !!(stored && typeof stored === 'object' && stored.isModified);
-            const conflictType = __updateRowTotalConflict(input, autoSum, manualVal, validation, isManuallyModified);
+            const manualScalar = __storedRowTotalManualScalar(stored);
+            const manualVal = manualScalar != null ? manualScalar : autoSum;
+            const isManuallyModified = manualScalar != null && manualScalar !== autoSum;
+            const conflictType = __updateRowTotalConflict(input, autoSum, isManuallyModified ? manualVal : '', validation, isManuallyModified);
             if (conflictType === 'error') {
                 matrixValid = false;
             }
@@ -2054,11 +2056,7 @@ class MatrixHandler {
 
         const autoSum = parseFloat(input.getAttribute('data-original-value')) || 0;
         input.value = autoSum ? __formatInteger(autoSum) : '';
-        matrix.data[cellKey] = {
-            original: autoSum,
-            modified: '',
-            isModified: false
-        };
+        delete matrix.data[cellKey];
         __updateRowTotalConflict(input, autoSum, '', __rowTotalValidation(matrix.config), false);
         if (matrix.hiddenField) {
             matrix.hiddenField.value = __serializeMatrixData(matrix.data);
@@ -3183,6 +3181,7 @@ class MatrixHandler {
 
             // Update matrix data and totals once after all rows are processed
             this.calculateMatrixTotals(fieldId);
+            this.applyVariableLookupComparison(fieldId);
 
         } catch (error) {
             debugError('matrix-handler', '[BATCH VARIABLE RESOLUTION] Error in batch resolution:', {
@@ -3201,100 +3200,68 @@ class MatrixHandler {
      */
     _applyResolvedVariablesToRow(fieldId, rowEntityId, rowElement, variableInputs, resolvedVariables) {
         const matrix = this.matrices.get(fieldId);
+        if (!matrix) return;
+        if (!matrix.lookupRefs) matrix.lookupRefs = {};
+        const labels = this.getVariableTooltipLabels(matrix.config);
 
         variableInputs.forEach((input) => {
             const variableName = input.getAttribute('data-variable-name');
             const cellKey = input.getAttribute('data-cell-key');
             const saveValue = input.getAttribute('data-variable-save-value') === 'true';
 
-            // Check if there's a saved value and if it's been modified by the user
-            let hasSavedValue = false;
-            let savedIsModified = false;
-            let savedDisplayValue = null;
-            let savedOriginalValue = null;
-
-            if (saveValue && cellKey && matrix && matrix.data && matrix.data[cellKey] !== undefined) {
-                const savedValue = matrix.data[cellKey];
-                hasSavedValue = true;
-
-                if (typeof savedValue === 'object' && savedValue.original !== undefined) {
-                    // Use != null so that "" (PNS deliberately cleared) and 0 show as-is,
-                    // only falling back to original when modified is absent (null/undefined).
-                    savedDisplayValue = savedValue.modified != null ? savedValue.modified : savedValue.original;
-                    savedOriginalValue = savedValue.original;
-                    savedIsModified = savedValue.isModified || false;
-                } else {
-                    savedDisplayValue = String(savedValue || '');
-                    savedOriginalValue = savedDisplayValue;
-                    savedIsModified = false;
-                }
-
-                if (savedIsModified) {
-                    if (input.type === 'checkbox') {
-                        const checkedValue = savedDisplayValue === '1' || savedDisplayValue === 1 || savedDisplayValue === 'true' || savedDisplayValue === true;
-                        input.checked = checkedValue;
-                        input.setAttribute('data-original-value', savedOriginalValue);
-                    } else {
-                        input.value = savedDisplayValue;
-                        input.setAttribute('data-original-value', savedOriginalValue);
-                        if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
-                    }
-                    this.updateVariableModificationIndicator(input, true, savedOriginalValue);
-                    return; // Skip resolution, preserve user modification
-                }
+            let lookupValue = '';
+            if (variableName && Object.prototype.hasOwnProperty.call(resolvedVariables, variableName)) {
+                lookupValue = resolvedVariables[variableName];
+            }
+            lookupValue = __formatLookupValueForInput(input.type, lookupValue);
+            if (cellKey) {
+                matrix.lookupRefs[cellKey] = lookupValue;
+                input.setAttribute('data-lookup-value', lookupValue);
             }
 
-            if (variableName && resolvedVariables.hasOwnProperty(variableName)) {
-                const resolvedValue = resolvedVariables[variableName];
-                const displayValue = resolvedValue !== null && resolvedValue !== undefined ? String(resolvedValue) : '';
-
+            if (!saveValue) {
                 if (input.type === 'checkbox') {
-                    const checkedValue = displayValue === '1' || displayValue === 'true' || resolvedValue === true || resolvedValue === 1;
-                    input.checked = checkedValue;
-                    input.setAttribute('data-original-value', checkedValue ? '1' : '0');
+                    input.checked = lookupValue === '1';
                 } else {
-                    input.value = displayValue;
-                    input.setAttribute('data-original-value', displayValue);
+                    input.value = lookupValue;
                     if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
                 }
+                this.updateVariableModificationIndicator(input, '', '', labels);
+                return;
+            }
 
-                const isUpdatingSavedValue = hasSavedValue && !savedIsModified;
+            const hasSaved = cellKey && matrix.data && matrix.data[cellKey] !== undefined;
+            const savedRaw = hasSaved ? matrix.data[cellKey] : undefined;
+            let savedScalar = hasSaved
+                ? __getSavedMatrixCellScalar(savedRaw)
+                : lookupValue;
+            const staleUnmodifiedSave = hasSaved
+                && lookupValue !== ''
+                && !__savedVariableCellIsUserModified(savedRaw)
+                && __variableCellDiffersFromLookup(lookupValue, savedScalar, input.type);
 
-                if (saveValue && cellKey && matrix) {
-                    const storedValue = input.type === 'checkbox'
-                        ? (input.checked ? '1' : '0')
-                        : displayValue;
-                    __applyVariableCellToMatrix(
-                        matrix,
-                        cellKey,
-                        input.type,
-                        storedValue,
-                        storedValue,
-                        false,
-                        isUpdatingSavedValue && savedOriginalValue !== null ? savedOriginalValue : null
-                    );
-
-                    if (matrix.hiddenField) {
-                        matrix.hiddenField.value = __serializeMatrixData(matrix.data);
-                    }
+            if (hasSaved && !staleUnmodifiedSave) {
+                const display = __formatSavedScalarForInput(input.type, savedScalar);
+                if (input.type === 'checkbox') {
+                    input.checked = display === '1';
+                } else {
+                    input.value = display;
+                    if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
                 }
-            } else {
-                if (hasSavedValue && savedDisplayValue !== null) {
-                    if (input.type === 'checkbox') {
-                        const checkedValue = savedDisplayValue === '1' || savedDisplayValue === 1 || savedDisplayValue === 'true' || savedDisplayValue === true;
-                        input.checked = checkedValue;
-                        input.setAttribute('data-original-value', savedOriginalValue || (checkedValue ? '1' : '0'));
-                    } else {
-                        input.value = savedDisplayValue;
-                        input.setAttribute('data-original-value', savedOriginalValue || savedDisplayValue);
-                        if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
-                    }
-
-                    if (savedIsModified) {
-                        this.updateVariableModificationIndicator(input, true, savedOriginalValue);
-                    }
+            } else if (variableName && Object.prototype.hasOwnProperty.call(resolvedVariables, variableName)) {
+                if (input.type === 'checkbox') {
+                    input.checked = lookupValue === '1';
+                } else {
+                    input.value = lookupValue;
+                    if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
+                }
+                savedScalar = lookupValue;
+                if (cellKey && saveValue) {
+                    matrix.data[cellKey] = __persistVariableCellScalar(lookupValue);
                 }
             }
+
+            this.updateVariableModificationIndicator(input, lookupValue, savedScalar, labels);
         });
     }
 
@@ -3384,127 +3351,7 @@ class MatrixHandler {
             const data = await response.json();
             const resolvedVariables = data.variables || {};
 
-            // Update each variable input with resolved value
-            variableInputs.forEach((input, index) => {
-                const variableName = input.getAttribute('data-variable-name');
-                const cellKey = input.getAttribute('data-cell-key');
-                const saveValue = input.getAttribute('data-variable-save-value') === 'true';
-                const matrix = this.matrices.get(fieldId);
-
-                // Check if there's a saved value and if it's been modified by the user
-                let hasSavedValue = false;
-                let savedIsModified = false;
-                let savedDisplayValue = null;
-                let savedOriginalValue = null;
-
-                if (saveValue && cellKey && matrix && matrix.data && matrix.data[cellKey] !== undefined) {
-                    const savedValue = matrix.data[cellKey];
-                    hasSavedValue = true;
-
-                    // Handle new structure with original/modified tracking
-                    if (typeof savedValue === 'object' && savedValue.original !== undefined) {
-                        savedDisplayValue = savedValue.modified != null ? savedValue.modified : savedValue.original;
-                        savedOriginalValue = savedValue.original;
-                        savedIsModified = savedValue.isModified || false;
-                    } else {
-                        // Legacy structure - treat as unmodified
-                        savedDisplayValue = String(savedValue || '');
-                        savedOriginalValue = savedDisplayValue;
-                        savedIsModified = false;
-                    }
-
-                    // If the saved value has been modified by the user, preserve it and skip resolution
-                    if (savedIsModified) {
-                        // Handle both number and tick variable inputs
-                        if (input.type === 'checkbox') {
-                            // For tick inputs, set checked state
-                            const checkedValue = savedDisplayValue === '1' || savedDisplayValue === 1 || savedDisplayValue === 'true' || savedDisplayValue === true;
-                            input.checked = checkedValue;
-                            input.setAttribute('data-original-value', savedOriginalValue);
-                        } else {
-                            // For number inputs, set value
-                            input.value = savedDisplayValue;
-                            input.setAttribute('data-original-value', savedOriginalValue);
-                            if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
-                        }
-
-                        // Update visual indicator
-                        this.updateVariableModificationIndicator(input, true, savedOriginalValue);
-
-                        return; // Skip resolution, preserve user modification
-                    }
-                    // If not modified, continue to resolve from source (will update if source changed)
-                }
-
-                if (variableName && resolvedVariables.hasOwnProperty(variableName)) {
-                    const resolvedValue = resolvedVariables[variableName];
-                    const displayValue = resolvedValue !== null && resolvedValue !== undefined ? String(resolvedValue) : '';
-
-                    // Handle both number and tick variable inputs
-                    if (input.type === 'checkbox') {
-                        // For tick inputs, set checked state based on resolved value
-                        const checkedValue = displayValue === '1' || displayValue === 'true' || resolvedValue === true || resolvedValue === 1;
-                        input.checked = checkedValue;
-                        input.setAttribute('data-original-value', checkedValue ? '1' : '0');
-                    } else {
-                        // For number inputs, set value and apply thousand-separator formatting
-                        input.value = displayValue;
-                        input.setAttribute('data-original-value', displayValue);
-                        if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
-                    }
-
-                    // Determine if this is an update to an existing saved value
-                    const isUpdatingSavedValue = hasSavedValue && !savedIsModified;
-
-                    // If save_value is enabled, manually update matrix data
-                    if (saveValue && cellKey && matrix) {
-                        const storedValue = input.type === 'checkbox'
-                            ? (input.checked ? '1' : '0')
-                            : displayValue;
-                        __applyVariableCellToMatrix(
-                            matrix,
-                            cellKey,
-                            input.type,
-                            storedValue,
-                            storedValue,
-                            false,
-                            isUpdatingSavedValue && savedOriginalValue !== null ? savedOriginalValue : null
-                        );
-
-                        // Update hidden field
-                        if (matrix.hiddenField) {
-                            matrix.hiddenField.value = __serializeMatrixData(matrix.data);
-                        }
-                    }
-                } else {
-                    // Variable not found in resolved variables
-                    // If we have a saved value (even if unmodified), use it as fallback
-                    if (hasSavedValue && savedDisplayValue !== null) {
-                        // Handle both number and tick variable inputs
-                        if (input.type === 'checkbox') {
-                            const checkedValue = savedDisplayValue === '1' || savedDisplayValue === 1 || savedDisplayValue === 'true' || savedDisplayValue === true;
-                            input.checked = checkedValue;
-                            input.setAttribute('data-original-value', savedOriginalValue || (checkedValue ? '1' : '0'));
-                        } else {
-                            input.value = savedDisplayValue;
-                            input.setAttribute('data-original-value', savedOriginalValue || savedDisplayValue);
-                            if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
-                        }
-
-                        // Update visual indicator if it was modified
-                        if (savedIsModified) {
-                            this.updateVariableModificationIndicator(input, true, savedOriginalValue);
-                        }
-
-                    } else {
-                        debugWarn('matrix-handler', `[VARIABLE RESOLUTION] Variable ${variableName} not found in resolved variables`, {
-                            variableName,
-                            availableVariables: Object.keys(resolvedVariables),
-                            resolvedVariables
-                        });
-                    }
-                }
-            });
+            this._applyResolvedVariablesToRow(fieldId, rowEntityId, rowElement, variableInputs, resolvedVariables);
 
             // Update matrix data and totals
             this.calculateMatrixTotals(fieldId);
@@ -3946,8 +3793,10 @@ class MatrixHandler {
                 const configColumnName = typeof column === 'object' ? column.name : column;
                 return configColumnName === columnName;
             });
+            const isRowTotalColumn = columnName === ROW_TOTAL_COLUMN_NAME
+                && __configFlag(config?.show_row_totals, true);
 
-            if (columnExists) {
+            if (columnExists || isRowTotalColumn) {
                 if (!rowInfoMap.has(rowId)) {
                     rowInfoMap.set(rowId, {
                         rowId: rowId,
@@ -4026,10 +3875,74 @@ class MatrixHandler {
     }
 
     /**
+     * Resolve customizable tooltip labels for variable lookup comparison.
+     */
+    getVariableTooltipLabels(config) {
+        return {
+            lookupLabel: __resolveMatrixLocalizedLabel(
+                config,
+                'variable_lookup_tooltip_label',
+                'variable_lookup_tooltip_label_translations',
+                'Lookup value'
+            ),
+            submittedLabel: __resolveMatrixLocalizedLabel(
+                config,
+                'variable_submitted_tooltip_label',
+                'variable_submitted_tooltip_label_translations',
+                'Submitted value'
+            ),
+        };
+    }
+
+    applyVariableLookupComparison(fieldId) {
+        const matrix = this.matrices.get(fieldId);
+        if (!matrix?.container) return;
+        const labels = this.getVariableTooltipLabels(matrix.config);
+        matrix.container.querySelectorAll('input[data-column-type="variable"]').forEach((input) => {
+            if (input.getAttribute('data-variable-save-value') !== 'true') {
+                this.updateVariableModificationIndicator(input, '', '', labels);
+                return;
+            }
+            const cellKey = input.getAttribute('data-cell-key');
+            const lookupValue = input.getAttribute('data-lookup-value')
+                ?? (cellKey && matrix.lookupRefs ? matrix.lookupRefs[cellKey] : '')
+                ?? '';
+            const savedScalar = cellKey && matrix.data && matrix.data[cellKey] !== undefined
+                ? __getSavedMatrixCellScalar(matrix.data[cellKey])
+                : __inputValueForMatrixCompare(input);
+            this.updateVariableModificationIndicator(input, lookupValue, savedScalar, labels);
+        });
+    }
+
+    applyVariableLookupComparisonForInput(fieldId, input) {
+        const matrix = this.matrices.get(fieldId);
+        if (!matrix || !input) return;
+        const labels = this.getVariableTooltipLabels(matrix.config);
+        if (input.getAttribute('data-variable-save-value') !== 'true') {
+            this.updateVariableModificationIndicator(input, '', '', labels);
+            return;
+        }
+        const cellKey = input.getAttribute('data-cell-key');
+        const lookupValue = input.getAttribute('data-lookup-value')
+            ?? (cellKey && matrix.lookupRefs ? matrix.lookupRefs[cellKey] : '')
+            ?? '';
+        const savedScalar = cellKey && matrix.data && matrix.data[cellKey] !== undefined
+            ? __getSavedMatrixCellScalar(matrix.data[cellKey])
+            : __inputValueForMatrixCompare(input);
+        this.updateVariableModificationIndicator(input, lookupValue, savedScalar, labels);
+    }
+
+    /**
      * Update visual indicator for modified variable fields
      */
-    updateVariableModificationIndicator(input, isModified, originalValue) {
+    updateVariableModificationIndicator(input, lookupValue, savedValue, labels = null) {
         if (!input) return;
+
+        const container = input.closest('.matrix-container');
+        const fieldId = container?.dataset?.fieldId;
+        const matrix = fieldId ? this.matrices.get(fieldId) : null;
+        const resolvedLabels = labels || this.getVariableTooltipLabels(matrix?.config || {});
+        const isModified = __variableCellDiffersFromLookup(lookupValue, savedValue, input.type);
 
         // Find the parent cell (td) to attach tooltip to
         const cell = input.closest('td');
@@ -4075,7 +3988,7 @@ class MatrixHandler {
                     cell.style.setProperty('background-color', '#fff3e0', 'important'); // Light orange background
                 }
 
-                debugLog('matrix-handler', `Applying orange styling to modified editable variable checkbox: ${input.getAttribute('data-cell-key')}, original="${originalValue}", current="${input.checked}"`);
+                debugLog('matrix-handler', `Applying orange styling to modified editable variable checkbox: ${input.getAttribute('data-cell-key')}, lookup="${lookupValue}", saved="${savedValue}"`);
             } else if (isCheckbox && !isEditable) {
                 // For readonly checkboxes: apply green to the cell (td) so it fills the full height
                 if (cell) {
@@ -4083,7 +3996,7 @@ class MatrixHandler {
                 }
                 input.classList.add('variable-modified');
 
-                debugLog('matrix-handler', `Applying green highlight to modified readonly variable checkbox: ${input.getAttribute('data-cell-key')}, original="${originalValue}", current="${input.checked}"`);
+                debugLog('matrix-handler', `Applying green highlight to modified readonly variable checkbox: ${input.getAttribute('data-cell-key')}, lookup="${lookupValue}", saved="${savedValue}"`);
             } else {
                 // For number inputs: apply green to the cell (td) so it fills the full height,
                 // and make the input itself transparent so the cell colour shows through.
@@ -4093,11 +4006,11 @@ class MatrixHandler {
                 input.style.setProperty('background-color', 'transparent', 'important');
                 input.classList.add('variable-modified');
 
-                debugLog('matrix-handler', `Applying green highlight to modified variable cell: ${input.getAttribute('data-cell-key')}, original="${originalValue}", current="${input.value}"`);
+                debugLog('matrix-handler', `Applying green highlight to modified variable cell: ${input.getAttribute('data-cell-key')}, lookup="${lookupValue}", saved="${savedValue}"`);
             }
 
-            // Store original value on the cell for tooltip recreation
-            cell._variableOriginalValue = originalValue;
+            cell._variableLookupValue = lookupValue;
+            cell._variableSubmittedValue = savedValue;
             cell._variableInput = input;
 
             // Create or get tooltip element - keep it in DOM for reuse
@@ -4155,26 +4068,35 @@ class MatrixHandler {
                 if (!currentInput) {
                     return;
                 }
-                const currentOriginalValue = cell._variableOriginalValue !== undefined ? cell._variableOriginalValue : originalValue;
+                const currentLookupValue = cell._variableLookupValue !== undefined ? cell._variableLookupValue : lookupValue;
+                const currentSavedValue = cell._variableSubmittedValue !== undefined
+                    ? cell._variableSubmittedValue
+                    : (currentInput.type === 'checkbox'
+                        ? (currentInput.checked ? '1' : '0')
+                        : __inputValueForMatrixCompare(currentInput));
 
                 if (tooltip) {
                     tooltip.replaceChildren();
                     const title = document.createElement('div');
                     title.style.fontWeight = 'bold';
                     title.style.marginBottom = '4px';
-                    title.textContent = 'Modified Value';
+                    title.textContent = 'Modified value';
 
-                    const originalRow = document.createElement('div');
-                    originalRow.appendChild(document.createTextNode('Original: '));
-                    const originalText =
-                        (currentOriginalValue !== null && currentOriginalValue !== undefined && currentOriginalValue !== '')
-                            ? (__formatNumberForDisplay(currentOriginalValue) ?? String(currentOriginalValue))
+                    const lookupRow = document.createElement('div');
+                    lookupRow.appendChild(document.createTextNode(`${resolvedLabels.lookupLabel}: `));
+                    const lookupText =
+                        (currentLookupValue !== null && currentLookupValue !== undefined && currentLookupValue !== '')
+                            ? (__formatNumberForDisplay(currentLookupValue) ?? String(currentLookupValue))
                             : '(empty)';
-                    originalRow.appendChild(document.createTextNode(originalText));
+                    lookupRow.appendChild(document.createTextNode(lookupText));
 
-                    const currentRow = document.createElement('div');
-                    currentRow.appendChild(document.createTextNode('Current: '));
-                    currentRow.appendChild(document.createTextNode(String(currentInput.type === 'checkbox' ? (currentInput.checked ? '1' : '0') : (currentInput.value || '(empty)'))));
+                    const submittedRow = document.createElement('div');
+                    submittedRow.appendChild(document.createTextNode(`${resolvedLabels.submittedLabel}: `));
+                    submittedRow.appendChild(document.createTextNode(
+                        String(currentSavedValue !== null && currentSavedValue !== undefined && currentSavedValue !== ''
+                            ? (__formatNumberForDisplay(currentSavedValue) ?? String(currentSavedValue))
+                            : '(empty)')
+                    ));
 
                     const restoreRow = document.createElement('div');
                     restoreRow.style.marginTop = '6px';
@@ -4182,48 +4104,41 @@ class MatrixHandler {
                     restoreRow.style.borderTop = '1px solid rgba(255,255,255,0.3)';
                     const restoreBtn = document.createElement('button');
                     restoreBtn.type = 'button';
-                    restoreBtn.setAttribute('aria-label', 'Restore original value');
+                    restoreBtn.setAttribute('aria-label', `Restore ${resolvedLabels.lookupLabel.toLowerCase()}`);
                     restoreBtn.style.cssText = 'background:#555;color:white;border:none;border-radius:3px;padding:4px 8px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;';
-                    restoreBtn.innerHTML = '↩ Restore original';
+                    restoreBtn.innerHTML = `↩ Restore ${resolvedLabels.lookupLabel.toLowerCase()}`;
                     restoreBtn.addEventListener('click', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         const inp = cell._variableInput;
-                        const orig = cell._variableOriginalValue;
+                        const lookup = cell._variableLookupValue;
                         if (!inp || !inp.isConnected) return;
-                        const container = inp.closest('.matrix-container') || inp.closest('[data-field-id]');
-                        const fieldId = container ? (container.getAttribute('data-field-id') || '') : '';
+                        const matrixContainer = inp.closest('.matrix-container') || inp.closest('[data-field-id]');
+                        const restoreFieldId = matrixContainer ? (matrixContainer.getAttribute('data-field-id') || '') : '';
                         const cellKey = inp.getAttribute('data-cell-key');
-                        const matrix = fieldId ? this.matrices.get(fieldId) : null;
+                        const restoreMatrix = restoreFieldId ? this.matrices.get(restoreFieldId) : null;
+                        const restoredDisplay = __formatLookupValueForInput(inp.type, lookup);
                         if (inp.type === 'checkbox') {
-                            inp.checked = (orig === 1 || orig === '1' || orig === true || orig === 'true');
+                            inp.checked = restoredDisplay === '1';
                         } else {
-                            inp.value = (orig !== null && orig !== undefined) ? String(orig) : '';
+                            inp.value = restoredDisplay;
+                            if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(inp);
                         }
-                        // Sync data-original-value to the value we just set (so modification check matches)
-                        const restoredDisplay = inp.type === 'checkbox' ? (inp.checked ? '1' : '0') : String(inp.value || '').trim();
-                        inp.setAttribute('data-original-value', restoredDisplay);
-                        if (matrix && cellKey) {
-                            __applyVariableCellToMatrix(
-                                matrix,
-                                cellKey,
-                                inp.type,
-                                restoredDisplay,
-                                restoredDisplay,
-                                false
-                            );
-                            this.sanitizeMatrixData(matrix);
-                            if (matrix.hiddenField) {
-                                matrix.hiddenField.value = __serializeMatrixData(matrix.data);
+                        if (restoreMatrix && cellKey) {
+                            restoreMatrix.data[cellKey] = inp.type === 'checkbox'
+                                ? restoredDisplay
+                                : __persistVariableCellScalar(restoredDisplay);
+                            this.sanitizeMatrixData(restoreMatrix);
+                            if (restoreMatrix.hiddenField) {
+                                restoreMatrix.hiddenField.value = __serializeMatrixData(restoreMatrix.data);
                             }
                         }
-                        // Clear green/tooltip without dispatching (dispatch would re-run handler and can re-apply green if display differs)
-                        this.updateVariableModificationIndicator(inp, false, restoredDisplay);
+                        this.updateVariableModificationIndicator(inp, lookup, restoredDisplay, resolvedLabels);
                         inp.dispatchEvent(new Event('input', { bubbles: true }));
                         inp.dispatchEvent(new Event('change', { bubbles: true }));
                     });
                     restoreRow.appendChild(restoreBtn);
-                    tooltip.append(title, originalRow, currentRow, restoreRow);
+                    tooltip.append(title, lookupRow, submittedRow, restoreRow);
 
                     // Calculate position based on cell's bounding box
                     const cellRect = cell.getBoundingClientRect();
@@ -4433,58 +4348,25 @@ class MatrixHandler {
             const value = rowInfo.values[cellKey];
 
             if (value !== undefined && value !== null) {
-                // Handle variable column data structure (with original/modified tracking)
                 let displayValue = value;
-                let originalValue = null;
-                let isModified = false;
 
                 if (isVariable) {
-                    if (typeof value === 'object' && value.original !== undefined) {
-                        // New structure with modification tracking
-                        displayValue = value.modified != null ? value.modified : value.original;
-                        originalValue = value.original;
-                        isModified = value.isModified || false;
-                        updatedMatrix.data[cellKey] = value; // Keep full structure
-                    } else {
-                        // Legacy structure - convert to new format
-                        displayValue = String(value);
-                        originalValue = displayValue;
-                        isModified = false;
-                        updatedMatrix.data[cellKey] = {
-                            original: displayValue,
-                            modified: displayValue,
-                            isModified: false
-                        };
-                    }
+                    displayValue = __getSavedMatrixCellScalar(value);
+                    updatedMatrix.data[cellKey] = displayValue;
                 } else {
-                    // Non-variable column - use simple value
-                updatedMatrix.data[cellKey] = value;
+                    updatedMatrix.data[cellKey] = value;
                 }
 
-                // Update the input value if it exists
                 const input = updatedMatrix.container.querySelector(`input[data-cell-key="${cellKey}"]`);
                 if (input) {
                     if (input.type === 'checkbox') {
                         const checkedValue = displayValue == '1' || displayValue == 1 || displayValue === 'true' || displayValue === true;
                         input.checked = checkedValue;
-                        // Store original value for variable tick columns
-                        if (isVariable && originalValue !== null) {
-                            input.setAttribute('data-original-value', originalValue);
-                            // Update visual indicator
-                            this.updateVariableModificationIndicator(input, isModified, originalValue);
-                        }
                     } else {
                         input.value = displayValue;
                         if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
-                        // Store original value for variable number columns
-                        if (isVariable && originalValue !== null) {
-                            input.setAttribute('data-original-value', originalValue);
-                            // Update visual indicator
-                            this.updateVariableModificationIndicator(input, isModified, originalValue);
-                        }
                     }
 
-                    // Ensure disabled state is set for readonly variable columns
                     if (isVariable && column) {
                         const variableReadonly = typeof column === 'object' ? (column.variable_readonly !== false) : true;
                         input.disabled = variableReadonly;
@@ -4544,61 +4426,29 @@ class MatrixHandler {
 
             const value = data[cellKey];
             if (value !== undefined && value !== null) {
-                // Handle variable column data structure (with original/modified tracking)
                 let displayValue = value;
-                let originalValue = null;
-                let isModified = false;
 
                 if (isVariable) {
-                    if (typeof value === 'object' && value.original !== undefined) {
-                        // New structure with modification tracking
-                        displayValue = value.modified != null ? value.modified : value.original;
-                        originalValue = value.original;
-                        isModified = value.isModified || false;
-                    } else {
-                        // Legacy structure - convert to new format
-                        displayValue = String(value);
-                        originalValue = displayValue;
-                        isModified = false;
-                        // Update data structure
-                        data[cellKey] = {
-                            original: displayValue,
-                            modified: displayValue,
-                            isModified: false
-                        };
-                    }
+                    displayValue = __getSavedMatrixCellScalar(value);
+                    data[cellKey] = displayValue;
                 }
 
-                // Find the input field for this cell
                 const input = container.querySelector(`input[data-cell-key="${cellKey}"]`);
                 if (input) {
                     if (input.type === 'checkbox') {
                         const checkedValue = displayValue == '1' || displayValue == 1 || displayValue === 'true' || displayValue === true;
                         input.checked = checkedValue;
-                        // Store original value for variable tick columns
-                        if (isVariable && originalValue !== null) {
-                            input.setAttribute('data-original-value', originalValue);
-                            // Update visual indicator
-                            this.updateVariableModificationIndicator(input, isModified, originalValue);
-                        }
                     } else {
                         input.value = displayValue;
                         if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
-                        // Store original value for variable number columns
-                        if (isVariable && originalValue !== null) {
-                            input.setAttribute('data-original-value', originalValue);
-                            // Update visual indicator
-                            this.updateVariableModificationIndicator(input, isModified, originalValue);
-                        }
                     }
 
-                    // Set disabled state for readonly variable columns
                     if (isVariable && column) {
                         const variableReadonly = typeof column === 'object' ? (column.variable_readonly !== false) : true;
                         input.disabled = variableReadonly;
                     }
 
-                    debugLog('matrix-handler', `Restored value for cell ${cellKey}: ${displayValue}${isModified ? ' (modified)' : ''}`);
+                    debugLog('matrix-handler', `Restored value for cell ${cellKey}: ${displayValue}`);
                 } else {
                     debugLog('matrix-handler', `Input not found for cell key: ${cellKey}`);
                 }
@@ -6011,6 +5861,23 @@ class MatrixHandler {
     }
 
     /**
+     * Replace built-in metadata tokens like [assignment_period] in display text.
+     */
+    resolveMetadataVariablesInText(text) {
+        if (!text || typeof text !== 'string' || !text.includes('[')) {
+            return text;
+        }
+        const meta = window.metadataContext || {};
+        return text.replace(/\[(\w+)\]/g, (match, tokenName) => {
+            if (!Object.prototype.hasOwnProperty.call(meta, tokenName)) {
+                return match;
+            }
+            const value = meta[tokenName];
+            return (value === undefined || value === null) ? '' : String(value);
+        });
+    }
+
+    /**
      * Resolve the display label for a matrix column for the current language.
      * IMPORTANT: This does NOT change the column key used for data storage (still `column.name`).
      */
@@ -6021,14 +5888,15 @@ class MatrixHandler {
                 : String(column || '');
             if (!baseName) return '';
 
+            let displayName = baseName;
             if (typeof column === 'object' && column && column.name_translations && typeof column.name_translations === 'object') {
                 const lang = this.getCurrentLanguage();
                 const cand = column.name_translations[lang] || column.name_translations.en;
                 if (typeof cand === 'string' && cand.trim()) {
-                    return cand.trim();
+                    displayName = cand.trim();
                 }
             }
-            return baseName;
+            return this.resolveMetadataVariablesInText(displayName);
         } catch (_e) {
             return (typeof column === 'object') ? String(column?.name || '') : String(column || '');
         }

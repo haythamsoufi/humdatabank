@@ -1557,16 +1557,12 @@ def _t22_total_only_breakdown_cell(
     pns_aes: int,
     host_cid: int,
     area: str,
-) -> Optional[Dict[str, Any]]:
-    """PNS reported a row total only — override breakdown where country reported a value."""
+) -> Optional[Any]:
+    """PNS reported a row total only — store cleared breakdown cell as empty scalar."""
     cv, _ = pns_t22_staging.get((pns_aes, host_cid, area), (None, None))
     if cv is None:
         return None
-    return {
-        "original": cv,
-        "modified": "",
-        "isModified": True,
-    }
+    return ""
 
 
 def transform_to_import_rows(
@@ -1589,7 +1585,7 @@ def transform_to_import_rows(
     core_yes_no_ids = set(ctx.core_yes_no_item_ids)
 
     # ── Planning T22 PNS funding staging ──────────────────────────────────────
-    # Collected across all rows then converted to {original, modified, isModified} matrix cells.
+    # Collected across all rows then converted to scalar matrix cells.
     # Keyed by (pns_aes_id, host_country_id, area) → (country_val, pns_val).
     pns_t22_staging: Dict[Tuple[int, int, str], Tuple[Optional[float], Optional[float]]] = {}
     pns_t22_has_pns: Set[Tuple[int, int]] = set()  # (pns_aes_id, host_country_id) with any pns_val
@@ -2092,30 +2088,21 @@ def transform_to_import_rows(
             matrix_cells[(aes_id, support_item)][cell_key] = 1
             continue
 
-    # ── Post-loop: T22 PNS funding → {original, modified, isModified} cells ──
-    # isModified per-cell: True only when this area has a PNS value that differs from country-reported.
+    # ── Post-loop: T22 PNS funding → submitted scalar cells ──
     for (pns_aes, host_cid, area), (cv, pv) in pns_t22_staging.items():
         orig_num = cv or 0
-        is_modified = pv is not None and ((pv or 0) != orig_num)
-        matrix_cells[(pns_aes, ITEM_FUNDING_REQUIREMENTS_T22)][f"{host_cid}_{area}"] = {
-            "original": orig_num,
-            "modified": pv if pv is not None else "",
-            "isModified": is_modified,
-        }
+        submitted = pv if pv is not None else orig_num
+        matrix_cells[(pns_aes, ITEM_FUNDING_REQUIREMENTS_T22)][f"{host_cid}_{area}"] = submitted
 
     # ── Post-loop: T22 PNS Total (Excel Area=Total) → row-total column ──
     for (pns_aes, host_cid), (cv, pv) in pns_t22_total_staging.items():
         pns_reported = (pns_aes, host_cid) in pns_t22_has_pns
         orig_num = cv or 0
-        is_modified = pns_reported and ((pv or 0) != orig_num)
+        submitted = pv if pns_reported and pv is not None else orig_num
         item_cells = matrix_cells[(pns_aes, ITEM_FUNDING_REQUIREMENTS_T22)]
-        item_cells[f"{host_cid}_{T22_ROW_TOTAL_COLUMN}"] = {
-            "original": orig_num,
-            "modified": pv if pv is not None else "",
-            "isModified": is_modified,
-        }
+        item_cells[f"{host_cid}_{T22_ROW_TOTAL_COLUMN}"] = submitted
         # PNS reported row totals only (no SP/EF breakdown) — blank current values but
-        # preserve country-reported amounts in original for tooltips / restore.
+        # preserve country-reported amounts as empty submitted scalars where needed.
         has_pns_breakdown = any(
             k[0] == pns_aes
             and k[1] == host_cid
@@ -2266,6 +2253,33 @@ def run_upr_import(
             progress_end_pct=85.0,
             stats=stats,
         )
+        if not dry_run and import_rows:
+            from app.services.variable_resolution_service import VariableResolutionService
+
+            updated_sources = set()
+            for row in import_rows:
+                try:
+                    aes_raw = row.get(COL_ASSIGNMENT) or row.get("assignment_entity_status_id")
+                    item_raw = row.get(COL_ITEM) or row.get("form_item_id")
+                    aes_id = int(aes_raw) if aes_raw else 0
+                    form_item_id = int(item_raw) if item_raw else 0
+                except (TypeError, ValueError):
+                    continue
+                if aes_id and form_item_id:
+                    updated_sources.add((aes_id, form_item_id))
+            if updated_sources:
+                refresh_stats = VariableResolutionService.refresh_stale_variable_matrix_cells(
+                    updated_sources
+                )
+                upsert_stats.update(
+                    {
+                        "variable_consumer_rows_checked": refresh_stats.get(
+                            "consumer_rows_checked", 0
+                        ),
+                        "variable_cells_cleared": refresh_stats.get("cells_cleared", 0),
+                        "variable_consumer_rows_updated": refresh_stats.get("rows_updated", 0),
+                    }
+                )
         emergency_stats = upsert_emergency_repeat_slots(ctx, dry_run=dry_run)
         upsert_stats.update(emergency_stats)
         dyn_stats = upsert_dynamic_indicator_entries(

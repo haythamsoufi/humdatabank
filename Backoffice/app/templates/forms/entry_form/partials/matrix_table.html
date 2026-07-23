@@ -14,8 +14,8 @@
 {% set is_advanced_mode = matrix_config.get('row_mode') == 'list_library' %}
 {# Use resolved matrix rows if available (with variables replaced), otherwise use original rows #}
 {% set matrix_rows = field._display_matrix_rows if hasattr(field, '_display_matrix_rows') and field._display_matrix_rows else matrix_config.get('rows', []) %}
-{% set matrix_columns = matrix_config.get('columns', []) %}
-{% set matrix_column_groups = matrix_config.get('column_groups', {}) %}
+{% set matrix_columns = field._display_matrix_columns if hasattr(field, '_display_matrix_columns') and field._display_matrix_columns else matrix_config.get('columns', []) %}
+{% set matrix_column_groups = field._display_matrix_column_groups if hasattr(field, '_display_matrix_column_groups') and field._display_matrix_column_groups else matrix_config.get('column_groups', {}) %}
 {# translation_key is provided by the parent entry form; fallback to session language if not present #}
 {% set _tk = (translation_key if translation_key is defined else (session.get('language','en') or 'en')) %}
 {% if _tk is string %}

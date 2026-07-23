@@ -214,9 +214,10 @@ export class TemplateVariablesManager {
         td4.className = 'px-4 py-3 whitespace-nowrap';
         {
             const PERIOD_LABELS = {
-                '__current__':  'Same as current period',
-                '__previous__': 'Previous period',
-                '__latest__':   'Latest available period',
+                '__same_year__': 'Same calendar year',
+                '__current__': 'Same period name',
+                '__previous__': 'Previous source period (by date)',
+                '__latest__': 'Latest source period',
             };
             const rawPeriod = varConfig.source_assignment_period || null;
             const periodDisplay = variableType === 'metadata'
@@ -376,15 +377,16 @@ export class TemplateVariablesManager {
                                     Source Assignment Period *
                                     <span class="custom-info-tooltip cursor-help w-5 h-5 inline-flex items-center justify-center ml-1">
                                         <i class="fas fa-info-circle text-gray-400"></i>
-                                        <span class="tooltip-text">Choose a dynamic option that is resolved at form-fill time, or pick a specific fixed period from the source template's existing assignments.</span>
+                                        <span class="tooltip-text">Dynamic options resolve when the form is opened. Use Same calendar year when a reporting round (e.g. Jan-Jun 2026) should read planning data for that year (e.g. 2026). Same period name only works when both templates share the exact period label.</span>
                                     </span>
                                 </label>
                                 <select name="source_assignment_period" class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md" id="source-assignment-select">
                                     <option value="">Select assignment period...</option>
                                     <optgroup label="Dynamic — resolved at form-fill time">
-                                        <option value="__current__" ${existingVar?.source_assignment_period === '__current__' ? 'selected' : ''}>Same period as current assignment</option>
-                                        <option value="__previous__" ${existingVar?.source_assignment_period === '__previous__' ? 'selected' : ''}>Previous period (one before current)</option>
-                                        <option value="__latest__" ${existingVar?.source_assignment_period === '__latest__' ? 'selected' : ''}>Latest available period</option>
+                                        <option value="__same_year__" ${existingVar?.source_assignment_period === '__same_year__' ? 'selected' : ''}>Same calendar year (recommended for planning ← reporting)</option>
+                                        <option value="__current__" ${existingVar?.source_assignment_period === '__current__' ? 'selected' : ''}>Same period name as current assignment</option>
+                                        <option value="__previous__" ${existingVar?.source_assignment_period === '__previous__' ? 'selected' : ''}>Previous source period (by date)</option>
+                                        <option value="__latest__" ${existingVar?.source_assignment_period === '__latest__' ? 'selected' : ''}>Latest period on source template</option>
                                     </optgroup>
                                     <optgroup label="Specific period" id="specific-periods-group">
                                     </optgroup>

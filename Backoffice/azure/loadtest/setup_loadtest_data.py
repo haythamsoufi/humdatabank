@@ -44,6 +44,8 @@ Environment variables (override CLI args)
   LOADTEST_SESSION_COOKIE        required — captured post-B2C session cookie
   LOADTEST_SETUP_TEMPLATE_ID     template_id to use for new assignments
   LOADTEST_SETUP_COUNTRY_IDS     comma-separated country IDs to add per assignment
+                                 (default: 193 Testland when auto-discovering)
+  LOADTEST_DEFAULT_COUNTRY_ID    preferred country when auto-discovering (default 193)
   LOADTEST_SETUP_COUNT           number of assignments to create (default 3)
 """
 
@@ -70,6 +72,9 @@ except ImportError:
 STATE_FILE = Path(__file__).parent / ".loadtest-state.json"
 DEFAULT_HOST = "https://databank-stage.ifrc.org"
 PROD_HOST_FRAGMENTS = ("databank.ifrc.org",)
+# Dedicated test country on staging and prod — avoid real countries (e.g. Afghanistan id 1).
+DEFAULT_LOADTEST_COUNTRY_ID = 193
+LOADTEST_COUNTRY_NAME_HINTS = ("testland",)
 
 
 def _is_prod(host: str) -> bool:
@@ -265,7 +270,7 @@ def _discover_template_id(session: requests.Session, host: str) -> int:
 
 
 def _discover_country_id(session: requests.Session, host: str) -> int:
-    """Return the first country ID from GET /api/v1/countrymap."""
+    """Return Testland (id 193) when present, else first country from /api/v1/countrymap."""
     resp = session.get(
         f"{host}/api/v1/countrymap",
         headers={"Accept": "application/json"},
@@ -277,6 +282,19 @@ def _discover_country_id(session: requests.Session, host: str) -> int:
     valid = [c for c in (countries or []) if c.get("id")]
     if not valid:
         raise RuntimeError("No countries returned by /api/v1/countrymap")
+
+    raw = (os.getenv("LOADTEST_DEFAULT_COUNTRY_ID") or "").strip()
+    preferred_id = int(raw) if raw else DEFAULT_LOADTEST_COUNTRY_ID
+
+    for c in valid:
+        if int(c["id"]) == preferred_id:
+            return preferred_id
+
+    for c in valid:
+        name = (c.get("name") or "").lower()
+        if any(h in name for h in LOADTEST_COUNTRY_NAME_HINTS):
+            return int(c["id"])
+
     return int(valid[0]["id"])
 
 

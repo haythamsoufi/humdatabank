@@ -14,7 +14,7 @@ from app.models import (
     FormData, FormItem, FormTemplate, FormTemplateVersion,
     AssignedForm, AssignmentEntityStatus
 )
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, Set, List, Iterable
 import ast
 import logging
 import operator
@@ -105,9 +105,82 @@ class VariableResolutionService:
     MATRIX_COLUMN_ROW_TOTAL = '_row_total'
 
     # Sentinel values for source_assignment_period that are resolved dynamically at form-fill time.
-    _PERIOD_SENTINEL_CURRENT  = '__current__'
-    _PERIOD_SENTINEL_PREVIOUS = '__previous__'
-    _PERIOD_SENTINEL_LATEST   = '__latest__'
+    _PERIOD_SENTINEL_CURRENT   = '__current__'
+    _PERIOD_SENTINEL_PREVIOUS  = '__previous__'
+    _PERIOD_SENTINEL_LATEST    = '__latest__'
+    _PERIOD_SENTINEL_SAME_YEAR = '__same_year__'
+
+    @classmethod
+    def _assignment_primary_year(cls, assigned_form: Optional[AssignedForm]) -> Optional[int]:
+        """Return the calendar year that best represents an assignment's reporting cycle."""
+        if not assigned_form:
+            return None
+        if assigned_form.period_end is not None:
+            return assigned_form.period_end.year
+        if assigned_form.period_start is not None:
+            return assigned_form.period_start.year
+        reporting_period = getattr(assigned_form, 'reporting_period', None)
+        if reporting_period is not None and reporting_period.period_end is not None:
+            return reporting_period.period_end.year
+        from app.utils.reporting_period_label_parser import _extract_years
+
+        years = _extract_years(assigned_form.period_name)
+        return max(years) if years else None
+
+    @classmethod
+    def _resolve_same_year_source_period(
+        cls,
+        source_template_id: Optional[int],
+        assignment_entity_status: Optional['AssignmentEntityStatus'],
+    ) -> Optional[str]:
+        """
+        Resolve a source-template assignment whose reporting year matches the current form.
+
+        Typical use: reporting template period ``Jan-Jun 2026`` → planning template period ``2026``.
+        Prefers an exact ``period_name`` match (e.g. ``"2026"``), then any source assignment whose
+        typed/catalog bounds fall in the same calendar year.
+        """
+        current_af = (
+            getattr(assignment_entity_status, 'assigned_form', None)
+            if assignment_entity_status else None
+        )
+        if not current_af or not source_template_id:
+            return None
+
+        target_year = cls._assignment_primary_year(current_af)
+        if target_year is None:
+            return None
+
+        source_assignments = AssignedForm.query.filter_by(template_id=source_template_id).all()
+        if not source_assignments:
+            return None
+
+        year_label = str(target_year)
+        exact_matches = [
+            af for af in source_assignments
+            if (af.period_name or '').strip() == year_label
+        ]
+        if exact_matches:
+            exact_matches.sort(
+                key=lambda af: getattr(af, 'assigned_at', None) or 0,
+                reverse=True,
+            )
+            return exact_matches[0].period_name
+
+        year_matches = [
+            af for af in source_assignments
+            if cls._assignment_primary_year(af) == target_year
+        ]
+        if not year_matches:
+            return None
+
+        year_matches.sort(
+            key=lambda af: (
+                len((af.period_name or '').strip()),
+                (af.period_name or ''),
+            )
+        )
+        return year_matches[0].period_name
 
     @classmethod
     def _resolve_effective_period(
@@ -120,10 +193,13 @@ class VariableResolutionService:
         Expand a dynamic period sentinel to an actual ``period_name`` string.
 
         Sentinel values:
-          ``__current__``  – same period as the current assignment being filled.
-          ``__previous__`` – the period immediately before the current one among
-                             the source template's assignments (lexicographic order
-                             matching how assignments are ordered across the system).
+          ``__same_year__`` – source assignment in the same calendar year as the current
+                              form (e.g. ``Jan-Jun 2026`` → planning ``2026``).
+          ``__current__``  – same ``period_name`` as the current assignment being filled.
+          ``__previous__`` – chronologically previous assignment on the source template.
+                             Uses typed/catalog period dates: when labels differ across
+                             templates, picks the latest source period that ends before
+                             the current period starts (not string sorting).
           ``__latest__``   – the most-recent period for the source template,
                              regardless of the current form's period.
 
@@ -133,48 +209,113 @@ class VariableResolutionService:
         if not source_assignment_period:
             return None
 
+        if source_assignment_period == cls._PERIOD_SENTINEL_SAME_YEAR:
+            return cls._resolve_same_year_source_period(
+                source_template_id, assignment_entity_status
+            )
+
         if source_assignment_period == cls._PERIOD_SENTINEL_CURRENT:
             af = getattr(assignment_entity_status, 'assigned_form', None) if assignment_entity_status else None
             return af.period_name if af else None
 
         if source_assignment_period == cls._PERIOD_SENTINEL_LATEST:
-            latest = AssignedForm.query.filter_by(
+            source_assignments = AssignedForm.query.filter_by(
                 template_id=source_template_id
-            ).order_by(AssignedForm.period_name.desc()).first()
-            return latest.period_name if latest else None
+            ).all()
+            if not source_assignments:
+                return None
+            latest_af = max(source_assignments, key=cls._assigned_form_chronology_key)
+            return latest_af.period_name
 
         if source_assignment_period == cls._PERIOD_SENTINEL_PREVIOUS:
-            current_af = getattr(assignment_entity_status, 'assigned_form', None) if assignment_entity_status else None
-            if not current_af:
-                return None
-            current_period = current_af.period_name
-            all_periods = [
-                a.period_name for a in AssignedForm.query.filter_by(
-                    template_id=source_template_id
-                ).order_by(AssignedForm.period_name.desc()).all()
-            ]
-            if not all_periods:
-                return None
-            try:
-                idx = all_periods.index(current_period)
-                # Descending list: the "previous" period is one index higher
-                return all_periods[idx + 1] if idx + 1 < len(all_periods) else None
-            except ValueError:
-                # Current period not among source template's assignments.
-                # Fall back to the most-recent period that is lexicographically before
-                # the current one (handles cross-template period mismatches gracefully).
-                before_current = [p for p in all_periods if p < current_period]
-                return before_current[0] if before_current else None
+            return cls._resolve_previous_source_period(
+                source_template_id, assignment_entity_status
+            )
 
         # Plain string — return as-is.
         return source_assignment_period
 
     @classmethod
+    def _assigned_form_chronology_key(cls, assigned_form: AssignedForm) -> tuple:
+        """Chronology sort key (period_end, period_start, period_name) for an assignment."""
+        from app.services.reporting_period_service import period_chronology_sort_key
+
+        return period_chronology_sort_key(
+            assigned_form.period_name,
+            period_start=assigned_form.period_start,
+            period_end=assigned_form.period_end,
+        )
+
+    @classmethod
+    def _assigned_form_period_bounds(
+        cls, assigned_form: AssignedForm
+    ) -> tuple[Optional['date'], Optional['date']]:
+        from app.services.reporting_period_service import _period_bounds_for_assigned_form
+
+        return _period_bounds_for_assigned_form(assigned_form)
+
+    @classmethod
+    def _resolve_previous_source_period(
+        cls,
+        source_template_id: Optional[int],
+        assignment_entity_status: Optional['AssignmentEntityStatus'],
+    ) -> Optional[str]:
+        """
+        Resolve the chronologically previous assignment on the source template.
+
+        - When the current ``period_name`` exists on the source template, return the
+          next-earlier source period in chronological order.
+        - Otherwise (cross-template labels), return the latest source assignment whose
+          typed/catalog period ends before the current assignment starts
+          (e.g. reporting ``Jan-Jun 2026`` → planning ``2025``, not ``2026``).
+        """
+        current_af = (
+            getattr(assignment_entity_status, 'assigned_form', None)
+            if assignment_entity_status else None
+        )
+        if not current_af or not source_template_id:
+            return None
+
+        source_assignments = AssignedForm.query.filter_by(
+            template_id=source_template_id
+        ).all()
+        if not source_assignments:
+            return None
+
+        sorted_source = sorted(
+            source_assignments,
+            key=cls._assigned_form_chronology_key,
+            reverse=True,
+        )
+
+        current_name = (current_af.period_name or '').strip()
+        for idx, source_af in enumerate(sorted_source):
+            if (source_af.period_name or '').strip() == current_name:
+                if idx + 1 < len(sorted_source):
+                    return sorted_source[idx + 1].period_name
+                return None
+
+        current_start, _current_end = cls._assigned_form_period_bounds(current_af)
+        if current_start is not None:
+            for source_af in sorted_source:
+                _src_start, src_end = cls._assigned_form_period_bounds(source_af)
+                if src_end is not None and src_end < current_start:
+                    return source_af.period_name
+            return None
+
+        current_key = cls._assigned_form_chronology_key(current_af)
+        for source_af in sorted_source:
+            if cls._assigned_form_chronology_key(source_af) < current_key:
+                return source_af.period_name
+        return None
+
+    @classmethod
     def _effective_matrix_cell_value(cls, cell_value: Any) -> Any:
         """
         Extract the effective (final) value from a matrix cell.
-        Handles variable-column format: { "original": "...", "modified": "...", "isModified": bool }.
-        Returns modified if present, else original; otherwise returns the value as-is.
+        Handles variable-column format (legacy):
+        { "original": "...", "modified": "...", "isModified": bool }.
+        Scalar cells are returned as-is. Legacy dicts resolve to modified ?? original.
         """
         if cell_value is None:
             return None
@@ -193,13 +334,26 @@ class VariableResolutionService:
         Compute the row total (sum of all column values) for a given row in matrix disagg_data.
         Used when variable config matrix_column_name is MATRIX_COLUMN_ROW_TOTAL.
         Handles variable-column format (original/modified) per cell.
+        When an explicit manual row-total cell ({rowId}_Total) is present, prefer it over
+        summing breakdown columns so PNS total-only rows do not double-count.
         """
         if not disagg_data or not isinstance(disagg_data, dict):
             return None
+        total_key = f"{row_entity_id}_Total"
+        if total_key in disagg_data:
+            effective = cls._effective_matrix_cell_value(disagg_data[total_key])
+            if effective is not None:
+                try:
+                    parsed = float(str(effective).replace(',', ''))
+                    return parsed if parsed else None
+                except (ValueError, TypeError):
+                    pass
         prefix = f"{row_entity_id}_"
         total = 0.0
         for key, cell_value in disagg_data.items():
             if key.startswith('_') or not key.startswith(prefix):
+                continue
+            if key == total_key:
                 continue
             effective = cls._effective_matrix_cell_value(cell_value)
             if effective is None:
@@ -209,6 +363,164 @@ class VariableResolutionService:
             except (ValueError, TypeError):
                 pass
         return total if total else None
+
+    @classmethod
+    def _variable_cell_is_user_modified(cls, cell_value: Any) -> bool:
+        """True when a saved variable matrix cell was explicitly overridden by the user."""
+        if isinstance(cell_value, dict):
+            return bool(cell_value.get('isModified'))
+        return False
+
+    @classmethod
+    def _matrix_column_names_for_variable(
+        cls, version_id: int, variable_name: str
+    ) -> List[Tuple[int, str]]:
+        """Return (form_item_id, column_name) pairs for matrix columns bound to variable_name."""
+        bindings: List[Tuple[int, str]] = []
+        items = FormItem.query.filter_by(version_id=version_id, archived=False).all()
+        for item in items:
+            if item.item_type != 'matrix':
+                continue
+            matrix_config = (item.config or {}).get('matrix_config') or {}
+            for column in matrix_config.get('columns') or []:
+                if not isinstance(column, dict):
+                    continue
+                if not (column.get('is_variable') or column.get('type') == 'variable'):
+                    continue
+                bound_name = column.get('variable') or column.get('variable_name')
+                column_name = column.get('name')
+                if bound_name == variable_name and column_name:
+                    bindings.append((item.id, column_name))
+        return bindings
+
+    @classmethod
+    def refresh_stale_variable_matrix_cells(
+        cls,
+        updated_sources: Iterable[Tuple[int, int]],
+        *,
+        dry_run: bool = False,
+    ) -> Dict[str, int]:
+        """
+        After source matrix/lookup data is reimported, drop saved variable-column cells on
+        consumer assignments that were not explicitly overridden (isModified != true).
+
+        UPR/FDRS upserts replace source form_data but do not touch downstream templates that
+        mirror values via template variables; clearing unstale cells lets resolution pick up
+        the new source values on the next form load/export.
+        """
+        from app.models.enums import FormTemplateVersionStatusValue
+
+        stats = {"consumer_rows_checked": 0, "cells_cleared": 0, "rows_updated": 0}
+        source_pairs: Set[Tuple[int, int]] = {
+            (int(aes_id), int(form_item_id))
+            for aes_id, form_item_id in updated_sources
+            if aes_id and form_item_id
+        }
+        if not source_pairs:
+            return stats
+
+        source_form_item_ids = {form_item_id for _, form_item_id in source_pairs}
+        source_aes_cache: Dict[int, AssignmentEntityStatus] = {}
+
+        dependents: Dict[int, List[Tuple[str, Dict[str, Any], int, int]]] = {
+            form_item_id: [] for form_item_id in source_form_item_ids
+        }
+        published_versions = FormTemplateVersion.query.filter(
+            FormTemplateVersion.status == FormTemplateVersionStatusValue.published,
+            FormTemplateVersion.variables.isnot(None),
+        ).all()
+        for template_version in published_versions:
+            variable_configs = template_version.variables or {}
+            if not isinstance(variable_configs, dict):
+                continue
+            for variable_name, variable_config in variable_configs.items():
+                if not isinstance(variable_config, dict):
+                    continue
+                source_form_item_id = variable_config.get('source_form_item_id')
+                if source_form_item_id in source_form_item_ids:
+                    dependents[int(source_form_item_id)].append(
+                        (
+                            variable_name,
+                            variable_config,
+                            template_version.id,
+                            template_version.template_id,
+                        )
+                    )
+
+        for source_aes_id, source_form_item_id in source_pairs:
+            source_aes = source_aes_cache.get(source_aes_id)
+            if source_aes is None:
+                source_aes = db.session.get(AssignmentEntityStatus, source_aes_id)
+                if source_aes:
+                    source_aes_cache[source_aes_id] = source_aes
+            if not source_aes:
+                continue
+
+            for variable_name, variable_config, version_id, consumer_template_id in dependents.get(
+                source_form_item_id, []
+            ):
+                entity_scope = variable_config.get('entity_scope', 'same')
+                if entity_scope not in ('same', 'specific'):
+                    continue
+                if entity_scope == 'specific':
+                    specific_type = variable_config.get('specific_entity_type')
+                    specific_id = variable_config.get('specific_entity_id')
+                    if (
+                        specific_type != source_aes.entity_type
+                        or int(specific_id or 0) != int(source_aes.entity_id)
+                    ):
+                        continue
+
+                column_bindings = cls._matrix_column_names_for_variable(version_id, variable_name)
+                if not column_bindings:
+                    continue
+
+                consumer_aes_ids = [
+                    row[0]
+                    for row in db.session.query(AssignmentEntityStatus.id)
+                    .join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+                    .filter(
+                        AssignedForm.template_id == consumer_template_id,
+                        AssignmentEntityStatus.entity_type == source_aes.entity_type,
+                        AssignmentEntityStatus.entity_id == source_aes.entity_id,
+                    )
+                    .all()
+                ]
+
+                for consumer_item_id, column_name in column_bindings:
+                    suffix = f"_{column_name}"
+                    for consumer_aes_id in consumer_aes_ids:
+                        form_data = FormData.query.filter_by(
+                            assignment_entity_status_id=consumer_aes_id,
+                            form_item_id=consumer_item_id,
+                        ).first()
+                        if not form_data or not isinstance(form_data.disagg_data, dict):
+                            continue
+
+                        stats["consumer_rows_checked"] += 1
+                        updated_disagg = dict(form_data.disagg_data)
+                        changed = False
+                        for key, cell_value in list(form_data.disagg_data.items()):
+                            if key.startswith('_') or not key.endswith(suffix):
+                                continue
+                            if cls._variable_cell_is_user_modified(cell_value):
+                                continue
+                            del updated_disagg[key]
+                            stats["cells_cleared"] += 1
+                            changed = True
+
+                        if not changed:
+                            continue
+                        stats["rows_updated"] += 1
+                        if dry_run:
+                            continue
+                        form_data.disagg_data = updated_disagg or None
+                        db.session.add(form_data)
+
+        if not dry_run and stats["rows_updated"]:
+            db.session.commit()
+
+        return stats
 
     @classmethod
     def _evaluate_ast_node(cls, node: ast.AST) -> float:
@@ -1621,6 +1933,164 @@ class VariableResolutionService:
         if not text or not resolved_variables or '[' not in str(text):
             return text
         return cls.replace_variables_in_text(text, resolved_variables, variable_configs)
+
+    @classmethod
+    def resolve_translation_map(
+        cls,
+        translation_map: Optional[Dict[str, Any]],
+        resolved_variables: Dict[str, Any],
+        variable_configs: Optional[Dict[str, Dict[str, Any]]] = None,
+        replace_fn=None,
+    ) -> Optional[Dict[str, str]]:
+        """Resolve [variable] placeholders in a language-code -> text translation map."""
+        if not isinstance(translation_map, dict) or not translation_map:
+            return translation_map
+        if not resolved_variables:
+            return translation_map
+
+        replacer = replace_fn or (
+            lambda text: cls.replace_variables_in_text(text, resolved_variables, variable_configs)
+        )
+
+        resolved: Dict[str, str] = {}
+        changed = False
+        for lang, text in translation_map.items():
+            if not isinstance(lang, str) or text is None:
+                continue
+            raw = str(text).strip()
+            if not raw:
+                continue
+            if '[' in raw:
+                replaced = replacer(raw)
+                resolved[lang] = replaced
+                if replaced != raw:
+                    changed = True
+            else:
+                resolved[lang] = raw
+
+        return resolved if changed else translation_map
+
+    @classmethod
+    def resolve_matrix_display_headers(
+        cls,
+        matrix_config: Optional[Dict[str, Any]],
+        resolved_variables: Dict[str, Any],
+        variable_configs: Optional[Dict[str, Dict[str, Any]]] = None,
+        replace_fn=None,
+    ) -> Tuple[Optional[List[Any]], Optional[Dict[str, Any]]]:
+        """
+        Resolve [variable] placeholders in matrix column header and group-label translations.
+
+        Returns (resolved_columns, resolved_column_groups). Each value is None when unchanged.
+        """
+        if not isinstance(matrix_config, dict) or not resolved_variables:
+            return None, None
+
+        resolved_columns: Optional[List[Any]] = None
+        resolved_groups: Optional[Dict[str, Any]] = None
+
+        columns = matrix_config.get('columns')
+        if isinstance(columns, list):
+            new_columns: List[Any] = []
+            columns_changed = False
+            for col in columns:
+                if not isinstance(col, dict):
+                    new_columns.append(col)
+                    continue
+                new_col = dict(col)
+                name_translations = col.get('name_translations')
+                if isinstance(name_translations, dict) and name_translations:
+                    resolved_map = cls.resolve_translation_map(
+                        name_translations,
+                        resolved_variables,
+                        variable_configs,
+                        replace_fn=replace_fn,
+                    )
+                    if resolved_map is not name_translations:
+                        new_col['name_translations'] = resolved_map
+                        columns_changed = True
+                new_columns.append(new_col)
+            if columns_changed:
+                resolved_columns = new_columns
+
+        column_groups = matrix_config.get('column_groups')
+        if isinstance(column_groups, dict) and column_groups:
+            new_groups: Dict[str, Any] = {}
+            groups_changed = False
+            for group_key, group_translations in column_groups.items():
+                if isinstance(group_translations, dict) and group_translations:
+                    resolved_map = cls.resolve_translation_map(
+                        group_translations,
+                        resolved_variables,
+                        variable_configs,
+                        replace_fn=replace_fn,
+                    )
+                    new_groups[group_key] = resolved_map
+                    if resolved_map is not group_translations:
+                        groups_changed = True
+                else:
+                    new_groups[group_key] = group_translations
+            if groups_changed:
+                resolved_groups = new_groups
+
+        return resolved_columns, resolved_groups
+
+    @classmethod
+    def resolve_matrix_display_rows(
+        cls,
+        matrix_config: Optional[Dict[str, Any]],
+        resolved_variables: Dict[str, Any],
+        variable_configs: Optional[Dict[str, Dict[str, Any]]] = None,
+        replace_fn=None,
+    ) -> Optional[List[Any]]:
+        """
+        Resolve [variable] placeholders in matrix manual row labels and row header translations.
+
+        Returns a new rows list when any value changed, otherwise None.
+        """
+        if not isinstance(matrix_config, dict) or not resolved_variables:
+            return None
+
+        rows = matrix_config.get('rows')
+        if not isinstance(rows, list) or not rows:
+            return None
+
+        replacer = replace_fn or (
+            lambda text: cls.replace_variables_in_text(text, resolved_variables, variable_configs)
+        )
+
+        new_rows: List[Any] = []
+        changed = False
+        for row in rows:
+            if isinstance(row, dict):
+                new_row = dict(row)
+                row_text = row.get('text', '')
+                if isinstance(row_text, str) and row_text and '[' in row_text:
+                    resolved_text = replacer(row_text)
+                    if resolved_text != row_text:
+                        new_row['text'] = resolved_text
+                        changed = True
+                name_translations = row.get('name_translations')
+                if isinstance(name_translations, dict) and name_translations:
+                    resolved_map = cls.resolve_translation_map(
+                        name_translations,
+                        resolved_variables,
+                        variable_configs,
+                        replace_fn=replace_fn,
+                    )
+                    if resolved_map is not name_translations:
+                        new_row['name_translations'] = resolved_map
+                        changed = True
+                new_rows.append(new_row)
+            elif isinstance(row, str) and '[' in row:
+                resolved_text = replacer(row)
+                new_rows.append(resolved_text)
+                if resolved_text != row:
+                    changed = True
+            else:
+                new_rows.append(row)
+
+        return new_rows if changed else None
 
     @classmethod
     def replace_variables_in_text(

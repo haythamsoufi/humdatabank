@@ -1075,13 +1075,13 @@
                                                                             </div>
                                                                         </span>
                                                                     </span>
-                                                                {% elif unified_item_type == 'matrix' and field.description %}
+                                                                {% elif unified_item_type == 'matrix' and (field._display_description if hasattr(field, '_display_description') and field._display_description else field.description) %}
                                                                     <span class="indicator-definition-tooltip cursor-help w-5 h-5 flex items-center justify-center">
                                                                         <i class="fas fa-info-circle text-blue-500 hover:text-blue-700"></i>
                                                                         <span class="tooltip-text">
                                                                             <div class="plugin-description mb-2">
                                                                                 <strong>{{ _('Description') }}:</strong><br>
-                                                                                {{ field.description|nl2br }}
+                                                                                {{ (field._display_description if hasattr(field, '_display_description') and field._display_description else field.description)|nl2br }}
                                                                             </div>
                                                                         </span>
                                                                     </span>
@@ -2023,13 +2023,13 @@
                                                                                     </div>
                                                                                 </span>
                                                                             </span>
-                                                                        {% elif unified_item_type == 'matrix' and field.description %}
+                                                                        {% elif unified_item_type == 'matrix' and (field._display_description if hasattr(field, '_display_description') and field._display_description else field.description) %}
                                                                             <span class="indicator-definition-tooltip cursor-help w-5 h-5 flex items-center justify-center">
                                                                                 <i class="fas fa-info-circle text-blue-500 hover:text-blue-700"></i>
                                                                                 <span class="tooltip-text">
                                                                                     <div class="plugin-description mb-2">
                                                                                         <strong>{{ _('Description') }}:</strong><br>
-                                                                                        {{ field.description|nl2br }}
+                                                                                        {{ (field._display_description if hasattr(field, '_display_description') and field._display_description else field.description)|nl2br }}
                                                                                     </div>
                                                                                 </span>
                                                                             </span>

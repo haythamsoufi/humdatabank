@@ -56,18 +56,39 @@ class EntityService:
         return rows
 
     # Eager-load options for hierarchy display (avoids lazy loads on parent relations).
-    _HIERARCHY_LOAD_OPTIONS = {
-        EntityType.ns_branch.value: (joinedload(NSBranch.country),),
-        EntityType.ns_subbranch.value: (
-            joinedload(NSSubBranch.branch).joinedload(NSBranch.country),
-        ),
-        EntityType.ns_localunit.value: (
-            joinedload(NSLocalUnit.branch).joinedload(NSBranch.country),
-            joinedload(NSLocalUnit.subbranch),
-        ),
-        EntityType.department.value: (joinedload(SecretariatDepartment.division),),
-        EntityType.cluster_office.value: (joinedload(SecretariatClusterOffice.regional_office),),
-    }
+    #
+    # Built lazily (on first use) rather than as a class-body dict literal.
+    # Constructing joinedload(NSBranch.country) etc. touches mapped attributes,
+    # which can force SQLAlchemy to run configure_mappers() across the *whole*
+    # declarative registry. Doing that unconditionally at module-import time
+    # (i.e. whenever entity_service.py is first imported, from
+    # template_context.py during app boot) previously raced a background
+    # thread that was still mid-import of app/models/embeddings.py, causing
+    # an intermittent "failed to locate a name ('AIEmbedding')" boot crash.
+    # App startup now eagerly configures all mappers before any thread starts
+    # (see app.bootstrap._configure_all_model_mappers), which is the primary
+    # fix; building this dict lazily is a defensive second layer so importing
+    # this module alone never has side effects on the ORM registry.
+    _HIERARCHY_LOAD_OPTIONS_CACHE = None
+
+    @classmethod
+    def _get_hierarchy_load_options(cls):
+        if cls._HIERARCHY_LOAD_OPTIONS_CACHE is None:
+            cls._HIERARCHY_LOAD_OPTIONS_CACHE = {
+                EntityType.ns_branch.value: (joinedload(NSBranch.country),),
+                EntityType.ns_subbranch.value: (
+                    joinedload(NSSubBranch.branch).joinedload(NSBranch.country),
+                ),
+                EntityType.ns_localunit.value: (
+                    joinedload(NSLocalUnit.branch).joinedload(NSBranch.country),
+                    joinedload(NSLocalUnit.subbranch),
+                ),
+                EntityType.department.value: (joinedload(SecretariatDepartment.division),),
+                EntityType.cluster_office.value: (
+                    joinedload(SecretariatClusterOffice.regional_office),
+                ),
+            }
+        return cls._HIERARCHY_LOAD_OPTIONS_CACHE
 
     @staticmethod
     def _normalize_entity_pair(entity_type, entity_id):
@@ -104,7 +125,7 @@ class EntityService:
 
             query = model_class.query.filter(model_class.id.in_(entity_ids))
             if include_hierarchy:
-                for option in EntityService._HIERARCHY_LOAD_OPTIONS.get(entity_type, ()):
+                for option in EntityService._get_hierarchy_load_options().get(entity_type, ()):
                     query = query.options(option)
 
             for entity in query.all():

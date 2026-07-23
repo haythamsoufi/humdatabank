@@ -737,9 +737,9 @@ def _resolve_matrix_cell(v: Any) -> Any:
     """
     Resolve a single matrix cell value to its effective scalar.
 
-    Variable-column (lookup-enabled, non-read-only) cells are stored as
-    {"original": <db value>, "modified": <user edit>, "isModified": bool}.
-    The API only needs the final value: modified if non-null, else original.
+    Variable-column (lookup-enabled) cells are stored as scalars (submitted value).
+    Legacy payloads may still use {"original": ..., "modified": ..., "isModified": bool};
+    the effective submitted value is modified when present, else original.
 
     Because variable-column values are always submitted as strings from form
     inputs, the resolved value is coerced to int/float when it represents a

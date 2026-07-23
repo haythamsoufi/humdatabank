@@ -13,7 +13,7 @@
 
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
-{% macro translation_modal(modal_id, modal_title, description=None, context='general', tabs=None, show_auto_translate=true, css_prefix=None, auto_translate_permission_context=None, auto_translate_permission_code=None) -%}
+{% macro translation_modal(modal_id, modal_title, description=None, context='general', tabs=None, show_auto_translate=true, css_prefix=None, auto_translate_permission_context=None, auto_translate_permission_code=None, enable_variables=false) -%}
 {% set css_prefix = css_prefix or modal_id %}
 {% set has_tabs = tabs and tabs|length > 0 %}
 
@@ -74,13 +74,13 @@
                      aria-labelledby="{{ css_prefix }}-tab-{{ tab.id }}"
                      class="{% if not loop.first %}hidden{% endif %}">
                     <div style="overflow-y:auto;max-height:45vh;" class="pr-2">
-                        {{ _render_translation_fields(css_prefix, tab.id) }}
+                        {{ _render_translation_fields(css_prefix, tab.id, enable_variables) }}
                     </div>
                 </div>
                 {% endfor %}
             {% else %}
                 <div style="overflow-y:auto;max-height:45vh;" class="pr-2">
-                    {{ _render_translation_fields(css_prefix) }}
+                    {{ _render_translation_fields(css_prefix, '', enable_variables) }}
                 </div>
             {% endif %}
 
@@ -112,7 +112,7 @@
 {%- endmacro %}
 
 {# Helper macro to render translation fields for supported languages #}
-{% macro _render_translation_fields(css_prefix, field_suffix='') -%}
+{% macro _render_translation_fields(css_prefix, field_suffix='', enable_variables=false) -%}
 {% set field_id_suffix = '-' + field_suffix if field_suffix else '' %}
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     {% for code in SUPPORTED_LANGUAGES %}
@@ -127,6 +127,7 @@
                 rows="3"
                 class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full text-sm border-gray-300 rounded-md resize-none"
                 placeholder="{{ (language_endonym(code) or LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }} translation"
+                {% if enable_variables %}data-enable-variables="true"{% endif %}
                 {% if code in ['ar','fa','he','ur'] %}dir="rtl" style="font-family: 'Tajawal', Arial, sans-serif;"{% endif %}></textarea>
         </div>
         {% endif %}

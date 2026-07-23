@@ -345,6 +345,71 @@ class TestLoadDynamicSettings:
 
 
 # ---------------------------------------------------------------------------
+# _configure_all_model_mappers
+# ---------------------------------------------------------------------------
+
+class TestConfigureAllModelMappers:
+    """Regression coverage for the 2026-07-23 boot-race fix.
+
+    ``app.models.embeddings`` defines ``AIDocument`` (string relationship to
+    ``AIEmbedding``) well before ``AIEmbedding`` itself in the same module. If
+    another thread forces ``configure_mappers()`` while that module is only
+    half-imported, SQLAlchemy raises ``InvalidRequestError``. Eagerly
+    importing the module and configuring mappers synchronously, once, before
+    any background thread starts removes that window.
+    """
+
+    def test_imports_embedding_modules_and_configures_mappers(self, app):
+        from app.bootstrap import _configure_all_model_mappers
+        from sqlalchemy.orm import configure_mappers as real_configure_mappers
+
+        with patch('sqlalchemy.orm.configure_mappers',
+                   wraps=real_configure_mappers) as mock_configure:
+            with app.app_context():
+                _configure_all_model_mappers(app)
+
+        mock_configure.assert_called_once()
+        # Modules should now be fully importable/resolved with no lazy-load error.
+        import importlib
+        embeddings_module = importlib.import_module('app.models.embeddings')
+        assert hasattr(embeddings_module, 'AIDocument')
+        assert hasattr(embeddings_module, 'AIEmbedding')
+
+    def test_idempotent_when_called_twice(self, app):
+        """A second call (e.g. from a re-imported module) must be a safe no-op."""
+        from app.bootstrap import _configure_all_model_mappers
+
+        with app.app_context():
+            _configure_all_model_mappers(app)
+            _configure_all_model_mappers(app)  # should not raise
+
+    def test_logs_and_reraises_on_mapper_failure(self, app):
+        """A genuine mapper misconfiguration must fail loudly at boot, not silently."""
+        from app.bootstrap import _configure_all_model_mappers
+
+        with patch('sqlalchemy.orm.configure_mappers',
+                   side_effect=Exception("boom: broken relationship")):
+            with patch.object(app.logger, 'exception') as mock_exc:
+                with app.app_context():
+                    with pytest.raises(Exception, match="boom"):
+                        _configure_all_model_mappers(app)
+            mock_exc.assert_called_once()
+
+    def test_called_before_background_threads_in_init_flask_extensions(self):
+        """init_flask_extensions must configure mappers immediately after db.init_app,
+        before install_db_pool_logging / dynamic settings / any thread-starting code."""
+        import inspect
+        from app import bootstrap
+
+        source = inspect.getsource(bootstrap.init_flask_extensions)
+        db_init_pos = source.index('db.init_app(app)')
+        configure_pos = source.index('_configure_all_model_mappers(app)')
+        pool_logging_pos = source.index('_install_db_pool_logging(app)')
+
+        assert db_init_pos < configure_pos < pool_logging_pos
+
+
+# ---------------------------------------------------------------------------
 # register_favicon_routes
 # ---------------------------------------------------------------------------
 

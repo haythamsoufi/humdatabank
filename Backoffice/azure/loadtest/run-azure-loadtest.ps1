@@ -444,7 +444,7 @@ function Invoke-RunProfile {
         Write-Host "  Session:       $(if ($hasSessionCookie) { 'provided' } else { 'not set (entry-form tasks disabled)' })"
         if ($useAutoSetup) {
             $tmplDisplay  = if ([string]::IsNullOrWhiteSpace($setupTemplateId)) { 'auto-discover' } else { $setupTemplateId }
-            $cntryDisplay = if ([string]::IsNullOrWhiteSpace($setupCountryIds)) { 'auto-discover' } else { $setupCountryIds }
+            $cntryDisplay = if ([string]::IsNullOrWhiteSpace($setupCountryIds)) { '193 (Testland)' } else { $setupCountryIds }
             $countDisplay = if ([string]::IsNullOrWhiteSpace($setupCount))      { '3' }             else { $setupCount }
             Write-Host "  Auto-setup:    ON  (template=$tmplDisplay  countries=$cntryDisplay  count=$countDisplay)" -ForegroundColor Cyan
         } else {
@@ -520,7 +520,7 @@ function Invoke-SetupTeardown {
         }
         $countryIds = $env:LOADTEST_SETUP_COUNTRY_IDS
         if ([string]::IsNullOrWhiteSpace($countryIds)) {
-            $countryIds = Read-Host "LOADTEST_SETUP_COUNTRY_IDS (leave blank to auto-discover, e.g. 5,12)"
+            $countryIds = Read-Host "LOADTEST_SETUP_COUNTRY_IDS (blank = Testland 193)"
         }
         $count = $env:LOADTEST_SETUP_COUNT
         if ([string]::IsNullOrWhiteSpace($count)) {
@@ -644,7 +644,11 @@ function Get-RunLogs {
         Write-Host " $($lf.Name)" -ForegroundColor Cyan
         Write-Host "--------------------------------------------------" -ForegroundColor Cyan
         Get-Content $lf.FullName | ForEach-Object {
-            if ($_ -match '\bERROR\b|\bFAILED\b|\bexception\b' -and $_ -notmatch 'INFO') {
+            if ($_ -match '\[loadtest-failures\]\s+SAMPLE|\[loadtest-failure\]') {
+                Write-Host $_ -ForegroundColor Magenta
+            } elseif ($_ -match '\[loadtest-failures\]\s+SUMMARY') {
+                Write-Host $_ -ForegroundColor Red
+            } elseif ($_ -match '\bERROR\b|\bFAILED\b|\bexception\b' -and $_ -notmatch 'INFO') {
                 Write-Host $_ -ForegroundColor Red
             } elseif ($_ -match '\bWARN(ING)?\b') {
                 Write-Host $_ -ForegroundColor Yellow
@@ -652,6 +656,28 @@ function Get-RunLogs {
                 Write-Host $_ -ForegroundColor Cyan
             } else {
                 Write-Host $_
+            }
+        }
+    }
+
+    $failureSummary = @(Get-ChildItem -Recurse -File $outDir -Filter "failure_summary.json" -ErrorAction SilentlyContinue)
+    if ($failureSummary.Count -gt 0) {
+        Write-Host ""
+        Write-Host "--------------------------------------------------" -ForegroundColor Magenta
+        Write-Host " failure_summary.json (rich failure samples)" -ForegroundColor Magenta
+        Write-Host "--------------------------------------------------" -ForegroundColor Magenta
+        foreach ($fs in $failureSummary) {
+            Write-Host "  $($fs.FullName)" -ForegroundColor Green
+            try {
+                $json = Get-Content $fs.FullName -Raw | ConvertFrom-Json
+                Write-Host "  total_failures: $($json.total_failures)" -ForegroundColor Red
+                if ($json.by_endpoint) {
+                    $json.by_endpoint.PSObject.Properties | Sort-Object Name | ForEach-Object {
+                        Write-Host "    $($_.Name): $($_.Value)" -ForegroundColor Yellow
+                    }
+                }
+            } catch {
+                Write-Host "  (could not parse JSON: $_)" -ForegroundColor Yellow
             }
         }
     }

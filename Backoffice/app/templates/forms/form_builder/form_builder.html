@@ -674,6 +674,7 @@
     ],
     show_auto_translate=true,
     css_prefix='matrix',
+    enable_variables=true,
     auto_translate_permission_context='templates',
     auto_translate_permission_code='admin.templates.edit'
 ) }}
@@ -726,11 +727,33 @@
     auto_translate_permission_code='admin.templates.edit'
 ) }}
 
+{# Matrix Variable Lookup Tooltip Label Translation Modal #}
+{{ translation_modal(
+    modal_id='matrix-variable-lookup-tooltip-label-translation-modal',
+    modal_title=_('Lookup Value Label Translations'),
+    context='form_item',
+    show_auto_translate=true,
+    css_prefix='matrix-variable-lookup-tooltip-label',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
+{# Matrix Variable Submitted Tooltip Label Translation Modal #}
+{{ translation_modal(
+    modal_id='matrix-variable-submitted-tooltip-label-translation-modal',
+    modal_title=_('Submitted Value Label Translations'),
+    context='form_item',
+    show_auto_translate=true,
+    css_prefix='matrix-variable-submitted-tooltip-label',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
 {# Matrix Column Headers Translation Matrix Modal #}
 {{ translation_matrix_modal(
     modal_id='matrix-column-headers-translation-matrix-modal',
     modal_title=_('Matrix Column Headers Translations Matrix'),
-    description=_('Set the English display label and translations for each column. The column code (used for variable lookups) is shown in the first column. If no English label is set, the code is used as the display fallback.'),
+    description=_('Set the English display label and translations for each column. The column code (used for variable lookups) is shown in the first column. If no English label is set, the code is used as the display fallback. You can use built-in system variables in labels, e.g. [assignment_period], [entity_name], [template_name].'),
     context='column_headers',
     table_body_id='matrix-column-headers-translation-matrix-tbody',
     show_auto_translate=true,
@@ -743,7 +766,7 @@
 {{ translation_matrix_modal(
     modal_id='matrix-row-headers-translation-matrix-modal',
     modal_title=_('Matrix Row Headers Translations Matrix'),
-    description=_('Set translations for each row header. The English text is shown in the first column as a reference. Translations will be displayed to users based on their selected language.'),
+    description=_('Set translations for each row header. The English text is shown in the first column as a reference. Translations will be displayed to users based on their selected language. You can use built-in system variables in labels, e.g. [assignment_period], [entity_name], [template_name].'),
     context='row_headers',
     table_body_id='matrix-row-headers-translation-matrix-tbody',
     show_auto_translate=true,

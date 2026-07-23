@@ -619,7 +619,7 @@
 
                         <div class="mb-4">
                             <label for="item-matrix-description" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Description (Optional)') }}</label>
-                            <textarea data-field-type="description" id="item-matrix-description" class="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Description (Optional)')|forceescape }}"></textarea>
+                            <textarea data-field-type="description" data-enable-variables="true" id="item-matrix-description" class="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Description (Optional) — supports [assignment_period], etc.')|forceescape }}"></textarea>
                         </div>
 
                         {# Matrix Configuration — Row setup + Display Options. Stays in the
@@ -789,6 +789,30 @@
                                         <input type="hidden" id="matrix-legend-text-translations" value="{}">
                                         <input type="hidden" id="matrix-legend-hide" value="false">
                                         <p class="text-xs text-gray-500 mt-1">{{ _('Text to display in the legend when manually added rows are highlighted') }}</p>
+                                    </div>
+                                    <div id="matrix-variable-tooltip-labels-wrapper" class="mt-3 space-y-3 border-t border-gray-200 pt-3">
+                                        <p class="text-xs font-medium text-gray-700">{{ _('Variable column tooltip labels') }}</p>
+                                        <div>
+                                            <div class="flex items-center gap-2 flex-wrap mb-1">
+                                                <label for="matrix-variable-lookup-tooltip-label" class="text-sm text-gray-700">{{ _('Lookup value label') }}</label>
+                                                <button type="button" id="matrix-variable-lookup-tooltip-label-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                            <input type="text" id="matrix-variable-lookup-tooltip-label" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="{{ _('Lookup value')|forceescape }}" value="{{ _('Lookup value') }}">
+                                            <input type="hidden" id="matrix-variable-lookup-tooltip-label-translations" value="{}">
+                                        </div>
+                                        <div>
+                                            <div class="flex items-center gap-2 flex-wrap mb-1">
+                                                <label for="matrix-variable-submitted-tooltip-label" class="text-sm text-gray-700">{{ _('Submitted value label') }}</label>
+                                                <button type="button" id="matrix-variable-submitted-tooltip-label-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                            <input type="text" id="matrix-variable-submitted-tooltip-label" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="{{ _('Submitted value')|forceescape }}" value="{{ _('Submitted value') }}">
+                                            <input type="hidden" id="matrix-variable-submitted-tooltip-label-translations" value="{}">
+                                        </div>
+                                        <p class="text-xs text-gray-500">{{ _('Labels shown in the tooltip when a saved variable value differs from the current lookup.') }}</p>
                                     </div>
                                 </div>
                             </div>

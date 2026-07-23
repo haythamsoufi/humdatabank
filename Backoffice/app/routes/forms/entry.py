@@ -220,6 +220,23 @@ def handle_assignment_form(aes_id):
                                                                 names.update(placeholder_pattern.findall(str(v)))
                                                     elif isinstance(row, str) and '[' in row:
                                                         names.update(placeholder_pattern.findall(row))
+                                            columns = matrix_config.get('columns', [])
+                                            if isinstance(columns, list):
+                                                for col in columns:
+                                                    if not isinstance(col, dict):
+                                                        continue
+                                                    name_translations = col.get('name_translations')
+                                                    if isinstance(name_translations, dict):
+                                                        for v in name_translations.values():
+                                                            if v and '[' in str(v):
+                                                                names.update(placeholder_pattern.findall(str(v)))
+                                            column_groups = matrix_config.get('column_groups', {})
+                                            if isinstance(column_groups, dict):
+                                                for group_translations in column_groups.values():
+                                                    if isinstance(group_translations, dict):
+                                                        for v in group_translations.values():
+                                                            if v and '[' in str(v):
+                                                                names.update(placeholder_pattern.findall(str(v)))
                                 except Exception as e:
                                     current_app.logger.debug("Placeholder extraction from row failed: %s", e)
                     return names
@@ -403,26 +420,35 @@ def handle_assignment_form(aes_id):
                             if isinstance(matrix_config, dict):
                                 row_mode = matrix_config.get('row_mode', 'manual')
                                 if row_mode == 'manual' or not row_mode:
-                                    rows = matrix_config.get('rows', [])
-                                    if rows and isinstance(rows, list):
-                                        resolved_rows = []
-                                        for row in rows:
-                                            row_text = row.get('text', '') if isinstance(row, dict) else row
-                                            if isinstance(row_text, str) and resolved_variables and '[' in row_text:
-                                                resolved_text = VariableResolutionService.replace_variables_in_text(
-                                                    row_text,
-                                                    _resolved_vars_for_field(field, row_text),
-                                                    variable_configs
-                                                )
-                                                if isinstance(row, dict):
-                                                    resolved_rows.append({**row, 'text': resolved_text})
-                                                else:
-                                                    resolved_rows.append(resolved_text)
-                                            else:
-                                                resolved_rows.append(row)
+                                    resolved_rows = VariableResolutionService.resolve_matrix_display_rows(
+                                        matrix_config,
+                                        resolved_variables,
+                                        variable_configs,
+                                        replace_fn=lambda text: VariableResolutionService.replace_variables_in_text(
+                                            text,
+                                            _resolved_vars_for_field(field, text),
+                                            variable_configs,
+                                        ),
+                                    )
+                                    if resolved_rows is not None:
                                         field._display_matrix_rows = resolved_rows
+
+                                resolved_columns, resolved_groups = VariableResolutionService.resolve_matrix_display_headers(
+                                    matrix_config,
+                                    resolved_variables,
+                                    variable_configs,
+                                    replace_fn=lambda text: VariableResolutionService.replace_variables_in_text(
+                                        text,
+                                        _resolved_vars_for_field(field, text),
+                                        variable_configs,
+                                    ),
+                                )
+                                if resolved_columns is not None:
+                                    field._display_matrix_columns = resolved_columns
+                                if resolved_groups is not None:
+                                    field._display_matrix_column_groups = resolved_groups
                         except Exception as e:
-                            current_app.logger.warning(f"Error resolving variables in matrix row labels for field {field.id}: {e}", exc_info=True)
+                            current_app.logger.warning(f"Error resolving variables in matrix labels for field {field.id}: {e}", exc_info=True)
 
     _entry_lap("variable_resolution")
 
@@ -1487,21 +1513,33 @@ def _preview_template_impl(template_id):
                             if isinstance(matrix_config, dict):
                                 row_mode = matrix_config.get('row_mode', 'manual')
                                 if row_mode == 'manual' or not row_mode:
-                                    rows = matrix_config.get('rows', [])
-                                    if rows and isinstance(rows, list):
-                                        resolved_preview = []
-                                        for r in rows:
-                                            if isinstance(r, str):
-                                                resolved_preview.append(
-                                                    VariableResolutionService.replace_variables_in_text(r, resolved_variables, variable_configs)
-                                                )
-                                            elif isinstance(r, dict):
-                                                row_text = r.get('text', '')
-                                                resolved_text = VariableResolutionService.replace_variables_in_text(row_text, resolved_variables, variable_configs) if row_text else row_text
-                                                resolved_preview.append({**r, 'text': resolved_text})
-                                            else:
-                                                resolved_preview.append(r)
+                                    resolved_preview = VariableResolutionService.resolve_matrix_display_rows(
+                                        matrix_config,
+                                        resolved_variables,
+                                        variable_configs,
+                                        replace_fn=lambda text: VariableResolutionService.replace_variables_in_text(
+                                            text,
+                                            resolved_variables,
+                                            variable_configs,
+                                        ),
+                                    )
+                                    if resolved_preview is not None:
                                         field._display_matrix_rows = resolved_preview
+
+                                resolved_columns, resolved_groups = VariableResolutionService.resolve_matrix_display_headers(
+                                    matrix_config,
+                                    resolved_variables,
+                                    variable_configs,
+                                    replace_fn=lambda text: VariableResolutionService.replace_variables_in_text(
+                                        text,
+                                        resolved_variables,
+                                        variable_configs,
+                                    ),
+                                )
+                                if resolved_columns is not None:
+                                    field._display_matrix_columns = resolved_columns
+                                if resolved_groups is not None:
+                                    field._display_matrix_column_groups = resolved_groups
                         except Exception as e:
                             current_app.logger.debug("matrix row variable replace failed: %s", e)
     except Exception as e:

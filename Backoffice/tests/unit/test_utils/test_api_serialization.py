@@ -1148,6 +1148,12 @@ class TestResolveMatrixCell:
         assert _resolve_matrix_cell('hello') == 'hello'
         assert _resolve_matrix_cell(None) is None
 
+    def test_numeric_string_scalar_passthrough(self):
+        """Submitted variable-column scalars are stored and returned as-is."""
+        assert _resolve_matrix_cell('100') == '100'
+        assert _resolve_matrix_cell(100) == 100
+        assert _resolve_matrix_cell('4,107,000') == '4,107,000'
+
     def test_modified_preferred_and_coerced_to_int(self):
         assert _resolve_matrix_cell({'original': '100', 'modified': '200', 'isModified': True}) == 200
         assert isinstance(_resolve_matrix_cell({'original': '100', 'modified': '200', 'isModified': True}), int)

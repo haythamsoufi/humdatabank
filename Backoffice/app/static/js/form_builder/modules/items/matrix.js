@@ -194,6 +194,14 @@ export const MatrixItem = {
         }
         if (legendTextTranslationsInput) legendTextTranslationsInput.value = '{}';
         if (legendHideInput) legendHideInput.value = 'false';
+        const lookupTooltipLabelInput = modalElement.querySelector('#matrix-variable-lookup-tooltip-label');
+        const lookupTooltipLabelTranslationsInput = modalElement.querySelector('#matrix-variable-lookup-tooltip-label-translations');
+        const submittedTooltipLabelInput = modalElement.querySelector('#matrix-variable-submitted-tooltip-label');
+        const submittedTooltipLabelTranslationsInput = modalElement.querySelector('#matrix-variable-submitted-tooltip-label-translations');
+        if (lookupTooltipLabelInput) lookupTooltipLabelInput.value = 'Lookup value';
+        if (lookupTooltipLabelTranslationsInput) lookupTooltipLabelTranslationsInput.value = '{}';
+        if (submittedTooltipLabelInput) submittedTooltipLabelInput.value = 'Submitted value';
+        if (submittedTooltipLabelTranslationsInput) submittedTooltipLabelTranslationsInput.value = '{}';
     },
 
     initializeDefault(modalElement) {
@@ -1495,6 +1503,34 @@ export const MatrixItem = {
         if (hasVariableColumn) {
             config.auto_load_entities = autoLoadEntities;
         }
+
+        const lookupTooltipLabelInput = Utils.getElementById('matrix-variable-lookup-tooltip-label');
+        if (lookupTooltipLabelInput?.value?.trim()) {
+            config.variable_lookup_tooltip_label = lookupTooltipLabelInput.value.trim();
+        }
+        const lookupTooltipLabelTranslationsInput = Utils.getElementById('matrix-variable-lookup-tooltip-label-translations');
+        if (lookupTooltipLabelTranslationsInput?.value) {
+            try {
+                const parsed = JSON.parse(lookupTooltipLabelTranslationsInput.value);
+                if (parsed && typeof parsed === 'object' && Object.values(parsed).some(v => String(v || '').trim())) {
+                    config.variable_lookup_tooltip_label_translations = parsed;
+                }
+            } catch (_) {}
+        }
+        const submittedTooltipLabelInput = Utils.getElementById('matrix-variable-submitted-tooltip-label');
+        if (submittedTooltipLabelInput?.value?.trim()) {
+            config.variable_submitted_tooltip_label = submittedTooltipLabelInput.value.trim();
+        }
+        const submittedTooltipLabelTranslationsInput = Utils.getElementById('matrix-variable-submitted-tooltip-label-translations');
+        if (submittedTooltipLabelTranslationsInput?.value) {
+            try {
+                const parsed = JSON.parse(submittedTooltipLabelTranslationsInput.value);
+                if (parsed && typeof parsed === 'object' && Object.values(parsed).some(v => String(v || '').trim())) {
+                    config.variable_submitted_tooltip_label_translations = parsed;
+                }
+            } catch (_) {}
+        }
+
         if (selectedMode === 'manual') {
             if (rowsContainer) {
                 const rows = [];
@@ -1810,6 +1846,22 @@ export const MatrixItem = {
                 }
                 if (legendTextTranslationsInput && matrixConfig.legend_text_translations) {
                     legendTextTranslationsInput.value = JSON.stringify(matrixConfig.legend_text_translations);
+                }
+                const lookupTooltipLabelInput = Utils.getElementById('matrix-variable-lookup-tooltip-label');
+                const lookupTooltipLabelTranslationsInput = Utils.getElementById('matrix-variable-lookup-tooltip-label-translations');
+                if (lookupTooltipLabelInput) {
+                    lookupTooltipLabelInput.value = matrixConfig.variable_lookup_tooltip_label || 'Lookup value';
+                }
+                if (lookupTooltipLabelTranslationsInput && matrixConfig.variable_lookup_tooltip_label_translations) {
+                    lookupTooltipLabelTranslationsInput.value = JSON.stringify(matrixConfig.variable_lookup_tooltip_label_translations);
+                }
+                const submittedTooltipLabelInput = Utils.getElementById('matrix-variable-submitted-tooltip-label');
+                const submittedTooltipLabelTranslationsInput = Utils.getElementById('matrix-variable-submitted-tooltip-label-translations');
+                if (submittedTooltipLabelInput) {
+                    submittedTooltipLabelInput.value = matrixConfig.variable_submitted_tooltip_label || 'Submitted value';
+                }
+                if (submittedTooltipLabelTranslationsInput && matrixConfig.variable_submitted_tooltip_label_translations) {
+                    submittedTooltipLabelTranslationsInput.value = JSON.stringify(matrixConfig.variable_submitted_tooltip_label_translations);
                 }
                 if (legendHideInput) {
                     const legendHide = matrixConfig.legend_hide === true;

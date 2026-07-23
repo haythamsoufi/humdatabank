@@ -443,6 +443,72 @@ function attachMatrixSearchPlaceholderModal() {
   });
 }
 
+function attachMatrixVariableTooltipLabelModals() {
+  const attachOne = ({
+    openButtonId,
+    modalId,
+    cssPrefix,
+    textInputId,
+    hiddenInputId,
+    defaultText,
+  }) => {
+    if (!window.TranslationModal || !document.getElementById(openButtonId)) return;
+    window.TranslationModal.attach({
+      openButtonId,
+      modalId,
+      cssPrefix,
+      resolveEnglishText: () => (document.getElementById(textInputId)?.value || defaultText),
+      onSaveHiddenFields: (collected) => {
+        const input = document.getElementById(hiddenInputId);
+        if (input) input.value = JSON.stringify(collected || {});
+        const btn = document.getElementById(openButtonId);
+        if (btn) {
+          const originalNodes = Array.from(btn.childNodes).map((n) => n.cloneNode(true));
+          const restore = () => {
+            btn.replaceChildren(...originalNodes.map((n) => n.cloneNode(true)));
+          };
+          btn.replaceChildren();
+          {
+            const icon = document.createElement('i');
+            icon.className = 'fas fa-check w-4 h-4 mr-1';
+            btn.append(icon, document.createTextNode('Saved'));
+          }
+          btn.classList.add('text-green-600');
+          setTimeout(() => { restore(); btn.classList.remove('text-green-600'); }, 2000);
+        }
+      },
+      autoTranslateType: 'form_item',
+      onModalOpen: () => {
+        const input = document.getElementById(hiddenInputId);
+        let translations = {};
+        if (input && input.value) {
+          try { translations = JSON.parse(input.value); } catch (e) {}
+        }
+        if (window.TranslationModalUtils) {
+          window.TranslationModalUtils.populateFields(cssPrefix, translations);
+        }
+      }
+    });
+  };
+
+  attachOne({
+    openButtonId: 'matrix-variable-lookup-tooltip-label-translations-btn',
+    modalId: 'matrix-variable-lookup-tooltip-label-translation-modal',
+    cssPrefix: 'matrix-variable-lookup-tooltip-label',
+    textInputId: 'matrix-variable-lookup-tooltip-label',
+    hiddenInputId: 'matrix-variable-lookup-tooltip-label-translations',
+    defaultText: 'Lookup value',
+  });
+  attachOne({
+    openButtonId: 'matrix-variable-submitted-tooltip-label-translations-btn',
+    modalId: 'matrix-variable-submitted-tooltip-label-translation-modal',
+    cssPrefix: 'matrix-variable-submitted-tooltip-label',
+    textInputId: 'matrix-variable-submitted-tooltip-label',
+    hiddenInputId: 'matrix-variable-submitted-tooltip-label-translations',
+    defaultText: 'Submitted value',
+  });
+}
+
 function attachMatrixColumnHeadersModal() {
   // Matrix-style modal for all column group headers and column headers
   if (!window.TranslationMatrix) return;
@@ -476,7 +542,8 @@ function attachMatrixColumnHeadersModal() {
       enTextarea.className = 'w-full text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500';
       enTextarea.rows = 2;
       enTextarea.setAttribute('data-language', 'en');
-      enTextarea.placeholder = 'English label';
+      enTextarea.dataset.enableVariables = 'true';
+      enTextarea.placeholder = 'English label (supports [assignment_period], etc.)';
       enTextarea.value = translations['en'] || '';
       enCell.appendChild(enTextarea);
       cells.push(enCell);
@@ -488,6 +555,7 @@ function attachMatrixColumnHeadersModal() {
         textarea.className = 'w-full text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500';
         textarea.rows = 2;
         textarea.setAttribute('data-language', code);
+        textarea.dataset.enableVariables = 'true';
         const displayName = languageDisplayNames[code] || code.toUpperCase();
         textarea.placeholder = `${displayName} translation`;
         textarea.value = translations[code] || '';
@@ -768,8 +836,9 @@ function attachMatrixRowHeadersModal() {
         textarea.className = 'w-full text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500';
         textarea.rows = 2;
         textarea.setAttribute('data-language', code);
+        textarea.dataset.enableVariables = 'true';
         const displayName = languageDisplayNames[code] || code.toUpperCase();
-        textarea.placeholder = `${displayName} translation`;
+        textarea.placeholder = `${displayName} translation (supports [assignment_period], etc.)`;
         textarea.value = translations[code] || '';
         if (['ar', 'fa', 'he', 'ur'].includes(code)) {
           textarea.dir = 'rtl';
@@ -996,6 +1065,7 @@ export function attachFormBuilderTranslation() {
     attachMatrixLabelModal();
     attachMatrixLegendTextModal();
     attachMatrixSearchPlaceholderModal();
+    attachMatrixVariableTooltipLabelModals();
     attachMatrixColumnHeadersModal();
     attachMatrixRowHeadersModal();
     attachMatrixModals();

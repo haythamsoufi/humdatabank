@@ -5,17 +5,23 @@ export const VariableAutocompleteMixin = {
             // Check if the input allows template variables (e.g. labels, default value inputs)
             const allowVariables = (e.target?.dataset?.enableVariables === 'true');
 
-            // Check if the input is a label field (legacy behavior)
+            // Check if the input is a label or description field (legacy behavior)
             const isLabelField = e.target.hasAttribute('data-field-type') &&
                                 e.target.getAttribute('data-field-type') === 'label';
+            const isDescriptionField = e.target.hasAttribute('data-field-type') &&
+                                e.target.getAttribute('data-field-type') === 'description';
             const isLabelFieldById = ['item-indicator-label', 'item-question-label',
                                      'item-document-label', 'item-matrix-label',
                                      'item-plugin-label'].includes(e.target.id);
 
-            if (!allowVariables && !isLabelField && !isLabelFieldById) return;
+            if (!allowVariables && !isLabelField && !isDescriptionField && !isLabelFieldById) return;
 
-            // Check if input is in the item modal
-            const modal = e.target.closest('#item-modal');
+            // Allow variable autocomplete in the item modal and translation modals.
+            const modal = e.target.closest('#item-modal')
+                || (allowVariables ? (
+                    e.target.closest('[id$="-translation-matrix-modal"]')
+                    || e.target.closest('[id$="-translation-modal"]')
+                ) : null);
             if (!modal) return;
 
             const input = e.target;
@@ -42,10 +48,12 @@ export const VariableAutocompleteMixin = {
 
         // Handle clicks outside to close suggestions
         document.addEventListener('click', (e) => {
-            const modal = e.target.closest('#item-modal');
+            const modal = e.target.closest('#item-modal')
+                || e.target.closest('[id$="-translation-matrix-modal"]')
+                || e.target.closest('[id$="-translation-modal"]');
             if (!modal) {
                 // Close suggestions in all modals
-                document.querySelectorAll('#item-modal .variable-suggestions').forEach(s => s.remove());
+                document.querySelectorAll('#item-modal .variable-suggestions, [id$="-translation-matrix-modal"] .variable-suggestions, [id$="-translation-modal"] .variable-suggestions').forEach(s => s.remove());
                 return;
             }
             const suggestions = modal.querySelectorAll('.variable-suggestions');

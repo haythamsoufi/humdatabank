@@ -134,6 +134,32 @@ class TestPrefetchEntities:
 
 
 @pytest.mark.unit
+class TestHierarchyLoadOptionsLazyBuild:
+    """Regression coverage: joinedload options must not be built at import time.
+
+    Building them eagerly as a class-body dict forces SQLAlchemy to resolve
+    mapped attributes (NSBranch.country, etc.) as soon as entity_service.py is
+    imported, which can trigger a registry-wide configure_mappers() call. If
+    that races a background thread mid-import of app/models/embeddings.py, it
+    raises the "failed to locate a name ('AIEmbedding')" boot crash seen in
+    prod on 2026-07-23. The options dict is now built lazily on first use.
+    """
+
+    def test_not_built_until_first_access(self):
+        EntityService._HIERARCHY_LOAD_OPTIONS_CACHE = None
+        assert EntityService._HIERARCHY_LOAD_OPTIONS_CACHE is None
+
+    def test_cached_after_first_call(self, app):
+        EntityService._HIERARCHY_LOAD_OPTIONS_CACHE = None
+        with app.app_context():
+            options = EntityService._get_hierarchy_load_options()
+            assert EntityType.ns_branch.value in options
+            assert EntityService._HIERARCHY_LOAD_OPTIONS_CACHE is options
+            # Second call reuses the cached dict instance (no rebuild).
+            assert EntityService._get_hierarchy_load_options() is options
+
+
+@pytest.mark.unit
 class TestBatchEntityNames:
     def test_plain_names_for_countries(self, db_session, app):
         with app.app_context():

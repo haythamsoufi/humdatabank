@@ -8,6 +8,7 @@ Targets 100% code coverage of:
 import ast
 import json
 import pytest
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 from app.services.variable_resolution_service import VariableResolutionService
@@ -114,6 +115,135 @@ class TestMatrixRowTotal:
         disagg = {'5_a': 1, '5_b': 2, '5_c': 3}
         result = VariableResolutionService._matrix_row_total(disagg, 5)
         assert result == 6.0
+
+    def test_prefers_explicit_total_over_breakdown_sum(self):
+        disagg = {'5_Total': 242030, '5_SP1': 100, '5_SP2': 200}
+        result = VariableResolutionService._matrix_row_total(disagg, 5)
+        assert result == 242030.0
+
+
+# ---------------------------------------------------------------------------
+# _resolve_effective_period / __same_year__
+# ---------------------------------------------------------------------------
+
+class TestResolveEffectivePeriod:
+    def _assigned_form(self, *, period_name, period_start=None, period_end=None, template_id=22):
+        af = MagicMock()
+        af.period_name = period_name
+        af.period_start = period_start
+        af.period_end = period_end
+        af.template_id = template_id
+        af.assigned_at = None
+        af.reporting_period = None
+        return af
+
+    def _aes(self, assigned_form):
+        aes = MagicMock()
+        aes.assigned_form = assigned_form
+        return aes
+
+    @patch('app.services.variable_resolution_service.AssignedForm')
+    def test_same_year_maps_reporting_label_to_planning_year(self, mock_af):
+        current = self._assigned_form(
+            period_name='Jan-Jun 2026',
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 6, 30),
+            template_id=23,
+        )
+        planning_2026 = self._assigned_form(period_name='2026', template_id=22)
+        planning_2025 = self._assigned_form(period_name='2025', template_id=22)
+        mock_af.query.filter_by.return_value.all.return_value = [planning_2026, planning_2025]
+
+        result = VariableResolutionService._resolve_effective_period(
+            '__same_year__', 22, self._aes(current)
+        )
+        assert result == '2026'
+
+    @patch('app.services.variable_resolution_service.AssignedForm')
+    def test_same_year_uses_year_from_period_name_when_dates_missing(self, mock_af):
+        current = self._assigned_form(period_name='Annual reporting 2027', template_id=23)
+        planning_2027 = self._assigned_form(period_name='2027', template_id=22)
+        mock_af.query.filter_by.return_value.all.return_value = [planning_2027]
+
+        result = VariableResolutionService._resolve_effective_period(
+            '__same_year__', 22, self._aes(current)
+        )
+        assert result == '2027'
+
+    @patch('app.services.variable_resolution_service.AssignedForm')
+    def test_same_year_returns_none_when_no_matching_source(self, mock_af):
+        current = self._assigned_form(period_name='Jan-Jun 2026', template_id=23)
+        mock_af.query.filter_by.return_value.all.return_value = [
+            self._assigned_form(period_name='2025', template_id=22),
+        ]
+
+        result = VariableResolutionService._resolve_effective_period(
+            '__same_year__', 22, self._aes(current)
+        )
+        assert result is None
+
+    @patch('app.services.variable_resolution_service.AssignedForm')
+    def test_previous_cross_template_uses_period_dates(self, mock_af):
+        current = self._assigned_form(
+            period_name='Jan-Jun 2026',
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 6, 30),
+            template_id=23,
+        )
+        planning_2026 = self._assigned_form(
+            period_name='2026',
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 12, 31),
+            template_id=22,
+        )
+        planning_2025 = self._assigned_form(
+            period_name='2025',
+            period_start=date(2025, 1, 1),
+            period_end=date(2025, 12, 31),
+            template_id=22,
+        )
+        mock_af.query.filter_by.return_value.all.return_value = [
+            planning_2026, planning_2025
+        ]
+
+        result = VariableResolutionService._resolve_effective_period(
+            '__previous__', 22, self._aes(current)
+        )
+        assert result == '2025'
+
+    @patch('app.services.variable_resolution_service.AssignedForm')
+    def test_previous_same_period_name_on_source(self, mock_af):
+        current = self._assigned_form(
+            period_name='2026',
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 12, 31),
+            template_id=22,
+        )
+        planning_2026 = self._assigned_form(
+            period_name='2026',
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 12, 31),
+            template_id=22,
+        )
+        planning_2025 = self._assigned_form(
+            period_name='2025',
+            period_start=date(2025, 1, 1),
+            period_end=date(2025, 12, 31),
+            template_id=22,
+        )
+        mock_af.query.filter_by.return_value.all.return_value = [
+            planning_2026, planning_2025
+        ]
+
+        result = VariableResolutionService._resolve_effective_period(
+            '__previous__', 22, self._aes(current)
+        )
+        assert result == '2025'
+
+    def test_plain_period_string_is_unchanged(self):
+        aes = self._aes(self._assigned_form(period_name='Jan-Jun 2026', template_id=23))
+        result = VariableResolutionService._resolve_effective_period('2026', 22, aes)
+        assert result == '2026'
 
 
 # ---------------------------------------------------------------------------
@@ -502,6 +632,66 @@ class TestReplaceVariablesInText:
         with patch.object(VariableResolutionService, '_evaluate_formula', side_effect=Exception("boom")):
             result = VariableResolutionService.replace_variables_in_text("[[val]+1]", {"val": 5})
         assert "[[val]+1]" in result
+
+
+# ---------------------------------------------------------------------------
+# resolve_translation_map / resolve_matrix_display_headers
+# ---------------------------------------------------------------------------
+
+class TestResolveMatrixDisplayHeaders:
+
+    def test_resolve_translation_map_replaces_builtin_tokens(self):
+        resolved = VariableResolutionService.resolve_translation_map(
+            {'en': 'Planned [assignment_period]', 'fr': 'Prévu [assignment_period]'},
+            {'assignment_period': '2026'},
+        )
+        assert resolved['en'] == 'Planned 2026'
+        assert resolved['fr'] == 'Prévu 2026'
+
+    def test_resolve_translation_map_unchanged_without_placeholders(self):
+        original = {'en': 'Planned', 'fr': 'Prévu'}
+        resolved = VariableResolutionService.resolve_translation_map(
+            original,
+            {'assignment_period': '2026'},
+        )
+        assert resolved is original
+
+    def test_resolve_matrix_display_headers_for_columns_and_groups(self):
+        matrix_config = {
+            'columns': [
+                {
+                    'name': 'planned',
+                    'name_translations': {'en': 'Planned [assignment_period]'},
+                }
+            ],
+            'column_groups': {
+                'Funding': {'en': 'Funding [assignment_period]'},
+            },
+        }
+        resolved_columns, resolved_groups = VariableResolutionService.resolve_matrix_display_headers(
+            matrix_config,
+            {'assignment_period': '2026'},
+        )
+        assert resolved_columns[0]['name_translations']['en'] == 'Planned 2026'
+        assert resolved_groups['Funding']['en'] == 'Funding 2026'
+
+    def test_resolve_matrix_display_rows_for_text_and_translations(self):
+        matrix_config = {
+            'rows': [
+                {
+                    'text': 'Baseline [assignment_period]',
+                    'name_translations': {'fr': 'Référence [assignment_period]'},
+                },
+                'Legacy [assignment_period]',
+            ],
+        }
+        resolved_rows = VariableResolutionService.resolve_matrix_display_rows(
+            matrix_config,
+            {'assignment_period': '2026'},
+        )
+        assert resolved_rows[0]['text'] == 'Baseline 2026'
+        assert resolved_rows[0]['name_translations']['fr'] == 'Référence 2026'
+        assert resolved_rows[1] == 'Legacy 2026'
 
 
 # ---------------------------------------------------------------------------

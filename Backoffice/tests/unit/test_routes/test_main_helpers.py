@@ -623,6 +623,24 @@ class TestExtractChangedMatrixValues:
             # r1_c1 didn't change, should not be in trimmed
             assert "r1_c2" in old or "r1_c2" in new
 
+    def test_scalar_matrix_cells_diff_without_metadata(self, app):
+        """Variable columns store submitted scalars; audit trimming compares them directly."""
+        with app.app_context():
+            result_old, result_new = self._call(
+                {"101_SP1": 100, "101_SP2": 50},
+                {"101_SP1": 150, "101_SP2": 50},
+            )
+        assert result_old is not None
+        assert result_new is not None
+        assert result_old["_matrix_change"] is True
+        assert result_new["_matrix_change"] is True
+        assert "101_SP1" in result_old
+        assert "101_SP1" in result_new
+        assert result_old["101_SP1"] == 100
+        assert result_new["101_SP1"] == 150
+        assert "101_SP2" not in result_old
+        assert "101_SP2" not in result_new
+
     def test_no_changes_returns_none(self, app):
         with app.app_context():
             old, new = self._call({"r1_c1": 5, "r1_c2": 10}, {"r1_c1": 5, "r1_c2": 10})

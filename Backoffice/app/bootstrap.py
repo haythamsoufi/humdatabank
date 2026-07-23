@@ -219,6 +219,58 @@ def _install_db_pool_logging(app) -> None:
                 pass
 
 
+def _configure_all_model_mappers(app) -> None:
+    """Eagerly import every model module and configure SQLAlchemy mappers once.
+
+    Fixes a boot-time race (2026-07-23 prod incident): ``app/models/embeddings.py``
+    defines ``AIDocument`` (with a *string* ``relationship('AIEmbedding', ...)``)
+    followed later in the same module by the ``AIEmbedding`` class itself.
+    SQLAlchemy only resolves that string when mappers are configured — which
+    happens the first time *any* mapped attribute is used across the whole
+    declarative registry (e.g. ``EntityService``'s class-body
+    ``joinedload(NSBranch.country)`` in ``template_context.py``).
+
+    ``app/models/__init__.py`` lazy-loads the AI/embedding modules (see
+    ``_LAZY_MODEL_MODULES``) to keep pgvector/numpy out of narrow test runs.
+    That is fine when nothing races it — but on a freshly forked Gunicorn
+    worker, a background thread (RBAC auto-seed, session cleanup, scheduler
+    init) can begin importing ``app.models.embeddings`` at the same moment the
+    main thread triggers ``configure_mappers()`` via ``EntityService``. Python
+    executes the module top-to-bottom: if the interpreter switches threads
+    right after ``AIDocument`` is defined but before ``AIEmbedding`` is (they
+    are ~130 lines apart in the same file), the main thread's
+    ``configure_mappers()`` sees a *half-imported* module and raises
+    ``InvalidRequestError: ... failed to locate a name ('AIEmbedding')`` —
+    which Gunicorn treats as a fatal worker-boot failure, which in turn kills
+    the whole master ("Worker failed to boot").
+
+    Importing every model module synchronously right after ``db.init_app()``
+    — before any background thread starts — and configuring mappers once,
+    deterministically, on the main thread removes the race entirely: by the
+    time any thread (this one or a background one) touches the ORM, the
+    registry is already fully configured and further ``configure_mappers()``
+    calls are no-ops.
+    """
+    try:
+        # NOTE: intentionally using importlib rather than `import app.models.x`
+        # — the latter would bind a local name `app`, shadowing this
+        # function's `app` (Flask instance) parameter.
+        import importlib
+        importlib.import_module('app.models.embeddings')  # AIDocument / AIEmbedding together
+        importlib.import_module('app.models.ai_terminology')
+
+        from sqlalchemy.orm import configure_mappers
+        configure_mappers()
+    except Exception:
+        # Fail loudly and immediately at boot (single-threaded, reproducible)
+        # rather than intermittently later under concurrency.
+        app.logger.exception(
+            "[MODEL_CONFIG] Failed to eagerly configure SQLAlchemy mappers at "
+            "startup — a model relationship is likely broken. See traceback."
+        )
+        raise
+
+
 def init_flask_extensions(app, config_class, startup_start):
     """Initialize SQLAlchemy, auth, i18n, CSRF, mail, and related hooks."""
     ext_start = time.time()
@@ -226,6 +278,12 @@ def init_flask_extensions(app, config_class, startup_start):
     ext_time = time.time() - ext_start
     if ext_time > 0.1:
         app.logger.debug("Database extension init took %.3fs", ext_time)
+
+    # Must run before any background thread starts (RBAC seed, session
+    # cleanup, scheduler init) and before register_template_context() forces
+    # mapper configuration via EntityService — see docstring for the race
+    # this prevents.
+    _configure_all_model_mappers(app)
 
     _install_db_pool_logging(app)
 

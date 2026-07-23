@@ -1,6 +1,6 @@
 version: v0.1
 displayName: Databank Load Test
-description: "Backoffice staging load test: health, api/v1, navigation, entry-form, ajax save, optional submit"
+description: "Staging: health, dashboard, entry-form, notifications, matrix batch, auto-setup"
 testPlan: locustfile.py
 testType: Locust
 engineInstances: 1
@@ -9,12 +9,34 @@ env:
     value: https://databank-stage.ifrc.org
   - name: LOADTEST_ALLOW_PROD
     value: 'false'
+  - name: LOADTEST_AUTO_SETUP
+    value: 'true'
   # Optional: focal-point entry form traffic (requires authenticated session cookie).
-  # Example: "123,456" (AssignmentEntityStatus IDs for focal-point assignments)
+  # When LOADTEST_AUTO_SETUP=true, AES IDs are created automatically — leave blank.
   - name: LOADTEST_HELP_DOC_PATH
     value: ''
   - name: LOADTEST_ASSIGNMENT_AES_IDS
     value: ''
+  - name: LOADTEST_COUNTRY_ID
+    value: '193'
+  - name: LOADTEST_SETUP_COUNTRY_IDS
+    value: '193'
+  - name: LOADTEST_DQ_TEMPLATE_ID
+    value: ''
+  - name: LOADTEST_DQ_PERIOD
+    value: ''
+  - name: LOADTEST_MATRIX_FORM_ITEM_IDS
+    value: ''
+  - name: LOADTEST_MATRIX_SOURCE_TEMPLATE_ID
+    value: ''
+  - name: LOADTEST_MATRIX_SOURCE_PERIOD
+    value: ''
+  - name: LOADTEST_ROW_ENTITY_IDS
+    value: ''
+  - name: LOADTEST_PROFILE_USER_IDS
+    value: ''
+  - name: LOADTEST_LOOKUP_LIST_ID
+    value: 'country_map'
   - name: LOCUST_USERS
     value: 20
   - name: LOCUST_SPAWN_RATE
@@ -23,6 +45,22 @@ env:
     value: '120'
   - name: ENABLE_LOGGING
     value: 'true'
+  - name: LOADTEST_FAILURE_BODY_MAX
+    value: '500'
+  - name: LOADTEST_FAILURE_SAMPLES_PER_ENDPOINT
+    value: '5'
+  - name: LOADTEST_FAILURE_SUMMARY_PATH
+    value: 'failure_summary.json'
+passFailCriteria:
+  passFailMetrics:
+    pct95ResponseTime:
+      condition: GreaterThan
+      value: 5000
+      action: continue
+    errorPercentage:
+      condition: GreaterThan
+      value: 5
+      action: continue
 # Provision LOADTEST_API_KEY (and optionally LOADTEST_SESSION_COOKIE) as a
 # Key Vault secret reference in Azure Load Testing rather than a literal value.
 # Example secret entry (uncomment and set the secretId in the portal/CI):

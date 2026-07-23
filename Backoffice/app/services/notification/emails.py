@@ -324,8 +324,30 @@ def send_notification_emails():
     """
     Background task to send notification digest emails.
     Should be called by scheduler periodically — function checks if it's time for each user.
+
+    A PostgreSQL advisory lock (``DIGEST_EMAIL_LOCK_ID``) prevents two App Service instances
+    from running the sweep concurrently when ``REDIS_URL`` is unset, so no user ever receives
+    two digest emails from the same scheduler window.  The per-user atomic UPDATE claim in
+    ``send_daily_digest``/``send_weekly_digest`` acts as belt-and-suspenders if the session
+    lock is released mid-sweep (e.g. pool recycle).
     """
+    use_pg_lock = False
+    lock_acquired = False
+    lock_id = None
     try:
+        from app.utils.constants import DEFAULT_DIGEST_EMAIL_LOCK_ID
+        from app.utils.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
+
+        use_pg_lock = db.engine.dialect.name == "postgresql"
+        if use_pg_lock:
+            lock_id = int(current_app.config.get('DIGEST_EMAIL_LOCK_ID', DEFAULT_DIGEST_EMAIL_LOCK_ID))
+            lock_acquired = try_session_advisory_lock(db.session, lock_id)
+            if not lock_acquired:
+                current_app.logger.debug(
+                    "Skipping digest email sweep — another instance is already running it"
+                )
+                return
+
         now = utcnow()
         current_hour = now.hour
         current_minute = now.minute
@@ -438,6 +460,12 @@ def send_notification_emails():
 
     except Exception as e:
         current_app.logger.error(f"Error sending notification emails: {str(e)}", exc_info=True)
+    finally:
+        if use_pg_lock and lock_id is not None:
+            try:
+                release_session_advisory_lock(db.session, lock_id, acquired=lock_acquired)
+            except Exception:
+                pass
 
 
 def send_daily_digest(user, preferences, retry_count=0, max_retries=3, existing_log=None):
@@ -480,16 +508,38 @@ def send_daily_digest(user, preferences, retry_count=0, max_retries=3, existing_
     if not notifications:
         return False
 
-    # Claim the digest slot BEFORE sending to prevent concurrent workers from
-    # double-sending. Writing last_digest_sent_at now means any other worker
-    # that reads this row after our commit will see the window as occupied and skip.
+    # Atomic claim: a single UPDATE WHERE wins the slot for exactly one concurrent caller.
+    # The advisory lock on send_notification_emails is the primary guard; this is
+    # belt-and-suspenders for edge cases where the session lock is released mid-sweep
+    # (e.g. pool recycle) and a second instance races to the same user.
     if retry_count == 0 and hasattr(preferences, 'last_digest_sent_at'):
         try:
-            preferences.last_digest_sent_at = utcnow()
+            from sqlalchemy import update as _sa_update, or_ as _sa_or_
+
+            _window_m = int(current_app.config.get('NOTIFICATION_DIGEST_TRIGGER_WINDOW_MINUTES', 60))
+            _cutoff = utcnow() - timedelta(minutes=_window_m)
+            claimed = db.session.execute(
+                _sa_update(NotificationPreferences)
+                .where(
+                    NotificationPreferences.user_id == preferences.user_id,
+                    _sa_or_(
+                        NotificationPreferences.last_digest_sent_at.is_(None),
+                        NotificationPreferences.last_digest_sent_at < _cutoff,
+                    ),
+                )
+                .values(last_digest_sent_at=utcnow())
+                .execution_options(synchronize_session=False)
+            ).rowcount
             db.session.commit()
+            if claimed == 0:
+                current_app.logger.debug(
+                    "Daily digest slot already claimed for user %s — skipping duplicate", user.id
+                )
+                return False
         except Exception as claim_err:
             current_app.logger.warning(
-                f"Could not claim digest slot for user {user.id}: {claim_err}. Proceeding anyway."
+                "Could not atomically claim daily digest slot for user %s: %s. Proceeding anyway.",
+                user.id, claim_err,
             )
             db.session.rollback()
 
@@ -564,14 +614,35 @@ def send_weekly_digest(user, preferences, retry_count=0, max_retries=3, existing
     if not notifications:
         return False
 
-    # Claim the digest slot BEFORE sending (same idempotency pattern as send_daily_digest).
+    # Atomic claim — same belt-and-suspenders pattern as send_daily_digest.
     if retry_count == 0 and hasattr(preferences, 'last_digest_sent_at'):
         try:
-            preferences.last_digest_sent_at = utcnow()
+            from sqlalchemy import update as _sa_update, or_ as _sa_or_
+
+            _window_m = int(current_app.config.get('NOTIFICATION_DIGEST_TRIGGER_WINDOW_MINUTES', 60))
+            _cutoff = utcnow() - timedelta(minutes=_window_m)
+            claimed = db.session.execute(
+                _sa_update(NotificationPreferences)
+                .where(
+                    NotificationPreferences.user_id == preferences.user_id,
+                    _sa_or_(
+                        NotificationPreferences.last_digest_sent_at.is_(None),
+                        NotificationPreferences.last_digest_sent_at < _cutoff,
+                    ),
+                )
+                .values(last_digest_sent_at=utcnow())
+                .execution_options(synchronize_session=False)
+            ).rowcount
             db.session.commit()
+            if claimed == 0:
+                current_app.logger.debug(
+                    "Weekly digest slot already claimed for user %s — skipping duplicate", user.id
+                )
+                return False
         except Exception as claim_err:
             current_app.logger.warning(
-                f"Could not claim weekly digest slot for user {user.id}: {claim_err}. Proceeding anyway."
+                "Could not atomically claim weekly digest slot for user %s: %s. Proceeding anyway.",
+                user.id, claim_err,
             )
             db.session.rollback()
 

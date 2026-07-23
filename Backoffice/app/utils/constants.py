@@ -21,6 +21,15 @@ DEFAULT_SCHEDULED_NOTIFICATIONS_LOCK_ID = 702346
 # Base for per-user OAuth callback advisory locks (lock_id = base + user_id % 1_000_000)
 DEFAULT_OAUTH_CALLBACK_LOCK_ID_BASE = 702347
 
+# Default PostgreSQL advisory lock ID for the notification digest email sweep.
+# Prevents two App Service instances from running the sweep concurrently when
+# REDIS_URL is unset (override via DIGEST_EMAIL_LOCK_ID app setting).
+DEFAULT_DIGEST_EMAIL_LOCK_ID = 702348
+
+# Default PostgreSQL advisory lock ID for the FDS access-request digest job.
+# Prevents concurrent runs across instances (override via FDS_DIGEST_LOCK_ID app setting).
+DEFAULT_FDS_DIGEST_LOCK_ID = 702349
+
 # ---------------------------------------------------------------------------
 # IFRC API Appeals Type IDs (Unified Planning: Plan, Mid-Year Report, Annual Report)
 # ---------------------------------------------------------------------------

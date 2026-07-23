@@ -2,6 +2,7 @@
 
 **Status:** Active guidance  
 **Last reviewed:** 2026-07-23  
+**Last updated:** 2026-07-23 — digest advisory locks + atomic claims implemented (see §3.3)  
 **Context:** Production scaled to **2 instances** on **P2v3** (`ifrc-databank-app`); **`REDIS_URL` not configured** (may remain unavailable for budget or infra reasons).
 
 Related: [Azure App Service](azure-app-service.md), [Gateway 504 / worker saturation](../incidents/gateway-504-worker-saturation.md), [Session management](../sessions/session-management.md).
@@ -36,8 +37,8 @@ Severity legend: **Critical** → user-facing data or trust impact; **High** →
 
 | ID | Risk | Level | What happens | Likelihood (2 inst., no Redis) |
 |----|------|-------|--------------|--------------------------------|
-| R1 | **Duplicate scheduler jobs** | **High** | Each instance runs its own APScheduler (lock is `flock` on local `/tmp`, not shared). Digest emails, session cleanup, scheduled notifications, FDS digests may run **twice**. | **Likely** — by design today |
-| R2 | **Digest email race** | **Medium** | Two schedulers fire `send_notification_emails` in the same window. Idempotency guard (`last_digest_sent_at`) usually prevents duplicates; simultaneous runs can still race. | **Possible** during aligned cron windows |
+| R1 | **Duplicate scheduler jobs** | ~~High~~ **Mitigated** | Each instance runs its own APScheduler (`flock` is local to each VM). Cleanup jobs are idempotent. Digest / notification jobs now protected by PG advisory locks + atomic DB claims (deployed 2026-07-23, see §3.3). | **Low** — advisory locks prevent concurrent sweeps |
+| R2 | **Digest email race** | ~~Medium~~ **Mitigated** | `send_notification_emails` and `run_fds_access_request_digest_job` each acquire a PG advisory lock before doing any work; per-user `last_digest_sent_at` claim is now an atomic `UPDATE WHERE`. Only one instance wins the slot per user per window. | **Very unlikely** — requires advisory lock and atomic claim to both fail simultaneously |
 | R3 | **Weakened rate limiting** | **High** | `RATELIMIT_STORAGE_URI` defaults to `memory://`. Effective limit ≈ **configured × instances × workers** (e.g. 2 × 3 = **6×**). | **Certain** under attack |
 | R4 | **Security alert email storm** | **Medium** | Alert cooldown is in-process without Redis → up to **one email per worker per incident** (e.g. 6 emails for 2×3 workers). Events are always logged. | **Possible** during 502/504 bursts |
 | R5 | **Co-editing presence inaccurate** | **Low** | Presence store falls back to in-memory per worker. Users on different instances may not see each other in the presence bar. **Form data is unaffected.** | **Likely** during genuine co-editing |
@@ -75,9 +76,9 @@ Actions grouped by effort. Prefer **Immediate** before the next reporting peak o
 
 | Action | Addresses | Detail |
 |--------|-----------|--------|
-| **External scheduler** | R1, R2 | Set `SCHEDULER_DISABLE_ALL_WORKERS=true` on **all** web instances. Run APScheduler jobs in **Azure Container Job**, **Function**, or a dedicated single-instance “worker” app. Eliminates duplicate schedulers without Redis. |
-| **DB-backed scheduler lock** | R1 | Code change: replace `/tmp` `flock` with PostgreSQL advisory lock or a `scheduler_leases` table. Single fleet-wide owner regardless of Redis. *(Not implemented today.)* |
-| **Stricter digest claim** | R2 | Code change: atomic `UPDATE … WHERE last_digest_sent_at IS NULL OR …` (or row lock) before send. *(Partial guard exists today.)* |
+| ✅ **DB advisory lock on digest sweeps** *(done 2026-07-23)* | R1, R2 | `send_notification_emails` and `run_fds_access_request_digest_job` each acquire a PostgreSQL session advisory lock (`pg_try_advisory_lock`) before doing any work. The second instance that fires concurrently skips immediately with a DEBUG log. Lock IDs: `DIGEST_EMAIL_LOCK_ID` (default `702348`) and `FDS_DIGEST_LOCK_ID` (default `702349`) — overridable as Azure app settings. |
+| ✅ **Atomic `last_digest_sent_at` claim** *(done 2026-07-23)* | R2 | `send_daily_digest` and `send_weekly_digest` replaced the non-atomic read-then-write with an atomic `UPDATE notification_preferences SET last_digest_sent_at = NOW() WHERE user_id = :id AND (last_digest_sent_at IS NULL OR last_digest_sent_at < :cutoff)`. Only the instance that gets `rowcount == 1` sends; all others return `False`. Belt-and-suspenders if the session lock is released mid-sweep. |
+| **External scheduler** (optional, future) | R1 | Set `SCHEDULER_DISABLE_ALL_WORKERS=true` on **all** web instances and run APScheduler jobs in **Azure Container Job** or **Function**. Current DB locks make this optional while staying on App Service. |
 | **Document rate-limit expectations** | R3 | Treat in-memory limits as **per-worker**; tune configured values down if abuse is a concern (e.g. divide by `instances × workers`). |
 
 ### 3.4 When Redis becomes available (future)
@@ -133,7 +134,7 @@ Before scaling to **N ≥ 2** instances without Redis:
 - [ ] ARR Affinity **On**
 - [ ] PostgreSQL connection headroom checked for **N × 90** max app connections
 - [ ] Scheduler duplication monitoring in place (§3.1)
-- [ ] Stakeholders aware digest emails *may* duplicate until external scheduler or Redis
+- [x] Digest email deduplication: PG advisory lock + atomic claim deployed (§3.3) — no longer requires external scheduler or Redis
 - [ ] Load-test profile documented (smoke vs stress VU)
 
 Before turning ARR Affinity **Off**:

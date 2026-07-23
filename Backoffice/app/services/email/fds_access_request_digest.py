@@ -345,62 +345,87 @@ def run_fds_access_request_digest_job(*, manual: bool = False) -> FdsDigestRunRe
         )
         return result
 
-    result.ran = True
-    result.pending_total, result.pending_without_fds_member = _pending_digest_counts()
-    grouped = pending_country_access_requests_by_fds_member()
-    result.fds_member_count = len(grouped)
+    # PostgreSQL advisory lock: prevents two App Service instances from running the
+    # FDS digest batch concurrently when REDIS_URL is unset.  Manual admin runs bypass
+    # the lock so a forced re-send always executes regardless of whether the scheduled
+    # run is in progress.
+    from app.utils.constants import DEFAULT_FDS_DIGEST_LOCK_ID
+    from app.utils.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
 
-    if not grouped:
-        if result.pending_total:
-            result.skip_reason = (
-                f'{result.pending_total} pending request(s), but none on countries with an '
-                f'assigned FDS member ({result.pending_without_fds_member} without FDS member)'
-            )
-        else:
-            result.skip_reason = 'No pending country access requests'
+    use_pg_lock = not manual and db.engine.dialect.name == "postgresql"
+    lock_acquired = False
+    lock_id = None
+    try:
+        if use_pg_lock:
+            lock_id = int(current_app.config.get('FDS_DIGEST_LOCK_ID', DEFAULT_FDS_DIGEST_LOCK_ID))
+            lock_acquired = try_session_advisory_lock(db.session, lock_id)
+            if not lock_acquired:
+                result.skip_reason = 'Another instance is already running the FDS digest'
+                _log_fds_digest_run(result, manual=manual)
+                return result
+
+        result.ran = True
+        result.pending_total, result.pending_without_fds_member = _pending_digest_counts()
+        grouped = pending_country_access_requests_by_fds_member()
+        result.fds_member_count = len(grouped)
+
+        if not grouped:
+            if result.pending_total:
+                result.skip_reason = (
+                    f'{result.pending_total} pending request(s), but none on countries with an '
+                    f'assigned FDS member ({result.pending_without_fds_member} without FDS member)'
+                )
+            else:
+                result.skip_reason = 'No pending country access requests'
+            _log_fds_digest_run(result, manual=manual)
+            db.session.commit()
+            return result
+
+        for fds_user_id, requests in grouped.items():
+            user_label = f'user {fds_user_id}'
+            if not manual and _digest_already_sent_today(fds_user_id):
+                result.skipped_count += 1
+                detail = f'{user_label}: already sent today'
+                result.details.append(detail)
+                user = User.query.filter_by(id=fds_user_id, active=True).first()
+                if user and user.email:
+                    _record_fds_digest_skip(
+                        user,
+                        subject=f'{FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX}skipped',
+                        reason='Already sent today',
+                    )
+                continue
+
+            user = User.query.filter_by(id=fds_user_id, active=True).first()
+            if not user or not user.email:
+                result.skipped_count += 1
+                detail = f'{user_label}: inactive or missing email'
+                result.details.append(detail)
+                if user and user.email:
+                    _record_fds_digest_skip(
+                        user,
+                        subject=f'{FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX}skipped',
+                        reason='Inactive user or missing email address',
+                    )
+                continue
+
+            user_label = user.email
+            if send_fds_access_request_digest_email(user, requests):
+                result.sent_count += 1
+                result.details.append(f'{user_label}: sent ({len(requests)} request(s))')
+            else:
+                result.failed_count += 1
+                result.details.append(f'{user_label}: send failed')
+
         _log_fds_digest_run(result, manual=manual)
         db.session.commit()
         return result
-
-    for fds_user_id, requests in grouped.items():
-        user_label = f'user {fds_user_id}'
-        if not manual and _digest_already_sent_today(fds_user_id):
-            result.skipped_count += 1
-            detail = f'{user_label}: already sent today'
-            result.details.append(detail)
-            user = User.query.filter_by(id=fds_user_id, active=True).first()
-            if user and user.email:
-                _record_fds_digest_skip(
-                    user,
-                    subject=f'{FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX}skipped',
-                    reason='Already sent today',
-                )
-            continue
-
-        user = User.query.filter_by(id=fds_user_id, active=True).first()
-        if not user or not user.email:
-            result.skipped_count += 1
-            detail = f'{user_label}: inactive or missing email'
-            result.details.append(detail)
-            if user and user.email:
-                _record_fds_digest_skip(
-                    user,
-                    subject=f'{FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX}skipped',
-                    reason='Inactive user or missing email address',
-                )
-            continue
-
-        user_label = user.email
-        if send_fds_access_request_digest_email(user, requests):
-            result.sent_count += 1
-            result.details.append(f'{user_label}: sent ({len(requests)} request(s))')
-        else:
-            result.failed_count += 1
-            result.details.append(f'{user_label}: send failed')
-
-    _log_fds_digest_run(result, manual=manual)
-    db.session.commit()
-    return result
+    finally:
+        if use_pg_lock and lock_id is not None:
+            try:
+                release_session_advisory_lock(db.session, lock_id, acquired=lock_acquired)
+            except Exception:
+                pass
 
 
 def send_fds_access_request_digests() -> int:

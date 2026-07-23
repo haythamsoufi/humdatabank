@@ -1,0 +1,7 @@
+<step title="Incoming Request" date="2026-04-13T21:18:25.704" instance="bd8f90" url="/diagnostics/runtime" method="GET" type="request" pid="768,1,35" Host="ifrc-databank-app-gtfncudqb2cwhngw.scm.westeurope-01.azurewebsites.net" User-Agent="GITHUBACTIONS_DeployWebAppToAzure_9a5de62f0d3eec479aca738549e74b5bd00c7f353345ef679d1dede464c828ef_2.2.18" Authorization="Bas..." Content-Type="application/json; charset=utf-8" Content-Length="0" X-ARR-LOG-ID="ecb4f791-5e9e-4d46-b32d-cc41c926c3b8" CLIENT-IP="172.184.214.208:15360" X-SITE-DEPLOYMENT-ID="ifrc-databank-app" WAS-DEFAULT-HOSTNAME="ifrc-databank-app-gtfncudqb2cwhngw.scm.westeurope-01.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/diagnostics/runtime" X-Client-IP="172.184.214.208" X-Client-Port="15360" >
+  <step title="Cleanup Xml Logs" date="2026-04-13T21:18:25.710" >
+    <step title="Cleanup Infos" date="2026-04-13T21:18:25.717" totalFiles="262" totalCleanup="102" /><!-- duration: 3ms -->
+  </step><!-- duration: 13ms -->
+  <step title="RuntimeController.GetRuntimeVersions" date="2026-04-13T21:18:25.741" /><!-- duration: 14ms -->
+  <step title="Outgoing response" date="2026-04-13T21:18:25.773" type="response" statusCode="200" statusText="OK" /><!-- duration: 2ms -->
+</step><!-- duration: 108ms -->

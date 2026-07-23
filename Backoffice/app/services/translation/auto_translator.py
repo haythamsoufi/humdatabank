@@ -211,6 +211,25 @@ def _debug_translation_enabled() -> bool:
 # in prod (2026-07-16 gateway-504 incident).
 STATUS_PROBE_TIMEOUT_SECONDS = 3.0
 
+# Opaque placeholder tokens sent to machine-translation APIs.  Must not contain
+# dictionary words (e.g. "IFRC", "PLACEHOLDER", "JINJA") that MT services split
+# or translate — see auto-translate leakage in .po msgstr entries.
+_MT_VAR_TOKEN_PREFIX = "QZXNTK"
+_MT_JINJA_TOKEN_PREFIX = "QZXJNK"
+
+
+def _make_mt_protection_token(prefix: str, counter: int) -> str:
+    """Build an alphanumeric-only token (no digits) for MT placeholder protection."""
+    n = counter
+    letters: list[str] = []
+    while True:
+        letters.append(chr(ord("A") + (n % 26)))
+        n = (n // 26) - 1
+        if n < 0:
+            break
+    suffix = "".join(reversed(letters))
+    return f"{prefix}{suffix}"
+
 
 class TranslationService:
     """Base class for translation services"""
@@ -704,7 +723,7 @@ class AutoTranslator:
         Protect Jinja2 ``{{ ... }}`` and ``{% ... %}`` fragments before machine translation
         of HTML email templates, so variable names and control tags are not translated.
 
-        Uses ``JINJAHOLDER*`` tokens (distinct from ``IFRCPLACEHOLDER*`` used in
+        Uses ``QZXJNK*`` tokens (distinct from ``QZXNTK*`` used in
         :meth:`_protect_variables`) to reduce collision if both run on nested protection passes.
         """
         if not text:
@@ -714,15 +733,7 @@ class AutoTranslator:
 
         def make_token() -> str:
             nonlocal token_counter
-            n = token_counter
-            letters: list[str] = []
-            while True:
-                letters.append(chr(ord("A") + (n % 26)))
-                n = (n // 26) - 1
-                if n < 0:
-                    break
-            suffix = "".join(reversed(letters))
-            token = f"JINJAHOLDER{suffix}"
+            token = _make_mt_protection_token(_MT_JINJA_TOKEN_PREFIX, token_counter)
             token_counter += 1
             return token
 
@@ -777,20 +788,9 @@ class AutoTranslator:
 
         def make_token() -> str:
             nonlocal token_counter
-            # Use an alphanumeric-only token (no underscores/punctuation).
-            # Some translation services (especially into RTL scripts like Arabic) may drop or
-            # transform tokens that look like "noise". A "word-like" token survives better.
-            # Avoid digits as some services localize 0-9 into Arabic-Indic numerals, which would
-            # prevent exact restoration. Encode counter as A, B, ..., Z, AA, AB, ...
-            n = token_counter
-            letters = []
-            while True:
-                letters.append(chr(ord('A') + (n % 26)))
-                n = (n // 26) - 1
-                if n < 0:
-                    break
-            suffix = ''.join(reversed(letters))
-            token = f"IFRCPLACEHOLDER{suffix}"
+            # Alphanumeric-only (no punctuation); letter suffixes only (no digits — Arabic
+            # MT may localize numerals).  Prefix is opaque consonants, not dictionary words.
+            token = _make_mt_protection_token(_MT_VAR_TOKEN_PREFIX, token_counter)
             token_counter += 1
             return token
 
@@ -850,6 +850,31 @@ class AutoTranslator:
         protected_text = positional_fmt.sub(replace_fmt, protected_text)
 
         return protected_text, token_map
+
+    @staticmethod
+    def _token_present_in_text(text: str, token: str) -> bool:
+        """Return True if *token* appears in *text* (exact or bidi/zero-width tolerant)."""
+        if not text or not token:
+            return False
+        if token in text:
+            return True
+        try:
+            zw = r"[\u200e\u200f\u202a-\u202e\u2066-\u2069\u200b\u200c\u200d\s]*"
+            pattern = zw.join(map(re.escape, list(token)))
+            return re.search(pattern, text, flags=re.IGNORECASE) is not None
+        except Exception as e:
+            logger.debug("_token_present_in_text: pattern match failed: %s", e)
+            return False
+
+    @staticmethod
+    def _all_tokens_preserved(translated: str, token_map: Dict[str, str]) -> bool:
+        """Return False when an MT service mangled or translated placeholder tokens."""
+        if not token_map:
+            return True
+        return all(
+            AutoTranslator._token_present_in_text(translated, token)
+            for token in token_map
+        )
 
     @staticmethod
     def _restore_variables(text: str, variable_map: Dict[str, str]) -> str:
@@ -991,6 +1016,14 @@ class AutoTranslator:
                     )
                 continue
 
+            if token_map and not self._all_tokens_preserved(translated, token_map):
+                if debug:
+                    logger.info(
+                        f"[auto_translate_debug] svc={getattr(svc,'service_name','?')} "
+                        f"{source_code}->{target_code} rejected=mangled_placeholders text={original_text[:120]!r}"
+                    )
+                continue
+
             # Some services legitimately return unchanged strings (e.g., acronyms/proper nouns).
             # If we have other services available, treat "unchanged" as a soft-failure so we
             # can attempt a better translation; otherwise accept it to avoid hard failures.
@@ -1100,6 +1133,8 @@ class AutoTranslator:
                 if i is None:
                     continue
                 if not translated:
+                    continue
+                if variable_maps[i] and not self._all_tokens_preserved(translated, variable_maps[i]):
                     continue
                 # If unchanged and we have more services to try, leave it pending.
                 if translated == protected_texts[i] and source_code != target_code:

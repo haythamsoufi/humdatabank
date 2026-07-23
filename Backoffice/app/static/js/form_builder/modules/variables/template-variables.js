@@ -131,7 +131,8 @@ export class TemplateVariablesManager {
                 'entity_id': 'Entity ID',
                 'entity_type': 'Entity Type',
                 'template_name': 'Template Name',
-                'assignment_period': 'Assignment Period'
+                'assignment_period': 'Assignment Period',
+                'assignment_year': 'Assignment Year'
             };
             sourceInfo = metadataTypeLabels[metadataType] || metadataType;
         } else {
@@ -357,6 +358,7 @@ export class TemplateVariablesManager {
                                     <option value="entity_type" ${existingVar?.metadata_type === 'entity_type' ? 'selected' : ''}>Entity Type</option>
                                     <option value="template_name" ${existingVar?.metadata_type === 'template_name' ? 'selected' : ''}>Template Name</option>
                                     <option value="assignment_period" ${existingVar?.metadata_type === 'assignment_period' ? 'selected' : ''}>Assignment Period</option>
+                                    <option value="assignment_year" ${existingVar?.metadata_type === 'assignment_year' ? 'selected' : ''}>Assignment Year</option>
                                 </select>
                             </div>
                         </div>

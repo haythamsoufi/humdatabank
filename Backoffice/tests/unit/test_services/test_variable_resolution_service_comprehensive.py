@@ -766,6 +766,38 @@ class TestResolveMetadataVariable:
         result = VariableResolutionService._resolve_metadata_variable({'metadata_type': 'assignment_period'}, aes, None)
         assert result is None
 
+    def test_assignment_year_from_period_name(self):
+        aes = self._aes()
+        aes.assigned_form = MagicMock()
+        aes.assigned_form.period_name = 'Jan-Jun 2026'
+        aes.assigned_form.period_end = None
+        aes.assigned_form.period_start = None
+        aes.assigned_form.reporting_period = None
+        result = VariableResolutionService._resolve_metadata_variable({'metadata_type': 'assignment_year'}, aes, None)
+        assert result == '2026'
+
+    def test_assignment_year_prefers_period_end(self):
+        aes = self._aes()
+        aes.assigned_form = MagicMock()
+        aes.assigned_form.period_name = 'FY 2025-2026'
+        from datetime import date
+        aes.assigned_form.period_end = date(2026, 6, 30)
+        aes.assigned_form.period_start = date(2025, 7, 1)
+        aes.assigned_form.reporting_period = None
+        result = VariableResolutionService._resolve_metadata_variable({'metadata_type': 'assignment_year'}, aes, None)
+        assert result == '2026'
+
+    def test_assignment_year_no_assigned_form(self):
+        aes = self._aes()
+        aes.assigned_form = None
+        result = VariableResolutionService._resolve_metadata_variable({'metadata_type': 'assignment_year'}, aes, None)
+        assert result is None
+
+    def test_get_assignment_year_from_period_name_helper(self):
+        assert VariableResolutionService.get_assignment_year_from_period_name('Jan-Jun 2026') == '2026'
+        assert VariableResolutionService.get_assignment_year_from_period_name('2024') == '2024'
+        assert VariableResolutionService.get_assignment_year_from_period_name('') is None
+
     def test_national_society_name_with_country(self):
         aes = self._aes()
         mock_country = MagicMock()
@@ -810,7 +842,7 @@ class TestResolveBuiltinMetadataVariables:
         with patch.object(VariableResolutionService, '_resolve_metadata_variable', return_value='val'):
             result = VariableResolutionService._resolve_builtin_metadata_variables(aes, None)
         expected = {'entity_name', 'entity_name_hierarchy', 'entity_id', 'entity_type',
-                    'national_society_name', 'template_name', 'assignment_period'}
+                    'national_society_name', 'template_name', 'assignment_period', 'assignment_year'}
         assert expected == set(result.keys())
         assert all(v == 'val' for v in result.values())
 
@@ -819,7 +851,7 @@ class TestResolveBuiltinMetadataVariables:
         with patch.object(VariableResolutionService, '_resolve_metadata_variable', side_effect=Exception("error")):
             result = VariableResolutionService._resolve_builtin_metadata_variables(aes, None)
         assert all(v is None for v in result.values())
-        assert len(result) == 7
+        assert len(result) == 8
 
 
 # ---------------------------------------------------------------------------

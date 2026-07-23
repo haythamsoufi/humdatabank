@@ -1,0 +1,152 @@
+# Multi-Instance App Service Without Redis — Risks & Mitigations
+
+**Status:** Active guidance  
+**Last reviewed:** 2026-07-23  
+**Context:** Production scaled to **2 instances** on **P2v3** (`ifrc-databank-app`); **`REDIS_URL` not configured** (may remain unavailable for budget or infra reasons).
+
+Related: [Azure App Service](azure-app-service.md), [Gateway 504 / worker saturation](../incidents/gateway-504-worker-saturation.md), [Session management](../sessions/session-management.md).
+
+---
+
+## 1. Executive summary
+
+Scaling App Service **out** (more instances) improves capacity and isolates worker-recycle blips, but several subsystems assume **shared state** that today lives in **process memory** or **local `/tmp`**. Without Redis, those subsystems do **not** coordinate across instances.
+
+**Good news:** Core databank operations (login, form entry, API writes) use **signed cookie sessions** and **PostgreSQL** — they do **not** require Redis.
+
+**Main gaps without Redis:**
+
+| Area | Cross-instance? |
+|------|-----------------|
+| Flask login session (cookie) | Yes |
+| Form / API persistence (PostgreSQL) | Yes |
+| APScheduler ownership (`flock` in `/tmp`) | **No — one scheduler per instance** |
+| Flask-Limiter + custom rate limits | **No — per worker memory** |
+| Security alert email cooldown | **No — per worker memory** |
+| Co-editing presence | **No — per worker memory** (degraded UX only) |
+| AI WebSocket connections | **No — per worker memory** |
+
+**Minimum action when running ≥2 instances without Redis:** enable **ARR Affinity (Session affinity) = On** in App Service Configuration.
+
+---
+
+## 2. Risk register
+
+Severity legend: **Critical** → user-facing data or trust impact; **High** → security or duplicate side effects; **Medium** → degraded UX or ops noise; **Low** → observability / edge cases.
+
+| ID | Risk | Level | What happens | Likelihood (2 inst., no Redis) |
+|----|------|-------|--------------|--------------------------------|
+| R1 | **Duplicate scheduler jobs** | **High** | Each instance runs its own APScheduler (lock is `flock` on local `/tmp`, not shared). Digest emails, session cleanup, scheduled notifications, FDS digests may run **twice**. | **Likely** — by design today |
+| R2 | **Digest email race** | **Medium** | Two schedulers fire `send_notification_emails` in the same window. Idempotency guard (`last_digest_sent_at`) usually prevents duplicates; simultaneous runs can still race. | **Possible** during aligned cron windows |
+| R3 | **Weakened rate limiting** | **High** | `RATELIMIT_STORAGE_URI` defaults to `memory://`. Effective limit ≈ **configured × instances × workers** (e.g. 2 × 3 = **6×**). | **Certain** under attack |
+| R4 | **Security alert email storm** | **Medium** | Alert cooldown is in-process without Redis → up to **one email per worker per incident** (e.g. 6 emails for 2×3 workers). Events are always logged. | **Possible** during 502/504 bursts |
+| R5 | **Co-editing presence inaccurate** | **Low** | Presence store falls back to in-memory per worker. Users on different instances may not see each other in the presence bar. **Form data is unaffected.** | **Likely** during genuine co-editing |
+| R6 | **AI WebSocket stickiness** | **Medium** | WS connections are in-memory on one worker. Without affinity, upgrade and later HTTP may hit different instances; client falls back to polling/SSE. | **Possible** for AI chat users |
+| R7 | **DB connection budget** | **Medium** | Max connections scale with instances: ~**90 → ~180** (3 workers × (pool 10 + overflow 20) × instances). Still below PostgreSQL `max_connections=250` if unchanged — monitor. | **Certain** when scaled out |
+| R8 | **Multi-step admin flows with local files** | **Low** | Flows that store a **local path** in session (e.g. UPR Excel import wizard under `instance/upr_import_uploads`) fail if the next request lands on an instance without that file. `/home` on App Service is often shared, but do not rely on this without verification. | **Unlikely** if ARR Affinity on |
+| R9 | **Uneven load with ARR Affinity** | **Low** | Sticky users reduce per-request spreading; capacity still scales with **user count**, not requests per user. | **Certain** when affinity on |
+| R10 | **Gateway 502 under stress** | **Medium** | Worker `max_requests` recycles under high load cause AGW 502s (observed 2026-07-23: 35×502 at 50 VU, single instance). Extra instances **reduce blast radius**; Redis does **not** fix this directly. | **Possible** during load tests / peaks |
+
+---
+
+## 3. Proposed solutions (Redis unavailable)
+
+Actions grouped by effort. Prefer **Immediate** before the next reporting peak or load test.
+
+### 3.1 Immediate (portal / config, no deploy)
+
+| Action | Addresses | Detail |
+|--------|-----------|--------|
+| **Enable ARR Affinity = On** | R5, R6, R8 | Azure Portal → App Service → Configuration → General settings → **Session affinity**. Required handbook default when `REDIS_URL` is unset. |
+| **Confirm instance count** | R7, R10 | Scale out only when needed; scale back to 1 after load tests if cost-sensitive. |
+| **Monitor scheduler duplication** | R1, R2 | Tail logs: `azure_webapp_tools.bat prod logs`. Grep `[SCHED_JOB] send_digest_emails`, `Email notification digests sent`. Watch for pairs within the same minute. |
+| **Monitor DB connections** | R7 | Azure PostgreSQL metrics: active connections vs `max_connections`. Alert if sustained >70% of limit. |
+
+### 3.2 Short term (ops / process)
+
+| Action | Addresses | Detail |
+|--------|-----------|--------|
+| **Load-test tiers** | R10 | Default prod profile: **10 VU / 60 s**. Stress (50 VU) only with ops approval; expect ~1% gateway 502 on single instance; re-test after scale-out. |
+| **Temporary scale-out** | R10 | Scale to 2 instances **only during** formal capacity tests, then scale back to 1 if budget requires. |
+| **Review digest window** | R2 | `NOTIFICATION_DIGEST_TRIGGER_WINDOW_MINUTES` and `last_digest_sent_at` idempotency — ensure window covers scheduler interval (default 5 min job, 60 min window). |
+| **Incident playbooks** | R4 | During 502 storms, expect multiple alert emails (cooldown per worker). Triage via Security events + logs, not email count alone. |
+
+### 3.3 Medium term (deploy / infra — still no Redis)
+
+| Action | Addresses | Detail |
+|--------|-----------|--------|
+| **External scheduler** | R1, R2 | Set `SCHEDULER_DISABLE_ALL_WORKERS=true` on **all** web instances. Run APScheduler jobs in **Azure Container Job**, **Function**, or a dedicated single-instance “worker” app. Eliminates duplicate schedulers without Redis. |
+| **DB-backed scheduler lock** | R1 | Code change: replace `/tmp` `flock` with PostgreSQL advisory lock or a `scheduler_leases` table. Single fleet-wide owner regardless of Redis. *(Not implemented today.)* |
+| **Stricter digest claim** | R2 | Code change: atomic `UPDATE … WHERE last_digest_sent_at IS NULL OR …` (or row lock) before send. *(Partial guard exists today.)* |
+| **Document rate-limit expectations** | R3 | Treat in-memory limits as **per-worker**; tune configured values down if abuse is a concern (e.g. divide by `instances × workers`). |
+
+### 3.4 When Redis becomes available (future)
+
+| Action | Addresses | Detail |
+|--------|-----------|--------|
+| Set **`REDIS_URL`** | R3, R4, R5 | Shared rate limits, fleet-wide alert cooldown, cross-worker presence. Azure Cache for Redis Basic C0 is sufficient to start. |
+| Set **`RATELIMIT_STORAGE_URI`** | R3 | Can mirror `REDIS_URL` or use a separate DB index. |
+| **Turn ARR Affinity Off** | R9 | Better load distribution once sessions/rate limits/presence are Redis-backed. |
+| **Redis scheduler lock** | R1 | Optional enhancement; external scheduler (§3.3) may still be preferable for heavy jobs. |
+
+---
+
+## 4. What does *not* require Redis
+
+These work correctly across multiple instances today:
+
+- **Authentication** — signed cookie sessions (`SESSION_*` in config; no server-side session store).
+- **Authorization / RBAC** — PostgreSQL.
+- **Form submission and matrix data** — PostgreSQL.
+- **Notification HTTP API** — prod uses HTTP polling for notifications (notification WebSockets disabled in production config).
+- **Blob / Azure storage uploads** — when using `azure_blob` backend (not local path only).
+
+---
+
+## 5. Capacity notes (2026-07-23 load test)
+
+Heavy prod run (`run-20260723-162830`, 50 VU, 300 s, single instance):
+
+- **0.75% errors** — all **35 failures were HTTP 502** from Application Gateway (not Flask 5xx, not WAF).
+- Prod console logs: **10× `recycle(max_requests)`** in the test window; **0× `WORKER TIMEOUT`**.
+- Root cause class: **worker recycle + thread saturation**, not missing Redis.
+
+Scaling to 2 instances **helps** R10 (isolation) but **introduces** R1–R5 unless mitigations in §3 are applied.
+
+Current prod platform (verify in Azure before changes):
+
+| Setting | Typical value |
+|---------|----------------|
+| Plan | P2v3, 2 instances (after scale-out) |
+| `GUNICORN_WORKERS` | 3 |
+| `SQLALCHEMY_POOL_SIZE` | 10 |
+| `REDIS_URL` | unset |
+| `DB_STATEMENT_TIMEOUT_MS` | code default **18000** ms (18 s) if unset in Azure |
+| `DB_CONNECT_TIMEOUT` | code default **10** s if unset in Azure |
+
+---
+
+## 6. Decision checklist
+
+Before scaling to **N ≥ 2** instances without Redis:
+
+- [ ] ARR Affinity **On**
+- [ ] PostgreSQL connection headroom checked for **N × 90** max app connections
+- [ ] Scheduler duplication monitoring in place (§3.1)
+- [ ] Stakeholders aware digest emails *may* duplicate until external scheduler or Redis
+- [ ] Load-test profile documented (smoke vs stress VU)
+
+Before turning ARR Affinity **Off**:
+
+- [ ] `REDIS_URL` configured and verified (`Presence store: using Redis backend` in logs)
+- [ ] `RATELIMIT_STORAGE_URI` or `REDIS_URL` set for Flask-Limiter
+- [ ] Presence / AI WS tested under multi-instance load
+
+---
+
+## 7. Related documentation
+
+- [Azure App Service §3a — recommended settings](azure-app-service.md#3a-recommended-application-settings-avoid-502504)
+- [Gateway 504 / worker saturation](../incidents/gateway-504-worker-saturation.md)
+- [Platform 502 DB pool incident (2026-07-22)](../../../../docs/handovers/2026-07-22-platform-502-db-pool-alert-storm-incident.md)
+- [Session management](../sessions/session-management.md)

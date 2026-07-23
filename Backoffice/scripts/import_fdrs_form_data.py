@@ -2224,6 +2224,7 @@ def upsert_form_data_rows(
     dry_run: bool = False,
     batch_size: int = 1000,
     valid_form_item_ids: Optional[set] = None,
+    valid_assignment_entity_status_ids: Optional[set] = None,
     progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
     progress_start_pct: float = 20.0,
@@ -2249,7 +2250,10 @@ def upsert_form_data_rows(
                 logger.debug("rollback on cancel failed: %s", e)
             raise FdrsSyncCancelled()
 
-    valid_aes_ids = set(aid for (aid,) in db.session.query(AssignmentEntityStatus.id).all())
+    if valid_assignment_entity_status_ids is not None:
+        valid_aes_ids = valid_assignment_entity_status_ids
+    else:
+        valid_aes_ids = set(aid for (aid,) in db.session.query(AssignmentEntityStatus.id).all())
     total_rows = len(rows)
     span = max(progress_end_pct - progress_start_pct, 0.0)
 

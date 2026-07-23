@@ -23,9 +23,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import os
+import pickle
 import re
 import sys
 from collections import defaultdict
@@ -66,6 +68,8 @@ from upr_import_warnings import summarize_warnings  # noqa: E402
 
 UPR_DATA_SHEET = "UPR Data"
 HEADER_ROW_INDEX = 2  # 0-based row 3 in Excel
+ROWS_CACHE_VERSION = 1
+TRANSFORM_CACHE_VERSION = 1
 
 UPR_TEMPLATE_PROFILES: Dict[int, Dict[str, Any]] = {
     # ── Planning ──────────────────────────────────────────────────────────────
@@ -493,6 +497,39 @@ def parse_comment_value(row: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _file_fingerprint(path: str) -> Tuple[int, int]:
+    st = os.stat(path)
+    return (st.st_mtime_ns, st.st_size)
+
+
+def rows_cache_path(path: str) -> str:
+    return f"{path}.rows.v{ROWS_CACHE_VERSION}.pkl"
+
+
+def clear_upr_import_caches(path: Optional[str]) -> None:
+    """Remove on-disk row/transform caches for an uploaded workbook path."""
+    if not path:
+        return
+    for suffix in (rows_cache_path(path),):
+        if os.path.isfile(suffix):
+            try:
+                os.remove(suffix)
+            except OSError:
+                pass
+    prefix = f"{path}.transform."
+    parent = os.path.dirname(path) or "."
+    base = os.path.basename(path)
+    try:
+        for name in os.listdir(parent):
+            if name.startswith(f"{base}.transform.") and name.endswith(".pkl"):
+                try:
+                    os.remove(os.path.join(parent, name))
+                except OSError:
+                    pass
+    except OSError:
+        pass
+
+
 def load_upr_data_sheet(path: str) -> Tuple[List[str], List[Dict[str, Any]]]:
     try:
         import openpyxl
@@ -525,9 +562,30 @@ def load_upr_data_sheet(path: str) -> Tuple[List[str], List[Dict[str, Any]]]:
     return headers, rows
 
 
-def analyze_workbook(path: str) -> Dict[str, Any]:
-    """Summarize workbook for the import wizard."""
+def load_upr_data_sheet_cached(path: str, *, use_cache: bool = True) -> Tuple[List[str], List[Dict[str, Any]]]:
+    """Load UPR Data rows, reusing a pickle cache keyed by file mtime/size."""
+    cache_path = rows_cache_path(path)
+    fingerprint = _file_fingerprint(path)
+    if use_cache and os.path.isfile(cache_path):
+        try:
+            with open(cache_path, "rb") as fh:
+                cached_fp, headers, rows = pickle.load(fh)
+            if cached_fp == fingerprint:
+                return headers, rows
+        except Exception as exc:
+            logger.debug("UPR rows cache read failed: %s", exc)
+
     headers, rows = load_upr_data_sheet(path)
+    try:
+        with open(cache_path, "wb") as fh:
+            pickle.dump((fingerprint, headers, rows), fh, protocol=pickle.HIGHEST_PROTOCOL)
+    except Exception as exc:
+        logger.debug("UPR rows cache write failed: %s", exc)
+    return headers, rows
+
+
+def summarize_workbook_from_rows(headers: List[str], rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Summarize already-loaded UPR Data rows for the import wizard."""
     rounds: Set[str] = set()
     sections: Set[str] = set()
     years: Set[str] = set()
@@ -573,6 +631,121 @@ def analyze_workbook(path: str) -> Dict[str, Any]:
         ],
         "row_counts_by_template_section": dict(by_template_section),
     }
+
+
+def analyze_workbook(path: str, *, use_cache: bool = True) -> Dict[str, Any]:
+    """Summarize workbook for the import wizard."""
+    headers, rows = load_upr_data_sheet_cached(path, use_cache=use_cache)
+    return summarize_workbook_from_rows(headers, rows)
+
+
+def _normalize_round_set(rounds: Optional[List[str]]) -> Optional[Set[str]]:
+    if not rounds:
+        return None
+    out = {r.strip().upper() for r in rounds if r and str(r).strip()}
+    return out or None
+
+
+def _transform_cache_key(path: str, template_ids: List[int], rounds: Optional[Set[str]]) -> str:
+    fingerprint = _file_fingerprint(path)
+    tids = ",".join(str(t) for t in sorted(template_ids))
+    rnd = ",".join(sorted(rounds)) if rounds else "*"
+    digest = hashlib.sha256(
+        f"{TRANSFORM_CACHE_VERSION}|{fingerprint}|{tids}|{rnd}".encode()
+    ).hexdigest()
+    return digest[:20]
+
+
+def transform_cache_path(path: str, cache_key: str) -> str:
+    return f"{path}.transform.{cache_key}.pkl"
+
+
+def _write_transform_cache(
+    path: str,
+    template_ids: List[int],
+    rounds: Optional[Set[str]],
+    import_rows: List[Dict[str, str]],
+    ctx: "UprImportContext",
+) -> None:
+    cache_key = _transform_cache_key(path, template_ids, rounds)
+    cache_path = transform_cache_path(path, cache_key)
+    try:
+        with open(cache_path, "wb") as fh:
+            pickle.dump(
+                (
+                    TRANSFORM_CACHE_VERSION,
+                    _file_fingerprint(path),
+                    sorted(template_ids),
+                    rounds,
+                    import_rows,
+                    ctx,
+                ),
+                fh,
+                protocol=pickle.HIGHEST_PROTOCOL,
+            )
+    except Exception as exc:
+        logger.debug("UPR transform cache write failed: %s", exc)
+
+
+def load_transform_cache(
+    path: str,
+    template_ids: List[int],
+    rounds: Optional[Set[str]],
+) -> Optional[Tuple[List[Dict[str, str]], "UprImportContext"]]:
+    cache_key = _transform_cache_key(path, template_ids, rounds)
+    cache_path = transform_cache_path(path, cache_key)
+    if not os.path.isfile(cache_path):
+        return None
+    try:
+        with open(cache_path, "rb") as fh:
+            (
+                version,
+                fingerprint,
+                cached_tids,
+                cached_rounds,
+                import_rows,
+                ctx,
+            ) = pickle.load(fh)
+        if version != TRANSFORM_CACHE_VERSION:
+            return None
+        if fingerprint != _file_fingerprint(path):
+            return None
+        if sorted(template_ids) != list(cached_tids):
+            return None
+        if cached_rounds != rounds:
+            return None
+        return import_rows, ctx
+    except Exception as exc:
+        logger.debug("UPR transform cache read failed: %s", exc)
+        return None
+
+
+def prepare_upr_transform(
+    input_path: str,
+    template_ids: List[int],
+    *,
+    rounds: Optional[List[str]] = None,
+    use_row_cache: bool = True,
+    use_transform_cache: bool = False,
+    save_transform_cache: bool = False,
+) -> Tuple[List[Dict[str, str]], "UprImportContext", bool]:
+    """Load workbook rows, build context, and transform to import rows."""
+    tids = [int(t) for t in template_ids]
+    round_set = _normalize_round_set(rounds)
+
+    if use_transform_cache:
+        cached = load_transform_cache(input_path, tids, round_set)
+        if cached:
+            return cached[0], cached[1], True
+
+    _, rows = load_upr_data_sheet_cached(input_path, use_cache=use_row_cache)
+    ctx = build_import_context(tids)
+    import_rows = transform_to_import_rows(rows, ctx, template_ids=tids, rounds=round_set)
+
+    if save_transform_cache:
+        _write_transform_cache(input_path, tids, round_set, import_rows, ctx)
+
+    return import_rows, ctx, False
 
 
 def _build_ns_name_index() -> Dict[str, int]:
@@ -1295,6 +1468,7 @@ def upsert_dynamic_indicator_entries(
 ) -> Dict[str, int]:
     from app.extensions import db
     from app.models.forms import DynamicIndicatorData
+    from sqlalchemy import tuple_
 
     stats = {"dynamic_inserted": 0, "dynamic_updated": 0, "dynamic_skipped": 0}
     if dry_run or not entries:
@@ -1304,21 +1478,54 @@ def upsert_dynamic_indicator_entries(
 
     valid_bank_ids = {int(row.id) for row in IndicatorBank.query.with_entities(IndicatorBank.id).all()}
     user_id = _default_user_id_for_import()
+
+    pending: List[Dict[str, Any]] = []
     for entry in entries:
-        aes_id = int(entry["aes_id"])
-        section_id = int(entry["section_id"])
         bank_id = int(entry["indicator_bank_id"])
         if bank_id not in valid_bank_ids:
             stats["dynamic_skipped"] += 1
             continue
+        pending.append(entry)
+
+    keys: List[Tuple[int, int, int, Any]] = [
+        (
+            int(entry["aes_id"]),
+            int(entry["section_id"]),
+            int(entry["indicator_bank_id"]),
+            entry.get("repeat_instance_number"),
+        )
+        for entry in pending
+    ]
+    existing_by_key: Dict[Tuple[int, int, int, Any], DynamicIndicatorData] = {}
+    chunk_size = 500
+    for i in range(0, len(keys), chunk_size):
+        chunk = keys[i : i + chunk_size]
+        if not chunk:
+            continue
+        for row in DynamicIndicatorData.query.filter(
+            tuple_(
+                DynamicIndicatorData.assignment_entity_status_id,
+                DynamicIndicatorData.section_id,
+                DynamicIndicatorData.indicator_bank_id,
+                DynamicIndicatorData.repeat_instance_number,
+            ).in_(chunk)
+        ).all():
+            existing_by_key[
+                (
+                    int(row.assignment_entity_status_id),
+                    int(row.section_id),
+                    int(row.indicator_bank_id),
+                    row.repeat_instance_number,
+                )
+            ] = row
+
+    for entry in pending:
+        aes_id = int(entry["aes_id"])
+        section_id = int(entry["section_id"])
+        bank_id = int(entry["indicator_bank_id"])
         repeat_num = entry.get("repeat_instance_number")
-        with db.session.no_autoflush:
-            row = DynamicIndicatorData.query.filter_by(
-                assignment_entity_status_id=aes_id,
-                section_id=section_id,
-                indicator_bank_id=bank_id,
-                repeat_instance_number=repeat_num,
-            ).first()
+        key = (aes_id, section_id, bank_id, repeat_num)
+        row = existing_by_key.get(key)
         action = "dynamic_updated"
         if not row:
             row = DynamicIndicatorData(
@@ -1330,6 +1537,7 @@ def upsert_dynamic_indicator_entries(
                 order=float(entry.get("order") or 0),
             )
             db.session.add(row)
+            existing_by_key[key] = row
             action = "dynamic_inserted"
         elif entry.get("order") is not None:
             row.order = float(entry["order"])
@@ -2183,6 +2391,8 @@ def run_upr_import(
     progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
     ensure_staff_matrix: bool = True,  # kept for API backward compat, no longer used
+    use_row_cache: bool = True,
+    use_transform_cache: bool = False,
 ) -> Dict[str, Any]:
     """Load UPR Excel, transform, and upsert into form_data."""
     from app.extensions import db
@@ -2192,8 +2402,6 @@ def run_upr_import(
     for tid in tids:
         if tid not in UPR_TEMPLATE_PROFILES:
             raise ValueError(f"Template {tid} is not configured for UPR Excel import")
-
-    round_set = {r.strip().upper() for r in rounds if r and str(r).strip()} if rounds else None
 
     def _progress(stage: str, message: str, percent: float, **extra: Any) -> None:
         if not progress_cb:
@@ -2216,11 +2424,18 @@ def run_upr_import(
 
     with _ctx:
         _progress("read", "Reading UPR Data sheet...", 5.0)
-        _, rows = load_upr_data_sheet(input_path)
-        ctx = build_import_context(tids)
-
-        _progress("transform", "Mapping Excel rows to form items...", 15.0)
-        import_rows = transform_to_import_rows(rows, ctx, template_ids=tids, rounds=round_set)
+        import_rows, ctx, from_transform_cache = prepare_upr_transform(
+            input_path,
+            tids,
+            rounds=rounds,
+            use_row_cache=use_row_cache,
+            use_transform_cache=use_transform_cache,
+            save_transform_cache=False,
+        )
+        if from_transform_cache:
+            _progress("transform", "Using cached transform from preview...", 15.0)
+        else:
+            _progress("transform", "Mapping Excel rows to form items...", 15.0)
         stats.update(summarize_warnings(ctx.warnings))
         stats["transformed"] = len(import_rows)
         stats["dynamic_transformed"] = len(ctx.dynamic_indicator_entries)
@@ -2235,6 +2450,10 @@ def run_upr_import(
 
             valid_item_ids = published_form_item_id_set_for_templates(tids)
 
+        valid_aes_ids: Set[int] = set()
+        for tpl_map in ctx.assignment_by_template.values():
+            valid_aes_ids.update(int(v) for v in tpl_map.values())
+
         def _emit(payload: Dict[str, Any]) -> None:
             if cancel_check and cancel_check():
                 db.session.rollback()
@@ -2247,6 +2466,7 @@ def run_upr_import(
             dry_run=dry_run,
             batch_size=batch_size,
             valid_form_item_ids=valid_item_ids,
+            valid_assignment_entity_status_ids=valid_aes_ids,
             progress_cb=_emit,
             cancel_check=cancel_check,
             progress_start_pct=25.0,

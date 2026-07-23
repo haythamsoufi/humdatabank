@@ -37,11 +37,17 @@ class UprExcelImportService:
 
     @classmethod
     def store_upload(cls, file_bytes: bytes, original_filename: str) -> str:
+        old_path = session.get(cls.SESSION_FILE_KEY)
         file_id = uuid.uuid4().hex
         ext = os.path.splitext(original_filename or "")[1].lower() or ".xlsx"
         tmp_path = os.path.join(cls._upload_dir(), f"{file_id}{ext}")
         with open(tmp_path, "wb") as fh:
             fh.write(file_bytes)
+        if old_path and old_path != tmp_path:
+            _ensure_scripts_in_path()
+            from import_upr_excel_data import clear_upr_import_caches
+
+            clear_upr_import_caches(old_path)
         session[cls.SESSION_FILE_KEY] = tmp_path
         session[cls.SESSION_ID_KEY] = file_id
         return file_id
@@ -62,7 +68,7 @@ class UprExcelImportService:
         from import_upr_excel_data import analyze_workbook
 
         try:
-            summary = analyze_workbook(path)
+            summary = analyze_workbook(path, use_cache=True)
             summary["file_id"] = session.get(cls.SESSION_ID_KEY)
             return summary
         except Exception as exc:
@@ -80,18 +86,17 @@ class UprExcelImportService:
         if not path:
             return {"success": False, "message": "No uploaded file in session."}
         _ensure_scripts_in_path()
-        from import_upr_excel_data import (
-            build_import_context,
-            load_upr_data_sheet,
-            summarize_warnings,
-            transform_to_import_rows,
-        )
+        from import_upr_excel_data import prepare_upr_transform, summarize_warnings
 
         try:
-            _, rows = load_upr_data_sheet(path)
-            round_set = {r.strip().upper() for r in (rounds or []) if r and str(r).strip()} or None
-            ctx = build_import_context(template_ids)
-            import_rows = transform_to_import_rows(rows, ctx, template_ids=template_ids, rounds=round_set)
+            import_rows, ctx, from_cache = prepare_upr_transform(
+                path,
+                template_ids,
+                rounds=rounds,
+                use_row_cache=True,
+                use_transform_cache=True,
+                save_transform_cache=True,
+            )
             by_item: Dict[str, int] = {}
             by_iso3: Dict[str, int] = {}
             for row in import_rows:
@@ -108,6 +113,7 @@ class UprExcelImportService:
                 "dynamic_rows": len(ctx.dynamic_indicator_entries),
                 "by_item": by_item,
                 "countries": len(by_iso3),
+                "from_transform_cache": from_cache,
                 **warning_summary,
             }
         except Exception as exc:
@@ -150,6 +156,8 @@ class UprExcelImportService:
             progress_cb=progress_cb,
             cancel_check=cancel_check,
             ensure_staff_matrix=ensure_staff_matrix,  # backward compat, ignored
+            use_row_cache=True,
+            use_transform_cache=True,
         )
         stats["success"] = stats.get("errors", 0) == 0
         if preview_path:

@@ -1190,6 +1190,8 @@ def handle_assignment_form(aes_id):
         get_localized_indicator_type=get_localized_indicator_type,
         get_localized_indicator_unit=get_localized_indicator_unit,
         get_localized_template_name=get_localized_template_name,
+        get_assignment_year=VariableResolutionService.get_assignment_year,
+        get_assignment_year_from_period_name=VariableResolutionService.get_assignment_year_from_period_name,
         plugin_manager=current_app.plugin_manager if hasattr(current_app, 'plugin_manager') else None,
         form_integration=current_app.form_integration if hasattr(current_app, 'form_integration') else None,
         template_id=form_template.id,
@@ -1548,6 +1550,8 @@ def _preview_template_impl(template_id):
 
     section_statuses = {section.name: 'Not Started' for section in all_sections}
 
+    from app.services.variable_resolution_service import VariableResolutionService
+
     form_features = build_entry_form_features(all_sections, template)
 
     return render_template("forms/entry_form/entry_form.html",
@@ -1575,6 +1579,8 @@ def _preview_template_impl(template_id):
                          get_localized_indicator_type=get_localized_indicator_type,
                          get_localized_indicator_unit=get_localized_indicator_unit,
                          get_localized_template_name=get_localized_template_name,
+                         get_assignment_year=VariableResolutionService.get_assignment_year,
+                         get_assignment_year_from_period_name=VariableResolutionService.get_assignment_year_from_period_name,
                          is_preview_mode=True,
                          template_id=template.id,
                          template_variables=variable_configs,

@@ -76,6 +76,7 @@ class VariableResolutionService:
         'national_society_name': 'national_society_name',
         'template_name': 'template_name',
         'assignment_period': 'assignment_period',
+        'assignment_year': 'assignment_year',
     }
 
     _SAFE_BINARY_OPERATORS = {
@@ -126,6 +127,22 @@ class VariableResolutionService:
 
         years = _extract_years(assigned_form.period_name)
         return max(years) if years else None
+
+    @classmethod
+    def get_assignment_year(cls, assigned_form: Optional[AssignedForm]) -> Optional[str]:
+        """Return the primary calendar year for an assignment (e.g. ``2026`` from ``Jan-Jun 2026``)."""
+        year = cls._assignment_primary_year(assigned_form)
+        return str(year) if year is not None else None
+
+    @classmethod
+    def get_assignment_year_from_period_name(cls, period_name: Optional[str]) -> Optional[str]:
+        """Infer assignment year from a period label when no AssignedForm row is available (preview)."""
+        if not period_name or not str(period_name).strip():
+            return None
+        from app.utils.reporting_period_label_parser import _extract_years
+
+        years = _extract_years(str(period_name))
+        return str(max(years)) if years else None
 
     @classmethod
     def _resolve_same_year_source_period(
@@ -1182,6 +1199,12 @@ class VariableResolutionService:
                 else:
                     logger.warning("_resolve_metadata_variable: assigned_form is None, cannot get assignment_period")
                     return None
+
+            elif metadata_type == 'assignment_year':
+                if assignment_entity_status.assigned_form:
+                    return cls.get_assignment_year(assignment_entity_status.assigned_form)
+                logger.warning("_resolve_metadata_variable: assigned_form is None, cannot get assignment_year")
+                return None
 
             else:
                 logger.warning(f"_resolve_metadata_variable: Unknown metadata_type '{metadata_type}'")

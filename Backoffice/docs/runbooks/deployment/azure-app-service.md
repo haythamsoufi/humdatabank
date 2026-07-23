@@ -79,6 +79,8 @@ Set these in Azure Portal → App Service → Configuration → Application sett
 
 > **With `REDIS_URL`**: ARR Affinity can be **Off**, which improves load distribution.
 
+> **Scaling to ≥2 instances without Redis:** see [Multi-instance without Redis](multi-instance-without-redis.md) for the risk register (duplicate schedulers, rate limits, presence) and mitigations.
+
 ### 3b. Azure Application Gateway / Front Door timeout
 
 If traffic passes through Application Gateway or Front Door before reaching App Service, set the **backend HTTP settings request timeout** ≥ 300s for AI chat/agent endpoints. The App Service front-end timeout (≈230s) still applies for requests that bypass the gateway.

@@ -1184,13 +1184,13 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2 text-black-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                 </svg>
-                {{ _('Assignments for') }}
-                {% if selected_entity_type and selected_entity_type != 'country' %}
+                {{ _('Assignments for') -}}
+                {%- if selected_entity_type and selected_entity_type != 'country' %}
                     {# Show entity with hierarchy #}
                     {{ status_label(selected_entity_display_name|default('', true), 'info', 'mr-1') }}
-                {% elif selected_country %}
-                    {{ get_localized_national_society_name(selected_country) }}
-                {% endif %}
+                {%- elif selected_country -%}
+                    {{- get_localized_national_society_name(selected_country) -}}
+                {%- endif %}
             </h2>
                     {# Loop through the current assignments list #}
         {% if current_assignments %}
@@ -1552,12 +1552,12 @@
                               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <p class="mt-2 text-sm font-medium text-gray-600">
-                                {{ _('All clear! No active assignments for') }}
-                                {% if selected_entity_type and selected_entity_type != 'country' %}
-                                    {{ selected_entity_display_name|default('', true) }}
-                                {% elif selected_country %}
-                                    {{ get_localized_national_society_name(selected_country) }}
-                                {% endif %}
+                                {{ _('All clear! No active assignments for') -}}
+                                {%- if selected_entity_type and selected_entity_type != 'country' -%}
+                                    {{- selected_entity_display_name|default('', true) -}}
+                                {%- elif selected_country -%}
+                                    {{- get_localized_national_society_name(selected_country) -}}
+                                {%- endif -%}
                                 {{ _('at this time.') }}
                             </p>
                             <p class="text-xs text-gray-500 mt-1">{{ _('New assignments will appear here when available.') }}</p>
@@ -1580,12 +1580,12 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
-                        {{ _('Past Assignments for') }}
-                        {% if selected_entity_type and selected_entity_type != 'country' %}
-                            {{ selected_entity_display_name|default('', true) }}
-                        {% elif selected_country %}
-                            {{ get_localized_national_society_name(selected_country) }}
-                        {% endif %}
+                        {{ _('Past Assignments for') -}}
+                        {%- if selected_entity_type and selected_entity_type != 'country' -%}
+                            {{- selected_entity_display_name|default('', true) -}}
+                        {%- elif selected_country -%}
+                            {{- get_localized_national_society_name(selected_country) -}}
+                        {%- endif %}
                         <span id="approved-assignments-hint" class="ml-2 text-sm font-normal text-gray-500 hidden md:inline">
                             {{ _('Click to expand') }}
                         </span>
@@ -1822,12 +1822,12 @@
                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                              </svg>
                             <p class="mt-2 text-sm font-medium text-gray-600">
-                                {{ _('No past assignments for') }}
-                                {% if selected_entity_type and selected_entity_type != 'country' %}
-                                    {{ selected_entity_display_name|default('', true) }}
-                                {% elif selected_country %}
-                                    {{ get_localized_national_society_name(selected_country) }}
-                                {% endif %}
+                                {{ _('No past assignments for') -}}
+                                {%- if selected_entity_type and selected_entity_type != 'country' -%}
+                                    {{- selected_entity_display_name|default('', true) -}}
+                                {%- elif selected_country -%}
+                                    {{- get_localized_national_society_name(selected_country) -}}
+                                {%- endif -%}
                                 {{ _('yet.') }}
                             </p>
                         </div>
@@ -1847,12 +1847,12 @@
                              <path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
                              <path stroke-linecap="round" stroke-linejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
                          </svg>
-                         {{ _('Submission History and Data Quality for') }}
-                         {% if selected_entity_type and selected_entity_type != 'country' %}
-                             {{ selected_entity_display_name|default('', true) }}
-                         {% elif selected_country %}
-                             {{ get_localized_national_society_name(selected_country) }}
-                         {% endif %}
+                         {{ _('Submission History and Data Quality for') -}}
+                         {%- if selected_entity_type and selected_entity_type != 'country' -%}
+                             {{- selected_entity_display_name|default('', true) -}}
+                         {%- elif selected_country -%}
+                             {{- get_localized_national_society_name(selected_country) -}}
+                         {%- endif %}
                      </h2>
 
                      {% if data_quality_dashboard_enabled and data_quality_templates %}
@@ -2105,8 +2105,8 @@
                                 <div class="activity-item-wrapper activity-item bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow" data-user-id="{{ activity_user_id }}" data-user-external-id="{{ activity_user_external_id }}" data-template-period="{{ activity_template_period }}">
                                 {% endif %}
                                     <div class="flex items-start justify-between mb-3">
-                                        <div class="flex items-center">
-                                            <div class="flex-shrink-0 mr-3{% if activity.user %} ag-user-hover-trigger{% endif %}"
+                                        <div class="flex items-center gap-3">
+                                            <div class="dashboard-activity-avatar{% if activity.user %} ag-user-hover-trigger{% endif %}"
                                                  {% if activity.user %}
                                                  data-user-id="{{ activity.user.id }}"
                                                  data-user-external-id="{{ activity.user.external_id|string if activity.user.external_id else '' }}"
@@ -2340,12 +2340,12 @@
                                 </svg>
                                 <p class="mt-2 text-sm font-medium text-gray-600">{{ _('No recent activities') }}</p>
                                 <p class="text-xs text-gray-500 mt-1">
-                                    {{ _('Activities from other focal points in') }}
-                                    {% if selected_entity_type and selected_entity_type != 'country' %}
-                                        {{ selected_entity_display_name|default('', true) }}
-                                    {% elif selected_country %}
-                                        {{ get_localized_national_society_name(selected_country) }}
-                                    {% endif %}
+                                    {{ _('Activities from other focal points in') -}}
+                                    {%- if selected_entity_type and selected_entity_type != 'country' -%}
+                                        {{- selected_entity_display_name|default('', true) -}}
+                                    {%- elif selected_country -%}
+                                        {{- get_localized_national_society_name(selected_country) -}}
+                                    {%- endif -%}
                                     {{ _('will appear here') }}
                                 </p>
                             </div>
@@ -2358,12 +2358,12 @@
                 <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
                     <h2 class="text-xl font-semibold mb-4 text-gray-700">
                         <i class="fas fa-user-friends inline-block mr-2 text-green-700" aria-hidden="true"></i>
-                        {{ _('Focal Points for') }}
-                        {% if selected_entity_type and selected_entity_type != 'country' %}
-                            {{ selected_entity_display_name|default('', true) }}
-                        {% elif selected_country %}
-                            {{ get_localized_national_society_name(selected_country) }}
-                        {% endif %}
+                        {{ _('Focal Points for') -}}
+                        {%- if selected_entity_type and selected_entity_type != 'country' -%}
+                            {{- selected_entity_display_name|default('', true) -}}
+                        {%- elif selected_country -%}
+                            {{- get_localized_national_society_name(selected_country) -}}
+                        {%- endif %}
                     </h2>
                     {% set country_fds_member = selected_country.fds_member_user if selected_country and selected_country.fds_member_user else none %}
                     {% set org_focal_point_ids = org_focal_points | map(attribute='id') | list %}
@@ -2376,17 +2376,17 @@
                             <h3 class="text-lg font-semibold text-gray-800 mb-2">{{ _('National Society Focal Points') }}</h3>
                             <ul class="divide-y divide-gray-200 mb-4">
                                 {% for fp in ns_focal_points %}
-                                    <li class="py-3 flex justify-between items-center">
-                                        <div class="flex items-center flex-1">
+                                    <li>
+                                        <div class="dashboard-focal-contact-row">
                                             {# Profile Icon - Using macro to support profile pictures #}
                                             <div class="ag-user-hover-trigger"
                                                  data-user-id="{{ fp.id }}"
                                                  data-user-external-id="{{ fp.external_id|string if fp.external_id else '' }}"
                                                  data-user-email="{{ fp.email }}">
-                                                {{ profile_icon(fp, 'md', false, false, false, 'mr-3') }}
+                                                {{ profile_icon(fp, 'md', false, false, false) }}
                                             </div>
                                             {# User Information #}
-                                            <div class="flex flex-col min-w-0 flex-1">
+                                            <div class="dashboard-focal-contact-text flex flex-col min-w-0">
                                                 <p class="text-md font-semibold text-gray-800">
                                                     <span class="ag-user-hover-trigger"
                                                           data-user-id="{{ fp.id }}"
@@ -2398,10 +2398,9 @@
                                                 {% if fp.title %}<p class="text-sm text-gray-600">{{ fp.title }}</p>{% endif %}
                                                 <p class="text-sm text-gray-600">{{ fp.email }}</p>
                                             </div>
-                                        </div>
                                         {# Contact links #}
                                         {% if fp.email %}
-                                            <div class="flex items-center ml-4 gap-2">
+                                            <div class="dashboard-focal-contact-actions">
                                                 <a href="mailto:{{ fp.email }}" class="text-blue-600 hover:text-blue-800" title="{{ _('Email')|forceescape }} {{ fp.name if fp.name else fp.email }}">
                                                     <i class="fas fa-envelope"></i>
                                                 </a>
@@ -2414,6 +2413,7 @@
                                                 </a>
                                             </div>
                                         {% endif %}
+                                        </div>
                                     </li>
                                 {% endfor %}
                             </ul>
@@ -2427,23 +2427,23 @@
                         {# Organization group (focal points + optional FDS member) #}
                         {% if has_org_focal_section %}
                             <h3 class="text-lg font-semibold text-gray-800 mb-3">{{ ORG_SHORT_NAME }}</h3>
-                            <div class="ml-1 pl-4 border-l-2 border-gray-200 space-y-4">
+                            <div class="dashboard-focal-org-group space-y-4">
                                 {% if org_focal_points %}
                                     <div>
                                         <h4 class="text-base font-semibold text-gray-700 mb-2">{{ _('Focal Points') }}</h4>
                                         <ul class="divide-y divide-gray-200">
                                             {% for fp in org_focal_points %}
-                                                <li class="py-3 flex justify-between items-center">
-                                                    <div class="flex items-center flex-1">
+                                                <li>
+                                                    <div class="dashboard-focal-contact-row">
                                                         {# Profile Icon - Using macro to support profile pictures #}
                                                         <div class="ag-user-hover-trigger"
                                                              data-user-id="{{ fp.id }}"
                                                              data-user-external-id="{{ fp.external_id|string if fp.external_id else '' }}"
                                                              data-user-email="{{ fp.email }}">
-                                                            {{ profile_icon(fp, 'md', false, false, false, 'mr-3') }}
+                                                            {{ profile_icon(fp, 'md', false, false, false) }}
                                                         </div>
                                                         {# User Information #}
-                                                        <div class="flex flex-col min-w-0 flex-1">
+                                                        <div class="dashboard-focal-contact-text flex flex-col min-w-0">
                                                             <p class="text-md font-semibold text-gray-800">
                                                                 <span class="ag-user-hover-trigger"
                                                                       data-user-id="{{ fp.id }}"
@@ -2455,10 +2455,9 @@
                                                             {% if fp.title %}<p class="text-sm text-gray-600">{{ fp.title }}</p>{% endif %}
                                                             <p class="text-sm text-gray-600">{{ fp.email }}</p>
                                                         </div>
-                                                    </div>
                                                     {# Contact links #}
                                                     {% if fp.email %}
-                                                        <div class="flex items-center ml-4 gap-2">
+                                                        <div class="dashboard-focal-contact-actions">
                                                             <a href="mailto:{{ fp.email }}" class="text-blue-600 hover:text-blue-800" title="{{ _('Email')|forceescape }} {{ fp.name if fp.name else fp.email }}">
                                                                 <i class="fas fa-envelope"></i>
                                                             </a>
@@ -2471,6 +2470,7 @@
                                                             </a>
                                                         </div>
                                                     {% endif %}
+                                                    </div>
                                                 </li>
                                             {% endfor %}
                                         </ul>
@@ -2486,15 +2486,15 @@
                                                aria-label="{{ _('FDS: Federation Wide Data Systems')|forceescape }}"></i>
                                         </h4>
                                         <ul class="divide-y divide-gray-200">
-                                            <li class="py-3 flex justify-between items-center">
-                                                <div class="flex items-center flex-1">
+                                            <li>
+                                                <div class="dashboard-focal-contact-row">
                                                     <div class="ag-user-hover-trigger"
                                                          data-user-id="{{ fds.id }}"
                                                          data-user-external-id="{{ fds.external_id|string if fds.external_id else '' }}"
                                                          data-user-email="{{ fds.email }}">
-                                                        {{ profile_icon(fds, 'md', false, false, false, 'mr-3') }}
+                                                        {{ profile_icon(fds, 'md', false, false, false) }}
                                                     </div>
-                                                    <div class="flex flex-col min-w-0 flex-1">
+                                                    <div class="dashboard-focal-contact-text flex flex-col min-w-0">
                                                         <p class="text-md font-semibold text-gray-800">
                                                             <span class="ag-user-hover-trigger"
                                                                   data-user-id="{{ fds.id }}"
@@ -2506,9 +2506,8 @@
                                                         {% if fds.title %}<p class="text-sm text-gray-600">{{ fds.title }}</p>{% endif %}
                                                         <p class="text-sm text-gray-600">{{ fds.email }}</p>
                                                     </div>
-                                                </div>
                                                 {% if fds.email %}
-                                                    <div class="flex items-center ml-4 gap-2">
+                                                    <div class="dashboard-focal-contact-actions">
                                                         <a href="mailto:{{ fds.email }}" class="text-blue-600 hover:text-blue-800" title="{{ _('Email')|forceescape }} {{ fds.name if fds.name else fds.email }}">
                                                             <i class="fas fa-envelope"></i>
                                                         </a>
@@ -2521,6 +2520,7 @@
                                                         </a>
                                                     </div>
                                                 {% endif %}
+                                                </div>
                                             </li>
                                         </ul>
                                     </div>
@@ -2533,12 +2533,12 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5.121 17.804A7 7 0 0112 15a7 7 0 016.879 2.804M15 11a3 3 0 10-6 0 3 3 0 006 0z" />
                             </svg>
                             <p class="mt-2 text-sm font-medium text-gray-600">
-                                {{ _('No focal points assigned to') }}
-                                {% if selected_entity_type and selected_entity_type != 'country' %}
-                                    {{ selected_entity_display_name|default('', true) }}
-                                {% elif selected_country %}
-                                    {{ get_localized_national_society_name(selected_country) }}
-                                {% endif %}
+                                {{ _('No focal points assigned to') -}}
+                                {%- if selected_entity_type and selected_entity_type != 'country' -%}
+                                    {{- selected_entity_display_name|default('', true) -}}
+                                {%- elif selected_country -%}
+                                    {{- get_localized_national_society_name(selected_country) -}}
+                                {%- endif -%}
                                 {{ _('yet.') }}
                             </p>
                         </div>
@@ -3022,7 +3022,14 @@
      data-sub-pillar-components-collapse="{{ _('Hide score components')|forceescape }}"
      data-no-filtered-activities="{{ _('No activities match the selected filters')|forceescape }}"
      data-loading="{{ _('Loading...')|forceescape }}"
-     data-thats-all='{{ _("That's all") }}' style="display: none;"></div>
+     data-thats-all='{{ _("That's all") }}'
+     data-click-to-expand="{{ _('Click to expand')|forceescape }}"
+     data-click-to-collapse="{{ _('Click to collapse')|forceescape }}"
+     data-show="{{ _('Show')|forceescape }}"
+     data-hide="{{ _('Hide')|forceescape }}"
+     data-show-past-assignments="{{ _('Show past assignments')|forceescape }}"
+     data-hide-past-assignments="{{ _('Hide past assignments')|forceescape }}"
+     style="display: none;"></div>
 
 {# CSS for disabled country options in Select2 #}
 <style>
@@ -3090,7 +3097,13 @@
         subPillarMissing: translationsEl.dataset.subPillarMissing,
         componentBreakdownLabel: translationsEl.dataset.componentBreakdownLabel,
         subPillarComponentsExpand: translationsEl.dataset.subPillarComponentsExpand,
-        subPillarComponentsCollapse: translationsEl.dataset.subPillarComponentsCollapse
+        subPillarComponentsCollapse: translationsEl.dataset.subPillarComponentsCollapse,
+        clickToExpand: translationsEl.dataset.clickToExpand,
+        clickToCollapse: translationsEl.dataset.clickToCollapse,
+        show: translationsEl.dataset.show,
+        hide: translationsEl.dataset.hide,
+        showPastAssignments: translationsEl.dataset.showPastAssignments,
+        hidePastAssignments: translationsEl.dataset.hidePastAssignments
     };
 </script>
 

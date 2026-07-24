@@ -555,7 +555,6 @@ html[dir="rtl"] #mobileFloatingMenuNav .mobile-language-menu-btn__chevron {
 @media (min-width: 769px) and (max-width: 1024px) {
     #notifications-dropdown {
         width: 50vw; /* Half of screen width */
-        right: 1rem;
         min-width: 400px;
         max-width: 600px;
         max-height: 80vh; /* Constrain height on tablet too */
@@ -599,7 +598,6 @@ html[dir="rtl"] #mobileFloatingMenuNav .mobile-language-menu-btn__chevron {
 @media (min-width: 1025px) {
     #notifications-dropdown {
         width: 33.33vw; /* 1/3 of screen width */
-        right: 1rem;
         min-width: 450px; /* At least 1/3 of typical laptop screen */
         max-width: 650px; /* Cap at reasonable size */
         max-height: 80vh; /* Constrain height on desktop too */

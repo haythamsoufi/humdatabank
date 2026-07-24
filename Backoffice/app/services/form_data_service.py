@@ -3452,16 +3452,27 @@ class FormDataService:
                     diff_old = old_value
                     diff_new = new_value_for_comparison
                     if isinstance(old_value, dict) and isinstance(new_value_for_comparison, dict):
+                        from app.utils.matrix_activity import (
+                            matrix_cell_activity_values_differ,
+                            matrix_cell_display_value,
+                        )
+
                         all_keys = set(old_value.keys()) | set(new_value_for_comparison.keys())
                         changed_keys = {
-                            k for k in all_keys
-                            if old_value.get(k) != new_value_for_comparison.get(k)
+                            k
+                            for k in all_keys
+                            if matrix_cell_activity_values_differ(
+                                old_value.get(k), new_value_for_comparison.get(k)
+                            )
                         }
                         if changed_keys:
-                            diff_old = {'_matrix_change': True}
-                            diff_old.update({k: old_value[k] for k in changed_keys if k in old_value})
-                            diff_new = {'_matrix_change': True}
-                            diff_new.update({k: new_value_for_comparison[k] for k in changed_keys if k in new_value_for_comparison})
+                            diff_old = {"_matrix_change": True}
+                            diff_new = {"_matrix_change": True}
+                            for k in changed_keys:
+                                diff_old[k] = matrix_cell_display_value(old_value.get(k))
+                                diff_new[k] = matrix_cell_display_value(
+                                    new_value_for_comparison.get(k)
+                                )
 
                     field_changes.append({
                         'type': 'updated',

@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Tuple
+import re
+from datetime import datetime as _dt
+from typing import Any, Dict, List, Optional, Tuple
+
+from sqlalchemy import and_, or_
+from sqlalchemy.orm import joinedload
 
 from app import db
-from app.models import FormData, FormItem, FormTemplate
+from app.models import AssignedForm, FormData, FormItem, FormTemplate
+from app.services.data_retrieval_shared import escape_like_pattern
+from app.services.reporting_period_service import sort_period_names
 from app.utils.stable_key import normalize_stable_key, resolve_published_form_item_id
 
 VERSION_SCOPE_PUBLISHED = 'published'
@@ -112,12 +119,84 @@ def apply_form_data_version_scoping(
     return _filter(assigned_query), _filter(public_query)
 
 
+def _assigned_form_period_name_filter(period_name: str):
+    """Match AssignedForm.period_name using the same rules as /data period filters."""
+    period = (period_name or '').strip()
+    if not period:
+        return None
+    _pat = f"%{escape_like_pattern(period)}%"
+    period_filter = AssignedForm.period_name.ilike(_pat, escape="\\")
+    years = [int(y) for y in re.findall(r"\b(19\d{2}|20\d{2}|21\d{2})\b", str(period))]
+    if years:
+        start_year = min(years)
+        end_year = max(years)
+        period_start = _dt(start_year, 1, 1).date()
+        period_end = _dt(end_year, 12, 31).date()
+        period_filter = or_(
+            period_filter,
+            and_(
+                AssignedForm.period_start.isnot(None),
+                AssignedForm.period_end.isnot(None),
+                AssignedForm.period_start <= period_end,
+                AssignedForm.period_end >= period_start,
+            ),
+        )
+    return period_filter
+
+
+def _resolve_scope_template_names(template_id: Optional[int]) -> List[str]:
+    if template_id is None:
+        return []
+    tmpl = (
+        FormTemplate.query
+        .options(joinedload(FormTemplate.published_version))
+        .filter(FormTemplate.id == int(template_id))
+        .first()
+    )
+    if not tmpl:
+        return []
+    name = (tmpl.name or '').strip()
+    return [name] if name else []
+
+
+def _resolve_scope_period_names(
+    *,
+    template_id: Optional[int],
+    assignment_id: Optional[int],
+    period_name: Optional[str],
+) -> List[str]:
+    if assignment_id is not None:
+        af = db.session.get(AssignedForm, int(assignment_id))
+        if af and (af.period_name or '').strip():
+            return [af.period_name.strip()]
+        return []
+
+    period_filter_str = (period_name or '').strip()
+    if not period_filter_str:
+        return []
+
+    q = db.session.query(AssignedForm.period_name).distinct()
+    if template_id is not None:
+        q = q.filter(AssignedForm.template_id == int(template_id))
+    period_filter = _assigned_form_period_name_filter(period_filter_str)
+    if period_filter is not None:
+        q = q.filter(period_filter)
+    names = [
+        (pn or '').strip()
+        for (pn,) in q.all()
+        if (pn or '').strip()
+    ]
+    return sort_period_names(names)
+
+
 def build_data_api_scope_meta(
     *,
     template_id: Optional[int],
     published_version_id: Optional[int],
     version_scope: str,
     stable_key: Optional[str] = None,
+    assignment_id: Optional[int] = None,
+    period_name: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Build optional ``scope`` object for data API responses when template_id is set."""
     if template_id is None:
@@ -129,4 +208,17 @@ def build_data_api_scope_meta(
     }
     if stable_key:
         meta['stable_key'] = stable_key
+
+    template_names = _resolve_scope_template_names(template_id)
+    if template_names:
+        meta['template_names'] = template_names
+
+    period_names = _resolve_scope_period_names(
+        template_id=template_id,
+        assignment_id=assignment_id,
+        period_name=period_name,
+    )
+    if period_names:
+        meta['period_names'] = period_names
+
     return meta

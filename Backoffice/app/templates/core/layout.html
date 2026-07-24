@@ -186,7 +186,7 @@
     {% include 'components/_staging_environment_banner.html' %}
     <div class="flex h-screen staging-app-shell">
         {% if is_admin_user %}
-        <aside id="adminSidebar" class="admin-sidebar bg-gray-800 text-white p-4 fixed top-0 left-0 h-full">
+        <aside id="adminSidebar" class="admin-sidebar bg-gray-800 text-white fixed top-0 left-0 h-full">
             <div class="admin-sidebar-header">
                 <div class="admin-panel-title-wrapper">
                     <h2 id="panelTitle" class="admin-panel-title text-xl font-bold text-white pl-2">{{ _('Admin Panel') }}</h2>
@@ -210,7 +210,7 @@
         <div id="mainContent" class="flex-1 flex flex-col min-w-0 {% if is_admin_user %}content-with-sidebar{% endif %}">
             <nav id="appTopNav" class="{% if is_system_manager %}nav-system-manager{% elif is_focal_point %}nav-focal-point{% else %}bg-red-700{% endif %} px-4 text-white shadow-md sticky top-0 z-30 h-14 flex items-center">
                 <div id="navContainer" class="container mx-auto h-full flex justify-between items-center">
-                    <div class="flex nav-menu-wrapper space-x-8 h-full items-center">
+                    <div class="flex nav-menu-wrapper gap-8 h-full items-center">
                         <div class="flex items-center min-w-0 flex-1 nav-brand-cluster">
                             {% set _nav_logo = ORG_LOGO_PATH|default('logo.svg')|trim %}
                             {% if _nav_logo %}
@@ -240,7 +240,7 @@
                         </div>
                         {% endif %}
                     </div>
-                    <div class="relative flex items-center justify-end space-x-4 nav-utilities">
+                    <div class="relative flex items-center justify-end gap-4 nav-utilities">
                         <!-- Enhanced Language Selector - Hidden on mobile, visible on tablet and larger -->
                         <div class="language-selector-container hidden sm:block">
                             <button id="language-selector-button" class="language-selector-button {% if SHOW_LANGUAGE_FLAGS %}flags-only{% endif %}" aria-label="{{ _('Language')|forceescape }}" aria-expanded="false" aria-haspopup="true">
@@ -280,7 +280,7 @@
                                 </button>
 
                                 <!-- Notifications Dropdown -->
-                                <div id="notifications-dropdown" class="notifications-dropdown hidden absolute right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-[32rem] overflow-hidden flex flex-col">
+                                <div id="notifications-dropdown" class="notifications-dropdown hidden absolute mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-[32rem] overflow-hidden flex flex-col">
                                     <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
                                         <div class="flex justify-between items-center">
                                             <h3 class="text-sm font-semibold text-gray-900">{{ _('Notifications') }}</h3>

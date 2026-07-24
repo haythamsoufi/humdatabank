@@ -39,8 +39,16 @@ from app.utils.constants import PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS
 from app.utils.request_utils import clear_mobile_app_embed_cookie
 from app.utils.azure_b2c_config import is_azure_b2c_configured
 from app.utils.csp_nonce import get_style_nonce
+from app.services.authorization_service import AuthorizationService
 
 bp = Blueprint("auth", __name__)
+
+_DEV_ACT_AS_ACCESS_LABELS = {
+    'system_manager': 'System Manager',
+    'admin': 'Admin',
+    'focal_point': 'Focal Point',
+    'user': 'User',
+}
 
 _ACCOUNT_LOCKOUT_THRESHOLD = 10  # consecutive failures before temporary lockout
 _ACCOUNT_LOCKOUT_WINDOW_MINUTES = 15  # window in which failures are counted
@@ -120,6 +128,167 @@ def _get_test_passwords():
             test_passwords['sys_manager'] = sys_pw
     return test_passwords
 
+
+def _is_dev_act_as_enabled(*, require_loopback: bool = False) -> bool:
+    """True when dev act-as is allowed (development/default config and DEBUG)."""
+    flask_config = os.environ.get('FLASK_CONFIG', '').lower()
+    if flask_config not in ('development', 'default'):
+        return False
+    if not current_app.config.get('DEBUG', False):
+        return False
+    if require_loopback:
+        remote_addr = (request.remote_addr or '').strip()
+        if remote_addr not in ('127.0.0.1', '::1', 'localhost'):
+            return False
+    return True
+
+
+def _get_dev_act_as_users() -> list[dict]:
+    """Active users for the dev act-as picker."""
+    users = User.query.filter_by(active=True).order_by(User.name, User.email).all()
+    result = []
+    for user in users:
+        access = AuthorizationService.access_level(user)
+        result.append({
+            'id': user.id,
+            'email': user.email,
+            'name': user.name or user.email,
+            'access_level': access,
+            'access_label': _DEV_ACT_AS_ACCESS_LABELS.get(access, access),
+        })
+    return result
+
+
+def _resolve_dev_act_as_preset(preset: str):
+    """Resolve a preset key (sys_manager, admin, focal) to a User, or None."""
+    from app.utils.organization_helpers import get_org_email_domain
+    from app.models.rbac import RbacUserRole, RbacRole
+
+    preset = (preset or '').strip().lower()
+    domain = get_org_email_domain()
+    email_map = {
+        'sys_manager': f'test_sys@{domain}',
+        'admin': f'test_admin@{domain}',
+        'focal': f'test_focal@{domain}',
+    }
+    if preset in email_map:
+        user = User.query.filter_by(email=email_map[preset], active=True).first()
+        if user:
+            return user
+
+    role_map = {
+        'sys_manager': 'system_manager',
+        'admin': 'admin_core',
+        'focal': 'assignment_editor_submitter',
+    }
+    role_code = role_map.get(preset)
+    if not role_code:
+        return None
+    return (
+        User.query.join(RbacUserRole, User.id == RbacUserRole.user_id)
+        .join(RbacRole, RbacUserRole.role_id == RbacRole.id)
+        .filter(User.active.is_(True), RbacRole.code == role_code)
+        .order_by(User.id.asc())
+        .first()
+    )
+
+
+def _complete_dev_act_as_login(user: User) -> None:
+    """Establish a session for a dev-only act-as login."""
+    session.clear()
+
+    session_id = str(uuid.uuid4())
+    session['session_id'] = session_id
+    session['session_start'] = utcnow().isoformat()
+    session['last_activity'] = utcnow().isoformat()
+    session.permanent = True
+    session['dev_act_as'] = True
+
+    login_user(user)
+    from app.i18n import seed_session_language_from_user
+
+    seed_session_language_from_user(user)
+
+    if not (user.title and user.title.strip()):
+        session['prompt_profile_completion'] = True
+
+    log_login_attempt(user.email, success=True, user=user, session_id=session_id)
+    start_user_session(user, session_id)
+    log_user_activity(
+        activity_type='login',
+        description=f'Dev act-as login as {user.email}',
+        context_data={
+            'user_id': user.id,
+            'session_id': session_id,
+            'auth_method': 'dev_act_as',
+        },
+    )
+
+
+def _login_page_context(
+    *,
+    form,
+    register_form,
+    forgot_form,
+    open_modal: str = '',
+    title: str | None = None,
+    **extra,
+) -> dict:
+    flask_config = os.environ.get('FLASK_CONFIG', '').lower()
+    # require_loopback=True so the UI is never rendered from a non-local IP
+    # even when FLASK_CONFIG=development is deployed on a reachable host.
+    dev_enabled = _is_dev_act_as_enabled(require_loopback=True)
+    ctx = {
+        'form': form,
+        'register_form': register_form,
+        'forgot_form': forgot_form,
+        'open_modal': open_modal,
+        'flask_config': flask_config,
+        'test_passwords': _get_test_passwords(),
+        'dev_act_as_enabled': dev_enabled,
+        'dev_act_as_users': _get_dev_act_as_users() if dev_enabled else [],
+    }
+    if title is not None:
+        ctx['title'] = title
+    ctx.update(extra)
+    return ctx
+
+
+@bp.route("/login/dev-act-as", methods=["POST"])
+@auth_rate_limit()
+def dev_act_as_login():
+    # Defence-in-depth layers (all must pass):
+    #   1. FLASK_CONFIG must be 'development' or 'default'
+    #   2. Flask DEBUG must be True (enforced at startup in __init__.py)
+    #   3. Request must originate from a loopback address (127.0.0.1 / ::1)
+    #   4. CSRF token must be valid (enforced by Flask-WTF globally)
+    #   5. Session is wiped before binding the new user (prevents fixation)
+    # The HTML panel and all JS are also only rendered when conditions 1-3 hold,
+    # so non-dev clients never even receive the form markup or endpoint URL.
+    if not _is_dev_act_as_enabled(require_loopback=True):
+        abort(404)
+
+    user_id = request.form.get('user_id', type=int)
+    preset = (request.form.get('preset') or '').strip().lower()
+
+    user = None
+    if user_id:
+        user = User.query.filter_by(id=user_id, active=True).first()
+    elif preset:
+        user = _resolve_dev_act_as_preset(preset)
+
+    if not user:
+        flash(_("User not found."), "warning")
+        next_page = request.form.get('next')
+        if next_page and is_safe_redirect_url(next_page):
+            return redirect(url_for("auth.login", next=next_page))
+        return redirect(url_for("auth.login"))
+
+    _complete_dev_act_as_login(user)
+    next_page = request.form.get('next') or request.args.get('next')
+    return safe_redirect(next_page, default_route='main.dashboard')
+
+
 @bp.route("/login", methods=["GET", "POST"])
 @auth_rate_limit()
 def login():
@@ -155,7 +324,15 @@ def login():
             )
             log_login_attempt(submitted_email, success=False, failure_reason='test_user_blocked')
             flash(_("Invalid email or password."), "warning")
-            return render_template("auth/login.html", form=form, register_form=register_form, forgot_form=forgot_form, open_modal='', flask_config=flask_config, test_passwords=_get_test_passwords())
+            return render_template(
+                "auth/login.html",
+                **_login_page_context(
+                    form=form,
+                    register_form=register_form,
+                    forgot_form=forgot_form,
+                    open_modal='',
+                ),
+            )
         # Re-fetch user after potential creation/update
         from app.services import UserService
         try:
@@ -169,12 +346,12 @@ def login():
             flash(_("Too many failed login attempts. Please try again later."), "warning")
             return render_template(
                 "auth/login.html",
-                form=form,
-                register_form=register_form,
-                forgot_form=forgot_form,
-                open_modal='',
-                flask_config=flask_config,
-                test_passwords=_get_test_passwords(),
+                **_login_page_context(
+                    form=form,
+                    register_form=register_form,
+                    forgot_form=forgot_form,
+                    open_modal='',
+                ),
             )
 
         failure_reason = None
@@ -204,12 +381,12 @@ def login():
                 flash(_("Invalid email or password."), "warning")
             return render_template(
                 "auth/login.html",
-                form=form,
-                register_form=register_form,
-                forgot_form=forgot_form,
-                open_modal='',
-                flask_config=flask_config,
-                test_passwords=_get_test_passwords(),
+                **_login_page_context(
+                    form=form,
+                    register_form=register_form,
+                    forgot_form=forgot_form,
+                    open_modal='',
+                ),
             )
 
         if user and password_ok:
@@ -260,8 +437,15 @@ def login():
             log_login_attempt(form.email.data, success=False, failure_reason=failure_reason)
             flash(_("Invalid email or password."), "warning")
 
-    flask_config = os.environ.get('FLASK_CONFIG', '').lower()
-    return render_template("auth/login.html", form=form, register_form=register_form, forgot_form=forgot_form, title="Login", flask_config=flask_config, test_passwords=_get_test_passwords())
+    return render_template(
+        "auth/login.html",
+        **_login_page_context(
+            form=form,
+            register_form=register_form,
+            forgot_form=forgot_form,
+            title="Login",
+        ),
+    )
 
 # ===== Azure AD B2C (OIDC) Integration =====
 def _b2c_get_required_config() -> dict | None:
@@ -1045,7 +1229,16 @@ def register():
             flash(_('An account with this email already exists.'), 'warning')
             # Re-render login with modal open and errors
             flask_config = os.environ.get('FLASK_CONFIG', '').lower()
-            return render_template('auth/login.html', form=LoginForm(), register_form=form, forgot_form=ForgotPasswordForm(), open_modal='register', title='Login', flask_config=flask_config, test_passwords=_get_test_passwords())
+            return render_template(
+                'auth/login.html',
+                **_login_page_context(
+                    form=LoginForm(),
+                    register_form=form,
+                    forgot_form=ForgotPasswordForm(),
+                    open_modal='register',
+                    title='Login',
+                ),
+            )
         # Server-side password strength validation
         is_valid, validation_errors = validate_password_strength(
             form.password.data,
@@ -1057,7 +1250,16 @@ def register():
             for error in validation_errors:
                 flash(error, 'warning')
             flask_config = os.environ.get('FLASK_CONFIG', '').lower()
-            return render_template('auth/login.html', form=LoginForm(), register_form=form, forgot_form=ForgotPasswordForm(), open_modal='register', title='Login', flask_config=flask_config, test_passwords=_get_test_passwords())
+            return render_template(
+                'auth/login.html',
+                **_login_page_context(
+                    form=LoginForm(),
+                    register_form=form,
+                    forgot_form=ForgotPasswordForm(),
+                    open_modal='register',
+                    title='Login',
+                ),
+            )
 
         user = User(email=form.email.data.strip().lower(), name=form.name.data or None, title=form.title.data or None)
         user.set_password(form.password.data)
@@ -1109,11 +1311,27 @@ def register():
             current_app.logger.warning("Account registration failed: %s", e, exc_info=True)
             request_transaction_rollback()
             flash(_('Could not create account. Please try again.'), 'danger')
-            flask_config = os.environ.get('FLASK_CONFIG', '').lower()
-            return render_template('auth/login.html', form=LoginForm(), register_form=form, forgot_form=ForgotPasswordForm(), open_modal='register', title='Login', flask_config=flask_config, test_passwords=_get_test_passwords())
+            return render_template(
+                'auth/login.html',
+                **_login_page_context(
+                    form=LoginForm(),
+                    register_form=form,
+                    forgot_form=ForgotPasswordForm(),
+                    open_modal='register',
+                    title='Login',
+                ),
+            )
     # Validation errors
-    flask_config = os.environ.get('FLASK_CONFIG', '').lower()
-    return render_template('auth/login.html', form=LoginForm(), register_form=form, forgot_form=ForgotPasswordForm(), open_modal='register', title='Login', flask_config=flask_config, test_passwords=_get_test_passwords())
+    return render_template(
+        'auth/login.html',
+        **_login_page_context(
+            form=LoginForm(),
+            register_form=form,
+            forgot_form=ForgotPasswordForm(),
+            open_modal='register',
+            title='Login',
+        ),
+    )
 
 @bp.route('/register/check-email', methods=['GET'])
 @rate_limit(requests_per_minute=10, key_func=lambda: f"check_email_{get_client_ip()}")
@@ -1166,8 +1384,16 @@ def forgot_password():
             'warning',
         )
         return redirect(url_for('auth.login'))
-    flask_config = os.environ.get('FLASK_CONFIG', '').lower()
-    return render_template('auth/login.html', form=LoginForm(), register_form=RegisterForm(), forgot_form=form, open_modal='forgot', title='Login', flask_config=flask_config, test_passwords=_get_test_passwords())
+    return render_template(
+        'auth/login.html',
+        **_login_page_context(
+            form=LoginForm(),
+            register_form=RegisterForm(),
+            forgot_form=form,
+            open_modal='forgot',
+            title='Login',
+        ),
+    )
 
 @bp.route('/reset-password/<token>', methods=['GET', 'POST'])
 @password_reset_rate_limit()

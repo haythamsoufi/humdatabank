@@ -583,6 +583,13 @@ def _parse_field_value_for_display(value, data_not_available=None, not_applicabl
     else:
         return str(value)
 
+from app.utils.matrix_activity import (  # noqa: E402
+    matrix_cell_activity_values_differ,
+    matrix_cell_display_value,
+    normalize_matrix_activity_display,
+    trim_matrix_activity_maps,
+)
+
 def _extract_changed_matrix_values(old_value, new_value):
     """
     For matrix-style values stored as dicts,
@@ -760,41 +767,12 @@ def _extract_changed_matrix_values(old_value, new_value):
             old_entry = old_map.get(k) if isinstance(old_map, dict) else None
             new_entry = new_map.get(k) if isinstance(new_map, dict) else None
 
-            # Metadata-style entries: {'original': ..., 'modified': ..., 'isModified': ...}
-            if isinstance(old_entry, dict) or isinstance(new_entry, dict):
-                meta = old_entry if isinstance(old_entry, dict) else new_entry
-                if not isinstance(meta, dict):
-                    continue
-
-                # Prefer explicit flag; fall back to original/modified comparison
-                try:
-                    is_mod = bool(meta.get('isModified'))
-                except Exception as e:
-                    current_app.logger.debug("isModified parse failed: %s", e)
-                    is_mod = False
-
-                original = meta.get('original')
-                modified = meta.get('modified')
-
-                if not is_mod and 'original' in meta and 'modified' in meta and original != modified:
-                    is_mod = True
-
-                if not is_mod:
-                    continue
-
-                trimmed_old[nk] = original
-                trimmed_new[nk] = modified
-                continue
-
-            # Scalar entries in the same payload are treated as regular changed cells.
-            # This keeps meaningful values while excluding metadata-only rows above.
-            if old_entry == new_entry:
-                continue
-            if old_entry in (None, "") and new_entry in (None, ""):
-                continue
-
-            trimmed_old[nk] = old_entry
-            trimmed_new[nk] = new_entry
+            # Metadata-style or scalar entries — compare user-visible values only.
+            if matrix_cell_activity_values_differ(old_entry, new_entry):
+                old_disp = matrix_cell_display_value(old_entry)
+                new_disp = matrix_cell_display_value(new_entry)
+                trimmed_old[nk] = old_disp
+                trimmed_new[nk] = new_disp
 
         # If nothing changed, don't override caller values
         if len(trimmed_old) <= 1 and len(trimmed_new) <= 1:
@@ -823,27 +801,7 @@ def _extract_changed_matrix_values(old_value, new_value):
     if not (_looks_like_matrix_cell_map(old_map) and _looks_like_matrix_cell_map(new_map)):
         return None, None
 
-    # Compute keys where the value actually changed
-    changed_keys = {
-        key
-        for key in set(old_map.keys()) | set(new_map.keys())
-        if not (isinstance(key, str) and key.startswith('_'))
-        and old_map.get(key) != new_map.get(key)
-    }
-
-    if not changed_keys:
-        # Nothing really changed – let callers fall back to the original values
-        return None, None
-
-    # Build trimmed dicts containing only the changed entries and mark them
-    # so the display layer can format them appropriately.
-    trimmed_old = {'_matrix_change': True}
-    trimmed_old.update({k: old_map.get(k) for k in changed_keys if k in old_map})
-
-    trimmed_new = {'_matrix_change': True}
-    trimmed_new.update({k: new_map.get(k) for k in changed_keys if k in new_map})
-
-    return trimmed_old, trimmed_new
+    return trim_matrix_activity_maps(old_map, new_map)
 
 from app.utils.route_helpers import normalize_value_for_display as _normalize_value_for_summary_display
 
@@ -880,11 +838,9 @@ def render_matrix_change(field_label, old_value, new_value, form_item_id=None):
         if not all_keys:
             return ""
 
-        # Helper to unwrap plugin-style metadata dicts
+        # Helper to unwrap plugin-style metadata dicts using user-visible display values
         def _effective_cell_value(v):
-            if isinstance(v, dict) and ('modified' in v or 'original' in v):
-                return v.get('modified', v.get('original'))
-            return v
+            return matrix_cell_display_value(v)
 
         # Group changes by entity (row) code
         rows = {}
@@ -901,7 +857,9 @@ def render_matrix_change(field_label, old_value, new_value, form_item_id=None):
             new_v = _effective_cell_value(new_map.get(key))
 
             # Skip if nothing actually changed (defensive; normally trimmed already)
-            if old_v == new_v:
+            if normalize_matrix_activity_display(old_map.get(key)) == normalize_matrix_activity_display(
+                new_map.get(key)
+            ):
                 continue
 
             rows.setdefault(row_code, []).append((col_label, old_v, new_v))

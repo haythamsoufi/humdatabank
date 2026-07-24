@@ -870,6 +870,20 @@ def _translate_notification_for_email(notif, locale: Optional[str]) -> tuple:
                 tp['submitter_name'] = 'A focal point'
             if 'period' not in tp:
                 tp['period'] = '—'
+        if message_params is None:
+            message_params = {}
+        elif not isinstance(message_params, dict):
+            try:
+                import json
+                message_params = json.loads(message_params) if isinstance(message_params, str) else {}
+            except Exception:
+                message_params = {}
+        else:
+            message_params = message_params.copy()
+        from app.services.notification.service import NotificationService
+        message_params = NotificationService._apply_localized_country_param(
+            notif, message_key, message_params, locale=locale
+        )
         with force_locale(locale):
             title = translate_notification_message(title_key, tp, locale=locale) if title_key else notif.title
             message = translate_notification_message(message_key, message_params, locale=locale) if message_key else notif.message

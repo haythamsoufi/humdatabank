@@ -6,12 +6,65 @@
 
 {% block content %}
 <style nonce="{{ csp_nonce() }}">
-/* Import and apply Montserrat font */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600;700;800;900&display=swap');
-
-/* Apply Montserrat to all elements in the login page */
-body, p, span, div, h1, h2, h3, h4, h5, h6, a, input, textarea, select, button, label, table, tr, td, th, li, ul, ol, .main-container, .left-section, .right-section, .fullscreen-content {
+/* LTR: Montserrat (matches app default). RTL: Tajawal (layout.css + rtl.css). */
+html[dir="ltr"] body,
+html[dir="ltr"] p,
+html[dir="ltr"] span,
+html[dir="ltr"] div,
+html[dir="ltr"] h1,
+html[dir="ltr"] h2,
+html[dir="ltr"] h3,
+html[dir="ltr"] h4,
+html[dir="ltr"] h5,
+html[dir="ltr"] h6,
+html[dir="ltr"] a,
+html[dir="ltr"] input,
+html[dir="ltr"] textarea,
+html[dir="ltr"] select,
+html[dir="ltr"] button,
+html[dir="ltr"] label,
+html[dir="ltr"] table,
+html[dir="ltr"] tr,
+html[dir="ltr"] td,
+html[dir="ltr"] th,
+html[dir="ltr"] li,
+html[dir="ltr"] ul,
+html[dir="ltr"] ol,
+html[dir="ltr"] .main-container,
+html[dir="ltr"] .left-section,
+html[dir="ltr"] .right-section,
+html[dir="ltr"] .fullscreen-content {
     font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+}
+
+html[dir="rtl"] body,
+html[dir="rtl"] p,
+html[dir="rtl"] span,
+html[dir="rtl"] div,
+html[dir="rtl"] h1,
+html[dir="rtl"] h2,
+html[dir="rtl"] h3,
+html[dir="rtl"] h4,
+html[dir="rtl"] h5,
+html[dir="rtl"] h6,
+html[dir="rtl"] a,
+html[dir="rtl"] input,
+html[dir="rtl"] textarea,
+html[dir="rtl"] select,
+html[dir="rtl"] button,
+html[dir="rtl"] label,
+html[dir="rtl"] table,
+html[dir="rtl"] tr,
+html[dir="rtl"] td,
+html[dir="rtl"] th,
+html[dir="rtl"] li,
+html[dir="rtl"] ul,
+html[dir="rtl"] ol,
+html[dir="rtl"] .main-container,
+html[dir="rtl"] .left-section,
+html[dir="rtl"] .right-section,
+html[dir="rtl"] .fullscreen-content {
+    font-family: 'Tajawal', sans-serif !important;
 }
 
 /* Preserve Font Awesome icons */
@@ -475,6 +528,10 @@ body.modal-open {
     font-size: 5rem;
 }
 
+.dev-act-as-user-select + .select2-container {
+    width: 100% !important;
+}
+
 @media (max-width: 768px) {
     .login-logo-placeholder {
         width: 8rem;
@@ -540,96 +597,64 @@ body.modal-open {
                 </a>
             </div>
 
-            {# Quick Login Buttons (Testers) - Only shown in development environment #}
-            {% if flask_config is defined and (flask_config == 'development' or flask_config == 'default') %}
-            <!-- Quick Login Buttons (Testers) -->
-            <div class="p-3 rounded-md bg-yellow-50 border border-yellow-200 space-y-2">
+            </form>
+
+            {# Dev act-as login — only shown in development with DEBUG enabled #}
+            {% if dev_act_as_enabled %}
+            <div class="p-3 rounded-md bg-yellow-50 border border-yellow-200 space-y-3">
                 <div class="flex items-center text-yellow-800 font-medium text-sm">
-                    <i class="fa-solid fa-flask mr-2"></i>
-                    {{ _('Quick login for testers') }}
+                    <i class="fa-solid fa-user-secret mr-2"></i>
+                    {{ _('Act as (dev only)') }}
                 </div>
-                <div class="grid grid-cols-1 gap-2">
-                    {% if test_passwords.get('sys_manager') %}
-                    <button id="quickSystemManagerLogin" type="button" aria-label="{{ _('Quick login as a System Manager')|forceescape }}" class="btn btn-block btn-purple">
-                        <i class="fa-solid fa-cogs"></i>
-                        {{ _('Test as System Manager') }}
-                    </button>
+                <p class="text-xs text-yellow-700 m-0">
+                    {{ _('Sign in without a password to test as a role preset or any active user.') }}
+                </p>
+
+                <form method="POST" action="{{ url_for('auth.dev_act_as_login') }}" id="devActAsForm" class="space-y-3">
+                    {% if form is defined and 'csrf_token' in form %}
+                    {{ form.csrf_token(id="dev_act_as_csrf_token") }}
                     {% endif %}
-                    <button id="quickAdminLogin" type="button" aria-label="{{ _('Quick login as an Admin')|forceescape }}" class="btn btn-block btn-dark">
-                        <i class="fa-solid fa-user-shield"></i>
-                        {{ _('Test as an Admin') }}
-                    </button>
-                    <button id="quickFocalLogin" type="button" aria-label="{{ _('Quick login as a Focal Point')|forceescape }}" class="btn btn-block btn-primary">
-                        <i class="fa-solid fa-user"></i>
-                        {{ _('Test as a Focal Point') }}
-                    </button>
-                </div>
+                    {% if request.args.get('next') %}<input type="hidden" name="next" value="{{ request.args.get('next') }}">{% endif %}
+                    <input type="hidden" name="preset" id="devActAsPreset" value="">
+                    <input type="hidden" name="user_id" id="devActAsUserId" value="">
+
+                    <div class="grid grid-cols-1 gap-2">
+                        <button type="button" data-dev-act-as-preset="sys_manager" aria-label="{{ _('Act as System Manager')|forceescape }}" class="btn btn-block btn-purple">
+                            <i class="fa-solid fa-cogs"></i>
+                            {{ _('System Manager') }}
+                        </button>
+                        <button type="button" data-dev-act-as-preset="admin" aria-label="{{ _('Act as Admin')|forceescape }}" class="btn btn-block btn-dark">
+                            <i class="fa-solid fa-user-shield"></i>
+                            {{ _('Admin') }}
+                        </button>
+                        <button type="button" data-dev-act-as-preset="focal" aria-label="{{ _('Act as Focal Point')|forceescape }}" class="btn btn-block btn-primary">
+                            <i class="fa-solid fa-user"></i>
+                            {{ _('Focal Point') }}
+                        </button>
+                    </div>
+
+                    <div class="space-y-2 pt-1 border-t border-yellow-200">
+                        <label for="devActAsUserSelect" class="block text-xs font-medium text-yellow-800">
+                            {{ _('Or choose a user') }}
+                        </label>
+                        <select id="devActAsUserSelect" class="dev-act-as-user-select block w-full px-3 py-2 border border-yellow-300 rounded-md text-sm bg-white text-gray-900">
+                            <option value="">{{ _('Select a user…') }}</option>
+                            {% for dev_user in dev_act_as_users %}
+                            <option value="{{ dev_user.id }}">
+                                {{ dev_user.name }} ({{ dev_user.email }}) — {{ dev_user.access_label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <p id="devActAsUserError" class="hidden text-xs text-red-600 m-0">{{ _('Please select a user first.') }}</p>
+                        <button type="button" id="devActAsSelectedUser" aria-label="{{ _('Act as selected user')|forceescape }}" class="btn btn-block btn-warning">
+                            <i class="fa-solid fa-right-to-bracket"></i>
+                            {{ _('Act as selected user') }}
+                        </button>
+                    </div>
+                </form>
             </div>
             {% endif %}
 
-            {# Manual login fields - commented out
-            <!-- Email -->
-            <div class="relative">
-                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 pointer-events-none">
-                <i class="fa-solid fa-envelope"></i>
-                </span>
-                {{ form.email(
-                id="login_email",
-                class="pl-10 block w-full px-4 py-3 border border-gray-300 rounded-md placeholder-gray-500 text-gray-900
-                focus:outline-none focus:ring-2 focus:ring-[#1a237e] focus:border-[#1a237e] sm:text-sm",
-                placeholder=_('Email address'),
-                aria_label=_('Email address'),
-                autocomplete="username"
-                ) }}
-                {% for error in form.email.errors %}
-                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
-                {% endfor %}
-            </div>
-
-            <!-- Password -->
-            <div class="relative">
-                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 pointer-events-none">
-                <i class="fa-solid fa-lock"></i>
-                </span>
-                {{ form.password(
-                id="login_password",
-                class="pl-10 block w-full px-4 py-3 border border-gray-300 rounded-md placeholder-gray-500 text-gray-900
-                focus:outline-none focus:ring-2 focus:ring-[#1a237e] focus:border-[#1a237e] sm:text-sm",
-                placeholder=_('Password'),
-                aria_label=_('Password'),
-                autocomplete="current-password"
-                ) }}
-                {% for error in form.password.errors %}
-                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
-                {% endfor %}
-            </div>
-
-            <div class="flex items-center justify-between text-sm">
-                <label class="flex items-center text-gray-700">
-                <input type="checkbox" name="remember-me" class="h-4 w-4 text-[#1a237e] border-gray-300 rounded">
-                <span class="ml-2">{{ _('Remember me') }}</span>
-                </label>
-                <button type="button" id="openForgotModal" class="text-[#1a237e] hover:underline font-medium">{{ _('Forgot password?') }}</button>
-            </div>
-
-
-
-            <div>
-                <button type="submit" name="submit" class="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium
-                rounded-md text-white bg-[#1a237e] hover:bg-blue-900 focus:outline-none focus:ring-2
-                focus:ring-offset-2 focus:ring-[#1a237e]">
-                    {{ _('Login') }}
-                </button>
-            </div>
-            #}
-
-            {# Don't have an account? Register - commented out
-            <p class="text-center text-sm text-gray-600">
-                {{ _("Don't have an account?") }}
-                <button type="button" id="openRegisterModal" class="font-medium text-[#1a237e] hover:underline hover:scale-105 transition-transform">{{ _('Register') }}</button>
-            </p>
-            #}
-            </form>
         </div>
         </div>
 
@@ -1040,60 +1065,102 @@ function handleFullscreenChange() {
     }
 }
 
-// Quick login helpers
-function setupQuickLogin(buttonId, email, password) {
-    const button = document.getElementById(buttonId);
-    if (!button) return;
-    button.addEventListener('click', () => {
-        const form = document.getElementById('loginForm');
-        if (!form) return;
-
-        // Remove any existing hidden inputs from previous clicks
-        const existingEmail = form.querySelector('input[name="email"][type="hidden"]');
-        const existingPassword = form.querySelector('input[name="password"][type="hidden"]');
-        if (existingEmail) existingEmail.remove();
-        if (existingPassword) existingPassword.remove();
-
-        // Create hidden input fields for email and password
-        const emailInput = document.createElement('input');
-        emailInput.type = 'hidden';
-        emailInput.name = 'email';
-        emailInput.value = email;
-        emailInput.id = 'login_email';
-
-        const passwordInput = document.createElement('input');
-        passwordInput.type = 'hidden';
-        passwordInput.name = 'password';
-        passwordInput.value = password || '';
-        passwordInput.id = 'login_password';
-
-        // Add the hidden inputs to the form
-        form.appendChild(emailInput);
-        form.appendChild(passwordInput);
-
-        // Submit the form
-        if (form.requestSubmit) {
-            form.requestSubmit();
-        } else {
-            form.submit();
+{% if dev_act_as_enabled %}
+function initDevActAsUserSelect() {
+    const userSelect = document.getElementById('devActAsUserSelect');
+    if (!userSelect) return;
+    if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
+        setTimeout(initDevActAsUserSelect, 250);
+        return;
+    }
+    const $select = window.jQuery(userSelect);
+    try {
+        if ($select.hasClass('select2-hidden-accessible')) {
+            return;
         }
-    });
+        $select.select2({
+            width: '100%',
+            placeholder: {{ _('Select a user…')|tojson|safe }},
+            allowClear: true,
+            minimumResultsForSearch: 0,
+        });
+        $select.on('select2:select select2:clear', () => {
+            const err = document.getElementById('devActAsUserError');
+            if (err) err.classList.add('hidden');
+        });
+    } catch (error) {
+        window.__clientWarn && window.__clientWarn('Could not initialize dev act-as user selector:', error);
+    }
 }
 
-// SECURITY: Only initialize test login buttons in development environment with DEBUG mode enabled.
-// Test passwords must be explicitly configured - never use hardcoded defaults in production.
-{% if flask_config is defined and (flask_config == 'development' or flask_config == 'default') and config.DEBUG %}
-{% if test_passwords is defined and test_passwords and test_passwords.get('admin') and test_passwords.get('focal') %}
-{% set test_domain = get_organization_email_domain() or get_organization_domain() or 'example.org' %}
-{% set test_admin_password = test_passwords['admin'] %}
-{% set test_focal_password = test_passwords['focal'] %}
-setupQuickLogin('quickAdminLogin', 'test_admin@{{ test_domain }}', '{{ test_admin_password }}');
-setupQuickLogin('quickFocalLogin', 'test_focal@{{ test_domain }}', '{{ test_focal_password }}');
-{% if test_passwords.get('sys_manager') %}
-{% set test_sys_password = test_passwords['sys_manager'] %}
-setupQuickLogin('quickSystemManagerLogin', 'test_sys@{{ test_domain }}', '{{ test_sys_password }}');
-{% endif %}
-{% endif %}
+function getDevActAsSelectedUserId() {
+    const userSelect = document.getElementById('devActAsUserSelect');
+    if (!userSelect) return '';
+    if (window.jQuery) {
+        const $select = window.jQuery(userSelect);
+        if ($select.length && $select.hasClass('select2-hidden-accessible')) {
+            const val = $select.val();
+            return val ? String(val).trim() : '';
+        }
+    }
+    return (userSelect.value || '').trim();
+}
+
+function initDevActAsLogin() {
+    const form = document.getElementById('devActAsForm');
+    if (!form) return;
+
+    const presetInput = document.getElementById('devActAsPreset');
+    const userIdInput = document.getElementById('devActAsUserId');
+    const userSelect = document.getElementById('devActAsUserSelect');
+    const selectedUserBtn = document.getElementById('devActAsSelectedUser');
+    const userError = document.getElementById('devActAsUserError');
+
+    function hideUserError() {
+        if (userError) userError.classList.add('hidden');
+    }
+
+    function showUserError() {
+        if (userError) userError.classList.remove('hidden');
+    }
+
+    function submitDevActAs({ preset, userId }) {
+        hideUserError();
+        if (presetInput) presetInput.value = preset || '';
+        if (userIdInput) userIdInput.value = userId ? String(userId) : '';
+        form.submit();
+    }
+
+    form.querySelectorAll('[data-dev-act-as-preset]').forEach((button) => {
+        button.addEventListener('click', () => {
+            submitDevActAs({ preset: button.getAttribute('data-dev-act-as-preset') || '' });
+        });
+    });
+
+    if (selectedUserBtn) {
+        selectedUserBtn.addEventListener('click', () => {
+            const userId = getDevActAsSelectedUserId();
+            if (!userId) {
+                showUserError();
+                if (window.jQuery && userSelect) {
+                    window.jQuery(userSelect).select2('open');
+                } else if (userSelect) {
+                    userSelect.focus();
+                }
+                return;
+            }
+            submitDevActAs({ userId });
+        });
+    }
+
+    if (userSelect) {
+        userSelect.addEventListener('change', hideUserError);
+    }
+
+    initDevActAsUserSelect();
+}
+
+initDevActAsLogin();
 {% endif %}
 
 function initRegisterCountrySelect() {

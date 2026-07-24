@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import jwt
 import pytest
-from flask import session
+from flask import session, make_response
 
 pytestmark = [pytest.mark.unit, pytest.mark.auth_security]
 
@@ -18,6 +18,9 @@ from app.routes.auth import (
     _is_account_locked_out,
     _flag_deactivated_account_login_attempt,
     _get_test_passwords,
+    _is_dev_act_as_enabled,
+    _resolve_dev_act_as_preset,
+    _get_dev_act_as_users,
     _generate_pkce_pair,
     _decode_jwt_payload_unverified,
     _generate_reset_token,
@@ -115,6 +118,97 @@ class TestGetTestPasswords:
         assert result['admin'] == 'admin-pw'
         assert result['focal'] == 'focal-pw'
         assert result['sys_manager'] == 'sys-pw'
+
+
+@pytest.mark.unit
+class TestDevActAsHelpers:
+    def test_disabled_outside_development(self, app, monkeypatch):
+        monkeypatch.setenv('FLASK_CONFIG', 'production')
+        with app.test_request_context('/'):
+            assert _is_dev_act_as_enabled() is False
+
+    def test_disabled_when_debug_false(self, app, monkeypatch):
+        monkeypatch.setenv('FLASK_CONFIG', 'development')
+        app.config['DEBUG'] = False
+        with app.test_request_context('/'):
+            assert _is_dev_act_as_enabled() is False
+
+    def test_enabled_in_development_with_debug_from_loopback(self, app, monkeypatch):
+        monkeypatch.setenv('FLASK_CONFIG', 'development')
+        app.config['DEBUG'] = True
+        with app.test_request_context('/', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+            assert _is_dev_act_as_enabled(require_loopback=True) is True
+
+    def test_disabled_from_non_loopback_even_in_dev(self, app, monkeypatch):
+        # UI and POST endpoint must both refuse non-local IPs.
+        monkeypatch.setenv('FLASK_CONFIG', 'development')
+        app.config['DEBUG'] = True
+        with app.test_request_context('/', environ_base={'REMOTE_ADDR': '192.168.1.10'}):
+            assert _is_dev_act_as_enabled(require_loopback=True) is False
+
+    def test_ipv6_loopback_allowed(self, app, monkeypatch):
+        monkeypatch.setenv('FLASK_CONFIG', 'development')
+        app.config['DEBUG'] = True
+        with app.test_request_context('/', environ_base={'REMOTE_ADDR': '::1'}):
+            assert _is_dev_act_as_enabled(require_loopback=True) is True
+
+    def test_get_dev_act_as_users_includes_access_label(self, app, db_session):
+        user = create_test_user(db_session, email='act-as-user@example.com', name='Act As User')
+        with app.test_request_context('/'):
+            users = _get_dev_act_as_users()
+        match = [u for u in users if u['id'] == user.id]
+        assert len(match) == 1
+        assert match[0]['access_label'] == 'User'
+
+    def test_resolve_preset_by_email(self, app, db_session, monkeypatch):
+        monkeypatch.setenv('FLASK_CONFIG', 'development')
+        user = create_test_user(db_session, email='test_admin@humdatabank.org', name='Preset Admin')
+        with app.test_request_context('/'):
+            resolved = _resolve_dev_act_as_preset('admin')
+        assert resolved is not None
+        assert resolved.id == user.id
+
+    def test_dev_act_as_route_logs_in_user(self, app, db_session, monkeypatch):
+        from app.routes.auth import dev_act_as_login
+
+        monkeypatch.setenv('FLASK_CONFIG', 'development')
+        app.config['DEBUG'] = True
+        user = create_test_user(db_session, email='route-act-as@example.com', name='Route User')
+
+        with app.test_request_context(
+            '/login/dev-act-as',
+            method='POST',
+            data={'user_id': str(user.id)},
+            environ_base={'REMOTE_ADDR': '127.0.0.1'},
+        ):
+            with patch('app.routes.auth._complete_dev_act_as_login') as mock_complete, \
+                 patch('app.routes.auth.safe_redirect', return_value=make_response('', 302)):
+                resp = dev_act_as_login()
+        mock_complete.assert_called_once()
+        assert mock_complete.call_args.args[0].id == user.id
+        assert resp.status_code == 302
+
+    def test_dev_act_as_route_404_in_production(self, app, monkeypatch):
+        from app.routes.auth import dev_act_as_login
+        from werkzeug.exceptions import NotFound
+
+        monkeypatch.setenv('FLASK_CONFIG', 'production')
+        app.config['DEBUG'] = False
+
+        with app.test_request_context('/login/dev-act-as', method='POST', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
+            with pytest.raises(NotFound):
+                dev_act_as_login()
+
+    def test_dev_act_as_route_404_from_non_loopback_in_dev(self, app, monkeypatch):
+        from app.routes.auth import dev_act_as_login
+        from werkzeug.exceptions import NotFound
+
+        monkeypatch.setenv('FLASK_CONFIG', 'development')
+        app.config['DEBUG'] = True
+
+        with app.test_request_context('/login/dev-act-as', method='POST', environ_base={'REMOTE_ADDR': '10.0.0.5'}):
+            with pytest.raises(NotFound):
+                dev_act_as_login()
 
 
 @pytest.mark.unit

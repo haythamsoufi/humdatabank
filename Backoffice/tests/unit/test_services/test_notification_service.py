@@ -868,6 +868,46 @@ class TestValidateActionButtonsForSerialization:
 
 
 # ---------------------------------------------------------------------------
+# _apply_localized_country_param
+# ---------------------------------------------------------------------------
+
+class TestApplyLocalizedCountryParam:
+    def test_localizes_user_added_to_country_message(self, app, db_session):
+        with app.app_context():
+            notification = MagicMock()
+            notification.id = 42
+            notification.entity_type = 'country'
+            notification.entity_id = 7
+            country = MagicMock()
+            country.name = 'Lebanon'
+            message_params = {'country': 'Lebanon'}
+
+            with patch('app.models.Country.query') as mock_query, \
+                 patch('app.utils.form_localization.get_localized_country_name', return_value='لبنان') as mock_localize:
+                mock_query.get.return_value = country
+                result = NotificationService._apply_localized_country_param(
+                    notification,
+                    'notification.user_added_to_country.message',
+                    message_params,
+                    locale='ar',
+                )
+
+            assert result['country'] == 'لبنان'
+            mock_localize.assert_called_once_with(country)
+
+    def test_skips_non_country_message_keys(self, app, db_session):
+        with app.app_context():
+            notification = MagicMock(entity_type='country', entity_id=7)
+            message_params = {'country': 'Lebanon'}
+            result = NotificationService._apply_localized_country_param(
+                notification,
+                'notification.form_updated.message',
+                message_params,
+            )
+            assert result == message_params
+
+
+# ---------------------------------------------------------------------------
 # _resolve_actor_user_id_for_notification
 # ---------------------------------------------------------------------------
 

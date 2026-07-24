@@ -52,8 +52,19 @@ html[dir="rtl"] #mainContent.content-with-collapsed-sidebar {
     margin-left: 0;
 }
 
-html[dir="rtl"] .admin-sidebar.collapsed {
+html[dir="rtl"] .admin-sidebar.collapsed,
+html[dir="rtl"].sidebar-initially-collapsed .admin-sidebar {
     width: 80px;
+    padding-left: 0.375rem !important;
+    padding-right: 0.375rem !important;
+}
+
+html[dir="rtl"] .admin-sidebar.collapsed #adminSidebarNav,
+html[dir="rtl"].sidebar-initially-collapsed .admin-sidebar #adminSidebarNav {
+    margin-right: 0;
+    margin-left: -0.375rem;
+    padding-right: 0;
+    padding-left: 0.375rem;
 }
 
 html[dir="rtl"] .admin-sidebar .sidebar-item-container.active {
@@ -63,9 +74,12 @@ html[dir="rtl"] .admin-sidebar .sidebar-item-container.active {
     padding-left: 1rem;
 }
 
-html[dir="rtl"] .admin-sidebar.collapsed .sidebar-item-container.active {
-    padding-right: 1rem;
-    border-right: none;
+html[dir="rtl"] .admin-sidebar.collapsed .sidebar-item-container.active,
+html[dir="rtl"].sidebar-initially-collapsed .admin-sidebar .sidebar-item-container.active {
+    padding-right: 0 !important;
+    padding-left: 0 !important;
+    border-right: 3px solid #f56565;
+    border-left: none;
 }
 
 /* RTL support for initial collapsed margin */
@@ -291,6 +305,73 @@ html[dir="rtl"] .sidebar-icon.ml-6 { margin-right: 1.5rem !important; }
 html[dir="rtl"] .sidebar-icon.ml-8 { margin-right: 2rem !important; }
 html[dir="rtl"] .sidebar-icon.ml-10 { margin-right: 2.5rem !important; }
 html[dir="rtl"] .sidebar-icon.ml-12 { margin-right: 3rem !important; }
+
+/* ==========================================================================
+   RTL: Global Tailwind horizontal margin flip (mr-* <-> ml-*)
+   Without this, mr-* on flex children adds outer-edge margin in RTL instead
+   of spacing between the icon/badge and adjacent text.
+   ========================================================================== */
+html[dir="rtl"] .mr-0 { margin-right: 0 !important; }
+html[dir="rtl"] .mr-1 { margin-right: 0 !important; margin-left: 0.25rem !important; }
+html[dir="rtl"] .mr-2 { margin-right: 0 !important; margin-left: 0.5rem !important; }
+html[dir="rtl"] .mr-3 { margin-right: 0 !important; margin-left: 0.75rem !important; }
+html[dir="rtl"] .mr-4 { margin-right: 0 !important; margin-left: 1rem !important; }
+html[dir="rtl"] .mr-5 { margin-right: 0 !important; margin-left: 1.25rem !important; }
+html[dir="rtl"] .mr-6 { margin-right: 0 !important; margin-left: 1.5rem !important; }
+html[dir="rtl"] .mr-8 { margin-right: 0 !important; margin-left: 2rem !important; }
+
+html[dir="rtl"] .ml-0 { margin-left: 0 !important; }
+html[dir="rtl"] .ml-1 { margin-left: 0 !important; margin-right: 0.25rem !important; }
+html[dir="rtl"] .ml-2 { margin-left: 0 !important; margin-right: 0.5rem !important; }
+html[dir="rtl"] .ml-3 { margin-left: 0 !important; margin-right: 0.75rem !important; }
+html[dir="rtl"] .ml-4 { margin-left: 0 !important; margin-right: 1rem !important; }
+html[dir="rtl"] .ml-5 { margin-left: 0 !important; margin-right: 1.25rem !important; }
+html[dir="rtl"] .ml-6 { margin-left: 0 !important; margin-right: 1.5rem !important; }
+html[dir="rtl"] .ml-8 { margin-left: 0 !important; margin-right: 2rem !important; }
+
+html[dir="rtl"] .ml-auto { margin-left: 0 !important; margin-right: auto !important; }
+html[dir="rtl"] .mr-auto { margin-right: 0 !important; margin-left: auto !important; }
+
+/* RTL: Flip common horizontal padding utilities */
+html[dir="rtl"] .pr-1 { padding-right: 0 !important; padding-left: 0.25rem !important; }
+html[dir="rtl"] .pr-2 { padding-right: 0 !important; padding-left: 0.5rem !important; }
+html[dir="rtl"] .pr-3 { padding-right: 0 !important; padding-left: 0.75rem !important; }
+html[dir="rtl"] .pr-4 { padding-right: 0 !important; padding-left: 1rem !important; }
+html[dir="rtl"] .pr-8 { padding-right: 0 !important; padding-left: 2rem !important; }
+
+html[dir="rtl"] .pl-1 { padding-left: 0 !important; padding-right: 0.25rem !important; }
+html[dir="rtl"] .pl-2 { padding-left: 0 !important; padding-right: 0.5rem !important; }
+html[dir="rtl"] .pl-3 { padding-left: 0 !important; padding-right: 0.75rem !important; }
+html[dir="rtl"] .pl-4 { padding-left: 0 !important; padding-right: 1rem !important; }
+html[dir="rtl"] .pl-6 { padding-left: 0 !important; padding-right: 1.5rem !important; }
+
+/* RTL: Modal chrome — close buttons and title clearance */
+html[dir="rtl"] [role="dialog"] .btn-close-icon.absolute.right-3,
+html[dir="rtl"] .modal-shell-content > .btn-close-icon.absolute.right-3,
+html[dir="rtl"] .close-modal.absolute.top-3.right-3,
+html[dir="rtl"] .close-modal.absolute.top-4.right-4 {
+    right: auto !important;
+    left: 0.75rem !important;
+}
+
+html[dir="rtl"] [role="dialog"] .close-modal.absolute.top-4.right-4 {
+    left: 1rem !important;
+}
+
+/* RTL: space-x-* sibling spacing in flex rows */
+html[dir="rtl"] .space-x-1 > :not([hidden]) ~ :not([hidden]) { margin-left: 0 !important; margin-right: 0.25rem !important; }
+html[dir="rtl"] .space-x-2 > :not([hidden]) ~ :not([hidden]) { margin-left: 0 !important; margin-right: 0.5rem !important; }
+html[dir="rtl"] .space-x-3 > :not([hidden]) ~ :not([hidden]) { margin-left: 0 !important; margin-right: 0.75rem !important; }
+html[dir="rtl"] .space-x-4 > :not([hidden]) ~ :not([hidden]) { margin-left: 0 !important; margin-right: 1rem !important; }
+html[dir="rtl"] .space-x-8 > :not([hidden]) ~ :not([hidden]) { margin-left: 0 !important; margin-right: 2rem !important; }
+
+html[dir="rtl"] #profile-completion-modal .flex.items-center.gap-3 {
+    gap: 0.75rem;
+}
+
+html[dir="rtl"] [role="dialog"] .text-left {
+    text-align: right !important;
+}
 
 /* ========================================
    RTL Support for Documentation Pages

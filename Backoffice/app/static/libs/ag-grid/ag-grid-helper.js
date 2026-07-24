@@ -127,7 +127,7 @@
      * @param {Object} config.options - Additional grid options
      * @param {Object} config.columnVisibilityOptions - Column Visibility Manager options
      * @param {boolean} [config.filterPersistence=true] - Persist filters in localStorage per templateId
-     * @param {boolean} [config.autoDetectFilters=true] - Run autoDetectColumnFilters on init; re-evaluate on filterChanged
+     * @param {boolean} [config.autoDetectFilters=true] - Run autoDetectColumnFilters during initialization
      * @param {Object} [config.autoDetectFilterOptions] - Options for autoDetectColumnFilters (maxUniqueValues, sampleSize, …)
      */
     function AgGridHelper(config) {
@@ -678,19 +678,14 @@
             // Ensure filter menu input spacing is applied reliably
             this.setupFilterMenuInputSpacing();
 
-            // Re-evaluate auto-detected filters when filters change
-            this.setupAutoDetectFiltersReevaluation();
+            // Header labels can overlap filter buttons after sizeColumnsToFit; bridge missed clicks.
+            this.setupHeaderFilterClickBridge();
 
             // Emit selection-changed events so templates can show bulk-action UI
             this.setupSelectionChangedDispatcher();
 
             // Custom right-click context menu (Copy cell, Export table to Excel) – works in Community edition
             this.setupContextMenuFallback();
-
-            // Page scroll chaining — use gridDiv directly (more reliable than resolving from api in onGridReady).
-            setTimeout(function() {
-                AgGridHelper.enablePageScrollChaining(self.gridDiv);
-            }, 200);
 
             // Mobile: unpin columns so wide cells are not trapped in narrow pinned panes.
             self._mobileColumnPinningDisabled = AgGridHelper.shouldDisableColumnPinning();
@@ -717,143 +712,6 @@
         } catch (error) {
             console.error('AgGridHelper: Error initializing grid:', error);
             return null;
-        }
-    };
-
-    /**
-     * Re-evaluate auto-detected column filters whenever the user applies filters.
-     * This uses the currently displayed rows (after filters) to decide if a column
-     * should stay on text filter or switch to the unique-items custom set filter.
-     *
-     * Notes:
-     * - Only active when AgGridHelper.create(..., { autoDetectFilters: true }) (default).
-     * - Attempts to preserve column state + filter model during columnDefs update.
-     */
-    AgGridHelper.prototype.setupAutoDetectFiltersReevaluation = function() {
-        if (this._autoDetectFiltersListenerAttached) {
-            return;
-        }
-        if (!this._autoDetectFiltersEnabled) {
-            return;
-        }
-        if (!this.gridApi || typeof this.gridApi.addEventListener !== 'function') {
-            return;
-        }
-
-        const self = this;
-        const handler = function() {
-            // Debounce slightly; AG Grid can fire filterChanged frequently.
-            if (self._autoDetectFiltersReevalTimer) {
-                clearTimeout(self._autoDetectFiltersReevalTimer);
-            }
-            self._autoDetectFiltersReevalTimer = setTimeout(function() {
-                self.reEvaluateAutoDetectedFilters();
-            }, 50);
-        };
-
-        this.gridApi.addEventListener('filterChanged', handler);
-        this._autoDetectFiltersListenerAttached = true;
-        this._autoDetectFiltersListener = handler;
-    };
-
-    AgGridHelper.prototype.reEvaluateAutoDetectedFilters = function() {
-        const api = this.gridApi;
-        if (!api || !this.config || !Array.isArray(this.config.columnDefs)) {
-            return;
-        }
-
-        // Build displayed rows snapshot
-        const displayedRows = [];
-        if (typeof api.forEachNodeAfterFilter === 'function') {
-            api.forEachNodeAfterFilter(function(node) {
-                if (node && node.data) {
-                    displayedRows.push(node.data);
-                }
-            });
-        } else if (typeof api.forEachNode === 'function') {
-            api.forEachNode(function(node) {
-                if (node && node.data && (node.displayed === true || node.displayed === undefined)) {
-                    displayedRows.push(node.data);
-                }
-            });
-        }
-        if (!displayedRows.length) {
-            return;
-        }
-
-        // Track existing filter choices
-        const before = {};
-        this.config.columnDefs.forEach(function(cd) {
-            if (cd && cd.field) {
-                before[cd.field] = cd.filter;
-            }
-        });
-
-        // Re-run detection on displayed data
-        const detectOpts = Object.assign({}, this._autoDetectFilterOptions || {});
-        AgGridHelper.autoDetectColumnFilters(this.config.columnDefs, displayedRows, detectOpts);
-
-        // See if anything changed
-        let changed = false;
-        this.config.columnDefs.forEach(function(cd) {
-            if (cd && cd.field) {
-                if (before[cd.field] !== cd.filter) {
-                    changed = true;
-                }
-            }
-        });
-        if (!changed) {
-            return;
-        }
-
-        // Preserve filter model and column state where possible
-        let filterModel = null;
-        try {
-            if (typeof api.getFilterModel === 'function') {
-                filterModel = api.getFilterModel();
-            }
-        } catch (e) {
-            filterModel = null;
-        }
-
-        let colState = null;
-        const colApi = this.getColumnApi && this.getColumnApi();
-        try {
-            if (colApi && typeof colApi.getColumnState === 'function') {
-                colState = colApi.getColumnState();
-            }
-        } catch (e) {
-            colState = null;
-        }
-
-        // Apply updated colDefs (API differs by AG Grid version)
-        try {
-            if (typeof api.setGridOption === 'function') {
-                api.setGridOption('columnDefs', this.config.columnDefs);
-            } else if (typeof api.setColumnDefs === 'function') {
-                api.setColumnDefs(this.config.columnDefs);
-            }
-        } catch (e) {
-            // If we can't apply new coldefs, stop here
-            return;
-        }
-
-        // Restore column state
-        try {
-            if (colState && colApi && typeof colApi.applyColumnState === 'function') {
-                colApi.applyColumnState({ state: colState, applyOrder: true });
-            }
-        } catch (e) {
-            // ignore
-        }
-
-        // Restore filter model
-        try {
-            if (filterModel && typeof api.setFilterModel === 'function') {
-                api.setFilterModel(filterModel);
-            }
-        } catch (e) {
-            // ignore
         }
     };
 
@@ -1646,6 +1504,78 @@
     };
 
     /**
+     * AG Grid opens column filters on click. After sizeColumnsToFit, header labels can
+     * overlap the filter button so pointerdown hits the button but click never completes.
+     * Capture the column on pointerdown (header DOM may re-render before pointerup) and
+     * call showColumnFilter if the menu is still closed shortly after the gesture ends.
+     */
+    AgGridHelper.prototype.setupHeaderFilterClickBridge = function() {
+        if (!this.gridDiv || !this.gridApi || this._headerFilterClickBridgeAttached) {
+            return;
+        }
+        this._headerFilterClickBridgeAttached = true;
+
+        var self = this;
+        var pendingColId = null;
+        var pendingTimer = null;
+
+        this.gridDiv.addEventListener('pointerdown', function(ev) {
+            if (ev.button !== 0) {
+                return;
+            }
+            var button = ev.target.closest && ev.target.closest('.ag-header-cell-filter-button');
+            if (!button) {
+                pendingColId = null;
+                return;
+            }
+            var headerCell = button.closest && button.closest('.ag-header-cell');
+            pendingColId = headerCell && headerCell.getAttribute('col-id');
+        }, true);
+
+        var scheduleOpenIfNeeded = function(ev) {
+            if (!pendingColId) {
+                return;
+            }
+            var inHeader = ev.target.closest && ev.target.closest('.ag-header');
+            if (!inHeader) {
+                pendingColId = null;
+                return;
+            }
+            var colId = pendingColId;
+            if (pendingTimer) {
+                clearTimeout(pendingTimer);
+            }
+            pendingTimer = setTimeout(function() {
+                pendingTimer = null;
+                pendingColId = null;
+                if (self.isFilterMenuOpen()) {
+                    return;
+                }
+                if (typeof self.gridApi.showColumnFilter !== 'function') {
+                    return;
+                }
+                try {
+                    self.gridApi.showColumnFilter(colId);
+                } catch (e1) {
+                    try {
+                        var column = typeof self.gridApi.getColumn === 'function'
+                            ? self.gridApi.getColumn(colId)
+                            : null;
+                        if (column) {
+                            self.gridApi.showColumnFilter(column);
+                        }
+                    } catch (e2) {
+                        // ignore
+                    }
+                }
+            }, 50);
+        };
+
+        this.gridDiv.addEventListener('pointerup', scheduleOpenIfNeeded, false);
+        this.gridDiv.addEventListener('click', scheduleOpenIfNeeded, false);
+    };
+
+    /**
      * Ensure filter popup input spacing to avoid icon overlap.
      */
     AgGridHelper.prototype.setupFilterMenuInputSpacing = function() {
@@ -1690,7 +1620,6 @@
             });
         };
 
-        const self = this;
         const observer = new MutationObserver(function(mutations) {
             mutations.forEach(function(mutation) {
                 mutation.addedNodes.forEach(function(node) {
@@ -1704,19 +1633,6 @@
                     const menu = node.querySelector && node.querySelector('.ag-filter-menu');
                     if (menu) {
                         applyFilterMenuSpacing(menu);
-                    }
-                });
-                mutation.removedNodes.forEach(function(node) {
-                    if (!(node instanceof HTMLElement)) {
-                        return;
-                    }
-                    if ((node.classList && node.classList.contains('ag-filter-menu')) ||
-                        (node.querySelector && node.querySelector('.ag-filter-menu'))) {
-                        setTimeout(function() {
-                            if (!self.isFilterMenuOpen()) {
-                                self.setDynamicHeight();
-                            }
-                        }, 0);
                     }
                 });
             });

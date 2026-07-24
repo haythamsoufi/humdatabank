@@ -2986,7 +2986,7 @@ def notify_user_added_to_country(user_id, country_id):
             current_app.logger.warning(f"Cannot notify user {user_id} about country {country_id}: user or country not found")
             return []
 
-        # Get localized country name (will be translated when notification is displayed)
+        # English fallback stored in params; localized at display time via entity_id.
         country_name = country.name
 
         # Create notification for the user using translation keys

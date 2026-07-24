@@ -497,7 +497,13 @@ class TestSerializeAssignedDataItem:
                 result = serialize_assigned_data_item(item)
         assert result['disaggregation_data'] is not None
         assert result['disaggregation_data']['mode'] == 'sex'
-        assert result['disaggregation_data']['values'] == {'male': 10, 'female': 20}
+        assert result['disaggregation_data']['values'] == {
+            'total_direct': 30,
+            'total_indirect': 0,
+            'total': 30,
+            'male': 10,
+            'female': 20,
+        }
 
     def test_none_disagg_data_returns_none(self, app):
         with app.test_request_context():
@@ -1060,13 +1066,86 @@ class TestWrapDisaggDict:
     def test_standard_sex_disagg(self):
         dd = {'mode': 'sex', 'values': {'male': 10, 'female': 20}}
         result = _wrap_disagg_dict(dd)
-        assert result == {'mode': 'sex', 'values': {'male': 10, 'female': 20}}
+        assert result == {
+            'mode': 'sex',
+            'values': {
+                'total_direct': 30,
+                'total_indirect': 0,
+                'total': 30,
+                'male': 10,
+                'female': 20,
+            },
+        }
+
+    def test_sex_disagg_with_nested_direct_flattens_values(self):
+        dd = {
+            'mode': 'sex',
+            'values': {
+                'direct': {'male': 10, 'female': 20},
+                'indirect': 5000,
+            },
+        }
+        result = _wrap_disagg_dict(dd)
+        assert result['values'] == {
+            'total_direct': 30,
+            'total_indirect': 5000,
+            'total': 5030,
+            'male': 10,
+            'female': 20,
+        }
+
+    def test_sex_age_disagg_with_nested_direct_flattens_values(self):
+        dd = {
+            'mode': 'sex_age',
+            'values': {
+                'direct': {'male_0_4': 3, 'female_0_4': 4, 'male_5_17': 5},
+                'indirect': 100,
+            },
+        }
+        result = _wrap_disagg_dict(dd)
+        assert result['values']['total_direct'] == 12
+        assert result['values']['total_indirect'] == 100
+        assert result['values']['total'] == 112
+        assert result['values']['male_0_4'] == 3
+        assert 'direct' not in result['values']
+        assert 'indirect' not in result['values']
+
+    def test_total_mode_scalar_direct_flattens_to_total(self):
+        dd = {'mode': 'total', 'values': {'direct': 100, 'indirect': 50}}
+        result = _wrap_disagg_dict(dd)
+        assert result['values'] == {
+            'total_direct': 100,
+            'total_indirect': 50,
+            'total': 150,
+        }
+
+    def test_nested_direct_total_recomputed_when_stale_total_present(self):
+        dd = {
+            'mode': 'age',
+            'values': {
+                'direct': {'total': 1, '0_4': 10, '5_17': 15},
+                'indirect': 50,
+            },
+        }
+        result = _wrap_disagg_dict(dd)
+        assert result['values']['total_direct'] == 25
+        assert result['values']['total_indirect'] == 50
+        assert result['values']['total'] == 75
+        assert result['values']['0_4'] == 10
+        assert 'direct' not in result['values']
+        assert 'indirect' not in result['values']
 
     def test_standard_age_disagg(self):
         dd = {'mode': 'age', 'values': {'0-17': 5, '18+': 95}}
         result = _wrap_disagg_dict(dd)
         assert result['mode'] == 'age'
-        assert result['values'] == {'0-17': 5, '18+': 95}
+        assert result['values'] == {
+            'total_direct': 100,
+            'total_indirect': 0,
+            'total': 100,
+            '0-17': 5,
+            '18+': 95,
+        }
 
     def test_total_mode_with_disability(self):
         dd = {'mode': 'total', 'values': {'total': 100, 'disability': {'disaggregated_by_disability': True}}}

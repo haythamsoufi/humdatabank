@@ -133,7 +133,9 @@ class TestBuildDataApiScopeMeta:
             version_scope=VERSION_SCOPE_PUBLISHED,
         ) is None
 
-    def test_includes_template_and_version_fields(self):
+    @patch('app.utils.api_data_filters._resolve_scope_period_names', return_value=[])
+    @patch('app.utils.api_data_filters._resolve_scope_template_names', return_value=['FDRS'])
+    def test_includes_template_and_version_fields(self, _mock_periods, _mock_templates):
         key = str(uuid.uuid4())
         meta = build_data_api_scope_meta(
             template_id=3,
@@ -146,7 +148,27 @@ class TestBuildDataApiScopeMeta:
             'published_version_id': 11,
             'version_scope': 'published',
             'stable_key': key,
+            'template_names': ['FDRS'],
         }
+
+    @patch('app.utils.api_data_filters._resolve_scope_period_names', return_value=['2024'])
+    @patch('app.utils.api_data_filters._resolve_scope_template_names', return_value=['Annual Report'])
+    def test_includes_template_and_period_names(self, _mock_templates, _mock_periods):
+        meta = build_data_api_scope_meta(
+            template_id=5,
+            published_version_id=9,
+            version_scope=VERSION_SCOPE_PUBLISHED,
+            assignment_id=42,
+            period_name='2024',
+        )
+        assert meta['template_names'] == ['Annual Report']
+        assert meta['period_names'] == ['2024']
+        _mock_templates.assert_called_once_with(5)
+        _mock_periods.assert_called_once_with(
+            template_id=5,
+            assignment_id=42,
+            period_name='2024',
+        )
 
 
 @pytest.mark.unit

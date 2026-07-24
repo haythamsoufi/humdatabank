@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-24 01:23+0200\n"
+"POT-Creation-Date: 2026-07-24 16:48+0200\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: ar <LL@li.org>\n"
@@ -77,17 +77,17 @@ msgstr "قد يحتاج الحقل المقترح IFRC إلى تأكيد قبل 
 msgid "%(count)s value(s) carried forward"
 msgstr "قيمة IFRCHOLDERA المحمولة إلى الأمام %(count)s"
 
-#: app/routes/main/helpers.py:1292
+#: app/routes/main/helpers.py:1250
 #, python-format
 msgid "%(field)s: %(new)s"
 msgstr "%(field)s: %(new)s"
 
-#: app/routes/main/helpers.py:1294
+#: app/routes/main/helpers.py:1252
 #, python-format
 msgid "%(field)s: %(old)s"
 msgstr "%(field)s: %(old)s"
 
-#: app/routes/main/helpers.py:1296
+#: app/routes/main/helpers.py:1254
 #, python-format
 msgid "%(field)s: %(old)s → %(new)s"
 msgstr "%(old)s %(field)s : %(new)s"
@@ -212,7 +212,7 @@ msgstr ".xlsx أو .xls"
 msgid ".xlsx or .xls (max 50 MB)"
 msgstr ".xlsx أو .xls (الحد الأقصى 50 ميجابايت)"
 
-#: app/templates/admin/assignments/manage_assignment.html:496
+#: app/templates/admin/assignments/manage_assignment.html:495
 msgid "0 selected"
 msgstr "0 تم اختياره"
 
@@ -689,6 +689,26 @@ msgstr "أقسام إعدادات الحساب"
 msgid "Accuracy and Verification"
 msgstr "الدقة والتحقق"
 
+#: app/templates/auth/login.html:607
+msgid "Act as (dev only)"
+msgstr "تصرف ك (مطور فقط)"
+
+#: app/templates/auth/login.html:626
+msgid "Act as Admin"
+msgstr "العمل كمسؤول"
+
+#: app/templates/auth/login.html:630
+msgid "Act as Focal Point"
+msgstr "العمل كنقطة اتصال"
+
+#: app/templates/auth/login.html:622
+msgid "Act as System Manager"
+msgstr "العمل كمدير نظام"
+
+#: app/templates/auth/login.html:649 app/templates/auth/login.html:651
+msgid "Act as selected user"
+msgstr "تصرف كمستخدم محدد"
+
 #: app/templates/admin/ai/_trace_card.html:371
 #: app/templates/admin/ai/conversation_traces.html:178
 #: app/templates/admin/security/alerts.html:27
@@ -753,7 +773,7 @@ msgstr ""
 "الملفات، إلخ) — تستثني عرض الصفحات."
 
 #: app/templates/admin/assignments/assignments.html:128
-#: app/templates/admin/assignments/manage_assignment.html:342
+#: app/templates/admin/assignments/manage_assignment.html:343
 #: app/templates/admin/plugin_management.html:213
 msgid "Activate"
 msgstr "تفعيل"
@@ -856,9 +876,9 @@ msgstr "الأنشطة"
 
 #: app/templates/core/dashboard.html:2343
 msgid "Activities from other focal points in"
-msgstr "الأنشطة من نقاط التركيز الأخرى في"
+msgstr "الأنشطة من نقاط اتصال الأخرى في"
 
-#: app/routes/main/helpers.py:1354
+#: app/routes/main/helpers.py:1312
 #: app/templates/admin/analytics/audit_trail.html:454
 msgid "Activity"
 msgstr "النشاط"
@@ -927,12 +947,12 @@ msgstr "إضافة تضمين"
 msgid "Add Embed Content"
 msgstr "إضافة محتوى مدمج"
 
-#: app/templates/admin/assignments/manage_assignment.html:457
+#: app/templates/admin/assignments/manage_assignment.html:458
 msgid "Add Entities"
 msgstr "إضافة الكيانات"
 
-#: app/templates/forms/entry_form/entry_form.html:1736
-#: app/templates/forms/entry_form/entry_form.html:2474
+#: app/templates/forms/entry_form/entry_form.html:1737
+#: app/templates/forms/entry_form/entry_form.html:2475
 msgid "Add Entry"
 msgstr "إضافة إدخال"
 
@@ -947,7 +967,7 @@ msgid "Add Group"
 msgstr "مجموعة الإضافة"
 
 #: app/templates/admin/indicator_bank/add_indicator_bank.html:73
-#: app/templates/forms/entry_form/entry_form.html:3823
+#: app/templates/forms/entry_form/entry_form.html:3824
 #: app/templates/forms/entry_form/partials/dynamic_indicators_interface.html:31
 msgid "Add Indicator"
 msgstr "إضافة مؤشر"
@@ -986,7 +1006,7 @@ msgid "Add New Division"
 msgstr "إضافة نسخة جديدة"
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:331
-#: app/templates/forms/entry_form/entry_form.html:3837
+#: app/templates/forms/entry_form/entry_form.html:3838
 msgid "Add New Indicator"
 msgstr "إضافة مؤشر جديد"
 
@@ -1094,7 +1114,7 @@ msgstr "إضافة كلمة شائعة"
 msgid "Add data source"
 msgstr "إضافة مصدر البيانات"
 
-#: app/templates/admin/assignments/manage_assignment.html:527
+#: app/templates/admin/assignments/manage_assignment.html:526
 msgid "Add entities by"
 msgstr "إضافة الكيانات بواسطة"
 
@@ -1144,8 +1164,8 @@ msgstr "إضافة عتبة"
 msgid "Add to self-report"
 msgstr "أضف إلى التقرير الذاتي"
 
-#: app/templates/admin/assignments/manage_assignment.html:168
 #: app/templates/admin/assignments/manage_assignment.html:169
+#: app/templates/admin/assignments/manage_assignment.html:170
 #: app/templates/admin/indicator_bank/_indicator_bank_translation_helpers.html:7
 #: app/templates/forms/form_builder/partials/_item_modal.html:89
 #: app/templates/forms/form_builder/partials/_item_modal.html:158
@@ -1167,7 +1187,7 @@ msgstr "إضافة ترجمات"
 msgid "Add translations for the aggregated label in different languages."
 msgstr "أضف ترجمات لتسمية التصنيف المجمع بلغات مختلفة."
 
-#: app/templates/admin/assignments/manage_assignment.html:770
+#: app/templates/admin/assignments/manage_assignment.html:769
 msgid ""
 "Add translations for this assignment name in different languages. English is"
 " entered in the Custom Name field above."
@@ -1211,7 +1231,7 @@ msgid "Added"
 msgstr "مضاف"
 
 # Activity descriptions
-#: app/routes/main/helpers.py:1318
+#: app/routes/main/helpers.py:1276
 #, python-format
 msgid "Added %(count)d field in %(template)s"
 msgstr "%(count)d ميدان مضاف %(template)s"
@@ -1325,13 +1345,14 @@ msgstr "إضافة..."
 #: app/templates/admin/validation_rules.html:6
 #: app/templates/admin/validation_rules.html:40
 #: app/templates/admin/view_indicator_suggestion.html:13
+#: app/templates/auth/login.html:628
 #: app/templates/forms/form_builder/field_mapping.html:203
 #: app/templates/forms/form_builder/form_builder.html:77
 #: app/templates/tours/tours.html:474
 msgid "Admin"
 msgstr "مدير"
 
-#: app/routes/main/helpers.py:1353
+#: app/routes/main/helpers.py:1311
 #, python-format
 msgid "Admin %(action)s %(target)s"
 msgstr "النسبة المئوية (الإجراء) النسبة المئوية (الهدف)"
@@ -1440,7 +1461,7 @@ msgstr "بعد ذلك"
 msgid "After importing, click \"Compile Translations\" to apply changes."
 msgstr "بعد الإستيراد، نقر \"الترجمة السريعة\" لتطبيق التغييرات."
 
-#: app/templates/admin/assignments/manage_assignment.html:254
+#: app/templates/admin/assignments/manage_assignment.html:255
 msgid ""
 "After this date the assignment will be treated as Closed. Leave empty for no"
 " automatic closure."
@@ -1509,7 +1530,7 @@ msgstr "المحاذاة"
 #: app/templates/admin/api_management.html:312
 #: app/templates/admin/indicator_bank/indicator_bank.html:2370
 #: app/templates/components/auto_translate_modal_js.html:30
-#: app/templates/forms/entry_form/entry_form.html:3841
+#: app/templates/forms/entry_form/entry_form.html:3842
 #: app/templates/forms/form_builder/field_mapping.html:303
 #: app/templates/notifications/center.html:70
 msgid "All"
@@ -1837,7 +1858,7 @@ msgstr "خيارات التفكيك المسموح بها"
 msgid "Allowed period types:"
 msgstr "أنواع الفترات المسموح بها:"
 
-#: app/templates/forms/entry_form/entry_form.html:2743
+#: app/templates/forms/entry_form/entry_form.html:2744
 msgid "Allowed types: PDF, Word, Excel, PowerPoint, Text"
 msgstr "الأنواع المسموحة: PDF، Word، Excel، PowerPoint، نص"
 
@@ -1858,7 +1879,7 @@ msgstr "النص البديل"
 msgid "Alt text (optional)"
 msgstr "نص بديل (اختياري)"
 
-#: app/routes/auth.py:1045
+#: app/routes/auth.py:1229
 msgid "An account with this email already exists."
 msgstr "هناك حساب يحتوي على هذا البريد الإلكتروني موجودا بالفعل."
 
@@ -1884,7 +1905,7 @@ msgstr "حدث خطأ أثناء تحميل بيانات الامتثال"
 msgid "An error occurred while loading data"
 msgstr "حدث خطأ. يرجى المحاولة مرة أخرى."
 
-#: app/routes/auth.py:1294
+#: app/routes/auth.py:1520
 msgid ""
 "An error occurred while updating your account settings. Please try again."
 msgstr "حدث خطأ. يرجى المحاولة مرة أخرى."
@@ -1977,7 +1998,7 @@ msgstr "وقت تشغيل المحلل"
 
 #: app/services/ai_step_ux.py:115
 msgid "Analyzing Unified Plans focus areas…"
-msgstr "تحليل مجالات تركيز الخطط الموحدة..."
+msgstr "تحليل مجالات اتصال الخطط الموحدة..."
 
 #: app/templates/admin/data_exploration/explore_data.html:363
 msgid "Analyzing data..."
@@ -2069,12 +2090,12 @@ msgstr "شاشة التطبيق"
 msgid "Append dynamic suffix (percentage, population, etc.)"
 msgstr "أضف لاحقة ديناميكية (النسبة المئوية، عدد السكان، إلخ)"
 
-#: app/templates/forms/entry_form/entry_form.html:1378
-#: app/templates/forms/entry_form/entry_form.html:1555
-#: app/templates/forms/entry_form/entry_form.html:1696
-#: app/templates/forms/entry_form/entry_form.html:2410
-#: app/templates/forms/entry_form/entry_form.html:2425
-#: app/templates/forms/entry_form/partials/matrix_table.html:446
+#: app/templates/forms/entry_form/entry_form.html:1379
+#: app/templates/forms/entry_form/entry_form.html:1556
+#: app/templates/forms/entry_form/entry_form.html:1697
+#: app/templates/forms/entry_form/entry_form.html:2411
+#: app/templates/forms/entry_form/entry_form.html:2426
+#: app/templates/forms/entry_form/partials/matrix_table.html:448
 msgid "Applicable but data not available"
 msgstr "قابل للتطبيق ولكن البيانات غير متوفرة"
 
@@ -2086,7 +2107,7 @@ msgstr "التطبيق"
 msgid "Application Log"
 msgstr "الطلب"
 
-#: app/templates/admin/assignments/manage_assignment.html:239
+#: app/templates/admin/assignments/manage_assignment.html:240
 msgid "Applies to all selected countries."
 msgstr "ينطبق على جميع الدول المختارة."
 
@@ -2104,8 +2125,8 @@ msgstr ""
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:32
 #: app/templates/admin/analytics/audit_trail.html:287
 #: app/templates/admin/analytics/page_path_analytics.html:52
-#: app/templates/admin/assignments/manage_assignment.html:830
-#: app/templates/admin/assignments/manage_assignment.html:845
+#: app/templates/admin/assignments/manage_assignment.html:829
+#: app/templates/admin/assignments/manage_assignment.html:844
 #: app/templates/admin/communication/registry.html:31
 #: app/templates/components/ag_grid_i18n_js.html:18
 #: app/templates/forms/entry_form/partials/_preview_banner.html:47
@@ -2171,7 +2192,7 @@ msgstr "الموافقة على الجميع"
 msgid "Approve all __COUNT__ pending requests for this user?"
 msgstr "هل أوافق على جميع الطلبات __COUNT__ المعلقة لهذا المستخدم؟"
 
-#: app/routes/main/helpers.py:1228
+#: app/routes/main/helpers.py:1186
 #: app/templates/admin/assignments/public_submissions.html:54
 #: app/templates/admin/assignments/public_submissions.html:105
 #: app/templates/admin/assignments/public_submissions.html:178
@@ -2191,12 +2212,12 @@ msgstr "موافق عليه"
 msgid "Approver"
 msgstr "التغطية"
 
-#: app/templates/admin/assignments/manage_assignment.html:115
-#: app/templates/admin/assignments/manage_assignment.html:135
+#: app/templates/admin/assignments/manage_assignment.html:116
+#: app/templates/admin/assignments/manage_assignment.html:136
 #: app/templates/admin/documents/documents.html:285
 #: app/templates/admin/documents/documents.html:311
-#: app/templates/forms/entry_form/entry_form.html:2860
-#: app/templates/forms/entry_form/entry_form.html:2886
+#: app/templates/forms/entry_form/entry_form.html:2861
+#: app/templates/forms/entry_form/entry_form.html:2887
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:74
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:87
 #: app/templates/forms/form_builder/partials/_item_modal.html:540
@@ -2292,7 +2313,7 @@ msgstr ""
 msgid "Are you sure you want to delete"
 msgstr "هل أنت متأكد أنك تريد الحذف؟"
 
-#: app/templates/forms/entry_form/entry_form.html:2688
+#: app/templates/forms/entry_form/entry_form.html:2689
 #, python-format
 msgid ""
 "Are you sure you want to delete \"%(filename)s\"? The document will be "
@@ -2380,7 +2401,7 @@ msgid ""
 msgstr ""
 "هل أنت متأكد من أنك تريد حذف هذا المستند؟ لا يمكن التراجع عن هذا الإجراء."
 
-#: app/templates/forms/entry_form/entry_form.html:3807
+#: app/templates/forms/entry_form/entry_form.html:3808
 msgid "Are you sure you want to delete this entry?"
 msgstr "هل أنت متأكد من أنك تريد حذف هذا الإدخال؟"
 
@@ -2497,7 +2518,7 @@ msgid "Are you sure you want to reload the plugin \"%(plugin)s\"?"
 msgstr "%(plugin)s هل أنت متأكد من أنك تريد إعادة تحميل \"البلوجين\"؟?"
 
 #: app/templates/core/dashboard.html:2978
-#: app/templates/forms/entry_form/entry_form.html:3968
+#: app/templates/forms/entry_form/entry_form.html:3969
 msgid "Are you sure you want to reopen this assignment?"
 msgstr "هل أنت متأكد من أنك تريد إعادة فتح هذه المهمة؟"
 
@@ -2506,8 +2527,8 @@ msgstr "هل أنت متأكد من أنك تريد إعادة فتح هذه ا�
 msgid "Are you sure you want to stop the translation?"
 msgstr "هل أنت متأكد من أنك تريد إيقاف الترجمة؟"
 
-#: app/templates/forms/entry_form/entry_form.html:580
-#: app/templates/forms/entry_form/entry_form.html:2523
+#: app/templates/forms/entry_form/entry_form.html:581
+#: app/templates/forms/entry_form/entry_form.html:2524
 msgid ""
 "Are you sure you want to submit this form? You will not be able to edit it "
 "after submission."
@@ -2532,7 +2553,7 @@ msgstr ""
 msgid "Are you sure you want to update the status?"
 msgstr "هل أنت متأكد من أنك تريد حذف هذا"
 
-#: app/templates/forms/entry_form/entry_form.html:3967
+#: app/templates/forms/entry_form/entry_form.html:3968
 msgid "Are you sure you want to validate this assignment?"
 msgstr "هل أنت متأكد من رغبتك في التحقق من صحة هذه المهمة؟"
 
@@ -2583,7 +2604,7 @@ msgstr "نسبة العرض إلى الارتفاع"
 msgid "Assessment"
 msgstr "التقييم"
 
-#: app/templates/admin/assignments/manage_assignment.html:566
+#: app/templates/admin/assignments/manage_assignment.html:565
 msgid "Assign Countries"
 msgstr "الدول المخصصة"
 
@@ -2591,7 +2612,7 @@ msgstr "الدول المخصصة"
 msgid "Assign languages this user may edit with the inline translation tool."
 msgstr "تعيين لغات يمكن لهذا المستخدم تحريرها باستخدام أداة الترجمة الداخلية."
 
-#: app/templates/admin/assignments/manage_assignment.html:423
+#: app/templates/admin/assignments/manage_assignment.html:424
 msgid ""
 "Assign this form to specific organizational entities. Data will be collected"
 " at the specific entity level (e.g., branch data vs. country-wide data)."
@@ -2607,12 +2628,12 @@ msgstr ""
 "تعيين هذا المستخدم لكيانات تنظيمية محددة. سيكون للمستخدمين وصول إلى البيانات"
 " على المستوى المخصص لهم."
 
-#: app/templates/admin/assignments/manage_assignment.html:1037
+#: app/templates/admin/assignments/manage_assignment.html:1036
 msgid ""
 "Assigned entities (focal points) will be notified about this new assignment."
 " Do you want to continue?"
 msgstr ""
-"سيتم إعلام الكيانات المعينة (نقاط التركيز) بهذا التعيين الجديد. هل تريد "
+"سيتم إعلام الكيانات المعينة (نقاط اتصال) بهذا التعيين الجديد. هل تريد "
 "الاستمرار؟"
 
 #: app/templates/admin/assignments/public_submissions.html:225
@@ -2715,12 +2736,12 @@ msgstr "سنة التعيين"
 msgid "Assignment approved"
 msgstr "تمت الموافقة على التعيين"
 
-#: app/routes/main/helpers.py:1348
+#: app/routes/main/helpers.py:1306
 #, python-format
 msgid "Assignment approved: %(template)s"
 msgstr "تمت الموافقة على التكليف: %(template)s"
 
-#: app/routes/main/helpers.py:1344
+#: app/routes/main/helpers.py:1302
 #, python-format
 msgid "Assignment created: %(template)s"
 msgstr "أنشئت مهمة: %(template)s"
@@ -2729,7 +2750,7 @@ msgstr "أنشئت مهمة: %(template)s"
 msgid "Assignment dashboard access requires one of the Assignment roles."
 msgstr "يتطلب الوصول إلى لوحة تحكم التعيين أحد أدوار التكليف."
 
-#: app/templates/components/_assignment_status_pipeline.html:64
+#: app/templates/components/_assignment_status_pipeline.html:66
 msgid "Assignment is closed"
 msgstr "تم إغلاق التعيين"
 
@@ -2737,7 +2758,7 @@ msgstr "تم إغلاق التعيين"
 msgid "Assignment period"
 msgstr "فترة الانتداب"
 
-#: app/templates/forms/entry_form/entry_form.html:2692
+#: app/templates/forms/entry_form/entry_form.html:2693
 msgid ""
 "Assignment period is not available. Set a period for this assignment or "
 "choose a fixed period in the form template."
@@ -2745,7 +2766,7 @@ msgstr ""
 "فترة التعيين غير متاحة. حدد فترة لهذا التعيين أو اختر فترة ثابتة في قالب "
 "النموذج."
 
-#: app/templates/forms/entry_form/entry_form.html:2693
+#: app/templates/forms/entry_form/entry_form.html:2694
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:76
 msgid ""
 "Assignment period is not set yet. Set the assignment period in the header, "
@@ -2756,12 +2777,12 @@ msgstr "فترة التعيين لم تحدد بعد. حدد فترة التعي
 msgid "Assignment reopened"
 msgstr "إعادة فتح التعيين"
 
-#: app/routes/main/helpers.py:1349
+#: app/routes/main/helpers.py:1307
 #, python-format
 msgid "Assignment reopened: %(template)s"
 msgstr "إعادة فتح المهمة: %(template)s"
 
-#: app/routes/main/helpers.py:1347
+#: app/routes/main/helpers.py:1305
 #, python-format
 msgid "Assignment returned for revision: %(template)s"
 msgstr "تم إعادة التعيين للمراجعة: %(template)s"
@@ -2774,7 +2795,7 @@ msgstr "عاد التعيين إلى الجمعية الوطنية للتغيي�
 msgid "Assignment sent for review successfully."
 msgstr "تم إرسال المهمة للمراجعة بنجاح."
 
-#: app/routes/main/helpers.py:1346
+#: app/routes/main/helpers.py:1304
 #, python-format
 msgid "Assignment sent for review: %(template)s"
 msgstr "تم إرسال المهمة للمراجعة: %(template)s"
@@ -2792,7 +2813,7 @@ msgstr ""
 "%(id)d Assignment status for this country not found (ID:) يرجى التحقق من URL"
 " أو دعم الاتصال."
 
-#: app/templates/forms/entry_form/entry_form.html:2510
+#: app/templates/forms/entry_form/entry_form.html:2511
 msgid "Assignment status for this country not found."
 msgstr "حالة المهمة لهذا البلد غير موجودة."
 
@@ -2804,7 +2825,7 @@ msgstr "سير عمل حالة التعيين"
 msgid "Assignment submitted successfully!"
 msgstr "تم تسليم الواجب بنجاح!"
 
-#: app/routes/main/helpers.py:1345
+#: app/routes/main/helpers.py:1303
 #, python-format
 msgid "Assignment submitted: %(template)s"
 msgstr "الإحالة المقدمة: %(template)s"
@@ -2845,7 +2866,7 @@ msgstr "مساعد الاتحاد الدولي"
 msgid "Assistant is typing"
 msgstr "المساعد يكتب"
 
-#: app/templates/auth/login.html:671 app/templates/auth/reset_password.html:38
+#: app/templates/auth/login.html:696 app/templates/auth/reset_password.html:38
 msgid "At least 8 characters"
 msgstr "الربع الأخير"
 
@@ -2917,12 +2938,12 @@ msgstr "تدقيق تسجيل الأحداث الأمنية (دون تخزين �
 msgid "Audited Financial Statement"
 msgstr "البيان المالي المدقق"
 
-#: app/templates/admin/assignments/manage_assignment.html:119
-#: app/templates/admin/assignments/manage_assignment.html:139
+#: app/templates/admin/assignments/manage_assignment.html:120
+#: app/templates/admin/assignments/manage_assignment.html:140
 #: app/templates/admin/documents/documents.html:289
 #: app/templates/admin/documents/documents.html:315
-#: app/templates/forms/entry_form/entry_form.html:2864
-#: app/templates/forms/entry_form/entry_form.html:2890
+#: app/templates/forms/entry_form/entry_form.html:2865
+#: app/templates/forms/entry_form/entry_form.html:2891
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:75
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:88
 #: app/templates/forms/form_builder/partials/_item_modal.html:544
@@ -3034,7 +3055,7 @@ msgstr "مواد نموذجية"
 msgid "Auto-Translate All Translation Fields"
 msgstr "الترجمة التلقائية لجميع المؤشرات"
 
-#: app/templates/admin/assignments/manage_assignment.html:390
+#: app/templates/admin/assignments/manage_assignment.html:391
 msgid "Auto-closes the assignment after this date."
 msgstr "يتم إغلاق المهمة تلقائيا بعد هذا التاريخ."
 
@@ -3388,7 +3409,7 @@ msgstr "الانهيار"
 msgid "Brief summary for the in-app notification list…"
 msgstr "ملخص موجز لقائمة الإشعارات داخل التطبيق..."
 
-#: app/templates/auth/login.html:663 app/templates/core/dashboard.html:2926
+#: app/templates/auth/login.html:688 app/templates/core/dashboard.html:2926
 msgid "Briefly describe your role and why you need access"
 msgstr "اوصف بإيجاز دورك ولماذا تحتاج الوصول"
 
@@ -3457,11 +3478,11 @@ msgstr ""
 "قم بتحرير هذا التعيين بشكل جماعي في Excel، ثم أعد تحميل الملف هنا، ثم احفظه "
 "عندما تكون جاهزا."
 
-#: app/templates/forms/entry_form/entry_form.html:1155
-#: app/templates/forms/entry_form/entry_form.html:1296
-#: app/templates/forms/entry_form/entry_form.html:1449
-#: app/templates/forms/entry_form/entry_form.html:2133
-#: app/templates/forms/entry_form/entry_form.html:2283
+#: app/templates/forms/entry_form/entry_form.html:1156
+#: app/templates/forms/entry_form/entry_form.html:1297
+#: app/templates/forms/entry_form/entry_form.html:1450
+#: app/templates/forms/entry_form/entry_form.html:2134
+#: app/templates/forms/entry_form/entry_form.html:2284
 #: app/templates/forms/entry_form/export_pdf.html:340
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:206
 msgid "By Age:"
@@ -3477,21 +3498,21 @@ msgstr "حسب البلد"
 msgid "By Indicator"
 msgstr "حسب المؤشر"
 
-#: app/templates/forms/entry_form/entry_form.html:1159
-#: app/templates/forms/entry_form/entry_form.html:1300
-#: app/templates/forms/entry_form/entry_form.html:1453
-#: app/templates/forms/entry_form/entry_form.html:2156
-#: app/templates/forms/entry_form/entry_form.html:2287
+#: app/templates/forms/entry_form/entry_form.html:1160
+#: app/templates/forms/entry_form/entry_form.html:1301
+#: app/templates/forms/entry_form/entry_form.html:1454
+#: app/templates/forms/entry_form/entry_form.html:2157
+#: app/templates/forms/entry_form/entry_form.html:2288
 #: app/templates/forms/entry_form/export_pdf.html:359
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:210
 msgid "By Sex and Age:"
 msgstr "حسب الجنس والعمر:"
 
-#: app/templates/forms/entry_form/entry_form.html:1151
-#: app/templates/forms/entry_form/entry_form.html:1292
-#: app/templates/forms/entry_form/entry_form.html:1445
-#: app/templates/forms/entry_form/entry_form.html:2111
-#: app/templates/forms/entry_form/entry_form.html:2279
+#: app/templates/forms/entry_form/entry_form.html:1152
+#: app/templates/forms/entry_form/entry_form.html:1293
+#: app/templates/forms/entry_form/entry_form.html:1446
+#: app/templates/forms/entry_form/entry_form.html:2112
+#: app/templates/forms/entry_form/entry_form.html:2280
 #: app/templates/forms/entry_form/export_pdf.html:321
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:202
 msgid "By Sex:"
@@ -3571,7 +3592,7 @@ msgstr "رسائل البريد الإلكتروني للحملة"
 msgid "Campaigns"
 msgstr "المديرون"
 
-#: app/templates/forms/entry_form/entry_form.html:3828
+#: app/templates/forms/entry_form/entry_form.html:3829
 msgid "Can't find an indicator? Propose a new one here"
 msgstr "لا يمكن العثور على مؤشر؟ إقتراح واحد جديد هنا"
 
@@ -3585,9 +3606,9 @@ msgstr "لا يمكن العثور على مؤشر؟ إقتراح واحد جد�
 #: app/templates/admin/api_keys/revoke.html:21
 #: app/templates/admin/api_keys/revoke.html:80
 #: app/templates/admin/assignments/gantt_chart.html:246
-#: app/templates/admin/assignments/manage_assignment.html:829
-#: app/templates/admin/assignments/manage_assignment.html:844
-#: app/templates/admin/assignments/manage_assignment.html:1028
+#: app/templates/admin/assignments/manage_assignment.html:828
+#: app/templates/admin/assignments/manage_assignment.html:843
+#: app/templates/admin/assignments/manage_assignment.html:1027
 #: app/templates/admin/assignments/public_submissions.html:382
 #: app/templates/admin/common_words/manage_common_words.html:912
 #: app/templates/admin/common_words/manage_common_words.html:914
@@ -3646,8 +3667,8 @@ msgstr "لا يمكن العثور على مؤشر؟ إقتراح واحد جد�
 #: app/templates/components/auto_translate_modal_js.html:55
 #: app/templates/core/chat_immersive.html:50
 #: app/templates/core/dashboard.html:2944
-#: app/templates/forms/entry_form/entry_form.html:2923
-#: app/templates/forms/entry_form/entry_form.html:3976
+#: app/templates/forms/entry_form/entry_form.html:2924
+#: app/templates/forms/entry_form/entry_form.html:3977
 #: app/templates/forms/entry_form/validation_summary_progress.html:246
 #: app/templates/forms/form_builder/form_builder.html:226
 #: app/templates/forms/form_builder/form_builder.html:259
@@ -3670,7 +3691,7 @@ msgstr "لا يمكن العثور على مؤشر؟ إقتراح واحد جد�
 msgid "Cancel"
 msgstr "إلغاء"
 
-#: app/templates/forms/entry_form/entry_form.html:2690
+#: app/templates/forms/entry_form/entry_form.html:2691
 msgid "Cancel deletion"
 msgstr "إلغاء الحذف"
 
@@ -3698,7 +3719,7 @@ msgstr "الإلغاء..."
 msgid "Cancelling…"
 msgstr "الإلغاء..."
 
-#: app/templates/forms/entry_form/entry_form.html:2686
+#: app/templates/forms/entry_form/entry_form.html:2687
 #, python-format
 msgid ""
 "Cannot cancel deletion. This field allows a maximum of %(max)s document(s). "
@@ -3781,11 +3802,11 @@ msgstr "عرض تاريخ التغييرات"
 msgid "Change Type"
 msgstr "تغيير"
 
-#: app/templates/admin/assignments/manage_assignment.html:504
+#: app/templates/admin/assignments/manage_assignment.html:503
 msgid "Change due date"
 msgstr "تغيير تاريخ التسليم"
 
-#: app/templates/admin/assignments/manage_assignment.html:836
+#: app/templates/admin/assignments/manage_assignment.html:835
 msgid "Change due date of selected"
 msgstr "تغيير تاريخ الاستحقاق المختار"
 
@@ -3793,11 +3814,11 @@ msgstr "تغيير تاريخ الاستحقاق المختار"
 msgid "Change link"
 msgstr "تغيير الرابط"
 
-#: app/templates/admin/assignments/manage_assignment.html:501
+#: app/templates/admin/assignments/manage_assignment.html:500
 msgid "Change status"
 msgstr "حالة التغيير"
 
-#: app/templates/admin/assignments/manage_assignment.html:817
+#: app/templates/admin/assignments/manage_assignment.html:816
 msgid "Change status of selected"
 msgstr "حالة تغيير الاختيار"
 
@@ -3841,11 +3862,11 @@ msgstr ""
 msgid "Changes requested: %(template)s"
 msgstr "التغييرات المطلوبة: %(template)s"
 
-#: app/routes/main/helpers.py:1194
+#: app/routes/main/helpers.py:1152
 msgid "Changes were requested. Update the form and submit again when ready."
 msgstr "تم طلب تغييرات. قم بتحديث النموذج وقدم مرة أخرى عندما تكون جاهزا."
 
-#: app/templates/forms/entry_form/entry_form.html:2964
+#: app/templates/forms/entry_form/entry_form.html:2965
 msgid "Chat"
 msgstr "دردشة"
 
@@ -4225,7 +4246,7 @@ msgstr "إضغط على ملف إكسل هنا"
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:264
 #: app/templates/admin/indicator_bank/indicator_bank.html:467
-#: app/templates/forms/entry_form/entry_form.html:2657
+#: app/templates/forms/entry_form/entry_form.html:2658
 #: app/templates/forms/form_builder/partials/_excel_modal.html:71
 msgid "Click or drag Excel file here to import"
 msgstr "انقر أو اسحب ملف Excel هنا للاستيراد"
@@ -4246,7 +4267,7 @@ msgstr "قم بسحب ملف \"زي بي\" هنا"
 msgid "Click or drag an Excel file here"
 msgstr "انقر أو اسحب ملف إكسل هنا"
 
-#: app/templates/forms/entry_form/entry_form.html:2737
+#: app/templates/forms/entry_form/entry_form.html:2738
 msgid "Click or drag document here to upload"
 msgstr "انقر أو اسحب المستند هنا للرفع"
 
@@ -4258,7 +4279,12 @@ msgstr "انقر لتغيير الفئة"
 msgid "Click to change file"
 msgstr "انقر لتغيير الملف"
 
+#: app/templates/core/dashboard.html:3027
+msgid "Click to collapse"
+msgstr "إضغطْ للطي"
+
 #: app/templates/core/dashboard.html:1590
+#: app/templates/core/dashboard.html:3026
 msgid "Click to expand"
 msgstr "إضغطْ للتوسع"
 
@@ -4270,8 +4296,8 @@ msgstr "انقر لعدم الانتشار"
 msgid "Click to make public"
 msgstr "انقر للنشر العام"
 
-#: app/templates/forms/entry_form/entry_form.html:1738
-#: app/templates/forms/entry_form/entry_form.html:2476
+#: app/templates/forms/entry_form/entry_form.html:1739
+#: app/templates/forms/entry_form/entry_form.html:2477
 msgid "Click to repeat this group of fields multiple times"
 msgstr "انقر لتكرار هذه المجموعة من الحقول عدة مرات"
 
@@ -4342,7 +4368,7 @@ msgstr "قالب النسخ"
 #: app/templates/admin/translations/manage_translations.html:234
 #: app/templates/admin/translations/manage_translations.html:485
 #: app/templates/admin/user_management/user_form.html:1489
-#: app/templates/auth/login.html:642 app/templates/auth/login.html:690
+#: app/templates/auth/login.html:667 app/templates/auth/login.html:715
 #: app/templates/components/auto_translate_modal.html:359
 #: app/templates/components/auto_translate_modal.html:529
 #: app/templates/components/auto_translate_modal_js.html:54
@@ -4373,7 +4399,7 @@ msgstr "إغلاق القائمة"
 msgid "Close modal"
 msgstr "إغلاق القائمة"
 
-#: app/templates/forms/entry_form/entry_form.html:374
+#: app/templates/forms/entry_form/entry_form.html:375
 msgid "Close navigation"
 msgstr "إغلاق التنقل"
 
@@ -4381,7 +4407,7 @@ msgstr "إغلاق التنقل"
 msgid "Close this assignment? It can be reopened later by an admin."
 msgstr "هل ستغلق هذه المهمة؟ يمكن إعادة فتحه لاحقا من قبل المسؤول."
 
-#: app/routes/main/helpers.py:1232
+#: app/routes/main/helpers.py:1190
 #: app/templates/components/_assignment_status_pipeline.html:12
 #: app/templates/components/_status_label.html:26
 msgid "Closed"
@@ -4433,7 +4459,7 @@ msgstr "لا يمكن تغيير الكود بينما تشير المؤشرات
 msgid "Code cannot be changed while indicators reference this unit."
 msgstr "لا يمكن تغيير الرمز بينما تشير المؤشرات إلى هذه الوحدة."
 
-#: app/templates/forms/entry_form/entry_form.html:2989
+#: app/templates/forms/entry_form/entry_form.html:2990
 msgid "Collapse"
 msgstr "الانهيار"
 
@@ -4458,11 +4484,11 @@ msgstr "طي جميع الصفحات"
 msgid "Collapse all sections"
 msgstr "طي جميع الأقسام"
 
-#: app/templates/forms/entry_form/entry_form.html:2990
+#: app/templates/forms/entry_form/entry_form.html:2991
 msgid "Collapse editors list"
 msgstr "قائمة محرري الانهيار"
 
-#: app/templates/forms/entry_form/entry_form.html:381
+#: app/templates/forms/entry_form/entry_form.html:382
 msgid "Collapse navigation panel"
 msgstr "لوحة التنقل القابلة للطي"
 
@@ -4474,8 +4500,8 @@ msgstr "قسم الانهيار"
 msgid "Collapse subsection"
 msgstr "قسم الانهيار"
 
-#: app/templates/forms/entry_form/entry_form.html:749
-#: app/templates/forms/entry_form/entry_form.html:1761
+#: app/templates/forms/entry_form/entry_form.html:750
+#: app/templates/forms/entry_form/entry_form.html:1762
 msgid "Collapse/Expand"
 msgstr "الانهيار/التوسع"
 
@@ -4815,7 +4841,7 @@ msgstr "المؤمنين"
 msgid "Configured via deployment / Config.FEATURES"
 msgstr "تم تكوينه عبر النشر / Config.FEATURES"
 
-#: app/templates/admin/assignments/manage_assignment.html:1030
+#: app/templates/admin/assignments/manage_assignment.html:1029
 #: app/templates/admin/assignments/public_submissions.html:382
 msgid "Confirm"
 msgstr "تأكيد"
@@ -4833,7 +4859,7 @@ msgstr "تأكيد الحذف"
 msgid "Confirm New Password"
 msgstr "نسيت كلمة المرور؟"
 
-#: app/templates/auth/login.html:679 app/templates/auth/register.html:25
+#: app/templates/auth/login.html:704 app/templates/auth/register.html:25
 msgid "Confirm Password"
 msgstr "نسيت كلمة المرور؟"
 
@@ -4841,7 +4867,7 @@ msgstr "نسيت كلمة المرور؟"
 msgid "Confirm Plugin Uninstallation"
 msgstr "تأكيد إزالة الإضافة"
 
-#: app/templates/admin/assignments/manage_assignment.html:1038
+#: app/templates/admin/assignments/manage_assignment.html:1037
 msgid "Confirm action"
 msgstr "تأكيد الإجراء"
 
@@ -4882,19 +4908,19 @@ msgstr "اسم البلد"
 msgid "Contains"
 msgstr "يحتوي على"
 
-#: app/templates/auth/login.html:673 app/templates/auth/reset_password.html:40
+#: app/templates/auth/login.html:698 app/templates/auth/reset_password.html:40
 msgid "Contains a lowercase letter"
 msgstr "يحتوي على حرف صغير"
 
-#: app/templates/auth/login.html:674 app/templates/auth/reset_password.html:41
+#: app/templates/auth/login.html:699 app/templates/auth/reset_password.html:41
 msgid "Contains a number"
 msgstr "استمر"
 
-#: app/templates/auth/login.html:675 app/templates/auth/reset_password.html:42
+#: app/templates/auth/login.html:700 app/templates/auth/reset_password.html:42
 msgid "Contains a special character (e.g. !@#$)"
 msgstr "يحتوي على حرف خاص (مثلا !@#$)"
 
-#: app/templates/auth/login.html:672 app/templates/auth/reset_password.html:39
+#: app/templates/auth/login.html:697 app/templates/auth/reset_password.html:39
 msgid "Contains an uppercase letter"
 msgstr "يحتوي على حرف كبير"
 
@@ -4911,7 +4937,7 @@ msgstr "استمر"
 msgid "Context Data"
 msgstr "بيانات السياق"
 
-#: app/templates/admin/assignments/manage_assignment.html:1035
+#: app/templates/admin/assignments/manage_assignment.html:1034
 #: app/templates/admin/translations/manage_translations.html:667
 #: app/templates/forms/form_builder/form_builder.html:1241
 msgid "Continue"
@@ -4959,7 +4985,7 @@ msgstr "تم النسخ!"
 #: app/templates/admin/api_keys/rotate_success.html:57
 #: app/templates/admin/api_keys/rotate_success.html:109
 #: app/templates/admin/api_management.html:699
-#: app/templates/admin/assignments/manage_assignment.html:337
+#: app/templates/admin/assignments/manage_assignment.html:338
 #: app/templates/core/chat_immersive.html:53
 #: app/templates/forms/form_builder/partials/_item_modal.html:1054
 msgid "Copy"
@@ -5087,7 +5113,7 @@ msgstr "التكلفة:"
 msgid "Could not check for existing data. Please try again."
 msgstr "لم أتمكن من التحقق من البيانات الموجودة. يرجى المحاولة مرة أخرى."
 
-#: app/routes/auth.py:619
+#: app/routes/auth.py:803
 msgid "Could not complete Azure sign-in."
 msgstr "لم أتمكن من إكمال تسجيل الدخول إلى Azure."
 
@@ -5096,7 +5122,7 @@ msgstr "لم أتمكن من إكمال تسجيل الدخول إلى Azure."
 msgid "Could not create SP/EF entry."
 msgstr "لم أتمكن من إنشاء مدخل SP/EF."
 
-#: app/routes/auth.py:1111
+#: app/routes/auth.py:1313
 msgid "Could not create account. Please try again."
 msgstr "فشل في إرسال النموذج. يرجى المحاولة مرة أخرى."
 
@@ -5112,7 +5138,7 @@ msgstr "لم أتمكن من إنشاء النوع."
 msgid "Could not create unit."
 msgstr "لم أتمكن من إنشاء وحدة."
 
-#: app/routes/auth.py:759 app/routes/auth.py:764
+#: app/routes/auth.py:943 app/routes/auth.py:948
 msgid "Could not create user from Azure login."
 msgstr "لم أتمكن من إنشاء مستخدم من تسجيل الدخول إلى Azure."
 
@@ -5277,7 +5303,7 @@ msgstr "الدول – إكسل"
 #: app/templates/admin/ai/documents.html:531
 #: app/templates/admin/analytics/audit_trail.html:245
 #: app/templates/admin/analytics/audit_trail.html:448
-#: app/templates/admin/assignments/manage_assignment.html:736
+#: app/templates/admin/assignments/manage_assignment.html:735
 #: app/templates/admin/assignments/public_submissions.html:216
 #: app/templates/admin/countries/manage_country.html:4
 #: app/templates/admin/countries/manage_country.html:8
@@ -5355,7 +5381,7 @@ msgstr "التوزيع على الدول"
 
 #: app/templates/admin/dashboard.html:59
 msgid "Country focal points"
-msgstr "نقاط التركيز في البلدان"
+msgstr "نقاط اتصال في البلدان"
 
 #: app/templates/admin/analytics/audit_trail.html:436
 msgid "Country selection"
@@ -5371,7 +5397,7 @@ msgstr "ملخص البلد"
 msgid "Country whose data you will manage"
 msgstr "الدولة التي ستدير بياناتها"
 
-#: app/templates/auth/login.html:656
+#: app/templates/auth/login.html:681
 msgid "Country you will cover"
 msgstr "البلد الذي ستغطيه"
 
@@ -5414,7 +5440,7 @@ msgstr "إنشاء"
 msgid "Create API Key"
 msgstr "إنشاء تقرير"
 
-#: app/templates/auth/login.html:682
+#: app/templates/auth/login.html:707
 msgid "Create Account"
 msgstr "تم الإنشاء في"
 
@@ -5540,11 +5566,11 @@ msgstr ""
 "ومنطق شرطي. استخدم القوالب لتوحيد جمع البيانات عبر فترات مختلفة وضمان "
 "الاتساق في سير عمل التقارير الخاص بك."
 
-#: app/templates/admin/assignments/manage_assignment.html:1032
+#: app/templates/admin/assignments/manage_assignment.html:1031
 msgid "Create anyway"
 msgstr "اصنع على أي حال"
 
-#: app/templates/admin/assignments/manage_assignment.html:1034
+#: app/templates/admin/assignments/manage_assignment.html:1033
 msgid "Create assignment"
 msgstr "إنشاء المهمة"
 
@@ -5572,7 +5598,7 @@ msgstr ""
 msgid "Create with AI"
 msgstr "إنشاء باستخدام الذكاء الاصطناعي"
 
-#: app/templates/auth/login.html:643 app/templates/auth/register.html:5
+#: app/templates/auth/login.html:668 app/templates/auth/register.html:5
 msgid "Create your account"
 msgstr "سجل الدخول إلى حسابك"
 
@@ -5651,7 +5677,7 @@ msgstr "رمز العملة"
 msgid "Current"
 msgstr "الحالي"
 
-#: app/templates/forms/entry_form/entry_form.html:2723
+#: app/templates/forms/entry_form/entry_form.html:2724
 msgid "Current Document:"
 msgstr "تعديل المستند"
 
@@ -5668,7 +5694,7 @@ msgstr "مقاييس النظام الحالية"
 msgid "Current Year View"
 msgstr "رمز العملة"
 
-#: app/templates/admin/assignments/manage_assignment.html:196
+#: app/templates/admin/assignments/manage_assignment.html:197
 msgid "Current name:"
 msgstr "الاسم الحالي:"
 
@@ -5694,7 +5720,7 @@ msgstr "الصورة المصغرة الحالية:"
 msgid "Currently viewing/editing this version"
 msgstr "حاليا أشاهد/أقوم بتحرير هذا الإصدار"
 
-#: app/templates/forms/entry_form/entry_form.html:2985
+#: app/templates/forms/entry_form/entry_form.html:2986
 msgid "Currently with you editing this form:"
 msgstr "حاليا معك أثناء تحرير هذا النموذج:"
 
@@ -5717,11 +5743,11 @@ msgstr "الحقول المخصصة"
 msgid "Custom Label (Optional)"
 msgstr "الملصق المخصص (اختياري)"
 
-#: app/templates/admin/assignments/manage_assignment.html:161
+#: app/templates/admin/assignments/manage_assignment.html:162
 msgid "Custom Name"
 msgstr "الاسم المخصص"
 
-#: app/templates/admin/assignments/manage_assignment.html:769
+#: app/templates/admin/assignments/manage_assignment.html:768
 msgid "Custom Name Translations"
 msgstr "ترجمات الأسماء المخصصة"
 
@@ -5935,7 +5961,7 @@ msgstr "أسئلة التحقق من صحة البيانات"
 msgid "Data Values"
 msgstr "قيم البيانات"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:436
+#: app/templates/forms/entry_form/partials/matrix_table.html:438
 msgid "Data availability options"
 msgstr "مؤشر جودة البيانات"
 
@@ -5943,13 +5969,13 @@ msgstr "مؤشر جودة البيانات"
 msgid "Data collection launch"
 msgstr "إطلاق جمع البيانات"
 
-#: app/routes/main/helpers.py:1191
+#: app/routes/main/helpers.py:1149
 msgid ""
 "Data entry is underway. You can save drafts and continue completing the "
 "form."
 msgstr "يتم إدخال البيانات جاريا. يمكنك حفظ المسودات ومتابعة إكمال النموذج."
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:72
+#: app/templates/forms/entry_form/partials/matrix_table.html:74
 msgid "Data matrix for"
 msgstr "تصدير البيانات"
 
@@ -6026,7 +6052,7 @@ msgid "Day of week"
 msgstr "يوم الأسبوع"
 
 #: app/templates/admin/assignments/assignments.html:127
-#: app/templates/admin/assignments/manage_assignment.html:342
+#: app/templates/admin/assignments/manage_assignment.html:343
 #: app/templates/admin/plugin_management.html:212
 #: app/templates/admin/user_management/user_form.html:29
 #: app/templates/admin/user_management/user_form.html:765
@@ -6047,12 +6073,12 @@ msgstr "تذكير بموعد الاستحقاق"
 msgid "Deadline reminder"
 msgstr "تذكير بالموعد النهائي"
 
-#: app/templates/admin/assignments/manage_assignment.html:123
-#: app/templates/admin/assignments/manage_assignment.html:143
+#: app/templates/admin/assignments/manage_assignment.html:124
+#: app/templates/admin/assignments/manage_assignment.html:144
 #: app/templates/admin/documents/documents.html:293
 #: app/templates/admin/documents/documents.html:319
-#: app/templates/forms/entry_form/entry_form.html:2868
-#: app/templates/forms/entry_form/entry_form.html:2894
+#: app/templates/forms/entry_form/entry_form.html:2869
+#: app/templates/forms/entry_form/entry_form.html:2895
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:76
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:89
 #: app/templates/forms/form_builder/partials/_item_modal.html:548
@@ -6114,7 +6140,7 @@ msgstr "القوالب الافتراضية"
 msgid "Default title"
 msgstr "العنوان الافتراضي"
 
-#: app/templates/admin/assignments/manage_assignment.html:200
+#: app/templates/admin/assignments/manage_assignment.html:201
 msgid "Default:"
 msgstr "الافتراضي:"
 
@@ -6138,10 +6164,10 @@ msgstr ""
 #: app/templates/admin/validation_questions.html:212
 #: app/templates/admin/validation_questions.html:275
 #: app/templates/components/_builder_items.html:68
-#: app/templates/forms/entry_form/entry_form.html:1033
-#: app/templates/forms/entry_form/entry_form.html:1064
-#: app/templates/forms/entry_form/entry_form.html:1982
-#: app/templates/forms/entry_form/entry_form.html:2012
+#: app/templates/forms/entry_form/entry_form.html:1034
+#: app/templates/forms/entry_form/entry_form.html:1065
+#: app/templates/forms/entry_form/entry_form.html:1983
+#: app/templates/forms/entry_form/entry_form.html:2013
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:90
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:120
 #: app/templates/forms/form_builder/form_builder.html:626
@@ -6234,7 +6260,7 @@ msgstr "حذف كلمة شائعة؟"
 msgid "Delete Data and Remove"
 msgstr "حذف البيانات وإزالتها"
 
-#: app/templates/forms/entry_form/entry_form.html:2683
+#: app/templates/forms/entry_form/entry_form.html:2684
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:109
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:160
 msgid "Delete Document"
@@ -6324,7 +6350,7 @@ msgid "Delete sector"
 msgstr "حذف القطاع"
 
 #: app/templates/admin/ai/reasoning_traces.html:149
-#: app/templates/admin/assignments/manage_assignment.html:498
+#: app/templates/admin/assignments/manage_assignment.html:497
 msgid "Delete selected"
 msgstr "حذف الاختيار"
 
@@ -6348,7 +6374,7 @@ msgstr "هل أحذف هذا الرمز SP/EF؟ لا يمكن التراجع ع�
 msgid "Delete this conversation? This cannot be undone."
 msgstr "هل أحذف هذه المحادثة؟ لا يمكن التراجع عن هذا."
 
-#: app/templates/forms/entry_form/entry_form.html:3806
+#: app/templates/forms/entry_form/entry_form.html:3807
 msgid "Delete this entry"
 msgstr "حذف هذا الإدخال"
 
@@ -6542,10 +6568,10 @@ msgstr "صف نموذجك أو أرفق استبيانا. المساعد يكت�
 #: app/templates/components/_builder_items.html:89
 #: app/templates/components/_builder_items.html:95
 #: app/templates/components/_builder_items.html:108
-#: app/templates/forms/entry_form/entry_form.html:860
-#: app/templates/forms/entry_form/entry_form.html:1083
-#: app/templates/forms/entry_form/entry_form.html:1822
-#: app/templates/forms/entry_form/entry_form.html:2031
+#: app/templates/forms/entry_form/entry_form.html:861
+#: app/templates/forms/entry_form/entry_form.html:1084
+#: app/templates/forms/entry_form/entry_form.html:1823
+#: app/templates/forms/entry_form/entry_form.html:2032
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:65
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:139
 #: app/templates/forms/form_builder/form_builder.html:658
@@ -6662,7 +6688,7 @@ msgstr "الإعاقة"
 msgid "Disability questions"
 msgstr "أسئلة حول الإعاقة"
 
-#: app/templates/admin/assignments/manage_assignment.html:511
+#: app/templates/admin/assignments/manage_assignment.html:510
 msgid "Disable public reporting"
 msgstr "تعطيل التقارير العامة"
 
@@ -6802,7 +6828,7 @@ msgstr "تم اختيار الفصل"
 msgid "Dismiss selected email failure(s) without retrying?"
 msgstr "هل يمكن إلغاء بعض الفشل في البريد الإلكتروني دون إعادة المحاولة؟"
 
-#: app/templates/forms/entry_form/entry_form.html:2953
+#: app/templates/forms/entry_form/entry_form.html:2954
 msgid "Dismiss warning"
 msgstr "تحذيرات إضافية:"
 
@@ -6908,7 +6934,7 @@ msgstr "اسم القسم"
 msgid "Divisions"
 msgstr "التعاريف"
 
-#: app/templates/admin/assignments/manage_assignment.html:657
+#: app/templates/admin/assignments/manage_assignment.html:656
 #: app/templates/admin/user_management/user_form.html:971
 msgid "Divisions & Departments"
 msgstr "الأقسام والأقسام"
@@ -6980,7 +7006,7 @@ msgstr "الوثيقة Labels"
 msgid "Document Management"
 msgstr "إدارة المستندات"
 
-#: app/templates/forms/entry_form/entry_form.html:2695
+#: app/templates/forms/entry_form/entry_form.html:2696
 msgid "Document Selected"
 msgstr "حقل المستندات"
 
@@ -6998,7 +7024,7 @@ msgstr "نوع المستند"
 msgid "Document Type (Optional)"
 msgstr "نوع المستند (اختياري)"
 
-#: app/templates/forms/entry_form/entry_form.html:2782
+#: app/templates/forms/entry_form/entry_form.html:2783
 msgid "Document Type:"
 msgstr "نوع المستند"
 
@@ -7006,7 +7032,7 @@ msgstr "نوع المستند"
 msgid "Document Types"
 msgstr "أنواع المستندات"
 
-#: app/templates/forms/entry_form/entry_form.html:2694
+#: app/templates/forms/entry_form/entry_form.html:2695
 msgid "Document Updated"
 msgstr "تم تحميل المستند"
 
@@ -7014,7 +7040,7 @@ msgstr "تم تحميل المستند"
 msgid "Document Upload"
 msgstr "الوثيقة:"
 
-#: app/templates/forms/entry_form/entry_form.html:2935
+#: app/templates/forms/entry_form/entry_form.html:2936
 msgid "Document Upload Not Available"
 msgstr "تم تحميل المستند"
 
@@ -7047,7 +7073,7 @@ msgstr "عنوان الوثيقة (اختياري)"
 msgid "Document types"
 msgstr "أنواع الوثائق"
 
-#: app/templates/forms/entry_form/entry_form.html:2936
+#: app/templates/forms/entry_form/entry_form.html:2937
 msgid "Document upload is disabled when the form is read-only."
 msgstr "الاستيراد معطل عندما يتم إرسال النموذج أو الموافقة عليه."
 
@@ -7055,7 +7081,7 @@ msgstr "الاستيراد معطل عندما يتم إرسال النموذج 
 msgid "Document uploaded"
 msgstr "المستند المرفوع"
 
-#: app/routes/main/helpers.py:1350
+#: app/routes/main/helpers.py:1308
 #, python-format
 msgid "Document uploaded: %(document)s"
 msgstr "الوثائق المحملة: %(document)s"
@@ -7171,7 +7197,7 @@ msgstr "تحميل المستند"
 msgid "Download preview Excel"
 msgstr "تحميل المعاينة التجريبية لبرنامج Excel"
 
-#: app/templates/forms/entry_form/entry_form.html:2616
+#: app/templates/forms/entry_form/entry_form.html:2617
 msgid "Download template"
 msgstr "تحميل القالب"
 
@@ -7252,7 +7278,7 @@ msgstr "سحب أنواع المستخدمين لتكوين التوزيع"
 msgid "Drop UPR Master.xlsx here or click to browse"
 msgstr "يمكنك Master.xlsx UPR هنا أو انقر للتصفح"
 
-#: app/templates/forms/entry_form/entry_form.html:2632
+#: app/templates/forms/entry_form/entry_form.html:2633
 msgid "Drop your saved workbook here"
 msgstr "ضع كتاب العمل المحفوظ الخاص بك هنا"
 
@@ -7269,8 +7295,8 @@ msgid "Dry run (preview only, no DB write)"
 msgstr "تجربة تجريبية (معاينة فقط، بدون كتابة قاعدة بيانات)"
 
 #: app/templates/admin/assignments/assignments.html:119
-#: app/templates/admin/assignments/manage_assignment.html:236
-#: app/templates/admin/assignments/manage_assignment.html:368
+#: app/templates/admin/assignments/manage_assignment.html:237
+#: app/templates/admin/assignments/manage_assignment.html:369
 #: app/templates/core/dashboard.html:1289
 msgid "Due Date"
 msgstr "تاريخ الاستحقاق"
@@ -7317,7 +7343,7 @@ msgstr "القسم المكرر"
 msgid "Duplicate Sub-section"
 msgstr "المادة الفرعية المزدوجة"
 
-#: app/templates/admin/assignments/manage_assignment.html:1033
+#: app/templates/admin/assignments/manage_assignment.html:1032
 msgid "Duplicate assignment"
 msgstr "التعيين المكرر"
 
@@ -7433,7 +7459,7 @@ msgid ""
 msgstr ""
 "كل صف يصف من يتلقى الإشعار داخل التطبيق عند إنشائه، ومدة الاحتفاظ به (TTL)، "
 "والأولوية الافتراضية للإشعارات الجديدة من هذا النوع. عند الاقتضاء، قم بتمكين"
-" أو تعطيل التسليم إلى نقاط التركيز (محرر التعيين/المرسل على الكيان) "
+" أو تعطيل التسليم إلى نقاط اتصال (محرر التعيين/المرسل على الكيان) "
 "وللمستخدمين القادرين على الإدارة (system_manager، admin_core، admin_*). تظهر"
 " العناصر المخزنة في مركز الاتصالات؛ تعتمد WebSockets، push، والبريد "
 "الإلكتروني على علامات الميزات وتفضيلات كل مستخدم نفسه. الأولويات العالية "
@@ -7449,7 +7475,7 @@ msgstr ""
 "كل قسم يجمع الحقول ذات الصلة معا. انقر على زر الطي (△) لإخفاء أو عرض محتوى "
 "القسم. املأ جميع الحقول المطلوبة الموسومة بنجمة حمراء (*)."
 
-#: app/templates/admin/assignments/manage_assignment.html:371
+#: app/templates/admin/assignments/manage_assignment.html:372
 msgid "Earliest:"
 msgstr "الأقدم:"
 
@@ -7512,7 +7538,7 @@ msgid "Edit Details"
 msgstr "تحرير التفاصيل"
 
 #: app/templates/admin/documents/documents.html:109
-#: app/templates/forms/entry_form/entry_form.html:2682
+#: app/templates/forms/entry_form/entry_form.html:2683
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:104
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:105
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:155
@@ -7562,7 +7588,7 @@ msgstr "قسم التحرير"
 msgid "Edit Sector"
 msgstr "تعديل القطاع"
 
-#: app/templates/admin/assignments/manage_assignment.html:780
+#: app/templates/admin/assignments/manage_assignment.html:779
 msgid "Edit Status"
 msgstr "حالة التعديل"
 
@@ -7653,10 +7679,10 @@ msgstr "المؤشرات المؤهلة: عدد المؤشرات المدرجة 
 #: app/templates/admin/user_management/user_form.html:1105
 #: app/templates/admin/user_management/users.html:292
 #: app/templates/auth/forgot_password.html:10
-#: app/templates/auth/login.html:648 app/templates/auth/login.html:697
-#: app/templates/auth/register.html:9 app/templates/core/dashboard.html:2405
-#: app/templates/core/dashboard.html:2462
-#: app/templates/core/dashboard.html:2512 app/templates/core/layout.html:311
+#: app/templates/auth/login.html:673 app/templates/auth/login.html:722
+#: app/templates/auth/register.html:9 app/templates/core/dashboard.html:2404
+#: app/templates/core/dashboard.html:2461
+#: app/templates/core/dashboard.html:2511 app/templates/core/layout.html:311
 #: app/templates/notifications/_preferences_form.html:86
 #: app/templates/public_submission_export_pdf.html:25
 msgid "Email"
@@ -7917,7 +7943,7 @@ msgstr ""
 msgid "Enable Sound"
 msgstr "تمكين الصوت"
 
-#: app/templates/admin/assignments/manage_assignment.html:508
+#: app/templates/admin/assignments/manage_assignment.html:507
 msgid "Enable public reporting"
 msgstr "تمكين التقارير العامة"
 
@@ -7945,9 +7971,9 @@ msgstr "جميع أنواع الأنشطة"
 msgid "End"
 msgstr "النهاية"
 
-#: app/templates/admin/assignments/manage_assignment.html:128
+#: app/templates/admin/assignments/manage_assignment.html:129
 #: app/templates/admin/documents/documents.html:298
-#: app/templates/forms/entry_form/entry_form.html:2873
+#: app/templates/forms/entry_form/entry_form.html:2874
 msgid "End Period"
 msgstr "الفترة الزمنية"
 
@@ -7955,9 +7981,9 @@ msgstr "الفترة الزمنية"
 msgid "End Tour"
 msgstr "الجولة النهائية"
 
-#: app/templates/admin/assignments/manage_assignment.html:103
+#: app/templates/admin/assignments/manage_assignment.html:104
 #: app/templates/admin/documents/documents.html:256
-#: app/templates/forms/entry_form/entry_form.html:2831
+#: app/templates/forms/entry_form/entry_form.html:2832
 #: app/templates/forms/form_builder/partials/_item_modal.html:513
 msgid "End Year"
 msgstr "السنة"
@@ -8073,7 +8099,7 @@ msgstr "أدخل المصطلح أو العبارة"
 msgid "Enter translation"
 msgstr "ترجمة"
 
-#: app/templates/auth/forgot_password.html:6 app/templates/auth/login.html:692
+#: app/templates/auth/forgot_password.html:6 app/templates/auth/login.html:717
 msgid "Enter your email and we'll send you a link to reset your password."
 msgstr "أدخل بريدك الإلكتروني وسنرسل لك رابطا لإعادة تعيين كلمة المرور."
 
@@ -8103,7 +8129,7 @@ msgstr "الكيان"
 msgid "Entity Access"
 msgstr "الوصول إلى الكيان"
 
-#: app/templates/admin/assignments/manage_assignment.html:417
+#: app/templates/admin/assignments/manage_assignment.html:418
 msgid "Entity Assignments"
 msgstr "تعيينات الكيانات"
 
@@ -8136,7 +8162,7 @@ msgstr "نوع النشاط"
 msgid "Entity Types to Include"
 msgstr "أنواع الكيانات التي يجب تضمينها"
 
-#: app/templates/admin/assignments/manage_assignment.html:432
+#: app/templates/admin/assignments/manage_assignment.html:433
 msgid "Entity assignment mode"
 msgstr "وضع تعيين الكيانات"
 
@@ -8152,7 +8178,7 @@ msgstr "حملات الكيانات فقط"
 msgid "Entity-based"
 msgstr "الكيان"
 
-#: app/templates/forms/entry_form/entry_form.html:3805
+#: app/templates/forms/entry_form/entry_form.html:3806
 msgid "Entry"
 msgstr "إدخال"
 
@@ -8407,7 +8433,7 @@ msgid ""
 "Example: I am the Focal Point for reporting and need access to submit annual"
 " data."
 msgstr ""
-"مثال: أنا النقطة المحورية للتقارير وأحتاج إلى الوصول لتقديم البيانات "
+"مثال: أنا نقطة اتصال للتقارير وأحتاج إلى الوصول لتقديم البيانات "
 "السنوية."
 
 #: app/templates/admin/organization/_countries_component.html:26
@@ -8433,7 +8459,7 @@ msgstr "استيراد/تصدير إكسل"
 msgid "Excel Import/Export"
 msgstr "استيراد/تصدير إكسل"
 
-#: app/templates/forms/entry_form/entry_form.html:2670
+#: app/templates/forms/entry_form/entry_form.html:2671
 msgid "Excel Import/Export Not Available"
 msgstr "استيراد/تصدير إكسل غير متوفر"
 
@@ -8441,10 +8467,10 @@ msgstr "استيراد/تصدير إكسل غير متوفر"
 msgid "Excel Imported"
 msgstr "إكسل مستورد"
 
-#: app/templates/forms/entry_form/entry_form.html:2600
-#: app/templates/forms/entry_form/entry_form.html:2643
-#: app/templates/forms/entry_form/entry_form.html:2666
+#: app/templates/forms/entry_form/entry_form.html:2601
+#: app/templates/forms/entry_form/entry_form.html:2644
 #: app/templates/forms/entry_form/entry_form.html:2667
+#: app/templates/forms/entry_form/entry_form.html:2668
 #: app/templates/forms/form_builder/partials/_excel_modal.html:4
 #: app/templates/forms/form_builder/partials/_excel_modal.html:56
 #: app/templates/macros/excel_io_modal.html:58
@@ -8482,12 +8508,12 @@ msgstr ""
 msgid "Excel import requires a 'msgid' column header."
 msgstr "إستيراد \"إكسل\" يتطلب رأس عمود."
 
-#: app/routes/main/helpers.py:1355
+#: app/routes/main/helpers.py:1313
 #, python-format
 msgid "Excel imported: %(count)s values loaded"
 msgstr "تم استيراد إكسل: قيم %(count)s محملة"
 
-#: app/templates/forms/entry_form/entry_form.html:2671
+#: app/templates/forms/entry_form/entry_form.html:2672
 msgid "Excel operations are not available for public submissions."
 msgstr "عمليات إكسل غير متوفرة للطلبات العامة."
 
@@ -8516,7 +8542,7 @@ msgstr "مسار التنفيذ"
 msgid "Exit fill content area"
 msgstr "منطقة محتوى الخروج المليء"
 
-#: app/templates/forms/entry_form/entry_form.html:2577
+#: app/templates/forms/entry_form/entry_form.html:2578
 msgid "Expand Sections Menu"
 msgstr "فتح قائمة الأقسام"
 
@@ -8539,7 +8565,7 @@ msgstr "توسيع جميع الصفحات"
 msgid "Expand all sections"
 msgstr "توسيع جميع الأقسام"
 
-#: app/templates/forms/entry_form/entry_form.html:2975
+#: app/templates/forms/entry_form/entry_form.html:2976
 msgid "Expand editors list"
 msgstr "توسيع قائمة المحررين"
 
@@ -8592,8 +8618,8 @@ msgid "Expires"
 msgstr "خبراء"
 
 #: app/templates/admin/assignments/assignments.html:120
-#: app/templates/admin/assignments/manage_assignment.html:251
-#: app/templates/admin/assignments/manage_assignment.html:387
+#: app/templates/admin/assignments/manage_assignment.html:252
+#: app/templates/admin/assignments/manage_assignment.html:388
 msgid "Expiry Date"
 msgstr "تاريخ الانتهاء"
 
@@ -8646,7 +8672,7 @@ msgstr "تصدير CSV"
 msgid "Export Data"
 msgstr "استكشاف البيانات"
 
-#: app/templates/forms/entry_form/entry_form.html:2650
+#: app/templates/forms/entry_form/entry_form.html:2651
 msgid "Export Data Template (.xlsx)"
 msgstr "تصدير قالب البيانات (.xlsx)"
 
@@ -8692,7 +8718,7 @@ msgstr "هيكل قالب التصدير (.xlsx)"
 msgid "Export Timeline"
 msgstr "خيارات التصدير"
 
-#: app/templates/forms/entry_form/entry_form.html:2624
+#: app/templates/forms/entry_form/entry_form.html:2625
 msgid "Export UPR Country Reporting (.xlsx)"
 msgstr "تصدير تقارير الدول في UPR (.xlsx)"
 
@@ -8878,11 +8904,11 @@ msgstr "فشل تسجيل الدخول"
 msgid "Failed logins"
 msgstr "تسجيل الدخول الفاشل"
 
-#: app/templates/forms/entry_form/entry_form.html:3543
+#: app/templates/forms/entry_form/entry_form.html:3544
 msgid "Failed modules"
 msgstr "فشل عمليات تسجيل الدخول"
 
-#: app/templates/forms/entry_form/entry_form.html:3830
+#: app/templates/forms/entry_form/entry_form.html:3831
 msgid "Failed to add indicator"
 msgstr "فشل في إضافة المؤشر"
 
@@ -8909,7 +8935,7 @@ msgstr "فشل في إنشاء سؤال متابعة"
 msgid "Failed to delete document."
 msgstr "لم تحذف الوثيقة."
 
-#: app/templates/forms/entry_form/entry_form.html:3835
+#: app/templates/forms/entry_form/entry_form.html:3836
 msgid "Failed to delete indicator"
 msgstr "فشل في حذف المؤشر"
 
@@ -9011,7 +9037,7 @@ msgstr "فشل في الترجمة"
 msgid "Failed to save indicator"
 msgstr "فشل في حفظ مؤشر"
 
-#: app/routes/auth.py:1415
+#: app/routes/auth.py:1641
 msgid "Failed to save profile. Please try again."
 msgstr "فشل في حفظ الملف الشخصي. يرجى المحاولة مرة أخرى."
 
@@ -9116,12 +9142,12 @@ msgstr "البحث في نقطة النهاية"
 msgid "Features"
 msgstr "المعالم"
 
-#: app/templates/admin/assignments/manage_assignment.html:113
-#: app/templates/admin/assignments/manage_assignment.html:133
+#: app/templates/admin/assignments/manage_assignment.html:114
+#: app/templates/admin/assignments/manage_assignment.html:134
 #: app/templates/admin/documents/documents.html:283
 #: app/templates/admin/documents/documents.html:309
-#: app/templates/forms/entry_form/entry_form.html:2858
-#: app/templates/forms/entry_form/entry_form.html:2884
+#: app/templates/forms/entry_form/entry_form.html:2859
+#: app/templates/forms/entry_form/entry_form.html:2885
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:73
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:86
 #: app/templates/forms/form_builder/partials/_item_modal.html:538
@@ -9147,8 +9173,8 @@ msgstr "معرف الحقل"
 msgid "Field Label"
 msgstr "ميدانية"
 
-#: app/templates/forms/entry_form/entry_form.html:930
-#: app/templates/forms/entry_form/entry_form.html:1891
+#: app/templates/forms/entry_form/entry_form.html:931
+#: app/templates/forms/entry_form/entry_form.html:1892
 msgid "Field Type No Longer Supported"
 msgstr "نوع الحقل لم يعد مدعوما"
 
@@ -9172,7 +9198,7 @@ msgid "Field to sort by (submitted_at, template_id, country_id, period_name)"
 msgstr ""
 "الحقل للترتيب حسب (submitted_at، template_id، country_id، period_name)"
 
-#: app/templates/forms/entry_form/entry_form.html:2704
+#: app/templates/forms/entry_form/entry_form.html:2705
 msgid "Field:"
 msgstr "الميدان:"
 
@@ -9208,7 +9234,7 @@ msgstr "الملف كبير جدا (الحد الأقصى 50 ميجابايت)"
 msgid "File is too large (max 80 MB)"
 msgstr "الملف كبير جدا (الحد الأقصى 80 ميجابايت)"
 
-#: app/templates/forms/entry_form/entry_form.html:2684
+#: app/templates/forms/entry_form/entry_form.html:2685
 msgid "File size exceeds 25MB limit. Please select a smaller file."
 msgstr "حجم الملف يتجاوز الحد الأقصى 25 ميجابايت. يرجى اختيار ملف أصغر."
 
@@ -9508,9 +9534,9 @@ msgstr ""
 #: app/templates/admin/dashboard.html:280
 #: app/templates/admin/user_management/user_form.html:309
 #: app/templates/admin/user_management/users.html:183
-#: app/templates/tours/tours.html:478
+#: app/templates/auth/login.html:632 app/templates/tours/tours.html:478
 msgid "Focal Point"
-msgstr "نقطة التركيز"
+msgstr "نقطة اتصال"
 
 #: app/templates/admin/communication/center.html:311
 #: app/templates/admin/communication/center.html:313
@@ -9518,26 +9544,26 @@ msgstr "نقطة التركيز"
 #: app/templates/admin/dashboard.html:55
 #: app/templates/core/dashboard.html:2433
 msgid "Focal Points"
-msgstr "نقاط التركيز"
+msgstr "نقاط اتصال"
 
 #: app/templates/core/dashboard.html:2361
 msgid "Focal Points for"
-msgstr "نقاط التركيز لـ"
+msgstr "نقاط اتصال لـ"
 
 #: app/templates/admin/settings/manage_settings.html:1505
 msgid "Focal points"
-msgstr "نقاط التركيز"
+msgstr "نقاط اتصال"
 
 #: app/templates/forms/form_builder/partials/_section_modal.html:84
 msgid "Focal points can add indicators from the indicator bank"
-msgstr "يمكن للنقاط المحورية إضافة مؤشرات من بنك المؤشرات"
+msgstr "يمكن لنقاط اتصال إضافة مؤشرات من بنك المؤشرات"
 
-#: app/templates/admin/assignments/manage_assignment.html:291
+#: app/templates/admin/assignments/manage_assignment.html:292
 msgid ""
 "Focal points will be notified about the new assignment. Uncheck to create "
 "without sending notifications."
 msgstr ""
-"سيتم إخطار النقاط المحورية بالمهمة الجديدة. قم بإلغاء التحديد لإنشاء دون "
+"سيتم إخطار نقاط اتصال بالمهمة الجديدة. قم بإلغاء التحديد لإنشاء دون "
 "إرسال إشعارات."
 
 #: app/templates/admin/validation_questions.html:306
@@ -9556,7 +9582,7 @@ msgstr "سؤال متابعة"
 #: app/templates/admin/validation_questions.html:313
 msgid ""
 "Follow-up question created. Send open questions to notify focal points."
-msgstr "تم إنشاء سؤال متابعة. أرسل أسئلة مفتوحة لإبلاغ نقاط التركيز."
+msgstr "تم إنشاء سؤال متابعة. أرسل أسئلة مفتوحة لإبلاغ نقاط اتصال."
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:273
 msgid "Food Security"
@@ -9574,7 +9600,7 @@ msgstr "إجبار صف جديد بعد هذا العنصر"
 msgid "Forgot Password"
 msgstr "نسيت كلمة المرور؟"
 
-#: app/templates/auth/forgot_password.html:5 app/templates/auth/login.html:691
+#: app/templates/auth/forgot_password.html:5 app/templates/auth/login.html:716
 msgid "Forgot your password?"
 msgstr "نسيت كلمة المرور؟"
 
@@ -9649,11 +9675,11 @@ msgstr ""
 "ملفات. بعض الحقول تعرض تلميحات أدوات (i) مع معلومات إضافية. الحقول المميزة "
 "باللون الأصفر تحتوي على قيم معبأة مسبقا يمكنك مراجعتها وتعديلها."
 
-#: app/templates/forms/entry_form/entry_form.html:3522
+#: app/templates/forms/entry_form/entry_form.html:3523
 msgid "Form initialization failed"
 msgstr "فشل التحقق: "
 
-#: app/templates/forms/entry_form/entry_form.html:3422
+#: app/templates/forms/entry_form/entry_form.html:3423
 msgid "Form initialization timeout - some modules may have failed to load"
 msgstr "مهلة تهيئة النموذج - قد تكون بعض الوحدات فشلت في التحميل"
 
@@ -9841,7 +9867,7 @@ msgstr "إعلان عام"
 msgid "Generate PDF Thumbnail"
 msgstr "URL المُنشأ"
 
-#: app/templates/admin/assignments/manage_assignment.html:358
+#: app/templates/admin/assignments/manage_assignment.html:359
 msgid "Generate Public URL"
 msgstr "URL المُنشأ"
 
@@ -9956,7 +9982,7 @@ msgstr "لوحة تحكم الحوكمة"
 msgid "Governance, finance, and people-reached indicators"
 msgstr "مؤشرات الحوكمة والمالية والأشخاص الذين يوصلون إليها"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:216
+#: app/templates/forms/entry_form/partials/matrix_table.html:218
 msgid "Grand total for matrix"
 msgstr "المجموع الكلي للمصفوفة"
 
@@ -9965,7 +9991,7 @@ msgstr "المجموع الكلي للمصفوفة"
 msgid "Granted directly"
 msgstr "منحت مباشرة"
 
-#: app/templates/auth/login.html:1237
+#: app/templates/auth/login.html:1304
 msgid "Great! This email is available."
 msgstr "رائع! هذا البريد الإلكتروني متاح."
 
@@ -10165,6 +10191,7 @@ msgstr "ساعد زملاءك على معرفة من أنت."
 
 #: app/templates/admin/ai/conversation_traces.html:349
 #: app/templates/admin/ai/trace_detail.html:87
+#: app/templates/core/dashboard.html:3029
 msgid "Hide"
 msgstr "اختبئ"
 
@@ -10186,6 +10213,10 @@ msgstr "فرق الاختباء"
 #: app/templates/macros/filter_card.html:37
 msgid "Hide filters"
 msgstr "مرشحات إخفاء"
+
+#: app/templates/core/dashboard.html:3031
+msgid "Hide past assignments"
+msgstr "إخفاء المهام السابقة"
 
 #: app/templates/core/dashboard.html:3017
 msgid "Hide score breakdown"
@@ -10435,7 +10466,7 @@ msgstr "فئة الأيقونة"
 msgid "Identity confirmed"
 msgstr "تأكيد الهوية"
 
-#: app/routes/auth.py:1160
+#: app/routes/auth.py:1378
 msgid "If an account exists for that email, a reset link has been sent."
 msgstr ""
 "إذا كان هناك حساب لهذا البريد الإلكتروني، فقد تم إرسال رابط إعادة الضبط."
@@ -10450,7 +10481,7 @@ msgstr "إذا أجبت نعم، هل يتم فصل بيانات إعاقتك و
 msgid "If set, this section will be nested under the selected parent section."
 msgstr "وفي حالة وضع هذا القسم، سيتم استخلاصه في إطار قسم الوالدين المختار."
 
-#: app/templates/forms/entry_form/entry_form.html:2951
+#: app/templates/forms/entry_form/entry_form.html:2952
 msgid ""
 "If they save after you, your changes may be overwritten. Coordinate to avoid"
 " conflicts."
@@ -10517,7 +10548,7 @@ msgid "Import Common Words"
 msgstr "استيراد الكلمات الشائعة"
 
 #: app/templates/admin/lists/list_detail.html:47
-#: app/templates/forms/entry_form/entry_form.html:2658
+#: app/templates/forms/entry_form/entry_form.html:2659
 #: app/templates/macros/excel_io_modal.html:62
 msgid "Import Data"
 msgstr "استيراد البيانات"
@@ -10776,7 +10807,7 @@ msgstr "إشعار القيم المنسوبة"
 msgid "Imputed value"
 msgstr "القيمة المحسوبة"
 
-#: app/routes/main/helpers.py:1226
+#: app/routes/main/helpers.py:1184
 msgid "In Progress"
 msgstr "قيد التنفيذ"
 
@@ -11067,24 +11098,24 @@ msgstr ""
 msgid "Indirect Reach"
 msgstr "الوصول غير المباشر"
 
-#: app/templates/forms/entry_form/entry_form.html:1536
-#: app/templates/forms/entry_form/entry_form.html:1678
-#: app/templates/forms/entry_form/entry_form.html:2387
+#: app/templates/forms/entry_form/entry_form.html:1537
+#: app/templates/forms/entry_form/entry_form.html:1679
+#: app/templates/forms/entry_form/entry_form.html:2388
 #: app/templates/forms/form_builder/partials/_item_modal.html:1104
 msgid "Indirect reach"
 msgstr "الوصول غير المباشر"
 
-#: app/templates/forms/entry_form/entry_form.html:1168
-#: app/templates/forms/entry_form/entry_form.html:1197
-#: app/templates/forms/entry_form/entry_form.html:1309
-#: app/templates/forms/entry_form/entry_form.html:1338
-#: app/templates/forms/entry_form/entry_form.html:1462
-#: app/templates/forms/entry_form/entry_form.html:1491
-#: app/templates/forms/entry_form/entry_form.html:2189
-#: app/templates/forms/entry_form/entry_form.html:2210
-#: app/templates/forms/entry_form/entry_form.html:2237
-#: app/templates/forms/entry_form/entry_form.html:2296
-#: app/templates/forms/entry_form/entry_form.html:2323
+#: app/templates/forms/entry_form/entry_form.html:1169
+#: app/templates/forms/entry_form/entry_form.html:1198
+#: app/templates/forms/entry_form/entry_form.html:1310
+#: app/templates/forms/entry_form/entry_form.html:1339
+#: app/templates/forms/entry_form/entry_form.html:1463
+#: app/templates/forms/entry_form/entry_form.html:1492
+#: app/templates/forms/entry_form/entry_form.html:2190
+#: app/templates/forms/entry_form/entry_form.html:2211
+#: app/templates/forms/entry_form/entry_form.html:2238
+#: app/templates/forms/entry_form/entry_form.html:2297
+#: app/templates/forms/entry_form/entry_form.html:2324
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:219
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:247
 msgid "Indirect reach:"
@@ -11154,7 +11185,7 @@ msgstr "عدد صحيح"
 msgid "Integrations"
 msgstr "التكامل"
 
-#: app/routes/auth.py:537
+#: app/routes/auth.py:721
 msgid "Invalid Azure callback."
 msgstr "إعادة استدعاء Azure غير صالحة."
 
@@ -11170,7 +11201,7 @@ msgstr "صيغة تعريف الدولة غير صالحة."
 msgid "Invalid country selection or country not assigned to you."
 msgstr "اختيار الدولة غير صالح أو الدولة غير المخصصة لك."
 
-#: app/routes/auth.py:157 app/routes/auth.py:204 app/routes/auth.py:261
+#: app/routes/auth.py:326 app/routes/auth.py:381 app/routes/auth.py:438
 msgid "Invalid email or password."
 msgstr "بريد إلكتروني أو كلمة مرور غير صالحة."
 
@@ -11195,7 +11226,7 @@ msgstr "تم حذف نوع الملف غير الصحيح"
 msgid "Invalid file type."
 msgstr "نوع الملف غير صالح."
 
-#: app/templates/forms/entry_form/entry_form.html:2685
+#: app/templates/forms/entry_form/entry_form.html:2686
 msgid ""
 "Invalid file type. Please select a PDF, Word, Excel, PowerPoint, or Text "
 "file."
@@ -11228,7 +11259,7 @@ msgstr "البدائل غير الصالحة"
 msgid "Invalid request. Please try again."
 msgstr "طلب غير صحيح. يرجى المحاولة مرة أخرى."
 
-#: app/routes/auth.py:1184
+#: app/routes/auth.py:1410
 msgid "Invalid reset link."
 msgstr "رابط إعادة التعيين غير صالح."
 
@@ -11376,12 +11407,12 @@ msgstr "سيتم مسح مرجع قطاعه عند الحذف."
 msgid "JSON request required"
 msgstr "مطلوب طلب JSON"
 
-#: app/templates/admin/assignments/manage_assignment.html:112
-#: app/templates/admin/assignments/manage_assignment.html:132
+#: app/templates/admin/assignments/manage_assignment.html:113
+#: app/templates/admin/assignments/manage_assignment.html:133
 #: app/templates/admin/documents/documents.html:282
 #: app/templates/admin/documents/documents.html:308
-#: app/templates/forms/entry_form/entry_form.html:2857
-#: app/templates/forms/entry_form/entry_form.html:2883
+#: app/templates/forms/entry_form/entry_form.html:2858
+#: app/templates/forms/entry_form/entry_form.html:2884
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:73
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:86
 #: app/templates/forms/form_builder/partials/_item_modal.html:537
@@ -11397,7 +11428,7 @@ msgstr "نمط sink جافا سكريبت (مثل eval() أو document.cookie)"
 msgid "Job Title"
 msgstr "المسمى الوظيفي"
 
-#: app/routes/auth.py:1398
+#: app/routes/auth.py:1624
 #: app/templates/components/_profile_completion_modal.html:125
 msgid "Job title is required."
 msgstr "المسمى الوظيفي مطلوب."
@@ -11414,12 +11445,12 @@ msgstr "منطق القضاة"
 msgid "Judged traces"
 msgstr "الآثار المحسوبة"
 
-#: app/templates/admin/assignments/manage_assignment.html:118
-#: app/templates/admin/assignments/manage_assignment.html:138
+#: app/templates/admin/assignments/manage_assignment.html:119
+#: app/templates/admin/assignments/manage_assignment.html:139
 #: app/templates/admin/documents/documents.html:288
 #: app/templates/admin/documents/documents.html:314
-#: app/templates/forms/entry_form/entry_form.html:2863
-#: app/templates/forms/entry_form/entry_form.html:2889
+#: app/templates/forms/entry_form/entry_form.html:2864
+#: app/templates/forms/entry_form/entry_form.html:2890
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:75
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:88
 #: app/templates/forms/form_builder/partials/_item_modal.html:543
@@ -11427,12 +11458,12 @@ msgstr "الآثار المحسوبة"
 msgid "Jul"
 msgstr "جول"
 
-#: app/templates/admin/assignments/manage_assignment.html:117
-#: app/templates/admin/assignments/manage_assignment.html:137
+#: app/templates/admin/assignments/manage_assignment.html:118
+#: app/templates/admin/assignments/manage_assignment.html:138
 #: app/templates/admin/documents/documents.html:287
 #: app/templates/admin/documents/documents.html:313
-#: app/templates/forms/entry_form/entry_form.html:2862
-#: app/templates/forms/entry_form/entry_form.html:2888
+#: app/templates/forms/entry_form/entry_form.html:2863
+#: app/templates/forms/entry_form/entry_form.html:2889
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:74
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:87
 #: app/templates/forms/form_builder/partials/_item_modal.html:542
@@ -11616,7 +11647,7 @@ msgstr "اللغة"
 msgid "Language columns"
 msgstr "أعمدة اللغة"
 
-#: app/templates/forms/entry_form/entry_form.html:2748
+#: app/templates/forms/entry_form/entry_form.html:2749
 msgid "Language:"
 msgstr "اللغة:"
 
@@ -11755,7 +11786,7 @@ msgstr "هل تترك الصفحة؟"
 msgid "Leave blank for no expiry."
 msgstr "اترك البطاقة فارغة بدون انتهاء صلاحية."
 
-#: app/templates/admin/assignments/manage_assignment.html:203
+#: app/templates/admin/assignments/manage_assignment.html:204
 msgid "Leave blank to use \"Template – Period\" everywhere."
 msgstr "اترك الاسم فارغا لاستخدام \"القالب – نقطة\" في كل مكان."
 
@@ -11803,7 +11834,7 @@ msgstr "اترك فارغا لاستخدام تعريف بنك المؤشرات.
 msgid "Leave empty to use the indicator bank name."
 msgstr "اترك فارغا لاستخدام اسم بنك المؤشر."
 
-#: app/templates/forms/entry_form/entry_form.html:2725
+#: app/templates/forms/entry_form/entry_form.html:2726
 msgid ""
 "Leave file selection empty to keep current document, or upload a new file to"
 " replace it."
@@ -11946,7 +11977,7 @@ msgstr "إعدادات التحميل الافتراضية (املأ فقط فا
 msgid "Load from campaign"
 msgstr "تحميل من الحملة"
 
-#: app/templates/forms/entry_form/entry_form.html:2634
+#: app/templates/forms/entry_form/entry_form.html:2635
 msgid "Load into form"
 msgstr "التحميل في الشكل"
 
@@ -11970,11 +12001,11 @@ msgstr "ملخص التحميل"
 msgid "Load summary first"
 msgstr "ملخص التحميل أولا"
 
-#: app/templates/admin/assignments/manage_assignment.html:706
+#: app/templates/admin/assignments/manage_assignment.html:705
 msgid "Loading Regions structure..."
 msgstr "هيكل مناطق التحميل..."
 
-#: app/templates/admin/assignments/manage_assignment.html:688
+#: app/templates/admin/assignments/manage_assignment.html:687
 msgid "Loading Secretariat structure..."
 msgstr "تحميل هيكل الأمانة العامة..."
 
@@ -12056,7 +12087,7 @@ msgstr "...."
 msgid "Loading form items..."
 msgstr "جاري تحميل المستندات..."
 
-#: app/templates/forms/entry_form/entry_form.html:350
+#: app/templates/forms/entry_form/entry_form.html:351
 msgid "Loading form…"
 msgstr "شكل التعبئة.."
 
@@ -12189,8 +12220,8 @@ msgstr "جاري تحميل أسئلة التحقق..."
 #: app/templates/components/_builder_items.html:135
 #: app/templates/components/_builder_items.html:139
 #: app/templates/components/ag_grid_i18n_js.html:67
-#: app/templates/components/ag_grid_includes.html:73
-#: app/templates/components/ag_grid_includes.html:109
+#: app/templates/components/ag_grid_includes.html:68
+#: app/templates/components/ag_grid_includes.html:132
 #: app/templates/components/loading_indicator.html:22
 #: app/templates/core/dashboard.html:3024
 #: app/templates/forms/form_builder/partials/_sections_container.html:303
@@ -12234,7 +12265,7 @@ msgid ""
 "Localized question text shown to focal points when a rule fires. Click Edit "
 "to change wording."
 msgstr ""
-"نص سؤال محلي يعرض على نقاط التركيز عند تطبيق قاعدة. انقر على تعديل لتغيير "
+"نص سؤال محلي يعرض على نقاط اتصال عند تطبيق قاعدة. انقر على تعديل لتغيير "
 "الصياغة."
 
 #: app/templates/admin/communication/center.html:1031
@@ -12253,7 +12284,7 @@ msgstr "المصدر"
 msgid "Log in"
 msgstr "تسجيل الدخول"
 
-#: app/templates/auth/login.html:524
+#: app/templates/auth/login.html:581
 msgid "Log in with:"
 msgstr "سجل الدخول مع:"
 
@@ -12299,7 +12330,7 @@ msgstr "سجلات تسجيل الدخول"
 msgid "Login events"
 msgstr "فعاليات تسجيل الدخول"
 
-#: app/routes/auth.py:566
+#: app/routes/auth.py:750
 msgid "Login session expired. Please try signing in again."
 msgstr "انتهت صلاحية جلسة تسجيل الدخول. يرجى محاولة تسجيل الدخول مرة أخرى."
 
@@ -12363,7 +12394,7 @@ msgstr "آثار منخفضة الجودة تحتاج إلى مراجعة"
 msgid "Main Screens"
 msgstr "الشاشات الرئيسية"
 
-#: app/templates/forms/entry_form/entry_form.html:2914
+#: app/templates/forms/entry_form/entry_form.html:2915
 msgid "Make this document publicly accessible"
 msgstr "حدد هذا المربع لجعل المستند متاحاً للجمهور"
 
@@ -12386,7 +12417,7 @@ msgstr "إدارة المهام"
 msgid "Manage Embed Content"
 msgstr "إدارة المحتوى المدمج"
 
-#: app/templates/admin/assignments/manage_assignment.html:443
+#: app/templates/admin/assignments/manage_assignment.html:444
 msgid "Manage Existing Entities"
 msgstr "إدارة الكيانات القائمة"
 
@@ -12462,7 +12493,7 @@ msgid ""
 "Manage default sex categories used for disaggregation. Drag to reorder."
 msgstr "إدارة فئات الجنس الافتراضية المستخدمة للتفصيل. اسحب لإعادة الترتيب."
 
-#: app/templates/admin/assignments/manage_assignment.html:421
+#: app/templates/admin/assignments/manage_assignment.html:422
 msgid ""
 "Manage existing entity assignments and assign new entities to this form. "
 "Data will be collected at the specific entity level (e.g., branch data vs. "
@@ -12538,8 +12569,8 @@ msgstr "إدارة أسئلة التحقق ومراجعة ملخصات الحا�
 msgid "Manage your registered mobile devices for push notifications."
 msgstr "أدر أجهزتك المحمولة المسجلة لإشعارات الدفع."
 
-#: app/templates/admin/assignments/manage_assignment.html:372
-#: app/templates/admin/assignments/manage_assignment.html:378
+#: app/templates/admin/assignments/manage_assignment.html:373
+#: app/templates/admin/assignments/manage_assignment.html:379
 msgid "Managed per entity below."
 msgstr "تمت الإدارة حسب الكيان أدناه."
 
@@ -12552,8 +12583,8 @@ msgid "Manual list"
 msgstr "قائمة الأدلة"
 
 #: app/templates/forms/entry_form/entry_form.html:51
-#: app/templates/forms/entry_form/entry_form.html:3317
-#: app/templates/forms/entry_form/entry_form.html:3336
+#: app/templates/forms/entry_form/entry_form.html:3318
+#: app/templates/forms/entry_form/entry_form.html:3337
 msgid "Manual save required"
 msgstr "إدارة الموارد"
 
@@ -12593,12 +12624,12 @@ msgstr ""
 "تجاوزات إعدادات النظام)، والأيقونة المعروضة في الشبكات. يتطابق مع عدد نوع "
 "الإشعارات المستخدم للصفوف المخزنة."
 
-#: app/templates/admin/assignments/manage_assignment.html:114
-#: app/templates/admin/assignments/manage_assignment.html:134
+#: app/templates/admin/assignments/manage_assignment.html:115
+#: app/templates/admin/assignments/manage_assignment.html:135
 #: app/templates/admin/documents/documents.html:284
 #: app/templates/admin/documents/documents.html:310
-#: app/templates/forms/entry_form/entry_form.html:2859
-#: app/templates/forms/entry_form/entry_form.html:2885
+#: app/templates/forms/entry_form/entry_form.html:2860
+#: app/templates/forms/entry_form/entry_form.html:2886
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:73
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:86
 #: app/templates/forms/form_builder/partials/_item_modal.html:539
@@ -12686,16 +12717,16 @@ msgstr "جدول المصفوفة"
 msgid "Matrix Title"
 msgstr "عنوان المصفوفة"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:405
+#: app/templates/forms/entry_form/partials/matrix_table.html:407
 msgid "Matrix configuration not available. Please contact the administrator."
 msgstr "تكوين المصفوفة غير متوفر. يرجى التواصل مع المدير."
 
-#: app/templates/forms/entry_form/entry_form.html:3550
+#: app/templates/forms/entry_form/entry_form.html:3551
 msgid "Matrix functionality unavailable"
 msgstr "وظيفة المصفوفة غير متوفرة"
 
-#: app/templates/forms/entry_form/entry_form.html:3530
-#: app/templates/forms/entry_form/entry_form.html:3534
+#: app/templates/forms/entry_form/entry_form.html:3531
+#: app/templates/forms/entry_form/entry_form.html:3535
 msgid "Matrix handler not initialized"
 msgstr "معالج المصفوفة غير مهيأ"
 
@@ -12708,8 +12739,8 @@ msgstr "Max Iterations"
 msgid "Max Number of Entries"
 msgstr "الحد الأقصى لعدد المشاركات"
 
-#: app/templates/forms/entry_form/entry_form.html:1740
-#: app/templates/forms/entry_form/entry_form.html:2478
+#: app/templates/forms/entry_form/entry_form.html:1741
+#: app/templates/forms/entry_form/entry_form.html:2479
 #, python-format
 msgid "Max entries: %(max)s"
 msgstr "(ماكس) %(max)s"
@@ -12727,16 +12758,16 @@ msgstr "أقصى عرض"
 msgid "Maximum Documents Allowed"
 msgstr "الحد الأقصى المسموح بالوثائق"
 
-#: app/templates/forms/entry_form/entry_form.html:2696
+#: app/templates/forms/entry_form/entry_form.html:2697
 msgid "Maximum documents allowed"
 msgstr "الحد الأقصى المسموح به للوثائق"
 
-#: app/templates/forms/entry_form/entry_form.html:2661
+#: app/templates/forms/entry_form/entry_form.html:2662
 #: app/templates/forms/form_builder/partials/_excel_modal.html:80
 msgid "Maximum file size: 10MB"
 msgstr "الحد الأقصى لحجم الملف: 25 ميجابايت"
 
-#: app/templates/forms/entry_form/entry_form.html:2743
+#: app/templates/forms/entry_form/entry_form.html:2744
 msgid "Maximum file size: 25MB"
 msgstr "الحد الأقصى لحجم الملف: 25 ميجابايت"
 
@@ -12748,7 +12779,7 @@ msgstr ""
 "Maximum number of repeat entries that can be added. Leave empty for no "
 "limit."
 
-#: app/templates/forms/entry_form/entry_form.html:2687
+#: app/templates/forms/entry_form/entry_form.html:2688
 #, python-format
 msgid ""
 "Maximum of %(max)s document(s) allowed for this field. You have already "
@@ -12757,12 +12788,12 @@ msgstr ""
 "الحد الأقصى من IFRC يسمح بوثيقة أو مستندات placeholder في هذا الحقل. لقد "
 "وصلت بالفعل إلى الحد. %(max)s"
 
-#: app/templates/admin/assignments/manage_assignment.html:116
-#: app/templates/admin/assignments/manage_assignment.html:136
+#: app/templates/admin/assignments/manage_assignment.html:117
+#: app/templates/admin/assignments/manage_assignment.html:137
 #: app/templates/admin/documents/documents.html:286
 #: app/templates/admin/documents/documents.html:312
-#: app/templates/forms/entry_form/entry_form.html:2861
-#: app/templates/forms/entry_form/entry_form.html:2887
+#: app/templates/forms/entry_form/entry_form.html:2862
+#: app/templates/forms/entry_form/entry_form.html:2888
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:74
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:87
 #: app/templates/forms/form_builder/partials/_item_modal.html:541
@@ -12856,7 +12887,7 @@ msgstr "معرف الرسالة"
 msgid "Message to admins"
 msgstr "رسالة للمسؤولين"
 
-#: app/templates/auth/login.html:662
+#: app/templates/auth/login.html:687
 msgid "Message to admins (optional)"
 msgstr "رسالة للمسؤولين"
 
@@ -13008,9 +13039,9 @@ msgstr "سجلات تسجيل الدخول"
 msgid "Monitoring Questions"
 msgstr "أسئلة المراقبة"
 
-#: app/templates/admin/assignments/manage_assignment.html:90
+#: app/templates/admin/assignments/manage_assignment.html:91
 #: app/templates/admin/documents/documents.html:227
-#: app/templates/forms/entry_form/entry_form.html:2802
+#: app/templates/forms/entry_form/entry_form.html:2803
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:43
 #: app/templates/forms/form_builder/partials/_item_modal.html:462
 #: app/templates/forms/form_builder/partials/_item_modal.html:487
@@ -13073,7 +13104,7 @@ msgstr "مجالات متعددة اللغات"
 msgid "Multiple"
 msgstr "متعدد"
 
-#: app/templates/admin/assignments/manage_assignment.html:374
+#: app/templates/admin/assignments/manage_assignment.html:375
 msgid "Multiple different due dates set across entities."
 msgstr "تواريخ استحقاق مختلفة محددة عبر الكيانات."
 
@@ -13133,7 +13164,7 @@ msgstr "جميع الوحدات"
 msgid "NS Name"
 msgstr "NS Name"
 
-#: app/templates/admin/assignments/manage_assignment.html:471
+#: app/templates/admin/assignments/manage_assignment.html:472
 #: app/templates/admin/organization/index.html:82
 #: app/templates/admin/user_management/user_form.html:872
 #: app/templates/core/layout.html:413 app/templates/core/layout.html:415
@@ -13186,7 +13217,7 @@ msgstr "كيانات هيكل NS"
 msgid "Name"
 msgstr "الاسم"
 
-#: app/templates/auth/login.html:651 app/templates/auth/register.html:13
+#: app/templates/auth/login.html:676 app/templates/auth/register.html:13
 msgid "Name (optional)"
 msgstr "ملاحظة النسخة (اختياري)"
 
@@ -13224,7 +13255,7 @@ msgstr "الجمعية الوطنية"
 
 #: app/templates/core/dashboard.html:2376
 msgid "National Society Focal Points"
-msgstr "نقاط التركيز في الجمعيات الوطنية"
+msgstr "نقاط اتصال في الجمعيات الوطنية"
 
 #: app/templates/public/landing.html:142
 msgid "National Society Leader"
@@ -13240,13 +13271,13 @@ msgstr "اسم الجمعية الوطنية"
 msgid "National Society Structure"
 msgstr "اسم الجمعية الوطنية"
 
-#: app/templates/admin/assignments/manage_assignment.html:299
-#: app/templates/admin/assignments/manage_assignment.html:312
+#: app/templates/admin/assignments/manage_assignment.html:300
+#: app/templates/admin/assignments/manage_assignment.html:313
 msgid ""
 "National Society focal points must send to delegation for review before "
 "final submission; delegation can edit and submit upstream."
 msgstr ""
-"يجب إرسال نقاط تركيز الجمعية الوطنية إلى الوفد للمراجعة قبل التقديم النهائي؛"
+"يجب إرسال نقاط اتصال الجمعية الوطنية إلى الوفد للمراجعة قبل التقديم النهائي؛"
 " يمكن للتفويض التعديل والتقديم في الجهة العليا."
 
 #: app/templates/tours/tours.html:57
@@ -13269,7 +13300,7 @@ msgid "Navigate your dashboard and access reporting tools"
 msgstr "تنقل في لوحة التحكم وأدوات التقارير الخاصة بك"
 
 #: app/templates/admin/docs/documentation.html:1117
-#: app/templates/forms/entry_form/entry_form.html:371
+#: app/templates/forms/entry_form/entry_form.html:372
 msgid "Navigation"
 msgstr "الملاحة"
 
@@ -13434,7 +13465,7 @@ msgstr "ستظهر الإضافات هنا بمجرد تثبيتها"
 msgid "New chat"
 msgstr "دردشة جديدة"
 
-#: app/templates/admin/assignments/manage_assignment.html:839
+#: app/templates/admin/assignments/manage_assignment.html:838
 msgid "New due date"
 msgstr "تاريخ الولادة الجديد"
 
@@ -13459,7 +13490,7 @@ msgstr "استيراد جديد"
 msgid "New key material generated for"
 msgstr "مواد مفاتيح جديدة تم إنشاؤها ل"
 
-#: app/templates/admin/assignments/manage_assignment.html:820
+#: app/templates/admin/assignments/manage_assignment.html:819
 msgid "New status"
 msgstr "الوضع الجديد"
 
@@ -13477,7 +13508,7 @@ msgid "Next"
 msgstr "التالي"
 
 #: app/templates/components/ag_grid_i18n_js.html:61
-#: app/templates/forms/entry_form/entry_form.html:3800
+#: app/templates/forms/entry_form/entry_form.html:3801
 msgid "Next Page"
 msgstr "الصفحة التالية"
 
@@ -13497,11 +13528,11 @@ msgstr "العام القادم"
 #: app/templates/components/_form_item_renderer.html:236
 #: app/templates/components/_status_label.html:82
 #: app/templates/components/ag_grid_i18n_js.html:36
-#: app/templates/forms/entry_form/entry_form.html:1225
-#: app/templates/forms/entry_form/entry_form.html:1360
-#: app/templates/forms/entry_form/entry_form.html:1513
-#: app/templates/forms/entry_form/entry_form.html:1638
-#: app/templates/forms/entry_form/entry_form.html:2350
+#: app/templates/forms/entry_form/entry_form.html:1226
+#: app/templates/forms/entry_form/entry_form.html:1361
+#: app/templates/forms/entry_form/entry_form.html:1514
+#: app/templates/forms/entry_form/entry_form.html:1639
+#: app/templates/forms/entry_form/entry_form.html:2351
 #: app/templates/forms/entry_form/partials/disability_questions.html:32
 #: app/templates/forms/entry_form/partials/disability_questions.html:57
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:274
@@ -13720,7 +13751,7 @@ msgstr "لم يتم العثور على إدخالات تدقيق تطابق م�
 msgid "No data loaded yet"
 msgstr "لم يتم تحميل البيانات حتى الآن"
 
-#: app/templates/admin/assignments/manage_assignment.html:225
+#: app/templates/admin/assignments/manage_assignment.html:226
 msgid "No data owner set — governance gap."
 msgstr "لا توجد مجموعة بيانات مالكة — فجوة الحوكمة."
 
@@ -13837,7 +13868,7 @@ msgstr "لا يوجد فلتر — القائمة الكاملة."
 
 #: app/templates/core/dashboard.html:2536
 msgid "No focal points assigned to"
-msgstr "لا توجد نقاط تركيز مخصصة لـ"
+msgstr "لا توجد نقاط اتصال مخصصة لـ"
 
 #: app/templates/admin/assignments/assignments.html:66
 msgid "No form assignments found."
@@ -13941,7 +13972,7 @@ msgstr "لا يوجد وحدة قياس"
 msgid "No metrics available"
 msgstr "مؤشرات متاحة"
 
-#: app/templates/forms/entry_form/entry_form.html:3836
+#: app/templates/forms/entry_form/entry_form.html:3837
 msgid "No more indicators available for this section."
 msgstr "لا توجد مؤشرات أخرى متاحة لهذا القسم."
 
@@ -14100,7 +14131,7 @@ msgstr ""
 msgid "No sections added to this template yet."
 msgstr "ولم يضاف إلى هذا النموذج بعد أي فروع."
 
-#: app/templates/forms/entry_form/entry_form.html:536
+#: app/templates/forms/entry_form/entry_form.html:537
 msgid "No sections defined."
 msgstr "لا توجد أقسام محددة."
 
@@ -14108,7 +14139,7 @@ msgstr "لا توجد أقسام محددة."
 msgid "No sections in this draft."
 msgstr "لا توجد أقسام في هذا المسودة."
 
-#: app/templates/forms/entry_form/entry_form.html:2495
+#: app/templates/forms/entry_form/entry_form.html:2496
 msgid "No sections or items found for this template."
 msgstr "لم يتم العثور على أقسام أو عناصر لهذا القالب."
 
@@ -14349,12 +14380,12 @@ msgstr "لا"
 
 #: app/routes/forms_validation_summary.py:399
 #: app/templates/components/_form_item_renderer.html:271
-#: app/templates/forms/entry_form/entry_form.html:1384
-#: app/templates/forms/entry_form/entry_form.html:1561
-#: app/templates/forms/entry_form/entry_form.html:1702
-#: app/templates/forms/entry_form/entry_form.html:2416
-#: app/templates/forms/entry_form/entry_form.html:2431
-#: app/templates/forms/entry_form/partials/matrix_table.html:458
+#: app/templates/forms/entry_form/entry_form.html:1385
+#: app/templates/forms/entry_form/entry_form.html:1562
+#: app/templates/forms/entry_form/entry_form.html:1703
+#: app/templates/forms/entry_form/entry_form.html:2417
+#: app/templates/forms/entry_form/entry_form.html:2432
+#: app/templates/forms/entry_form/partials/matrix_table.html:460
 #: app/templates/forms/entry_form/validation_summary_pdf.html:124
 msgid "Not applicable"
 msgstr "غير قابل للتطبيق"
@@ -14396,7 +14427,7 @@ msgstr "غير متساوي"
 msgid "Not filled"
 msgstr "غير ممتلئة"
 
-#: app/templates/admin/assignments/manage_assignment.html:353
+#: app/templates/admin/assignments/manage_assignment.html:354
 #: app/templates/admin/validation_dashboard.html:252
 msgid "Not generated"
 msgstr "لم يتم إنشاؤه"
@@ -14437,7 +14468,7 @@ msgid "Not sent"
 msgstr "لم يرسل"
 
 #: app/templates/admin/assignments/assignments.html:125
-#: app/templates/admin/assignments/manage_assignment.html:377
+#: app/templates/admin/assignments/manage_assignment.html:378
 msgid "Not set"
 msgstr "لم يتم تحديد"
 
@@ -14457,8 +14488,8 @@ msgstr "لم تبدأ بعد"
 msgid "Note"
 msgstr "ملاحظه"
 
-#: app/templates/admin/assignments/manage_assignment.html:643
-#: app/templates/admin/assignments/manage_assignment.html:724
+#: app/templates/admin/assignments/manage_assignment.html:642
+#: app/templates/admin/assignments/manage_assignment.html:723
 msgid "Note:"
 msgstr "ملاحظه:"
 
@@ -14564,14 +14595,14 @@ msgstr ""
 
 #: app/templates/admin/settings/manage_settings.html:1510
 msgid "Notify focal points (assignment editor/submitter)"
-msgstr "إشعار نقاط التركيز (محرر التعيين/المقدم)"
+msgstr "إشعار نقاط اتصال (محرر التعيين/المقدم)"
 
-#: app/templates/admin/assignments/manage_assignment.html:122
-#: app/templates/admin/assignments/manage_assignment.html:142
+#: app/templates/admin/assignments/manage_assignment.html:123
+#: app/templates/admin/assignments/manage_assignment.html:143
 #: app/templates/admin/documents/documents.html:292
 #: app/templates/admin/documents/documents.html:318
-#: app/templates/forms/entry_form/entry_form.html:2867
-#: app/templates/forms/entry_form/entry_form.html:2893
+#: app/templates/forms/entry_form/entry_form.html:2868
+#: app/templates/forms/entry_form/entry_form.html:2894
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:76
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:89
 #: app/templates/forms/form_builder/partials/_item_modal.html:547
@@ -14639,12 +14670,12 @@ msgstr "نظام التشغيل"
 msgid "Observation"
 msgstr "المراقبة"
 
-#: app/templates/admin/assignments/manage_assignment.html:121
-#: app/templates/admin/assignments/manage_assignment.html:141
+#: app/templates/admin/assignments/manage_assignment.html:122
+#: app/templates/admin/assignments/manage_assignment.html:142
 #: app/templates/admin/documents/documents.html:291
 #: app/templates/admin/documents/documents.html:317
-#: app/templates/forms/entry_form/entry_form.html:2866
-#: app/templates/forms/entry_form/entry_form.html:2892
+#: app/templates/forms/entry_form/entry_form.html:2867
+#: app/templates/forms/entry_form/entry_form.html:2893
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:76
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:89
 #: app/templates/forms/form_builder/partials/_item_modal.html:546
@@ -14734,7 +14765,7 @@ msgstr ""
 "فقط المستخدمون الذين لديهم بريد إلكتروني للمنظمة يمكنهم طلب الوصول إلى عدة "
 "دول في نفس الوقت. يرجى اختيار دولة واحدة."
 
-#: app/routes/auth.py:526
+#: app/routes/auth.py:710
 msgid ""
 "Oops, something went wrong! We weren't able to complete your sign-in. Please"
 " try again or contact support if the problem continues."
@@ -14772,7 +14803,7 @@ msgstr "مكتبة القوائم"
 msgid "Open P&B report management (system managers only)"
 msgstr "إدارة تقارير المسؤولية والخسارة المفتوحة (مديري النظام فقط)"
 
-#: app/templates/forms/entry_form/entry_form.html:2515
+#: app/templates/forms/entry_form/entry_form.html:2516
 msgid "Open Sections Menu"
 msgstr "فتح قائمة الأقسام"
 
@@ -14802,7 +14833,7 @@ msgstr "الوثيقة المفتوحة"
 msgid "Open documents library"
 msgstr "مكتبة الوثائق المفتوحة"
 
-#: app/templates/forms/entry_form/entry_form.html:3826
+#: app/templates/forms/entry_form/entry_form.html:3827
 msgid "Open indicator bank to propose new indicators or review existing ones"
 msgstr "فتح بنك المؤشرات لاقتراح مؤشرات جديدة أو مراجعة المؤشرات الحالية"
 
@@ -14934,6 +14965,10 @@ msgstr "الخيارات"
 #: app/templates/forms/form_builder/partials/_item_modal.html:282
 msgid "Options Source"
 msgstr "مصدر الخيارات"
+
+#: app/templates/auth/login.html:638
+msgid "Or choose a user"
+msgstr "أو اختر مستخدما"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:216
 msgid "Orange"
@@ -15071,7 +15106,7 @@ msgstr "مسارات أخرى (مجمعة)"
 msgid "Other programs"
 msgstr "برامج أخرى"
 
-#: app/templates/forms/entry_form/entry_form.html:2950
+#: app/templates/forms/entry_form/entry_form.html:2951
 msgid "Others are editing this form"
 msgstr "آخرون يحررون هذا النموذج"
 
@@ -15227,8 +15262,8 @@ msgstr "%(e)d %(m)d %(u)d %(lang)s مستورد من طراز PO أنهى آخر
 msgid "Page"
 msgstr "الصفحة"
 
-#: app/templates/forms/entry_form/entry_form.html:439
-#: app/templates/forms/entry_form/entry_form.html:709
+#: app/templates/forms/entry_form/entry_form.html:440
+#: app/templates/forms/entry_form/entry_form.html:710
 msgid "Page "
 msgstr "الصفحة"
 
@@ -15335,8 +15370,8 @@ msgstr "معاملات المسار"
 msgid "Parent Section"
 msgstr "قسم الوالدين"
 
-#: app/templates/admin/assignments/manage_assignment.html:488
-#: app/templates/admin/assignments/manage_assignment.html:590
+#: app/templates/admin/assignments/manage_assignment.html:487
+#: app/templates/admin/assignments/manage_assignment.html:589
 msgid "Part of:"
 msgstr "جزء من:"
 
@@ -15357,11 +15392,11 @@ msgid "Partnerships"
 msgstr "الشراكات"
 
 #: app/templates/admin/analytics/audit_trail.html:328
-#: app/templates/auth/login.html:667 app/templates/auth/register.html:21
+#: app/templates/auth/login.html:692 app/templates/auth/register.html:21
 msgid "Password"
 msgstr "كلمة المرور"
 
-#: app/routes/auth.py:1165
+#: app/routes/auth.py:1383
 msgid ""
 "Password reset is not available. Please sign in with your organization "
 "account."
@@ -15371,12 +15406,12 @@ msgstr "إعادة تعيين كلمة المرور غير متاحة. يرجى 
 msgid "Password was changed"
 msgstr "تم تغيير كلمة المرور"
 
-#: app/templates/auth/login.html:1283
+#: app/templates/auth/login.html:1350
 #: app/templates/auth/reset_password.html:103
 msgid "Passwords do not match"
 msgstr "كلمات المرور لا تتطابق"
 
-#: app/templates/auth/login.html:1279
+#: app/templates/auth/login.html:1346
 #: app/templates/auth/reset_password.html:99
 msgid "Passwords match"
 msgstr "كلمة المرور"
@@ -15436,7 +15471,7 @@ msgstr "إيقاف مؤقت"
 msgid "Paused"
 msgstr "توقف"
 
-#: app/routes/main/helpers.py:1225 app/templates/admin/ai/documents.html:70
+#: app/routes/main/helpers.py:1183 app/templates/admin/ai/documents.html:70
 #: app/templates/admin/ai/documents.html:442
 #: app/templates/admin/ai/documents.html:593
 #: app/templates/admin/ai/review_queue.html:28
@@ -15546,7 +15581,7 @@ msgid ""
 "Period %(period)s: a National Society focal point escalated this assignment "
 "for delegation review."
 msgstr ""
-"الفترة %(period)s: نقطة تركيز الجمعية الوطنية صعد هذه المهمة لمراجعة "
+"الفترة %(period)s: نقطة اتصال الجمعية الوطنية صعد هذه المهمة لمراجعة "
 "التفويض."
 
 #: app/services/notification/core.py:314
@@ -15555,7 +15590,7 @@ msgid ""
 "Period %(period)s: a National Society focal point sent this assignment for "
 "your review before submission."
 msgstr ""
-"نقطة IFRCHOLDERA: نقطة تركيز من الجمعية الوطنية أرسلت هذه المهمة للمراجعة "
+"نقطة IFRCHOLDERA: نقطة اتصال من الجمعية الوطنية أرسلت هذه المهمة للمراجعة "
 "قبل تقديمها. %(period)s"
 
 #: app/services/notification/core.py:290
@@ -15564,7 +15599,7 @@ msgid ""
 "Period %(period)s: another focal point in your entity submitted this form. "
 "No action needed from you."
 msgstr ""
-"نقطة IFRCHOLDERA: نقطة تركيز أخرى في كيانك قدمت هذا النموذج. لا حاجة لأي "
+"نقطة IFRCHOLDERA: نقطة اتصال أخرى في كيانك قدمت هذا النموذج. لا حاجة لأي "
 "إجراء منك. %(period)s"
 
 #: app/services/notification/core.py:327
@@ -15576,7 +15611,7 @@ msgstr ""
 "الفترة IFRCHOLDERA: التفويض أعاد هذا التعيين لتغييراتك قبل إعادة تقديمه "
 "للمراجعة. %(period)s"
 
-#: app/templates/admin/assignments/manage_assignment.html:86
+#: app/templates/admin/assignments/manage_assignment.html:87
 msgid "Period Type"
 msgstr "نوع الفترة"
 
@@ -15585,7 +15620,7 @@ msgid "Period type"
 msgstr "نوع الفترة"
 
 #: app/templates/admin/documents/documents.html:220
-#: app/templates/forms/entry_form/entry_form.html:2796
+#: app/templates/forms/entry_form/entry_form.html:2797
 msgid "Period/Year Covered"
 msgstr "السنة المغطاة"
 
@@ -15648,8 +15683,8 @@ msgstr "اختر خيارا واحدا من قائمة."
 msgid "Pick one or more options from a list."
 msgstr "اختر خيارا أو أكثر من القائمة."
 
-#: app/templates/forms/entry_form/entry_form.html:2526
-#: app/templates/forms/entry_form/entry_form.html:2528
+#: app/templates/forms/entry_form/entry_form.html:2527
+#: app/templates/forms/entry_form/entry_form.html:2529
 msgid "Pin Sections Pane"
 msgstr "فتح قائمة الأقسام"
 
@@ -15720,7 +15755,7 @@ msgstr "يرجى إدخال اسم أساسي للترجمة منه."
 msgid "Please enter a query."
 msgstr "رجاءً إدخلْ a سؤال."
 
-#: app/templates/auth/login.html:1218
+#: app/templates/auth/login.html:1285
 msgid "Please enter a valid email address"
 msgstr "يرجى إدخال بريد إلكتروني صالح"
 
@@ -15748,11 +15783,11 @@ msgstr ""
 msgid "Please review and validate this submission in the Backoffice."
 msgstr "يرجى مراجعة هذا التقديم والتحقق منه في قسم الخلفية."
 
-#: app/templates/forms/entry_form/entry_form.html:2697
+#: app/templates/forms/entry_form/entry_form.html:2698
 msgid "Please save the form first before editing this document."
 msgstr "يرجى حفظ النموذج أولا قبل تحرير هذا المستند."
 
-#: app/templates/forms/entry_form/entry_form.html:2691
+#: app/templates/forms/entry_form/entry_form.html:2692
 msgid "Please select a Year/Period for the document."
 msgstr "يُرجى اختيار سنة/شهر للوثيقة."
 
@@ -15784,7 +15819,11 @@ msgstr ""
 msgid "Please select a template to self-report."
 msgstr "اختر نوع العنصر"
 
-#: app/templates/admin/assignments/manage_assignment.html:404
+#: app/templates/auth/login.html:648
+msgid "Please select a user first."
+msgstr "يرجى اختيار مستخدم أولا."
+
+#: app/templates/admin/assignments/manage_assignment.html:405
 msgid "Please select a valid period (year or date range) before submitting."
 msgstr "يرجى اختيار فترة صالحة (سنة أو نطاق تاريخي) قبل التقديم."
 
@@ -15961,11 +16000,11 @@ msgstr "معبأ مسبقا"
 msgid "Prefilled Values Notice"
 msgstr "إشعار القيم المُعبأة مسبقاً"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:46
+#: app/templates/forms/entry_form/partials/matrix_table.html:48
 msgid "Prefilled value"
 msgstr "القيمة المعبأة مسبقا"
 
-#: app/templates/forms/entry_form/entry_form.html:351
+#: app/templates/forms/entry_form/entry_form.html:352
 #: app/templates/forms/form_builder/form_builder.html:104
 msgid "Preparing components. Please wait."
 msgstr "إعداد المكونات. انتظر من فضلك."
@@ -15974,7 +16013,7 @@ msgstr "إعداد المكونات. انتظر من فضلك."
 msgid "Preparing query…"
 msgstr "جار التحضير للاستفسار..."
 
-#: app/templates/forms/entry_form/entry_form.html:3888
+#: app/templates/forms/entry_form/entry_form.html:3889
 msgid "Preparing request..."
 msgstr "تحضير الطلب..."
 
@@ -16041,7 +16080,7 @@ msgstr "فشل المعاينة."
 msgid "Preview import"
 msgstr "استيراد المعاينة"
 
-#: app/templates/forms/entry_form/entry_form.html:3829
+#: app/templates/forms/entry_form/entry_form.html:3830
 msgid ""
 "Preview mode: this will not be saved. Assign this template to a country to "
 "test saving dynamic indicators."
@@ -16083,7 +16122,7 @@ msgid "Previous"
 msgstr "السابق"
 
 #: app/templates/components/ag_grid_i18n_js.html:60
-#: app/templates/forms/entry_form/entry_form.html:3799
+#: app/templates/forms/entry_form/entry_form.html:3800
 msgid "Previous Page"
 msgstr "الصفحة السابقة"
 
@@ -16229,7 +16268,7 @@ msgstr "لون الملف الشخصي"
 msgid "Profile colour must be a #RRGGBB value."
 msgstr "يجب أن يكون لون الملف الشخصي قيمة #RRGGBB."
 
-#: app/routes/auth.py:1411
+#: app/routes/auth.py:1637
 msgid "Profile updated successfully."
 msgstr "تم تحديث الملف الشخصي بنجاح."
 
@@ -16250,11 +16289,11 @@ msgstr "الإسقاط"
 msgid "Properties"
 msgstr "خصائص"
 
-#: app/templates/forms/entry_form/entry_form.html:3825
+#: app/templates/forms/entry_form/entry_form.html:3826
 msgid "Propose Changes"
 msgstr "حفظ التغييرات"
 
-#: app/templates/forms/entry_form/entry_form.html:3824
+#: app/templates/forms/entry_form/entry_form.html:3825
 msgid "Propose Indicator"
 msgstr "اختر المؤشر"
 
@@ -16262,9 +16301,9 @@ msgstr "اختر المؤشر"
 msgid "Propose New Indicator URL"
 msgstr "اقتراح المؤشر الجديد URL"
 
-#: app/templates/forms/entry_form/entry_form.html:1105
-#: app/templates/forms/entry_form/entry_form.html:2048
-#: app/templates/forms/entry_form/entry_form.html:3827
+#: app/templates/forms/entry_form/entry_form.html:1106
+#: app/templates/forms/entry_form/entry_form.html:2049
+#: app/templates/forms/entry_form/entry_form.html:3828
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:157
 msgid "Propose changes to this indicator"
 msgstr "إزالة هذا المؤشر"
@@ -16289,7 +16328,7 @@ msgid "Public"
 msgstr "عام"
 
 #: app/templates/admin/documents/documents.html:344
-#: app/templates/forms/entry_form/entry_form.html:2913
+#: app/templates/forms/entry_form/entry_form.html:2914
 msgid "Public Document"
 msgstr "مستند عام"
 
@@ -16312,7 +16351,7 @@ msgstr "تم استلام إرسال عام"
 msgid "Public Submissions"
 msgstr "تقديم عام"
 
-#: app/templates/admin/assignments/manage_assignment.html:325
+#: app/templates/admin/assignments/manage_assignment.html:326
 #: app/templates/admin/assignments/public_submissions.html:66
 msgid "Public URL"
 msgstr "عام"
@@ -16328,7 +16367,7 @@ msgstr "عنوان URL العام نشط"
 msgid "Public URL copied to clipboard!"
 msgstr "تم نسخ الرابط العام إلى الحافظة!"
 
-#: app/templates/admin/assignments/manage_assignment.html:1031
+#: app/templates/admin/assignments/manage_assignment.html:1030
 msgid "Public reporting"
 msgstr "التقارير العامة"
 
@@ -16546,22 +16585,6 @@ msgstr "الوصول السريع"
 #: app/templates/admin/security/dashboard.html:108
 msgid "Quick Actions"
 msgstr "الإجراءات السريعة"
-
-#: app/templates/auth/login.html:562
-msgid "Quick login as a Focal Point"
-msgstr "تسجيل الدخول السريع كنقطة تركيز"
-
-#: app/templates/auth/login.html:553
-msgid "Quick login as a System Manager"
-msgstr "تسجيل الدخول السريع كمدير نظام"
-
-#: app/templates/auth/login.html:558
-msgid "Quick login as an Admin"
-msgstr "تسجيل دخول سريع كمسؤول"
-
-#: app/templates/auth/login.html:549
-msgid "Quick login for testers"
-msgstr "تسجيل الدخول السريع للمختبرين"
 
 #: app/templates/admin/api_management.html:1666
 msgid "RBAC"
@@ -16840,11 +16863,11 @@ msgstr "مستلمين"
 msgid "Recommendation:"
 msgstr "توصية:"
 
-#: app/templates/forms/entry_form/entry_form.html:3333
+#: app/templates/forms/entry_form/entry_form.html:3334
 msgid "Reconnected!"
 msgstr "مرفوض"
 
-#: app/templates/forms/entry_form/entry_form.html:3327
+#: app/templates/forms/entry_form/entry_form.html:3328
 msgid "Reconnecting..."
 msgstr "جاري الحساب..."
 
@@ -16953,7 +16976,7 @@ msgstr "اسم الجمعية الوطنية"
 msgid "Regional Offices"
 msgstr "المكاتب الإقليمية"
 
-#: app/templates/admin/assignments/manage_assignment.html:668
+#: app/templates/admin/assignments/manage_assignment.html:667
 #: app/templates/admin/organization/index.html:147
 #: app/templates/admin/user_management/user_form.html:976
 msgid "Regions"
@@ -16994,7 +17017,7 @@ msgstr "رفض الجميع"
 msgid "Reject all __COUNT__ pending requests for this user?"
 msgstr "هل أرفض جميع الطلبات المعلقة __COUNT__ لهذا المستخدم؟"
 
-#: app/routes/main/helpers.py:1231
+#: app/routes/main/helpers.py:1189
 #: app/templates/admin/assignments/public_submissions.html:55
 #: app/templates/admin/assignments/public_submissions.html:106
 #: app/templates/admin/assignments/public_submissions.html:179
@@ -17056,7 +17079,7 @@ msgstr "رفع"
 msgid "Reload All Plugins"
 msgstr "إعادة تحميل جميع الإضافات"
 
-#: app/templates/forms/entry_form/entry_form.html:355
+#: app/templates/forms/entry_form/entry_form.html:356
 msgid "Reload Page"
 msgstr "إضافة صفحة"
 
@@ -17090,10 +17113,10 @@ msgid ""
 "Reminds focal points to complete pending assignments. Variables: title, "
 "message, user_name, dashboard_url, org_name, copyright_year"
 msgstr ""
-"يذكر نقاط التركيز بإكمال المهام المعلقة. المتغيرات: العنوان، الرسالة، "
+"يذكر نقاط اتصال بإكمال المهام المعلقة. المتغيرات: العنوان، الرسالة، "
 "user_name، dashboard_url، org_name، copyright_year"
 
-#: app/templates/admin/assignments/manage_assignment.html:1027
+#: app/templates/admin/assignments/manage_assignment.html:1026
 #: app/templates/admin/indicator_bank/_dynamic_text_list.html:11
 #: app/templates/admin/indicator_bank/_dynamic_text_list.html:21
 #: app/templates/forms/form_builder/form_builder.html:362
@@ -17158,13 +17181,13 @@ msgstr "إزالة كل"
 msgid "Remove all deleted strings?"
 msgstr "إزالة كل السلاسل المحذوفة؟"
 
-#: app/templates/admin/assignments/manage_assignment.html:1029
+#: app/templates/admin/assignments/manage_assignment.html:1028
 msgid "Remove entities"
 msgstr "إزالة الكيانات"
 
-#: app/templates/forms/entry_form/entry_form.html:1113
-#: app/templates/forms/entry_form/entry_form.html:2056
-#: app/templates/forms/entry_form/entry_form.html:3832
+#: app/templates/forms/entry_form/entry_form.html:1114
+#: app/templates/forms/entry_form/entry_form.html:2057
+#: app/templates/forms/entry_form/entry_form.html:3833
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:165
 msgid "Remove this indicator"
 msgstr "إزالة هذا المؤشر"
@@ -17175,7 +17198,7 @@ msgstr "إزالة هذا المؤشر"
 msgid "Removed"
 msgstr "إزالة"
 
-#: app/routes/main/helpers.py:1326
+#: app/routes/main/helpers.py:1284
 #, python-format
 msgid "Removed %(count)d field in %(template)s"
 msgstr "%(count)d نقل الحقل في %(template)s"
@@ -17225,7 +17248,7 @@ msgstr ""
 #: app/templates/core/dashboard.html:1763
 #: app/templates/core/dashboard.html:1770
 #: app/templates/forms/entry_form/entry_form.html:170
-#: app/templates/forms/entry_form/entry_form.html:3969
+#: app/templates/forms/entry_form/entry_form.html:3970
 msgid "Reopen"
 msgstr "إعادة فتح"
 
@@ -17249,7 +17272,7 @@ msgstr "البيانات المتكررة/الديناميكية تبقى مؤر
 msgid "Replace"
 msgstr "استبدال"
 
-#: app/templates/forms/entry_form/entry_form.html:2681
+#: app/templates/forms/entry_form/entry_form.html:2682
 msgid "Replace Document"
 msgstr "رفع مستند"
 
@@ -17399,7 +17422,7 @@ msgid "Request cancelled"
 msgstr "تم إلغاء الطلب"
 
 #: app/templates/core/dashboard.html:1476
-#: app/templates/forms/entry_form/entry_form.html:591
+#: app/templates/forms/entry_form/entry_form.html:592
 msgid "Request changes"
 msgstr "طلبات التغييرات"
 
@@ -17482,7 +17505,7 @@ msgstr "تتطلب انتباه"
 msgid "Requires Review"
 msgstr "تتطلب مراجعة"
 
-#: app/routes/main/helpers.py:1229
+#: app/routes/main/helpers.py:1187
 msgid "Requires Revision"
 msgstr "يتطلب مراجعة"
 
@@ -17655,7 +17678,7 @@ msgstr ""
 "المهمة."
 
 #: app/templates/core/dashboard.html:1475
-#: app/templates/forms/entry_form/entry_form.html:589
+#: app/templates/forms/entry_form/entry_form.html:590
 msgid "Return this assignment to the National Society for changes?"
 msgstr "هل أعيد هذه المهمة إلى الجمعية الوطنية للتغييرات؟"
 
@@ -17948,8 +17971,8 @@ msgid "Rules Registry"
 msgstr "سجل القواعد"
 
 #: app/templates/admin/data_exploration/explore_data.html:253
-#: app/templates/forms/entry_form/entry_form.html:2565
-#: app/templates/forms/entry_form/entry_form.html:2569
+#: app/templates/forms/entry_form/entry_form.html:2566
+#: app/templates/forms/entry_form/entry_form.html:2570
 msgid "Run AI validation"
 msgstr "تشغيل التحقق من الذكاء الاصطناعي"
 
@@ -17970,7 +17993,7 @@ msgstr "تشغيل استيراد"
 msgid "Run validations (not run)"
 msgstr "تشغيل التحقق من الصحة (وليس التشغيل)"
 
-#: app/templates/forms/entry_form/entry_form.html:3887
+#: app/templates/forms/entry_form/entry_form.html:3888
 msgid "Running AI opinions..."
 msgstr "تشغيل آراء الذكاء الاصطناعي..."
 
@@ -18059,7 +18082,7 @@ msgid "Saturday"
 msgstr "السبت"
 
 #: app/templates/admin/ai/review_detail.html:175
-#: app/templates/admin/assignments/manage_assignment.html:18
+#: app/templates/admin/assignments/manage_assignment.html:19
 #: app/templates/admin/embed_content/manage_embed_content.html:191
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:18
 #: app/templates/admin/organization/edit_entity.html:139
@@ -18068,10 +18091,10 @@ msgstr "السبت"
 #: app/templates/admin/validation_rules.html:195
 #: app/templates/admin/validation_rules.html:221
 #: app/templates/components/_translation_review_modal.html:20
-#: app/templates/forms/entry_form/entry_form.html:548
-#: app/templates/forms/entry_form/entry_form.html:562
-#: app/templates/forms/entry_form/entry_form.html:2532
-#: app/templates/forms/entry_form/entry_form.html:2534
+#: app/templates/forms/entry_form/entry_form.html:549
+#: app/templates/forms/entry_form/entry_form.html:563
+#: app/templates/forms/entry_form/entry_form.html:2533
+#: app/templates/forms/entry_form/entry_form.html:2535
 #: app/templates/forms/form_builder/partials/_template_details.html:11
 msgid "Save"
 msgstr "حفظ"
@@ -18093,8 +18116,8 @@ msgstr "حفظ جميع الترجمات"
 msgid "Save Changes"
 msgstr "حفظ التغييرات"
 
-#: app/templates/forms/entry_form/entry_form.html:599
-#: app/templates/forms/entry_form/entry_form.html:606
+#: app/templates/forms/entry_form/entry_form.html:600
+#: app/templates/forms/entry_form/entry_form.html:607
 msgid "Save Draft"
 msgstr "حفظ ملاحظة"
 
@@ -18166,7 +18189,7 @@ msgstr ""
 msgid "Saved"
 msgstr "تم إنقاذها"
 
-#: app/templates/forms/entry_form/entry_form.html:3811
+#: app/templates/forms/entry_form/entry_form.html:3812
 msgid ""
 "Saved value is no longer in the current list. It will still be submitted "
 "unless you choose another option."
@@ -18189,7 +18212,7 @@ msgstr "إنقاذ..."
 msgid "Saving…"
 msgstr "إنقاذ..."
 
-#: app/templates/auth/login.html:514 app/templates/auth/login.html:721
+#: app/templates/auth/login.html:571 app/templates/auth/login.html:746
 msgid ""
 "Say goodbye to scattered Excel files, KoBo forms, multiple platforms, and "
 "logins — everything is now centralized and streamlined here."
@@ -18282,7 +18305,7 @@ msgstr "تعريف البحث"
 msgid "Search Mode"
 msgstr "البحث مو"
 
-#: app/templates/admin/assignments/manage_assignment.html:729
+#: app/templates/admin/assignments/manage_assignment.html:728
 msgid "Search NS Structure"
 msgstr "بنية البحث في NS"
 
@@ -18314,11 +18337,11 @@ msgstr "البحث عن ترجمات مؤقتة"
 msgid "Search Recipients"
 msgstr "مستلمين"
 
-#: app/templates/admin/assignments/manage_assignment.html:696
+#: app/templates/admin/assignments/manage_assignment.html:695
 msgid "Search Regions"
 msgstr "مناطق البحث"
 
-#: app/templates/admin/assignments/manage_assignment.html:678
+#: app/templates/admin/assignments/manage_assignment.html:677
 msgid "Search Secretariat"
 msgstr "ابحث عن أمانة"
 
@@ -18340,7 +18363,7 @@ msgstr "جميع أنواع الأنشطة"
 msgid "Search and select a row to add..."
 msgstr "ابحث واختر صفا لإضافته..."
 
-#: app/templates/admin/assignments/manage_assignment.html:733
+#: app/templates/admin/assignments/manage_assignment.html:732
 msgid "Search branches, sub-branches, or local units..."
 msgstr "ابحث عن الفروع، الفروع الفرعية، أو الوحدات المحلية..."
 
@@ -18404,7 +18427,7 @@ msgstr "أقسام البحث..."
 msgid "Search description (e.g., template name)"
 msgstr "وصف البحث (مثل اسم القالب)"
 
-#: app/templates/admin/assignments/manage_assignment.html:682
+#: app/templates/admin/assignments/manage_assignment.html:681
 msgid "Search divisions or departments..."
 msgstr "ابحث في الأقسام أو الأقسام..."
 
@@ -18440,7 +18463,7 @@ msgstr "ابحث في الجمعيات الوطنية..."
 msgid "Search notifications..."
 msgstr "البحث في الإشعارات..."
 
-#: app/templates/admin/assignments/manage_assignment.html:700
+#: app/templates/admin/assignments/manage_assignment.html:699
 msgid "Search regional or cluster offices..."
 msgstr "ابحث في المكاتب الإقليمية أو المكاتب الجماعية..."
 
@@ -18546,7 +18569,7 @@ msgstr "مكاتب الأمانة الإقليمية"
 msgid "Secretariat assignment"
 msgstr "تعيين الأمانة العامة"
 
-#: app/templates/admin/assignments/manage_assignment.html:648
+#: app/templates/admin/assignments/manage_assignment.html:647
 #: app/templates/admin/organization/index.html:137
 msgid "Secretariat structure"
 msgstr "هيكل الأمانة العامة"
@@ -18606,9 +18629,9 @@ msgstr "تقدم الأقسام"
 #: app/templates/admin/templates/new_template.html:1136
 #: app/templates/admin/templates/upr_excel_import.html:450
 #: app/templates/admin/validation_dashboard.html:265
-#: app/templates/forms/entry_form/entry_form.html:465
 #: app/templates/forms/entry_form/entry_form.html:466
-#: app/templates/forms/entry_form/entry_form.html:734
+#: app/templates/forms/entry_form/entry_form.html:467
+#: app/templates/forms/entry_form/entry_form.html:735
 #: app/templates/forms/form_builder/field_mapping.html:296
 #: app/templates/forms/form_builder/form_builder.html:941
 msgid "Sections"
@@ -18715,7 +18738,7 @@ msgid ""
 "Security settings configuration UI is not yet implemented in this view."
 msgstr "واجهة إعدادات الأمان في واجهة المستخدم لم تنفذ بعد في هذا العرض."
 
-#: app/templates/forms/entry_form/entry_form.html:3834
+#: app/templates/forms/entry_form/entry_form.html:3835
 msgid "Security token not found. Please refresh the page and try again."
 msgstr "رمز الأمان غير موجود. يرجى تحديث الصفحة والمحاولة مرة أخرى."
 
@@ -18748,7 +18771,7 @@ msgstr "فشل التصنيف"
 msgid "Select All"
 msgstr "اختيار الكل"
 
-#: app/templates/admin/assignments/manage_assignment.html:587
+#: app/templates/admin/assignments/manage_assignment.html:586
 #: app/templates/components/_form_helpers.html:73
 msgid "Select All Countries"
 msgstr "اختر جميع الدول"
@@ -18762,7 +18785,7 @@ msgstr "اختيار الكل"
 msgid "Select Column..."
 msgstr "عمود الاختيار..."
 
-#: app/templates/forms/entry_form/entry_form.html:2716
+#: app/templates/forms/entry_form/entry_form.html:2717
 msgid "Select Document:"
 msgstr "اختر المستند:"
 
@@ -18774,7 +18797,7 @@ msgstr "اختر نقطة النهاية"
 msgid "Select Entities"
 msgstr "اختر نقطة النهاية"
 
-#: app/templates/forms/entry_form/entry_form.html:3838
+#: app/templates/forms/entry_form/entry_form.html:3839
 msgid "Select Indicator"
 msgstr "اختر المؤشر"
 
@@ -18836,14 +18859,14 @@ msgstr "اختر المتغير..."
 msgid "Select a campaign..."
 msgstr "اختر حملة..."
 
-#: app/templates/admin/assignments/manage_assignment.html:738
+#: app/templates/admin/assignments/manage_assignment.html:737
 #: app/templates/admin/documents/documents.html:164
 #: app/templates/admin/user_management/user_form.html:941
-#: app/templates/auth/login.html:1115
+#: app/templates/auth/login.html:1182
 msgid "Select a country"
 msgstr "اختر بلداً"
 
-#: app/templates/admin/assignments/manage_assignment.html:753
+#: app/templates/admin/assignments/manage_assignment.html:752
 #: app/templates/admin/user_management/user_form.html:956
 msgid "Select a country to view NS structure."
 msgstr "اختر دولة لعرض هيكل NS."
@@ -18904,6 +18927,10 @@ msgstr "خدمة الترجمة"
 msgid "Select a user to receive the test email."
 msgstr "اختر مستخدما لاستقبال البريد الإلكتروني التجريبي."
 
+#: app/templates/auth/login.html:641 app/templates/auth/login.html:1083
+msgid "Select a user…"
+msgstr "اختر مستخدما..."
+
 #: app/templates/admin/analytics/audit_trail.html:341
 msgid "Select activity types..."
 msgstr "جميع أنواع الأنشطة"
@@ -18944,7 +18971,7 @@ msgstr "اختر على الأقل مؤشرا واحدا للمتابعة."
 msgid "Select colour"
 msgstr "اختيار اللون"
 
-#: app/templates/admin/assignments/manage_assignment.html:569
+#: app/templates/admin/assignments/manage_assignment.html:568
 msgid ""
 "Select countries to add to this assignment. Already assigned countries are "
 "pre-checked."
@@ -18952,12 +18979,12 @@ msgstr ""
 "اختر الدول التي تضيفها إلى هذه المهمة. الدول المعينة مسبقا يتم التحقق منها "
 "مسبقا."
 
-#: app/templates/admin/assignments/manage_assignment.html:571
+#: app/templates/admin/assignments/manage_assignment.html:570
 msgid "Select countries to assign to this assignment."
 msgstr "اختر الدول التي سيتم تعيينها لهذه المهمة."
 
-#: app/templates/core/dashboard.html:3203
-#: app/templates/core/dashboard.html:3278
+#: app/templates/core/dashboard.html:3216
+#: app/templates/core/dashboard.html:3291
 msgid "Select countries you will manage data for"
 msgstr "اختر الدول التي ستدير بياناتها"
 
@@ -18969,13 +18996,13 @@ msgstr "عمود الاختيار..."
 msgid "Select country"
 msgstr "دولة مختارة"
 
-#: app/templates/core/dashboard.html:3204
-#: app/templates/core/dashboard.html:3279
+#: app/templates/core/dashboard.html:3217
+#: app/templates/core/dashboard.html:3292
 msgid "Select country you will manage data for"
 msgstr "اختر الدولة التي ستدير بياناتها"
 
 #: app/templates/admin/documents/documents.html:180
-#: app/templates/forms/entry_form/entry_form.html:2784
+#: app/templates/forms/entry_form/entry_form.html:2785
 msgid "Select document type"
 msgstr "اختر نوع المستند"
 
@@ -18983,8 +19010,8 @@ msgstr "اختر نوع المستند"
 msgid "Select document type..."
 msgstr "اختر نوع المستند..."
 
-#: app/templates/admin/assignments/manage_assignment.html:643
-#: app/templates/admin/assignments/manage_assignment.html:724
+#: app/templates/admin/assignments/manage_assignment.html:642
+#: app/templates/admin/assignments/manage_assignment.html:723
 msgid ""
 "Select entities by checking the boxes, then click \"Save Changes\" to apply "
 "them."
@@ -19000,7 +19027,7 @@ msgid "Select indicators"
 msgstr "مؤشرات مختارة"
 
 #: app/templates/admin/documents/documents.html:189
-#: app/templates/forms/entry_form/entry_form.html:2751
+#: app/templates/forms/entry_form/entry_form.html:2752
 msgid "Select language"
 msgstr "اختر اللغة"
 
@@ -19008,7 +19035,7 @@ msgstr "اختر اللغة"
 msgid "Select languages to translate"
 msgstr "اختر اللغات للترجمة"
 
-#: app/templates/auth/login.html:659
+#: app/templates/auth/login.html:684
 msgid ""
 "Select one country you request access to. An admin will review your request."
 msgstr "حدد البلد الذي تحتاج الوصول إليه. سيقوم المسؤول بمراجعة طلبك."
@@ -19049,7 +19076,7 @@ msgid ""
 msgstr ""
 "اختر قوالب محددة. اترك فارغا ليشمل جميع التعيينات ذات الحالة المختارة."
 
-#: app/templates/admin/assignments/manage_assignment.html:822
+#: app/templates/admin/assignments/manage_assignment.html:821
 msgid "Select status"
 msgstr "الحالة المختارة"
 
@@ -19112,11 +19139,11 @@ msgstr ""
 #: app/templates/admin/documents/documents.html:262
 #: app/templates/admin/documents/documents.html:279
 #: app/templates/admin/documents/documents.html:305
-#: app/templates/forms/entry_form/entry_form.html:2813
-#: app/templates/forms/entry_form/entry_form.html:2827
-#: app/templates/forms/entry_form/entry_form.html:2837
-#: app/templates/forms/entry_form/entry_form.html:2854
-#: app/templates/forms/entry_form/entry_form.html:2880
+#: app/templates/forms/entry_form/entry_form.html:2814
+#: app/templates/forms/entry_form/entry_form.html:2828
+#: app/templates/forms/entry_form/entry_form.html:2838
+#: app/templates/forms/entry_form/entry_form.html:2855
+#: app/templates/forms/entry_form/entry_form.html:2881
 #: app/templates/forms/form_builder/partials/_item_modal.html:497
 #: app/templates/forms/form_builder/partials/_item_modal.html:509
 #: app/templates/forms/form_builder/partials/_item_modal.html:519
@@ -19174,12 +19201,12 @@ msgstr "التقرير الذاتي"
 msgid "Self-Reported"
 msgstr "مبلغ عنه ذاتياً"
 
-#: app/routes/main/helpers.py:1351
+#: app/routes/main/helpers.py:1309
 #, python-format
 msgid "Self-report created: %(template)s"
 msgstr "تقرير المصير: %(template)s"
 
-#: app/routes/auth.py:1036
+#: app/routes/auth.py:1220
 msgid ""
 "Self-service registration is not available. Please sign in with your "
 "organization account."
@@ -19205,7 +19232,7 @@ msgstr "إرسال إشعار فوري"
 msgid "Send Now"
 msgstr "أرسل الآن"
 
-#: app/templates/auth/login.html:699
+#: app/templates/auth/login.html:724
 msgid "Send Reset Link"
 msgstr "رابط إعادة الإرسال"
 
@@ -19247,12 +19274,12 @@ msgstr ""
 msgid "Send digest now"
 msgstr "أرسل ملخصا الآن"
 
-#: app/templates/forms/entry_form/entry_form.html:569
-#: app/templates/forms/entry_form/entry_form.html:572
+#: app/templates/forms/entry_form/entry_form.html:570
+#: app/templates/forms/entry_form/entry_form.html:573
 msgid "Send for Review"
 msgstr "أرسلوا للمراجعة"
 
-#: app/templates/forms/entry_form/entry_form.html:568
+#: app/templates/forms/entry_form/entry_form.html:569
 msgid "Send for Review?"
 msgstr "هل أرسل للمراجعة؟"
 
@@ -19263,7 +19290,7 @@ msgstr "أرسل أسئلة مفتوحة"
 #: app/templates/admin/validation_questions.html:302
 msgid ""
 "Send open validation questions to focal points for the selected country?"
-msgstr "هل أرسل أسئلة التحقق المفتوحة إلى نقاط التركيز في الدولة المختارة؟"
+msgstr "هل أرسل أسئلة التحقق المفتوحة إلى نقاط اتصال في الدولة المختارة؟"
 
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:79
 #: app/templates/admin/settings/manage_settings.html:1005
@@ -19272,7 +19299,7 @@ msgstr "هل أرسل أسئلة التحقق المفتوحة إلى نقاط �
 msgid "Send test email"
 msgstr "إرسال بريد إلكتروني للاختبار"
 
-#: app/templates/forms/entry_form/entry_form.html:570
+#: app/templates/forms/entry_form/entry_form.html:571
 msgid ""
 "Send this assignment to delegation for review? You will not be able to edit "
 "it until they return it for changes."
@@ -19327,7 +19354,7 @@ msgstr ""
 "الحملات المرسلة تحمل المحتوى فقط ما لم تدرج المستلمين. يمكن أن تشمل الحملات "
 "المجدولة والمسودة المستلمين بشكل افتراضي."
 
-#: app/routes/main/helpers.py:1230
+#: app/routes/main/helpers.py:1188
 msgid "Sent for Review"
 msgstr "تم إرسالها للمراجعة"
 
@@ -19340,12 +19367,12 @@ msgstr "تم إرساله للمراجعة"
 msgid "Sent for review: %(template)s"
 msgstr "تم إرسالها للمراجعة: %(template)s"
 
-#: app/templates/admin/assignments/manage_assignment.html:120
-#: app/templates/admin/assignments/manage_assignment.html:140
+#: app/templates/admin/assignments/manage_assignment.html:121
+#: app/templates/admin/assignments/manage_assignment.html:141
 #: app/templates/admin/documents/documents.html:290
 #: app/templates/admin/documents/documents.html:316
-#: app/templates/forms/entry_form/entry_form.html:2865
-#: app/templates/forms/entry_form/entry_form.html:2891
+#: app/templates/forms/entry_form/entry_form.html:2866
+#: app/templates/forms/entry_form/entry_form.html:2892
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:75
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:88
 #: app/templates/forms/form_builder/partials/_item_modal.html:545
@@ -19517,11 +19544,11 @@ msgstr "الإنشاء"
 msgid "Severity"
 msgstr "الشدة"
 
-#: app/templates/forms/entry_form/entry_form.html:1160
-#: app/templates/forms/entry_form/entry_form.html:1301
-#: app/templates/forms/entry_form/entry_form.html:1454
-#: app/templates/forms/entry_form/entry_form.html:2160
-#: app/templates/forms/entry_form/entry_form.html:2288
+#: app/templates/forms/entry_form/entry_form.html:1161
+#: app/templates/forms/entry_form/entry_form.html:1302
+#: app/templates/forms/entry_form/entry_form.html:1455
+#: app/templates/forms/entry_form/entry_form.html:2161
+#: app/templates/forms/entry_form/entry_form.html:2289
 #: app/templates/forms/entry_form/export_pdf.html:363
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:211
 msgid "Sex"
@@ -19617,6 +19644,7 @@ msgstr ""
 #: app/templates/admin/ai/trace_detail.html:450
 #: app/templates/core/dashboard.html:1601
 #: app/templates/core/dashboard.html:2196
+#: app/templates/core/dashboard.html:3028
 msgid "Show"
 msgstr "عرض"
 
@@ -19702,7 +19730,7 @@ msgstr "أقسام العرض"
 msgid "Show divisions"
 msgstr "أقسام العرض"
 
-#: app/templates/forms/entry_form/entry_form.html:2974
+#: app/templates/forms/entry_form/entry_form.html:2975
 msgid "Show editors"
 msgstr "محررو البرامج"
 
@@ -19759,6 +19787,7 @@ msgid "Show national societies"
 msgstr "عرض الجمعيات الوطنية"
 
 #: app/templates/core/dashboard.html:1599
+#: app/templates/core/dashboard.html:3030
 msgid "Show past assignments"
 msgstr "عرض المهام السابقة"
 
@@ -19876,7 +19905,12 @@ msgstr ""
 msgid "Sign in"
 msgstr "تسجيل الدخول"
 
-#: app/routes/auth.py:524
+#: app/templates/auth/login.html:610
+msgid ""
+"Sign in without a password to test as a role preset or any active user."
+msgstr "سجل الدخول بدون كلمة مرور لاختبار إعداد دور أو مستخدم نشط."
+
+#: app/routes/auth.py:708
 msgid "Sign-In Failed"
 msgstr "فشل تسجيل الدخول"
 
@@ -19884,9 +19918,9 @@ msgstr "فشل تسجيل الدخول"
 msgid "Single PO"
 msgstr "م ف"
 
-#: app/templates/admin/assignments/manage_assignment.html:88
+#: app/templates/admin/assignments/manage_assignment.html:89
 #: app/templates/admin/documents/documents.html:225
-#: app/templates/forms/entry_form/entry_form.html:2800
+#: app/templates/forms/entry_form/entry_form.html:2801
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:41
 #: app/templates/forms/form_builder/partials/_item_modal.html:454
 #: app/templates/forms/form_builder/partials/_item_modal.html:485
@@ -19909,7 +19943,7 @@ msgstr "تخطي"
 msgid "Skip for now"
 msgstr "تخطى الآن"
 
-#: app/services/notification/service.py:1585
+#: app/services/notification/service.py:1644
 #: app/templates/admin/translations/manage_translations.html:674
 #: app/templates/components/auto_translate_modal.html:470
 msgid "Skipped"
@@ -20068,9 +20102,9 @@ msgstr "القسم القياسي"
 msgid "Start"
 msgstr "ابدأ"
 
-#: app/templates/admin/assignments/manage_assignment.html:108
+#: app/templates/admin/assignments/manage_assignment.html:109
 #: app/templates/admin/documents/documents.html:272
-#: app/templates/forms/entry_form/entry_form.html:2847
+#: app/templates/forms/entry_form/entry_form.html:2848
 msgid "Start Period"
 msgstr "الفترة الزمنية"
 
@@ -20082,9 +20116,9 @@ msgstr "ابدأي بالزنزانة"
 msgid "Start Translation"
 msgstr "بدء الترجمة"
 
-#: app/templates/admin/assignments/manage_assignment.html:100
+#: app/templates/admin/assignments/manage_assignment.html:101
 #: app/templates/admin/documents/documents.html:246
-#: app/templates/forms/entry_form/entry_form.html:2821
+#: app/templates/forms/entry_form/entry_form.html:2822
 #: app/templates/forms/form_builder/partials/_item_modal.html:503
 msgid "Start Year"
 msgstr "السنة الماضية"
@@ -20165,7 +20199,7 @@ msgstr "يبدأ..."
 msgid "Starts with"
 msgstr "يبدأ ب"
 
-#: app/routes/auth.py:584
+#: app/routes/auth.py:768
 msgid "State mismatch. Please try signing in again."
 msgstr "عدم تطابق الولاية. يرجى محاولة تسجيل الدخول مرة أخرى."
 
@@ -20262,7 +20296,7 @@ msgid ""
 "Stay updated with recent activities and changes made by other focal points "
 "in your country."
 msgstr ""
-"ابق على اطلاع بأحدث الأنشطة والتغييرات التي أجرتها نقاط التركيز الأخرى في "
+"ابق على اطلاع بأحدث الأنشطة والتغييرات التي أجرتها نقاط اتصال الأخرى في "
 "بلدك."
 
 #: app/templates/admin/ai/_trace_card.html:360
@@ -20283,7 +20317,7 @@ msgstr "الخطوات الجارية"
 msgid "Steps:"
 msgstr "الخطوات:"
 
-#: app/templates/forms/entry_form/entry_form.html:3096
+#: app/templates/forms/entry_form/entry_form.html:3097
 #: app/templates/forms/form_builder/form_builder.html:1098
 msgid "Still loading…"
 msgstr "لا يزال تحميل.."
@@ -20293,11 +20327,11 @@ msgstr "لا يزال تحميل.."
 #: app/templates/components/auto_translate_modal_js.html:62
 #: app/templates/core/chat_immersive.html:52
 #: app/templates/core/chat_immersive.html:259
-#: app/templates/forms/entry_form/entry_form.html:3885
+#: app/templates/forms/entry_form/entry_form.html:3886
 msgid "Stop"
 msgstr "توقف"
 
-#: app/templates/forms/entry_form/entry_form.html:3886
+#: app/templates/forms/entry_form/entry_form.html:3887
 msgid "Stop AI validation"
 msgstr "أوقف التحقق من صحة الذكاء الاصطناعي"
 
@@ -20420,11 +20454,11 @@ msgstr "تذكير بالتقديم"
 msgid "Submission status map"
 msgstr "خريطة حالة التقديم"
 
-#: app/templates/forms/entry_form/entry_form.html:553
-#: app/templates/forms/entry_form/entry_form.html:579
-#: app/templates/forms/entry_form/entry_form.html:582
-#: app/templates/forms/entry_form/entry_form.html:2538
-#: app/templates/forms/entry_form/entry_form.html:2540
+#: app/templates/forms/entry_form/entry_form.html:554
+#: app/templates/forms/entry_form/entry_form.html:580
+#: app/templates/forms/entry_form/entry_form.html:583
+#: app/templates/forms/entry_form/entry_form.html:2539
+#: app/templates/forms/entry_form/entry_form.html:2541
 msgid "Submit"
 msgstr "إرسال"
 
@@ -20432,7 +20466,7 @@ msgstr "إرسال"
 msgid "Submit Documents"
 msgstr "Submit Documents"
 
-#: app/templates/forms/entry_form/entry_form.html:578
+#: app/templates/forms/entry_form/entry_form.html:579
 msgid "Submit Form?"
 msgstr "هل أقدم نموذجا؟"
 
@@ -20444,7 +20478,7 @@ msgstr "إرسال الإجابة"
 msgid "Submit your request"
 msgstr "قدم طلبك"
 
-#: app/routes/main/helpers.py:1227
+#: app/routes/main/helpers.py:1185
 #: app/templates/admin/communication/center.html:921
 #: app/templates/admin/templates/data_sync_imputation.html:144
 #: app/templates/admin/templates/data_sync_imputation.html:1305
@@ -20482,8 +20516,8 @@ msgstr "تسمية القيمة المقدمة"
 msgid "Submitter"
 msgstr "مُقدّم"
 
-#: app/templates/forms/entry_form/entry_form.html:395
-#: app/templates/forms/entry_form/entry_form.html:628
+#: app/templates/forms/entry_form/entry_form.html:396
+#: app/templates/forms/entry_form/entry_form.html:629
 #: app/templates/public_submission_export_pdf.html:14
 msgid "Submitter Information"
 msgstr "معلومات المقدم"
@@ -20602,7 +20636,7 @@ msgstr "الأحد"
 msgid "Supported Languages"
 msgstr "اللغات المدعومة"
 
-#: app/templates/forms/entry_form/entry_form.html:2661
+#: app/templates/forms/entry_form/entry_form.html:2662
 #: app/templates/forms/form_builder/partials/_excel_modal.html:80
 msgid "Supported formats: .xlsx"
 msgstr "الصيغ المدعومة: .xlsx, .xls"
@@ -20746,7 +20780,8 @@ msgstr "قائمة النظام (للقراءة فقط)"
 #: app/templates/admin/analytics/user_detail.html:51
 #: app/templates/admin/dashboard.html:276
 #: app/templates/admin/user_management/users.html:175
-#: app/templates/core/layout.html:222 app/templates/core/layout.html:224
+#: app/templates/auth/login.html:624 app/templates/core/layout.html:222
+#: app/templates/core/layout.html:224
 msgid "System Manager"
 msgstr "مدير النظام"
 
@@ -20858,12 +20893,12 @@ msgstr "عضو الفريق"
 msgid "Team update: %(template)s submitted"
 msgstr "تحديث الفريق: %(template)s تم تقديمه"
 
+#: app/templates/core/dashboard.html:2410
 #: app/templates/core/dashboard.html:2411
-#: app/templates/core/dashboard.html:2412
+#: app/templates/core/dashboard.html:2467
 #: app/templates/core/dashboard.html:2468
-#: app/templates/core/dashboard.html:2469
+#: app/templates/core/dashboard.html:2517
 #: app/templates/core/dashboard.html:2518
-#: app/templates/core/dashboard.html:2519
 msgid "Teams Chat"
 msgstr "دردشة Teams"
 
@@ -21095,18 +21130,6 @@ msgstr "إنذار الاختبار"
 msgid "Test a query…"
 msgstr "اختبر استفسارا..."
 
-#: app/templates/auth/login.html:555
-msgid "Test as System Manager"
-msgstr "اختبار كمدير نظام"
-
-#: app/templates/auth/login.html:564
-msgid "Test as a Focal Point"
-msgstr "الاختبار كنقطة محورية"
-
-#: app/templates/auth/login.html:560
-msgid "Test as an Admin"
-msgstr "رسالة للمسؤولين"
-
 #: app/templates/admin/settings/manage_settings.html:1525
 msgid ""
 "Test email could not be sent. Check the message below or your mail settings."
@@ -21167,7 +21190,7 @@ msgstr ""
 "النسخة الإنجليزية من هذا القالب فارغة. أضف أو احفظ النص الإنجليزي أولا، ثم "
 "حاول مرة أخرى."
 
-#: app/routes/main/helpers.py:1188
+#: app/routes/main/helpers.py:1146
 msgid "The assignment is available but data entry has not started yet."
 msgstr "المهمة متاحة لكن إدخال البيانات لم يبدأ بعد."
 
@@ -21177,7 +21200,7 @@ msgstr "المهمة متاحة لكن إدخال البيانات لم يبدأ
 msgid "The code field is locked while this entry is still in use."
 msgstr "حقل الكود مغلق بينما لا يزال هذا الإدخال قيد الاستخدام."
 
-#: app/templates/forms/entry_form/entry_form.html:2637
+#: app/templates/forms/entry_form/entry_form.html:2638
 msgid ""
 "The file is checked for template version, country, and reporting period "
 "before import."
@@ -21197,16 +21220,16 @@ msgstr "سيتم حذف البيانات ذات الصلة التالية. لا 
 msgid "The following will be unassigned (kept for history):"
 msgstr "سيتم إلغاء تعيين الكتب التالية (محفوظة للتاريخ):"
 
-#: app/templates/forms/entry_form/entry_form.html:3106
+#: app/templates/forms/entry_form/entry_form.html:3107
 msgid ""
 "The form is taking longer than expected to load. Please reload the page."
 msgstr "ويستغرق الشكل وقتا أطول مما كان متوقعا. من فضلك أعد تحميل الصفحة."
 
-#: app/routes/main/helpers.py:1197
+#: app/routes/main/helpers.py:1155
 msgid "The form was sent for delegation review before final submission."
 msgstr "تم إرسال النموذج لمراجعة الوفد قبل التقديم النهائي."
 
-#: app/routes/main/helpers.py:1200
+#: app/routes/main/helpers.py:1158
 msgid "The form was submitted and is awaiting validation by an administrator."
 msgstr "تم تقديم النموذج وهو ينتظر التحقق من قبل المسؤول."
 
@@ -21241,7 +21264,7 @@ msgid ""
 "The number of repeat entries cannot exceed the number of available options."
 msgstr "لا يمكن أن يتجاوز عدد الإدخالات المتكررة عدد الخيارات المتاحة."
 
-#: app/templates/admin/assignments/manage_assignment.html:216
+#: app/templates/admin/assignments/manage_assignment.html:217
 msgid ""
 "The person accountable for data quality in this collection cycle. Defaults "
 "to the template owner."
@@ -21254,7 +21277,7 @@ msgstr ""
 msgid "The requested resource was not found."
 msgstr "ولم يعثر على الموارد المطلوبة."
 
-#: app/templates/forms/entry_form/entry_form.html:3847
+#: app/templates/forms/entry_form/entry_form.html:3848
 msgid "The server is temporarily unavailable. Please try again in a moment."
 msgstr "الخادم غير متاح مؤقتا. يرجى المحاولة مرة أخرى بعد قليل."
 
@@ -21266,7 +21289,7 @@ msgstr ""
 "يعرض الشريط الجانبي لوحة التحكم الخاصة بك ونماذج التقارير المتاحة. يمكنك "
 "توسيع أو تسريع الأقسام، وتستمر الحالة عبر الزيارات."
 
-#: app/routes/main/helpers.py:1203
+#: app/routes/main/helpers.py:1161
 msgid "The submission was validated and approved. Data entry is complete."
 msgstr ""
 "تم التحقق من صحة التقديم والموافقة عليه. تم الانتهاء من إدخال البيانات."
@@ -21384,7 +21407,7 @@ msgstr ""
 "تم إرسال هذا الواجب إلى %(org)s للمراجعة. لا يمكنك إجراء التعديلات حتى يتم "
 "إرجاعها للمراجعة."
 
-#: app/routes/main/helpers.py:1206
+#: app/routes/main/helpers.py:1164
 msgid "This assignment is closed and no further changes are expected."
 msgstr "تم إغلاق هذا التعيين ولا يتوقع تغييرات إضافية."
 
@@ -21392,7 +21415,7 @@ msgstr "تم إغلاق هذا التعيين ولا يتوقع تغييرات �
 msgid "This assignment is currently inactive."
 msgstr "هذه المهمة غير نشطة حاليا."
 
-#: app/templates/admin/assignments/manage_assignment.html:1036
+#: app/templates/admin/assignments/manage_assignment.html:1035
 msgid ""
 "This assignment will be created without sending notifications to assigned "
 "entities. Do you want to continue?"
@@ -21420,7 +21443,7 @@ msgstr "لا يمكن إخفاء هذا العمود"
 msgid "This column cannot be unpinned"
 msgstr "لا يمكن إلغاء تثبيت هذا العمود"
 
-#: app/templates/auth/login.html:1234 app/templates/auth/login.html:1319
+#: app/templates/auth/login.html:1301 app/templates/auth/login.html:1386
 msgid ""
 "This email is already registered. Try signing in or reset your password."
 msgstr ""
@@ -21431,12 +21454,12 @@ msgstr ""
 msgid "This feature is under development"
 msgstr "هذه الميزة قيد التطوير"
 
-#: app/templates/forms/entry_form/entry_form.html:933
-#: app/templates/forms/entry_form/entry_form.html:1894
+#: app/templates/forms/entry_form/entry_form.html:934
+#: app/templates/forms/entry_form/entry_form.html:1895
 msgid "This field type is no longer available. Please contact your"
 msgstr "هذا النوع من الحقل لم يعد متاحا. يرجى التواصل مع"
 
-#: app/templates/forms/entry_form/entry_form.html:614
+#: app/templates/forms/entry_form/entry_form.html:615
 #, python-format
 msgid "This form has been %(status)s. Data entry is disabled."
 msgstr "%(status)s هذا الشكل كان دخول البيانات معوق."
@@ -21473,7 +21496,7 @@ msgid ""
 msgstr ""
 "هذا النموذج للقراءة فقط. يمكنك مراجعة البيانات لكن لا يمكنك إجراء التغييرات."
 
-#: app/templates/forms/entry_form/entry_form.html:2671
+#: app/templates/forms/entry_form/entry_form.html:2672
 msgid ""
 "This functionality is only available when working with actual assignments."
 msgstr "هذه الوظيفة متوفرة فقط عند العمل مع مهام فعلية."
@@ -21489,7 +21512,7 @@ msgstr ""
 msgid "This import will permanently delete existing submission data:"
 msgstr "هذا الاستيراد سيحذف بيانات التقديم الحالية بشكل دائم:"
 
-#: app/templates/forms/entry_form/entry_form.html:3848
+#: app/templates/forms/entry_form/entry_form.html:3849
 msgid "This indicator is already added to this section."
 msgstr "هذا المؤشر مضاف بالفعل إلى هذا القسم."
 
@@ -21510,21 +21533,21 @@ msgstr ""
 "هذا قسم ديناميكي حيث يمكنك إضافة مؤشرات مخصصة من بنك المؤشرات. استخدم هذا "
 "للإبلاغ عن مقاييس إضافية ذات صلة ببلدك."
 
-#: app/templates/forms/entry_form/entry_form.html:1287
-#: app/templates/forms/entry_form/entry_form.html:1334
-#: app/templates/forms/entry_form/entry_form.html:1440
-#: app/templates/forms/entry_form/entry_form.html:1487
-#: app/templates/forms/entry_form/entry_form.html:1524
-#: app/templates/forms/entry_form/entry_form.html:1587
-#: app/templates/forms/entry_form/entry_form.html:1597
-#: app/templates/forms/entry_form/entry_form.html:1610
-#: app/templates/forms/entry_form/entry_form.html:1625
-#: app/templates/forms/entry_form/entry_form.html:1649
-#: app/templates/forms/entry_form/entry_form.html:1657
-#: app/templates/forms/entry_form/entry_form.html:1671
-#: app/templates/forms/entry_form/entry_form.html:2106
-#: app/templates/forms/entry_form/entry_form.html:2203
-#: app/templates/forms/entry_form/entry_form.html:2226
+#: app/templates/forms/entry_form/entry_form.html:1288
+#: app/templates/forms/entry_form/entry_form.html:1335
+#: app/templates/forms/entry_form/entry_form.html:1441
+#: app/templates/forms/entry_form/entry_form.html:1488
+#: app/templates/forms/entry_form/entry_form.html:1525
+#: app/templates/forms/entry_form/entry_form.html:1588
+#: app/templates/forms/entry_form/entry_form.html:1598
+#: app/templates/forms/entry_form/entry_form.html:1611
+#: app/templates/forms/entry_form/entry_form.html:1626
+#: app/templates/forms/entry_form/entry_form.html:1650
+#: app/templates/forms/entry_form/entry_form.html:1658
+#: app/templates/forms/entry_form/entry_form.html:1672
+#: app/templates/forms/entry_form/entry_form.html:2107
+#: app/templates/forms/entry_form/entry_form.html:2204
+#: app/templates/forms/entry_form/entry_form.html:2227
 #: app/templates/forms/entry_form/partials/_question_single_choice.html:38
 #: app/templates/forms/entry_form/partials/matrix_table.html:12
 msgid "This is a prefilled value"
@@ -21538,21 +21561,21 @@ msgstr ""
 "هذه معاينة لكيفية ظهور القالب للمستخدمين. يمكنك اختبار إدخال البيانات في وضع"
 " المعاينة هذا."
 
-#: app/templates/forms/entry_form/entry_form.html:1287
-#: app/templates/forms/entry_form/entry_form.html:1334
-#: app/templates/forms/entry_form/entry_form.html:1440
-#: app/templates/forms/entry_form/entry_form.html:1487
-#: app/templates/forms/entry_form/entry_form.html:1524
-#: app/templates/forms/entry_form/entry_form.html:1587
-#: app/templates/forms/entry_form/entry_form.html:1597
-#: app/templates/forms/entry_form/entry_form.html:1610
-#: app/templates/forms/entry_form/entry_form.html:1625
-#: app/templates/forms/entry_form/entry_form.html:1649
-#: app/templates/forms/entry_form/entry_form.html:1657
-#: app/templates/forms/entry_form/entry_form.html:1671
-#: app/templates/forms/entry_form/entry_form.html:2106
-#: app/templates/forms/entry_form/entry_form.html:2203
-#: app/templates/forms/entry_form/entry_form.html:2226
+#: app/templates/forms/entry_form/entry_form.html:1288
+#: app/templates/forms/entry_form/entry_form.html:1335
+#: app/templates/forms/entry_form/entry_form.html:1441
+#: app/templates/forms/entry_form/entry_form.html:1488
+#: app/templates/forms/entry_form/entry_form.html:1525
+#: app/templates/forms/entry_form/entry_form.html:1588
+#: app/templates/forms/entry_form/entry_form.html:1598
+#: app/templates/forms/entry_form/entry_form.html:1611
+#: app/templates/forms/entry_form/entry_form.html:1626
+#: app/templates/forms/entry_form/entry_form.html:1650
+#: app/templates/forms/entry_form/entry_form.html:1658
+#: app/templates/forms/entry_form/entry_form.html:1672
+#: app/templates/forms/entry_form/entry_form.html:2107
+#: app/templates/forms/entry_form/entry_form.html:2204
+#: app/templates/forms/entry_form/entry_form.html:2227
 #: app/templates/forms/entry_form/partials/_question_single_choice.html:38
 msgid "This is an imputed value"
 msgstr "هذه قيمة محسوبة"
@@ -21561,7 +21584,7 @@ msgstr "هذه قيمة محسوبة"
 msgid "This is the main navigation area."
 msgstr "هذه هي منطقة الملاحة الرئيسية."
 
-#: app/templates/auth/login.html:514 app/templates/auth/login.html:721
+#: app/templates/auth/login.html:571 app/templates/auth/login.html:746
 msgid "This is the one and only system for reporting data to"
 msgstr "هذا هو النظام الوحيد للإبلاغ عن البيانات إلى"
 
@@ -21598,7 +21621,7 @@ msgstr ""
 "هذه اللغة لا تحتوي على محتوى قالب لإرساله. أضف HTML في المحرر أو اختر تبويب "
 "لغة آخر."
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:54
+#: app/templates/forms/entry_form/partials/matrix_table.html:56
 msgid "This matrix is imputed"
 msgstr "يتم فرض هذه المصفوفة"
 
@@ -21647,7 +21670,7 @@ msgid ""
 msgstr ""
 "تمت الموافقة على هذا الطلب، لكن وصولك إلى هذا البلد قد أزال من قبل مدير."
 
-#: app/routes/auth.py:1179 app/routes/auth.py:1187
+#: app/routes/auth.py:1405 app/routes/auth.py:1413
 msgid "This reset link is invalid or has expired."
 msgstr "رابط إعادة التعيين هذا غير صالح أو منتهي الصلاحية."
 
@@ -21712,11 +21735,11 @@ msgid "This sub-section contains %(count)s saved data entries."
 msgstr "%(count)s ويتضمن هذا القسم الفرعي بيانات محتفظ بها."
 
 #: app/templates/components/_section_renderer.html:69
-#: app/templates/forms/entry_form/entry_form.html:2453
+#: app/templates/forms/entry_form/entry_form.html:2454
 msgid "This sub-section has no fields."
 msgstr "هذا القسم الفرعي لا يحتوي على حقول."
 
-#: app/routes/main/helpers.py:1205
+#: app/routes/main/helpers.py:1163
 msgid "This submission was rejected."
 msgstr "تم رفض هذا العرض."
 
@@ -21757,7 +21780,7 @@ msgstr "لا تزال هذه الوحدة تستخدم لمؤشر واحد أو 
 msgid "This user is currently inactive."
 msgstr "هذا المستخدم غير نشط حاليا."
 
-#: app/templates/forms/entry_form/entry_form.html:3903
+#: app/templates/forms/entry_form/entry_form.html:3904
 msgid "This value is prefilled and cannot be modified here."
 msgstr "هذه القيمة مملوءة مسبقا ولا يمكن تعديلها هنا."
 
@@ -21874,7 +21897,7 @@ msgstr "الخميس"
 msgid "Tick (✓)"
 msgstr "تيك (✓)"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:314
+#: app/templates/forms/entry_form/partials/matrix_table.html:316
 msgid "Tick for"
 msgstr "علامة على"
 
@@ -21943,7 +21966,7 @@ msgstr "الطابع الزمني"
 msgid "Title"
 msgstr "المسمى الوظيفي"
 
-#: app/templates/auth/login.html:653 app/templates/auth/register.html:17
+#: app/templates/auth/login.html:678 app/templates/auth/register.html:17
 msgid "Title (optional)"
 msgstr "ملاحظة النسخة (اختياري)"
 
@@ -22000,7 +22023,7 @@ msgstr "التعريف بالأقسام"
 msgid "Toggle sidebar"
 msgstr "تبديل الشريط الجانبي"
 
-#: app/routes/auth.py:169
+#: app/routes/auth.py:346
 msgid "Too many failed login attempts. Please try again later."
 msgstr "محاولات تسجيل الدخول فاشلة كثيرة جدا. يرجى المحاولة مرة أخرى لاحقا."
 
@@ -22058,27 +22081,27 @@ msgstr "الأدوات الرئيسية المستخدمة"
 #: app/templates/admin/ai/documents.html:62
 #: app/templates/forms/entry_form/export_pdf.html:197
 #: app/templates/forms/entry_form/export_pdf.html:275
-#: app/templates/forms/entry_form/partials/matrix_table.html:145
-#: app/templates/forms/entry_form/partials/matrix_table.html:192
-#: app/templates/forms/entry_form/partials/matrix_table.html:202
+#: app/templates/forms/entry_form/partials/matrix_table.html:147
+#: app/templates/forms/entry_form/partials/matrix_table.html:194
+#: app/templates/forms/entry_form/partials/matrix_table.html:204
 #: app/templates/notifications/center.html:61
 msgid "Total"
 msgstr "المجموع"
 
-#: app/templates/forms/entry_form/entry_form.html:1172
-#: app/templates/forms/entry_form/entry_form.html:1201
-#: app/templates/forms/entry_form/entry_form.html:1313
-#: app/templates/forms/entry_form/entry_form.html:1342
-#: app/templates/forms/entry_form/entry_form.html:1466
-#: app/templates/forms/entry_form/entry_form.html:1495
-#: app/templates/forms/entry_form/entry_form.html:1542
-#: app/templates/forms/entry_form/entry_form.html:1684
-#: app/templates/forms/entry_form/entry_form.html:2193
-#: app/templates/forms/entry_form/entry_form.html:2214
-#: app/templates/forms/entry_form/entry_form.html:2243
-#: app/templates/forms/entry_form/entry_form.html:2300
-#: app/templates/forms/entry_form/entry_form.html:2327
-#: app/templates/forms/entry_form/entry_form.html:2393
+#: app/templates/forms/entry_form/entry_form.html:1173
+#: app/templates/forms/entry_form/entry_form.html:1202
+#: app/templates/forms/entry_form/entry_form.html:1314
+#: app/templates/forms/entry_form/entry_form.html:1343
+#: app/templates/forms/entry_form/entry_form.html:1467
+#: app/templates/forms/entry_form/entry_form.html:1496
+#: app/templates/forms/entry_form/entry_form.html:1543
+#: app/templates/forms/entry_form/entry_form.html:1685
+#: app/templates/forms/entry_form/entry_form.html:2194
+#: app/templates/forms/entry_form/entry_form.html:2215
+#: app/templates/forms/entry_form/entry_form.html:2244
+#: app/templates/forms/entry_form/entry_form.html:2301
+#: app/templates/forms/entry_form/entry_form.html:2328
+#: app/templates/forms/entry_form/entry_form.html:2394
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:223
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:251
 msgid "Total (Direct + Indirect):"
@@ -22097,15 +22120,15 @@ msgstr "المهام"
 msgid "Total Cost"
 msgstr "مجموع التكاليف"
 
-#: app/templates/forms/entry_form/entry_form.html:1145
-#: app/templates/forms/entry_form/entry_form.html:1192
-#: app/templates/forms/entry_form/entry_form.html:1286
-#: app/templates/forms/entry_form/entry_form.html:1333
-#: app/templates/forms/entry_form/entry_form.html:1439
-#: app/templates/forms/entry_form/entry_form.html:1486
-#: app/templates/forms/entry_form/entry_form.html:2105
-#: app/templates/forms/entry_form/entry_form.html:2273
-#: app/templates/forms/entry_form/entry_form.html:2318
+#: app/templates/forms/entry_form/entry_form.html:1146
+#: app/templates/forms/entry_form/entry_form.html:1193
+#: app/templates/forms/entry_form/entry_form.html:1287
+#: app/templates/forms/entry_form/entry_form.html:1334
+#: app/templates/forms/entry_form/entry_form.html:1440
+#: app/templates/forms/entry_form/entry_form.html:1487
+#: app/templates/forms/entry_form/entry_form.html:2106
+#: app/templates/forms/entry_form/entry_form.html:2274
+#: app/templates/forms/entry_form/entry_form.html:2319
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:196
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:242
 msgid "Total Direct:"
@@ -22167,12 +22190,12 @@ msgstr "الأنشطة الكاملة"
 msgid "Total cost"
 msgstr "التكلفة الإجمالية"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:209
+#: app/templates/forms/entry_form/partials/matrix_table.html:211
 msgid "Total for column"
 msgstr "أعمدة أخرى"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:360
-#: app/templates/forms/entry_form/partials/matrix_table.html:372
+#: app/templates/forms/entry_form/partials/matrix_table.html:362
+#: app/templates/forms/entry_form/partials/matrix_table.html:374
 msgid "Total for row"
 msgstr "الإجمالي فقط"
 
@@ -22219,20 +22242,20 @@ msgid ""
 "breakdown."
 msgstr "الإبلاغ الكلي فقط: مؤشرات ذات قيمة ولكن بدون تقسيم للتفكيك."
 
-#: app/templates/forms/entry_form/entry_form.html:1145
-#: app/templates/forms/entry_form/entry_form.html:1183
-#: app/templates/forms/entry_form/entry_form.html:1192
-#: app/templates/forms/entry_form/entry_form.html:1286
-#: app/templates/forms/entry_form/entry_form.html:1324
-#: app/templates/forms/entry_form/entry_form.html:1333
-#: app/templates/forms/entry_form/entry_form.html:1439
-#: app/templates/forms/entry_form/entry_form.html:1477
-#: app/templates/forms/entry_form/entry_form.html:1486
-#: app/templates/forms/entry_form/entry_form.html:2105
-#: app/templates/forms/entry_form/entry_form.html:2202
-#: app/templates/forms/entry_form/entry_form.html:2273
-#: app/templates/forms/entry_form/entry_form.html:2310
-#: app/templates/forms/entry_form/entry_form.html:2318
+#: app/templates/forms/entry_form/entry_form.html:1146
+#: app/templates/forms/entry_form/entry_form.html:1184
+#: app/templates/forms/entry_form/entry_form.html:1193
+#: app/templates/forms/entry_form/entry_form.html:1287
+#: app/templates/forms/entry_form/entry_form.html:1325
+#: app/templates/forms/entry_form/entry_form.html:1334
+#: app/templates/forms/entry_form/entry_form.html:1440
+#: app/templates/forms/entry_form/entry_form.html:1478
+#: app/templates/forms/entry_form/entry_form.html:1487
+#: app/templates/forms/entry_form/entry_form.html:2106
+#: app/templates/forms/entry_form/entry_form.html:2203
+#: app/templates/forms/entry_form/entry_form.html:2274
+#: app/templates/forms/entry_form/entry_form.html:2311
+#: app/templates/forms/entry_form/entry_form.html:2319
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:196
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:234
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:242
@@ -22262,7 +22285,7 @@ msgid ""
 "and generate questions for focal points."
 msgstr ""
 "تتبع تقدم تقديم FDRS عبر الدول، ومراقبة علامات التحقق، وتوليد أسئلة لنقاط "
-"التركيز."
+"الاتصال."
 
 #: app/templates/admin/validation_dashboard.html:105
 msgid "Tracker"
@@ -22675,12 +22698,12 @@ msgstr "رمز الموقع المكون من حرفين للتوطين"
 #: app/templates/components/_builder_items.html:86
 #: app/templates/components/_builder_items.html:92
 #: app/templates/components/_builder_items.html:105
-#: app/templates/forms/entry_form/entry_form.html:1039
-#: app/templates/forms/entry_form/entry_form.html:1070
-#: app/templates/forms/entry_form/entry_form.html:1072
-#: app/templates/forms/entry_form/entry_form.html:1988
-#: app/templates/forms/entry_form/entry_form.html:2018
-#: app/templates/forms/entry_form/entry_form.html:2020
+#: app/templates/forms/entry_form/entry_form.html:1040
+#: app/templates/forms/entry_form/entry_form.html:1071
+#: app/templates/forms/entry_form/entry_form.html:1073
+#: app/templates/forms/entry_form/entry_form.html:1989
+#: app/templates/forms/entry_form/entry_form.html:2019
+#: app/templates/forms/entry_form/entry_form.html:2021
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:38
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:96
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:126
@@ -22709,11 +22732,11 @@ msgstr "مفتاح النوع"
 msgid "Type not set on this item"
 msgstr "الكتابة غير مضبوطة على هذا العنصر"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:415
+#: app/templates/forms/entry_form/partials/matrix_table.html:417
 msgid "Type to search for rows to add..."
 msgstr "اكتب للبحث عن صفوف لإضافتها..."
 
-#: app/templates/forms/entry_form/entry_form.html:3839
+#: app/templates/forms/entry_form/entry_form.html:3840
 msgid "Type to search indicators..."
 msgstr "اكتب للبحث عن المؤشرات..."
 
@@ -22737,12 +22760,12 @@ msgid "Typing"
 msgstr "الطباعة"
 
 #: app/templates/admin/templates/upr_excel_import.html:434
-#: app/templates/forms/entry_form/entry_form.html:2600
-#: app/templates/forms/entry_form/entry_form.html:2610
+#: app/templates/forms/entry_form/entry_form.html:2601
+#: app/templates/forms/entry_form/entry_form.html:2611
 msgid "UPR Country Reporting"
 msgstr "تقارير الريف في UPR"
 
-#: app/routes/main/helpers.py:1356
+#: app/routes/main/helpers.py:1314
 #, python-format
 msgid "UPR Country Reporting Excel imported: %(count)s values staged"
 msgstr "استيراد بيانات UPR Country Reporting Excel: قيم %(count)s مرحلية"
@@ -22775,7 +22798,7 @@ msgstr "دولار أمريكي"
 msgid "Unable to determine which entity to show documents for."
 msgstr "غير قادر على تحديد أي جهة يجب أن أعرض لها المستندات."
 
-#: app/templates/forms/entry_form/entry_form.html:2698
+#: app/templates/forms/entry_form/entry_form.html:2699
 msgid ""
 "Unable to edit: document ID is invalid. Please refresh the page and try "
 "again."
@@ -22803,9 +22826,9 @@ msgstr "قسم غير آلي"
 msgid "Unarchive Sub-section"
 msgstr "القسم الفرعي غير المنظم"
 
-#: app/templates/forms/entry_form/entry_form.html:456
 #: app/templates/forms/entry_form/entry_form.html:457
-#: app/templates/forms/entry_form/entry_form.html:725
+#: app/templates/forms/entry_form/entry_form.html:458
+#: app/templates/forms/entry_form/entry_form.html:726
 msgid "Unassigned Sections"
 msgstr "إضافة قسم"
 
@@ -22889,10 +22912,10 @@ msgstr ""
 #: app/templates/admin/indicator_bank/neural_map.html:194
 #: app/templates/admin/templates/data_sync_imputation.html:396
 #: app/templates/components/_builder_items.html:50
-#: app/templates/forms/entry_form/entry_form.html:1040
-#: app/templates/forms/entry_form/entry_form.html:1074
-#: app/templates/forms/entry_form/entry_form.html:1989
-#: app/templates/forms/entry_form/entry_form.html:2022
+#: app/templates/forms/entry_form/entry_form.html:1041
+#: app/templates/forms/entry_form/entry_form.html:1075
+#: app/templates/forms/entry_form/entry_form.html:1990
+#: app/templates/forms/entry_form/entry_form.html:2023
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:97
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:130
 #: app/templates/forms/form_builder/partials/_item_modal.html:146
@@ -22924,7 +22947,7 @@ msgstr "تم إنقاذ الوحدة."
 msgid "Units"
 msgstr "وحدات"
 
-#: app/routes/main/helpers.py:1244
+#: app/routes/main/helpers.py:1202
 #: app/services/communication_center_service.py:95
 #: app/templates/admin/analytics/_user_detail_partial.html:246
 #: app/templates/admin/analytics/dashboard.html:31
@@ -22950,18 +22973,18 @@ msgstr "وحدات"
 msgid "Unknown"
 msgstr "غير معروف"
 
-#: app/services/notification/service.py:631
+#: app/services/notification/service.py:683
 #: app/templates/core/dashboard.html:2726
 #: app/templates/core/dashboard.html:2880 app/utils/form_localization.py:494
 #: app/utils/form_localization.py:507
 msgid "Unknown Country"
 msgstr "مستخدم غير معروف"
 
-#: app/templates/forms/entry_form/entry_form.html:1104
-#: app/templates/forms/entry_form/entry_form.html:1112
-#: app/templates/forms/entry_form/entry_form.html:2047
-#: app/templates/forms/entry_form/entry_form.html:2055
-#: app/templates/forms/entry_form/entry_form.html:3833
+#: app/templates/forms/entry_form/entry_form.html:1105
+#: app/templates/forms/entry_form/entry_form.html:1113
+#: app/templates/forms/entry_form/entry_form.html:2048
+#: app/templates/forms/entry_form/entry_form.html:2056
+#: app/templates/forms/entry_form/entry_form.html:3834
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:156
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:164
 #: app/utils/form_localization.py:244 app/utils/form_localization.py:251
@@ -22972,12 +22995,12 @@ msgstr "مؤشر غير معروف"
 msgid "Unknown Section"
 msgstr "قسم غير معروف"
 
-#: app/routes/main/helpers.py:1133 app/utils/form_localization.py:414
+#: app/routes/main/helpers.py:1091 app/utils/form_localization.py:414
 #: app/utils/form_localization.py:421
 msgid "Unknown Template"
 msgstr "قالب غير معروف"
 
-#: app/services/notification/service.py:619
+#: app/services/notification/service.py:671
 #: app/templates/admin/ai/reasoning_traces.html:325
 #: app/templates/admin/analytics/audit_trail.html:446
 #: app/templates/admin/analytics/security_events.html:189
@@ -23098,7 +23121,7 @@ msgstr ""
 msgid "Updated"
 msgstr "محدث"
 
-#: app/routes/main/helpers.py:1334
+#: app/routes/main/helpers.py:1292
 #, python-format
 msgid "Updated %(count)d field in %(template)s"
 msgstr "%(count)d ميدان مستكمل %(template)s"
@@ -23114,13 +23137,13 @@ msgstr "التحديثات"
 #: app/templates/admin/settings/manage_settings.html:502
 #: app/templates/admin/settings/manage_settings.html:547
 #: app/templates/admin/templates/upr_excel_import.html:40
-#: app/templates/forms/entry_form/entry_form.html:2929
+#: app/templates/forms/entry_form/entry_form.html:2930
 #: app/templates/forms/form_builder/partials/_item_modal.html:979
 #: app/templates/macros/upr_country_reporting_excel_instructions.html:44
 msgid "Upload"
 msgstr "رفع"
 
-#: app/templates/forms/entry_form/entry_form.html:2617
+#: app/templates/forms/entry_form/entry_form.html:2618
 msgid "Upload & import"
 msgstr "رفع واستيراد"
 
@@ -23129,9 +23152,9 @@ msgid "Upload Date"
 msgstr "تاريخ الرفع"
 
 #: app/templates/admin/documents/documents.html:42
-#: app/templates/forms/entry_form/entry_form.html:2680
-#: app/templates/forms/entry_form/entry_form.html:2700
+#: app/templates/forms/entry_form/entry_form.html:2681
 #: app/templates/forms/entry_form/entry_form.html:2701
+#: app/templates/forms/entry_form/entry_form.html:2702
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:190
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:196
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:198
@@ -23271,7 +23294,7 @@ msgid ""
 "period covers all years of the current assignment, and the document type "
 "matches the type set above."
 msgstr ""
-"يتم الاحتفاظ بالرفعات بواسطة نقاط تركيز هذا الكيان لهذا النموذج كمستودع "
+"يتم الاحتفاظ بالرفعات بواسطة نقاط اتصال هذا الكيان لهذا النموذج كمستودع "
 "مشترك. عند تفعيله، يتم تلبية هذا الحقل إذا كان هناك نوع مستند مطابق موجود "
 "بالفعل في ذلك المستودع لنفس الكيان، وتغطي فترة الوثيقة جميع سنوات التعيين "
 "الحالي، ونوع المستند يطابق النوع الموجود أعلاه."
@@ -23395,7 +23418,7 @@ msgstr ""
 "استخدم المساعد لمقارنة القيم، والعثور على المعلومات، وتفسير الأدلة من "
 "التقارير والخطط."
 
-#: app/templates/forms/entry_form/entry_form.html:3822
+#: app/templates/forms/entry_form/entry_form.html:3823
 msgid "Use the button to add indicators to this section."
 msgstr "استخدم الزر لإضافة مؤشرات إلى هذا القسم."
 
@@ -23447,7 +23470,7 @@ msgstr "يستخدم كبديل عندما لا يتم رفع شعار"
 msgid "User"
 msgstr "المستخدم"
 
-#: app/routes/main/helpers.py:1352
+#: app/routes/main/helpers.py:1310
 #, python-format
 msgid "User %(action)s"
 msgstr "مستعمل %(action)s"
@@ -23579,6 +23602,10 @@ msgstr "معلومات المستخدم"
 msgid "User not found"
 msgstr "لم يتم العثور على المستخدم"
 
+#: app/routes/auth.py:281
+msgid "User not found."
+msgstr "المستخدم غير موجود."
+
 #: app/templates/admin/user_management/access_requests.html:424
 msgid "User note"
 msgstr "ملاحظة المستخدم"
@@ -23685,7 +23712,7 @@ msgid "Valid export"
 msgstr "التصدير الصحيح"
 
 #: app/templates/forms/entry_form/entry_form.html:161
-#: app/templates/forms/entry_form/entry_form.html:3969
+#: app/templates/forms/entry_form/entry_form.html:3970
 msgid "Validate"
 msgstr "التحقق من صحتك"
 
@@ -23741,8 +23768,8 @@ msgstr "قاعدة التحقق"
 msgid "Validation Rules Registry"
 msgstr "سجل قواعد التحقق"
 
-#: app/templates/forms/entry_form/entry_form.html:2554
-#: app/templates/forms/entry_form/entry_form.html:2558
+#: app/templates/forms/entry_form/entry_form.html:2555
+#: app/templates/forms/entry_form/entry_form.html:2559
 #: app/templates/forms/entry_form/validation_summary_pdf.html:9
 #: app/templates/forms/entry_form/validation_summary_pdf.html:17
 #: app/templates/forms/entry_form/validation_summary_progress.html:9
@@ -23788,7 +23815,7 @@ msgstr "أسئلة التحقق تتطلب انتباهك"
 
 #: app/templates/admin/validation_questions.html:303
 msgid "Validation questions sent to focal points."
-msgstr "أسئلة التحقق تم إرسالها إلى نقاط التركيز."
+msgstr "أسئلة التحقق تم إرسالها إلى نقاط اتصال."
 
 #: app/templates/admin/validation_questions.html:52
 msgid "Validation questions views"
@@ -23808,7 +23835,7 @@ msgstr "قواعد التحقق من صحة مسجل القواعد"
 msgid "Value"
 msgstr "القيمة"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:326
+#: app/templates/forms/entry_form/partials/matrix_table.html:328
 msgid "Value for"
 msgstr "القيمة ل"
 
@@ -23836,11 +23863,11 @@ msgstr "متاح في"
 msgid "Variable column tooltip labels"
 msgstr "تسميات تلميحات الأعمدة المتغيرة"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:280
+#: app/templates/forms/entry_form/partials/matrix_table.html:282
 msgid "Variable tick for"
 msgstr "متاح في"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:297
+#: app/templates/forms/entry_form/partials/matrix_table.html:299
 msgid "Variable value for"
 msgstr "القيمة المتغيرة ل"
 
@@ -24008,8 +24035,8 @@ msgstr "عرض التفاصيل"
 msgid "View FDRS document compliance by country."
 msgstr "عرض الامتثال لوثائق FDRS حسب الدولة."
 
-#: app/templates/forms/entry_form/entry_form.html:1050
-#: app/templates/forms/entry_form/entry_form.html:1999
+#: app/templates/forms/entry_form/entry_form.html:1051
+#: app/templates/forms/entry_form/entry_form.html:2000
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:107
 msgid "View Full Details"
 msgstr "عرض التفاصيل"
@@ -24219,18 +24246,18 @@ msgstr "المياه والصرف الصحي"
 msgid "Water Quality"
 msgstr "جودة المياه"
 
-#: app/routes/auth.py:1155
+#: app/routes/auth.py:1373
 msgid ""
 "We could not process the reset request at this time. Please try again later."
 msgstr ""
 "لم نتمكن من معالجة طلب إعادة الضبط في هذا الوقت. يرجى المحاولة مرة أخرى "
 "لاحقا."
 
-#: app/routes/auth.py:679
+#: app/routes/auth.py:863
 msgid "We could not retrieve your email from Azure."
 msgstr "لم نتمكن من استرجاع بريدك الإلكتروني من Azure."
 
-#: app/routes/auth.py:1159
+#: app/routes/auth.py:1377
 msgid ""
 "We could not send the reset email at this time. Please contact support."
 msgstr ""
@@ -24283,7 +24310,7 @@ msgstr "البريد الإلكتروني للمستخدم"
 msgid "Welcome to"
 msgstr "مرحبا بك في"
 
-#: app/templates/auth/login.html:512 app/templates/auth/login.html:719
+#: app/templates/auth/login.html:569 app/templates/auth/login.html:744
 #: app/templates/tours/tours.html:23 app/templates/tours/tours.html:34
 msgid "Welcome to the"
 msgstr "مرحبا بك في"
@@ -24367,8 +24394,8 @@ msgid ""
 "When the Year/Period selector is hidden, all uploads use this period. Focal "
 "points cannot change it."
 msgstr ""
-"عندما يكون محدد السنة/الفترة مخفيا، تستخدم جميع الرفعات هذه الفترة. النقاط "
-"المحورية لا يمكن أن تغير ذلك."
+"عندما يكون محدد السنة/الفترة مخفيا، تستخدم جميع الرفعات هذه الفترة. نقاط "
+"اتصال لا يمكن أن تغير ذلك."
 
 #: app/templates/admin/user_management/user_form.html:1086
 msgid "When to send the digest email."
@@ -24402,7 +24429,7 @@ msgstr "العرض"
 msgid "Will be cleared on save"
 msgstr "سيتم التخلص منه عند الحفظ"
 
-#: app/templates/forms/entry_form/entry_form.html:2689
+#: app/templates/forms/entry_form/entry_form.html:2690
 msgid "Will be deleted when you save the form."
 msgstr "سيتم حذفه عند حفظ النموذج."
 
@@ -24480,7 +24507,7 @@ msgstr "ييي-مم-دد أو يي-مم-دثث:مم:إس إس"
 
 #: app/templates/admin/ai/documents.html:361
 #: app/templates/admin/ai/documents.html:660
-#: app/templates/admin/assignments/manage_assignment.html:95
+#: app/templates/admin/assignments/manage_assignment.html:96
 #: app/templates/admin/data_exploration/explore_data.html:332
 #: app/templates/admin/settings/manage_settings.html:990
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:49
@@ -24489,9 +24516,9 @@ msgstr "ييي-مم-دد أو يي-مم-دثث:مم:إس إس"
 msgid "Year"
 msgstr "السنة"
 
-#: app/templates/admin/assignments/manage_assignment.html:89
+#: app/templates/admin/assignments/manage_assignment.html:90
 #: app/templates/admin/documents/documents.html:226
-#: app/templates/forms/entry_form/entry_form.html:2801
+#: app/templates/forms/entry_form/entry_form.html:2802
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:42
 #: app/templates/forms/form_builder/partials/_item_modal.html:458
 #: app/templates/forms/form_builder/partials/_item_modal.html:486
@@ -24529,11 +24556,11 @@ msgstr "الأصفر"
 #: app/templates/components/_form_item_renderer.html:229
 #: app/templates/components/_status_label.html:81
 #: app/templates/components/ag_grid_i18n_js.html:35
-#: app/templates/forms/entry_form/entry_form.html:1221
-#: app/templates/forms/entry_form/entry_form.html:1356
-#: app/templates/forms/entry_form/entry_form.html:1509
-#: app/templates/forms/entry_form/entry_form.html:1634
-#: app/templates/forms/entry_form/entry_form.html:2346
+#: app/templates/forms/entry_form/entry_form.html:1222
+#: app/templates/forms/entry_form/entry_form.html:1357
+#: app/templates/forms/entry_form/entry_form.html:1510
+#: app/templates/forms/entry_form/entry_form.html:1635
+#: app/templates/forms/entry_form/entry_form.html:2347
 #: app/templates/forms/entry_form/partials/disability_questions.html:23
 #: app/templates/forms/entry_form/partials/disability_questions.html:48
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:270
@@ -24568,8 +24595,8 @@ msgstr "نعم/لا"
 msgid "You already have a pending request for: %(country)s"
 msgstr "لديك بالفعل طلب معلق %(country)s"
 
-#: app/templates/core/dashboard.html:3217
-#: app/templates/core/dashboard.html:3293
+#: app/templates/core/dashboard.html:3230
+#: app/templates/core/dashboard.html:3306
 msgid "You already have access"
 msgstr "لديك بالفعل إمكانية الوصول"
 
@@ -24611,7 +24638,7 @@ msgstr "%(entity)s لا يحق لك الدخول لهذه المهمة."
 #: app/services/notification/core.py:350
 #, python-format
 msgid "You are now a focal point for %(country)s."
-msgstr "أنت الآن نقطة تركيز ل %(country)s."
+msgstr "أنت الآن نقطة اتصال ل%(country)s."
 
 #: app/templates/components/_ai_policy_modal.html:41
 msgid ""
@@ -24785,13 +24812,13 @@ msgid ""
 msgstr ""
 "%(count)d لقد تم تقديم طلبات دخولك إلى البلدان سيراجعهم أحد الحكام قريباً."
 
-#: app/routes/auth.py:1106
+#: app/routes/auth.py:1308
 msgid ""
 "Your account has been created. Your country access request is pending admin "
 "approval."
 msgstr "تم إنشاء حسابك. طلب الوصول إلى بلدك ينتظر موافقة المسؤول."
 
-#: app/routes/auth.py:200 app/routes/auth.py:776
+#: app/routes/auth.py:377 app/routes/auth.py:960
 msgid ""
 "Your account is deactivated. Please contact an administrator to reactivate "
 "it."
@@ -24809,11 +24836,11 @@ msgid ""
 "under review."
 msgstr "حسابك غير مرتبط بدولة بعد. لديك طلبات معلقة قيد المراجعة."
 
-#: app/templates/auth/login.html:539
+#: app/templates/auth/login.html:596
 msgid "Your account or create an account"
 msgstr "ليس لديك حساب؟"
 
-#: app/routes/auth.py:1271
+#: app/routes/auth.py:1497
 msgid "Your account settings have been updated successfully."
 msgstr "تم تحديث إعدادات حسابك بنجاح."
 
@@ -24854,7 +24881,7 @@ msgstr ""
 "(مثل OpenAI، Gemini، Azure) لتوليد ردود. نستخدم تتبع النظام والقياس عن بعد "
 "لتحسين المساعد."
 
-#: app/routes/auth.py:1232
+#: app/routes/auth.py:1458
 msgid "Your password has been reset. You can now log in."
 msgstr "تم إعادة تعيين كلمة المرور الخاصة بك. يمكنك الآن تسجيل الدخول."
 
@@ -24864,7 +24891,7 @@ msgid ""
 "focal points identify you. You can update this at any time in your account "
 "settings."
 msgstr ""
-"ملفك الشخصي يفتقد مسمى وظيفي. إضافة هذا الاسم تساعد الإداريين ونقاط التركيز "
+"ملفك الشخصي يفتقد مسمى وظيفي. إضافة هذا الاسم تساعد الإداريين ونقاط اتصال "
 "على التعرف عليك. يمكنك تحديث هذا في أي وقت في إعدادات حسابك."
 
 #: app/templates/admin/user_management/user_form.html:777
@@ -24908,10 +24935,10 @@ msgstr "السماح"
 #: app/templates/admin/api_management.html:617
 #: app/templates/admin/api_management.html:618
 #: app/templates/admin/data_exploration/explore_data.html:3009
-#: app/templates/forms/entry_form/partials/matrix_table.html:280
-#: app/templates/forms/entry_form/partials/matrix_table.html:297
-#: app/templates/forms/entry_form/partials/matrix_table.html:314
-#: app/templates/forms/entry_form/partials/matrix_table.html:326
+#: app/templates/forms/entry_form/partials/matrix_table.html:282
+#: app/templates/forms/entry_form/partials/matrix_table.html:299
+#: app/templates/forms/entry_form/partials/matrix_table.html:316
+#: app/templates/forms/entry_form/partials/matrix_table.html:328
 msgid "and"
 msgstr "و"
 
@@ -24947,11 +24974,11 @@ msgid "at: %(datetime)s"
 msgstr "في: %(datetime)s"
 
 #: app/templates/admin/settings/manage_settings.html:1493
-#: app/templates/forms/entry_form/entry_form.html:3844
+#: app/templates/forms/entry_form/entry_form.html:3845
 msgid "available"
 msgstr "متاح"
 
-#: app/templates/forms/entry_form/entry_form.html:3845
+#: app/templates/forms/entry_form/entry_form.html:3846
 msgid "available in"
 msgstr "متاح في"
 
@@ -25016,7 +25043,7 @@ msgstr "اكتمل"
 msgid "countries"
 msgstr "بلدان"
 
-#: app/templates/admin/assignments/manage_assignment.html:350
+#: app/templates/admin/assignments/manage_assignment.html:351
 msgid "countries enabled for public submission"
 msgstr "الدول المتاحة للتقديم العام"
 
@@ -25090,13 +25117,13 @@ msgstr "مثلا 10"
 msgid "e.g. <5, 5-17, 18-49, 50+"
 msgstr "مثلا: <5، 5-17، 18-49، 50+"
 
-#: app/templates/admin/assignments/manage_assignment.html:176
+#: app/templates/admin/assignments/manage_assignment.html:177
 msgid "e.g. Annual Country Survey 2025 — leave blank to use \"Template – Period\""
 msgstr "مثلا: المسح السنوي للدول 2025 — اترك فارغا لاستخدام \"القالب – نقطة\""
 
 #: app/templates/components/_profile_completion_modal.html:69
 msgid "e.g. Data Manager, Focal Point"
-msgstr "مثلا: مدير البيانات، نقطة التركيز"
+msgstr "مثلا: مدير البيانات، نقطة اتصال"
 
 #: app/templates/admin/embed_content/manage_embed_content.html:125
 msgid "e.g. ECHO Programmatic Partnership"
@@ -25237,7 +25264,7 @@ msgstr "فشلت"
 msgid "failed."
 msgstr "فشلت."
 
-#: app/templates/forms/entry_form/entry_form.html:3846
+#: app/templates/forms/entry_form/entry_form.html:3847
 msgid "filtered by"
 msgstr "مفلتر بواسطة"
 
@@ -25247,10 +25274,10 @@ msgid "filtered from"
 msgstr "تم تصفية من"
 
 #: app/templates/admin/public/public_form_unavailable.html:38
-#: app/templates/forms/entry_form/entry_form.html:933
-#: app/templates/forms/entry_form/entry_form.html:1894
+#: app/templates/forms/entry_form/entry_form.html:934
+#: app/templates/forms/entry_form/entry_form.html:1895
 msgid "focal point for assistance."
-msgstr "نقاط التركيز لـ"
+msgstr "نقاط اتصال لـ"
 
 #: app/templates/admin/templates/templates.html:325
 msgid "form data entries"
@@ -25260,7 +25287,7 @@ msgstr "مدخلات بيانات محفوظة."
 msgid "form items loaded"
 msgstr "قوالب النماذج"
 
-#: app/templates/forms/entry_form/entry_form.html:3843
+#: app/templates/forms/entry_form/entry_form.html:3844
 msgid "found"
 msgstr "تم العثور على"
 
@@ -25314,11 +25341,11 @@ msgstr "تشمل:"
 msgid "indexed"
 msgstr "مفهرس"
 
-#: app/templates/forms/entry_form/entry_form.html:3842
+#: app/templates/forms/entry_form/entry_form.html:3843
 msgid "indicators"
 msgstr "مؤشرات"
 
-#: app/templates/forms/entry_form/entry_form.html:3840
+#: app/templates/forms/entry_form/entry_form.html:3841
 msgid "indicators available"
 msgstr "مؤشرات متاحة"
 
@@ -25465,11 +25492,11 @@ msgstr "ليس الركض"
 #: app/templates/components/ag_grid_i18n_js.html:65
 #: app/templates/components/pagination.html:59
 #: app/templates/core/dashboard.html:1799
-#: app/templates/forms/entry_form/entry_form.html:3801
+#: app/templates/forms/entry_form/entry_form.html:3802
 msgid "of"
 msgstr "من"
 
-#: app/templates/admin/assignments/manage_assignment.html:162
+#: app/templates/admin/assignments/manage_assignment.html:163
 #: app/templates/core/dashboard.html:2796
 #: app/templates/core/dashboard.html:2924
 msgid "optional"
@@ -25479,7 +25506,7 @@ msgstr "الإنجاز"
 msgid "or"
 msgstr "أو"
 
-#: app/templates/forms/entry_form/entry_form.html:2633
+#: app/templates/forms/entry_form/entry_form.html:2634
 msgid "or click to browse — .xlsx only"
 msgstr "أو انقر للتصفح — .xlsx فقط"
 
@@ -25842,7 +25869,7 @@ msgstr "غير موثق"
 msgid "unique"
 msgstr "فريدة من نوعها"
 
-#: app/templates/forms/entry_form/entry_form.html:3831
+#: app/templates/forms/entry_form/entry_form.html:3832
 msgid "unlimited"
 msgstr "غير محدود"
 

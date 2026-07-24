@@ -467,6 +467,22 @@ html[dir="rtl"] .ag-theme-alpine .ag-floating-filter-input input.ag-number-field
     padding-right: 26px !important;
 }
 
+/* After sizeColumnsToFit, header labels can overlap the filter trigger; keep it on top. */
+.ag-header-cell .ag-header-cell-label {
+    max-width: calc(100% - 36px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ag-header-cell-filter-button {
+    position: relative;
+    z-index: 2;
+    flex-shrink: 0;
+    min-width: 28px;
+    min-height: 28px;
+    cursor: pointer;
+}
+
 /* ===================================================================
    MOBILE ACTIONS OVERFLOW (vertical three-dots menu)
    =================================================================== */

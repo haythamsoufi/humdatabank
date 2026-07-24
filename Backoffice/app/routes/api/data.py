@@ -1078,12 +1078,6 @@ def get_all_data():
             return api_error(filter_error['message'], filter_error['status'])
 
         published_version_id = resolve_template_published_version_id(template_id)
-        scope_meta = build_data_api_scope_meta(
-            template_id=template_id,
-            published_version_id=published_version_id,
-            version_scope=version_scope,
-            stable_key=stable_key_filter,
-        )
 
         item_type = request.args.get('item_type', type=str)
         country_id = request.args.get('country_id', type=int)
@@ -1107,6 +1101,14 @@ def get_all_data():
                 country_id = resolved_id
         submission_type = request.args.get('submission_type')
         period_name = request.args.get('period_name', type=str)
+        scope_meta = build_data_api_scope_meta(
+            template_id=template_id,
+            published_version_id=published_version_id,
+            version_scope=version_scope,
+            stable_key=stable_key_filter,
+            assignment_id=assignment_id,
+            period_name=period_name,
+        )
         indicator_bank_id = request.args.get('indicator_bank_id', type=int)
         # Comma-separated indicator bank IDs for multi-indicator filtering.
         # Used by the disaggregation time-series call to fetch only the required

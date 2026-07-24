@@ -38,8 +38,8 @@
     <div class="activity-item-wrapper activity-item bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow" data-user-id="{{ activity_user_id }}" data-user-external-id="{{ activity_user_external_id }}" data-template-period="{{ activity_template_period }}">
     {% endif %}
         <div class="flex items-start justify-between mb-3">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 mr-3">
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 dashboard-activity-avatar">
                     {{ profile_icon(activity.user, 'md', false, false, false, 'avatar-circle') }}
                 </div>
                 <div>

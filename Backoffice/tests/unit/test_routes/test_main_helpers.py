@@ -673,6 +673,45 @@ class TestExtractChangedMatrixValues:
         if result_old is not None:
             assert "_matrix_change" in result_old
 
+    def test_restore_lookup_from_cleared_metadata_to_scalar(self, app):
+        """Restore lookup: cleared blob -> scalar should show empty -> value, not value -> removed."""
+        with app.app_context():
+            old = {
+                "13_SP2": {
+                    "original": 108020,
+                    "modified": "",
+                    "isModified": True,
+                }
+            }
+            new = {"13_SP2": 108020}
+            result_old, result_new = self._call(old, new)
+        assert result_old is not None
+        assert result_new is not None
+        assert result_old["13_SP2"] == ""
+        assert result_new["13_SP2"] == 108020
+
+    def test_clear_lookup_shows_removed(self, app):
+        with app.app_context():
+            old = {"13_SP2": 108020}
+            new = {
+                "13_SP2": {
+                    "original": 108020,
+                    "modified": "",
+                    "isModified": True,
+                }
+            }
+            result_old, result_new = self._call(old, new)
+        assert result_old["13_SP2"] == 108020
+        assert result_new["13_SP2"] == ""
+
+    def test_missing_vs_zero_not_listed_as_change(self, app):
+        with app.app_context():
+            old = {"14_SP1": None, "14_SP2": 0}
+            new = {"14_SP1": 0, "14_SP2": {"original": 0, "modified": "", "isModified": False}}
+            result_old, result_new = self._call(old, new)
+        assert result_old is None
+        assert result_new is None
+
     def test_string_old_parsed_as_dict(self, app):
         with app.app_context():
             old = '{"r1_c1": 1, "r1_c2": 2}'
@@ -788,6 +827,27 @@ class TestRenderMatrixChange:
             new = {"r1_c1": {"modified": 5, "original": 3}}
             result = render_matrix_change("F", old, new)
         assert isinstance(result, str)
+
+    def test_restore_lookup_renders_added_not_removed(self, app):
+        from app.routes.main.helpers import render_matrix_change
+        with app.app_context():
+            result = render_matrix_change(
+                "Funding Requirements",
+                {"_matrix_change": True, "13_SP2": ""},
+                {"_matrix_change": True, "13_SP2": 108020},
+            )
+        assert "108020" in result
+        assert "removed" not in result
+
+    def test_equal_zero_cells_not_rendered(self, app):
+        from app.routes.main.helpers import render_matrix_change
+        with app.app_context():
+            result = render_matrix_change(
+                "Funding Requirements",
+                {"_matrix_change": True, "14_SP1": 0},
+                {"_matrix_change": True, "14_SP1": 0},
+            )
+        assert result == ""
 
 
 # ---------------------------------------------------------------------------

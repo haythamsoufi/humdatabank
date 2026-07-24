@@ -6,7 +6,7 @@ Extracted from routes/api.py for better organization and reusability.
 
 import logging
 from datetime import date
-from typing import Any
+from typing import Any, Optional
 
 from app.services.reporting_period_service import period_chronology_sort_key
 
@@ -774,13 +774,147 @@ def _resolve_matrix_cell(v: Any) -> Any:
     return effective
 
 
+_DISAGG_MODES_WITH_BREAKDOWN = frozenset({'sex', 'age', 'sex_age'})
+_DISAGG_STRUCTURE_KEYS = frozenset({'total', 'total_direct', 'total_indirect', 'indirect', 'direct'})
+_DISAGG_SUM_SKIP_KEYS = _DISAGG_STRUCTURE_KEYS | frozenset({'disability'})
+
+
+def _coerce_disagg_numeric(value):
+    """Return a numeric for disagg totals, or None when not summable."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        stripped = value.strip().replace(',', '')
+        if not stripped:
+            return None
+        try:
+            return float(stripped)
+        except ValueError:
+            return None
+    return None
+
+
+def _sum_disagg_breakdown_cells(breakdown: dict) -> Optional[float]:
+    """Sum numeric leaf cells in a sex/age/sex_age breakdown dict."""
+    if not isinstance(breakdown, dict):
+        return None
+    total = 0.0
+    found = False
+    for key, val in breakdown.items():
+        if key in _DISAGG_SUM_SKIP_KEYS or isinstance(val, dict):
+            continue
+        numeric = _coerce_disagg_numeric(val)
+        if numeric is None:
+            continue
+        total += numeric
+        found = True
+    return total if found else None
+
+
+def _format_disagg_total(total: float):
+    if total == int(total):
+        return int(total)
+    return total
+
+
+def _finalize_disagg_values(
+    *,
+    breakdown: dict,
+    passthrough: dict,
+    direct_total: Optional[float],
+    indirect_total: float,
+) -> dict:
+    """Attach total / total_direct / total_indirect to a flat values map."""
+    out = {}
+    direct_numeric = direct_total if direct_total is not None else 0.0
+    indirect_numeric = indirect_total or 0.0
+    out['total'] = _format_disagg_total(direct_numeric + indirect_numeric)
+    out['total_direct'] = _format_disagg_total(direct_numeric)
+    out['total_indirect'] = _format_disagg_total(indirect_numeric)
+    out.update(breakdown)
+    out.update(passthrough)
+    return out
+
+
+def _flatten_disagg_values_for_api(mode, values: dict) -> dict:
+    """
+    Flatten stored disaggregation payloads for API output.
+
+    On disk, indirect-reach indicators nest breakdown cells under ``values.direct``
+    with ``values.indirect`` alongside. API consumers get one flat ``values`` map with
+    ``total`` (direct + indirect), ``total_direct``, ``total_indirect``, and any
+    breakdown cells.
+    """
+    if not isinstance(values, dict) or not values:
+        return values
+
+    mode_norm = str(mode or '').strip().lower()
+    direct = values.get('direct')
+    indirect_total = _coerce_disagg_numeric(values.get('indirect')) or 0.0
+    passthrough = {
+        k: v for k, v in values.items()
+        if k not in _DISAGG_STRUCTURE_KEYS
+    }
+
+    if isinstance(direct, dict):
+        breakdown = {k: v for k, v in direct.items() if k not in _DISAGG_SUM_SKIP_KEYS}
+        direct_total = _sum_disagg_breakdown_cells(direct)
+        return _finalize_disagg_values(
+            breakdown=breakdown,
+            passthrough=passthrough,
+            direct_total=direct_total,
+            indirect_total=indirect_total,
+        )
+
+    if 'direct' in values and not isinstance(direct, dict):
+        direct_total = _coerce_disagg_numeric(direct)
+        return _finalize_disagg_values(
+            breakdown={},
+            passthrough=passthrough,
+            direct_total=direct_total,
+            indirect_total=indirect_total,
+        )
+
+    if mode_norm in _DISAGG_MODES_WITH_BREAKDOWN:
+        breakdown = {
+            k: v for k, v in values.items()
+            if k not in _DISAGG_STRUCTURE_KEYS and _coerce_disagg_numeric(v) is not None
+        }
+        passthrough = {
+            k: v for k, v in values.items()
+            if k not in breakdown and k not in _DISAGG_STRUCTURE_KEYS
+        }
+        direct_total = _sum_disagg_breakdown_cells(breakdown)
+        return _finalize_disagg_values(
+            breakdown=breakdown,
+            passthrough=passthrough,
+            direct_total=direct_total,
+            indirect_total=indirect_total,
+        )
+
+    if mode_norm == 'total' or 'total' in values:
+        direct_total = _coerce_disagg_numeric(values.get('total'))
+        return _finalize_disagg_values(
+            breakdown={},
+            passthrough=passthrough,
+            direct_total=direct_total,
+            indirect_total=indirect_total,
+        )
+
+    return values
+
+
 def _wrap_disagg_dict(dd):
     """
     Normalize a raw disagg_data dict for API output, returning None when empty.
 
     Handles three on-disk formats:
     - Standard disaggregation: {"mode": "sex|age|sex_age|total", "values": {...}}
-      Returned as-is (mode + values preserved).
+      Nested ``values.direct`` / scalar ``values.direct`` buckets are flattened so
+      breakdown cells share one ``values`` map with ``total``, ``total_direct``, and
+      ``total_indirect``.
     - Matrix (flat): {"_table": "ns", "10_SP2": 4107000, ...}
       No "values" key present; wrapped as {"mode": "matrix", "values": {non-_ keys}}.
       Variable-column cells stored as {"original": ..., "modified": ..., "isModified": bool}
@@ -793,9 +927,13 @@ def _wrap_disagg_dict(dd):
         return None
     if 'values' in dd:
         values = dd['values']
+        if not isinstance(values, dict):
+            values = {}
+        mode = dd.get('mode')
+        values = _flatten_disagg_values_for_api(mode, values)
         return {
-            'mode': dd.get('mode'),
-            'values': values if isinstance(values, dict) else {},
+            'mode': mode,
+            'values': values,
         }
     # Flat matrix or plugin format — no nested "values" key.
     # Strip internal reserved keys (prefixed with "_") and resolve variable-column cells.

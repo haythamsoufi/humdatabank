@@ -39,11 +39,11 @@ Parameters:
         {% endfor %}
         {% set shadow_class_str = shadow_classes | join(' ') %}
         {% set container_class_str = container_classes | join(' ') %}
-        <div class="flex items-center profile-icon {{ container_class_str }}">
+        <div class="flex items-center profile-icon gap-2 {{ container_class_str }}">
             {% set profile_color = user.profile_color if user.profile_color and user.profile_color != '#3B82F6' else user.generate_profile_color() %}
             {% set size_classes = {'xs': 'w-5 h-5 text-xs', 'sm': 'w-6 h-6 text-xs', 'md': 'w-8 h-8 text-xs', 'lg': 'w-12 h-12 text-sm'} %}
             {% set icon_size = size_classes.get(size, 'w-8 h-8 text-xs') %}
-            <div class="{{ icon_size }} rounded-full text-white font-semibold flex items-center justify-center mr-2 flex-shrink-0 profile-icon-circle {{ shadow_class_str }}" style="background-color: {{ profile_color }};">
+            <div class="{{ icon_size }} rounded-full text-white font-semibold flex items-center justify-center flex-shrink-0 profile-icon-circle {{ shadow_class_str }}" style="background-color: {{ profile_color }};">
                 {{ user | profile_initials }}
             </div>
             {% if show_name or show_email or show_title %}
@@ -60,8 +60,8 @@ Parameters:
             {% endif %}
         </div>
     {% else %}
-        <div class="flex items-center {{ class }}">
-            <div class="w-8 h-8 rounded-full bg-gray-400 text-white text-xs font-semibold flex items-center justify-center mr-2 flex-shrink-0">
+        <div class="flex items-center gap-2 {{ class }}">
+            <div class="w-8 h-8 rounded-full bg-gray-400 text-white text-xs font-semibold flex items-center justify-center flex-shrink-0">
                 ?
             </div>
             <span class="text-gray-400 text-sm">Unknown</span>

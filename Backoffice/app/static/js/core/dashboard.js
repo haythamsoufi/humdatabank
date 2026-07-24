@@ -1264,12 +1264,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Update microcopy (optional elements)
             if (approvedAssignmentsHint) {
-                approvedAssignmentsHint.textContent = isExpanded ? 'Click to collapse' : 'Click to expand';
+                approvedAssignmentsHint.textContent = isExpanded
+                    ? getSecureConfirmMessage('clickToCollapse', 'Click to collapse')
+                    : getSecureConfirmMessage('clickToExpand', 'Click to expand');
             }
             if (approvedAssignmentsToggleText) {
-                approvedAssignmentsToggleText.textContent = isExpanded ? 'Hide' : 'Show';
+                approvedAssignmentsToggleText.textContent = isExpanded
+                    ? getSecureConfirmMessage('hide', 'Hide')
+                    : getSecureConfirmMessage('show', 'Show');
             }
-            toggleApprovedAssignmentsButton.title = isExpanded ? 'Hide past assignments' : 'Show past assignments';
+            toggleApprovedAssignmentsButton.title = isExpanded
+                ? getSecureConfirmMessage('hidePastAssignments', 'Hide past assignments')
+                : getSecureConfirmMessage('showPastAssignments', 'Show past assignments');
         }
 
         function toggleApprovedAssignments() {

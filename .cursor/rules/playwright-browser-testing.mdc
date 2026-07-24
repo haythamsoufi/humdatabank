@@ -7,15 +7,16 @@ alwaysApply: true
 
 ## Logging In (Local Dev)
 
-The Backoffice runs at `http://localhost:5000`. In development config, the login page (`/login`) shows a yellow **"Quick login for testers"** box with three one-click buttons (no credentials needed — they auto-submit the login form with seeded test accounts):
+The Backoffice runs at `http://localhost:5000`. In development config with `DEBUG=true`, the login page (`/login`) shows a yellow **"Act as (dev only)"** box (no credentials needed):
 
-| Button id | Logs in as |
+| Control | Logs in as |
 |---|---|
-| `#quickSystemManagerLogin` | System Manager (`test_sys@<org-domain>`) |
-| `#quickAdminLogin` | Admin (`test_admin@<org-domain>`) |
-| `#quickFocalLogin` | Focal Point (`test_focal@<org-domain>`) |
+| Preset button `[data-dev-act-as-preset="sys_manager"]` | System Manager (`test_sys@<org-domain>`) |
+| Preset button `[data-dev-act-as-preset="admin"]` | Admin (`test_admin@<org-domain>`) |
+| Preset button `[data-dev-act-as-preset="focal"]` | Focal Point (`test_focal@<org-domain>`) |
+| `#devActAsUserSelect` + `#devActAsSelectedUser` | Any active user from the database |
 
-Use these buttons whenever a test session is needed — never ask the user for credentials. To switch roles, navigate to `/logout` first, then click a different quick-login button.
+Use these controls whenever a test session is needed — never ask the user for credentials. To switch roles, navigate to `/logout` first, then act as a different user.
 
 ## Hard Refresh After Code Changes
 

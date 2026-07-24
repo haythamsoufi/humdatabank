@@ -291,6 +291,58 @@ class NotificationService:
             }
         return out
 
+    _MESSAGE_KEYS_WITH_COUNTRY_PARAM = frozenset({
+        'notification.user_added_to_country.message',
+        'notification.public_submission_received.message',
+    })
+
+    @classmethod
+    def _apply_localized_country_param(
+        cls,
+        notification: Notification,
+        message_key: Optional[str],
+        message_params: Optional[Dict[str, Any]],
+        locale: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Replace stored English country names with locale-aware names at display time."""
+        if not message_key or message_key not in cls._MESSAGE_KEYS_WITH_COUNTRY_PARAM:
+            return message_params or {}
+        if not message_params or 'country' not in message_params:
+            return message_params or {}
+
+        entity_type = getattr(notification, 'entity_type', None)
+        entity_id = getattr(notification, 'entity_id', None)
+        if entity_type != 'country' or not entity_id:
+            return message_params
+
+        try:
+            from app.models import Country
+            from app.utils.form_localization import get_localized_country_name
+            from flask_babel import force_locale
+
+            country = Country.query.get(entity_id)
+            if not country:
+                return message_params
+
+            if locale:
+                with force_locale(locale):
+                    localized_country = get_localized_country_name(country)
+            else:
+                localized_country = get_localized_country_name(country)
+
+            if localized_country:
+                updated = message_params.copy()
+                updated['country'] = localized_country
+                return updated
+        except Exception as e:
+            logger.warning(
+                "Error localizing country param for notification %s: %s",
+                getattr(notification, 'id', '?'),
+                e,
+                exc_info=True,
+            )
+        return message_params
+
     @classmethod
     def _translate_notification_content(cls, notification: Notification) -> Tuple[Optional[str], Optional[str]]:
         """
@@ -638,6 +690,13 @@ class NotificationService:
                                 message_params['country_name'] = country_name
                         except Exception as e:
                             logger.warning(f"Error fetching access request data for notification {notification.id}: {e}")
+
+                    message_params = cls._apply_localized_country_param(
+                        notification,
+                        message_key,
+                        message_params,
+                        locale=locale_to_use,
+                    )
 
                     translated_message = translate_notification_message(message_key, message_params, locale=locale_to_use)
                 except Exception as e:

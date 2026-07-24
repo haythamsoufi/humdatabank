@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-24 01:23+0200\n"
+"POT-Creation-Date: 2026-07-24 16:48+0200\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: zh <LL@li.org>\n"
@@ -71,17 +71,17 @@ msgstr ""
 msgid "%(count)s value(s) carried forward"
 msgstr ""
 
-#: app/routes/main/helpers.py:1292
+#: app/routes/main/helpers.py:1250
 #, python-format
 msgid "%(field)s: %(new)s"
 msgstr ""
 
-#: app/routes/main/helpers.py:1294
+#: app/routes/main/helpers.py:1252
 #, python-format
 msgid "%(field)s: %(old)s"
 msgstr ""
 
-#: app/routes/main/helpers.py:1296
+#: app/routes/main/helpers.py:1254
 #, python-format
 msgid "%(field)s: %(old)s → %(new)s"
 msgstr ""
@@ -204,7 +204,7 @@ msgstr ""
 msgid ".xlsx or .xls (max 50 MB)"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:496
+#: app/templates/admin/assignments/manage_assignment.html:495
 msgid "0 selected"
 msgstr ""
 
@@ -653,6 +653,26 @@ msgstr ""
 msgid "Accuracy and Verification"
 msgstr ""
 
+#: app/templates/auth/login.html:607
+msgid "Act as (dev only)"
+msgstr ""
+
+#: app/templates/auth/login.html:626
+msgid "Act as Admin"
+msgstr ""
+
+#: app/templates/auth/login.html:630
+msgid "Act as Focal Point"
+msgstr ""
+
+#: app/templates/auth/login.html:622
+msgid "Act as System Manager"
+msgstr ""
+
+#: app/templates/auth/login.html:649 app/templates/auth/login.html:651
+msgid "Act as selected user"
+msgstr ""
+
 #: app/templates/admin/ai/_trace_card.html:371
 #: app/templates/admin/ai/conversation_traces.html:178
 #: app/templates/admin/security/alerts.html:27
@@ -715,7 +735,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/admin/assignments/assignments.html:128
-#: app/templates/admin/assignments/manage_assignment.html:342
+#: app/templates/admin/assignments/manage_assignment.html:343
 #: app/templates/admin/plugin_management.html:213
 msgid "Activate"
 msgstr "启用"
@@ -820,7 +840,7 @@ msgstr "活动"
 msgid "Activities from other focal points in"
 msgstr "来自其他联络点的活动"
 
-#: app/routes/main/helpers.py:1354
+#: app/routes/main/helpers.py:1312
 #: app/templates/admin/analytics/audit_trail.html:454
 msgid "Activity"
 msgstr "活动"
@@ -889,12 +909,12 @@ msgstr ""
 msgid "Add Embed Content"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:457
+#: app/templates/admin/assignments/manage_assignment.html:458
 msgid "Add Entities"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:1736
-#: app/templates/forms/entry_form/entry_form.html:2474
+#: app/templates/forms/entry_form/entry_form.html:1737
+#: app/templates/forms/entry_form/entry_form.html:2475
 msgid "Add Entry"
 msgstr "添加条目"
 
@@ -909,7 +929,7 @@ msgid "Add Group"
 msgstr ""
 
 #: app/templates/admin/indicator_bank/add_indicator_bank.html:73
-#: app/templates/forms/entry_form/entry_form.html:3823
+#: app/templates/forms/entry_form/entry_form.html:3824
 #: app/templates/forms/entry_form/partials/dynamic_indicators_interface.html:31
 msgid "Add Indicator"
 msgstr "添加指标"
@@ -948,7 +968,7 @@ msgid "Add New Division"
 msgstr "添加新部门"
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:331
-#: app/templates/forms/entry_form/entry_form.html:3837
+#: app/templates/forms/entry_form/entry_form.html:3838
 msgid "Add New Indicator"
 msgstr "添加新指标"
 
@@ -1056,7 +1076,7 @@ msgstr ""
 msgid "Add data source"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:527
+#: app/templates/admin/assignments/manage_assignment.html:526
 msgid "Add entities by"
 msgstr ""
 
@@ -1106,8 +1126,8 @@ msgstr ""
 msgid "Add to self-report"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:168
 #: app/templates/admin/assignments/manage_assignment.html:169
+#: app/templates/admin/assignments/manage_assignment.html:170
 #: app/templates/admin/indicator_bank/_indicator_bank_translation_helpers.html:7
 #: app/templates/forms/form_builder/partials/_item_modal.html:89
 #: app/templates/forms/form_builder/partials/_item_modal.html:158
@@ -1129,7 +1149,7 @@ msgstr ""
 msgid "Add translations for the aggregated label in different languages."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:770
+#: app/templates/admin/assignments/manage_assignment.html:769
 msgid ""
 "Add translations for this assignment name in different languages. English is"
 " entered in the Custom Name field above."
@@ -1167,7 +1187,7 @@ msgid "Added"
 msgstr "已添加"
 
 # Activity descriptions
-#: app/routes/main/helpers.py:1318
+#: app/routes/main/helpers.py:1276
 #, python-format
 msgid "Added %(count)d field in %(template)s"
 msgstr "在 %(template)s 中添加了 %(count)d 个字段"
@@ -1279,13 +1299,14 @@ msgstr ""
 #: app/templates/admin/validation_rules.html:6
 #: app/templates/admin/validation_rules.html:40
 #: app/templates/admin/view_indicator_suggestion.html:13
+#: app/templates/auth/login.html:628
 #: app/templates/forms/form_builder/field_mapping.html:203
 #: app/templates/forms/form_builder/form_builder.html:77
 #: app/templates/tours/tours.html:474
 msgid "Admin"
 msgstr "管理员"
 
-#: app/routes/main/helpers.py:1353
+#: app/routes/main/helpers.py:1311
 #, python-format
 msgid "Admin %(action)s %(target)s"
 msgstr ""
@@ -1391,7 +1412,7 @@ msgstr ""
 msgid "After importing, click \"Compile Translations\" to apply changes."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:254
+#: app/templates/admin/assignments/manage_assignment.html:255
 msgid ""
 "After this date the assignment will be treated as Closed. Leave empty for no"
 " automatic closure."
@@ -1457,7 +1478,7 @@ msgstr ""
 #: app/templates/admin/api_management.html:312
 #: app/templates/admin/indicator_bank/indicator_bank.html:2370
 #: app/templates/components/auto_translate_modal_js.html:30
-#: app/templates/forms/entry_form/entry_form.html:3841
+#: app/templates/forms/entry_form/entry_form.html:3842
 #: app/templates/forms/form_builder/field_mapping.html:303
 #: app/templates/notifications/center.html:70
 msgid "All"
@@ -1778,7 +1799,7 @@ msgstr ""
 msgid "Allowed period types:"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2743
+#: app/templates/forms/entry_form/entry_form.html:2744
 msgid "Allowed types: PDF, Word, Excel, PowerPoint, Text"
 msgstr "允许的类型：PDF、Word、Excel、PowerPoint、文本"
 
@@ -1799,7 +1820,7 @@ msgstr ""
 msgid "Alt text (optional)"
 msgstr ""
 
-#: app/routes/auth.py:1045
+#: app/routes/auth.py:1229
 msgid "An account with this email already exists."
 msgstr ""
 
@@ -1823,7 +1844,7 @@ msgstr ""
 msgid "An error occurred while loading data"
 msgstr "发生错误。请重试。"
 
-#: app/routes/auth.py:1294
+#: app/routes/auth.py:1520
 msgid ""
 "An error occurred while updating your account settings. Please try again."
 msgstr "发生错误。请重试。"
@@ -2001,12 +2022,12 @@ msgstr ""
 msgid "Append dynamic suffix (percentage, population, etc.)"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:1378
-#: app/templates/forms/entry_form/entry_form.html:1555
-#: app/templates/forms/entry_form/entry_form.html:1696
-#: app/templates/forms/entry_form/entry_form.html:2410
-#: app/templates/forms/entry_form/entry_form.html:2425
-#: app/templates/forms/entry_form/partials/matrix_table.html:446
+#: app/templates/forms/entry_form/entry_form.html:1379
+#: app/templates/forms/entry_form/entry_form.html:1556
+#: app/templates/forms/entry_form/entry_form.html:1697
+#: app/templates/forms/entry_form/entry_form.html:2411
+#: app/templates/forms/entry_form/entry_form.html:2426
+#: app/templates/forms/entry_form/partials/matrix_table.html:448
 msgid "Applicable but data not available"
 msgstr "适用但数据不可用"
 
@@ -2018,7 +2039,7 @@ msgstr ""
 msgid "Application Log"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:239
+#: app/templates/admin/assignments/manage_assignment.html:240
 msgid "Applies to all selected countries."
 msgstr ""
 
@@ -2034,8 +2055,8 @@ msgstr ""
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:32
 #: app/templates/admin/analytics/audit_trail.html:287
 #: app/templates/admin/analytics/page_path_analytics.html:52
-#: app/templates/admin/assignments/manage_assignment.html:830
-#: app/templates/admin/assignments/manage_assignment.html:845
+#: app/templates/admin/assignments/manage_assignment.html:829
+#: app/templates/admin/assignments/manage_assignment.html:844
 #: app/templates/admin/communication/registry.html:31
 #: app/templates/components/ag_grid_i18n_js.html:18
 #: app/templates/forms/entry_form/partials/_preview_banner.html:47
@@ -2101,7 +2122,7 @@ msgstr ""
 msgid "Approve all __COUNT__ pending requests for this user?"
 msgstr ""
 
-#: app/routes/main/helpers.py:1228
+#: app/routes/main/helpers.py:1186
 #: app/templates/admin/assignments/public_submissions.html:54
 #: app/templates/admin/assignments/public_submissions.html:105
 #: app/templates/admin/assignments/public_submissions.html:178
@@ -2121,12 +2142,12 @@ msgstr "已批准"
 msgid "Approver"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:115
-#: app/templates/admin/assignments/manage_assignment.html:135
+#: app/templates/admin/assignments/manage_assignment.html:116
+#: app/templates/admin/assignments/manage_assignment.html:136
 #: app/templates/admin/documents/documents.html:285
 #: app/templates/admin/documents/documents.html:311
-#: app/templates/forms/entry_form/entry_form.html:2860
-#: app/templates/forms/entry_form/entry_form.html:2886
+#: app/templates/forms/entry_form/entry_form.html:2861
+#: app/templates/forms/entry_form/entry_form.html:2887
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:74
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:87
 #: app/templates/forms/form_builder/partials/_item_modal.html:540
@@ -2217,7 +2238,7 @@ msgstr "您确定要提交此表单吗？提交后您将无法编辑它。"
 msgid "Are you sure you want to delete"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2688
+#: app/templates/forms/entry_form/entry_form.html:2689
 #, python-format
 msgid ""
 "Are you sure you want to delete \"%(filename)s\"? The document will be "
@@ -2294,7 +2315,7 @@ msgid ""
 "Are you sure you want to delete this document? This action cannot be undone."
 msgstr "确定要删除此文档吗？此操作无法撤销。"
 
-#: app/templates/forms/entry_form/entry_form.html:3807
+#: app/templates/forms/entry_form/entry_form.html:3808
 msgid "Are you sure you want to delete this entry?"
 msgstr "您确定要删除此条目吗？"
 
@@ -2410,7 +2431,7 @@ msgid "Are you sure you want to reload the plugin \"%(plugin)s\"?"
 msgstr "Are you sure you want to reload the plugin \"%(plugin)s\"?"
 
 #: app/templates/core/dashboard.html:2978
-#: app/templates/forms/entry_form/entry_form.html:3968
+#: app/templates/forms/entry_form/entry_form.html:3969
 msgid "Are you sure you want to reopen this assignment?"
 msgstr "确定要重新打开此分配吗？"
 
@@ -2419,8 +2440,8 @@ msgstr "确定要重新打开此分配吗？"
 msgid "Are you sure you want to stop the translation?"
 msgstr "您确定要停止翻译吗？"
 
-#: app/templates/forms/entry_form/entry_form.html:580
-#: app/templates/forms/entry_form/entry_form.html:2523
+#: app/templates/forms/entry_form/entry_form.html:581
+#: app/templates/forms/entry_form/entry_form.html:2524
 msgid ""
 "Are you sure you want to submit this form? You will not be able to edit it "
 "after submission."
@@ -2444,7 +2465,7 @@ msgstr ""
 msgid "Are you sure you want to update the status?"
 msgstr "您确定要删除它吗"
 
-#: app/templates/forms/entry_form/entry_form.html:3967
+#: app/templates/forms/entry_form/entry_form.html:3968
 msgid "Are you sure you want to validate this assignment?"
 msgstr ""
 
@@ -2493,7 +2514,7 @@ msgstr ""
 msgid "Assessment"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:566
+#: app/templates/admin/assignments/manage_assignment.html:565
 msgid "Assign Countries"
 msgstr ""
 
@@ -2501,7 +2522,7 @@ msgstr ""
 msgid "Assign languages this user may edit with the inline translation tool."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:423
+#: app/templates/admin/assignments/manage_assignment.html:424
 msgid ""
 "Assign this form to specific organizational entities. Data will be collected"
 " at the specific entity level (e.g., branch data vs. country-wide data)."
@@ -2513,7 +2534,7 @@ msgid ""
 " to data at the level they are assigned."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1037
+#: app/templates/admin/assignments/manage_assignment.html:1036
 msgid ""
 "Assigned entities (focal points) will be notified about this new assignment."
 " Do you want to continue?"
@@ -2619,12 +2640,12 @@ msgstr ""
 msgid "Assignment approved"
 msgstr ""
 
-#: app/routes/main/helpers.py:1348
+#: app/routes/main/helpers.py:1306
 #, python-format
 msgid "Assignment approved: %(template)s"
 msgstr "任务已批准"
 
-#: app/routes/main/helpers.py:1344
+#: app/routes/main/helpers.py:1302
 #, python-format
 msgid "Assignment created: %(template)s"
 msgstr "分配已创建"
@@ -2633,7 +2654,7 @@ msgstr "分配已创建"
 msgid "Assignment dashboard access requires one of the Assignment roles."
 msgstr ""
 
-#: app/templates/components/_assignment_status_pipeline.html:64
+#: app/templates/components/_assignment_status_pipeline.html:66
 msgid "Assignment is closed"
 msgstr ""
 
@@ -2641,13 +2662,13 @@ msgstr ""
 msgid "Assignment period"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2692
+#: app/templates/forms/entry_form/entry_form.html:2693
 msgid ""
 "Assignment period is not available. Set a period for this assignment or "
 "choose a fixed period in the form template."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2693
+#: app/templates/forms/entry_form/entry_form.html:2694
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:76
 msgid ""
 "Assignment period is not set yet. Set the assignment period in the header, "
@@ -2658,12 +2679,12 @@ msgstr ""
 msgid "Assignment reopened"
 msgstr ""
 
-#: app/routes/main/helpers.py:1349
+#: app/routes/main/helpers.py:1307
 #, python-format
 msgid "Assignment reopened: %(template)s"
 msgstr "任务已重新开放"
 
-#: app/routes/main/helpers.py:1347
+#: app/routes/main/helpers.py:1305
 #, python-format
 msgid "Assignment returned for revision: %(template)s"
 msgstr ""
@@ -2676,7 +2697,7 @@ msgstr ""
 msgid "Assignment sent for review successfully."
 msgstr ""
 
-#: app/routes/main/helpers.py:1346
+#: app/routes/main/helpers.py:1304
 #, python-format
 msgid "Assignment sent for review: %(template)s"
 msgstr ""
@@ -2692,7 +2713,7 @@ msgid ""
 "URL or contact support."
 msgstr "未找到此国家的分配状态。"
 
-#: app/templates/forms/entry_form/entry_form.html:2510
+#: app/templates/forms/entry_form/entry_form.html:2511
 msgid "Assignment status for this country not found."
 msgstr "未找到此国家的分配状态。"
 
@@ -2704,7 +2725,7 @@ msgstr ""
 msgid "Assignment submitted successfully!"
 msgstr ""
 
-#: app/routes/main/helpers.py:1345
+#: app/routes/main/helpers.py:1303
 #, python-format
 msgid "Assignment submitted: %(template)s"
 msgstr "任务已提交"
@@ -2745,7 +2766,7 @@ msgstr "红十字会与红新月会国际联合会助手"
 msgid "Assistant is typing"
 msgstr ""
 
-#: app/templates/auth/login.html:671 app/templates/auth/reset_password.html:38
+#: app/templates/auth/login.html:696 app/templates/auth/reset_password.html:38
 msgid "At least 8 characters"
 msgstr "上一季度"
 
@@ -2810,12 +2831,12 @@ msgstr ""
 msgid "Audited Financial Statement"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:119
-#: app/templates/admin/assignments/manage_assignment.html:139
+#: app/templates/admin/assignments/manage_assignment.html:120
+#: app/templates/admin/assignments/manage_assignment.html:140
 #: app/templates/admin/documents/documents.html:289
 #: app/templates/admin/documents/documents.html:315
-#: app/templates/forms/entry_form/entry_form.html:2864
-#: app/templates/forms/entry_form/entry_form.html:2890
+#: app/templates/forms/entry_form/entry_form.html:2865
+#: app/templates/forms/entry_form/entry_form.html:2891
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:75
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:88
 #: app/templates/forms/form_builder/partials/_item_modal.html:544
@@ -2925,7 +2946,7 @@ msgstr ""
 msgid "Auto-Translate All Translation Fields"
 msgstr "自动翻译所有指标"
 
-#: app/templates/admin/assignments/manage_assignment.html:390
+#: app/templates/admin/assignments/manage_assignment.html:391
 msgid "Auto-closes the assignment after this date."
 msgstr ""
 
@@ -3261,7 +3282,7 @@ msgstr ""
 msgid "Brief summary for the in-app notification list…"
 msgstr ""
 
-#: app/templates/auth/login.html:663 app/templates/core/dashboard.html:2926
+#: app/templates/auth/login.html:688 app/templates/core/dashboard.html:2926
 msgid "Briefly describe your role and why you need access"
 msgstr "简要描述您的角色以及为什么需要访问"
 
@@ -3324,11 +3345,11 @@ msgid ""
 "you are ready."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:1155
-#: app/templates/forms/entry_form/entry_form.html:1296
-#: app/templates/forms/entry_form/entry_form.html:1449
-#: app/templates/forms/entry_form/entry_form.html:2133
-#: app/templates/forms/entry_form/entry_form.html:2283
+#: app/templates/forms/entry_form/entry_form.html:1156
+#: app/templates/forms/entry_form/entry_form.html:1297
+#: app/templates/forms/entry_form/entry_form.html:1450
+#: app/templates/forms/entry_form/entry_form.html:2134
+#: app/templates/forms/entry_form/entry_form.html:2284
 #: app/templates/forms/entry_form/export_pdf.html:340
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:206
 msgid "By Age:"
@@ -3344,21 +3365,21 @@ msgstr ""
 msgid "By Indicator"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:1159
-#: app/templates/forms/entry_form/entry_form.html:1300
-#: app/templates/forms/entry_form/entry_form.html:1453
-#: app/templates/forms/entry_form/entry_form.html:2156
-#: app/templates/forms/entry_form/entry_form.html:2287
+#: app/templates/forms/entry_form/entry_form.html:1160
+#: app/templates/forms/entry_form/entry_form.html:1301
+#: app/templates/forms/entry_form/entry_form.html:1454
+#: app/templates/forms/entry_form/entry_form.html:2157
+#: app/templates/forms/entry_form/entry_form.html:2288
 #: app/templates/forms/entry_form/export_pdf.html:359
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:210
 msgid "By Sex and Age:"
 msgstr "按性别和年龄："
 
-#: app/templates/forms/entry_form/entry_form.html:1151
-#: app/templates/forms/entry_form/entry_form.html:1292
-#: app/templates/forms/entry_form/entry_form.html:1445
-#: app/templates/forms/entry_form/entry_form.html:2111
-#: app/templates/forms/entry_form/entry_form.html:2279
+#: app/templates/forms/entry_form/entry_form.html:1152
+#: app/templates/forms/entry_form/entry_form.html:1293
+#: app/templates/forms/entry_form/entry_form.html:1446
+#: app/templates/forms/entry_form/entry_form.html:2112
+#: app/templates/forms/entry_form/entry_form.html:2280
 #: app/templates/forms/entry_form/export_pdf.html:321
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:202
 msgid "By Sex:"
@@ -3439,7 +3460,7 @@ msgstr ""
 msgid "Campaigns"
 msgstr "管理员"
 
-#: app/templates/forms/entry_form/entry_form.html:3828
+#: app/templates/forms/entry_form/entry_form.html:3829
 msgid "Can't find an indicator? Propose a new one here"
 msgstr ""
 
@@ -3453,9 +3474,9 @@ msgstr ""
 #: app/templates/admin/api_keys/revoke.html:21
 #: app/templates/admin/api_keys/revoke.html:80
 #: app/templates/admin/assignments/gantt_chart.html:246
-#: app/templates/admin/assignments/manage_assignment.html:829
-#: app/templates/admin/assignments/manage_assignment.html:844
-#: app/templates/admin/assignments/manage_assignment.html:1028
+#: app/templates/admin/assignments/manage_assignment.html:828
+#: app/templates/admin/assignments/manage_assignment.html:843
+#: app/templates/admin/assignments/manage_assignment.html:1027
 #: app/templates/admin/assignments/public_submissions.html:382
 #: app/templates/admin/common_words/manage_common_words.html:912
 #: app/templates/admin/common_words/manage_common_words.html:914
@@ -3514,8 +3535,8 @@ msgstr ""
 #: app/templates/components/auto_translate_modal_js.html:55
 #: app/templates/core/chat_immersive.html:50
 #: app/templates/core/dashboard.html:2944
-#: app/templates/forms/entry_form/entry_form.html:2923
-#: app/templates/forms/entry_form/entry_form.html:3976
+#: app/templates/forms/entry_form/entry_form.html:2924
+#: app/templates/forms/entry_form/entry_form.html:3977
 #: app/templates/forms/entry_form/validation_summary_progress.html:246
 #: app/templates/forms/form_builder/form_builder.html:226
 #: app/templates/forms/form_builder/form_builder.html:259
@@ -3538,7 +3559,7 @@ msgstr ""
 msgid "Cancel"
 msgstr "取消"
 
-#: app/templates/forms/entry_form/entry_form.html:2690
+#: app/templates/forms/entry_form/entry_form.html:2691
 msgid "Cancel deletion"
 msgstr ""
 
@@ -3566,7 +3587,7 @@ msgstr ""
 msgid "Cancelling…"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2686
+#: app/templates/forms/entry_form/entry_form.html:2687
 #, python-format
 msgid ""
 "Cannot cancel deletion. This field allows a maximum of %(max)s document(s). "
@@ -3647,11 +3668,11 @@ msgstr "查看变更历史"
 msgid "Change Type"
 msgstr "变更"
 
-#: app/templates/admin/assignments/manage_assignment.html:504
+#: app/templates/admin/assignments/manage_assignment.html:503
 msgid "Change due date"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:836
+#: app/templates/admin/assignments/manage_assignment.html:835
 msgid "Change due date of selected"
 msgstr ""
 
@@ -3659,11 +3680,11 @@ msgstr ""
 msgid "Change link"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:501
+#: app/templates/admin/assignments/manage_assignment.html:500
 msgid "Change status"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:817
+#: app/templates/admin/assignments/manage_assignment.html:816
 msgid "Change status of selected"
 msgstr ""
 
@@ -3705,11 +3726,11 @@ msgstr ""
 msgid "Changes requested: %(template)s"
 msgstr ""
 
-#: app/routes/main/helpers.py:1194
+#: app/routes/main/helpers.py:1152
 msgid "Changes were requested. Update the form and submit again when ready."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2964
+#: app/templates/forms/entry_form/entry_form.html:2965
 msgid "Chat"
 msgstr ""
 
@@ -4073,7 +4094,7 @@ msgstr ""
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:264
 #: app/templates/admin/indicator_bank/indicator_bank.html:467
-#: app/templates/forms/entry_form/entry_form.html:2657
+#: app/templates/forms/entry_form/entry_form.html:2658
 #: app/templates/forms/form_builder/partials/_excel_modal.html:71
 msgid "Click or drag Excel file here to import"
 msgstr ""
@@ -4094,7 +4115,7 @@ msgstr ""
 msgid "Click or drag an Excel file here"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2737
+#: app/templates/forms/entry_form/entry_form.html:2738
 msgid "Click or drag document here to upload"
 msgstr ""
 
@@ -4106,7 +4127,12 @@ msgstr ""
 msgid "Click to change file"
 msgstr ""
 
+#: app/templates/core/dashboard.html:3027
+msgid "Click to collapse"
+msgstr ""
+
 #: app/templates/core/dashboard.html:1590
+#: app/templates/core/dashboard.html:3026
 msgid "Click to expand"
 msgstr ""
 
@@ -4118,8 +4144,8 @@ msgstr ""
 msgid "Click to make public"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:1738
-#: app/templates/forms/entry_form/entry_form.html:2476
+#: app/templates/forms/entry_form/entry_form.html:1739
+#: app/templates/forms/entry_form/entry_form.html:2477
 msgid "Click to repeat this group of fields multiple times"
 msgstr ""
 
@@ -4188,7 +4214,7 @@ msgstr ""
 #: app/templates/admin/translations/manage_translations.html:234
 #: app/templates/admin/translations/manage_translations.html:485
 #: app/templates/admin/user_management/user_form.html:1489
-#: app/templates/auth/login.html:642 app/templates/auth/login.html:690
+#: app/templates/auth/login.html:667 app/templates/auth/login.html:715
 #: app/templates/components/auto_translate_modal.html:359
 #: app/templates/components/auto_translate_modal.html:529
 #: app/templates/components/auto_translate_modal_js.html:54
@@ -4219,7 +4245,7 @@ msgstr "关闭菜单"
 msgid "Close modal"
 msgstr "关闭菜单"
 
-#: app/templates/forms/entry_form/entry_form.html:374
+#: app/templates/forms/entry_form/entry_form.html:375
 msgid "Close navigation"
 msgstr ""
 
@@ -4227,7 +4253,7 @@ msgstr ""
 msgid "Close this assignment? It can be reopened later by an admin."
 msgstr ""
 
-#: app/routes/main/helpers.py:1232
+#: app/routes/main/helpers.py:1190
 #: app/templates/components/_assignment_status_pipeline.html:12
 #: app/templates/components/_status_label.html:26
 msgid "Closed"
@@ -4279,7 +4305,7 @@ msgstr ""
 msgid "Code cannot be changed while indicators reference this unit."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2989
+#: app/templates/forms/entry_form/entry_form.html:2990
 msgid "Collapse"
 msgstr ""
 
@@ -4304,11 +4330,11 @@ msgstr ""
 msgid "Collapse all sections"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2990
+#: app/templates/forms/entry_form/entry_form.html:2991
 msgid "Collapse editors list"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:381
+#: app/templates/forms/entry_form/entry_form.html:382
 msgid "Collapse navigation panel"
 msgstr ""
 
@@ -4320,8 +4346,8 @@ msgstr ""
 msgid "Collapse subsection"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:749
-#: app/templates/forms/entry_form/entry_form.html:1761
+#: app/templates/forms/entry_form/entry_form.html:750
+#: app/templates/forms/entry_form/entry_form.html:1762
 msgid "Collapse/Expand"
 msgstr ""
 
@@ -4647,7 +4673,7 @@ msgstr ""
 msgid "Configured via deployment / Config.FEATURES"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1030
+#: app/templates/admin/assignments/manage_assignment.html:1029
 #: app/templates/admin/assignments/public_submissions.html:382
 msgid "Confirm"
 msgstr ""
@@ -4665,7 +4691,7 @@ msgstr "确认删除"
 msgid "Confirm New Password"
 msgstr "忘记密码？"
 
-#: app/templates/auth/login.html:679 app/templates/auth/register.html:25
+#: app/templates/auth/login.html:704 app/templates/auth/register.html:25
 msgid "Confirm Password"
 msgstr "忘记密码？"
 
@@ -4673,7 +4699,7 @@ msgstr "忘记密码？"
 msgid "Confirm Plugin Uninstallation"
 msgstr "Confirm Plugin Uninstallation"
 
-#: app/templates/admin/assignments/manage_assignment.html:1038
+#: app/templates/admin/assignments/manage_assignment.html:1037
 msgid "Confirm action"
 msgstr ""
 
@@ -4712,19 +4738,19 @@ msgstr "国家名称"
 msgid "Contains"
 msgstr ""
 
-#: app/templates/auth/login.html:673 app/templates/auth/reset_password.html:40
+#: app/templates/auth/login.html:698 app/templates/auth/reset_password.html:40
 msgid "Contains a lowercase letter"
 msgstr ""
 
-#: app/templates/auth/login.html:674 app/templates/auth/reset_password.html:41
+#: app/templates/auth/login.html:699 app/templates/auth/reset_password.html:41
 msgid "Contains a number"
 msgstr ""
 
-#: app/templates/auth/login.html:675 app/templates/auth/reset_password.html:42
+#: app/templates/auth/login.html:700 app/templates/auth/reset_password.html:42
 msgid "Contains a special character (e.g. !@#$)"
 msgstr ""
 
-#: app/templates/auth/login.html:672 app/templates/auth/reset_password.html:39
+#: app/templates/auth/login.html:697 app/templates/auth/reset_password.html:39
 msgid "Contains an uppercase letter"
 msgstr ""
 
@@ -4741,7 +4767,7 @@ msgstr "注释"
 msgid "Context Data"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1035
+#: app/templates/admin/assignments/manage_assignment.html:1034
 #: app/templates/admin/translations/manage_translations.html:667
 #: app/templates/forms/form_builder/form_builder.html:1241
 msgid "Continue"
@@ -4789,7 +4815,7 @@ msgstr "已复制！"
 #: app/templates/admin/api_keys/rotate_success.html:57
 #: app/templates/admin/api_keys/rotate_success.html:109
 #: app/templates/admin/api_management.html:699
-#: app/templates/admin/assignments/manage_assignment.html:337
+#: app/templates/admin/assignments/manage_assignment.html:338
 #: app/templates/core/chat_immersive.html:53
 #: app/templates/forms/form_builder/partials/_item_modal.html:1054
 msgid "Copy"
@@ -4913,7 +4939,7 @@ msgstr ""
 msgid "Could not check for existing data. Please try again."
 msgstr ""
 
-#: app/routes/auth.py:619
+#: app/routes/auth.py:803
 msgid "Could not complete Azure sign-in."
 msgstr ""
 
@@ -4922,7 +4948,7 @@ msgstr ""
 msgid "Could not create SP/EF entry."
 msgstr ""
 
-#: app/routes/auth.py:1111
+#: app/routes/auth.py:1313
 msgid "Could not create account. Please try again."
 msgstr "提交表单失败。请重试。"
 
@@ -4938,7 +4964,7 @@ msgstr ""
 msgid "Could not create unit."
 msgstr ""
 
-#: app/routes/auth.py:759 app/routes/auth.py:764
+#: app/routes/auth.py:943 app/routes/auth.py:948
 msgid "Could not create user from Azure login."
 msgstr ""
 
@@ -5102,7 +5128,7 @@ msgstr ""
 #: app/templates/admin/ai/documents.html:531
 #: app/templates/admin/analytics/audit_trail.html:245
 #: app/templates/admin/analytics/audit_trail.html:448
-#: app/templates/admin/assignments/manage_assignment.html:736
+#: app/templates/admin/assignments/manage_assignment.html:735
 #: app/templates/admin/assignments/public_submissions.html:216
 #: app/templates/admin/countries/manage_country.html:4
 #: app/templates/admin/countries/manage_country.html:8
@@ -5196,7 +5222,7 @@ msgstr ""
 msgid "Country whose data you will manage"
 msgstr ""
 
-#: app/templates/auth/login.html:656
+#: app/templates/auth/login.html:681
 msgid "Country you will cover"
 msgstr ""
 
@@ -5236,7 +5262,7 @@ msgstr "创建"
 msgid "Create API Key"
 msgstr "创建报告"
 
-#: app/templates/auth/login.html:682
+#: app/templates/auth/login.html:707
 msgid "Create Account"
 msgstr "创建时间"
 
@@ -5352,11 +5378,11 @@ msgid ""
 " consistency in your reporting workflows."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1032
+#: app/templates/admin/assignments/manage_assignment.html:1031
 msgid "Create anyway"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1034
+#: app/templates/admin/assignments/manage_assignment.html:1033
 msgid "Create assignment"
 msgstr ""
 
@@ -5382,7 +5408,7 @@ msgstr ""
 msgid "Create with AI"
 msgstr ""
 
-#: app/templates/auth/login.html:643 app/templates/auth/register.html:5
+#: app/templates/auth/login.html:668 app/templates/auth/register.html:5
 msgid "Create your account"
 msgstr "登录您的账户"
 
@@ -5459,7 +5485,7 @@ msgstr "货币代码"
 msgid "Current"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2723
+#: app/templates/forms/entry_form/entry_form.html:2724
 msgid "Current Document:"
 msgstr "编辑文档"
 
@@ -5476,7 +5502,7 @@ msgstr ""
 msgid "Current Year View"
 msgstr "货币代码"
 
-#: app/templates/admin/assignments/manage_assignment.html:196
+#: app/templates/admin/assignments/manage_assignment.html:197
 msgid "Current name:"
 msgstr ""
 
@@ -5502,7 +5528,7 @@ msgstr ""
 msgid "Currently viewing/editing this version"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2985
+#: app/templates/forms/entry_form/entry_form.html:2986
 msgid "Currently with you editing this form:"
 msgstr ""
 
@@ -5525,11 +5551,11 @@ msgstr "Custom Fields"
 msgid "Custom Label (Optional)"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:161
+#: app/templates/admin/assignments/manage_assignment.html:162
 msgid "Custom Name"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:769
+#: app/templates/admin/assignments/manage_assignment.html:768
 msgid "Custom Name Translations"
 msgstr ""
 
@@ -5733,7 +5759,7 @@ msgstr ""
 msgid "Data Values"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:436
+#: app/templates/forms/entry_form/partials/matrix_table.html:438
 msgid "Data availability options"
 msgstr "数据质量指数"
 
@@ -5741,13 +5767,13 @@ msgstr "数据质量指数"
 msgid "Data collection launch"
 msgstr ""
 
-#: app/routes/main/helpers.py:1191
+#: app/routes/main/helpers.py:1149
 msgid ""
 "Data entry is underway. You can save drafts and continue completing the "
 "form."
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:72
+#: app/templates/forms/entry_form/partials/matrix_table.html:74
 msgid "Data matrix for"
 msgstr "数据导出"
 
@@ -5824,7 +5850,7 @@ msgid "Day of week"
 msgstr ""
 
 #: app/templates/admin/assignments/assignments.html:127
-#: app/templates/admin/assignments/manage_assignment.html:342
+#: app/templates/admin/assignments/manage_assignment.html:343
 #: app/templates/admin/plugin_management.html:212
 #: app/templates/admin/user_management/user_form.html:29
 #: app/templates/admin/user_management/user_form.html:765
@@ -5845,12 +5871,12 @@ msgstr "截止日期提醒"
 msgid "Deadline reminder"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:123
-#: app/templates/admin/assignments/manage_assignment.html:143
+#: app/templates/admin/assignments/manage_assignment.html:124
+#: app/templates/admin/assignments/manage_assignment.html:144
 #: app/templates/admin/documents/documents.html:293
 #: app/templates/admin/documents/documents.html:319
-#: app/templates/forms/entry_form/entry_form.html:2868
-#: app/templates/forms/entry_form/entry_form.html:2894
+#: app/templates/forms/entry_form/entry_form.html:2869
+#: app/templates/forms/entry_form/entry_form.html:2895
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:76
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:89
 #: app/templates/forms/form_builder/partials/_item_modal.html:548
@@ -5912,7 +5938,7 @@ msgstr ""
 msgid "Default title"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:200
+#: app/templates/admin/assignments/manage_assignment.html:201
 msgid "Default:"
 msgstr ""
 
@@ -5933,10 +5959,10 @@ msgstr ""
 #: app/templates/admin/validation_questions.html:212
 #: app/templates/admin/validation_questions.html:275
 #: app/templates/components/_builder_items.html:68
-#: app/templates/forms/entry_form/entry_form.html:1033
-#: app/templates/forms/entry_form/entry_form.html:1064
-#: app/templates/forms/entry_form/entry_form.html:1982
-#: app/templates/forms/entry_form/entry_form.html:2012
+#: app/templates/forms/entry_form/entry_form.html:1034
+#: app/templates/forms/entry_form/entry_form.html:1065
+#: app/templates/forms/entry_form/entry_form.html:1983
+#: app/templates/forms/entry_form/entry_form.html:2013
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:90
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:120
 #: app/templates/forms/form_builder/form_builder.html:626
@@ -6029,7 +6055,7 @@ msgstr ""
 msgid "Delete Data and Remove"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2683
+#: app/templates/forms/entry_form/entry_form.html:2684
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:109
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:160
 msgid "Delete Document"
@@ -6118,7 +6144,7 @@ msgid "Delete sector"
 msgstr ""
 
 #: app/templates/admin/ai/reasoning_traces.html:149
-#: app/templates/admin/assignments/manage_assignment.html:498
+#: app/templates/admin/assignments/manage_assignment.html:497
 msgid "Delete selected"
 msgstr ""
 
@@ -6142,7 +6168,7 @@ msgstr ""
 msgid "Delete this conversation? This cannot be undone."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3806
+#: app/templates/forms/entry_form/entry_form.html:3807
 msgid "Delete this entry"
 msgstr "删除此条目"
 
@@ -6335,10 +6361,10 @@ msgstr ""
 #: app/templates/components/_builder_items.html:89
 #: app/templates/components/_builder_items.html:95
 #: app/templates/components/_builder_items.html:108
-#: app/templates/forms/entry_form/entry_form.html:860
-#: app/templates/forms/entry_form/entry_form.html:1083
-#: app/templates/forms/entry_form/entry_form.html:1822
-#: app/templates/forms/entry_form/entry_form.html:2031
+#: app/templates/forms/entry_form/entry_form.html:861
+#: app/templates/forms/entry_form/entry_form.html:1084
+#: app/templates/forms/entry_form/entry_form.html:1823
+#: app/templates/forms/entry_form/entry_form.html:2032
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:65
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:139
 #: app/templates/forms/form_builder/form_builder.html:658
@@ -6455,7 +6481,7 @@ msgstr ""
 msgid "Disability questions"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:511
+#: app/templates/admin/assignments/manage_assignment.html:510
 msgid "Disable public reporting"
 msgstr ""
 
@@ -6595,7 +6621,7 @@ msgstr ""
 msgid "Dismiss selected email failure(s) without retrying?"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2953
+#: app/templates/forms/entry_form/entry_form.html:2954
 msgid "Dismiss warning"
 msgstr "Additional Warnings:"
 
@@ -6700,7 +6726,7 @@ msgstr ""
 msgid "Divisions"
 msgstr "定义"
 
-#: app/templates/admin/assignments/manage_assignment.html:657
+#: app/templates/admin/assignments/manage_assignment.html:656
 #: app/templates/admin/user_management/user_form.html:971
 msgid "Divisions & Departments"
 msgstr ""
@@ -6771,7 +6797,7 @@ msgid "Document Management"
 msgstr "文档管理"
 
 # Documents
-#: app/templates/forms/entry_form/entry_form.html:2695
+#: app/templates/forms/entry_form/entry_form.html:2696
 msgid "Document Selected"
 msgstr "文档类型"
 
@@ -6791,7 +6817,7 @@ msgid "Document Type (Optional)"
 msgstr ""
 
 # Documents
-#: app/templates/forms/entry_form/entry_form.html:2782
+#: app/templates/forms/entry_form/entry_form.html:2783
 msgid "Document Type:"
 msgstr "文档类型"
 
@@ -6799,7 +6825,7 @@ msgstr "文档类型"
 msgid "Document Types"
 msgstr "文档类型"
 
-#: app/templates/forms/entry_form/entry_form.html:2694
+#: app/templates/forms/entry_form/entry_form.html:2695
 msgid "Document Updated"
 msgstr "文档已上传"
 
@@ -6807,7 +6833,7 @@ msgstr "文档已上传"
 msgid "Document Upload"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2935
+#: app/templates/forms/entry_form/entry_form.html:2936
 msgid "Document Upload Not Available"
 msgstr "文档已上传"
 
@@ -6840,7 +6866,7 @@ msgstr ""
 msgid "Document types"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2936
+#: app/templates/forms/entry_form/entry_form.html:2937
 msgid "Document upload is disabled when the form is read-only."
 msgstr "当表单提交或批准时，导入功能被禁用。"
 
@@ -6848,7 +6874,7 @@ msgstr "当表单提交或批准时，导入功能被禁用。"
 msgid "Document uploaded"
 msgstr ""
 
-#: app/routes/main/helpers.py:1350
+#: app/routes/main/helpers.py:1308
 #, python-format
 msgid "Document uploaded: %(document)s"
 msgstr "文档已上传"
@@ -6960,7 +6986,7 @@ msgstr ""
 msgid "Download preview Excel"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2616
+#: app/templates/forms/entry_form/entry_form.html:2617
 msgid "Download template"
 msgstr ""
 
@@ -7039,7 +7065,7 @@ msgstr ""
 msgid "Drop UPR Master.xlsx here or click to browse"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2632
+#: app/templates/forms/entry_form/entry_form.html:2633
 msgid "Drop your saved workbook here"
 msgstr ""
 
@@ -7056,8 +7082,8 @@ msgid "Dry run (preview only, no DB write)"
 msgstr ""
 
 #: app/templates/admin/assignments/assignments.html:119
-#: app/templates/admin/assignments/manage_assignment.html:236
-#: app/templates/admin/assignments/manage_assignment.html:368
+#: app/templates/admin/assignments/manage_assignment.html:237
+#: app/templates/admin/assignments/manage_assignment.html:369
 #: app/templates/core/dashboard.html:1289
 msgid "Due Date"
 msgstr "截止日期"
@@ -7104,7 +7130,7 @@ msgstr ""
 msgid "Duplicate Sub-section"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1033
+#: app/templates/admin/assignments/manage_assignment.html:1032
 msgid "Duplicate assignment"
 msgstr ""
 
@@ -7220,7 +7246,7 @@ msgid ""
 "asterisk (*)."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:371
+#: app/templates/admin/assignments/manage_assignment.html:372
 msgid "Earliest:"
 msgstr ""
 
@@ -7283,7 +7309,7 @@ msgid "Edit Details"
 msgstr "编辑详情"
 
 #: app/templates/admin/documents/documents.html:109
-#: app/templates/forms/entry_form/entry_form.html:2682
+#: app/templates/forms/entry_form/entry_form.html:2683
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:104
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:105
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:155
@@ -7333,7 +7359,7 @@ msgstr ""
 msgid "Edit Sector"
 msgstr "编辑部门"
 
-#: app/templates/admin/assignments/manage_assignment.html:780
+#: app/templates/admin/assignments/manage_assignment.html:779
 msgid "Edit Status"
 msgstr ""
 
@@ -7424,10 +7450,10 @@ msgstr ""
 #: app/templates/admin/user_management/user_form.html:1105
 #: app/templates/admin/user_management/users.html:292
 #: app/templates/auth/forgot_password.html:10
-#: app/templates/auth/login.html:648 app/templates/auth/login.html:697
-#: app/templates/auth/register.html:9 app/templates/core/dashboard.html:2405
-#: app/templates/core/dashboard.html:2462
-#: app/templates/core/dashboard.html:2512 app/templates/core/layout.html:311
+#: app/templates/auth/login.html:673 app/templates/auth/login.html:722
+#: app/templates/auth/register.html:9 app/templates/core/dashboard.html:2404
+#: app/templates/core/dashboard.html:2461
+#: app/templates/core/dashboard.html:2511 app/templates/core/layout.html:311
 #: app/templates/notifications/_preferences_form.html:86
 #: app/templates/public_submission_export_pdf.html:25
 msgid "Email"
@@ -7657,7 +7683,7 @@ msgstr ""
 msgid "Enable Sound"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:508
+#: app/templates/admin/assignments/manage_assignment.html:507
 msgid "Enable public reporting"
 msgstr ""
 
@@ -7685,9 +7711,9 @@ msgstr "所有活动类型"
 msgid "End"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:128
+#: app/templates/admin/assignments/manage_assignment.html:129
 #: app/templates/admin/documents/documents.html:298
-#: app/templates/forms/entry_form/entry_form.html:2873
+#: app/templates/forms/entry_form/entry_form.html:2874
 msgid "End Period"
 msgstr "时间段"
 
@@ -7695,9 +7721,9 @@ msgstr "时间段"
 msgid "End Tour"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:103
+#: app/templates/admin/assignments/manage_assignment.html:104
 #: app/templates/admin/documents/documents.html:256
-#: app/templates/forms/entry_form/entry_form.html:2831
+#: app/templates/forms/entry_form/entry_form.html:2832
 #: app/templates/forms/form_builder/partials/_item_modal.html:513
 msgid "End Year"
 msgstr "年份"
@@ -7812,7 +7838,7 @@ msgstr ""
 msgid "Enter translation"
 msgstr ""
 
-#: app/templates/auth/forgot_password.html:6 app/templates/auth/login.html:692
+#: app/templates/auth/forgot_password.html:6 app/templates/auth/login.html:717
 msgid "Enter your email and we'll send you a link to reset your password."
 msgstr ""
 
@@ -7842,7 +7868,7 @@ msgstr "实体"
 msgid "Entity Access"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:417
+#: app/templates/admin/assignments/manage_assignment.html:418
 msgid "Entity Assignments"
 msgstr ""
 
@@ -7875,7 +7901,7 @@ msgstr "活动类型"
 msgid "Entity Types to Include"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:432
+#: app/templates/admin/assignments/manage_assignment.html:433
 msgid "Entity assignment mode"
 msgstr ""
 
@@ -7891,7 +7917,7 @@ msgstr ""
 msgid "Entity-based"
 msgstr "实体"
 
-#: app/templates/forms/entry_form/entry_form.html:3805
+#: app/templates/forms/entry_form/entry_form.html:3806
 msgid "Entry"
 msgstr "条目"
 
@@ -8168,7 +8194,7 @@ msgstr "Excel导入/导出"
 msgid "Excel Import/Export"
 msgstr "Excel导入/导出"
 
-#: app/templates/forms/entry_form/entry_form.html:2670
+#: app/templates/forms/entry_form/entry_form.html:2671
 msgid "Excel Import/Export Not Available"
 msgstr "Excel导入/导出不可用"
 
@@ -8176,10 +8202,10 @@ msgstr "Excel导入/导出不可用"
 msgid "Excel Imported"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2600
-#: app/templates/forms/entry_form/entry_form.html:2643
-#: app/templates/forms/entry_form/entry_form.html:2666
+#: app/templates/forms/entry_form/entry_form.html:2601
+#: app/templates/forms/entry_form/entry_form.html:2644
 #: app/templates/forms/entry_form/entry_form.html:2667
+#: app/templates/forms/entry_form/entry_form.html:2668
 #: app/templates/forms/form_builder/partials/_excel_modal.html:4
 #: app/templates/forms/form_builder/partials/_excel_modal.html:56
 #: app/templates/macros/excel_io_modal.html:58
@@ -8213,12 +8239,12 @@ msgstr ""
 msgid "Excel import requires a 'msgid' column header."
 msgstr ""
 
-#: app/routes/main/helpers.py:1355
+#: app/routes/main/helpers.py:1313
 #, python-format
 msgid "Excel imported: %(count)s values loaded"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2671
+#: app/templates/forms/entry_form/entry_form.html:2672
 msgid "Excel operations are not available for public submissions."
 msgstr "Excel操作不适用于公开提交。"
 
@@ -8247,7 +8273,7 @@ msgstr ""
 msgid "Exit fill content area"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2577
+#: app/templates/forms/entry_form/entry_form.html:2578
 msgid "Expand Sections Menu"
 msgstr "打开章节菜单"
 
@@ -8270,7 +8296,7 @@ msgstr ""
 msgid "Expand all sections"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2975
+#: app/templates/forms/entry_form/entry_form.html:2976
 msgid "Expand editors list"
 msgstr ""
 
@@ -8321,8 +8347,8 @@ msgid "Expires"
 msgstr "专家"
 
 #: app/templates/admin/assignments/assignments.html:120
-#: app/templates/admin/assignments/manage_assignment.html:251
-#: app/templates/admin/assignments/manage_assignment.html:387
+#: app/templates/admin/assignments/manage_assignment.html:252
+#: app/templates/admin/assignments/manage_assignment.html:388
 msgid "Expiry Date"
 msgstr ""
 
@@ -8372,7 +8398,7 @@ msgstr ""
 msgid "Export Data"
 msgstr "探索数据"
 
-#: app/templates/forms/entry_form/entry_form.html:2650
+#: app/templates/forms/entry_form/entry_form.html:2651
 msgid "Export Data Template (.xlsx)"
 msgstr "导出数据模板(.xlsx)"
 
@@ -8416,7 +8442,7 @@ msgstr ""
 msgid "Export Timeline"
 msgstr "导出选项"
 
-#: app/templates/forms/entry_form/entry_form.html:2624
+#: app/templates/forms/entry_form/entry_form.html:2625
 msgid "Export UPR Country Reporting (.xlsx)"
 msgstr ""
 
@@ -8596,11 +8622,11 @@ msgstr ""
 msgid "Failed logins"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3543
+#: app/templates/forms/entry_form/entry_form.html:3544
 msgid "Failed modules"
 msgstr "登录失败"
 
-#: app/templates/forms/entry_form/entry_form.html:3830
+#: app/templates/forms/entry_form/entry_form.html:3831
 msgid "Failed to add indicator"
 msgstr "添加指标失败"
 
@@ -8627,7 +8653,7 @@ msgstr ""
 msgid "Failed to delete document."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3835
+#: app/templates/forms/entry_form/entry_form.html:3836
 msgid "Failed to delete indicator"
 msgstr "删除指标失败"
 
@@ -8729,7 +8755,7 @@ msgstr "翻译失败"
 msgid "Failed to save indicator"
 msgstr ""
 
-#: app/routes/auth.py:1415
+#: app/routes/auth.py:1641
 msgid "Failed to save profile. Please try again."
 msgstr ""
 
@@ -8834,12 +8860,12 @@ msgstr "搜索端点"
 msgid "Features"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:113
-#: app/templates/admin/assignments/manage_assignment.html:133
+#: app/templates/admin/assignments/manage_assignment.html:114
+#: app/templates/admin/assignments/manage_assignment.html:134
 #: app/templates/admin/documents/documents.html:283
 #: app/templates/admin/documents/documents.html:309
-#: app/templates/forms/entry_form/entry_form.html:2858
-#: app/templates/forms/entry_form/entry_form.html:2884
+#: app/templates/forms/entry_form/entry_form.html:2859
+#: app/templates/forms/entry_form/entry_form.html:2885
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:73
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:86
 #: app/templates/forms/form_builder/partials/_item_modal.html:538
@@ -8865,8 +8891,8 @@ msgstr ""
 msgid "Field Label"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:930
-#: app/templates/forms/entry_form/entry_form.html:1891
+#: app/templates/forms/entry_form/entry_form.html:931
+#: app/templates/forms/entry_form/entry_form.html:1892
 msgid "Field Type No Longer Supported"
 msgstr ""
 
@@ -8889,7 +8915,7 @@ msgstr ""
 msgid "Field to sort by (submitted_at, template_id, country_id, period_name)"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2704
+#: app/templates/forms/entry_form/entry_form.html:2705
 msgid "Field:"
 msgstr "失败"
 
@@ -8925,7 +8951,7 @@ msgstr ""
 msgid "File is too large (max 80 MB)"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2684
+#: app/templates/forms/entry_form/entry_form.html:2685
 msgid "File size exceeds 25MB limit. Please select a smaller file."
 msgstr ""
 
@@ -9214,7 +9240,7 @@ msgstr ""
 #: app/templates/admin/dashboard.html:280
 #: app/templates/admin/user_management/user_form.html:309
 #: app/templates/admin/user_management/users.html:183
-#: app/templates/tours/tours.html:478
+#: app/templates/auth/login.html:632 app/templates/tours/tours.html:478
 msgid "Focal Point"
 msgstr "联络点"
 
@@ -9238,7 +9264,7 @@ msgstr ""
 msgid "Focal points can add indicators from the indicator bank"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:291
+#: app/templates/admin/assignments/manage_assignment.html:292
 msgid ""
 "Focal points will be notified about the new assignment. Uncheck to create "
 "without sending notifications."
@@ -9278,7 +9304,7 @@ msgstr ""
 msgid "Forgot Password"
 msgstr "忘记密码？"
 
-#: app/templates/auth/forgot_password.html:5 app/templates/auth/login.html:691
+#: app/templates/auth/forgot_password.html:5 app/templates/auth/login.html:716
 msgid "Forgot your password?"
 msgstr "忘记密码？"
 
@@ -9350,11 +9376,11 @@ msgid ""
 "highlighted fields contain prefilled values you can review and modify."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3522
+#: app/templates/forms/entry_form/entry_form.html:3523
 msgid "Form initialization failed"
 msgstr "验证失败："
 
-#: app/templates/forms/entry_form/entry_form.html:3422
+#: app/templates/forms/entry_form/entry_form.html:3423
 msgid "Form initialization timeout - some modules may have failed to load"
 msgstr ""
 
@@ -9540,7 +9566,7 @@ msgstr ""
 msgid "Generate PDF Thumbnail"
 msgstr "生成的URL"
 
-#: app/templates/admin/assignments/manage_assignment.html:358
+#: app/templates/admin/assignments/manage_assignment.html:359
 msgid "Generate Public URL"
 msgstr "生成的URL"
 
@@ -9655,7 +9681,7 @@ msgstr ""
 msgid "Governance, finance, and people-reached indicators"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:216
+#: app/templates/forms/entry_form/partials/matrix_table.html:218
 msgid "Grand total for matrix"
 msgstr ""
 
@@ -9664,7 +9690,7 @@ msgstr ""
 msgid "Granted directly"
 msgstr ""
 
-#: app/templates/auth/login.html:1237
+#: app/templates/auth/login.html:1304
 msgid "Great! This email is available."
 msgstr ""
 
@@ -9847,6 +9873,7 @@ msgstr ""
 
 #: app/templates/admin/ai/conversation_traces.html:349
 #: app/templates/admin/ai/trace_detail.html:87
+#: app/templates/core/dashboard.html:3029
 msgid "Hide"
 msgstr ""
 
@@ -9867,6 +9894,10 @@ msgstr ""
 #: app/templates/macros/filter_card.html:35
 #: app/templates/macros/filter_card.html:37
 msgid "Hide filters"
+msgstr ""
+
+#: app/templates/core/dashboard.html:3031
+msgid "Hide past assignments"
 msgstr ""
 
 #: app/templates/core/dashboard.html:3017
@@ -10099,7 +10130,7 @@ msgstr "图标类"
 msgid "Identity confirmed"
 msgstr ""
 
-#: app/routes/auth.py:1160
+#: app/routes/auth.py:1378
 msgid "If an account exists for that email, a reset link has been sent."
 msgstr ""
 
@@ -10113,7 +10144,7 @@ msgstr ""
 msgid "If set, this section will be nested under the selected parent section."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2951
+#: app/templates/forms/entry_form/entry_form.html:2952
 msgid ""
 "If they save after you, your changes may be overwritten. Coordinate to avoid"
 " conflicts."
@@ -10180,7 +10211,7 @@ msgid "Import Common Words"
 msgstr ""
 
 #: app/templates/admin/lists/list_detail.html:47
-#: app/templates/forms/entry_form/entry_form.html:2658
+#: app/templates/forms/entry_form/entry_form.html:2659
 #: app/templates/macros/excel_io_modal.html:62
 msgid "Import Data"
 msgstr "导入数据"
@@ -10428,7 +10459,7 @@ msgstr ""
 msgid "Imputed value"
 msgstr ""
 
-#: app/routes/main/helpers.py:1226
+#: app/routes/main/helpers.py:1184
 msgid "In Progress"
 msgstr "进行中"
 
@@ -10708,24 +10739,24 @@ msgstr ""
 msgid "Indirect Reach"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:1536
-#: app/templates/forms/entry_form/entry_form.html:1678
-#: app/templates/forms/entry_form/entry_form.html:2387
+#: app/templates/forms/entry_form/entry_form.html:1537
+#: app/templates/forms/entry_form/entry_form.html:1679
+#: app/templates/forms/entry_form/entry_form.html:2388
 #: app/templates/forms/form_builder/partials/_item_modal.html:1104
 msgid "Indirect reach"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:1168
-#: app/templates/forms/entry_form/entry_form.html:1197
-#: app/templates/forms/entry_form/entry_form.html:1309
-#: app/templates/forms/entry_form/entry_form.html:1338
-#: app/templates/forms/entry_form/entry_form.html:1462
-#: app/templates/forms/entry_form/entry_form.html:1491
-#: app/templates/forms/entry_form/entry_form.html:2189
-#: app/templates/forms/entry_form/entry_form.html:2210
-#: app/templates/forms/entry_form/entry_form.html:2237
-#: app/templates/forms/entry_form/entry_form.html:2296
-#: app/templates/forms/entry_form/entry_form.html:2323
+#: app/templates/forms/entry_form/entry_form.html:1169
+#: app/templates/forms/entry_form/entry_form.html:1198
+#: app/templates/forms/entry_form/entry_form.html:1310
+#: app/templates/forms/entry_form/entry_form.html:1339
+#: app/templates/forms/entry_form/entry_form.html:1463
+#: app/templates/forms/entry_form/entry_form.html:1492
+#: app/templates/forms/entry_form/entry_form.html:2190
+#: app/templates/forms/entry_form/entry_form.html:2211
+#: app/templates/forms/entry_form/entry_form.html:2238
+#: app/templates/forms/entry_form/entry_form.html:2297
+#: app/templates/forms/entry_form/entry_form.html:2324
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:219
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:247
 msgid "Indirect reach:"
@@ -10793,7 +10824,7 @@ msgstr "整数"
 msgid "Integrations"
 msgstr ""
 
-#: app/routes/auth.py:537
+#: app/routes/auth.py:721
 msgid "Invalid Azure callback."
 msgstr ""
 
@@ -10809,7 +10840,7 @@ msgstr ""
 msgid "Invalid country selection or country not assigned to you."
 msgstr ""
 
-#: app/routes/auth.py:157 app/routes/auth.py:204 app/routes/auth.py:261
+#: app/routes/auth.py:326 app/routes/auth.py:381 app/routes/auth.py:438
 msgid "Invalid email or password."
 msgstr ""
 
@@ -10834,7 +10865,7 @@ msgstr ""
 msgid "Invalid file type."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2685
+#: app/templates/forms/entry_form/entry_form.html:2686
 msgid ""
 "Invalid file type. Please select a PDF, Word, Excel, PowerPoint, or Text "
 "file."
@@ -10866,7 +10897,7 @@ msgstr ""
 msgid "Invalid request. Please try again."
 msgstr ""
 
-#: app/routes/auth.py:1184
+#: app/routes/auth.py:1410
 msgid "Invalid reset link."
 msgstr ""
 
@@ -11009,12 +11040,12 @@ msgstr ""
 msgid "JSON request required"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:112
-#: app/templates/admin/assignments/manage_assignment.html:132
+#: app/templates/admin/assignments/manage_assignment.html:113
+#: app/templates/admin/assignments/manage_assignment.html:133
 #: app/templates/admin/documents/documents.html:282
 #: app/templates/admin/documents/documents.html:308
-#: app/templates/forms/entry_form/entry_form.html:2857
-#: app/templates/forms/entry_form/entry_form.html:2883
+#: app/templates/forms/entry_form/entry_form.html:2858
+#: app/templates/forms/entry_form/entry_form.html:2884
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:73
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:86
 #: app/templates/forms/form_builder/partials/_item_modal.html:537
@@ -11030,7 +11061,7 @@ msgstr ""
 msgid "Job Title"
 msgstr ""
 
-#: app/routes/auth.py:1398
+#: app/routes/auth.py:1624
 #: app/templates/components/_profile_completion_modal.html:125
 msgid "Job title is required."
 msgstr ""
@@ -11047,12 +11078,12 @@ msgstr ""
 msgid "Judged traces"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:118
-#: app/templates/admin/assignments/manage_assignment.html:138
+#: app/templates/admin/assignments/manage_assignment.html:119
+#: app/templates/admin/assignments/manage_assignment.html:139
 #: app/templates/admin/documents/documents.html:288
 #: app/templates/admin/documents/documents.html:314
-#: app/templates/forms/entry_form/entry_form.html:2863
-#: app/templates/forms/entry_form/entry_form.html:2889
+#: app/templates/forms/entry_form/entry_form.html:2864
+#: app/templates/forms/entry_form/entry_form.html:2890
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:75
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:88
 #: app/templates/forms/form_builder/partials/_item_modal.html:543
@@ -11060,12 +11091,12 @@ msgstr ""
 msgid "Jul"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:117
-#: app/templates/admin/assignments/manage_assignment.html:137
+#: app/templates/admin/assignments/manage_assignment.html:118
+#: app/templates/admin/assignments/manage_assignment.html:138
 #: app/templates/admin/documents/documents.html:287
 #: app/templates/admin/documents/documents.html:313
-#: app/templates/forms/entry_form/entry_form.html:2862
-#: app/templates/forms/entry_form/entry_form.html:2888
+#: app/templates/forms/entry_form/entry_form.html:2863
+#: app/templates/forms/entry_form/entry_form.html:2889
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:74
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:87
 #: app/templates/forms/form_builder/partials/_item_modal.html:542
@@ -11244,7 +11275,7 @@ msgstr "语言"
 msgid "Language columns"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2748
+#: app/templates/forms/entry_form/entry_form.html:2749
 msgid "Language:"
 msgstr "语言"
 
@@ -11383,7 +11414,7 @@ msgstr ""
 msgid "Leave blank for no expiry."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:203
+#: app/templates/admin/assignments/manage_assignment.html:204
 msgid "Leave blank to use \"Template – Period\" everywhere."
 msgstr ""
 
@@ -11425,7 +11456,7 @@ msgstr ""
 msgid "Leave empty to use the indicator bank name."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2725
+#: app/templates/forms/entry_form/entry_form.html:2726
 msgid ""
 "Leave file selection empty to keep current document, or upload a new file to"
 " replace it."
@@ -11564,7 +11595,7 @@ msgstr ""
 msgid "Load from campaign"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2634
+#: app/templates/forms/entry_form/entry_form.html:2635
 msgid "Load into form"
 msgstr ""
 
@@ -11587,11 +11618,11 @@ msgstr ""
 msgid "Load summary first"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:706
+#: app/templates/admin/assignments/manage_assignment.html:705
 msgid "Loading Regions structure..."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:688
+#: app/templates/admin/assignments/manage_assignment.html:687
 msgid "Loading Secretariat structure..."
 msgstr ""
 
@@ -11673,7 +11704,7 @@ msgstr ""
 msgid "Loading form items..."
 msgstr "正在加载文档..."
 
-#: app/templates/forms/entry_form/entry_form.html:350
+#: app/templates/forms/entry_form/entry_form.html:351
 msgid "Loading form…"
 msgstr ""
 
@@ -11806,8 +11837,8 @@ msgstr ""
 #: app/templates/components/_builder_items.html:135
 #: app/templates/components/_builder_items.html:139
 #: app/templates/components/ag_grid_i18n_js.html:67
-#: app/templates/components/ag_grid_includes.html:73
-#: app/templates/components/ag_grid_includes.html:109
+#: app/templates/components/ag_grid_includes.html:68
+#: app/templates/components/ag_grid_includes.html:132
 #: app/templates/components/loading_indicator.html:22
 #: app/templates/core/dashboard.html:3024
 #: app/templates/forms/form_builder/partials/_sections_container.html:303
@@ -11868,7 +11899,7 @@ msgstr ""
 msgid "Log in"
 msgstr ""
 
-#: app/templates/auth/login.html:524
+#: app/templates/auth/login.html:581
 msgid "Log in with:"
 msgstr ""
 
@@ -11913,7 +11944,7 @@ msgstr "登录日志"
 msgid "Login events"
 msgstr ""
 
-#: app/routes/auth.py:566
+#: app/routes/auth.py:750
 msgid "Login session expired. Please try signing in again."
 msgstr ""
 
@@ -11977,7 +12008,7 @@ msgstr ""
 msgid "Main Screens"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2914
+#: app/templates/forms/entry_form/entry_form.html:2915
 msgid "Make this document publicly accessible"
 msgstr "勾选此项以公开文档"
 
@@ -12000,7 +12031,7 @@ msgstr "管理分配"
 msgid "Manage Embed Content"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:443
+#: app/templates/admin/assignments/manage_assignment.html:444
 msgid "Manage Existing Entities"
 msgstr ""
 
@@ -12074,7 +12105,7 @@ msgid ""
 "Manage default sex categories used for disaggregation. Drag to reorder."
 msgstr "管理用于分类的默认性别类别。拖拽重新排序。"
 
-#: app/templates/admin/assignments/manage_assignment.html:421
+#: app/templates/admin/assignments/manage_assignment.html:422
 msgid ""
 "Manage existing entity assignments and assign new entities to this form. "
 "Data will be collected at the specific entity level (e.g., branch data vs. "
@@ -12146,8 +12177,8 @@ msgstr ""
 msgid "Manage your registered mobile devices for push notifications."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:372
-#: app/templates/admin/assignments/manage_assignment.html:378
+#: app/templates/admin/assignments/manage_assignment.html:373
+#: app/templates/admin/assignments/manage_assignment.html:379
 msgid "Managed per entity below."
 msgstr ""
 
@@ -12160,8 +12191,8 @@ msgid "Manual list"
 msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:51
-#: app/templates/forms/entry_form/entry_form.html:3317
-#: app/templates/forms/entry_form/entry_form.html:3336
+#: app/templates/forms/entry_form/entry_form.html:3318
+#: app/templates/forms/entry_form/entry_form.html:3337
 msgid "Manual save required"
 msgstr "管理资源"
 
@@ -12193,12 +12224,12 @@ msgid ""
 "shown in grids. Matches the NotificationType enum used for stored rows."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:114
-#: app/templates/admin/assignments/manage_assignment.html:134
+#: app/templates/admin/assignments/manage_assignment.html:115
+#: app/templates/admin/assignments/manage_assignment.html:135
 #: app/templates/admin/documents/documents.html:284
 #: app/templates/admin/documents/documents.html:310
-#: app/templates/forms/entry_form/entry_form.html:2859
-#: app/templates/forms/entry_form/entry_form.html:2885
+#: app/templates/forms/entry_form/entry_form.html:2860
+#: app/templates/forms/entry_form/entry_form.html:2886
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:73
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:86
 #: app/templates/forms/form_builder/partials/_item_modal.html:539
@@ -12286,16 +12317,16 @@ msgstr ""
 msgid "Matrix Title"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:405
+#: app/templates/forms/entry_form/partials/matrix_table.html:407
 msgid "Matrix configuration not available. Please contact the administrator."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3550
+#: app/templates/forms/entry_form/entry_form.html:3551
 msgid "Matrix functionality unavailable"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3530
-#: app/templates/forms/entry_form/entry_form.html:3534
+#: app/templates/forms/entry_form/entry_form.html:3531
+#: app/templates/forms/entry_form/entry_form.html:3535
 msgid "Matrix handler not initialized"
 msgstr ""
 
@@ -12308,8 +12339,8 @@ msgstr ""
 msgid "Max Number of Entries"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:1740
-#: app/templates/forms/entry_form/entry_form.html:2478
+#: app/templates/forms/entry_form/entry_form.html:1741
+#: app/templates/forms/entry_form/entry_form.html:2479
 #, python-format
 msgid "Max entries: %(max)s"
 msgstr ""
@@ -12327,16 +12358,16 @@ msgstr ""
 msgid "Maximum Documents Allowed"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2696
+#: app/templates/forms/entry_form/entry_form.html:2697
 msgid "Maximum documents allowed"
 msgstr "文档已上传"
 
-#: app/templates/forms/entry_form/entry_form.html:2661
+#: app/templates/forms/entry_form/entry_form.html:2662
 #: app/templates/forms/form_builder/partials/_excel_modal.html:80
 msgid "Maximum file size: 10MB"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2743
+#: app/templates/forms/entry_form/entry_form.html:2744
 msgid "Maximum file size: 25MB"
 msgstr ""
 
@@ -12346,19 +12377,19 @@ msgid ""
 "limit."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2687
+#: app/templates/forms/entry_form/entry_form.html:2688
 #, python-format
 msgid ""
 "Maximum of %(max)s document(s) allowed for this field. You have already "
 "reached the limit."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:116
-#: app/templates/admin/assignments/manage_assignment.html:136
+#: app/templates/admin/assignments/manage_assignment.html:117
+#: app/templates/admin/assignments/manage_assignment.html:137
 #: app/templates/admin/documents/documents.html:286
 #: app/templates/admin/documents/documents.html:312
-#: app/templates/forms/entry_form/entry_form.html:2861
-#: app/templates/forms/entry_form/entry_form.html:2887
+#: app/templates/forms/entry_form/entry_form.html:2862
+#: app/templates/forms/entry_form/entry_form.html:2888
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:74
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:87
 #: app/templates/forms/form_builder/partials/_item_modal.html:541
@@ -12452,7 +12483,7 @@ msgstr "消息ID"
 msgid "Message to admins"
 msgstr "给管理员的消息"
 
-#: app/templates/auth/login.html:662
+#: app/templates/auth/login.html:687
 msgid "Message to admins (optional)"
 msgstr "给管理员的消息"
 
@@ -12598,9 +12629,9 @@ msgstr "登录日志"
 msgid "Monitoring Questions"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:90
+#: app/templates/admin/assignments/manage_assignment.html:91
 #: app/templates/admin/documents/documents.html:227
-#: app/templates/forms/entry_form/entry_form.html:2802
+#: app/templates/forms/entry_form/entry_form.html:2803
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:43
 #: app/templates/forms/form_builder/partials/_item_modal.html:462
 #: app/templates/forms/form_builder/partials/_item_modal.html:487
@@ -12663,7 +12694,7 @@ msgstr "多语言领域"
 msgid "Multiple"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:374
+#: app/templates/admin/assignments/manage_assignment.html:375
 msgid "Multiple different due dates set across entities."
 msgstr ""
 
@@ -12723,7 +12754,7 @@ msgstr "联络点"
 msgid "NS Name"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:471
+#: app/templates/admin/assignments/manage_assignment.html:472
 #: app/templates/admin/organization/index.html:82
 #: app/templates/admin/user_management/user_form.html:872
 #: app/templates/core/layout.html:413 app/templates/core/layout.html:415
@@ -12776,7 +12807,7 @@ msgstr ""
 msgid "Name"
 msgstr "姓名"
 
-#: app/templates/auth/login.html:651 app/templates/auth/register.html:13
+#: app/templates/auth/login.html:676 app/templates/auth/register.html:13
 msgid "Name (optional)"
 msgstr "姓名（印地语）"
 
@@ -12828,8 +12859,8 @@ msgstr "国家红会名称"
 msgid "National Society Structure"
 msgstr "国家红会名称"
 
-#: app/templates/admin/assignments/manage_assignment.html:299
-#: app/templates/admin/assignments/manage_assignment.html:312
+#: app/templates/admin/assignments/manage_assignment.html:300
+#: app/templates/admin/assignments/manage_assignment.html:313
 msgid ""
 "National Society focal points must send to delegation for review before "
 "final submission; delegation can edit and submit upstream."
@@ -12852,7 +12883,7 @@ msgid "Navigate your dashboard and access reporting tools"
 msgstr ""
 
 #: app/templates/admin/docs/documentation.html:1117
-#: app/templates/forms/entry_form/entry_form.html:371
+#: app/templates/forms/entry_form/entry_form.html:372
 msgid "Navigation"
 msgstr ""
 
@@ -13014,7 +13045,7 @@ msgstr "Plugins will appear here once they are installed"
 msgid "New chat"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:839
+#: app/templates/admin/assignments/manage_assignment.html:838
 msgid "New due date"
 msgstr ""
 
@@ -13039,7 +13070,7 @@ msgstr ""
 msgid "New key material generated for"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:820
+#: app/templates/admin/assignments/manage_assignment.html:819
 msgid "New status"
 msgstr ""
 
@@ -13057,7 +13088,7 @@ msgid "Next"
 msgstr "下一页"
 
 #: app/templates/components/ag_grid_i18n_js.html:61
-#: app/templates/forms/entry_form/entry_form.html:3800
+#: app/templates/forms/entry_form/entry_form.html:3801
 msgid "Next Page"
 msgstr "下一页"
 
@@ -13077,11 +13108,11 @@ msgstr ""
 #: app/templates/components/_form_item_renderer.html:236
 #: app/templates/components/_status_label.html:82
 #: app/templates/components/ag_grid_i18n_js.html:36
-#: app/templates/forms/entry_form/entry_form.html:1225
-#: app/templates/forms/entry_form/entry_form.html:1360
-#: app/templates/forms/entry_form/entry_form.html:1513
-#: app/templates/forms/entry_form/entry_form.html:1638
-#: app/templates/forms/entry_form/entry_form.html:2350
+#: app/templates/forms/entry_form/entry_form.html:1226
+#: app/templates/forms/entry_form/entry_form.html:1361
+#: app/templates/forms/entry_form/entry_form.html:1514
+#: app/templates/forms/entry_form/entry_form.html:1639
+#: app/templates/forms/entry_form/entry_form.html:2351
 #: app/templates/forms/entry_form/partials/disability_questions.html:32
 #: app/templates/forms/entry_form/partials/disability_questions.html:57
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:274
@@ -13297,7 +13328,7 @@ msgstr "未找到符合您条件的审计条目。"
 msgid "No data loaded yet"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:225
+#: app/templates/admin/assignments/manage_assignment.html:226
 msgid "No data owner set — governance gap."
 msgstr ""
 
@@ -13512,7 +13543,7 @@ msgstr ""
 msgid "No metrics available"
 msgstr "个指标可用"
 
-#: app/templates/forms/entry_form/entry_form.html:3836
+#: app/templates/forms/entry_form/entry_form.html:3837
 msgid "No more indicators available for this section."
 msgstr "此章节没有更多可用指标。"
 
@@ -13668,7 +13699,7 @@ msgstr ""
 msgid "No sections added to this template yet."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:536
+#: app/templates/forms/entry_form/entry_form.html:537
 msgid "No sections defined."
 msgstr "未定义章节。"
 
@@ -13676,7 +13707,7 @@ msgstr "未定义章节。"
 msgid "No sections in this draft."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2495
+#: app/templates/forms/entry_form/entry_form.html:2496
 msgid "No sections or items found for this template."
 msgstr "未找到此模板的章节或项目。"
 
@@ -13914,12 +13945,12 @@ msgstr ""
 
 #: app/routes/forms_validation_summary.py:399
 #: app/templates/components/_form_item_renderer.html:271
-#: app/templates/forms/entry_form/entry_form.html:1384
-#: app/templates/forms/entry_form/entry_form.html:1561
-#: app/templates/forms/entry_form/entry_form.html:1702
-#: app/templates/forms/entry_form/entry_form.html:2416
-#: app/templates/forms/entry_form/entry_form.html:2431
-#: app/templates/forms/entry_form/partials/matrix_table.html:458
+#: app/templates/forms/entry_form/entry_form.html:1385
+#: app/templates/forms/entry_form/entry_form.html:1562
+#: app/templates/forms/entry_form/entry_form.html:1703
+#: app/templates/forms/entry_form/entry_form.html:2417
+#: app/templates/forms/entry_form/entry_form.html:2432
+#: app/templates/forms/entry_form/partials/matrix_table.html:460
 #: app/templates/forms/entry_form/validation_summary_pdf.html:124
 msgid "Not applicable"
 msgstr "不适用"
@@ -13961,7 +13992,7 @@ msgstr ""
 msgid "Not filled"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:353
+#: app/templates/admin/assignments/manage_assignment.html:354
 #: app/templates/admin/validation_dashboard.html:252
 msgid "Not generated"
 msgstr ""
@@ -14002,7 +14033,7 @@ msgid "Not sent"
 msgstr ""
 
 #: app/templates/admin/assignments/assignments.html:125
-#: app/templates/admin/assignments/manage_assignment.html:377
+#: app/templates/admin/assignments/manage_assignment.html:378
 msgid "Not set"
 msgstr ""
 
@@ -14022,8 +14053,8 @@ msgstr ""
 msgid "Note"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:643
-#: app/templates/admin/assignments/manage_assignment.html:724
+#: app/templates/admin/assignments/manage_assignment.html:642
+#: app/templates/admin/assignments/manage_assignment.html:723
 msgid "Note:"
 msgstr ""
 
@@ -14128,12 +14159,12 @@ msgstr ""
 msgid "Notify focal points (assignment editor/submitter)"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:122
-#: app/templates/admin/assignments/manage_assignment.html:142
+#: app/templates/admin/assignments/manage_assignment.html:123
+#: app/templates/admin/assignments/manage_assignment.html:143
 #: app/templates/admin/documents/documents.html:292
 #: app/templates/admin/documents/documents.html:318
-#: app/templates/forms/entry_form/entry_form.html:2867
-#: app/templates/forms/entry_form/entry_form.html:2893
+#: app/templates/forms/entry_form/entry_form.html:2868
+#: app/templates/forms/entry_form/entry_form.html:2894
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:76
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:89
 #: app/templates/forms/form_builder/partials/_item_modal.html:547
@@ -14196,12 +14227,12 @@ msgstr ""
 msgid "Observation"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:121
-#: app/templates/admin/assignments/manage_assignment.html:141
+#: app/templates/admin/assignments/manage_assignment.html:122
+#: app/templates/admin/assignments/manage_assignment.html:142
 #: app/templates/admin/documents/documents.html:291
 #: app/templates/admin/documents/documents.html:317
-#: app/templates/forms/entry_form/entry_form.html:2866
-#: app/templates/forms/entry_form/entry_form.html:2892
+#: app/templates/forms/entry_form/entry_form.html:2867
+#: app/templates/forms/entry_form/entry_form.html:2893
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:76
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:89
 #: app/templates/forms/form_builder/partials/_item_modal.html:546
@@ -14283,7 +14314,7 @@ msgid ""
 "countries at once. Please select a single country."
 msgstr ""
 
-#: app/routes/auth.py:526
+#: app/routes/auth.py:710
 msgid ""
 "Oops, something went wrong! We weren't able to complete your sign-in. Please"
 " try again or contact support if the problem continues."
@@ -14319,7 +14350,7 @@ msgstr ""
 msgid "Open P&B report management (system managers only)"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2515
+#: app/templates/forms/entry_form/entry_form.html:2516
 msgid "Open Sections Menu"
 msgstr "打开章节菜单"
 
@@ -14349,7 +14380,7 @@ msgstr ""
 msgid "Open documents library"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3826
+#: app/templates/forms/entry_form/entry_form.html:3827
 msgid "Open indicator bank to propose new indicators or review existing ones"
 msgstr ""
 
@@ -14466,6 +14497,10 @@ msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:282
 msgid "Options Source"
+msgstr ""
+
+#: app/templates/auth/login.html:638
+msgid "Or choose a user"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:216
@@ -14604,7 +14639,7 @@ msgstr ""
 msgid "Other programs"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2950
+#: app/templates/forms/entry_form/entry_form.html:2951
 msgid "Others are editing this form"
 msgstr ""
 
@@ -14756,8 +14791,8 @@ msgstr ""
 msgid "Page"
 msgstr "页面"
 
-#: app/templates/forms/entry_form/entry_form.html:439
-#: app/templates/forms/entry_form/entry_form.html:709
+#: app/templates/forms/entry_form/entry_form.html:440
+#: app/templates/forms/entry_form/entry_form.html:710
 msgid "Page "
 msgstr "页面"
 
@@ -14864,8 +14899,8 @@ msgstr "路径参数"
 msgid "Parent Section"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:488
-#: app/templates/admin/assignments/manage_assignment.html:590
+#: app/templates/admin/assignments/manage_assignment.html:487
+#: app/templates/admin/assignments/manage_assignment.html:589
 msgid "Part of:"
 msgstr ""
 
@@ -14886,11 +14921,11 @@ msgid "Partnerships"
 msgstr ""
 
 #: app/templates/admin/analytics/audit_trail.html:328
-#: app/templates/auth/login.html:667 app/templates/auth/register.html:21
+#: app/templates/auth/login.html:692 app/templates/auth/register.html:21
 msgid "Password"
 msgstr "密码"
 
-#: app/routes/auth.py:1165
+#: app/routes/auth.py:1383
 msgid ""
 "Password reset is not available. Please sign in with your organization "
 "account."
@@ -14900,12 +14935,12 @@ msgstr ""
 msgid "Password was changed"
 msgstr ""
 
-#: app/templates/auth/login.html:1283
+#: app/templates/auth/login.html:1350
 #: app/templates/auth/reset_password.html:103
 msgid "Passwords do not match"
 msgstr ""
 
-#: app/templates/auth/login.html:1279
+#: app/templates/auth/login.html:1346
 #: app/templates/auth/reset_password.html:99
 msgid "Passwords match"
 msgstr "密码"
@@ -14963,7 +14998,7 @@ msgstr "暂停"
 msgid "Paused"
 msgstr ""
 
-#: app/routes/main/helpers.py:1225 app/templates/admin/ai/documents.html:70
+#: app/routes/main/helpers.py:1183 app/templates/admin/ai/documents.html:70
 #: app/templates/admin/ai/documents.html:442
 #: app/templates/admin/ai/documents.html:593
 #: app/templates/admin/ai/review_queue.html:28
@@ -15088,7 +15123,7 @@ msgid ""
 "before resubmitting for review."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:86
+#: app/templates/admin/assignments/manage_assignment.html:87
 msgid "Period Type"
 msgstr ""
 
@@ -15097,7 +15132,7 @@ msgid "Period type"
 msgstr ""
 
 #: app/templates/admin/documents/documents.html:220
-#: app/templates/forms/entry_form/entry_form.html:2796
+#: app/templates/forms/entry_form/entry_form.html:2797
 msgid "Period/Year Covered"
 msgstr "涵盖年份"
 
@@ -15160,8 +15195,8 @@ msgstr ""
 msgid "Pick one or more options from a list."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2526
-#: app/templates/forms/entry_form/entry_form.html:2528
+#: app/templates/forms/entry_form/entry_form.html:2527
+#: app/templates/forms/entry_form/entry_form.html:2529
 msgid "Pin Sections Pane"
 msgstr "打开章节菜单"
 
@@ -15230,7 +15265,7 @@ msgstr ""
 msgid "Please enter a query."
 msgstr ""
 
-#: app/templates/auth/login.html:1218
+#: app/templates/auth/login.html:1285
 msgid "Please enter a valid email address"
 msgstr ""
 
@@ -15256,11 +15291,11 @@ msgstr ""
 msgid "Please review and validate this submission in the Backoffice."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2697
+#: app/templates/forms/entry_form/entry_form.html:2698
 msgid "Please save the form first before editing this document."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2691
+#: app/templates/forms/entry_form/entry_form.html:2692
 msgid "Please select a Year/Period for the document."
 msgstr ""
 
@@ -15290,7 +15325,11 @@ msgstr ""
 msgid "Please select a template to self-report."
 msgstr "选择要导入的Excel文件："
 
-#: app/templates/admin/assignments/manage_assignment.html:404
+#: app/templates/auth/login.html:648
+msgid "Please select a user first."
+msgstr ""
+
+#: app/templates/admin/assignments/manage_assignment.html:405
 msgid "Please select a valid period (year or date range) before submitting."
 msgstr ""
 
@@ -15464,11 +15503,11 @@ msgstr ""
 msgid "Prefilled Values Notice"
 msgstr "预填充值通知"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:46
+#: app/templates/forms/entry_form/partials/matrix_table.html:48
 msgid "Prefilled value"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:351
+#: app/templates/forms/entry_form/entry_form.html:352
 #: app/templates/forms/form_builder/form_builder.html:104
 msgid "Preparing components. Please wait."
 msgstr ""
@@ -15477,7 +15516,7 @@ msgstr ""
 msgid "Preparing query…"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3888
+#: app/templates/forms/entry_form/entry_form.html:3889
 msgid "Preparing request..."
 msgstr ""
 
@@ -15544,7 +15583,7 @@ msgstr ""
 msgid "Preview import"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3829
+#: app/templates/forms/entry_form/entry_form.html:3830
 msgid ""
 "Preview mode: this will not be saved. Assign this template to a country to "
 "test saving dynamic indicators."
@@ -15584,7 +15623,7 @@ msgid "Previous"
 msgstr "上一页"
 
 #: app/templates/components/ag_grid_i18n_js.html:60
-#: app/templates/forms/entry_form/entry_form.html:3799
+#: app/templates/forms/entry_form/entry_form.html:3800
 msgid "Previous Page"
 msgstr "上一页"
 
@@ -15728,7 +15767,7 @@ msgstr ""
 msgid "Profile colour must be a #RRGGBB value."
 msgstr ""
 
-#: app/routes/auth.py:1411
+#: app/routes/auth.py:1637
 msgid "Profile updated successfully."
 msgstr ""
 
@@ -15749,11 +15788,11 @@ msgstr ""
 msgid "Properties"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3825
+#: app/templates/forms/entry_form/entry_form.html:3826
 msgid "Propose Changes"
 msgstr "保存更改"
 
-#: app/templates/forms/entry_form/entry_form.html:3824
+#: app/templates/forms/entry_form/entry_form.html:3825
 msgid "Propose Indicator"
 msgstr "选择指标"
 
@@ -15761,9 +15800,9 @@ msgstr "选择指标"
 msgid "Propose New Indicator URL"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:1105
-#: app/templates/forms/entry_form/entry_form.html:2048
-#: app/templates/forms/entry_form/entry_form.html:3827
+#: app/templates/forms/entry_form/entry_form.html:1106
+#: app/templates/forms/entry_form/entry_form.html:2049
+#: app/templates/forms/entry_form/entry_form.html:3828
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:157
 msgid "Propose changes to this indicator"
 msgstr "删除此指标"
@@ -15788,7 +15827,7 @@ msgid "Public"
 msgstr "公开"
 
 #: app/templates/admin/documents/documents.html:344
-#: app/templates/forms/entry_form/entry_form.html:2913
+#: app/templates/forms/entry_form/entry_form.html:2914
 msgid "Public Document"
 msgstr "公开文档"
 
@@ -15811,7 +15850,7 @@ msgstr "已收到公共提交"
 msgid "Public Submissions"
 msgstr "公开提交"
 
-#: app/templates/admin/assignments/manage_assignment.html:325
+#: app/templates/admin/assignments/manage_assignment.html:326
 #: app/templates/admin/assignments/public_submissions.html:66
 msgid "Public URL"
 msgstr "公开"
@@ -15827,7 +15866,7 @@ msgstr ""
 msgid "Public URL copied to clipboard!"
 msgstr "公共链接已复制到剪贴板！"
 
-#: app/templates/admin/assignments/manage_assignment.html:1031
+#: app/templates/admin/assignments/manage_assignment.html:1030
 msgid "Public reporting"
 msgstr ""
 
@@ -16039,22 +16078,6 @@ msgstr "快速访问"
 #: app/templates/admin/security/dashboard.html:108
 msgid "Quick Actions"
 msgstr "快捷操作"
-
-#: app/templates/auth/login.html:562
-msgid "Quick login as a Focal Point"
-msgstr ""
-
-#: app/templates/auth/login.html:553
-msgid "Quick login as a System Manager"
-msgstr ""
-
-#: app/templates/auth/login.html:558
-msgid "Quick login as an Admin"
-msgstr ""
-
-#: app/templates/auth/login.html:549
-msgid "Quick login for testers"
-msgstr ""
 
 #: app/templates/admin/api_management.html:1666
 msgid "RBAC"
@@ -16324,11 +16347,11 @@ msgstr "接收者"
 msgid "Recommendation:"
 msgstr "Recommendation:"
 
-#: app/templates/forms/entry_form/entry_form.html:3333
+#: app/templates/forms/entry_form/entry_form.html:3334
 msgid "Reconnected!"
 msgstr "已拒绝"
 
-#: app/templates/forms/entry_form/entry_form.html:3327
+#: app/templates/forms/entry_form/entry_form.html:3328
 msgid "Reconnecting..."
 msgstr "计算中..."
 
@@ -16437,7 +16460,7 @@ msgstr "国家红会名称"
 msgid "Regional Offices"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:668
+#: app/templates/admin/assignments/manage_assignment.html:667
 #: app/templates/admin/organization/index.html:147
 #: app/templates/admin/user_management/user_form.html:976
 msgid "Regions"
@@ -16478,7 +16501,7 @@ msgstr ""
 msgid "Reject all __COUNT__ pending requests for this user?"
 msgstr ""
 
-#: app/routes/main/helpers.py:1231
+#: app/routes/main/helpers.py:1189
 #: app/templates/admin/assignments/public_submissions.html:55
 #: app/templates/admin/assignments/public_submissions.html:106
 #: app/templates/admin/assignments/public_submissions.html:179
@@ -16538,7 +16561,7 @@ msgstr "上传"
 msgid "Reload All Plugins"
 msgstr "Reload All Plugins"
 
-#: app/templates/forms/entry_form/entry_form.html:355
+#: app/templates/forms/entry_form/entry_form.html:356
 msgid "Reload Page"
 msgstr "添加页面"
 
@@ -16573,7 +16596,7 @@ msgid ""
 "message, user_name, dashboard_url, org_name, copyright_year"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1027
+#: app/templates/admin/assignments/manage_assignment.html:1026
 #: app/templates/admin/indicator_bank/_dynamic_text_list.html:11
 #: app/templates/admin/indicator_bank/_dynamic_text_list.html:21
 #: app/templates/forms/form_builder/form_builder.html:362
@@ -16638,13 +16661,13 @@ msgstr ""
 msgid "Remove all deleted strings?"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1029
+#: app/templates/admin/assignments/manage_assignment.html:1028
 msgid "Remove entities"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:1113
-#: app/templates/forms/entry_form/entry_form.html:2056
-#: app/templates/forms/entry_form/entry_form.html:3832
+#: app/templates/forms/entry_form/entry_form.html:1114
+#: app/templates/forms/entry_form/entry_form.html:2057
+#: app/templates/forms/entry_form/entry_form.html:3833
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:165
 msgid "Remove this indicator"
 msgstr "删除此指标"
@@ -16655,7 +16678,7 @@ msgstr "删除此指标"
 msgid "Removed"
 msgstr "删除"
 
-#: app/routes/main/helpers.py:1326
+#: app/routes/main/helpers.py:1284
 #, python-format
 msgid "Removed %(count)d field in %(template)s"
 msgstr "在 %(template)s 中删除了 %(count)d 个字段"
@@ -16702,7 +16725,7 @@ msgstr ""
 #: app/templates/core/dashboard.html:1763
 #: app/templates/core/dashboard.html:1770
 #: app/templates/forms/entry_form/entry_form.html:170
-#: app/templates/forms/entry_form/entry_form.html:3969
+#: app/templates/forms/entry_form/entry_form.html:3970
 msgid "Reopen"
 msgstr "重新打开"
 
@@ -16726,7 +16749,7 @@ msgstr ""
 msgid "Replace"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2681
+#: app/templates/forms/entry_form/entry_form.html:2682
 msgid "Replace Document"
 msgstr "上传文档"
 
@@ -16872,7 +16895,7 @@ msgid "Request cancelled"
 msgstr ""
 
 #: app/templates/core/dashboard.html:1476
-#: app/templates/forms/entry_form/entry_form.html:591
+#: app/templates/forms/entry_form/entry_form.html:592
 msgid "Request changes"
 msgstr ""
 
@@ -16955,7 +16978,7 @@ msgstr "需要关注"
 msgid "Requires Review"
 msgstr "需要审查"
 
-#: app/routes/main/helpers.py:1229
+#: app/routes/main/helpers.py:1187
 msgid "Requires Revision"
 msgstr "需要修订"
 
@@ -17121,7 +17144,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/core/dashboard.html:1475
-#: app/templates/forms/entry_form/entry_form.html:589
+#: app/templates/forms/entry_form/entry_form.html:590
 msgid "Return this assignment to the National Society for changes?"
 msgstr ""
 
@@ -17402,8 +17425,8 @@ msgid "Rules Registry"
 msgstr ""
 
 #: app/templates/admin/data_exploration/explore_data.html:253
-#: app/templates/forms/entry_form/entry_form.html:2565
-#: app/templates/forms/entry_form/entry_form.html:2569
+#: app/templates/forms/entry_form/entry_form.html:2566
+#: app/templates/forms/entry_form/entry_form.html:2570
 msgid "Run AI validation"
 msgstr ""
 
@@ -17424,7 +17447,7 @@ msgstr ""
 msgid "Run validations (not run)"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3887
+#: app/templates/forms/entry_form/entry_form.html:3888
 msgid "Running AI opinions..."
 msgstr ""
 
@@ -17509,7 +17532,7 @@ msgid "Saturday"
 msgstr ""
 
 #: app/templates/admin/ai/review_detail.html:175
-#: app/templates/admin/assignments/manage_assignment.html:18
+#: app/templates/admin/assignments/manage_assignment.html:19
 #: app/templates/admin/embed_content/manage_embed_content.html:191
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:18
 #: app/templates/admin/organization/edit_entity.html:139
@@ -17518,10 +17541,10 @@ msgstr ""
 #: app/templates/admin/validation_rules.html:195
 #: app/templates/admin/validation_rules.html:221
 #: app/templates/components/_translation_review_modal.html:20
-#: app/templates/forms/entry_form/entry_form.html:548
-#: app/templates/forms/entry_form/entry_form.html:562
-#: app/templates/forms/entry_form/entry_form.html:2532
-#: app/templates/forms/entry_form/entry_form.html:2534
+#: app/templates/forms/entry_form/entry_form.html:549
+#: app/templates/forms/entry_form/entry_form.html:563
+#: app/templates/forms/entry_form/entry_form.html:2533
+#: app/templates/forms/entry_form/entry_form.html:2535
 #: app/templates/forms/form_builder/partials/_template_details.html:11
 msgid "Save"
 msgstr "保存"
@@ -17543,8 +17566,8 @@ msgstr ""
 msgid "Save Changes"
 msgstr "保存更改"
 
-#: app/templates/forms/entry_form/entry_form.html:599
-#: app/templates/forms/entry_form/entry_form.html:606
+#: app/templates/forms/entry_form/entry_form.html:600
+#: app/templates/forms/entry_form/entry_form.html:607
 msgid "Save Draft"
 msgstr ""
 
@@ -17615,7 +17638,7 @@ msgstr ""
 msgid "Saved"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3811
+#: app/templates/forms/entry_form/entry_form.html:3812
 msgid ""
 "Saved value is no longer in the current list. It will still be submitted "
 "unless you choose another option."
@@ -17636,7 +17659,7 @@ msgstr ""
 msgid "Saving…"
 msgstr ""
 
-#: app/templates/auth/login.html:514 app/templates/auth/login.html:721
+#: app/templates/auth/login.html:571 app/templates/auth/login.html:746
 msgid ""
 "Say goodbye to scattered Excel files, KoBo forms, multiple platforms, and "
 "logins — everything is now centralized and streamlined here."
@@ -17727,7 +17750,7 @@ msgstr "搜索定义"
 msgid "Search Mode"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:729
+#: app/templates/admin/assignments/manage_assignment.html:728
 msgid "Search NS Structure"
 msgstr ""
 
@@ -17759,11 +17782,11 @@ msgstr ""
 msgid "Search Recipients"
 msgstr "接收者"
 
-#: app/templates/admin/assignments/manage_assignment.html:696
+#: app/templates/admin/assignments/manage_assignment.html:695
 msgid "Search Regions"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:678
+#: app/templates/admin/assignments/manage_assignment.html:677
 msgid "Search Secretariat"
 msgstr ""
 
@@ -17785,7 +17808,7 @@ msgstr "所有活动类型"
 msgid "Search and select a row to add..."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:733
+#: app/templates/admin/assignments/manage_assignment.html:732
 msgid "Search branches, sub-branches, or local units..."
 msgstr ""
 
@@ -17849,7 +17872,7 @@ msgstr ""
 msgid "Search description (e.g., template name)"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:682
+#: app/templates/admin/assignments/manage_assignment.html:681
 msgid "Search divisions or departments..."
 msgstr ""
 
@@ -17885,7 +17908,7 @@ msgstr ""
 msgid "Search notifications..."
 msgstr "搜索通知......"
 
-#: app/templates/admin/assignments/manage_assignment.html:700
+#: app/templates/admin/assignments/manage_assignment.html:699
 msgid "Search regional or cluster offices..."
 msgstr ""
 
@@ -17991,7 +18014,7 @@ msgstr ""
 msgid "Secretariat assignment"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:648
+#: app/templates/admin/assignments/manage_assignment.html:647
 #: app/templates/admin/organization/index.html:137
 msgid "Secretariat structure"
 msgstr ""
@@ -18051,9 +18074,9 @@ msgstr ""
 #: app/templates/admin/templates/new_template.html:1136
 #: app/templates/admin/templates/upr_excel_import.html:450
 #: app/templates/admin/validation_dashboard.html:265
-#: app/templates/forms/entry_form/entry_form.html:465
 #: app/templates/forms/entry_form/entry_form.html:466
-#: app/templates/forms/entry_form/entry_form.html:734
+#: app/templates/forms/entry_form/entry_form.html:467
+#: app/templates/forms/entry_form/entry_form.html:735
 #: app/templates/forms/form_builder/field_mapping.html:296
 #: app/templates/forms/form_builder/form_builder.html:941
 msgid "Sections"
@@ -18160,7 +18183,7 @@ msgid ""
 "Security settings configuration UI is not yet implemented in this view."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3834
+#: app/templates/forms/entry_form/entry_form.html:3835
 msgid "Security token not found. Please refresh the page and try again."
 msgstr "未找到安全令牌。请刷新页面并重试。"
 
@@ -18191,7 +18214,7 @@ msgstr ""
 msgid "Select All"
 msgstr "全选"
 
-#: app/templates/admin/assignments/manage_assignment.html:587
+#: app/templates/admin/assignments/manage_assignment.html:586
 #: app/templates/components/_form_helpers.html:73
 msgid "Select All Countries"
 msgstr ""
@@ -18205,7 +18228,7 @@ msgstr "全选"
 msgid "Select Column..."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2716
+#: app/templates/forms/entry_form/entry_form.html:2717
 msgid "Select Document:"
 msgstr "删除文档"
 
@@ -18217,7 +18240,7 @@ msgstr "选择端点"
 msgid "Select Entities"
 msgstr "选择端点"
 
-#: app/templates/forms/entry_form/entry_form.html:3838
+#: app/templates/forms/entry_form/entry_form.html:3839
 msgid "Select Indicator"
 msgstr "选择指标"
 
@@ -18279,14 +18302,14 @@ msgstr ""
 msgid "Select a campaign..."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:738
+#: app/templates/admin/assignments/manage_assignment.html:737
 #: app/templates/admin/documents/documents.html:164
 #: app/templates/admin/user_management/user_form.html:941
-#: app/templates/auth/login.html:1115
+#: app/templates/auth/login.html:1182
 msgid "Select a country"
 msgstr "选择国家"
 
-#: app/templates/admin/assignments/manage_assignment.html:753
+#: app/templates/admin/assignments/manage_assignment.html:752
 #: app/templates/admin/user_management/user_form.html:956
 msgid "Select a country to view NS structure."
 msgstr ""
@@ -18345,6 +18368,10 @@ msgstr "翻译服务"
 msgid "Select a user to receive the test email."
 msgstr ""
 
+#: app/templates/auth/login.html:641 app/templates/auth/login.html:1083
+msgid "Select a user…"
+msgstr ""
+
 #: app/templates/admin/analytics/audit_trail.html:341
 msgid "Select activity types..."
 msgstr "所有活动类型"
@@ -18385,18 +18412,18 @@ msgstr ""
 msgid "Select colour"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:569
+#: app/templates/admin/assignments/manage_assignment.html:568
 msgid ""
 "Select countries to add to this assignment. Already assigned countries are "
 "pre-checked."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:571
+#: app/templates/admin/assignments/manage_assignment.html:570
 msgid "Select countries to assign to this assignment."
 msgstr ""
 
-#: app/templates/core/dashboard.html:3203
-#: app/templates/core/dashboard.html:3278
+#: app/templates/core/dashboard.html:3216
+#: app/templates/core/dashboard.html:3291
 msgid "Select countries you will manage data for"
 msgstr ""
 
@@ -18408,13 +18435,13 @@ msgstr "选择选项..."
 msgid "Select country"
 msgstr ""
 
-#: app/templates/core/dashboard.html:3204
-#: app/templates/core/dashboard.html:3279
+#: app/templates/core/dashboard.html:3217
+#: app/templates/core/dashboard.html:3292
 msgid "Select country you will manage data for"
 msgstr ""
 
 #: app/templates/admin/documents/documents.html:180
-#: app/templates/forms/entry_form/entry_form.html:2784
+#: app/templates/forms/entry_form/entry_form.html:2785
 msgid "Select document type"
 msgstr "选择文档类型"
 
@@ -18422,8 +18449,8 @@ msgstr "选择文档类型"
 msgid "Select document type..."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:643
-#: app/templates/admin/assignments/manage_assignment.html:724
+#: app/templates/admin/assignments/manage_assignment.html:642
+#: app/templates/admin/assignments/manage_assignment.html:723
 msgid ""
 "Select entities by checking the boxes, then click \"Save Changes\" to apply "
 "them."
@@ -18439,7 +18466,7 @@ msgid "Select indicators"
 msgstr ""
 
 #: app/templates/admin/documents/documents.html:189
-#: app/templates/forms/entry_form/entry_form.html:2751
+#: app/templates/forms/entry_form/entry_form.html:2752
 msgid "Select language"
 msgstr "选择语言"
 
@@ -18447,7 +18474,7 @@ msgstr "选择语言"
 msgid "Select languages to translate"
 msgstr "选择要翻译的语言"
 
-#: app/templates/auth/login.html:659
+#: app/templates/auth/login.html:684
 msgid ""
 "Select one country you request access to. An admin will review your request."
 msgstr "选择您需要访问的国家。管理员将审核您的请求。"
@@ -18487,7 +18514,7 @@ msgid ""
 "selected status."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:822
+#: app/templates/admin/assignments/manage_assignment.html:821
 msgid "Select status"
 msgstr ""
 
@@ -18546,11 +18573,11 @@ msgstr ""
 #: app/templates/admin/documents/documents.html:262
 #: app/templates/admin/documents/documents.html:279
 #: app/templates/admin/documents/documents.html:305
-#: app/templates/forms/entry_form/entry_form.html:2813
-#: app/templates/forms/entry_form/entry_form.html:2827
-#: app/templates/forms/entry_form/entry_form.html:2837
-#: app/templates/forms/entry_form/entry_form.html:2854
-#: app/templates/forms/entry_form/entry_form.html:2880
+#: app/templates/forms/entry_form/entry_form.html:2814
+#: app/templates/forms/entry_form/entry_form.html:2828
+#: app/templates/forms/entry_form/entry_form.html:2838
+#: app/templates/forms/entry_form/entry_form.html:2855
+#: app/templates/forms/entry_form/entry_form.html:2881
 #: app/templates/forms/form_builder/partials/_item_modal.html:497
 #: app/templates/forms/form_builder/partials/_item_modal.html:509
 #: app/templates/forms/form_builder/partials/_item_modal.html:519
@@ -18608,12 +18635,12 @@ msgstr "自报"
 msgid "Self-Reported"
 msgstr "自报"
 
-#: app/routes/main/helpers.py:1351
+#: app/routes/main/helpers.py:1309
 #, python-format
 msgid "Self-report created: %(template)s"
 msgstr "已创建自我报告"
 
-#: app/routes/auth.py:1036
+#: app/routes/auth.py:1220
 msgid ""
 "Self-service registration is not available. Please sign in with your "
 "organization account."
@@ -18639,7 +18666,7 @@ msgstr "发送推送通知"
 msgid "Send Now"
 msgstr ""
 
-#: app/templates/auth/login.html:699
+#: app/templates/auth/login.html:724
 msgid "Send Reset Link"
 msgstr ""
 
@@ -18676,12 +18703,12 @@ msgstr ""
 msgid "Send digest now"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:569
-#: app/templates/forms/entry_form/entry_form.html:572
+#: app/templates/forms/entry_form/entry_form.html:570
+#: app/templates/forms/entry_form/entry_form.html:573
 msgid "Send for Review"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:568
+#: app/templates/forms/entry_form/entry_form.html:569
 msgid "Send for Review?"
 msgstr ""
 
@@ -18701,7 +18728,7 @@ msgstr ""
 msgid "Send test email"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:570
+#: app/templates/forms/entry_form/entry_form.html:571
 msgid ""
 "Send this assignment to delegation for review? You will not be able to edit "
 "it until they return it for changes."
@@ -18750,7 +18777,7 @@ msgid ""
 "scheduled campaigns can include recipients by default."
 msgstr ""
 
-#: app/routes/main/helpers.py:1230
+#: app/routes/main/helpers.py:1188
 msgid "Sent for Review"
 msgstr ""
 
@@ -18763,12 +18790,12 @@ msgstr ""
 msgid "Sent for review: %(template)s"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:120
-#: app/templates/admin/assignments/manage_assignment.html:140
+#: app/templates/admin/assignments/manage_assignment.html:121
+#: app/templates/admin/assignments/manage_assignment.html:141
 #: app/templates/admin/documents/documents.html:290
 #: app/templates/admin/documents/documents.html:316
-#: app/templates/forms/entry_form/entry_form.html:2865
-#: app/templates/forms/entry_form/entry_form.html:2891
+#: app/templates/forms/entry_form/entry_form.html:2866
+#: app/templates/forms/entry_form/entry_form.html:2892
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:75
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:88
 #: app/templates/forms/form_builder/partials/_item_modal.html:545
@@ -18930,11 +18957,11 @@ msgstr ""
 msgid "Severity"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:1160
-#: app/templates/forms/entry_form/entry_form.html:1301
-#: app/templates/forms/entry_form/entry_form.html:1454
-#: app/templates/forms/entry_form/entry_form.html:2160
-#: app/templates/forms/entry_form/entry_form.html:2288
+#: app/templates/forms/entry_form/entry_form.html:1161
+#: app/templates/forms/entry_form/entry_form.html:1302
+#: app/templates/forms/entry_form/entry_form.html:1455
+#: app/templates/forms/entry_form/entry_form.html:2161
+#: app/templates/forms/entry_form/entry_form.html:2289
 #: app/templates/forms/entry_form/export_pdf.html:363
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:211
 msgid "Sex"
@@ -19028,6 +19055,7 @@ msgstr ""
 #: app/templates/admin/ai/trace_detail.html:450
 #: app/templates/core/dashboard.html:1601
 #: app/templates/core/dashboard.html:2196
+#: app/templates/core/dashboard.html:3028
 msgid "Show"
 msgstr "显示"
 
@@ -19114,7 +19142,7 @@ msgstr ""
 msgid "Show divisions"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2974
+#: app/templates/forms/entry_form/entry_form.html:2975
 msgid "Show editors"
 msgstr ""
 
@@ -19171,6 +19199,7 @@ msgid "Show national societies"
 msgstr ""
 
 #: app/templates/core/dashboard.html:1599
+#: app/templates/core/dashboard.html:3030
 msgid "Show past assignments"
 msgstr ""
 
@@ -19276,7 +19305,12 @@ msgstr ""
 msgid "Sign in"
 msgstr ""
 
-#: app/routes/auth.py:524
+#: app/templates/auth/login.html:610
+msgid ""
+"Sign in without a password to test as a role preset or any active user."
+msgstr ""
+
+#: app/routes/auth.py:708
 msgid "Sign-In Failed"
 msgstr ""
 
@@ -19284,9 +19318,9 @@ msgstr ""
 msgid "Single PO"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:88
+#: app/templates/admin/assignments/manage_assignment.html:89
 #: app/templates/admin/documents/documents.html:225
-#: app/templates/forms/entry_form/entry_form.html:2800
+#: app/templates/forms/entry_form/entry_form.html:2801
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:41
 #: app/templates/forms/form_builder/partials/_item_modal.html:454
 #: app/templates/forms/form_builder/partials/_item_modal.html:485
@@ -19309,7 +19343,7 @@ msgstr ""
 msgid "Skip for now"
 msgstr ""
 
-#: app/services/notification/service.py:1585
+#: app/services/notification/service.py:1644
 #: app/templates/admin/translations/manage_translations.html:674
 #: app/templates/components/auto_translate_modal.html:470
 msgid "Skipped"
@@ -19462,9 +19496,9 @@ msgstr ""
 msgid "Start"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:108
+#: app/templates/admin/assignments/manage_assignment.html:109
 #: app/templates/admin/documents/documents.html:272
-#: app/templates/forms/entry_form/entry_form.html:2847
+#: app/templates/forms/entry_form/entry_form.html:2848
 msgid "Start Period"
 msgstr "时间段"
 
@@ -19476,9 +19510,9 @@ msgstr ""
 msgid "Start Translation"
 msgstr "开始翻译"
 
-#: app/templates/admin/assignments/manage_assignment.html:100
+#: app/templates/admin/assignments/manage_assignment.html:101
 #: app/templates/admin/documents/documents.html:246
-#: app/templates/forms/entry_form/entry_form.html:2821
+#: app/templates/forms/entry_form/entry_form.html:2822
 #: app/templates/forms/form_builder/partials/_item_modal.html:503
 msgid "Start Year"
 msgstr "去年"
@@ -19553,7 +19587,7 @@ msgstr ""
 msgid "Starts with"
 msgstr ""
 
-#: app/routes/auth.py:584
+#: app/routes/auth.py:768
 msgid "State mismatch. Please try signing in again."
 msgstr ""
 
@@ -19669,7 +19703,7 @@ msgstr ""
 msgid "Steps:"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3096
+#: app/templates/forms/entry_form/entry_form.html:3097
 #: app/templates/forms/form_builder/form_builder.html:1098
 msgid "Still loading…"
 msgstr ""
@@ -19679,11 +19713,11 @@ msgstr ""
 #: app/templates/components/auto_translate_modal_js.html:62
 #: app/templates/core/chat_immersive.html:52
 #: app/templates/core/chat_immersive.html:259
-#: app/templates/forms/entry_form/entry_form.html:3885
+#: app/templates/forms/entry_form/entry_form.html:3886
 msgid "Stop"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3886
+#: app/templates/forms/entry_form/entry_form.html:3887
 msgid "Stop AI validation"
 msgstr ""
 
@@ -19801,11 +19835,11 @@ msgstr ""
 msgid "Submission status map"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:553
-#: app/templates/forms/entry_form/entry_form.html:579
-#: app/templates/forms/entry_form/entry_form.html:582
-#: app/templates/forms/entry_form/entry_form.html:2538
-#: app/templates/forms/entry_form/entry_form.html:2540
+#: app/templates/forms/entry_form/entry_form.html:554
+#: app/templates/forms/entry_form/entry_form.html:580
+#: app/templates/forms/entry_form/entry_form.html:583
+#: app/templates/forms/entry_form/entry_form.html:2539
+#: app/templates/forms/entry_form/entry_form.html:2541
 msgid "Submit"
 msgstr "提交"
 
@@ -19813,7 +19847,7 @@ msgstr "提交"
 msgid "Submit Documents"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:578
+#: app/templates/forms/entry_form/entry_form.html:579
 msgid "Submit Form?"
 msgstr ""
 
@@ -19825,7 +19859,7 @@ msgstr ""
 msgid "Submit your request"
 msgstr ""
 
-#: app/routes/main/helpers.py:1227
+#: app/routes/main/helpers.py:1185
 #: app/templates/admin/communication/center.html:921
 #: app/templates/admin/templates/data_sync_imputation.html:144
 #: app/templates/admin/templates/data_sync_imputation.html:1305
@@ -19863,8 +19897,8 @@ msgstr ""
 msgid "Submitter"
 msgstr "已提交"
 
-#: app/templates/forms/entry_form/entry_form.html:395
-#: app/templates/forms/entry_form/entry_form.html:628
+#: app/templates/forms/entry_form/entry_form.html:396
+#: app/templates/forms/entry_form/entry_form.html:629
 #: app/templates/public_submission_export_pdf.html:14
 msgid "Submitter Information"
 msgstr "提交者信息"
@@ -19979,7 +20013,7 @@ msgstr ""
 msgid "Supported Languages"
 msgstr "支持的语言"
 
-#: app/templates/forms/entry_form/entry_form.html:2661
+#: app/templates/forms/entry_form/entry_form.html:2662
 #: app/templates/forms/form_builder/partials/_excel_modal.html:80
 msgid "Supported formats: .xlsx"
 msgstr "支持的格式：.xlsx, .xls"
@@ -20121,7 +20155,8 @@ msgstr ""
 #: app/templates/admin/analytics/user_detail.html:51
 #: app/templates/admin/dashboard.html:276
 #: app/templates/admin/user_management/users.html:175
-#: app/templates/core/layout.html:222 app/templates/core/layout.html:224
+#: app/templates/auth/login.html:624 app/templates/core/layout.html:222
+#: app/templates/core/layout.html:224
 msgid "System Manager"
 msgstr "系统管理员"
 
@@ -20232,12 +20267,12 @@ msgstr ""
 msgid "Team update: %(template)s submitted"
 msgstr ""
 
+#: app/templates/core/dashboard.html:2410
 #: app/templates/core/dashboard.html:2411
-#: app/templates/core/dashboard.html:2412
+#: app/templates/core/dashboard.html:2467
 #: app/templates/core/dashboard.html:2468
-#: app/templates/core/dashboard.html:2469
+#: app/templates/core/dashboard.html:2517
 #: app/templates/core/dashboard.html:2518
-#: app/templates/core/dashboard.html:2519
 msgid "Teams Chat"
 msgstr ""
 
@@ -20463,18 +20498,6 @@ msgstr ""
 msgid "Test a query…"
 msgstr ""
 
-#: app/templates/auth/login.html:555
-msgid "Test as System Manager"
-msgstr ""
-
-#: app/templates/auth/login.html:564
-msgid "Test as a Focal Point"
-msgstr ""
-
-#: app/templates/auth/login.html:560
-msgid "Test as an Admin"
-msgstr "给管理员的消息"
-
 #: app/templates/admin/settings/manage_settings.html:1525
 msgid ""
 "Test email could not be sent. Check the message below or your mail settings."
@@ -20531,7 +20554,7 @@ msgid ""
 "first, then try again."
 msgstr ""
 
-#: app/routes/main/helpers.py:1188
+#: app/routes/main/helpers.py:1146
 msgid "The assignment is available but data entry has not started yet."
 msgstr ""
 
@@ -20541,7 +20564,7 @@ msgstr ""
 msgid "The code field is locked while this entry is still in use."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2637
+#: app/templates/forms/entry_form/entry_form.html:2638
 msgid ""
 "The file is checked for template version, country, and reporting period "
 "before import."
@@ -20560,16 +20583,16 @@ msgstr ""
 msgid "The following will be unassigned (kept for history):"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3106
+#: app/templates/forms/entry_form/entry_form.html:3107
 msgid ""
 "The form is taking longer than expected to load. Please reload the page."
 msgstr ""
 
-#: app/routes/main/helpers.py:1197
+#: app/routes/main/helpers.py:1155
 msgid "The form was sent for delegation review before final submission."
 msgstr ""
 
-#: app/routes/main/helpers.py:1200
+#: app/routes/main/helpers.py:1158
 msgid "The form was submitted and is awaiting validation by an administrator."
 msgstr ""
 
@@ -20598,7 +20621,7 @@ msgid ""
 "The number of repeat entries cannot exceed the number of available options."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:216
+#: app/templates/admin/assignments/manage_assignment.html:217
 msgid ""
 "The person accountable for data quality in this collection cycle. Defaults "
 "to the template owner."
@@ -20609,7 +20632,7 @@ msgstr ""
 msgid "The requested resource was not found."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3847
+#: app/templates/forms/entry_form/entry_form.html:3848
 msgid "The server is temporarily unavailable. Please try again in a moment."
 msgstr ""
 
@@ -20619,7 +20642,7 @@ msgid ""
 "expand or collapse sections, and the state persists across visits."
 msgstr ""
 
-#: app/routes/main/helpers.py:1203
+#: app/routes/main/helpers.py:1161
 msgid "The submission was validated and approved. Data entry is complete."
 msgstr ""
 
@@ -20718,7 +20741,7 @@ msgid ""
 " until it is returned for revision."
 msgstr ""
 
-#: app/routes/main/helpers.py:1206
+#: app/routes/main/helpers.py:1164
 msgid "This assignment is closed and no further changes are expected."
 msgstr ""
 
@@ -20726,7 +20749,7 @@ msgstr ""
 msgid "This assignment is currently inactive."
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:1036
+#: app/templates/admin/assignments/manage_assignment.html:1035
 msgid ""
 "This assignment will be created without sending notifications to assigned "
 "entities. Do you want to continue?"
@@ -20750,7 +20773,7 @@ msgstr ""
 msgid "This column cannot be unpinned"
 msgstr ""
 
-#: app/templates/auth/login.html:1234 app/templates/auth/login.html:1319
+#: app/templates/auth/login.html:1301 app/templates/auth/login.html:1386
 msgid ""
 "This email is already registered. Try signing in or reset your password."
 msgstr ""
@@ -20759,12 +20782,12 @@ msgstr ""
 msgid "This feature is under development"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:933
-#: app/templates/forms/entry_form/entry_form.html:1894
+#: app/templates/forms/entry_form/entry_form.html:934
+#: app/templates/forms/entry_form/entry_form.html:1895
 msgid "This field type is no longer available. Please contact your"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:614
+#: app/templates/forms/entry_form/entry_form.html:615
 #, python-format
 msgid "This form has been %(status)s. Data entry is disabled."
 msgstr "此表单已%(status)s。数据输入已禁用。"
@@ -20796,7 +20819,7 @@ msgid ""
 "This form is read-only. You can review the data but cannot make changes."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2671
+#: app/templates/forms/entry_form/entry_form.html:2672
 msgid ""
 "This functionality is only available when working with actual assignments."
 msgstr "此功能仅在处理实际分配时可用。"
@@ -20811,7 +20834,7 @@ msgstr ""
 msgid "This import will permanently delete existing submission data:"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3848
+#: app/templates/forms/entry_form/entry_form.html:3849
 msgid "This indicator is already added to this section."
 msgstr ""
 
@@ -20830,21 +20853,21 @@ msgid ""
 "country."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:1287
-#: app/templates/forms/entry_form/entry_form.html:1334
-#: app/templates/forms/entry_form/entry_form.html:1440
-#: app/templates/forms/entry_form/entry_form.html:1487
-#: app/templates/forms/entry_form/entry_form.html:1524
-#: app/templates/forms/entry_form/entry_form.html:1587
-#: app/templates/forms/entry_form/entry_form.html:1597
-#: app/templates/forms/entry_form/entry_form.html:1610
-#: app/templates/forms/entry_form/entry_form.html:1625
-#: app/templates/forms/entry_form/entry_form.html:1649
-#: app/templates/forms/entry_form/entry_form.html:1657
-#: app/templates/forms/entry_form/entry_form.html:1671
-#: app/templates/forms/entry_form/entry_form.html:2106
-#: app/templates/forms/entry_form/entry_form.html:2203
-#: app/templates/forms/entry_form/entry_form.html:2226
+#: app/templates/forms/entry_form/entry_form.html:1288
+#: app/templates/forms/entry_form/entry_form.html:1335
+#: app/templates/forms/entry_form/entry_form.html:1441
+#: app/templates/forms/entry_form/entry_form.html:1488
+#: app/templates/forms/entry_form/entry_form.html:1525
+#: app/templates/forms/entry_form/entry_form.html:1588
+#: app/templates/forms/entry_form/entry_form.html:1598
+#: app/templates/forms/entry_form/entry_form.html:1611
+#: app/templates/forms/entry_form/entry_form.html:1626
+#: app/templates/forms/entry_form/entry_form.html:1650
+#: app/templates/forms/entry_form/entry_form.html:1658
+#: app/templates/forms/entry_form/entry_form.html:1672
+#: app/templates/forms/entry_form/entry_form.html:2107
+#: app/templates/forms/entry_form/entry_form.html:2204
+#: app/templates/forms/entry_form/entry_form.html:2227
 #: app/templates/forms/entry_form/partials/_question_single_choice.html:38
 #: app/templates/forms/entry_form/partials/matrix_table.html:12
 msgid "This is a prefilled value"
@@ -20856,21 +20879,21 @@ msgid ""
 "data entry in this preview mode."
 msgstr "这是模板将如何向用户显示的预览。您可以在此预览模式下测试数据输入。"
 
-#: app/templates/forms/entry_form/entry_form.html:1287
-#: app/templates/forms/entry_form/entry_form.html:1334
-#: app/templates/forms/entry_form/entry_form.html:1440
-#: app/templates/forms/entry_form/entry_form.html:1487
-#: app/templates/forms/entry_form/entry_form.html:1524
-#: app/templates/forms/entry_form/entry_form.html:1587
-#: app/templates/forms/entry_form/entry_form.html:1597
-#: app/templates/forms/entry_form/entry_form.html:1610
-#: app/templates/forms/entry_form/entry_form.html:1625
-#: app/templates/forms/entry_form/entry_form.html:1649
-#: app/templates/forms/entry_form/entry_form.html:1657
-#: app/templates/forms/entry_form/entry_form.html:1671
-#: app/templates/forms/entry_form/entry_form.html:2106
-#: app/templates/forms/entry_form/entry_form.html:2203
-#: app/templates/forms/entry_form/entry_form.html:2226
+#: app/templates/forms/entry_form/entry_form.html:1288
+#: app/templates/forms/entry_form/entry_form.html:1335
+#: app/templates/forms/entry_form/entry_form.html:1441
+#: app/templates/forms/entry_form/entry_form.html:1488
+#: app/templates/forms/entry_form/entry_form.html:1525
+#: app/templates/forms/entry_form/entry_form.html:1588
+#: app/templates/forms/entry_form/entry_form.html:1598
+#: app/templates/forms/entry_form/entry_form.html:1611
+#: app/templates/forms/entry_form/entry_form.html:1626
+#: app/templates/forms/entry_form/entry_form.html:1650
+#: app/templates/forms/entry_form/entry_form.html:1658
+#: app/templates/forms/entry_form/entry_form.html:1672
+#: app/templates/forms/entry_form/entry_form.html:2107
+#: app/templates/forms/entry_form/entry_form.html:2204
+#: app/templates/forms/entry_form/entry_form.html:2227
 #: app/templates/forms/entry_form/partials/_question_single_choice.html:38
 msgid "This is an imputed value"
 msgstr ""
@@ -20879,7 +20902,7 @@ msgstr ""
 msgid "This is the main navigation area."
 msgstr ""
 
-#: app/templates/auth/login.html:514 app/templates/auth/login.html:721
+#: app/templates/auth/login.html:571 app/templates/auth/login.html:746
 msgid "This is the one and only system for reporting data to"
 msgstr ""
 
@@ -20912,7 +20935,7 @@ msgid ""
 "pick another language tab."
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:54
+#: app/templates/forms/entry_form/partials/matrix_table.html:56
 msgid "This matrix is imputed"
 msgstr ""
 
@@ -20952,7 +20975,7 @@ msgid ""
 "removed by an administrator."
 msgstr ""
 
-#: app/routes/auth.py:1179 app/routes/auth.py:1187
+#: app/routes/auth.py:1405 app/routes/auth.py:1413
 msgid "This reset link is invalid or has expired."
 msgstr ""
 
@@ -21010,11 +21033,11 @@ msgid "This sub-section contains %(count)s saved data entries."
 msgstr "此子章节没有字段。"
 
 #: app/templates/components/_section_renderer.html:69
-#: app/templates/forms/entry_form/entry_form.html:2453
+#: app/templates/forms/entry_form/entry_form.html:2454
 msgid "This sub-section has no fields."
 msgstr "此子章节没有字段。"
 
-#: app/routes/main/helpers.py:1205
+#: app/routes/main/helpers.py:1163
 msgid "This submission was rejected."
 msgstr ""
 
@@ -21049,7 +21072,7 @@ msgstr ""
 msgid "This user is currently inactive."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3903
+#: app/templates/forms/entry_form/entry_form.html:3904
 msgid "This value is prefilled and cannot be modified here."
 msgstr ""
 
@@ -21161,7 +21184,7 @@ msgstr ""
 msgid "Tick (✓)"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:314
+#: app/templates/forms/entry_form/partials/matrix_table.html:316
 msgid "Tick for"
 msgstr ""
 
@@ -21230,7 +21253,7 @@ msgstr "时间戳"
 msgid "Title"
 msgstr "职位"
 
-#: app/templates/auth/login.html:653 app/templates/auth/register.html:17
+#: app/templates/auth/login.html:678 app/templates/auth/register.html:17
 msgid "Title (optional)"
 msgstr ""
 
@@ -21287,7 +21310,7 @@ msgstr ""
 msgid "Toggle sidebar"
 msgstr ""
 
-#: app/routes/auth.py:169
+#: app/routes/auth.py:346
 msgid "Too many failed login attempts. Please try again later."
 msgstr ""
 
@@ -21345,27 +21368,27 @@ msgstr ""
 #: app/templates/admin/ai/documents.html:62
 #: app/templates/forms/entry_form/export_pdf.html:197
 #: app/templates/forms/entry_form/export_pdf.html:275
-#: app/templates/forms/entry_form/partials/matrix_table.html:145
-#: app/templates/forms/entry_form/partials/matrix_table.html:192
-#: app/templates/forms/entry_form/partials/matrix_table.html:202
+#: app/templates/forms/entry_form/partials/matrix_table.html:147
+#: app/templates/forms/entry_form/partials/matrix_table.html:194
+#: app/templates/forms/entry_form/partials/matrix_table.html:204
 #: app/templates/notifications/center.html:61
 msgid "Total"
 msgstr "总计"
 
-#: app/templates/forms/entry_form/entry_form.html:1172
-#: app/templates/forms/entry_form/entry_form.html:1201
-#: app/templates/forms/entry_form/entry_form.html:1313
-#: app/templates/forms/entry_form/entry_form.html:1342
-#: app/templates/forms/entry_form/entry_form.html:1466
-#: app/templates/forms/entry_form/entry_form.html:1495
-#: app/templates/forms/entry_form/entry_form.html:1542
-#: app/templates/forms/entry_form/entry_form.html:1684
-#: app/templates/forms/entry_form/entry_form.html:2193
-#: app/templates/forms/entry_form/entry_form.html:2214
-#: app/templates/forms/entry_form/entry_form.html:2243
-#: app/templates/forms/entry_form/entry_form.html:2300
-#: app/templates/forms/entry_form/entry_form.html:2327
-#: app/templates/forms/entry_form/entry_form.html:2393
+#: app/templates/forms/entry_form/entry_form.html:1173
+#: app/templates/forms/entry_form/entry_form.html:1202
+#: app/templates/forms/entry_form/entry_form.html:1314
+#: app/templates/forms/entry_form/entry_form.html:1343
+#: app/templates/forms/entry_form/entry_form.html:1467
+#: app/templates/forms/entry_form/entry_form.html:1496
+#: app/templates/forms/entry_form/entry_form.html:1543
+#: app/templates/forms/entry_form/entry_form.html:1685
+#: app/templates/forms/entry_form/entry_form.html:2194
+#: app/templates/forms/entry_form/entry_form.html:2215
+#: app/templates/forms/entry_form/entry_form.html:2244
+#: app/templates/forms/entry_form/entry_form.html:2301
+#: app/templates/forms/entry_form/entry_form.html:2328
+#: app/templates/forms/entry_form/entry_form.html:2394
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:223
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:251
 msgid "Total (Direct + Indirect):"
@@ -21384,15 +21407,15 @@ msgstr "分配"
 msgid "Total Cost"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:1145
-#: app/templates/forms/entry_form/entry_form.html:1192
-#: app/templates/forms/entry_form/entry_form.html:1286
-#: app/templates/forms/entry_form/entry_form.html:1333
-#: app/templates/forms/entry_form/entry_form.html:1439
-#: app/templates/forms/entry_form/entry_form.html:1486
-#: app/templates/forms/entry_form/entry_form.html:2105
-#: app/templates/forms/entry_form/entry_form.html:2273
-#: app/templates/forms/entry_form/entry_form.html:2318
+#: app/templates/forms/entry_form/entry_form.html:1146
+#: app/templates/forms/entry_form/entry_form.html:1193
+#: app/templates/forms/entry_form/entry_form.html:1287
+#: app/templates/forms/entry_form/entry_form.html:1334
+#: app/templates/forms/entry_form/entry_form.html:1440
+#: app/templates/forms/entry_form/entry_form.html:1487
+#: app/templates/forms/entry_form/entry_form.html:2106
+#: app/templates/forms/entry_form/entry_form.html:2274
+#: app/templates/forms/entry_form/entry_form.html:2319
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:196
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:242
 msgid "Total Direct:"
@@ -21453,12 +21476,12 @@ msgstr ""
 msgid "Total cost"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:209
+#: app/templates/forms/entry_form/partials/matrix_table.html:211
 msgid "Total for column"
 msgstr "其他列"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:360
-#: app/templates/forms/entry_form/partials/matrix_table.html:372
+#: app/templates/forms/entry_form/partials/matrix_table.html:362
+#: app/templates/forms/entry_form/partials/matrix_table.html:374
 msgid "Total for row"
 msgstr "仅总计"
 
@@ -21503,20 +21526,20 @@ msgid ""
 "breakdown."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:1145
-#: app/templates/forms/entry_form/entry_form.html:1183
-#: app/templates/forms/entry_form/entry_form.html:1192
-#: app/templates/forms/entry_form/entry_form.html:1286
-#: app/templates/forms/entry_form/entry_form.html:1324
-#: app/templates/forms/entry_form/entry_form.html:1333
-#: app/templates/forms/entry_form/entry_form.html:1439
-#: app/templates/forms/entry_form/entry_form.html:1477
-#: app/templates/forms/entry_form/entry_form.html:1486
-#: app/templates/forms/entry_form/entry_form.html:2105
-#: app/templates/forms/entry_form/entry_form.html:2202
-#: app/templates/forms/entry_form/entry_form.html:2273
-#: app/templates/forms/entry_form/entry_form.html:2310
-#: app/templates/forms/entry_form/entry_form.html:2318
+#: app/templates/forms/entry_form/entry_form.html:1146
+#: app/templates/forms/entry_form/entry_form.html:1184
+#: app/templates/forms/entry_form/entry_form.html:1193
+#: app/templates/forms/entry_form/entry_form.html:1287
+#: app/templates/forms/entry_form/entry_form.html:1325
+#: app/templates/forms/entry_form/entry_form.html:1334
+#: app/templates/forms/entry_form/entry_form.html:1440
+#: app/templates/forms/entry_form/entry_form.html:1478
+#: app/templates/forms/entry_form/entry_form.html:1487
+#: app/templates/forms/entry_form/entry_form.html:2106
+#: app/templates/forms/entry_form/entry_form.html:2203
+#: app/templates/forms/entry_form/entry_form.html:2274
+#: app/templates/forms/entry_form/entry_form.html:2311
+#: app/templates/forms/entry_form/entry_form.html:2319
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:196
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:234
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:242
@@ -21937,12 +21960,12 @@ msgstr ""
 #: app/templates/components/_builder_items.html:86
 #: app/templates/components/_builder_items.html:92
 #: app/templates/components/_builder_items.html:105
-#: app/templates/forms/entry_form/entry_form.html:1039
-#: app/templates/forms/entry_form/entry_form.html:1070
-#: app/templates/forms/entry_form/entry_form.html:1072
-#: app/templates/forms/entry_form/entry_form.html:1988
-#: app/templates/forms/entry_form/entry_form.html:2018
-#: app/templates/forms/entry_form/entry_form.html:2020
+#: app/templates/forms/entry_form/entry_form.html:1040
+#: app/templates/forms/entry_form/entry_form.html:1071
+#: app/templates/forms/entry_form/entry_form.html:1073
+#: app/templates/forms/entry_form/entry_form.html:1989
+#: app/templates/forms/entry_form/entry_form.html:2019
+#: app/templates/forms/entry_form/entry_form.html:2021
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:38
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:96
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:126
@@ -21971,11 +21994,11 @@ msgstr ""
 msgid "Type not set on this item"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:415
+#: app/templates/forms/entry_form/partials/matrix_table.html:417
 msgid "Type to search for rows to add..."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3839
+#: app/templates/forms/entry_form/entry_form.html:3840
 msgid "Type to search indicators..."
 msgstr "输入搜索指标..."
 
@@ -21999,12 +22022,12 @@ msgid "Typing"
 msgstr ""
 
 #: app/templates/admin/templates/upr_excel_import.html:434
-#: app/templates/forms/entry_form/entry_form.html:2600
-#: app/templates/forms/entry_form/entry_form.html:2610
+#: app/templates/forms/entry_form/entry_form.html:2601
+#: app/templates/forms/entry_form/entry_form.html:2611
 msgid "UPR Country Reporting"
 msgstr ""
 
-#: app/routes/main/helpers.py:1356
+#: app/routes/main/helpers.py:1314
 #, python-format
 msgid "UPR Country Reporting Excel imported: %(count)s values staged"
 msgstr ""
@@ -22037,7 +22060,7 @@ msgstr "美元"
 msgid "Unable to determine which entity to show documents for."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2698
+#: app/templates/forms/entry_form/entry_form.html:2699
 msgid ""
 "Unable to edit: document ID is invalid. Please refresh the page and try "
 "again."
@@ -22063,9 +22086,9 @@ msgstr ""
 msgid "Unarchive Sub-section"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:456
 #: app/templates/forms/entry_form/entry_form.html:457
-#: app/templates/forms/entry_form/entry_form.html:725
+#: app/templates/forms/entry_form/entry_form.html:458
+#: app/templates/forms/entry_form/entry_form.html:726
 msgid "Unassigned Sections"
 msgstr "添加部分"
 
@@ -22147,10 +22170,10 @@ msgstr ""
 #: app/templates/admin/indicator_bank/neural_map.html:194
 #: app/templates/admin/templates/data_sync_imputation.html:396
 #: app/templates/components/_builder_items.html:50
-#: app/templates/forms/entry_form/entry_form.html:1040
-#: app/templates/forms/entry_form/entry_form.html:1074
-#: app/templates/forms/entry_form/entry_form.html:1989
-#: app/templates/forms/entry_form/entry_form.html:2022
+#: app/templates/forms/entry_form/entry_form.html:1041
+#: app/templates/forms/entry_form/entry_form.html:1075
+#: app/templates/forms/entry_form/entry_form.html:1990
+#: app/templates/forms/entry_form/entry_form.html:2023
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:97
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:130
 #: app/templates/forms/form_builder/partials/_item_modal.html:146
@@ -22182,7 +22205,7 @@ msgstr ""
 msgid "Units"
 msgstr "单位"
 
-#: app/routes/main/helpers.py:1244
+#: app/routes/main/helpers.py:1202
 #: app/services/communication_center_service.py:95
 #: app/templates/admin/analytics/_user_detail_partial.html:246
 #: app/templates/admin/analytics/dashboard.html:31
@@ -22208,18 +22231,18 @@ msgstr "单位"
 msgid "Unknown"
 msgstr "未知"
 
-#: app/services/notification/service.py:631
+#: app/services/notification/service.py:683
 #: app/templates/core/dashboard.html:2726
 #: app/templates/core/dashboard.html:2880 app/utils/form_localization.py:494
 #: app/utils/form_localization.py:507
 msgid "Unknown Country"
 msgstr "未知用户"
 
-#: app/templates/forms/entry_form/entry_form.html:1104
-#: app/templates/forms/entry_form/entry_form.html:1112
-#: app/templates/forms/entry_form/entry_form.html:2047
-#: app/templates/forms/entry_form/entry_form.html:2055
-#: app/templates/forms/entry_form/entry_form.html:3833
+#: app/templates/forms/entry_form/entry_form.html:1105
+#: app/templates/forms/entry_form/entry_form.html:1113
+#: app/templates/forms/entry_form/entry_form.html:2048
+#: app/templates/forms/entry_form/entry_form.html:2056
+#: app/templates/forms/entry_form/entry_form.html:3834
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:156
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:164
 #: app/utils/form_localization.py:244 app/utils/form_localization.py:251
@@ -22230,12 +22253,12 @@ msgstr "未知指标"
 msgid "Unknown Section"
 msgstr "未知部分"
 
-#: app/routes/main/helpers.py:1133 app/utils/form_localization.py:414
+#: app/routes/main/helpers.py:1091 app/utils/form_localization.py:414
 #: app/utils/form_localization.py:421
 msgid "Unknown Template"
 msgstr "未知模板"
 
-#: app/services/notification/service.py:619
+#: app/services/notification/service.py:671
 #: app/templates/admin/ai/reasoning_traces.html:325
 #: app/templates/admin/analytics/audit_trail.html:446
 #: app/templates/admin/analytics/security_events.html:189
@@ -22353,7 +22376,7 @@ msgstr ""
 msgid "Updated"
 msgstr "已更新"
 
-#: app/routes/main/helpers.py:1334
+#: app/routes/main/helpers.py:1292
 #, python-format
 msgid "Updated %(count)d field in %(template)s"
 msgstr "在 %(template)s 中更新了 %(count)d 个字段"
@@ -22369,13 +22392,13 @@ msgstr ""
 #: app/templates/admin/settings/manage_settings.html:502
 #: app/templates/admin/settings/manage_settings.html:547
 #: app/templates/admin/templates/upr_excel_import.html:40
-#: app/templates/forms/entry_form/entry_form.html:2929
+#: app/templates/forms/entry_form/entry_form.html:2930
 #: app/templates/forms/form_builder/partials/_item_modal.html:979
 #: app/templates/macros/upr_country_reporting_excel_instructions.html:44
 msgid "Upload"
 msgstr "上传"
 
-#: app/templates/forms/entry_form/entry_form.html:2617
+#: app/templates/forms/entry_form/entry_form.html:2618
 msgid "Upload & import"
 msgstr ""
 
@@ -22384,9 +22407,9 @@ msgid "Upload Date"
 msgstr "上传日期"
 
 #: app/templates/admin/documents/documents.html:42
-#: app/templates/forms/entry_form/entry_form.html:2680
-#: app/templates/forms/entry_form/entry_form.html:2700
+#: app/templates/forms/entry_form/entry_form.html:2681
 #: app/templates/forms/entry_form/entry_form.html:2701
+#: app/templates/forms/entry_form/entry_form.html:2702
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:190
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:196
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:198
@@ -22619,7 +22642,7 @@ msgid ""
 "evidence from reports and plans."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3822
+#: app/templates/forms/entry_form/entry_form.html:3823
 msgid "Use the button to add indicators to this section."
 msgstr "使用按钮向此章节添加指标。"
 
@@ -22669,7 +22692,7 @@ msgstr "未上传标志时用作备用"
 msgid "User"
 msgstr "用户"
 
-#: app/routes/main/helpers.py:1352
+#: app/routes/main/helpers.py:1310
 #, python-format
 msgid "User %(action)s"
 msgstr "章节"
@@ -22801,6 +22824,10 @@ msgstr ""
 msgid "User not found"
 msgstr ""
 
+#: app/routes/auth.py:281
+msgid "User not found."
+msgstr ""
+
 #: app/templates/admin/user_management/access_requests.html:424
 msgid "User note"
 msgstr ""
@@ -22895,7 +22922,7 @@ msgid "Valid export"
 msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:161
-#: app/templates/forms/entry_form/entry_form.html:3969
+#: app/templates/forms/entry_form/entry_form.html:3970
 msgid "Validate"
 msgstr ""
 
@@ -22951,8 +22978,8 @@ msgstr ""
 msgid "Validation Rules Registry"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2554
-#: app/templates/forms/entry_form/entry_form.html:2558
+#: app/templates/forms/entry_form/entry_form.html:2555
+#: app/templates/forms/entry_form/entry_form.html:2559
 #: app/templates/forms/entry_form/validation_summary_pdf.html:9
 #: app/templates/forms/entry_form/validation_summary_pdf.html:17
 #: app/templates/forms/entry_form/validation_summary_progress.html:9
@@ -23018,7 +23045,7 @@ msgstr ""
 msgid "Value"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:326
+#: app/templates/forms/entry_form/partials/matrix_table.html:328
 msgid "Value for"
 msgstr ""
 
@@ -23042,11 +23069,11 @@ msgstr "在...中可用"
 msgid "Variable column tooltip labels"
 msgstr ""
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:280
+#: app/templates/forms/entry_form/partials/matrix_table.html:282
 msgid "Variable tick for"
 msgstr "在...中可用"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:297
+#: app/templates/forms/entry_form/partials/matrix_table.html:299
 msgid "Variable value for"
 msgstr ""
 
@@ -23211,8 +23238,8 @@ msgstr "查看详情"
 msgid "View FDRS document compliance by country."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:1050
-#: app/templates/forms/entry_form/entry_form.html:1999
+#: app/templates/forms/entry_form/entry_form.html:1051
+#: app/templates/forms/entry_form/entry_form.html:2000
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:107
 msgid "View Full Details"
 msgstr "查看详情"
@@ -23412,16 +23439,16 @@ msgstr "水与卫生"
 msgid "Water Quality"
 msgstr "水质"
 
-#: app/routes/auth.py:1155
+#: app/routes/auth.py:1373
 msgid ""
 "We could not process the reset request at this time. Please try again later."
 msgstr ""
 
-#: app/routes/auth.py:679
+#: app/routes/auth.py:863
 msgid "We could not retrieve your email from Azure."
 msgstr ""
 
-#: app/routes/auth.py:1159
+#: app/routes/auth.py:1377
 msgid ""
 "We could not send the reset email at this time. Please contact support."
 msgstr ""
@@ -23470,7 +23497,7 @@ msgstr "用户邮箱"
 msgid "Welcome to"
 msgstr ""
 
-#: app/templates/auth/login.html:512 app/templates/auth/login.html:719
+#: app/templates/auth/login.html:569 app/templates/auth/login.html:744
 #: app/templates/tours/tours.html:23 app/templates/tours/tours.html:34
 msgid "Welcome to the"
 msgstr ""
@@ -23570,7 +23597,7 @@ msgstr ""
 msgid "Will be cleared on save"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2689
+#: app/templates/forms/entry_form/entry_form.html:2690
 msgid "Will be deleted when you save the form."
 msgstr ""
 
@@ -23648,7 +23675,7 @@ msgstr ""
 
 #: app/templates/admin/ai/documents.html:361
 #: app/templates/admin/ai/documents.html:660
-#: app/templates/admin/assignments/manage_assignment.html:95
+#: app/templates/admin/assignments/manage_assignment.html:96
 #: app/templates/admin/data_exploration/explore_data.html:332
 #: app/templates/admin/settings/manage_settings.html:990
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:49
@@ -23657,9 +23684,9 @@ msgstr ""
 msgid "Year"
 msgstr "年份"
 
-#: app/templates/admin/assignments/manage_assignment.html:89
+#: app/templates/admin/assignments/manage_assignment.html:90
 #: app/templates/admin/documents/documents.html:226
-#: app/templates/forms/entry_form/entry_form.html:2801
+#: app/templates/forms/entry_form/entry_form.html:2802
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:42
 #: app/templates/forms/form_builder/partials/_item_modal.html:458
 #: app/templates/forms/form_builder/partials/_item_modal.html:486
@@ -23697,11 +23724,11 @@ msgstr ""
 #: app/templates/components/_form_item_renderer.html:229
 #: app/templates/components/_status_label.html:81
 #: app/templates/components/ag_grid_i18n_js.html:35
-#: app/templates/forms/entry_form/entry_form.html:1221
-#: app/templates/forms/entry_form/entry_form.html:1356
-#: app/templates/forms/entry_form/entry_form.html:1509
-#: app/templates/forms/entry_form/entry_form.html:1634
-#: app/templates/forms/entry_form/entry_form.html:2346
+#: app/templates/forms/entry_form/entry_form.html:1222
+#: app/templates/forms/entry_form/entry_form.html:1357
+#: app/templates/forms/entry_form/entry_form.html:1510
+#: app/templates/forms/entry_form/entry_form.html:1635
+#: app/templates/forms/entry_form/entry_form.html:2347
 #: app/templates/forms/entry_form/partials/disability_questions.html:23
 #: app/templates/forms/entry_form/partials/disability_questions.html:48
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:270
@@ -23736,8 +23763,8 @@ msgstr "是/否"
 msgid "You already have a pending request for: %(country)s"
 msgstr ""
 
-#: app/templates/core/dashboard.html:3217
-#: app/templates/core/dashboard.html:3293
+#: app/templates/core/dashboard.html:3230
+#: app/templates/core/dashboard.html:3306
 msgid "You already have access"
 msgstr ""
 
@@ -23939,13 +23966,13 @@ msgid ""
 "will review them shortly."
 msgstr ""
 
-#: app/routes/auth.py:1106
+#: app/routes/auth.py:1308
 msgid ""
 "Your account has been created. Your country access request is pending admin "
 "approval."
 msgstr ""
 
-#: app/routes/auth.py:200 app/routes/auth.py:776
+#: app/routes/auth.py:377 app/routes/auth.py:960
 msgid ""
 "Your account is deactivated. Please contact an administrator to reactivate "
 "it."
@@ -23963,11 +23990,11 @@ msgid ""
 "under review."
 msgstr ""
 
-#: app/templates/auth/login.html:539
+#: app/templates/auth/login.html:596
 msgid "Your account or create an account"
 msgstr "没有账户？"
 
-#: app/routes/auth.py:1271
+#: app/routes/auth.py:1497
 msgid "Your account settings have been updated successfully."
 msgstr ""
 
@@ -24003,7 +24030,7 @@ msgid ""
 "traces and telemetry to improve the assistant."
 msgstr ""
 
-#: app/routes/auth.py:1232
+#: app/routes/auth.py:1458
 msgid "Your password has been reset. You can now log in."
 msgstr ""
 
@@ -24053,10 +24080,10 @@ msgstr ""
 #: app/templates/admin/api_management.html:617
 #: app/templates/admin/api_management.html:618
 #: app/templates/admin/data_exploration/explore_data.html:3009
-#: app/templates/forms/entry_form/partials/matrix_table.html:280
-#: app/templates/forms/entry_form/partials/matrix_table.html:297
-#: app/templates/forms/entry_form/partials/matrix_table.html:314
-#: app/templates/forms/entry_form/partials/matrix_table.html:326
+#: app/templates/forms/entry_form/partials/matrix_table.html:282
+#: app/templates/forms/entry_form/partials/matrix_table.html:299
+#: app/templates/forms/entry_form/partials/matrix_table.html:316
+#: app/templates/forms/entry_form/partials/matrix_table.html:328
 msgid "and"
 msgstr ""
 
@@ -24092,11 +24119,11 @@ msgid "at: %(datetime)s"
 msgstr "在：%(datetime)s"
 
 #: app/templates/admin/settings/manage_settings.html:1493
-#: app/templates/forms/entry_form/entry_form.html:3844
+#: app/templates/forms/entry_form/entry_form.html:3845
 msgid "available"
 msgstr "可用"
 
-#: app/templates/forms/entry_form/entry_form.html:3845
+#: app/templates/forms/entry_form/entry_form.html:3846
 msgid "available in"
 msgstr "在...中可用"
 
@@ -24161,7 +24188,7 @@ msgstr ""
 msgid "countries"
 msgstr "个国家"
 
-#: app/templates/admin/assignments/manage_assignment.html:350
+#: app/templates/admin/assignments/manage_assignment.html:351
 msgid "countries enabled for public submission"
 msgstr ""
 
@@ -24235,7 +24262,7 @@ msgstr ""
 msgid "e.g. <5, 5-17, 18-49, 50+"
 msgstr ""
 
-#: app/templates/admin/assignments/manage_assignment.html:176
+#: app/templates/admin/assignments/manage_assignment.html:177
 msgid "e.g. Annual Country Survey 2025 — leave blank to use \"Template – Period\""
 msgstr ""
 
@@ -24382,7 +24409,7 @@ msgstr "失败"
 msgid "failed."
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3846
+#: app/templates/forms/entry_form/entry_form.html:3847
 msgid "filtered by"
 msgstr "按...筛选"
 
@@ -24392,8 +24419,8 @@ msgid "filtered from"
 msgstr ""
 
 #: app/templates/admin/public/public_form_unavailable.html:38
-#: app/templates/forms/entry_form/entry_form.html:933
-#: app/templates/forms/entry_form/entry_form.html:1894
+#: app/templates/forms/entry_form/entry_form.html:934
+#: app/templates/forms/entry_form/entry_form.html:1895
 msgid "focal point for assistance."
 msgstr "联络点（"
 
@@ -24405,7 +24432,7 @@ msgstr "表单和数据管理"
 msgid "form items loaded"
 msgstr "表单模板"
 
-#: app/templates/forms/entry_form/entry_form.html:3843
+#: app/templates/forms/entry_form/entry_form.html:3844
 msgid "found"
 msgstr "找到"
 
@@ -24459,11 +24486,11 @@ msgstr ""
 msgid "indexed"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3842
+#: app/templates/forms/entry_form/entry_form.html:3843
 msgid "indicators"
 msgstr "个指标"
 
-#: app/templates/forms/entry_form/entry_form.html:3840
+#: app/templates/forms/entry_form/entry_form.html:3841
 msgid "indicators available"
 msgstr "个指标可用"
 
@@ -24610,11 +24637,11 @@ msgstr ""
 #: app/templates/components/ag_grid_i18n_js.html:65
 #: app/templates/components/pagination.html:59
 #: app/templates/core/dashboard.html:1799
-#: app/templates/forms/entry_form/entry_form.html:3801
+#: app/templates/forms/entry_form/entry_form.html:3802
 msgid "of"
 msgstr "共"
 
-#: app/templates/admin/assignments/manage_assignment.html:162
+#: app/templates/admin/assignments/manage_assignment.html:163
 #: app/templates/core/dashboard.html:2796
 #: app/templates/core/dashboard.html:2924
 msgid "optional"
@@ -24624,7 +24651,7 @@ msgstr "完成度"
 msgid "or"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:2633
+#: app/templates/forms/entry_form/entry_form.html:2634
 msgid "or click to browse — .xlsx only"
 msgstr ""
 
@@ -24985,7 +25012,7 @@ msgstr ""
 msgid "unique"
 msgstr ""
 
-#: app/templates/forms/entry_form/entry_form.html:3831
+#: app/templates/forms/entry_form/entry_form.html:3832
 msgid "unlimited"
 msgstr "无限制"
 
@@ -26456,3 +26483,31 @@ msgstr ""
 # [Removed] was: app/templates/admin/settings/manage_settings.html:1189
 #~ msgid "WebSockets"
 #~ msgstr ""
+
+# [Removed] was: app/templates/auth/login.html:562
+#~ msgid "Quick login as a Focal Point"
+#~ msgstr ""
+
+# [Removed] was: app/templates/auth/login.html:553
+#~ msgid "Quick login as a System Manager"
+#~ msgstr ""
+
+# [Removed] was: app/templates/auth/login.html:558
+#~ msgid "Quick login as an Admin"
+#~ msgstr ""
+
+# [Removed] was: app/templates/auth/login.html:549
+#~ msgid "Quick login for testers"
+#~ msgstr ""
+
+# [Removed] was: app/templates/auth/login.html:555
+#~ msgid "Test as System Manager"
+#~ msgstr ""
+
+# [Removed] was: app/templates/auth/login.html:564
+#~ msgid "Test as a Focal Point"
+#~ msgstr ""
+
+# [Removed] was: app/templates/auth/login.html:560
+#~ msgid "Test as an Admin"
+#~ msgstr "给管理员的消息"

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-07-24 01:23+0200\n"
+"POT-Creation-Date: 2026-07-24 16:48+0200\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: ru <LL@li.org>\n"
@@ -79,17 +79,17 @@ msgstr ""
 msgid "%(count)s value(s) carried forward"
 msgstr "%(count)s значения, перенесённые вперёд"
 
-#: app/routes/main/helpers.py:1292
+#: app/routes/main/helpers.py:1250
 #, python-format
 msgid "%(field)s: %(new)s"
 msgstr "%(field)s: %(new)s"
 
-#: app/routes/main/helpers.py:1294
+#: app/routes/main/helpers.py:1252
 #, python-format
 msgid "%(field)s: %(old)s"
 msgstr "%(field)s: %(old)s"
 
-#: app/routes/main/helpers.py:1296
+#: app/routes/main/helpers.py:1254
 #, python-format
 msgid "%(field)s: %(old)s → %(new)s"
 msgstr "%(field)s: %(old)s → %(new)s"
@@ -214,7 +214,7 @@ msgstr ".xlsx или .xls"
 msgid ".xlsx or .xls (max 50 MB)"
 msgstr ".xlsx или .xls (максимум 50 МБ)"
 
-#: app/templates/admin/assignments/manage_assignment.html:496
+#: app/templates/admin/assignments/manage_assignment.html:495
 msgid "0 selected"
 msgstr "0 выбранных"
 
@@ -706,6 +706,26 @@ msgstr "Разделы настроек аккаунта"
 msgid "Accuracy and Verification"
 msgstr "Точность и проверка"
 
+#: app/templates/auth/login.html:607
+msgid "Act as (dev only)"
+msgstr "Действуйте как (только для разработчиков)"
+
+#: app/templates/auth/login.html:626
+msgid "Act as Admin"
+msgstr "Выполняйте обязанности администратора"
+
+#: app/templates/auth/login.html:630
+msgid "Act as Focal Point"
+msgstr "Выступайте в роли фокуса"
+
+#: app/templates/auth/login.html:622
+msgid "Act as System Manager"
+msgstr "Выполняйте обязанности управляющего системой"
+
+#: app/templates/auth/login.html:649 app/templates/auth/login.html:651
+msgid "Act as selected user"
+msgstr "Действуйте как выбранный пользователь"
+
 #: app/templates/admin/ai/_trace_card.html:371
 #: app/templates/admin/ai/conversation_traces.html:178
 #: app/templates/admin/security/alerts.html:27
@@ -771,7 +791,7 @@ msgstr ""
 "страниц."
 
 #: app/templates/admin/assignments/assignments.html:128
-#: app/templates/admin/assignments/manage_assignment.html:342
+#: app/templates/admin/assignments/manage_assignment.html:343
 #: app/templates/admin/plugin_management.html:213
 msgid "Activate"
 msgstr "Активировать"
@@ -876,7 +896,7 @@ msgstr "Активности"
 msgid "Activities from other focal points in"
 msgstr "Действия от других координаторов в"
 
-#: app/routes/main/helpers.py:1354
+#: app/routes/main/helpers.py:1312
 #: app/templates/admin/analytics/audit_trail.html:454
 msgid "Activity"
 msgstr "Активность"
@@ -945,12 +965,12 @@ msgstr "Добавить встраивание"
 msgid "Add Embed Content"
 msgstr "Добавить встроенный контент"
 
-#: app/templates/admin/assignments/manage_assignment.html:457
+#: app/templates/admin/assignments/manage_assignment.html:458
 msgid "Add Entities"
 msgstr "Добавить сущности"
 
-#: app/templates/forms/entry_form/entry_form.html:1736
-#: app/templates/forms/entry_form/entry_form.html:2474
+#: app/templates/forms/entry_form/entry_form.html:1737
+#: app/templates/forms/entry_form/entry_form.html:2475
 msgid "Add Entry"
 msgstr "Добавить запись"
 
@@ -965,7 +985,7 @@ msgid "Add Group"
 msgstr "Добавить группу"
 
 #: app/templates/admin/indicator_bank/add_indicator_bank.html:73
-#: app/templates/forms/entry_form/entry_form.html:3823
+#: app/templates/forms/entry_form/entry_form.html:3824
 #: app/templates/forms/entry_form/partials/dynamic_indicators_interface.html:31
 msgid "Add Indicator"
 msgstr "Добавить индикатор"
@@ -1004,7 +1024,7 @@ msgid "Add New Division"
 msgstr "Добавить новый сектор"
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:331
-#: app/templates/forms/entry_form/entry_form.html:3837
+#: app/templates/forms/entry_form/entry_form.html:3838
 msgid "Add New Indicator"
 msgstr "Добавить новый показатель"
 
@@ -1112,7 +1132,7 @@ msgstr "Добавьте распространённое слово"
 msgid "Add data source"
 msgstr "Добавить источник данных"
 
-#: app/templates/admin/assignments/manage_assignment.html:527
+#: app/templates/admin/assignments/manage_assignment.html:526
 msgid "Add entities by"
 msgstr "Добавить сущности по"
 
@@ -1163,8 +1183,8 @@ msgstr "Добавление порога"
 msgid "Add to self-report"
 msgstr "Добавить в самоотчёт"
 
-#: app/templates/admin/assignments/manage_assignment.html:168
 #: app/templates/admin/assignments/manage_assignment.html:169
+#: app/templates/admin/assignments/manage_assignment.html:170
 #: app/templates/admin/indicator_bank/_indicator_bank_translation_helpers.html:7
 #: app/templates/forms/form_builder/partials/_item_modal.html:89
 #: app/templates/forms/form_builder/partials/_item_modal.html:158
@@ -1186,7 +1206,7 @@ msgstr "Добавить переводы"
 msgid "Add translations for the aggregated label in different languages."
 msgstr "Добавьте переводы агрегированной метки на разных языках."
 
-#: app/templates/admin/assignments/manage_assignment.html:770
+#: app/templates/admin/assignments/manage_assignment.html:769
 msgid ""
 "Add translations for this assignment name in different languages. English is"
 " entered in the Custom Name field above."
@@ -1230,7 +1250,7 @@ msgid "Added"
 msgstr "Добавлено"
 
 # Activity descriptions
-#: app/routes/main/helpers.py:1318
+#: app/routes/main/helpers.py:1276
 #, python-format
 msgid "Added %(count)d field in %(template)s"
 msgstr "Добавлено %(count)d поле в %(template)s"
@@ -1346,13 +1366,14 @@ msgstr "Добавить..."
 #: app/templates/admin/validation_rules.html:6
 #: app/templates/admin/validation_rules.html:40
 #: app/templates/admin/view_indicator_suggestion.html:13
+#: app/templates/auth/login.html:628
 #: app/templates/forms/form_builder/field_mapping.html:203
 #: app/templates/forms/form_builder/form_builder.html:77
 #: app/templates/tours/tours.html:474
 msgid "Admin"
 msgstr "Администратор"
 
-#: app/routes/main/helpers.py:1353
+#: app/routes/main/helpers.py:1311
 #, python-format
 msgid "Admin %(action)s %(target)s"
 msgstr "Admin %(action)s %(target)s"
@@ -1462,7 +1483,7 @@ msgid "After importing, click \"Compile Translations\" to apply changes."
 msgstr ""
 "После импорта нажмите «Compile Translations», чтобы применить изменения."
 
-#: app/templates/admin/assignments/manage_assignment.html:254
+#: app/templates/admin/assignments/manage_assignment.html:255
 msgid ""
 "After this date the assignment will be treated as Closed. Leave empty for no"
 " automatic closure."
@@ -1533,7 +1554,7 @@ msgstr "Трассировка"
 #: app/templates/admin/api_management.html:312
 #: app/templates/admin/indicator_bank/indicator_bank.html:2370
 #: app/templates/components/auto_translate_modal_js.html:30
-#: app/templates/forms/entry_form/entry_form.html:3841
+#: app/templates/forms/entry_form/entry_form.html:3842
 #: app/templates/forms/form_builder/field_mapping.html:303
 #: app/templates/notifications/center.html:70
 msgid "All"
@@ -1866,7 +1887,7 @@ msgstr "Разрешённые варианты разбиения"
 msgid "Allowed period types:"
 msgstr "Разрешённые типы периодов:"
 
-#: app/templates/forms/entry_form/entry_form.html:2743
+#: app/templates/forms/entry_form/entry_form.html:2744
 msgid "Allowed types: PDF, Word, Excel, PowerPoint, Text"
 msgstr "Разрешенные типы: PDF, Word, Excel, PowerPoint, Текст"
 
@@ -1887,7 +1908,7 @@ msgstr "Альтернативный текст"
 msgid "Alt text (optional)"
 msgstr "Альтернативный текст (опционально)"
 
-#: app/routes/auth.py:1045
+#: app/routes/auth.py:1229
 msgid "An account with this email already exists."
 msgstr "Аккаунт с этой электронной почтой уже существует."
 
@@ -1914,7 +1935,7 @@ msgstr "При загрузке данных о соблюдении требо�
 msgid "An error occurred while loading data"
 msgstr "Произошла ошибка. Пожалуйста, попробуйте снова."
 
-#: app/routes/auth.py:1294
+#: app/routes/auth.py:1520
 msgid ""
 "An error occurred while updating your account settings. Please try again."
 msgstr "Произошла ошибка. Пожалуйста, попробуйте снова."
@@ -2102,12 +2123,12 @@ msgstr "Экран приложения"
 msgid "Append dynamic suffix (percentage, population, etc.)"
 msgstr "Добавляйте динамический суффикс (процент, население и т.д.)"
 
-#: app/templates/forms/entry_form/entry_form.html:1378
-#: app/templates/forms/entry_form/entry_form.html:1555
-#: app/templates/forms/entry_form/entry_form.html:1696
-#: app/templates/forms/entry_form/entry_form.html:2410
-#: app/templates/forms/entry_form/entry_form.html:2425
-#: app/templates/forms/entry_form/partials/matrix_table.html:446
+#: app/templates/forms/entry_form/entry_form.html:1379
+#: app/templates/forms/entry_form/entry_form.html:1556
+#: app/templates/forms/entry_form/entry_form.html:1697
+#: app/templates/forms/entry_form/entry_form.html:2411
+#: app/templates/forms/entry_form/entry_form.html:2426
+#: app/templates/forms/entry_form/partials/matrix_table.html:448
 msgid "Applicable but data not available"
 msgstr "Применимо, но данные недоступны"
 
@@ -2119,7 +2140,7 @@ msgstr "Применение"
 msgid "Application Log"
 msgstr "Журнал приложений"
 
-#: app/templates/admin/assignments/manage_assignment.html:239
+#: app/templates/admin/assignments/manage_assignment.html:240
 msgid "Applies to all selected countries."
 msgstr "Распространяется на все выбранные страны."
 
@@ -2137,8 +2158,8 @@ msgstr ""
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:32
 #: app/templates/admin/analytics/audit_trail.html:287
 #: app/templates/admin/analytics/page_path_analytics.html:52
-#: app/templates/admin/assignments/manage_assignment.html:830
-#: app/templates/admin/assignments/manage_assignment.html:845
+#: app/templates/admin/assignments/manage_assignment.html:829
+#: app/templates/admin/assignments/manage_assignment.html:844
 #: app/templates/admin/communication/registry.html:31
 #: app/templates/components/ag_grid_i18n_js.html:18
 #: app/templates/forms/entry_form/partials/_preview_banner.html:47
@@ -2204,7 +2225,7 @@ msgstr "Одобрить всех"
 msgid "Approve all __COUNT__ pending requests for this user?"
 msgstr "Одобрить все __COUNT__ ожидающие запросы для этого пользователя?"
 
-#: app/routes/main/helpers.py:1228
+#: app/routes/main/helpers.py:1186
 #: app/templates/admin/assignments/public_submissions.html:54
 #: app/templates/admin/assignments/public_submissions.html:105
 #: app/templates/admin/assignments/public_submissions.html:178
@@ -2224,12 +2245,12 @@ msgstr "Одобрено"
 msgid "Approver"
 msgstr "Подтверждающий"
 
-#: app/templates/admin/assignments/manage_assignment.html:115
-#: app/templates/admin/assignments/manage_assignment.html:135
+#: app/templates/admin/assignments/manage_assignment.html:116
+#: app/templates/admin/assignments/manage_assignment.html:136
 #: app/templates/admin/documents/documents.html:285
 #: app/templates/admin/documents/documents.html:311
-#: app/templates/forms/entry_form/entry_form.html:2860
-#: app/templates/forms/entry_form/entry_form.html:2886
+#: app/templates/forms/entry_form/entry_form.html:2861
+#: app/templates/forms/entry_form/entry_form.html:2887
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:74
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:87
 #: app/templates/forms/form_builder/partials/_item_modal.html:540
@@ -2327,7 +2348,7 @@ msgstr ""
 msgid "Are you sure you want to delete"
 msgstr "Ты уверен, что хочешь удалить"
 
-#: app/templates/forms/entry_form/entry_form.html:2688
+#: app/templates/forms/entry_form/entry_form.html:2689
 #, python-format
 msgid ""
 "Are you sure you want to delete \"%(filename)s\"? The document will be "
@@ -2415,7 +2436,7 @@ msgid ""
 msgstr ""
 "Вы уверены, что хотите удалить этот документ? Это действие нельзя отменить."
 
-#: app/templates/forms/entry_form/entry_form.html:3807
+#: app/templates/forms/entry_form/entry_form.html:3808
 msgid "Are you sure you want to delete this entry?"
 msgstr "Вы уверены, что хотите удалить эту запись?"
 
@@ -2533,7 +2554,7 @@ msgid "Are you sure you want to reload the plugin \"%(plugin)s\"?"
 msgstr "Are you sure you want to reload the plugin \"%(plugin)s\"?"
 
 #: app/templates/core/dashboard.html:2978
-#: app/templates/forms/entry_form/entry_form.html:3968
+#: app/templates/forms/entry_form/entry_form.html:3969
 msgid "Are you sure you want to reopen this assignment?"
 msgstr "Вы уверены, что хотите переоткрыть это назначение?"
 
@@ -2542,8 +2563,8 @@ msgstr "Вы уверены, что хотите переоткрыть это �
 msgid "Are you sure you want to stop the translation?"
 msgstr "Вы уверены, что хотите остановить перевод?"
 
-#: app/templates/forms/entry_form/entry_form.html:580
-#: app/templates/forms/entry_form/entry_form.html:2523
+#: app/templates/forms/entry_form/entry_form.html:581
+#: app/templates/forms/entry_form/entry_form.html:2524
 msgid ""
 "Are you sure you want to submit this form? You will not be able to edit it "
 "after submission."
@@ -2569,7 +2590,7 @@ msgstr ""
 msgid "Are you sure you want to update the status?"
 msgstr "Вы уверены, что хотите удалить это"
 
-#: app/templates/forms/entry_form/entry_form.html:3967
+#: app/templates/forms/entry_form/entry_form.html:3968
 msgid "Are you sure you want to validate this assignment?"
 msgstr "Вы уверены, что хотите подтвердить это задание?"
 
@@ -2621,7 +2642,7 @@ msgstr "Соотношение сторон"
 msgid "Assessment"
 msgstr "Оценка"
 
-#: app/templates/admin/assignments/manage_assignment.html:566
+#: app/templates/admin/assignments/manage_assignment.html:565
 msgid "Assign Countries"
 msgstr "Присваивание стран"
 
@@ -2631,7 +2652,7 @@ msgstr ""
 "Назначьте языки, которые этот пользователь может редактировать, с помощью "
 "инструмента встроенного перевода."
 
-#: app/templates/admin/assignments/manage_assignment.html:423
+#: app/templates/admin/assignments/manage_assignment.html:424
 msgid ""
 "Assign this form to specific organizational entities. Data will be collected"
 " at the specific entity level (e.g., branch data vs. country-wide data)."
@@ -2648,7 +2669,7 @@ msgstr ""
 "Назначьте этого пользователя на конкретные организационные структуры. "
 "Пользователи получат доступ к данным на назначенном им уровне."
 
-#: app/templates/admin/assignments/manage_assignment.html:1037
+#: app/templates/admin/assignments/manage_assignment.html:1036
 msgid ""
 "Assigned entities (focal points) will be notified about this new assignment."
 " Do you want to continue?"
@@ -2756,12 +2777,12 @@ msgstr "Год назначения"
 msgid "Assignment approved"
 msgstr "Назначение одобрено"
 
-#: app/routes/main/helpers.py:1348
+#: app/routes/main/helpers.py:1306
 #, python-format
 msgid "Assignment approved: %(template)s"
 msgstr "Задание одобрено"
 
-#: app/routes/main/helpers.py:1344
+#: app/routes/main/helpers.py:1302
 #, python-format
 msgid "Assignment created: %(template)s"
 msgstr "Созданное задание"
@@ -2770,7 +2791,7 @@ msgstr "Созданное задание"
 msgid "Assignment dashboard access requires one of the Assignment roles."
 msgstr "Доступ к панели назначения требует одной из ролей Assignment."
 
-#: app/templates/components/_assignment_status_pipeline.html:64
+#: app/templates/components/_assignment_status_pipeline.html:66
 msgid "Assignment is closed"
 msgstr "Присваивание закрыто"
 
@@ -2778,7 +2799,7 @@ msgstr "Присваивание закрыто"
 msgid "Assignment period"
 msgstr "Период назначения"
 
-#: app/templates/forms/entry_form/entry_form.html:2692
+#: app/templates/forms/entry_form/entry_form.html:2693
 msgid ""
 "Assignment period is not available. Set a period for this assignment or "
 "choose a fixed period in the form template."
@@ -2786,7 +2807,7 @@ msgstr ""
 "Период назначения недоступен. Укажите период для этого задания или выберите "
 "фиксированный период в шаблоне формы."
 
-#: app/templates/forms/entry_form/entry_form.html:2693
+#: app/templates/forms/entry_form/entry_form.html:2694
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:76
 msgid ""
 "Assignment period is not set yet. Set the assignment period in the header, "
@@ -2799,12 +2820,12 @@ msgstr ""
 msgid "Assignment reopened"
 msgstr "Задание возобновлено"
 
-#: app/routes/main/helpers.py:1349
+#: app/routes/main/helpers.py:1307
 #, python-format
 msgid "Assignment reopened: %(template)s"
 msgstr "Задание reopened"
 
-#: app/routes/main/helpers.py:1347
+#: app/routes/main/helpers.py:1305
 #, python-format
 msgid "Assignment returned for revision: %(template)s"
 msgstr "Назначение возвращено на пересмотр: %(template)s"
@@ -2817,7 +2838,7 @@ msgstr "Назначение вернулось в Национальное об
 msgid "Assignment sent for review successfully."
 msgstr "Задание успешно отправлено на рассмотрение."
 
-#: app/routes/main/helpers.py:1346
+#: app/routes/main/helpers.py:1304
 #, python-format
 msgid "Assignment sent for review: %(template)s"
 msgstr "Задание отправлено на рассмотрение: %(template)s"
@@ -2833,7 +2854,7 @@ msgid ""
 "URL or contact support."
 msgstr "Статус назначения для этой страны не найден."
 
-#: app/templates/forms/entry_form/entry_form.html:2510
+#: app/templates/forms/entry_form/entry_form.html:2511
 msgid "Assignment status for this country not found."
 msgstr "Статус назначения для этой страны не найден."
 
@@ -2845,7 +2866,7 @@ msgstr "Рабочий процесс статуса назначения"
 msgid "Assignment submitted successfully!"
 msgstr "Задание успешно сдано!"
 
-#: app/routes/main/helpers.py:1345
+#: app/routes/main/helpers.py:1303
 #, python-format
 msgid "Assignment submitted: %(template)s"
 msgstr "Задание отправлено"
@@ -2888,7 +2909,7 @@ msgstr "Ассистент МФОКК"
 msgid "Assistant is typing"
 msgstr "Ассистент печатает"
 
-#: app/templates/auth/login.html:671 app/templates/auth/reset_password.html:38
+#: app/templates/auth/login.html:696 app/templates/auth/reset_password.html:38
 msgid "At least 8 characters"
 msgstr "Последний квартал"
 
@@ -2962,12 +2983,12 @@ msgstr ""
 msgid "Audited Financial Statement"
 msgstr "Аудированная финансовая отчетность"
 
-#: app/templates/admin/assignments/manage_assignment.html:119
-#: app/templates/admin/assignments/manage_assignment.html:139
+#: app/templates/admin/assignments/manage_assignment.html:120
+#: app/templates/admin/assignments/manage_assignment.html:140
 #: app/templates/admin/documents/documents.html:289
 #: app/templates/admin/documents/documents.html:315
-#: app/templates/forms/entry_form/entry_form.html:2864
-#: app/templates/forms/entry_form/entry_form.html:2890
+#: app/templates/forms/entry_form/entry_form.html:2865
+#: app/templates/forms/entry_form/entry_form.html:2891
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:75
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:88
 #: app/templates/forms/form_builder/partials/_item_modal.html:544
@@ -3079,7 +3100,7 @@ msgstr "Автоперевод всех элементов шаблонов"
 msgid "Auto-Translate All Translation Fields"
 msgstr "Автоматический перевод всех показателей"
 
-#: app/templates/admin/assignments/manage_assignment.html:390
+#: app/templates/admin/assignments/manage_assignment.html:391
 msgid "Auto-closes the assignment after this date."
 msgstr "После этой даты задание автоматически закрывается."
 
@@ -3439,7 +3460,7 @@ msgstr "Разбор"
 msgid "Brief summary for the in-app notification list…"
 msgstr "Краткое описание списка уведомлений внутри приложения..."
 
-#: app/templates/auth/login.html:663 app/templates/core/dashboard.html:2926
+#: app/templates/auth/login.html:688 app/templates/core/dashboard.html:2926
 msgid "Briefly describe your role and why you need access"
 msgstr "Кратко опишите вашу роль и почему вам нужен доступ"
 
@@ -3508,11 +3529,11 @@ msgstr ""
 "Отредактируйте это задание в Excel, загрузите файл обратно сюда, а затем "
 "сохраните, когда будете готовы."
 
-#: app/templates/forms/entry_form/entry_form.html:1155
-#: app/templates/forms/entry_form/entry_form.html:1296
-#: app/templates/forms/entry_form/entry_form.html:1449
-#: app/templates/forms/entry_form/entry_form.html:2133
-#: app/templates/forms/entry_form/entry_form.html:2283
+#: app/templates/forms/entry_form/entry_form.html:1156
+#: app/templates/forms/entry_form/entry_form.html:1297
+#: app/templates/forms/entry_form/entry_form.html:1450
+#: app/templates/forms/entry_form/entry_form.html:2134
+#: app/templates/forms/entry_form/entry_form.html:2284
 #: app/templates/forms/entry_form/export_pdf.html:340
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:206
 msgid "By Age:"
@@ -3528,21 +3549,21 @@ msgstr "По странам"
 msgid "By Indicator"
 msgstr "По индикаторам"
 
-#: app/templates/forms/entry_form/entry_form.html:1159
-#: app/templates/forms/entry_form/entry_form.html:1300
-#: app/templates/forms/entry_form/entry_form.html:1453
-#: app/templates/forms/entry_form/entry_form.html:2156
-#: app/templates/forms/entry_form/entry_form.html:2287
+#: app/templates/forms/entry_form/entry_form.html:1160
+#: app/templates/forms/entry_form/entry_form.html:1301
+#: app/templates/forms/entry_form/entry_form.html:1454
+#: app/templates/forms/entry_form/entry_form.html:2157
+#: app/templates/forms/entry_form/entry_form.html:2288
 #: app/templates/forms/entry_form/export_pdf.html:359
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:210
 msgid "By Sex and Age:"
 msgstr "По полу и возрасту:"
 
-#: app/templates/forms/entry_form/entry_form.html:1151
-#: app/templates/forms/entry_form/entry_form.html:1292
-#: app/templates/forms/entry_form/entry_form.html:1445
-#: app/templates/forms/entry_form/entry_form.html:2111
-#: app/templates/forms/entry_form/entry_form.html:2279
+#: app/templates/forms/entry_form/entry_form.html:1152
+#: app/templates/forms/entry_form/entry_form.html:1293
+#: app/templates/forms/entry_form/entry_form.html:1446
+#: app/templates/forms/entry_form/entry_form.html:2112
+#: app/templates/forms/entry_form/entry_form.html:2280
 #: app/templates/forms/entry_form/export_pdf.html:321
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:202
 msgid "By Sex:"
@@ -3623,7 +3644,7 @@ msgstr "Электронные письма кампании"
 msgid "Campaigns"
 msgstr "Администраторы"
 
-#: app/templates/forms/entry_form/entry_form.html:3828
+#: app/templates/forms/entry_form/entry_form.html:3829
 msgid "Can't find an indicator? Propose a new one here"
 msgstr "Не можете найти индикатор? Предложите новый вариант здесь"
 
@@ -3637,9 +3658,9 @@ msgstr "Не можете найти индикатор? Предложите н
 #: app/templates/admin/api_keys/revoke.html:21
 #: app/templates/admin/api_keys/revoke.html:80
 #: app/templates/admin/assignments/gantt_chart.html:246
-#: app/templates/admin/assignments/manage_assignment.html:829
-#: app/templates/admin/assignments/manage_assignment.html:844
-#: app/templates/admin/assignments/manage_assignment.html:1028
+#: app/templates/admin/assignments/manage_assignment.html:828
+#: app/templates/admin/assignments/manage_assignment.html:843
+#: app/templates/admin/assignments/manage_assignment.html:1027
 #: app/templates/admin/assignments/public_submissions.html:382
 #: app/templates/admin/common_words/manage_common_words.html:912
 #: app/templates/admin/common_words/manage_common_words.html:914
@@ -3698,8 +3719,8 @@ msgstr "Не можете найти индикатор? Предложите н
 #: app/templates/components/auto_translate_modal_js.html:55
 #: app/templates/core/chat_immersive.html:50
 #: app/templates/core/dashboard.html:2944
-#: app/templates/forms/entry_form/entry_form.html:2923
-#: app/templates/forms/entry_form/entry_form.html:3976
+#: app/templates/forms/entry_form/entry_form.html:2924
+#: app/templates/forms/entry_form/entry_form.html:3977
 #: app/templates/forms/entry_form/validation_summary_progress.html:246
 #: app/templates/forms/form_builder/form_builder.html:226
 #: app/templates/forms/form_builder/form_builder.html:259
@@ -3722,7 +3743,7 @@ msgstr "Не можете найти индикатор? Предложите н
 msgid "Cancel"
 msgstr "Отмена"
 
-#: app/templates/forms/entry_form/entry_form.html:2690
+#: app/templates/forms/entry_form/entry_form.html:2691
 msgid "Cancel deletion"
 msgstr "Отменить удаление"
 
@@ -3750,7 +3771,7 @@ msgstr "Отмена..."
 msgid "Cancelling…"
 msgstr "Отмена..."
 
-#: app/templates/forms/entry_form/entry_form.html:2686
+#: app/templates/forms/entry_form/entry_form.html:2687
 #, python-format
 msgid ""
 "Cannot cancel deletion. This field allows a maximum of %(max)s document(s). "
@@ -3833,11 +3854,11 @@ msgstr "Просмотр истории изменений"
 msgid "Change Type"
 msgstr "изменение"
 
-#: app/templates/admin/assignments/manage_assignment.html:504
+#: app/templates/admin/assignments/manage_assignment.html:503
 msgid "Change due date"
 msgstr "Дата смены сроков"
 
-#: app/templates/admin/assignments/manage_assignment.html:836
+#: app/templates/admin/assignments/manage_assignment.html:835
 msgid "Change due date of selected"
 msgstr "Изменение даты сдачи выбранного"
 
@@ -3845,11 +3866,11 @@ msgstr "Изменение даты сдачи выбранного"
 msgid "Change link"
 msgstr "Изменить ссылку"
 
-#: app/templates/admin/assignments/manage_assignment.html:501
+#: app/templates/admin/assignments/manage_assignment.html:500
 msgid "Change status"
 msgstr "Статус изменения"
 
-#: app/templates/admin/assignments/manage_assignment.html:817
+#: app/templates/admin/assignments/manage_assignment.html:816
 msgid "Change status of selected"
 msgstr "Статус изменения выбранного"
 
@@ -3894,13 +3915,13 @@ msgstr ""
 msgid "Changes requested: %(template)s"
 msgstr "Запрашиваются изменения: %(template)s"
 
-#: app/routes/main/helpers.py:1194
+#: app/routes/main/helpers.py:1152
 msgid "Changes were requested. Update the form and submit again when ready."
 msgstr ""
 "Были запрошены изменения. Обновите форму и отправьте снова, когда будете "
 "готовы."
 
-#: app/templates/forms/entry_form/entry_form.html:2964
+#: app/templates/forms/entry_form/entry_form.html:2965
 msgid "Chat"
 msgstr "Чат"
 
@@ -4291,7 +4312,7 @@ msgstr "Нажмите или перетащите файл Excel здесь"
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:264
 #: app/templates/admin/indicator_bank/indicator_bank.html:467
-#: app/templates/forms/entry_form/entry_form.html:2657
+#: app/templates/forms/entry_form/entry_form.html:2658
 #: app/templates/forms/form_builder/partials/_excel_modal.html:71
 msgid "Click or drag Excel file here to import"
 msgstr "Нажмите или перетащите файл Excel здесь, чтобы импортировать"
@@ -4312,7 +4333,7 @@ msgstr "Нажмите или перетащите ZIP-файл здесь"
 msgid "Click or drag an Excel file here"
 msgstr "Нажмите или перетащите файл Excel здесь"
 
-#: app/templates/forms/entry_form/entry_form.html:2737
+#: app/templates/forms/entry_form/entry_form.html:2738
 msgid "Click or drag document here to upload"
 msgstr "Нажмите или перетащите документ здесь, чтобы загрузить"
 
@@ -4324,7 +4345,12 @@ msgstr "Нажмите, чтобы сменить категорию"
 msgid "Click to change file"
 msgstr "Нажмите, чтобы изменить файл"
 
+#: app/templates/core/dashboard.html:3027
+msgid "Click to collapse"
+msgstr "Нажмите, чтобы свернуть"
+
 #: app/templates/core/dashboard.html:1590
+#: app/templates/core/dashboard.html:3026
 msgid "Click to expand"
 msgstr "Нажмите, чтобы развернуть"
 
@@ -4336,8 +4362,8 @@ msgstr "Нажмите, чтобы сделать непубличным"
 msgid "Click to make public"
 msgstr "Нажмите, чтобы сделать публичным"
 
-#: app/templates/forms/entry_form/entry_form.html:1738
-#: app/templates/forms/entry_form/entry_form.html:2476
+#: app/templates/forms/entry_form/entry_form.html:1739
+#: app/templates/forms/entry_form/entry_form.html:2477
 msgid "Click to repeat this group of fields multiple times"
 msgstr "Нажмите, чтобы повторить эту группу полей несколько раз"
 
@@ -4409,7 +4435,7 @@ msgstr "Шаблон клона"
 #: app/templates/admin/translations/manage_translations.html:234
 #: app/templates/admin/translations/manage_translations.html:485
 #: app/templates/admin/user_management/user_form.html:1489
-#: app/templates/auth/login.html:642 app/templates/auth/login.html:690
+#: app/templates/auth/login.html:667 app/templates/auth/login.html:715
 #: app/templates/components/auto_translate_modal.html:359
 #: app/templates/components/auto_translate_modal.html:529
 #: app/templates/components/auto_translate_modal_js.html:54
@@ -4440,7 +4466,7 @@ msgstr "Закрыть меню"
 msgid "Close modal"
 msgstr "Закрыть меню"
 
-#: app/templates/forms/entry_form/entry_form.html:374
+#: app/templates/forms/entry_form/entry_form.html:375
 msgid "Close navigation"
 msgstr "Закрытая навигация"
 
@@ -4448,7 +4474,7 @@ msgstr "Закрытая навигация"
 msgid "Close this assignment? It can be reopened later by an admin."
 msgstr "Закрыть это задание? Администратор может открыть его позже."
 
-#: app/routes/main/helpers.py:1232
+#: app/routes/main/helpers.py:1190
 #: app/templates/components/_assignment_status_pipeline.html:12
 #: app/templates/components/_status_label.html:26
 msgid "Closed"
@@ -4500,7 +4526,7 @@ msgstr "Код нельзя менять, пока индикаторы ссыл
 msgid "Code cannot be changed while indicators reference this unit."
 msgstr "Код нельзя менять, пока индикаторы ссылаются на этот блок."
 
-#: app/templates/forms/entry_form/entry_form.html:2989
+#: app/templates/forms/entry_form/entry_form.html:2990
 msgid "Collapse"
 msgstr "Крах"
 
@@ -4525,11 +4551,11 @@ msgstr "Свернуть все страницы"
 msgid "Collapse all sections"
 msgstr "Свалить все секции"
 
-#: app/templates/forms/entry_form/entry_form.html:2990
+#: app/templates/forms/entry_form/entry_form.html:2991
 msgid "Collapse editors list"
 msgstr "Список редакторов Collapse"
 
-#: app/templates/forms/entry_form/entry_form.html:381
+#: app/templates/forms/entry_form/entry_form.html:382
 msgid "Collapse navigation panel"
 msgstr "Панель навигации при свалке"
 
@@ -4541,8 +4567,8 @@ msgstr "Участок обрушения"
 msgid "Collapse subsection"
 msgstr "Подраздел обрушения"
 
-#: app/templates/forms/entry_form/entry_form.html:749
-#: app/templates/forms/entry_form/entry_form.html:1761
+#: app/templates/forms/entry_form/entry_form.html:750
+#: app/templates/forms/entry_form/entry_form.html:1762
 msgid "Collapse/Expand"
 msgstr "Коллапс/Расширение"
 
@@ -4886,7 +4912,7 @@ msgstr "Конфигурация"
 msgid "Configured via deployment / Config.FEATURES"
 msgstr "Настроено через развертывание / Config.FEATURES"
 
-#: app/templates/admin/assignments/manage_assignment.html:1030
+#: app/templates/admin/assignments/manage_assignment.html:1029
 #: app/templates/admin/assignments/public_submissions.html:382
 msgid "Confirm"
 msgstr "Подтвердите"
@@ -4904,7 +4930,7 @@ msgstr "Подтвердить удаление"
 msgid "Confirm New Password"
 msgstr "Забыли пароль?"
 
-#: app/templates/auth/login.html:679 app/templates/auth/register.html:25
+#: app/templates/auth/login.html:704 app/templates/auth/register.html:25
 msgid "Confirm Password"
 msgstr "Забыли пароль?"
 
@@ -4912,7 +4938,7 @@ msgstr "Забыли пароль?"
 msgid "Confirm Plugin Uninstallation"
 msgstr "Confirm Plugin Uninstallation"
 
-#: app/templates/admin/assignments/manage_assignment.html:1038
+#: app/templates/admin/assignments/manage_assignment.html:1037
 msgid "Confirm action"
 msgstr "Подтвердить действие"
 
@@ -4954,19 +4980,19 @@ msgstr "Название страны"
 msgid "Contains"
 msgstr "Содержит"
 
-#: app/templates/auth/login.html:673 app/templates/auth/reset_password.html:40
+#: app/templates/auth/login.html:698 app/templates/auth/reset_password.html:40
 msgid "Contains a lowercase letter"
 msgstr "Содержит строчную букву"
 
-#: app/templates/auth/login.html:674 app/templates/auth/reset_password.html:41
+#: app/templates/auth/login.html:699 app/templates/auth/reset_password.html:41
 msgid "Contains a number"
 msgstr "Содержит число"
 
-#: app/templates/auth/login.html:675 app/templates/auth/reset_password.html:42
+#: app/templates/auth/login.html:700 app/templates/auth/reset_password.html:42
 msgid "Contains a special character (e.g. !@#$)"
 msgstr "Содержит специальный символ (например, !@#$)"
 
-#: app/templates/auth/login.html:672 app/templates/auth/reset_password.html:39
+#: app/templates/auth/login.html:697 app/templates/auth/reset_password.html:39
 msgid "Contains an uppercase letter"
 msgstr "Содержит заглавную букву"
 
@@ -4983,7 +5009,7 @@ msgstr "Комментарии"
 msgid "Context Data"
 msgstr "Контекстные данные"
 
-#: app/templates/admin/assignments/manage_assignment.html:1035
+#: app/templates/admin/assignments/manage_assignment.html:1034
 #: app/templates/admin/translations/manage_translations.html:667
 #: app/templates/forms/form_builder/form_builder.html:1241
 msgid "Continue"
@@ -5031,7 +5057,7 @@ msgstr "Скопировано!"
 #: app/templates/admin/api_keys/rotate_success.html:57
 #: app/templates/admin/api_keys/rotate_success.html:109
 #: app/templates/admin/api_management.html:699
-#: app/templates/admin/assignments/manage_assignment.html:337
+#: app/templates/admin/assignments/manage_assignment.html:338
 #: app/templates/core/chat_immersive.html:53
 #: app/templates/forms/form_builder/partials/_item_modal.html:1054
 msgid "Copy"
@@ -5161,7 +5187,7 @@ msgid "Could not check for existing data. Please try again."
 msgstr ""
 "Не удалось проверить существующие данные. Пожалуйста, попробуйте ещё раз."
 
-#: app/routes/auth.py:619
+#: app/routes/auth.py:803
 msgid "Could not complete Azure sign-in."
 msgstr "Не удалось завершить вход Azure в систему."
 
@@ -5170,7 +5196,7 @@ msgstr "Не удалось завершить вход Azure в систему.
 msgid "Could not create SP/EF entry."
 msgstr "Не удалось создать запись в SP/EF."
 
-#: app/routes/auth.py:1111
+#: app/routes/auth.py:1313
 msgid "Could not create account. Please try again."
 msgstr "Не удалось отправить форму. Попробуйте еще раз."
 
@@ -5186,7 +5212,7 @@ msgstr "Не мог создать тип."
 msgid "Could not create unit."
 msgstr "Не смог создать юнит."
 
-#: app/routes/auth.py:759 app/routes/auth.py:764
+#: app/routes/auth.py:943 app/routes/auth.py:948
 msgid "Could not create user from Azure login."
 msgstr "Не удалось создать пользователя через Azure login."
 
@@ -5352,7 +5378,7 @@ msgstr "Страны — Excel"
 #: app/templates/admin/ai/documents.html:531
 #: app/templates/admin/analytics/audit_trail.html:245
 #: app/templates/admin/analytics/audit_trail.html:448
-#: app/templates/admin/assignments/manage_assignment.html:736
+#: app/templates/admin/assignments/manage_assignment.html:735
 #: app/templates/admin/assignments/public_submissions.html:216
 #: app/templates/admin/countries/manage_country.html:4
 #: app/templates/admin/countries/manage_country.html:8
@@ -5446,7 +5472,7 @@ msgstr "Краткое описание страны"
 msgid "Country whose data you will manage"
 msgstr "Страна, данные которой вы будете управлять"
 
-#: app/templates/auth/login.html:656
+#: app/templates/auth/login.html:681
 msgid "Country you will cover"
 msgstr "Страну, которую ты будешь обслуживать"
 
@@ -5490,7 +5516,7 @@ msgstr "Создать"
 msgid "Create API Key"
 msgstr "Создать отчет"
 
-#: app/templates/auth/login.html:682
+#: app/templates/auth/login.html:707
 msgid "Create Account"
 msgstr "Создано"
 
@@ -5619,11 +5645,11 @@ msgstr ""
 "шаблоны для стандартизации сбора данных в разные периоды и обеспечения "
 "согласованности ваших отчетных процессов."
 
-#: app/templates/admin/assignments/manage_assignment.html:1032
+#: app/templates/admin/assignments/manage_assignment.html:1031
 msgid "Create anyway"
 msgstr "Всё равно создавайте"
 
-#: app/templates/admin/assignments/manage_assignment.html:1034
+#: app/templates/admin/assignments/manage_assignment.html:1033
 msgid "Create assignment"
 msgstr "Создать задание"
 
@@ -5651,7 +5677,7 @@ msgstr ""
 msgid "Create with AI"
 msgstr "Создавайте с помощью ИИ"
 
-#: app/templates/auth/login.html:643 app/templates/auth/register.html:5
+#: app/templates/auth/login.html:668 app/templates/auth/register.html:5
 msgid "Create your account"
 msgstr "Войдите в свой аккаунт"
 
@@ -5730,7 +5756,7 @@ msgstr "Код валюты"
 msgid "Current"
 msgstr "Настоящее время"
 
-#: app/templates/forms/entry_form/entry_form.html:2723
+#: app/templates/forms/entry_form/entry_form.html:2724
 msgid "Current Document:"
 msgstr "Редактировать документ"
 
@@ -5747,7 +5773,7 @@ msgstr "Текущие показатели системы"
 msgid "Current Year View"
 msgstr "Код валюты"
 
-#: app/templates/admin/assignments/manage_assignment.html:196
+#: app/templates/admin/assignments/manage_assignment.html:197
 msgid "Current name:"
 msgstr "Текущее название:"
 
@@ -5773,7 +5799,7 @@ msgstr "Текущая миниатюра:"
 msgid "Currently viewing/editing this version"
 msgstr "В настоящее время смотрю/редактирую эту версию"
 
-#: app/templates/forms/entry_form/entry_form.html:2985
+#: app/templates/forms/entry_form/entry_form.html:2986
 msgid "Currently with you editing this form:"
 msgstr "В настоящее время вы редактируете эту форму:"
 
@@ -5796,11 +5822,11 @@ msgstr "Custom Fields"
 msgid "Custom Label (Optional)"
 msgstr "Индивидуальная этикетка (по желанию)"
 
-#: app/templates/admin/assignments/manage_assignment.html:161
+#: app/templates/admin/assignments/manage_assignment.html:162
 msgid "Custom Name"
 msgstr "Пользовательское имя"
 
-#: app/templates/admin/assignments/manage_assignment.html:769
+#: app/templates/admin/assignments/manage_assignment.html:768
 msgid "Custom Name Translations"
 msgstr "Переводы пользовательских имён"
 
@@ -6018,7 +6044,7 @@ msgstr "Вопросы по валидации данных"
 msgid "Data Values"
 msgstr "Значения данных"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:436
+#: app/templates/forms/entry_form/partials/matrix_table.html:438
 msgid "Data availability options"
 msgstr "Индекс качества данных"
 
@@ -6026,7 +6052,7 @@ msgstr "Индекс качества данных"
 msgid "Data collection launch"
 msgstr "Запуск сбора данных"
 
-#: app/routes/main/helpers.py:1191
+#: app/routes/main/helpers.py:1149
 msgid ""
 "Data entry is underway. You can save drafts and continue completing the "
 "form."
@@ -6034,7 +6060,7 @@ msgstr ""
 "Введение данных уже начатое. Вы можете сохранять черновики и продолжать "
 "заполнять форму."
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:72
+#: app/templates/forms/entry_form/partials/matrix_table.html:74
 msgid "Data matrix for"
 msgstr "Экспорт данных"
 
@@ -6111,7 +6137,7 @@ msgid "Day of week"
 msgstr "День недели"
 
 #: app/templates/admin/assignments/assignments.html:127
-#: app/templates/admin/assignments/manage_assignment.html:342
+#: app/templates/admin/assignments/manage_assignment.html:343
 #: app/templates/admin/plugin_management.html:212
 #: app/templates/admin/user_management/user_form.html:29
 #: app/templates/admin/user_management/user_form.html:765
@@ -6132,12 +6158,12 @@ msgstr "Напоминание о сроке"
 msgid "Deadline reminder"
 msgstr "Напоминание о дедлайне"
 
-#: app/templates/admin/assignments/manage_assignment.html:123
-#: app/templates/admin/assignments/manage_assignment.html:143
+#: app/templates/admin/assignments/manage_assignment.html:124
+#: app/templates/admin/assignments/manage_assignment.html:144
 #: app/templates/admin/documents/documents.html:293
 #: app/templates/admin/documents/documents.html:319
-#: app/templates/forms/entry_form/entry_form.html:2868
-#: app/templates/forms/entry_form/entry_form.html:2894
+#: app/templates/forms/entry_form/entry_form.html:2869
+#: app/templates/forms/entry_form/entry_form.html:2895
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:76
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:89
 #: app/templates/forms/form_builder/partials/_item_modal.html:548
@@ -6199,7 +6225,7 @@ msgstr "Шаблоны по умолчанию"
 msgid "Default title"
 msgstr "Заголовок по умолчанию"
 
-#: app/templates/admin/assignments/manage_assignment.html:200
+#: app/templates/admin/assignments/manage_assignment.html:201
 msgid "Default:"
 msgstr "По умолчанию:"
 
@@ -6223,10 +6249,10 @@ msgstr ""
 #: app/templates/admin/validation_questions.html:212
 #: app/templates/admin/validation_questions.html:275
 #: app/templates/components/_builder_items.html:68
-#: app/templates/forms/entry_form/entry_form.html:1033
-#: app/templates/forms/entry_form/entry_form.html:1064
-#: app/templates/forms/entry_form/entry_form.html:1982
-#: app/templates/forms/entry_form/entry_form.html:2012
+#: app/templates/forms/entry_form/entry_form.html:1034
+#: app/templates/forms/entry_form/entry_form.html:1065
+#: app/templates/forms/entry_form/entry_form.html:1983
+#: app/templates/forms/entry_form/entry_form.html:2013
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:90
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:120
 #: app/templates/forms/form_builder/form_builder.html:626
@@ -6319,7 +6345,7 @@ msgstr "Удалить Common Word?"
 msgid "Delete Data and Remove"
 msgstr "Удалить данные и удалить их"
 
-#: app/templates/forms/entry_form/entry_form.html:2683
+#: app/templates/forms/entry_form/entry_form.html:2684
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:109
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:160
 msgid "Delete Document"
@@ -6410,7 +6436,7 @@ msgid "Delete sector"
 msgstr "Удалить сектор"
 
 #: app/templates/admin/ai/reasoning_traces.html:149
-#: app/templates/admin/assignments/manage_assignment.html:498
+#: app/templates/admin/assignments/manage_assignment.html:497
 msgid "Delete selected"
 msgstr "Удаление выбрано"
 
@@ -6434,7 +6460,7 @@ msgstr "Удалить этот код SP/EF? Это нельзя исправи
 msgid "Delete this conversation? This cannot be undone."
 msgstr "Удалить этот разговор? Это нельзя исправить."
 
-#: app/templates/forms/entry_form/entry_form.html:3806
+#: app/templates/forms/entry_form/entry_form.html:3807
 msgid "Delete this entry"
 msgstr "Удалить эту запись"
 
@@ -6630,10 +6656,10 @@ msgstr ""
 #: app/templates/components/_builder_items.html:89
 #: app/templates/components/_builder_items.html:95
 #: app/templates/components/_builder_items.html:108
-#: app/templates/forms/entry_form/entry_form.html:860
-#: app/templates/forms/entry_form/entry_form.html:1083
-#: app/templates/forms/entry_form/entry_form.html:1822
-#: app/templates/forms/entry_form/entry_form.html:2031
+#: app/templates/forms/entry_form/entry_form.html:861
+#: app/templates/forms/entry_form/entry_form.html:1084
+#: app/templates/forms/entry_form/entry_form.html:1823
+#: app/templates/forms/entry_form/entry_form.html:2032
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:65
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:139
 #: app/templates/forms/form_builder/form_builder.html:658
@@ -6750,7 +6776,7 @@ msgstr "Инвалидность"
 msgid "Disability questions"
 msgstr "Вопросы по инвалидности"
 
-#: app/templates/admin/assignments/manage_assignment.html:511
+#: app/templates/admin/assignments/manage_assignment.html:510
 msgid "Disable public reporting"
 msgstr "Отключить публичную отчетность"
 
@@ -6893,7 +6919,7 @@ msgid "Dismiss selected email failure(s) without retrying?"
 msgstr ""
 "Отклонить выбранные ошибки по электронной почте без повторной попытки?"
 
-#: app/templates/forms/entry_form/entry_form.html:2953
+#: app/templates/forms/entry_form/entry_form.html:2954
 msgid "Dismiss warning"
 msgstr "Additional Warnings:"
 
@@ -7002,7 +7028,7 @@ msgstr "Название дивизиона"
 msgid "Divisions"
 msgstr "Определения"
 
-#: app/templates/admin/assignments/manage_assignment.html:657
+#: app/templates/admin/assignments/manage_assignment.html:656
 #: app/templates/admin/user_management/user_form.html:971
 msgid "Divisions & Departments"
 msgstr "Подразделения и департаменты"
@@ -7075,7 +7101,7 @@ msgid "Document Management"
 msgstr "Управление документами"
 
 # Documents
-#: app/templates/forms/entry_form/entry_form.html:2695
+#: app/templates/forms/entry_form/entry_form.html:2696
 msgid "Document Selected"
 msgstr "Тип документа"
 
@@ -7095,7 +7121,7 @@ msgid "Document Type (Optional)"
 msgstr "Тип документа (необязательно)"
 
 # Documents
-#: app/templates/forms/entry_form/entry_form.html:2782
+#: app/templates/forms/entry_form/entry_form.html:2783
 msgid "Document Type:"
 msgstr "Тип документа"
 
@@ -7103,7 +7129,7 @@ msgstr "Тип документа"
 msgid "Document Types"
 msgstr "Типы документов"
 
-#: app/templates/forms/entry_form/entry_form.html:2694
+#: app/templates/forms/entry_form/entry_form.html:2695
 msgid "Document Updated"
 msgstr "Документ загружен"
 
@@ -7111,7 +7137,7 @@ msgstr "Документ загружен"
 msgid "Document Upload"
 msgstr "Загрузка документов"
 
-#: app/templates/forms/entry_form/entry_form.html:2935
+#: app/templates/forms/entry_form/entry_form.html:2936
 msgid "Document Upload Not Available"
 msgstr "Документ загружен"
 
@@ -7144,7 +7170,7 @@ msgstr "Название документа (необязательно)"
 msgid "Document types"
 msgstr "Типы документов"
 
-#: app/templates/forms/entry_form/entry_form.html:2936
+#: app/templates/forms/entry_form/entry_form.html:2937
 msgid "Document upload is disabled when the form is read-only."
 msgstr "Импорт отключен, когда форма отправлена или одобрена."
 
@@ -7152,7 +7178,7 @@ msgstr "Импорт отключен, когда форма отправлен�
 msgid "Document uploaded"
 msgstr "Загружен документ"
 
-#: app/routes/main/helpers.py:1350
+#: app/routes/main/helpers.py:1308
 #, python-format
 msgid "Document uploaded: %(document)s"
 msgstr "Документ загружен"
@@ -7270,7 +7296,7 @@ msgstr "Скачать документ"
 msgid "Download preview Excel"
 msgstr "Скачать превью в Excel"
 
-#: app/templates/forms/entry_form/entry_form.html:2616
+#: app/templates/forms/entry_form/entry_form.html:2617
 msgid "Download template"
 msgstr "Скачать шаблон"
 
@@ -7353,7 +7379,7 @@ msgstr "Перетаскивайте пользовательские типы �
 msgid "Drop UPR Master.xlsx here or click to browse"
 msgstr "Оставьте UPR Master.xlsx здесь или нажмите для просмотра"
 
-#: app/templates/forms/entry_form/entry_form.html:2632
+#: app/templates/forms/entry_form/entry_form.html:2633
 msgid "Drop your saved workbook here"
 msgstr "Оставьте сохранённую рабочую тетрадь здесь"
 
@@ -7372,8 +7398,8 @@ msgstr ""
 "Пробный запуск (только предварительный просмотр, без записи в базу данных)"
 
 #: app/templates/admin/assignments/assignments.html:119
-#: app/templates/admin/assignments/manage_assignment.html:236
-#: app/templates/admin/assignments/manage_assignment.html:368
+#: app/templates/admin/assignments/manage_assignment.html:237
+#: app/templates/admin/assignments/manage_assignment.html:369
 #: app/templates/core/dashboard.html:1289
 msgid "Due Date"
 msgstr "Срок выполнения"
@@ -7420,7 +7446,7 @@ msgstr "Дублирующий участок"
 msgid "Duplicate Sub-section"
 msgstr "Дублирующий подраздел"
 
-#: app/templates/admin/assignments/manage_assignment.html:1033
+#: app/templates/admin/assignments/manage_assignment.html:1032
 msgid "Duplicate assignment"
 msgstr "Дублирующее назначение"
 
@@ -7567,7 +7593,7 @@ msgstr ""
 " чтобы скрыть/показать содержимое раздела. Заполните все необходимые поля, "
 "отмеченные красной звездочкой (*)."
 
-#: app/templates/admin/assignments/manage_assignment.html:371
+#: app/templates/admin/assignments/manage_assignment.html:372
 msgid "Earliest:"
 msgstr "Самые ранние:"
 
@@ -7630,7 +7656,7 @@ msgid "Edit Details"
 msgstr "Редактировать детали"
 
 #: app/templates/admin/documents/documents.html:109
-#: app/templates/forms/entry_form/entry_form.html:2682
+#: app/templates/forms/entry_form/entry_form.html:2683
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:104
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:105
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:155
@@ -7680,7 +7706,7 @@ msgstr "Раздел редактирования"
 msgid "Edit Sector"
 msgstr "Редактировать сектор"
 
-#: app/templates/admin/assignments/manage_assignment.html:780
+#: app/templates/admin/assignments/manage_assignment.html:779
 msgid "Edit Status"
 msgstr "Статус правки"
 
@@ -7772,10 +7798,10 @@ msgstr ""
 #: app/templates/admin/user_management/user_form.html:1105
 #: app/templates/admin/user_management/users.html:292
 #: app/templates/auth/forgot_password.html:10
-#: app/templates/auth/login.html:648 app/templates/auth/login.html:697
-#: app/templates/auth/register.html:9 app/templates/core/dashboard.html:2405
-#: app/templates/core/dashboard.html:2462
-#: app/templates/core/dashboard.html:2512 app/templates/core/layout.html:311
+#: app/templates/auth/login.html:673 app/templates/auth/login.html:722
+#: app/templates/auth/register.html:9 app/templates/core/dashboard.html:2404
+#: app/templates/core/dashboard.html:2461
+#: app/templates/core/dashboard.html:2511 app/templates/core/layout.html:311
 #: app/templates/notifications/_preferences_form.html:86
 #: app/templates/public_submission_export_pdf.html:25
 msgid "Email"
@@ -8040,7 +8066,7 @@ msgstr ""
 msgid "Enable Sound"
 msgstr "Включить звук"
 
-#: app/templates/admin/assignments/manage_assignment.html:508
+#: app/templates/admin/assignments/manage_assignment.html:507
 msgid "Enable public reporting"
 msgstr "Обеспечение публичной отчетности"
 
@@ -8068,9 +8094,9 @@ msgstr "Все типы активности"
 msgid "End"
 msgstr "Конец"
 
-#: app/templates/admin/assignments/manage_assignment.html:128
+#: app/templates/admin/assignments/manage_assignment.html:129
 #: app/templates/admin/documents/documents.html:298
-#: app/templates/forms/entry_form/entry_form.html:2873
+#: app/templates/forms/entry_form/entry_form.html:2874
 msgid "End Period"
 msgstr "Период времени"
 
@@ -8078,9 +8104,9 @@ msgstr "Период времени"
 msgid "End Tour"
 msgstr "Финальный тур"
 
-#: app/templates/admin/assignments/manage_assignment.html:103
+#: app/templates/admin/assignments/manage_assignment.html:104
 #: app/templates/admin/documents/documents.html:256
-#: app/templates/forms/entry_form/entry_form.html:2831
+#: app/templates/forms/entry_form/entry_form.html:2832
 #: app/templates/forms/form_builder/partials/_item_modal.html:513
 msgid "End Year"
 msgstr "Год"
@@ -8201,7 +8227,7 @@ msgstr "Вводите термин или фразу"
 msgid "Enter translation"
 msgstr "Вступает перевод"
 
-#: app/templates/auth/forgot_password.html:6 app/templates/auth/login.html:692
+#: app/templates/auth/forgot_password.html:6 app/templates/auth/login.html:717
 msgid "Enter your email and we'll send you a link to reset your password."
 msgstr "Введите свой email, и мы отправим вам ссылку для сброса пароля."
 
@@ -8231,7 +8257,7 @@ msgstr "Объект"
 msgid "Entity Access"
 msgstr "Доступ к субъектам"
 
-#: app/templates/admin/assignments/manage_assignment.html:417
+#: app/templates/admin/assignments/manage_assignment.html:418
 msgid "Entity Assignments"
 msgstr "Присвоение сущностям"
 
@@ -8264,7 +8290,7 @@ msgstr "Тип активности"
 msgid "Entity Types to Include"
 msgstr "Типы сущностей для включения"
 
-#: app/templates/admin/assignments/manage_assignment.html:432
+#: app/templates/admin/assignments/manage_assignment.html:433
 msgid "Entity assignment mode"
 msgstr "Режим присвоения сущностей"
 
@@ -8280,7 +8306,7 @@ msgstr "Только кампании сущностей"
 msgid "Entity-based"
 msgstr "Объект"
 
-#: app/templates/forms/entry_form/entry_form.html:3805
+#: app/templates/forms/entry_form/entry_form.html:3806
 msgid "Entry"
 msgstr "Запись"
 
@@ -8561,7 +8587,7 @@ msgstr "Импорт/Экспорт Excel"
 msgid "Excel Import/Export"
 msgstr "Импорт/Экспорт Excel"
 
-#: app/templates/forms/entry_form/entry_form.html:2670
+#: app/templates/forms/entry_form/entry_form.html:2671
 msgid "Excel Import/Export Not Available"
 msgstr "Импорт/Экспорт Excel недоступен"
 
@@ -8569,10 +8595,10 @@ msgstr "Импорт/Экспорт Excel недоступен"
 msgid "Excel Imported"
 msgstr "Импорт в Excel"
 
-#: app/templates/forms/entry_form/entry_form.html:2600
-#: app/templates/forms/entry_form/entry_form.html:2643
-#: app/templates/forms/entry_form/entry_form.html:2666
+#: app/templates/forms/entry_form/entry_form.html:2601
+#: app/templates/forms/entry_form/entry_form.html:2644
 #: app/templates/forms/entry_form/entry_form.html:2667
+#: app/templates/forms/entry_form/entry_form.html:2668
 #: app/templates/forms/form_builder/partials/_excel_modal.html:4
 #: app/templates/forms/form_builder/partials/_excel_modal.html:56
 #: app/templates/macros/excel_io_modal.html:58
@@ -8610,12 +8636,12 @@ msgstr ""
 msgid "Excel import requires a 'msgid' column header."
 msgstr "Для импорта в Excel требуется заголовок столбца 'msgid'."
 
-#: app/routes/main/helpers.py:1355
+#: app/routes/main/helpers.py:1313
 #, python-format
 msgid "Excel imported: %(count)s values loaded"
 msgstr "Импорт в Excel: значения %(count)s загружены"
 
-#: app/templates/forms/entry_form/entry_form.html:2671
+#: app/templates/forms/entry_form/entry_form.html:2672
 msgid "Excel operations are not available for public submissions."
 msgstr "Операции Excel недоступны для публичных отправлений."
 
@@ -8644,7 +8670,7 @@ msgstr "Путь выполнения"
 msgid "Exit fill content area"
 msgstr "Область содержания выхода"
 
-#: app/templates/forms/entry_form/entry_form.html:2577
+#: app/templates/forms/entry_form/entry_form.html:2578
 msgid "Expand Sections Menu"
 msgstr "Открыть меню разделов"
 
@@ -8667,7 +8693,7 @@ msgstr "Развернуть все страницы"
 msgid "Expand all sections"
 msgstr "Развернуть все разделы"
 
-#: app/templates/forms/entry_form/entry_form.html:2975
+#: app/templates/forms/entry_form/entry_form.html:2976
 msgid "Expand editors list"
 msgstr "Расширить список редакторов"
 
@@ -8721,8 +8747,8 @@ msgid "Expires"
 msgstr "Эксперты"
 
 #: app/templates/admin/assignments/assignments.html:120
-#: app/templates/admin/assignments/manage_assignment.html:251
-#: app/templates/admin/assignments/manage_assignment.html:387
+#: app/templates/admin/assignments/manage_assignment.html:252
+#: app/templates/admin/assignments/manage_assignment.html:388
 msgid "Expiry Date"
 msgstr "Срок годности"
 
@@ -8776,7 +8802,7 @@ msgstr "Экспортный CSV"
 msgid "Export Data"
 msgstr "Исследование данных"
 
-#: app/templates/forms/entry_form/entry_form.html:2650
+#: app/templates/forms/entry_form/entry_form.html:2651
 msgid "Export Data Template (.xlsx)"
 msgstr "Экспорт шаблона данных (.xlsx)"
 
@@ -8822,7 +8848,7 @@ msgstr "Структура шаблона экспорта (.xlsx)"
 msgid "Export Timeline"
 msgstr "Варианты экспорта"
 
-#: app/templates/forms/entry_form/entry_form.html:2624
+#: app/templates/forms/entry_form/entry_form.html:2625
 msgid "Export UPR Country Reporting (.xlsx)"
 msgstr "Экспортная отчетность по странам УНР (.xlsx)"
 
@@ -9017,11 +9043,11 @@ msgstr "Неудачный вход"
 msgid "Failed logins"
 msgstr "Неудачные входы"
 
-#: app/templates/forms/entry_form/entry_form.html:3543
+#: app/templates/forms/entry_form/entry_form.html:3544
 msgid "Failed modules"
 msgstr "Неудачные входы в систему"
 
-#: app/templates/forms/entry_form/entry_form.html:3830
+#: app/templates/forms/entry_form/entry_form.html:3831
 msgid "Failed to add indicator"
 msgstr "Не удалось добавить индикатор"
 
@@ -9048,7 +9074,7 @@ msgstr "Не удалось создать дополнительный вопр
 msgid "Failed to delete document."
 msgstr "Не удалось удалить документ."
 
-#: app/templates/forms/entry_form/entry_form.html:3835
+#: app/templates/forms/entry_form/entry_form.html:3836
 msgid "Failed to delete indicator"
 msgstr "Не удалось удалить индикатор"
 
@@ -9150,7 +9176,7 @@ msgstr "Не удалось перевести"
 msgid "Failed to save indicator"
 msgstr "Индикатор не удалось сохранить"
 
-#: app/routes/auth.py:1415
+#: app/routes/auth.py:1641
 msgid "Failed to save profile. Please try again."
 msgstr "Не удалось сохранить профиль. Пожалуйста, попробуйте ещё раз."
 
@@ -9256,12 +9282,12 @@ msgstr "Поиск конечной точки"
 msgid "Features"
 msgstr "Особенности"
 
-#: app/templates/admin/assignments/manage_assignment.html:113
-#: app/templates/admin/assignments/manage_assignment.html:133
+#: app/templates/admin/assignments/manage_assignment.html:114
+#: app/templates/admin/assignments/manage_assignment.html:134
 #: app/templates/admin/documents/documents.html:283
 #: app/templates/admin/documents/documents.html:309
-#: app/templates/forms/entry_form/entry_form.html:2858
-#: app/templates/forms/entry_form/entry_form.html:2884
+#: app/templates/forms/entry_form/entry_form.html:2859
+#: app/templates/forms/entry_form/entry_form.html:2885
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:73
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:86
 #: app/templates/forms/form_builder/partials/_item_modal.html:538
@@ -9287,8 +9313,8 @@ msgstr "Идентификатор поля"
 msgid "Field Label"
 msgstr "Field Label"
 
-#: app/templates/forms/entry_form/entry_form.html:930
-#: app/templates/forms/entry_form/entry_form.html:1891
+#: app/templates/forms/entry_form/entry_form.html:931
+#: app/templates/forms/entry_form/entry_form.html:1892
 msgid "Field Type No Longer Supported"
 msgstr "Тип поля больше не поддерживается"
 
@@ -9312,7 +9338,7 @@ msgid "Field to sort by (submitted_at, template_id, country_id, period_name)"
 msgstr ""
 "Поле для сортировки по (submitted_at, template_id, country_id, period_name)"
 
-#: app/templates/forms/entry_form/entry_form.html:2704
+#: app/templates/forms/entry_form/entry_form.html:2705
 msgid "Field:"
 msgstr "неудачных"
 
@@ -9349,7 +9375,7 @@ msgstr "Файл слишком большой (максимум 50 МБ)"
 msgid "File is too large (max 80 MB)"
 msgstr "Файл слишком большой (максимум 80 МБ)"
 
-#: app/templates/forms/entry_form/entry_form.html:2684
+#: app/templates/forms/entry_form/entry_form.html:2685
 msgid "File size exceeds 25MB limit. Please select a smaller file."
 msgstr ""
 "Размер файла превышает лимит в 25 МБ. Пожалуйста, выберите меньший файл."
@@ -9655,7 +9681,7 @@ msgstr ""
 #: app/templates/admin/dashboard.html:280
 #: app/templates/admin/user_management/user_form.html:309
 #: app/templates/admin/user_management/users.html:183
-#: app/templates/tours/tours.html:478
+#: app/templates/auth/login.html:632 app/templates/tours/tours.html:478
 msgid "Focal Point"
 msgstr "Координатор"
 
@@ -9679,7 +9705,7 @@ msgstr "Ключевые моменты"
 msgid "Focal points can add indicators from the indicator bank"
 msgstr "Фокусные точки могут добавлять индикаторы из банка индикаторов"
 
-#: app/templates/admin/assignments/manage_assignment.html:291
+#: app/templates/admin/assignments/manage_assignment.html:292
 msgid ""
 "Focal points will be notified about the new assignment. Uncheck to create "
 "without sending notifications."
@@ -9723,7 +9749,7 @@ msgstr "После этого элемента заставить сменить
 msgid "Forgot Password"
 msgstr "Забыли пароль?"
 
-#: app/templates/auth/forgot_password.html:5 app/templates/auth/login.html:691
+#: app/templates/auth/forgot_password.html:5 app/templates/auth/login.html:716
 msgid "Forgot your password?"
 msgstr "Забыли пароль?"
 
@@ -9799,11 +9825,11 @@ msgstr ""
 "дополнительной информацией. Поля, выделенные жёлтым, содержат заранее "
 "заполненные значения, которые можно просматривать и изменять."
 
-#: app/templates/forms/entry_form/entry_form.html:3522
+#: app/templates/forms/entry_form/entry_form.html:3523
 msgid "Form initialization failed"
 msgstr "Проверка не удалась: "
 
-#: app/templates/forms/entry_form/entry_form.html:3422
+#: app/templates/forms/entry_form/entry_form.html:3423
 msgid "Form initialization timeout - some modules may have failed to load"
 msgstr "Тайм-аут инициализации формы — некоторые модули могли не загрузиться"
 
@@ -9993,7 +10019,7 @@ msgstr "Общее объявление"
 msgid "Generate PDF Thumbnail"
 msgstr "Сгенерированный URL"
 
-#: app/templates/admin/assignments/manage_assignment.html:358
+#: app/templates/admin/assignments/manage_assignment.html:359
 msgid "Generate Public URL"
 msgstr "Сгенерированный URL"
 
@@ -10108,7 +10134,7 @@ msgstr "Dashboard управления"
 msgid "Governance, finance, and people-reached indicators"
 msgstr "Показатели управления, финансов и дохода до людей"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:216
+#: app/templates/forms/entry_form/partials/matrix_table.html:218
 msgid "Grand total for matrix"
 msgstr "Общая сумма для матрицы"
 
@@ -10117,7 +10143,7 @@ msgstr "Общая сумма для матрицы"
 msgid "Granted directly"
 msgstr "Предоставлены напрямую"
 
-#: app/templates/auth/login.html:1237
+#: app/templates/auth/login.html:1304
 msgid "Great! This email is available."
 msgstr "Отлично! Это письмо доступно."
 
@@ -10319,6 +10345,7 @@ msgstr "Помогите коллегам понять, кто вы."
 
 #: app/templates/admin/ai/conversation_traces.html:349
 #: app/templates/admin/ai/trace_detail.html:87
+#: app/templates/core/dashboard.html:3029
 msgid "Hide"
 msgstr "Спрячься"
 
@@ -10340,6 +10367,10 @@ msgstr "Секции для скрытия"
 #: app/templates/macros/filter_card.html:37
 msgid "Hide filters"
 msgstr "Скрыть фильтры"
+
+#: app/templates/core/dashboard.html:3031
+msgid "Hide past assignments"
+msgstr "Скрыть прошлые задания"
 
 #: app/templates/core/dashboard.html:3017
 msgid "Hide score breakdown"
@@ -10589,7 +10620,7 @@ msgstr "Класс иконки"
 msgid "Identity confirmed"
 msgstr "Идентификация подтверждена"
 
-#: app/routes/auth.py:1160
+#: app/routes/auth.py:1378
 msgid "If an account exists for that email, a reset link has been sent."
 msgstr "Если для этого письма существует аккаунт, ссылка на сброс отправлена."
 
@@ -10607,7 +10638,7 @@ msgstr ""
 "Если он установлен, этот раздел будет вложен в выбранную родительскую "
 "секцию."
 
-#: app/templates/forms/entry_form/entry_form.html:2951
+#: app/templates/forms/entry_form/entry_form.html:2952
 msgid ""
 "If they save after you, your changes may be overwritten. Coordinate to avoid"
 " conflicts."
@@ -10678,7 +10709,7 @@ msgid "Import Common Words"
 msgstr "Импортные обычные слова"
 
 #: app/templates/admin/lists/list_detail.html:47
-#: app/templates/forms/entry_form/entry_form.html:2658
+#: app/templates/forms/entry_form/entry_form.html:2659
 #: app/templates/macros/excel_io_modal.html:62
 msgid "Import Data"
 msgstr "Импорт данных"
@@ -10942,7 +10973,7 @@ msgstr "Уведомление о введённых значениях"
 msgid "Imputed value"
 msgstr "Введённое значение"
 
-#: app/routes/main/helpers.py:1226
+#: app/routes/main/helpers.py:1184
 msgid "In Progress"
 msgstr "В процессе"
 
@@ -11234,24 +11265,24 @@ msgstr ""
 msgid "Indirect Reach"
 msgstr "Косвенный охват"
 
-#: app/templates/forms/entry_form/entry_form.html:1536
-#: app/templates/forms/entry_form/entry_form.html:1678
-#: app/templates/forms/entry_form/entry_form.html:2387
+#: app/templates/forms/entry_form/entry_form.html:1537
+#: app/templates/forms/entry_form/entry_form.html:1679
+#: app/templates/forms/entry_form/entry_form.html:2388
 #: app/templates/forms/form_builder/partials/_item_modal.html:1104
 msgid "Indirect reach"
 msgstr "Косвенный охват"
 
-#: app/templates/forms/entry_form/entry_form.html:1168
-#: app/templates/forms/entry_form/entry_form.html:1197
-#: app/templates/forms/entry_form/entry_form.html:1309
-#: app/templates/forms/entry_form/entry_form.html:1338
-#: app/templates/forms/entry_form/entry_form.html:1462
-#: app/templates/forms/entry_form/entry_form.html:1491
-#: app/templates/forms/entry_form/entry_form.html:2189
-#: app/templates/forms/entry_form/entry_form.html:2210
-#: app/templates/forms/entry_form/entry_form.html:2237
-#: app/templates/forms/entry_form/entry_form.html:2296
-#: app/templates/forms/entry_form/entry_form.html:2323
+#: app/templates/forms/entry_form/entry_form.html:1169
+#: app/templates/forms/entry_form/entry_form.html:1198
+#: app/templates/forms/entry_form/entry_form.html:1310
+#: app/templates/forms/entry_form/entry_form.html:1339
+#: app/templates/forms/entry_form/entry_form.html:1463
+#: app/templates/forms/entry_form/entry_form.html:1492
+#: app/templates/forms/entry_form/entry_form.html:2190
+#: app/templates/forms/entry_form/entry_form.html:2211
+#: app/templates/forms/entry_form/entry_form.html:2238
+#: app/templates/forms/entry_form/entry_form.html:2297
+#: app/templates/forms/entry_form/entry_form.html:2324
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:219
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:247
 msgid "Indirect reach:"
@@ -11321,7 +11352,7 @@ msgstr "Целое число"
 msgid "Integrations"
 msgstr "Интеграции"
 
-#: app/routes/auth.py:537
+#: app/routes/auth.py:721
 msgid "Invalid Azure callback."
 msgstr "Invalid Azure callback."
 
@@ -11339,7 +11370,7 @@ msgstr "Неверный формат идентификатора страны.
 msgid "Invalid country selection or country not assigned to you."
 msgstr "Неправильный выбор страны или страна, не назначенная вам."
 
-#: app/routes/auth.py:157 app/routes/auth.py:204 app/routes/auth.py:261
+#: app/routes/auth.py:326 app/routes/auth.py:381 app/routes/auth.py:438
 msgid "Invalid email or password."
 msgstr "Неправильный email или пароль."
 
@@ -11364,7 +11395,7 @@ msgstr "Удален некорректный тип файла"
 msgid "Invalid file type."
 msgstr "Некорректный тип файла."
 
-#: app/templates/forms/entry_form/entry_form.html:2685
+#: app/templates/forms/entry_form/entry_form.html:2686
 msgid ""
 "Invalid file type. Please select a PDF, Word, Excel, PowerPoint, or Text "
 "file."
@@ -11398,7 +11429,7 @@ msgstr "Некорректные заполняющие"
 msgid "Invalid request. Please try again."
 msgstr "Недействительный запрос. Пожалуйста, попробуйте ещё раз."
 
-#: app/routes/auth.py:1184
+#: app/routes/auth.py:1410
 msgid "Invalid reset link."
 msgstr "Неправильная ссылка на сброс."
 
@@ -11547,12 +11578,12 @@ msgstr "Его секторная ссылка будет очищена при 
 msgid "JSON request required"
 msgstr "Требуется запрос на JSON"
 
-#: app/templates/admin/assignments/manage_assignment.html:112
-#: app/templates/admin/assignments/manage_assignment.html:132
+#: app/templates/admin/assignments/manage_assignment.html:113
+#: app/templates/admin/assignments/manage_assignment.html:133
 #: app/templates/admin/documents/documents.html:282
 #: app/templates/admin/documents/documents.html:308
-#: app/templates/forms/entry_form/entry_form.html:2857
-#: app/templates/forms/entry_form/entry_form.html:2883
+#: app/templates/forms/entry_form/entry_form.html:2858
+#: app/templates/forms/entry_form/entry_form.html:2884
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:73
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:86
 #: app/templates/forms/form_builder/partials/_item_modal.html:537
@@ -11568,7 +11599,7 @@ msgstr "JavaScript sink pattern (например, eval() или document.cookie
 msgid "Job Title"
 msgstr "Должность"
 
-#: app/routes/auth.py:1398
+#: app/routes/auth.py:1624
 #: app/templates/components/_profile_completion_modal.html:125
 msgid "Job title is required."
 msgstr "Требуется название должности."
@@ -11585,12 +11616,12 @@ msgstr "Рассуждение судей"
 msgid "Judged traces"
 msgstr "Оценочные следы"
 
-#: app/templates/admin/assignments/manage_assignment.html:118
-#: app/templates/admin/assignments/manage_assignment.html:138
+#: app/templates/admin/assignments/manage_assignment.html:119
+#: app/templates/admin/assignments/manage_assignment.html:139
 #: app/templates/admin/documents/documents.html:288
 #: app/templates/admin/documents/documents.html:314
-#: app/templates/forms/entry_form/entry_form.html:2863
-#: app/templates/forms/entry_form/entry_form.html:2889
+#: app/templates/forms/entry_form/entry_form.html:2864
+#: app/templates/forms/entry_form/entry_form.html:2890
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:75
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:88
 #: app/templates/forms/form_builder/partials/_item_modal.html:543
@@ -11598,12 +11629,12 @@ msgstr "Оценочные следы"
 msgid "Jul"
 msgstr "Июль"
 
-#: app/templates/admin/assignments/manage_assignment.html:117
-#: app/templates/admin/assignments/manage_assignment.html:137
+#: app/templates/admin/assignments/manage_assignment.html:118
+#: app/templates/admin/assignments/manage_assignment.html:138
 #: app/templates/admin/documents/documents.html:287
 #: app/templates/admin/documents/documents.html:313
-#: app/templates/forms/entry_form/entry_form.html:2862
-#: app/templates/forms/entry_form/entry_form.html:2888
+#: app/templates/forms/entry_form/entry_form.html:2863
+#: app/templates/forms/entry_form/entry_form.html:2889
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:74
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:87
 #: app/templates/forms/form_builder/partials/_item_modal.html:542
@@ -11789,7 +11820,7 @@ msgstr "Язык"
 msgid "Language columns"
 msgstr "Языковые колонки"
 
-#: app/templates/forms/entry_form/entry_form.html:2748
+#: app/templates/forms/entry_form/entry_form.html:2749
 msgid "Language:"
 msgstr "Язык"
 
@@ -11928,7 +11959,7 @@ msgstr "Оставить страницу?"
 msgid "Leave blank for no expiry."
 msgstr "Оставьте пустым для отсутствия срока годности."
 
-#: app/templates/admin/assignments/manage_assignment.html:203
+#: app/templates/admin/assignments/manage_assignment.html:204
 msgid "Leave blank to use \"Template – Period\" everywhere."
 msgstr "Оставьте пустым, чтобы использовать «Шаблон – Точка» везде."
 
@@ -11978,7 +12009,7 @@ msgstr "Оставьте пустым, чтобы использовать оп�
 msgid "Leave empty to use the indicator bank name."
 msgstr "Оставьте пустым для использования имени индикаторного банка."
 
-#: app/templates/forms/entry_form/entry_form.html:2725
+#: app/templates/forms/entry_form/entry_form.html:2726
 msgid ""
 "Leave file selection empty to keep current document, or upload a new file to"
 " replace it."
@@ -12125,7 +12156,7 @@ msgstr "Загрузка по умолчанию (только заполнит�
 msgid "Load from campaign"
 msgstr "Загрузка из кампании"
 
-#: app/templates/forms/entry_form/entry_form.html:2634
+#: app/templates/forms/entry_form/entry_form.html:2635
 msgid "Load into form"
 msgstr "Загрузка в форму"
 
@@ -12150,11 +12181,11 @@ msgstr "Краткое описание загрузки"
 msgid "Load summary first"
 msgstr "Сначала сводка загрузки"
 
-#: app/templates/admin/assignments/manage_assignment.html:706
+#: app/templates/admin/assignments/manage_assignment.html:705
 msgid "Loading Regions structure..."
 msgstr "Структура регионов загрузки..."
 
-#: app/templates/admin/assignments/manage_assignment.html:688
+#: app/templates/admin/assignments/manage_assignment.html:687
 msgid "Loading Secretariat structure..."
 msgstr "Структура Секретариата загрузки..."
 
@@ -12236,7 +12267,7 @@ msgstr "Конструктор загрузочной формы..."
 msgid "Loading form items..."
 msgstr "Загрузка документов..."
 
-#: app/templates/forms/entry_form/entry_form.html:350
+#: app/templates/forms/entry_form/entry_form.html:351
 msgid "Loading form…"
 msgstr "Форма для загрузки..."
 
@@ -12369,8 +12400,8 @@ msgstr "Загрузка вопросов на валидацию..."
 #: app/templates/components/_builder_items.html:135
 #: app/templates/components/_builder_items.html:139
 #: app/templates/components/ag_grid_i18n_js.html:67
-#: app/templates/components/ag_grid_includes.html:73
-#: app/templates/components/ag_grid_includes.html:109
+#: app/templates/components/ag_grid_includes.html:68
+#: app/templates/components/ag_grid_includes.html:132
 #: app/templates/components/loading_indicator.html:22
 #: app/templates/core/dashboard.html:3024
 #: app/templates/forms/form_builder/partials/_sections_container.html:303
@@ -12433,7 +12464,7 @@ msgstr "Лог Source"
 msgid "Log in"
 msgstr "Войти"
 
-#: app/templates/auth/login.html:524
+#: app/templates/auth/login.html:581
 msgid "Log in with:"
 msgstr "Войти с:"
 
@@ -12478,7 +12509,7 @@ msgstr "Журналы входа"
 msgid "Login events"
 msgstr "Входные события"
 
-#: app/routes/auth.py:566
+#: app/routes/auth.py:750
 msgid "Login session expired. Please try signing in again."
 msgstr "Сессия входа закончилась. Пожалуйста, попробуйте войти снова."
 
@@ -12542,7 +12573,7 @@ msgstr "Треки низкого качества, требующие пров�
 msgid "Main Screens"
 msgstr "Главные экраны"
 
-#: app/templates/forms/entry_form/entry_form.html:2914
+#: app/templates/forms/entry_form/entry_form.html:2915
 msgid "Make this document publicly accessible"
 msgstr "Отметьте, чтобы сделать документ публичным"
 
@@ -12565,7 +12596,7 @@ msgstr "Управление назначениями"
 msgid "Manage Embed Content"
 msgstr "Управление встраиванием контента"
 
-#: app/templates/admin/assignments/manage_assignment.html:443
+#: app/templates/admin/assignments/manage_assignment.html:444
 msgid "Manage Existing Entities"
 msgstr "Управление существующими организациями"
 
@@ -12648,7 +12679,7 @@ msgstr ""
 "Управление категориями пола по умолчанию, используемыми для дезагрегации. "
 "Перетащите для изменения порядка."
 
-#: app/templates/admin/assignments/manage_assignment.html:421
+#: app/templates/admin/assignments/manage_assignment.html:422
 msgid ""
 "Manage existing entity assignments and assign new entities to this form. "
 "Data will be collected at the specific entity level (e.g., branch data vs. "
@@ -12734,8 +12765,8 @@ msgstr ""
 "Управляйте своими зарегистрированными мобильными устройствами для push-"
 "уведомлений."
 
-#: app/templates/admin/assignments/manage_assignment.html:372
-#: app/templates/admin/assignments/manage_assignment.html:378
+#: app/templates/admin/assignments/manage_assignment.html:373
+#: app/templates/admin/assignments/manage_assignment.html:379
 msgid "Managed per entity below."
 msgstr "Ниже приведено управление по организациям."
 
@@ -12748,8 +12779,8 @@ msgid "Manual list"
 msgstr "Список руководств"
 
 #: app/templates/forms/entry_form/entry_form.html:51
-#: app/templates/forms/entry_form/entry_form.html:3317
-#: app/templates/forms/entry_form/entry_form.html:3336
+#: app/templates/forms/entry_form/entry_form.html:3318
+#: app/templates/forms/entry_form/entry_form.html:3337
 msgid "Manual save required"
 msgstr "Управление ресурсами"
 
@@ -12791,12 +12822,12 @@ msgstr ""
 "иконка, отображаемая в сетках. Совпадает с энумом NotificationType, "
 "используемым для хранящихся строк."
 
-#: app/templates/admin/assignments/manage_assignment.html:114
-#: app/templates/admin/assignments/manage_assignment.html:134
+#: app/templates/admin/assignments/manage_assignment.html:115
+#: app/templates/admin/assignments/manage_assignment.html:135
 #: app/templates/admin/documents/documents.html:284
 #: app/templates/admin/documents/documents.html:310
-#: app/templates/forms/entry_form/entry_form.html:2859
-#: app/templates/forms/entry_form/entry_form.html:2885
+#: app/templates/forms/entry_form/entry_form.html:2860
+#: app/templates/forms/entry_form/entry_form.html:2886
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:73
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:86
 #: app/templates/forms/form_builder/partials/_item_modal.html:539
@@ -12884,17 +12915,17 @@ msgstr "Матричная таблица"
 msgid "Matrix Title"
 msgstr "Название Matrix"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:405
+#: app/templates/forms/entry_form/partials/matrix_table.html:407
 msgid "Matrix configuration not available. Please contact the administrator."
 msgstr ""
 "Конфигурация матрицы недоступна. Пожалуйста, свяжитесь с администратором."
 
-#: app/templates/forms/entry_form/entry_form.html:3550
+#: app/templates/forms/entry_form/entry_form.html:3551
 msgid "Matrix functionality unavailable"
 msgstr "Функциональность матрицы недоступна"
 
-#: app/templates/forms/entry_form/entry_form.html:3530
-#: app/templates/forms/entry_form/entry_form.html:3534
+#: app/templates/forms/entry_form/entry_form.html:3531
+#: app/templates/forms/entry_form/entry_form.html:3535
 msgid "Matrix handler not initialized"
 msgstr "Обработчик матриц не инициализирован"
 
@@ -12907,8 +12938,8 @@ msgstr "Максимальные итерации"
 msgid "Max Number of Entries"
 msgstr "Максимальное количество заявок"
 
-#: app/templates/forms/entry_form/entry_form.html:1740
-#: app/templates/forms/entry_form/entry_form.html:2478
+#: app/templates/forms/entry_form/entry_form.html:1741
+#: app/templates/forms/entry_form/entry_form.html:2479
 #, python-format
 msgid "Max entries: %(max)s"
 msgstr "Максимальное количество участников: %(max)s"
@@ -12926,16 +12957,16 @@ msgstr "Максимальная ширина"
 msgid "Maximum Documents Allowed"
 msgstr "Максимальное количество разрешённых документов"
 
-#: app/templates/forms/entry_form/entry_form.html:2696
+#: app/templates/forms/entry_form/entry_form.html:2697
 msgid "Maximum documents allowed"
 msgstr "Документ загружен"
 
-#: app/templates/forms/entry_form/entry_form.html:2661
+#: app/templates/forms/entry_form/entry_form.html:2662
 #: app/templates/forms/form_builder/partials/_excel_modal.html:80
 msgid "Maximum file size: 10MB"
 msgstr "Максимальный размер файла: 10MB"
 
-#: app/templates/forms/entry_form/entry_form.html:2743
+#: app/templates/forms/entry_form/entry_form.html:2744
 msgid "Maximum file size: 25MB"
 msgstr "Максимальный размер файла: 25 МБ"
 
@@ -12947,7 +12978,7 @@ msgstr ""
 "Максимальное количество повторных записей, которые можно добавить. "
 "Оставляйте пустое без ограничений."
 
-#: app/templates/forms/entry_form/entry_form.html:2687
+#: app/templates/forms/entry_form/entry_form.html:2688
 #, python-format
 msgid ""
 "Maximum of %(max)s document(s) allowed for this field. You have already "
@@ -12956,12 +12987,12 @@ msgstr ""
 "Максимальное количество документов %(max)s, разрешенных для этого поля. Ты "
 "уже достиг предела."
 
-#: app/templates/admin/assignments/manage_assignment.html:116
-#: app/templates/admin/assignments/manage_assignment.html:136
+#: app/templates/admin/assignments/manage_assignment.html:117
+#: app/templates/admin/assignments/manage_assignment.html:137
 #: app/templates/admin/documents/documents.html:286
 #: app/templates/admin/documents/documents.html:312
-#: app/templates/forms/entry_form/entry_form.html:2861
-#: app/templates/forms/entry_form/entry_form.html:2887
+#: app/templates/forms/entry_form/entry_form.html:2862
+#: app/templates/forms/entry_form/entry_form.html:2888
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:74
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:87
 #: app/templates/forms/form_builder/partials/_item_modal.html:541
@@ -13055,7 +13086,7 @@ msgstr "ID сообщения"
 msgid "Message to admins"
 msgstr "Сообщение администраторам"
 
-#: app/templates/auth/login.html:662
+#: app/templates/auth/login.html:687
 msgid "Message to admins (optional)"
 msgstr "Сообщение администраторам"
 
@@ -13211,9 +13242,9 @@ msgstr "Журналы входа"
 msgid "Monitoring Questions"
 msgstr "Вопросы мониторинга"
 
-#: app/templates/admin/assignments/manage_assignment.html:90
+#: app/templates/admin/assignments/manage_assignment.html:91
 #: app/templates/admin/documents/documents.html:227
-#: app/templates/forms/entry_form/entry_form.html:2802
+#: app/templates/forms/entry_form/entry_form.html:2803
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:43
 #: app/templates/forms/form_builder/partials/_item_modal.html:462
 #: app/templates/forms/form_builder/partials/_item_modal.html:487
@@ -13276,7 +13307,7 @@ msgstr "Многоязычные поля"
 msgid "Multiple"
 msgstr "Множественные"
 
-#: app/templates/admin/assignments/manage_assignment.html:374
+#: app/templates/admin/assignments/manage_assignment.html:375
 msgid "Multiple different due dates set across entities."
 msgstr "Несколько разных сроков сдачи, установленных между организациями."
 
@@ -13336,7 +13367,7 @@ msgstr "Координаторы"
 msgid "NS Name"
 msgstr "Название NS"
 
-#: app/templates/admin/assignments/manage_assignment.html:471
+#: app/templates/admin/assignments/manage_assignment.html:472
 #: app/templates/admin/organization/index.html:82
 #: app/templates/admin/user_management/user_form.html:872
 #: app/templates/core/layout.html:413 app/templates/core/layout.html:415
@@ -13389,7 +13420,7 @@ msgstr "Сущности структуры NS"
 msgid "Name"
 msgstr "Имя"
 
-#: app/templates/auth/login.html:651 app/templates/auth/register.html:13
+#: app/templates/auth/login.html:676 app/templates/auth/register.html:13
 msgid "Name (optional)"
 msgstr "Имя (хинди)"
 
@@ -13444,8 +13475,8 @@ msgstr "Название национального общества"
 msgid "National Society Structure"
 msgstr "Название национального общества"
 
-#: app/templates/admin/assignments/manage_assignment.html:299
-#: app/templates/admin/assignments/manage_assignment.html:312
+#: app/templates/admin/assignments/manage_assignment.html:300
+#: app/templates/admin/assignments/manage_assignment.html:313
 msgid ""
 "National Society focal points must send to delegation for review before "
 "final submission; delegation can edit and submit upstream."
@@ -13479,7 +13510,7 @@ msgstr ""
 "отчётности"
 
 #: app/templates/admin/docs/documentation.html:1117
-#: app/templates/forms/entry_form/entry_form.html:371
+#: app/templates/forms/entry_form/entry_form.html:372
 msgid "Navigation"
 msgstr "Навигация"
 
@@ -13648,7 +13679,7 @@ msgstr "Plugins will appear here once they are installed"
 msgid "New chat"
 msgstr "Новый чат"
 
-#: app/templates/admin/assignments/manage_assignment.html:839
+#: app/templates/admin/assignments/manage_assignment.html:838
 msgid "New due date"
 msgstr "Новая дата родов"
 
@@ -13673,7 +13704,7 @@ msgstr "Новый импорт"
 msgid "New key material generated for"
 msgstr "Новый ключевой материал, созданный для"
 
-#: app/templates/admin/assignments/manage_assignment.html:820
+#: app/templates/admin/assignments/manage_assignment.html:819
 msgid "New status"
 msgstr "Новый статус"
 
@@ -13691,7 +13722,7 @@ msgid "Next"
 msgstr "Следующая"
 
 #: app/templates/components/ag_grid_i18n_js.html:61
-#: app/templates/forms/entry_form/entry_form.html:3800
+#: app/templates/forms/entry_form/entry_form.html:3801
 msgid "Next Page"
 msgstr "Следующая страница"
 
@@ -13711,11 +13742,11 @@ msgstr "В следующем году"
 #: app/templates/components/_form_item_renderer.html:236
 #: app/templates/components/_status_label.html:82
 #: app/templates/components/ag_grid_i18n_js.html:36
-#: app/templates/forms/entry_form/entry_form.html:1225
-#: app/templates/forms/entry_form/entry_form.html:1360
-#: app/templates/forms/entry_form/entry_form.html:1513
-#: app/templates/forms/entry_form/entry_form.html:1638
-#: app/templates/forms/entry_form/entry_form.html:2350
+#: app/templates/forms/entry_form/entry_form.html:1226
+#: app/templates/forms/entry_form/entry_form.html:1361
+#: app/templates/forms/entry_form/entry_form.html:1514
+#: app/templates/forms/entry_form/entry_form.html:1639
+#: app/templates/forms/entry_form/entry_form.html:2351
 #: app/templates/forms/entry_form/partials/disability_questions.html:32
 #: app/templates/forms/entry_form/partials/disability_questions.html:57
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:274
@@ -13936,7 +13967,7 @@ msgstr "Записи аудита, соответствующие вашим к�
 msgid "No data loaded yet"
 msgstr "Данные пока не загружены"
 
-#: app/templates/admin/assignments/manage_assignment.html:225
+#: app/templates/admin/assignments/manage_assignment.html:226
 msgid "No data owner set — governance gap."
 msgstr "Нет набора владельцев данных — разрыв в управлении."
 
@@ -14161,7 +14192,7 @@ msgstr "Нет единицы измерения"
 msgid "No metrics available"
 msgstr "индикаторов доступно"
 
-#: app/templates/forms/entry_form/entry_form.html:3836
+#: app/templates/forms/entry_form/entry_form.html:3837
 msgid "No more indicators available for this section."
 msgstr "Больше нет доступных индикаторов для этого раздела."
 
@@ -14326,7 +14357,7 @@ msgstr ""
 msgid "No sections added to this template yet."
 msgstr "Пока в этот шаблон не добавлены разделы."
 
-#: app/templates/forms/entry_form/entry_form.html:536
+#: app/templates/forms/entry_form/entry_form.html:537
 msgid "No sections defined."
 msgstr "Разделы не определены."
 
@@ -14334,7 +14365,7 @@ msgstr "Разделы не определены."
 msgid "No sections in this draft."
 msgstr "В этом черновике нет разделов."
 
-#: app/templates/forms/entry_form/entry_form.html:2495
+#: app/templates/forms/entry_form/entry_form.html:2496
 msgid "No sections or items found for this template."
 msgstr "Для этого шаблона не найдено разделов или элементов."
 
@@ -14580,12 +14611,12 @@ msgstr "Не установлен"
 
 #: app/routes/forms_validation_summary.py:399
 #: app/templates/components/_form_item_renderer.html:271
-#: app/templates/forms/entry_form/entry_form.html:1384
-#: app/templates/forms/entry_form/entry_form.html:1561
-#: app/templates/forms/entry_form/entry_form.html:1702
-#: app/templates/forms/entry_form/entry_form.html:2416
-#: app/templates/forms/entry_form/entry_form.html:2431
-#: app/templates/forms/entry_form/partials/matrix_table.html:458
+#: app/templates/forms/entry_form/entry_form.html:1385
+#: app/templates/forms/entry_form/entry_form.html:1562
+#: app/templates/forms/entry_form/entry_form.html:1703
+#: app/templates/forms/entry_form/entry_form.html:2417
+#: app/templates/forms/entry_form/entry_form.html:2432
+#: app/templates/forms/entry_form/partials/matrix_table.html:460
 #: app/templates/forms/entry_form/validation_summary_pdf.html:124
 msgid "Not applicable"
 msgstr "Не применимо"
@@ -14629,7 +14660,7 @@ msgstr "Не равные"
 msgid "Not filled"
 msgstr "Не заполнена"
 
-#: app/templates/admin/assignments/manage_assignment.html:353
+#: app/templates/admin/assignments/manage_assignment.html:354
 #: app/templates/admin/validation_dashboard.html:252
 msgid "Not generated"
 msgstr "Не генерируется"
@@ -14670,7 +14701,7 @@ msgid "Not sent"
 msgstr "Не отправлен"
 
 #: app/templates/admin/assignments/assignments.html:125
-#: app/templates/admin/assignments/manage_assignment.html:377
+#: app/templates/admin/assignments/manage_assignment.html:378
 msgid "Not set"
 msgstr "Не установлен"
 
@@ -14690,8 +14721,8 @@ msgstr "Не начал"
 msgid "Note"
 msgstr "Примечание"
 
-#: app/templates/admin/assignments/manage_assignment.html:643
-#: app/templates/admin/assignments/manage_assignment.html:724
+#: app/templates/admin/assignments/manage_assignment.html:642
+#: app/templates/admin/assignments/manage_assignment.html:723
 msgid "Note:"
 msgstr "Примечание:"
 
@@ -14800,12 +14831,12 @@ msgstr ""
 msgid "Notify focal points (assignment editor/submitter)"
 msgstr "Уведомлять контактные пункты (редактор/отправитель заданий)"
 
-#: app/templates/admin/assignments/manage_assignment.html:122
-#: app/templates/admin/assignments/manage_assignment.html:142
+#: app/templates/admin/assignments/manage_assignment.html:123
+#: app/templates/admin/assignments/manage_assignment.html:143
 #: app/templates/admin/documents/documents.html:292
 #: app/templates/admin/documents/documents.html:318
-#: app/templates/forms/entry_form/entry_form.html:2867
-#: app/templates/forms/entry_form/entry_form.html:2893
+#: app/templates/forms/entry_form/entry_form.html:2868
+#: app/templates/forms/entry_form/entry_form.html:2894
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:76
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:89
 #: app/templates/forms/form_builder/partials/_item_modal.html:547
@@ -14874,12 +14905,12 @@ msgstr "ОС"
 msgid "Observation"
 msgstr "Наблюдение"
 
-#: app/templates/admin/assignments/manage_assignment.html:121
-#: app/templates/admin/assignments/manage_assignment.html:141
+#: app/templates/admin/assignments/manage_assignment.html:122
+#: app/templates/admin/assignments/manage_assignment.html:142
 #: app/templates/admin/documents/documents.html:291
 #: app/templates/admin/documents/documents.html:317
-#: app/templates/forms/entry_form/entry_form.html:2866
-#: app/templates/forms/entry_form/entry_form.html:2892
+#: app/templates/forms/entry_form/entry_form.html:2867
+#: app/templates/forms/entry_form/entry_form.html:2893
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:76
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:89
 #: app/templates/forms/form_builder/partials/_item_modal.html:546
@@ -14974,7 +15005,7 @@ msgstr ""
 "Только пользователи с электронной почтой организации могут запрашивать "
 "доступ сразу в несколько стран. Пожалуйста, выберите одну страну."
 
-#: app/routes/auth.py:526
+#: app/routes/auth.py:710
 msgid ""
 "Oops, something went wrong! We weren't able to complete your sign-in. Please"
 " try again or contact support if the problem continues."
@@ -15015,7 +15046,7 @@ msgstr ""
 "Открытое управление отчётами по убыткам и выплатам (только системные "
 "менеджеры)"
 
-#: app/templates/forms/entry_form/entry_form.html:2515
+#: app/templates/forms/entry_form/entry_form.html:2516
 msgid "Open Sections Menu"
 msgstr "Открыть меню разделов"
 
@@ -15045,7 +15076,7 @@ msgstr "Открытый документ"
 msgid "Open documents library"
 msgstr "Библиотека открытых документов"
 
-#: app/templates/forms/entry_form/entry_form.html:3826
+#: app/templates/forms/entry_form/entry_form.html:3827
 msgid "Open indicator bank to propose new indicators or review existing ones"
 msgstr ""
 "Откройте банк индикаторов для предложения новых индикаторов или пересмотра "
@@ -15183,6 +15214,10 @@ msgstr "Варианты"
 msgid "Options Source"
 msgstr "Источник опций"
 
+#: app/templates/auth/login.html:638
+msgid "Or choose a user"
+msgstr "Или выбрать пользователя"
+
 #: app/templates/forms/form_builder/partials/_item_modal.html:216
 msgid "Orange"
 msgstr "Оранжевый"
@@ -15319,7 +15354,7 @@ msgstr "Другие пути (агрегированные)"
 msgid "Other programs"
 msgstr "Другие программы"
 
-#: app/templates/forms/entry_form/entry_form.html:2950
+#: app/templates/forms/entry_form/entry_form.html:2951
 msgid "Others are editing this form"
 msgstr "Другие редактируют эту форму"
 
@@ -15480,8 +15515,8 @@ msgstr ""
 msgid "Page"
 msgstr "Страница"
 
-#: app/templates/forms/entry_form/entry_form.html:439
-#: app/templates/forms/entry_form/entry_form.html:709
+#: app/templates/forms/entry_form/entry_form.html:440
+#: app/templates/forms/entry_form/entry_form.html:710
 msgid "Page "
 msgstr "Страница"
 
@@ -15588,8 +15623,8 @@ msgstr "Параметры пути"
 msgid "Parent Section"
 msgstr "Родительский сектор"
 
-#: app/templates/admin/assignments/manage_assignment.html:488
-#: app/templates/admin/assignments/manage_assignment.html:590
+#: app/templates/admin/assignments/manage_assignment.html:487
+#: app/templates/admin/assignments/manage_assignment.html:589
 msgid "Part of:"
 msgstr "Часть:"
 
@@ -15610,11 +15645,11 @@ msgid "Partnerships"
 msgstr "Партнёрства"
 
 #: app/templates/admin/analytics/audit_trail.html:328
-#: app/templates/auth/login.html:667 app/templates/auth/register.html:21
+#: app/templates/auth/login.html:692 app/templates/auth/register.html:21
 msgid "Password"
 msgstr "Пароль"
 
-#: app/routes/auth.py:1165
+#: app/routes/auth.py:1383
 msgid ""
 "Password reset is not available. Please sign in with your organization "
 "account."
@@ -15626,12 +15661,12 @@ msgstr ""
 msgid "Password was changed"
 msgstr "Пароль был изменён"
 
-#: app/templates/auth/login.html:1283
+#: app/templates/auth/login.html:1350
 #: app/templates/auth/reset_password.html:103
 msgid "Passwords do not match"
 msgstr "Пароли не совпадают."
 
-#: app/templates/auth/login.html:1279
+#: app/templates/auth/login.html:1346
 #: app/templates/auth/reset_password.html:99
 msgid "Passwords match"
 msgstr "Пароль"
@@ -15691,7 +15726,7 @@ msgstr "Пауза"
 msgid "Paused"
 msgstr "Пауза"
 
-#: app/routes/main/helpers.py:1225 app/templates/admin/ai/documents.html:70
+#: app/routes/main/helpers.py:1183 app/templates/admin/ai/documents.html:70
 #: app/templates/admin/ai/documents.html:442
 #: app/templates/admin/ai/documents.html:593
 #: app/templates/admin/ai/review_queue.html:28
@@ -15832,7 +15867,7 @@ msgstr ""
 "Точка %(period)s: делегирование вернуло это задание для ваших изменений "
 "перед повторной отправкой на рассмотрение."
 
-#: app/templates/admin/assignments/manage_assignment.html:86
+#: app/templates/admin/assignments/manage_assignment.html:87
 msgid "Period Type"
 msgstr "Тип периода"
 
@@ -15841,7 +15876,7 @@ msgid "Period type"
 msgstr "Тип периода"
 
 #: app/templates/admin/documents/documents.html:220
-#: app/templates/forms/entry_form/entry_form.html:2796
+#: app/templates/forms/entry_form/entry_form.html:2797
 msgid "Period/Year Covered"
 msgstr "Покрываемый год"
 
@@ -15906,8 +15941,8 @@ msgstr "Выберите один вариант из списка."
 msgid "Pick one or more options from a list."
 msgstr "Выберите один или несколько вариантов из списка."
 
-#: app/templates/forms/entry_form/entry_form.html:2526
-#: app/templates/forms/entry_form/entry_form.html:2528
+#: app/templates/forms/entry_form/entry_form.html:2527
+#: app/templates/forms/entry_form/entry_form.html:2529
 msgid "Pin Sections Pane"
 msgstr "Открыть меню разделов"
 
@@ -15980,7 +16015,7 @@ msgstr "Пожалуйста, введите основное имя для пе
 msgid "Please enter a query."
 msgstr "Пожалуйста, введите запрос."
 
-#: app/templates/auth/login.html:1218
+#: app/templates/auth/login.html:1285
 msgid "Please enter a valid email address"
 msgstr "Пожалуйста, введите действительный адрес электронной почты"
 
@@ -16008,12 +16043,12 @@ msgstr ""
 msgid "Please review and validate this submission in the Backoffice."
 msgstr "Пожалуйста, ознакомьтесь и проверьте эту заявку в Бэк-офисе."
 
-#: app/templates/forms/entry_form/entry_form.html:2697
+#: app/templates/forms/entry_form/entry_form.html:2698
 msgid "Please save the form first before editing this document."
 msgstr ""
 "Пожалуйста, сначала сохраните форму перед редактированием этого документа."
 
-#: app/templates/forms/entry_form/entry_form.html:2691
+#: app/templates/forms/entry_form/entry_form.html:2692
 msgid "Please select a Year/Period for the document."
 msgstr "Пожалуйста, выберите год/период для документа."
 
@@ -16045,7 +16080,11 @@ msgstr ""
 msgid "Please select a template to self-report."
 msgstr "Выберите файл Excel для импорта:"
 
-#: app/templates/admin/assignments/manage_assignment.html:404
+#: app/templates/auth/login.html:648
+msgid "Please select a user first."
+msgstr "Пожалуйста, сначала выберите пользователя."
+
+#: app/templates/admin/assignments/manage_assignment.html:405
 msgid "Please select a valid period (year or date range) before submitting."
 msgstr ""
 "Пожалуйста, выберите действительный период (год или диапазон дат) перед "
@@ -16226,11 +16265,11 @@ msgstr "Предварительно заполненная"
 msgid "Prefilled Values Notice"
 msgstr "Уведомление о предварительно заполненных значениях"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:46
+#: app/templates/forms/entry_form/partials/matrix_table.html:48
 msgid "Prefilled value"
 msgstr "Предварительно заполненное значение"
 
-#: app/templates/forms/entry_form/entry_form.html:351
+#: app/templates/forms/entry_form/entry_form.html:352
 #: app/templates/forms/form_builder/form_builder.html:104
 msgid "Preparing components. Please wait."
 msgstr "Подготовка компонентов. Пожалуйста, подождите."
@@ -16239,7 +16278,7 @@ msgstr "Подготовка компонентов. Пожалуйста, по�
 msgid "Preparing query…"
 msgstr "Подготовка запроса..."
 
-#: app/templates/forms/entry_form/entry_form.html:3888
+#: app/templates/forms/entry_form/entry_form.html:3889
 msgid "Preparing request..."
 msgstr "Подготовка запроса..."
 
@@ -16308,7 +16347,7 @@ msgstr "Превью провалился."
 msgid "Preview import"
 msgstr "Предварительный импорт"
 
-#: app/templates/forms/entry_form/entry_form.html:3829
+#: app/templates/forms/entry_form/entry_form.html:3830
 msgid ""
 "Preview mode: this will not be saved. Assign this template to a country to "
 "test saving dynamic indicators."
@@ -16350,7 +16389,7 @@ msgid "Previous"
 msgstr "Предыдущая"
 
 #: app/templates/components/ag_grid_i18n_js.html:60
-#: app/templates/forms/entry_form/entry_form.html:3799
+#: app/templates/forms/entry_form/entry_form.html:3800
 msgid "Previous Page"
 msgstr "Предыдущая страница"
 
@@ -16496,7 +16535,7 @@ msgstr "Цвет профиля"
 msgid "Profile colour must be a #RRGGBB value."
 msgstr "Цвет профиля должен быть #RRGGBB значением."
 
-#: app/routes/auth.py:1411
+#: app/routes/auth.py:1637
 msgid "Profile updated successfully."
 msgstr "Профиль успешно обновился."
 
@@ -16517,11 +16556,11 @@ msgstr "Проекция"
 msgid "Properties"
 msgstr "Свойства"
 
-#: app/templates/forms/entry_form/entry_form.html:3825
+#: app/templates/forms/entry_form/entry_form.html:3826
 msgid "Propose Changes"
 msgstr "Сохранить изменения"
 
-#: app/templates/forms/entry_form/entry_form.html:3824
+#: app/templates/forms/entry_form/entry_form.html:3825
 msgid "Propose Indicator"
 msgstr "Выбрать индикатор"
 
@@ -16529,9 +16568,9 @@ msgstr "Выбрать индикатор"
 msgid "Propose New Indicator URL"
 msgstr "Предложить новый индикаторный URL"
 
-#: app/templates/forms/entry_form/entry_form.html:1105
-#: app/templates/forms/entry_form/entry_form.html:2048
-#: app/templates/forms/entry_form/entry_form.html:3827
+#: app/templates/forms/entry_form/entry_form.html:1106
+#: app/templates/forms/entry_form/entry_form.html:2049
+#: app/templates/forms/entry_form/entry_form.html:3828
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:157
 msgid "Propose changes to this indicator"
 msgstr "Удалить этот индикатор"
@@ -16558,7 +16597,7 @@ msgid "Public"
 msgstr "Публичный"
 
 #: app/templates/admin/documents/documents.html:344
-#: app/templates/forms/entry_form/entry_form.html:2913
+#: app/templates/forms/entry_form/entry_form.html:2914
 msgid "Public Document"
 msgstr "Публичный документ"
 
@@ -16581,7 +16620,7 @@ msgstr "Получена публичная заявка"
 msgid "Public Submissions"
 msgstr "Публичная подача"
 
-#: app/templates/admin/assignments/manage_assignment.html:325
+#: app/templates/admin/assignments/manage_assignment.html:326
 #: app/templates/admin/assignments/public_submissions.html:66
 msgid "Public URL"
 msgstr "Публичный"
@@ -16597,7 +16636,7 @@ msgstr "Публичный URL активен"
 msgid "Public URL copied to clipboard!"
 msgstr "Публичный URL скопирован в буфер обмена!"
 
-#: app/templates/admin/assignments/manage_assignment.html:1031
+#: app/templates/admin/assignments/manage_assignment.html:1030
 msgid "Public reporting"
 msgstr "Публичная журналистика"
 
@@ -16817,22 +16856,6 @@ msgstr "Быстрый доступ"
 #: app/templates/admin/security/dashboard.html:108
 msgid "Quick Actions"
 msgstr "Быстрые действия"
-
-#: app/templates/auth/login.html:562
-msgid "Quick login as a Focal Point"
-msgstr "Быстрый вход как точка фокуса"
-
-#: app/templates/auth/login.html:553
-msgid "Quick login as a System Manager"
-msgstr "Быстрый вход в качестве системного менеджера"
-
-#: app/templates/auth/login.html:558
-msgid "Quick login as an Admin"
-msgstr "Быстрый вход в качестве администратора"
-
-#: app/templates/auth/login.html:549
-msgid "Quick login for testers"
-msgstr "Быстрый вход для тестировщиков"
 
 #: app/templates/admin/api_management.html:1666
 msgid "RBAC"
@@ -17108,11 +17131,11 @@ msgstr "Получатели"
 msgid "Recommendation:"
 msgstr "Recommendation:"
 
-#: app/templates/forms/entry_form/entry_form.html:3333
+#: app/templates/forms/entry_form/entry_form.html:3334
 msgid "Reconnected!"
 msgstr "Отклонено"
 
-#: app/templates/forms/entry_form/entry_form.html:3327
+#: app/templates/forms/entry_form/entry_form.html:3328
 msgid "Reconnecting..."
 msgstr "Вычисление..."
 
@@ -17221,7 +17244,7 @@ msgstr "Название национального общества"
 msgid "Regional Offices"
 msgstr "Региональные офисы"
 
-#: app/templates/admin/assignments/manage_assignment.html:668
+#: app/templates/admin/assignments/manage_assignment.html:667
 #: app/templates/admin/organization/index.html:147
 #: app/templates/admin/user_management/user_form.html:976
 msgid "Regions"
@@ -17263,7 +17286,7 @@ msgstr "Отклонить всех"
 msgid "Reject all __COUNT__ pending requests for this user?"
 msgstr "Отклонить все __COUNT__ ожидающие запросы для этого пользователя?"
 
-#: app/routes/main/helpers.py:1231
+#: app/routes/main/helpers.py:1189
 #: app/templates/admin/assignments/public_submissions.html:55
 #: app/templates/admin/assignments/public_submissions.html:106
 #: app/templates/admin/assignments/public_submissions.html:179
@@ -17325,7 +17348,7 @@ msgstr "Закачать"
 msgid "Reload All Plugins"
 msgstr "Reload All Plugins"
 
-#: app/templates/forms/entry_form/entry_form.html:355
+#: app/templates/forms/entry_form/entry_form.html:356
 msgid "Reload Page"
 msgstr "Добавить страницу"
 
@@ -17362,7 +17385,7 @@ msgstr ""
 "Напоминает руководителям выполнить невыполненные задания. Переменные: "
 "заголовок, сообщение, user_name, dashboard_url, org_name, copyright_year"
 
-#: app/templates/admin/assignments/manage_assignment.html:1027
+#: app/templates/admin/assignments/manage_assignment.html:1026
 #: app/templates/admin/indicator_bank/_dynamic_text_list.html:11
 #: app/templates/admin/indicator_bank/_dynamic_text_list.html:21
 #: app/templates/forms/form_builder/form_builder.html:362
@@ -17427,13 +17450,13 @@ msgstr "Удалить всё"
 msgid "Remove all deleted strings?"
 msgstr "Удалить все удалённые строки?"
 
-#: app/templates/admin/assignments/manage_assignment.html:1029
+#: app/templates/admin/assignments/manage_assignment.html:1028
 msgid "Remove entities"
 msgstr "Удаление сущностей"
 
-#: app/templates/forms/entry_form/entry_form.html:1113
-#: app/templates/forms/entry_form/entry_form.html:2056
-#: app/templates/forms/entry_form/entry_form.html:3832
+#: app/templates/forms/entry_form/entry_form.html:1114
+#: app/templates/forms/entry_form/entry_form.html:2057
+#: app/templates/forms/entry_form/entry_form.html:3833
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:165
 msgid "Remove this indicator"
 msgstr "Удалить этот индикатор"
@@ -17444,7 +17467,7 @@ msgstr "Удалить этот индикатор"
 msgid "Removed"
 msgstr "Удалить"
 
-#: app/routes/main/helpers.py:1326
+#: app/routes/main/helpers.py:1284
 #, python-format
 msgid "Removed %(count)d field in %(template)s"
 msgstr "Удалено %(count)d поле в %(template)s"
@@ -17493,7 +17516,7 @@ msgstr ""
 #: app/templates/core/dashboard.html:1763
 #: app/templates/core/dashboard.html:1770
 #: app/templates/forms/entry_form/entry_form.html:170
-#: app/templates/forms/entry_form/entry_form.html:3969
+#: app/templates/forms/entry_form/entry_form.html:3970
 msgid "Reopen"
 msgstr "Переоткрыть"
 
@@ -17517,7 +17540,7 @@ msgstr "Повторяющие/динамические данные остаю�
 msgid "Replace"
 msgstr "Замена"
 
-#: app/templates/forms/entry_form/entry_form.html:2681
+#: app/templates/forms/entry_form/entry_form.html:2682
 msgid "Replace Document"
 msgstr "Загрузить документ"
 
@@ -17669,7 +17692,7 @@ msgid "Request cancelled"
 msgstr "Запрос отменён"
 
 #: app/templates/core/dashboard.html:1476
-#: app/templates/forms/entry_form/entry_form.html:591
+#: app/templates/forms/entry_form/entry_form.html:592
 msgid "Request changes"
 msgstr "Изменения запросов"
 
@@ -17752,7 +17775,7 @@ msgstr "Требует внимания"
 msgid "Requires Review"
 msgstr "Требует проверки"
 
-#: app/routes/main/helpers.py:1229
+#: app/routes/main/helpers.py:1187
 msgid "Requires Revision"
 msgstr "Требует пересмотра"
 
@@ -17927,7 +17950,7 @@ msgstr ""
 "страна и период совпадают с этим заданием."
 
 #: app/templates/core/dashboard.html:1475
-#: app/templates/forms/entry_form/entry_form.html:589
+#: app/templates/forms/entry_form/entry_form.html:590
 msgid "Return this assignment to the National Society for changes?"
 msgstr "Вернуть это задание в Национальное общество для изменений?"
 
@@ -18227,8 +18250,8 @@ msgid "Rules Registry"
 msgstr "Реестр правил"
 
 #: app/templates/admin/data_exploration/explore_data.html:253
-#: app/templates/forms/entry_form/entry_form.html:2565
-#: app/templates/forms/entry_form/entry_form.html:2569
+#: app/templates/forms/entry_form/entry_form.html:2566
+#: app/templates/forms/entry_form/entry_form.html:2570
 msgid "Run AI validation"
 msgstr "Запуск валидации ИИ"
 
@@ -18249,7 +18272,7 @@ msgstr "Импорт запуска"
 msgid "Run validations (not run)"
 msgstr "Проверка запуска (не запуск)"
 
-#: app/templates/forms/entry_form/entry_form.html:3887
+#: app/templates/forms/entry_form/entry_form.html:3888
 msgid "Running AI opinions..."
 msgstr "Проведение мнений ИИ..."
 
@@ -18338,7 +18361,7 @@ msgid "Saturday"
 msgstr "Суббота"
 
 #: app/templates/admin/ai/review_detail.html:175
-#: app/templates/admin/assignments/manage_assignment.html:18
+#: app/templates/admin/assignments/manage_assignment.html:19
 #: app/templates/admin/embed_content/manage_embed_content.html:191
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:18
 #: app/templates/admin/organization/edit_entity.html:139
@@ -18347,10 +18370,10 @@ msgstr "Суббота"
 #: app/templates/admin/validation_rules.html:195
 #: app/templates/admin/validation_rules.html:221
 #: app/templates/components/_translation_review_modal.html:20
-#: app/templates/forms/entry_form/entry_form.html:548
-#: app/templates/forms/entry_form/entry_form.html:562
-#: app/templates/forms/entry_form/entry_form.html:2532
-#: app/templates/forms/entry_form/entry_form.html:2534
+#: app/templates/forms/entry_form/entry_form.html:549
+#: app/templates/forms/entry_form/entry_form.html:563
+#: app/templates/forms/entry_form/entry_form.html:2533
+#: app/templates/forms/entry_form/entry_form.html:2535
 #: app/templates/forms/form_builder/partials/_template_details.html:11
 msgid "Save"
 msgstr "Сохранить"
@@ -18372,8 +18395,8 @@ msgstr "Сохранить все переводы"
 msgid "Save Changes"
 msgstr "Сохранить изменения"
 
-#: app/templates/forms/entry_form/entry_form.html:599
-#: app/templates/forms/entry_form/entry_form.html:606
+#: app/templates/forms/entry_form/entry_form.html:600
+#: app/templates/forms/entry_form/entry_form.html:607
 msgid "Save Draft"
 msgstr "Сохранить черновик"
 
@@ -18446,7 +18469,7 @@ msgstr ""
 msgid "Saved"
 msgstr "Сохранено"
 
-#: app/templates/forms/entry_form/entry_form.html:3811
+#: app/templates/forms/entry_form/entry_form.html:3812
 msgid ""
 "Saved value is no longer in the current list. It will still be submitted "
 "unless you choose another option."
@@ -18469,7 +18492,7 @@ msgstr "Сберегаю..."
 msgid "Saving…"
 msgstr "Сберегаю..."
 
-#: app/templates/auth/login.html:514 app/templates/auth/login.html:721
+#: app/templates/auth/login.html:571 app/templates/auth/login.html:746
 msgid ""
 "Say goodbye to scattered Excel files, KoBo forms, multiple platforms, and "
 "logins — everything is now centralized and streamlined here."
@@ -18563,7 +18586,7 @@ msgstr "Определение поиска"
 msgid "Search Mode"
 msgstr "Режим поиска"
 
-#: app/templates/admin/assignments/manage_assignment.html:729
+#: app/templates/admin/assignments/manage_assignment.html:728
 msgid "Search NS Structure"
 msgstr "Структура поиска NS"
 
@@ -18595,11 +18618,11 @@ msgstr "Поиск временных переводов"
 msgid "Search Recipients"
 msgstr "Получатели"
 
-#: app/templates/admin/assignments/manage_assignment.html:696
+#: app/templates/admin/assignments/manage_assignment.html:695
 msgid "Search Regions"
 msgstr "Поиск регионов"
 
-#: app/templates/admin/assignments/manage_assignment.html:678
+#: app/templates/admin/assignments/manage_assignment.html:677
 msgid "Search Secretariat"
 msgstr "Секретариат поиска"
 
@@ -18621,7 +18644,7 @@ msgstr "Все типы активности"
 msgid "Search and select a row to add..."
 msgstr "Найдите и выберите строку, чтобы добавить..."
 
-#: app/templates/admin/assignments/manage_assignment.html:733
+#: app/templates/admin/assignments/manage_assignment.html:732
 msgid "Search branches, sub-branches, or local units..."
 msgstr "Обыск отделов, подотделений или местных подразделений..."
 
@@ -18685,7 +18708,7 @@ msgstr "Отделы поиска..."
 msgid "Search description (e.g., template name)"
 msgstr "Описание поиска (например, название шаблона)"
 
-#: app/templates/admin/assignments/manage_assignment.html:682
+#: app/templates/admin/assignments/manage_assignment.html:681
 msgid "Search divisions or departments..."
 msgstr "Поиск отделов или отделов..."
 
@@ -18721,7 +18744,7 @@ msgstr "Ищи национальные общества..."
 msgid "Search notifications..."
 msgstr "Уведомления о поиске..."
 
-#: app/templates/admin/assignments/manage_assignment.html:700
+#: app/templates/admin/assignments/manage_assignment.html:699
 msgid "Search regional or cluster offices..."
 msgstr "Ищите региональные или кластерные офисы..."
 
@@ -18827,7 +18850,7 @@ msgstr "Региональные офисы секретариата"
 msgid "Secretariat assignment"
 msgstr "Назначение в секретариат"
 
-#: app/templates/admin/assignments/manage_assignment.html:648
+#: app/templates/admin/assignments/manage_assignment.html:647
 #: app/templates/admin/organization/index.html:137
 msgid "Secretariat structure"
 msgstr "Структура секретариата"
@@ -18887,9 +18910,9 @@ msgstr "Прогресс секции"
 #: app/templates/admin/templates/new_template.html:1136
 #: app/templates/admin/templates/upr_excel_import.html:450
 #: app/templates/admin/validation_dashboard.html:265
-#: app/templates/forms/entry_form/entry_form.html:465
 #: app/templates/forms/entry_form/entry_form.html:466
-#: app/templates/forms/entry_form/entry_form.html:734
+#: app/templates/forms/entry_form/entry_form.html:467
+#: app/templates/forms/entry_form/entry_form.html:735
 #: app/templates/forms/form_builder/field_mapping.html:296
 #: app/templates/forms/form_builder/form_builder.html:941
 msgid "Sections"
@@ -18997,7 +19020,7 @@ msgid ""
 msgstr ""
 "Интерфейс настройки настроек безопасности в этом виде пока не реализован."
 
-#: app/templates/forms/entry_form/entry_form.html:3834
+#: app/templates/forms/entry_form/entry_form.html:3835
 msgid "Security token not found. Please refresh the page and try again."
 msgstr ""
 "Токен безопасности не найден. Пожалуйста, обновите страницу и попробуйте "
@@ -19032,7 +19055,7 @@ msgstr "Посев не удалось"
 msgid "Select All"
 msgstr "Выбрать все"
 
-#: app/templates/admin/assignments/manage_assignment.html:587
+#: app/templates/admin/assignments/manage_assignment.html:586
 #: app/templates/components/_form_helpers.html:73
 msgid "Select All Countries"
 msgstr "Выберите все страны"
@@ -19046,7 +19069,7 @@ msgstr "Выбрать все"
 msgid "Select Column..."
 msgstr "Выберите столбец..."
 
-#: app/templates/forms/entry_form/entry_form.html:2716
+#: app/templates/forms/entry_form/entry_form.html:2717
 msgid "Select Document:"
 msgstr "Удалить документ"
 
@@ -19058,7 +19081,7 @@ msgstr "Выбрать конечную точку"
 msgid "Select Entities"
 msgstr "Выбрать конечную точку"
 
-#: app/templates/forms/entry_form/entry_form.html:3838
+#: app/templates/forms/entry_form/entry_form.html:3839
 msgid "Select Indicator"
 msgstr "Выбрать индикатор"
 
@@ -19120,14 +19143,14 @@ msgstr "Выбрать переменную..."
 msgid "Select a campaign..."
 msgstr "Выберите кампанию..."
 
-#: app/templates/admin/assignments/manage_assignment.html:738
+#: app/templates/admin/assignments/manage_assignment.html:737
 #: app/templates/admin/documents/documents.html:164
 #: app/templates/admin/user_management/user_form.html:941
-#: app/templates/auth/login.html:1115
+#: app/templates/auth/login.html:1182
 msgid "Select a country"
 msgstr "Выберите страну"
 
-#: app/templates/admin/assignments/manage_assignment.html:753
+#: app/templates/admin/assignments/manage_assignment.html:752
 #: app/templates/admin/user_management/user_form.html:956
 msgid "Select a country to view NS structure."
 msgstr "Выберите страну, чтобы просмотреть структуру NS."
@@ -19190,6 +19213,10 @@ msgstr "Служба перевода"
 msgid "Select a user to receive the test email."
 msgstr "Выберите пользователя для получения тестового письма."
 
+#: app/templates/auth/login.html:641 app/templates/auth/login.html:1083
+msgid "Select a user…"
+msgstr "Выберите пользователя..."
+
 #: app/templates/admin/analytics/audit_trail.html:341
 msgid "Select activity types..."
 msgstr "Все типы активности"
@@ -19232,7 +19259,7 @@ msgstr "Выберите хотя бы один индикатор, чтобы �
 msgid "Select colour"
 msgstr "Выберите цвет"
 
-#: app/templates/admin/assignments/manage_assignment.html:569
+#: app/templates/admin/assignments/manage_assignment.html:568
 msgid ""
 "Select countries to add to this assignment. Already assigned countries are "
 "pre-checked."
@@ -19240,12 +19267,12 @@ msgstr ""
 "Выберите страны для добавления в это задание. Уже назначенные страны "
 "предварительно проверяются."
 
-#: app/templates/admin/assignments/manage_assignment.html:571
+#: app/templates/admin/assignments/manage_assignment.html:570
 msgid "Select countries to assign to this assignment."
 msgstr "Выберите страны для назначения на это задание."
 
-#: app/templates/core/dashboard.html:3203
-#: app/templates/core/dashboard.html:3278
+#: app/templates/core/dashboard.html:3216
+#: app/templates/core/dashboard.html:3291
 msgid "Select countries you will manage data for"
 msgstr "Выберите страны, для которых вы будете управлять данными"
 
@@ -19257,13 +19284,13 @@ msgstr "Выбрать опции..."
 msgid "Select country"
 msgstr "Избранная страна"
 
-#: app/templates/core/dashboard.html:3204
-#: app/templates/core/dashboard.html:3279
+#: app/templates/core/dashboard.html:3217
+#: app/templates/core/dashboard.html:3292
 msgid "Select country you will manage data for"
 msgstr "Выберите страну, по которой будете управлять данными"
 
 #: app/templates/admin/documents/documents.html:180
-#: app/templates/forms/entry_form/entry_form.html:2784
+#: app/templates/forms/entry_form/entry_form.html:2785
 msgid "Select document type"
 msgstr "Выберите тип документа"
 
@@ -19271,8 +19298,8 @@ msgstr "Выберите тип документа"
 msgid "Select document type..."
 msgstr "Выберите тип документа..."
 
-#: app/templates/admin/assignments/manage_assignment.html:643
-#: app/templates/admin/assignments/manage_assignment.html:724
+#: app/templates/admin/assignments/manage_assignment.html:642
+#: app/templates/admin/assignments/manage_assignment.html:723
 msgid ""
 "Select entities by checking the boxes, then click \"Save Changes\" to apply "
 "them."
@@ -19290,7 +19317,7 @@ msgid "Select indicators"
 msgstr "Выбор индикаторов"
 
 #: app/templates/admin/documents/documents.html:189
-#: app/templates/forms/entry_form/entry_form.html:2751
+#: app/templates/forms/entry_form/entry_form.html:2752
 msgid "Select language"
 msgstr "Выберите язык"
 
@@ -19298,7 +19325,7 @@ msgstr "Выберите язык"
 msgid "Select languages to translate"
 msgstr "Выберите языки для перевода"
 
-#: app/templates/auth/login.html:659
+#: app/templates/auth/login.html:684
 msgid ""
 "Select one country you request access to. An admin will review your request."
 msgstr ""
@@ -19342,7 +19369,7 @@ msgstr ""
 "Выберите конкретные шаблоны. Оставьте пустым, чтобы включить все задания с "
 "выбранным статусом."
 
-#: app/templates/admin/assignments/manage_assignment.html:822
+#: app/templates/admin/assignments/manage_assignment.html:821
 msgid "Select status"
 msgstr "Выбор статуса"
 
@@ -19406,11 +19433,11 @@ msgstr ""
 #: app/templates/admin/documents/documents.html:262
 #: app/templates/admin/documents/documents.html:279
 #: app/templates/admin/documents/documents.html:305
-#: app/templates/forms/entry_form/entry_form.html:2813
-#: app/templates/forms/entry_form/entry_form.html:2827
-#: app/templates/forms/entry_form/entry_form.html:2837
-#: app/templates/forms/entry_form/entry_form.html:2854
-#: app/templates/forms/entry_form/entry_form.html:2880
+#: app/templates/forms/entry_form/entry_form.html:2814
+#: app/templates/forms/entry_form/entry_form.html:2828
+#: app/templates/forms/entry_form/entry_form.html:2838
+#: app/templates/forms/entry_form/entry_form.html:2855
+#: app/templates/forms/entry_form/entry_form.html:2881
 #: app/templates/forms/form_builder/partials/_item_modal.html:497
 #: app/templates/forms/form_builder/partials/_item_modal.html:509
 #: app/templates/forms/form_builder/partials/_item_modal.html:519
@@ -19470,12 +19497,12 @@ msgstr "Самоотчет"
 msgid "Self-Reported"
 msgstr "Самоотчет"
 
-#: app/routes/main/helpers.py:1351
+#: app/routes/main/helpers.py:1309
 #, python-format
 msgid "Self-report created: %(template)s"
 msgstr "Создан самостоятельный отчет"
 
-#: app/routes/auth.py:1036
+#: app/routes/auth.py:1220
 msgid ""
 "Self-service registration is not available. Please sign in with your "
 "organization account."
@@ -19503,7 +19530,7 @@ msgstr "Отправить push-уведомление"
 msgid "Send Now"
 msgstr "Отправить сейчас"
 
-#: app/templates/auth/login.html:699
+#: app/templates/auth/login.html:724
 msgid "Send Reset Link"
 msgstr "Отправить ссылку на сброс"
 
@@ -19545,12 +19572,12 @@ msgstr ""
 msgid "Send digest now"
 msgstr "Отправьте дайджест сейчас"
 
-#: app/templates/forms/entry_form/entry_form.html:569
-#: app/templates/forms/entry_form/entry_form.html:572
+#: app/templates/forms/entry_form/entry_form.html:570
+#: app/templates/forms/entry_form/entry_form.html:573
 msgid "Send for Review"
 msgstr "Отправьте для проверки"
 
-#: app/templates/forms/entry_form/entry_form.html:568
+#: app/templates/forms/entry_form/entry_form.html:569
 msgid "Send for Review?"
 msgstr "Отправить на проверку?"
 
@@ -19571,7 +19598,7 @@ msgstr ""
 msgid "Send test email"
 msgstr "Отправьте тестовое письмо"
 
-#: app/templates/forms/entry_form/entry_form.html:570
+#: app/templates/forms/entry_form/entry_form.html:571
 msgid ""
 "Send this assignment to delegation for review? You will not be able to edit "
 "it until they return it for changes."
@@ -19631,7 +19658,7 @@ msgstr ""
 "Драфтовые и запланированные кампании могут включать получателей по "
 "умолчанию."
 
-#: app/routes/main/helpers.py:1230
+#: app/routes/main/helpers.py:1188
 msgid "Sent for Review"
 msgstr "Отправлено на рассмотрение"
 
@@ -19644,12 +19671,12 @@ msgstr "Отправлено на рассмотрение"
 msgid "Sent for review: %(template)s"
 msgstr "Отправлено на рецензию: %(template)s"
 
-#: app/templates/admin/assignments/manage_assignment.html:120
-#: app/templates/admin/assignments/manage_assignment.html:140
+#: app/templates/admin/assignments/manage_assignment.html:121
+#: app/templates/admin/assignments/manage_assignment.html:141
 #: app/templates/admin/documents/documents.html:290
 #: app/templates/admin/documents/documents.html:316
-#: app/templates/forms/entry_form/entry_form.html:2865
-#: app/templates/forms/entry_form/entry_form.html:2891
+#: app/templates/forms/entry_form/entry_form.html:2866
+#: app/templates/forms/entry_form/entry_form.html:2892
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:75
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:88
 #: app/templates/forms/form_builder/partials/_item_modal.html:545
@@ -19825,11 +19852,11 @@ msgstr "Настройка"
 msgid "Severity"
 msgstr "Степень тяжести"
 
-#: app/templates/forms/entry_form/entry_form.html:1160
-#: app/templates/forms/entry_form/entry_form.html:1301
-#: app/templates/forms/entry_form/entry_form.html:1454
-#: app/templates/forms/entry_form/entry_form.html:2160
-#: app/templates/forms/entry_form/entry_form.html:2288
+#: app/templates/forms/entry_form/entry_form.html:1161
+#: app/templates/forms/entry_form/entry_form.html:1302
+#: app/templates/forms/entry_form/entry_form.html:1455
+#: app/templates/forms/entry_form/entry_form.html:2161
+#: app/templates/forms/entry_form/entry_form.html:2289
 #: app/templates/forms/entry_form/export_pdf.html:363
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:211
 msgid "Sex"
@@ -19926,6 +19953,7 @@ msgstr ""
 #: app/templates/admin/ai/trace_detail.html:450
 #: app/templates/core/dashboard.html:1601
 #: app/templates/core/dashboard.html:2196
+#: app/templates/core/dashboard.html:3028
 msgid "Show"
 msgstr "Показать"
 
@@ -20012,7 +20040,7 @@ msgstr "Отделы шоу"
 msgid "Show divisions"
 msgstr "Дивизионы шоу"
 
-#: app/templates/forms/entry_form/entry_form.html:2974
+#: app/templates/forms/entry_form/entry_form.html:2975
 msgid "Show editors"
 msgstr "Редакторы шоу"
 
@@ -20069,6 +20097,7 @@ msgid "Show national societies"
 msgstr "Выставлять национальные общества"
 
 #: app/templates/core/dashboard.html:1599
+#: app/templates/core/dashboard.html:3030
 msgid "Show past assignments"
 msgstr "Показать прошлые задания"
 
@@ -20192,7 +20221,14 @@ msgstr ""
 msgid "Sign in"
 msgstr "Войти"
 
-#: app/routes/auth.py:524
+#: app/templates/auth/login.html:610
+msgid ""
+"Sign in without a password to test as a role preset or any active user."
+msgstr ""
+"Войдите без пароля, чтобы проверить как предустановленную роль или любого "
+"активного пользователя."
+
+#: app/routes/auth.py:708
 msgid "Sign-In Failed"
 msgstr "Неудачный вход"
 
@@ -20200,9 +20236,9 @@ msgstr "Неудачный вход"
 msgid "Single PO"
 msgstr "Одиночный PO"
 
-#: app/templates/admin/assignments/manage_assignment.html:88
+#: app/templates/admin/assignments/manage_assignment.html:89
 #: app/templates/admin/documents/documents.html:225
-#: app/templates/forms/entry_form/entry_form.html:2800
+#: app/templates/forms/entry_form/entry_form.html:2801
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:41
 #: app/templates/forms/form_builder/partials/_item_modal.html:454
 #: app/templates/forms/form_builder/partials/_item_modal.html:485
@@ -20225,7 +20261,7 @@ msgstr "Пропустить"
 msgid "Skip for now"
 msgstr "Пока что пропусти"
 
-#: app/services/notification/service.py:1585
+#: app/services/notification/service.py:1644
 #: app/templates/admin/translations/manage_translations.html:674
 #: app/templates/components/auto_translate_modal.html:470
 msgid "Skipped"
@@ -20390,9 +20426,9 @@ msgstr "Стандартный участок"
 msgid "Start"
 msgstr "Начало"
 
-#: app/templates/admin/assignments/manage_assignment.html:108
+#: app/templates/admin/assignments/manage_assignment.html:109
 #: app/templates/admin/documents/documents.html:272
-#: app/templates/forms/entry_form/entry_form.html:2847
+#: app/templates/forms/entry_form/entry_form.html:2848
 msgid "Start Period"
 msgstr "Период времени"
 
@@ -20404,9 +20440,9 @@ msgstr "Начать синхронизацию"
 msgid "Start Translation"
 msgstr "Начать перевод"
 
-#: app/templates/admin/assignments/manage_assignment.html:100
+#: app/templates/admin/assignments/manage_assignment.html:101
 #: app/templates/admin/documents/documents.html:246
-#: app/templates/forms/entry_form/entry_form.html:2821
+#: app/templates/forms/entry_form/entry_form.html:2822
 #: app/templates/forms/form_builder/partials/_item_modal.html:503
 msgid "Start Year"
 msgstr "Прошлый год"
@@ -20488,7 +20524,7 @@ msgstr "Начинаю..."
 msgid "Starts with"
 msgstr "Начинается с"
 
-#: app/routes/auth.py:584
+#: app/routes/auth.py:768
 msgid "State mismatch. Please try signing in again."
 msgstr "Несоответствие состояний. Пожалуйста, попробуйте войти снова."
 
@@ -20606,7 +20642,7 @@ msgstr "Шаги в процессе"
 msgid "Steps:"
 msgstr "Шаги:"
 
-#: app/templates/forms/entry_form/entry_form.html:3096
+#: app/templates/forms/entry_form/entry_form.html:3097
 #: app/templates/forms/form_builder/form_builder.html:1098
 msgid "Still loading…"
 msgstr "Всё ещё загружается..."
@@ -20616,11 +20652,11 @@ msgstr "Всё ещё загружается..."
 #: app/templates/components/auto_translate_modal_js.html:62
 #: app/templates/core/chat_immersive.html:52
 #: app/templates/core/chat_immersive.html:259
-#: app/templates/forms/entry_form/entry_form.html:3885
+#: app/templates/forms/entry_form/entry_form.html:3886
 msgid "Stop"
 msgstr "Стой"
 
-#: app/templates/forms/entry_form/entry_form.html:3886
+#: app/templates/forms/entry_form/entry_form.html:3887
 msgid "Stop AI validation"
 msgstr "Остановите валидацию ИИ"
 
@@ -20741,11 +20777,11 @@ msgstr "Напоминание о подаче заявок"
 msgid "Submission status map"
 msgstr "Карта статуса подачи заявок"
 
-#: app/templates/forms/entry_form/entry_form.html:553
-#: app/templates/forms/entry_form/entry_form.html:579
-#: app/templates/forms/entry_form/entry_form.html:582
-#: app/templates/forms/entry_form/entry_form.html:2538
-#: app/templates/forms/entry_form/entry_form.html:2540
+#: app/templates/forms/entry_form/entry_form.html:554
+#: app/templates/forms/entry_form/entry_form.html:580
+#: app/templates/forms/entry_form/entry_form.html:583
+#: app/templates/forms/entry_form/entry_form.html:2539
+#: app/templates/forms/entry_form/entry_form.html:2541
 msgid "Submit"
 msgstr "Отправить"
 
@@ -20753,7 +20789,7 @@ msgstr "Отправить"
 msgid "Submit Documents"
 msgstr "Отправить документы"
 
-#: app/templates/forms/entry_form/entry_form.html:578
+#: app/templates/forms/entry_form/entry_form.html:579
 msgid "Submit Form?"
 msgstr "Форма отправки?"
 
@@ -20765,7 +20801,7 @@ msgstr "Отправить ответ"
 msgid "Submit your request"
 msgstr "Отправьте свой запрос"
 
-#: app/routes/main/helpers.py:1227
+#: app/routes/main/helpers.py:1185
 #: app/templates/admin/communication/center.html:921
 #: app/templates/admin/templates/data_sync_imputation.html:144
 #: app/templates/admin/templates/data_sync_imputation.html:1305
@@ -20803,8 +20839,8 @@ msgstr "Метка отправленного значения"
 msgid "Submitter"
 msgstr "Отправлено"
 
-#: app/templates/forms/entry_form/entry_form.html:395
-#: app/templates/forms/entry_form/entry_form.html:628
+#: app/templates/forms/entry_form/entry_form.html:396
+#: app/templates/forms/entry_form/entry_form.html:629
 #: app/templates/public_submission_export_pdf.html:14
 msgid "Submitter Information"
 msgstr "Информация о подателе"
@@ -20923,7 +20959,7 @@ msgstr "Воскресенье"
 msgid "Supported Languages"
 msgstr "Поддерживаемые языки"
 
-#: app/templates/forms/entry_form/entry_form.html:2661
+#: app/templates/forms/entry_form/entry_form.html:2662
 #: app/templates/forms/form_builder/partials/_excel_modal.html:80
 msgid "Supported formats: .xlsx"
 msgstr "Поддерживаемые форматы: .xlsx, .xls"
@@ -21071,7 +21107,8 @@ msgstr "Список систем (только для чтения)"
 #: app/templates/admin/analytics/user_detail.html:51
 #: app/templates/admin/dashboard.html:276
 #: app/templates/admin/user_management/users.html:175
-#: app/templates/core/layout.html:222 app/templates/core/layout.html:224
+#: app/templates/auth/login.html:624 app/templates/core/layout.html:222
+#: app/templates/core/layout.html:224
 msgid "System Manager"
 msgstr "Системный администратор"
 
@@ -21186,12 +21223,12 @@ msgstr "Член команды"
 msgid "Team update: %(template)s submitted"
 msgstr "Обновление команды: %(template)s представлена"
 
+#: app/templates/core/dashboard.html:2410
 #: app/templates/core/dashboard.html:2411
-#: app/templates/core/dashboard.html:2412
+#: app/templates/core/dashboard.html:2467
 #: app/templates/core/dashboard.html:2468
-#: app/templates/core/dashboard.html:2469
+#: app/templates/core/dashboard.html:2517
 #: app/templates/core/dashboard.html:2518
-#: app/templates/core/dashboard.html:2519
 msgid "Teams Chat"
 msgstr "Teams Chat"
 
@@ -21424,18 +21461,6 @@ msgstr "Предупреждение о тесте"
 msgid "Test a query…"
 msgstr "Проверьте запрос..."
 
-#: app/templates/auth/login.html:555
-msgid "Test as System Manager"
-msgstr "Тестирование как системный менеджер"
-
-#: app/templates/auth/login.html:564
-msgid "Test as a Focal Point"
-msgstr "Тест как фокусная точка"
-
-#: app/templates/auth/login.html:560
-msgid "Test as an Admin"
-msgstr "Сообщение администраторам"
-
 #: app/templates/admin/settings/manage_settings.html:1525
 msgid ""
 "Test email could not be sent. Check the message below or your mail settings."
@@ -21499,7 +21524,7 @@ msgstr ""
 "Английская версия этого шаблона пуста. Сначала добавьте или сохраните "
 "английский текст, затем попробуйте снова."
 
-#: app/routes/main/helpers.py:1188
+#: app/routes/main/helpers.py:1146
 msgid "The assignment is available but data entry has not started yet."
 msgstr "Задание доступно, но ввод данных ещё не начался."
 
@@ -21509,7 +21534,7 @@ msgstr "Задание доступно, но ввод данных ещё не 
 msgid "The code field is locked while this entry is still in use."
 msgstr "Поле кода заблокировано, пока эта запись ещё используется."
 
-#: app/templates/forms/entry_form/entry_form.html:2637
+#: app/templates/forms/entry_form/entry_form.html:2638
 msgid ""
 "The file is checked for template version, country, and reporting period "
 "before import."
@@ -21530,19 +21555,19 @@ msgstr ""
 msgid "The following will be unassigned (kept for history):"
 msgstr "Следующее не будет присвоено (сохранено для истории):"
 
-#: app/templates/forms/entry_form/entry_form.html:3106
+#: app/templates/forms/entry_form/entry_form.html:3107
 msgid ""
 "The form is taking longer than expected to load. Please reload the page."
 msgstr ""
 "Форма загружается дольше, чем ожидалось. Пожалуйста, перезагрузите страницу."
 
-#: app/routes/main/helpers.py:1197
+#: app/routes/main/helpers.py:1155
 msgid "The form was sent for delegation review before final submission."
 msgstr ""
 "Форма была отправлена на рассмотрение делегацией перед окончательной "
 "подачей."
 
-#: app/routes/main/helpers.py:1200
+#: app/routes/main/helpers.py:1158
 msgid "The form was submitted and is awaiting validation by an administrator."
 msgstr "Форма была подана и ожидает проверки администратором."
 
@@ -21580,7 +21605,7 @@ msgstr ""
 "Количество повторных записей не должно превышать количество доступных "
 "вариантов."
 
-#: app/templates/admin/assignments/manage_assignment.html:216
+#: app/templates/admin/assignments/manage_assignment.html:217
 msgid ""
 "The person accountable for data quality in this collection cycle. Defaults "
 "to the template owner."
@@ -21593,7 +21618,7 @@ msgstr ""
 msgid "The requested resource was not found."
 msgstr "Запрошенный ресурс не был найден."
 
-#: app/templates/forms/entry_form/entry_form.html:3847
+#: app/templates/forms/entry_form/entry_form.html:3848
 msgid "The server is temporarily unavailable. Please try again in a moment."
 msgstr ""
 "Сервер временно недоступен. Пожалуйста, попробуйте снова через минуту."
@@ -21607,7 +21632,7 @@ msgstr ""
 "отчётов. Вы можете расширять или сжимать секции, и состояние сохраняется при"
 " посещениях."
 
-#: app/routes/main/helpers.py:1203
+#: app/routes/main/helpers.py:1161
 msgid "The submission was validated and approved. Data entry is complete."
 msgstr "Заявка была одобрена и одобрена. Ввод данных завершен."
 
@@ -21730,7 +21755,7 @@ msgstr ""
 "Это задание было отправлено на рассмотрение в %(org)s. Нельзя вносить "
 "изменения, пока материал не будет вернут на редактирование."
 
-#: app/routes/main/helpers.py:1206
+#: app/routes/main/helpers.py:1164
 msgid "This assignment is closed and no further changes are expected."
 msgstr "Это задание закрыто, и дальнейших изменений не ожидается."
 
@@ -21738,7 +21763,7 @@ msgstr "Это задание закрыто, и дальнейших измен
 msgid "This assignment is currently inactive."
 msgstr "Это задание в настоящее время неактивно."
 
-#: app/templates/admin/assignments/manage_assignment.html:1036
+#: app/templates/admin/assignments/manage_assignment.html:1035
 msgid ""
 "This assignment will be created without sending notifications to assigned "
 "entities. Do you want to continue?"
@@ -21767,7 +21792,7 @@ msgstr "Этот столбец нельзя скрыть"
 msgid "This column cannot be unpinned"
 msgstr "Этот столбец нельзя раскрепить"
 
-#: app/templates/auth/login.html:1234 app/templates/auth/login.html:1319
+#: app/templates/auth/login.html:1301 app/templates/auth/login.html:1386
 msgid ""
 "This email is already registered. Try signing in or reset your password."
 msgstr ""
@@ -21777,12 +21802,12 @@ msgstr ""
 msgid "This feature is under development"
 msgstr "Эта функция находится в разработке"
 
-#: app/templates/forms/entry_form/entry_form.html:933
-#: app/templates/forms/entry_form/entry_form.html:1894
+#: app/templates/forms/entry_form/entry_form.html:934
+#: app/templates/forms/entry_form/entry_form.html:1895
 msgid "This field type is no longer available. Please contact your"
 msgstr "Этот тип поля больше недоступен. Пожалуйста, свяжитесь с вашим"
 
-#: app/templates/forms/entry_form/entry_form.html:614
+#: app/templates/forms/entry_form/entry_form.html:615
 #, python-format
 msgid "This form has been %(status)s. Data entry is disabled."
 msgstr "Эта форма была %(status)s. Ввод данных отключен."
@@ -21822,7 +21847,7 @@ msgstr ""
 "Эта форма предназначена только для чтения. Вы можете просматривать данные, "
 "но не можете вносить изменения."
 
-#: app/templates/forms/entry_form/entry_form.html:2671
+#: app/templates/forms/entry_form/entry_form.html:2672
 msgid ""
 "This functionality is only available when working with actual assignments."
 msgstr "Эта функция доступна только при работе с реальными назначениями."
@@ -21839,7 +21864,7 @@ msgstr ""
 msgid "This import will permanently delete existing submission data:"
 msgstr "Этот импорт навсегда удалит существующие данные отправки:"
 
-#: app/templates/forms/entry_form/entry_form.html:3848
+#: app/templates/forms/entry_form/entry_form.html:3849
 msgid "This indicator is already added to this section."
 msgstr "Этот индикатор уже добавлен в этот раздел."
 
@@ -21861,21 +21886,21 @@ msgstr ""
 "банка индикаторов. Используйте это для отчёта по дополнительным показателям,"
 " релевантным вашей стране."
 
-#: app/templates/forms/entry_form/entry_form.html:1287
-#: app/templates/forms/entry_form/entry_form.html:1334
-#: app/templates/forms/entry_form/entry_form.html:1440
-#: app/templates/forms/entry_form/entry_form.html:1487
-#: app/templates/forms/entry_form/entry_form.html:1524
-#: app/templates/forms/entry_form/entry_form.html:1587
-#: app/templates/forms/entry_form/entry_form.html:1597
-#: app/templates/forms/entry_form/entry_form.html:1610
-#: app/templates/forms/entry_form/entry_form.html:1625
-#: app/templates/forms/entry_form/entry_form.html:1649
-#: app/templates/forms/entry_form/entry_form.html:1657
-#: app/templates/forms/entry_form/entry_form.html:1671
-#: app/templates/forms/entry_form/entry_form.html:2106
-#: app/templates/forms/entry_form/entry_form.html:2203
-#: app/templates/forms/entry_form/entry_form.html:2226
+#: app/templates/forms/entry_form/entry_form.html:1288
+#: app/templates/forms/entry_form/entry_form.html:1335
+#: app/templates/forms/entry_form/entry_form.html:1441
+#: app/templates/forms/entry_form/entry_form.html:1488
+#: app/templates/forms/entry_form/entry_form.html:1525
+#: app/templates/forms/entry_form/entry_form.html:1588
+#: app/templates/forms/entry_form/entry_form.html:1598
+#: app/templates/forms/entry_form/entry_form.html:1611
+#: app/templates/forms/entry_form/entry_form.html:1626
+#: app/templates/forms/entry_form/entry_form.html:1650
+#: app/templates/forms/entry_form/entry_form.html:1658
+#: app/templates/forms/entry_form/entry_form.html:1672
+#: app/templates/forms/entry_form/entry_form.html:2107
+#: app/templates/forms/entry_form/entry_form.html:2204
+#: app/templates/forms/entry_form/entry_form.html:2227
 #: app/templates/forms/entry_form/partials/_question_single_choice.html:38
 #: app/templates/forms/entry_form/partials/matrix_table.html:12
 msgid "This is a prefilled value"
@@ -21890,21 +21915,21 @@ msgstr ""
 "пользователей. Вы можете протестировать ввод данных в этом режиме "
 "предварительного просмотра."
 
-#: app/templates/forms/entry_form/entry_form.html:1287
-#: app/templates/forms/entry_form/entry_form.html:1334
-#: app/templates/forms/entry_form/entry_form.html:1440
-#: app/templates/forms/entry_form/entry_form.html:1487
-#: app/templates/forms/entry_form/entry_form.html:1524
-#: app/templates/forms/entry_form/entry_form.html:1587
-#: app/templates/forms/entry_form/entry_form.html:1597
-#: app/templates/forms/entry_form/entry_form.html:1610
-#: app/templates/forms/entry_form/entry_form.html:1625
-#: app/templates/forms/entry_form/entry_form.html:1649
-#: app/templates/forms/entry_form/entry_form.html:1657
-#: app/templates/forms/entry_form/entry_form.html:1671
-#: app/templates/forms/entry_form/entry_form.html:2106
-#: app/templates/forms/entry_form/entry_form.html:2203
-#: app/templates/forms/entry_form/entry_form.html:2226
+#: app/templates/forms/entry_form/entry_form.html:1288
+#: app/templates/forms/entry_form/entry_form.html:1335
+#: app/templates/forms/entry_form/entry_form.html:1441
+#: app/templates/forms/entry_form/entry_form.html:1488
+#: app/templates/forms/entry_form/entry_form.html:1525
+#: app/templates/forms/entry_form/entry_form.html:1588
+#: app/templates/forms/entry_form/entry_form.html:1598
+#: app/templates/forms/entry_form/entry_form.html:1611
+#: app/templates/forms/entry_form/entry_form.html:1626
+#: app/templates/forms/entry_form/entry_form.html:1650
+#: app/templates/forms/entry_form/entry_form.html:1658
+#: app/templates/forms/entry_form/entry_form.html:1672
+#: app/templates/forms/entry_form/entry_form.html:2107
+#: app/templates/forms/entry_form/entry_form.html:2204
+#: app/templates/forms/entry_form/entry_form.html:2227
 #: app/templates/forms/entry_form/partials/_question_single_choice.html:38
 msgid "This is an imputed value"
 msgstr "Это причисленное значение"
@@ -21913,7 +21938,7 @@ msgstr "Это причисленное значение"
 msgid "This is the main navigation area."
 msgstr "Это основная навигационная зона."
 
-#: app/templates/auth/login.html:514 app/templates/auth/login.html:721
+#: app/templates/auth/login.html:571 app/templates/auth/login.html:746
 msgid "This is the one and only system for reporting data to"
 msgstr "Это единственная система для передачи данных"
 
@@ -21951,7 +21976,7 @@ msgstr ""
 "В этом языке нет шаблонного контента для отправки. Добавьте HTML в редактор "
 "или выберите вкладку другого языка."
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:54
+#: app/templates/forms/entry_form/partials/matrix_table.html:56
 msgid "This matrix is imputed"
 msgstr "Эта матрица вчисляется"
 
@@ -22003,7 +22028,7 @@ msgstr ""
 "Этот запрос был одобрен, но ваш доступ в эту страну был удалён "
 "администратором."
 
-#: app/routes/auth.py:1179 app/routes/auth.py:1187
+#: app/routes/auth.py:1405 app/routes/auth.py:1413
 msgid "This reset link is invalid or has expired."
 msgstr "Эта ссылка на сброс некорректна или истёкла."
 
@@ -22071,11 +22096,11 @@ msgid "This sub-section contains %(count)s saved data entries."
 msgstr "В этом подразделе нет полей."
 
 #: app/templates/components/_section_renderer.html:69
-#: app/templates/forms/entry_form/entry_form.html:2453
+#: app/templates/forms/entry_form/entry_form.html:2454
 msgid "This sub-section has no fields."
 msgstr "В этом подразделе нет полей."
 
-#: app/routes/main/helpers.py:1205
+#: app/routes/main/helpers.py:1163
 msgid "This submission was rejected."
 msgstr "Это предложение было отклонено."
 
@@ -22120,7 +22145,7 @@ msgstr ""
 msgid "This user is currently inactive."
 msgstr "Этот пользователь в настоящее время неактивен."
 
-#: app/templates/forms/entry_form/entry_form.html:3903
+#: app/templates/forms/entry_form/entry_form.html:3904
 msgid "This value is prefilled and cannot be modified here."
 msgstr "Это значение заранее заполнено и не может быть изменено здесь."
 
@@ -22241,7 +22266,7 @@ msgstr "Четверг"
 msgid "Tick (✓)"
 msgstr "Тик (✓)"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:314
+#: app/templates/forms/entry_form/partials/matrix_table.html:316
 msgid "Tick for"
 msgstr "Галочка для"
 
@@ -22310,7 +22335,7 @@ msgstr "Временная метка"
 msgid "Title"
 msgstr "Должность"
 
-#: app/templates/auth/login.html:653 app/templates/auth/register.html:17
+#: app/templates/auth/login.html:678 app/templates/auth/register.html:17
 msgid "Title (optional)"
 msgstr "Название (по желанию)"
 
@@ -22367,7 +22392,7 @@ msgstr "Видимость переключённых секций"
 msgid "Toggle sidebar"
 msgstr "Боковая панель переключения"
 
-#: app/routes/auth.py:169
+#: app/routes/auth.py:346
 msgid "Too many failed login attempts. Please try again later."
 msgstr "Слишком много неудачных попыток входа. Пожалуйста, попробуйте позже."
 
@@ -22425,27 +22450,27 @@ msgstr "Лучшие используемые инструменты"
 #: app/templates/admin/ai/documents.html:62
 #: app/templates/forms/entry_form/export_pdf.html:197
 #: app/templates/forms/entry_form/export_pdf.html:275
-#: app/templates/forms/entry_form/partials/matrix_table.html:145
-#: app/templates/forms/entry_form/partials/matrix_table.html:192
-#: app/templates/forms/entry_form/partials/matrix_table.html:202
+#: app/templates/forms/entry_form/partials/matrix_table.html:147
+#: app/templates/forms/entry_form/partials/matrix_table.html:194
+#: app/templates/forms/entry_form/partials/matrix_table.html:204
 #: app/templates/notifications/center.html:61
 msgid "Total"
 msgstr "Всего"
 
-#: app/templates/forms/entry_form/entry_form.html:1172
-#: app/templates/forms/entry_form/entry_form.html:1201
-#: app/templates/forms/entry_form/entry_form.html:1313
-#: app/templates/forms/entry_form/entry_form.html:1342
-#: app/templates/forms/entry_form/entry_form.html:1466
-#: app/templates/forms/entry_form/entry_form.html:1495
-#: app/templates/forms/entry_form/entry_form.html:1542
-#: app/templates/forms/entry_form/entry_form.html:1684
-#: app/templates/forms/entry_form/entry_form.html:2193
-#: app/templates/forms/entry_form/entry_form.html:2214
-#: app/templates/forms/entry_form/entry_form.html:2243
-#: app/templates/forms/entry_form/entry_form.html:2300
-#: app/templates/forms/entry_form/entry_form.html:2327
-#: app/templates/forms/entry_form/entry_form.html:2393
+#: app/templates/forms/entry_form/entry_form.html:1173
+#: app/templates/forms/entry_form/entry_form.html:1202
+#: app/templates/forms/entry_form/entry_form.html:1314
+#: app/templates/forms/entry_form/entry_form.html:1343
+#: app/templates/forms/entry_form/entry_form.html:1467
+#: app/templates/forms/entry_form/entry_form.html:1496
+#: app/templates/forms/entry_form/entry_form.html:1543
+#: app/templates/forms/entry_form/entry_form.html:1685
+#: app/templates/forms/entry_form/entry_form.html:2194
+#: app/templates/forms/entry_form/entry_form.html:2215
+#: app/templates/forms/entry_form/entry_form.html:2244
+#: app/templates/forms/entry_form/entry_form.html:2301
+#: app/templates/forms/entry_form/entry_form.html:2328
+#: app/templates/forms/entry_form/entry_form.html:2394
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:223
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:251
 msgid "Total (Direct + Indirect):"
@@ -22464,15 +22489,15 @@ msgstr "Назначения"
 msgid "Total Cost"
 msgstr "Общая стоимость"
 
-#: app/templates/forms/entry_form/entry_form.html:1145
-#: app/templates/forms/entry_form/entry_form.html:1192
-#: app/templates/forms/entry_form/entry_form.html:1286
-#: app/templates/forms/entry_form/entry_form.html:1333
-#: app/templates/forms/entry_form/entry_form.html:1439
-#: app/templates/forms/entry_form/entry_form.html:1486
-#: app/templates/forms/entry_form/entry_form.html:2105
-#: app/templates/forms/entry_form/entry_form.html:2273
-#: app/templates/forms/entry_form/entry_form.html:2318
+#: app/templates/forms/entry_form/entry_form.html:1146
+#: app/templates/forms/entry_form/entry_form.html:1193
+#: app/templates/forms/entry_form/entry_form.html:1287
+#: app/templates/forms/entry_form/entry_form.html:1334
+#: app/templates/forms/entry_form/entry_form.html:1440
+#: app/templates/forms/entry_form/entry_form.html:1487
+#: app/templates/forms/entry_form/entry_form.html:2106
+#: app/templates/forms/entry_form/entry_form.html:2274
+#: app/templates/forms/entry_form/entry_form.html:2319
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:196
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:242
 msgid "Total Direct:"
@@ -22536,12 +22561,12 @@ msgstr "Общая деятельность"
 msgid "Total cost"
 msgstr "Общая стоимость"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:209
+#: app/templates/forms/entry_form/partials/matrix_table.html:211
 msgid "Total for column"
 msgstr "Другие столбцы"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:360
-#: app/templates/forms/entry_form/partials/matrix_table.html:372
+#: app/templates/forms/entry_form/partials/matrix_table.html:362
+#: app/templates/forms/entry_form/partials/matrix_table.html:374
 msgid "Total for row"
 msgstr "Только общее"
 
@@ -22590,20 +22615,20 @@ msgstr ""
 "Общая отчетность: индикаторы с определённым значением, но без разбивки по "
 "разбору."
 
-#: app/templates/forms/entry_form/entry_form.html:1145
-#: app/templates/forms/entry_form/entry_form.html:1183
-#: app/templates/forms/entry_form/entry_form.html:1192
-#: app/templates/forms/entry_form/entry_form.html:1286
-#: app/templates/forms/entry_form/entry_form.html:1324
-#: app/templates/forms/entry_form/entry_form.html:1333
-#: app/templates/forms/entry_form/entry_form.html:1439
-#: app/templates/forms/entry_form/entry_form.html:1477
-#: app/templates/forms/entry_form/entry_form.html:1486
-#: app/templates/forms/entry_form/entry_form.html:2105
-#: app/templates/forms/entry_form/entry_form.html:2202
-#: app/templates/forms/entry_form/entry_form.html:2273
-#: app/templates/forms/entry_form/entry_form.html:2310
-#: app/templates/forms/entry_form/entry_form.html:2318
+#: app/templates/forms/entry_form/entry_form.html:1146
+#: app/templates/forms/entry_form/entry_form.html:1184
+#: app/templates/forms/entry_form/entry_form.html:1193
+#: app/templates/forms/entry_form/entry_form.html:1287
+#: app/templates/forms/entry_form/entry_form.html:1325
+#: app/templates/forms/entry_form/entry_form.html:1334
+#: app/templates/forms/entry_form/entry_form.html:1440
+#: app/templates/forms/entry_form/entry_form.html:1478
+#: app/templates/forms/entry_form/entry_form.html:1487
+#: app/templates/forms/entry_form/entry_form.html:2106
+#: app/templates/forms/entry_form/entry_form.html:2203
+#: app/templates/forms/entry_form/entry_form.html:2274
+#: app/templates/forms/entry_form/entry_form.html:2311
+#: app/templates/forms/entry_form/entry_form.html:2319
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:196
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:234
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:242
@@ -23054,12 +23079,12 @@ msgstr "Двухбуквенный код локализации для лока
 #: app/templates/components/_builder_items.html:86
 #: app/templates/components/_builder_items.html:92
 #: app/templates/components/_builder_items.html:105
-#: app/templates/forms/entry_form/entry_form.html:1039
-#: app/templates/forms/entry_form/entry_form.html:1070
-#: app/templates/forms/entry_form/entry_form.html:1072
-#: app/templates/forms/entry_form/entry_form.html:1988
-#: app/templates/forms/entry_form/entry_form.html:2018
-#: app/templates/forms/entry_form/entry_form.html:2020
+#: app/templates/forms/entry_form/entry_form.html:1040
+#: app/templates/forms/entry_form/entry_form.html:1071
+#: app/templates/forms/entry_form/entry_form.html:1073
+#: app/templates/forms/entry_form/entry_form.html:1989
+#: app/templates/forms/entry_form/entry_form.html:2019
+#: app/templates/forms/entry_form/entry_form.html:2021
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:38
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:96
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:126
@@ -23088,11 +23113,11 @@ msgstr "Типовой ключ"
 msgid "Type not set on this item"
 msgstr "Тип не установлен на этом предмете"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:415
+#: app/templates/forms/entry_form/partials/matrix_table.html:417
 msgid "Type to search for rows to add..."
 msgstr "Введите, чтобы искать строки для добавления..."
 
-#: app/templates/forms/entry_form/entry_form.html:3839
+#: app/templates/forms/entry_form/entry_form.html:3840
 msgid "Type to search indicators..."
 msgstr "Введите для поиска индикаторов..."
 
@@ -23116,12 +23141,12 @@ msgid "Typing"
 msgstr "Типизация"
 
 #: app/templates/admin/templates/upr_excel_import.html:434
-#: app/templates/forms/entry_form/entry_form.html:2600
-#: app/templates/forms/entry_form/entry_form.html:2610
+#: app/templates/forms/entry_form/entry_form.html:2601
+#: app/templates/forms/entry_form/entry_form.html:2611
 msgid "UPR Country Reporting"
 msgstr "Отчётность по странам UPR"
 
-#: app/routes/main/helpers.py:1356
+#: app/routes/main/helpers.py:1314
 #, python-format
 msgid "UPR Country Reporting Excel imported: %(count)s values staged"
 msgstr "UPR Country Reporting Excel импортирован: значения %(count)s поэтапно"
@@ -23154,7 +23179,7 @@ msgstr "Доллар США"
 msgid "Unable to determine which entity to show documents for."
 msgstr "Не удалось определить, для какой организации предъявить документы."
 
-#: app/templates/forms/entry_form/entry_form.html:2698
+#: app/templates/forms/entry_form/entry_form.html:2699
 msgid ""
 "Unable to edit: document ID is invalid. Please refresh the page and try "
 "again."
@@ -23182,9 +23207,9 @@ msgstr "Раздел Unarchive"
 msgid "Unarchive Sub-section"
 msgstr "Подраздел Unarchive"
 
-#: app/templates/forms/entry_form/entry_form.html:456
 #: app/templates/forms/entry_form/entry_form.html:457
-#: app/templates/forms/entry_form/entry_form.html:725
+#: app/templates/forms/entry_form/entry_form.html:458
+#: app/templates/forms/entry_form/entry_form.html:726
 msgid "Unassigned Sections"
 msgstr "Добавить раздел"
 
@@ -23270,10 +23295,10 @@ msgstr ""
 #: app/templates/admin/indicator_bank/neural_map.html:194
 #: app/templates/admin/templates/data_sync_imputation.html:396
 #: app/templates/components/_builder_items.html:50
-#: app/templates/forms/entry_form/entry_form.html:1040
-#: app/templates/forms/entry_form/entry_form.html:1074
-#: app/templates/forms/entry_form/entry_form.html:1989
-#: app/templates/forms/entry_form/entry_form.html:2022
+#: app/templates/forms/entry_form/entry_form.html:1041
+#: app/templates/forms/entry_form/entry_form.html:1075
+#: app/templates/forms/entry_form/entry_form.html:1990
+#: app/templates/forms/entry_form/entry_form.html:2023
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:97
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:130
 #: app/templates/forms/form_builder/partials/_item_modal.html:146
@@ -23305,7 +23330,7 @@ msgstr "Юнит спасён."
 msgid "Units"
 msgstr "Единицы"
 
-#: app/routes/main/helpers.py:1244
+#: app/routes/main/helpers.py:1202
 #: app/services/communication_center_service.py:95
 #: app/templates/admin/analytics/_user_detail_partial.html:246
 #: app/templates/admin/analytics/dashboard.html:31
@@ -23331,18 +23356,18 @@ msgstr "Единицы"
 msgid "Unknown"
 msgstr "Неизвестно"
 
-#: app/services/notification/service.py:631
+#: app/services/notification/service.py:683
 #: app/templates/core/dashboard.html:2726
 #: app/templates/core/dashboard.html:2880 app/utils/form_localization.py:494
 #: app/utils/form_localization.py:507
 msgid "Unknown Country"
 msgstr "Неизвестный пользователь"
 
-#: app/templates/forms/entry_form/entry_form.html:1104
-#: app/templates/forms/entry_form/entry_form.html:1112
-#: app/templates/forms/entry_form/entry_form.html:2047
-#: app/templates/forms/entry_form/entry_form.html:2055
-#: app/templates/forms/entry_form/entry_form.html:3833
+#: app/templates/forms/entry_form/entry_form.html:1105
+#: app/templates/forms/entry_form/entry_form.html:1113
+#: app/templates/forms/entry_form/entry_form.html:2048
+#: app/templates/forms/entry_form/entry_form.html:2056
+#: app/templates/forms/entry_form/entry_form.html:3834
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:156
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:164
 #: app/utils/form_localization.py:244 app/utils/form_localization.py:251
@@ -23353,12 +23378,12 @@ msgstr "Неизвестный индикатор"
 msgid "Unknown Section"
 msgstr "Неизвестная секция"
 
-#: app/routes/main/helpers.py:1133 app/utils/form_localization.py:414
+#: app/routes/main/helpers.py:1091 app/utils/form_localization.py:414
 #: app/utils/form_localization.py:421
 msgid "Unknown Template"
 msgstr "Неизвестный шаблон"
 
-#: app/services/notification/service.py:619
+#: app/services/notification/service.py:671
 #: app/templates/admin/ai/reasoning_traces.html:325
 #: app/templates/admin/analytics/audit_trail.html:446
 #: app/templates/admin/analytics/security_events.html:189
@@ -23480,7 +23505,7 @@ msgstr ""
 msgid "Updated"
 msgstr "Обновлено"
 
-#: app/routes/main/helpers.py:1334
+#: app/routes/main/helpers.py:1292
 #, python-format
 msgid "Updated %(count)d field in %(template)s"
 msgstr "Обновлено %(count)d поле в %(template)s"
@@ -23496,13 +23521,13 @@ msgstr "Обновления"
 #: app/templates/admin/settings/manage_settings.html:502
 #: app/templates/admin/settings/manage_settings.html:547
 #: app/templates/admin/templates/upr_excel_import.html:40
-#: app/templates/forms/entry_form/entry_form.html:2929
+#: app/templates/forms/entry_form/entry_form.html:2930
 #: app/templates/forms/form_builder/partials/_item_modal.html:979
 #: app/templates/macros/upr_country_reporting_excel_instructions.html:44
 msgid "Upload"
 msgstr "Закачать"
 
-#: app/templates/forms/entry_form/entry_form.html:2617
+#: app/templates/forms/entry_form/entry_form.html:2618
 msgid "Upload & import"
 msgstr "Загрузка и импорт"
 
@@ -23511,9 +23536,9 @@ msgid "Upload Date"
 msgstr "Дата загрузки"
 
 #: app/templates/admin/documents/documents.html:42
-#: app/templates/forms/entry_form/entry_form.html:2680
-#: app/templates/forms/entry_form/entry_form.html:2700
+#: app/templates/forms/entry_form/entry_form.html:2681
 #: app/templates/forms/entry_form/entry_form.html:2701
+#: app/templates/forms/entry_form/entry_form.html:2702
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:190
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:196
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:198
@@ -23786,7 +23811,7 @@ msgstr ""
 "Используйте помощника для сравнения значений, поиска информации и "
 "интерпретации доказательств из отчётов и планов."
 
-#: app/templates/forms/entry_form/entry_form.html:3822
+#: app/templates/forms/entry_form/entry_form.html:3823
 msgid "Use the button to add indicators to this section."
 msgstr "Используйте кнопку для добавления индикаторов в этот раздел."
 
@@ -23842,7 +23867,7 @@ msgstr "Используется как запасной вариант, ког�
 msgid "User"
 msgstr "Пользователь"
 
-#: app/routes/main/helpers.py:1352
+#: app/routes/main/helpers.py:1310
 #, python-format
 msgid "User %(action)s"
 msgstr "Разделы"
@@ -23975,6 +24000,10 @@ msgstr "Информация о пользователях"
 msgid "User not found"
 msgstr "Пользователь не найден"
 
+#: app/routes/auth.py:281
+msgid "User not found."
+msgstr "Пользователь не найден."
+
 #: app/templates/admin/user_management/access_requests.html:424
 msgid "User note"
 msgstr "Примечание пользователя"
@@ -24086,7 +24115,7 @@ msgid "Valid export"
 msgstr "Действительный экспорт"
 
 #: app/templates/forms/entry_form/entry_form.html:161
-#: app/templates/forms/entry_form/entry_form.html:3969
+#: app/templates/forms/entry_form/entry_form.html:3970
 msgid "Validate"
 msgstr "Валидировать"
 
@@ -24142,8 +24171,8 @@ msgstr "Правило валидации"
 msgid "Validation Rules Registry"
 msgstr "Реестр правил валидации"
 
-#: app/templates/forms/entry_form/entry_form.html:2554
-#: app/templates/forms/entry_form/entry_form.html:2558
+#: app/templates/forms/entry_form/entry_form.html:2555
+#: app/templates/forms/entry_form/entry_form.html:2559
 #: app/templates/forms/entry_form/validation_summary_pdf.html:9
 #: app/templates/forms/entry_form/validation_summary_pdf.html:17
 #: app/templates/forms/entry_form/validation_summary_progress.html:9
@@ -24209,7 +24238,7 @@ msgstr "Просмотры реестра правил валидации"
 msgid "Value"
 msgstr "Ценность"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:326
+#: app/templates/forms/entry_form/partials/matrix_table.html:328
 msgid "Value for"
 msgstr "Ценность для"
 
@@ -24239,11 +24268,11 @@ msgstr "доступно в"
 msgid "Variable column tooltip labels"
 msgstr "Метки подсказок переменных столбцов"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:280
+#: app/templates/forms/entry_form/partials/matrix_table.html:282
 msgid "Variable tick for"
 msgstr "доступно в"
 
-#: app/templates/forms/entry_form/partials/matrix_table.html:297
+#: app/templates/forms/entry_form/partials/matrix_table.html:299
 msgid "Variable value for"
 msgstr "Значение переменной для"
 
@@ -24411,8 +24440,8 @@ msgstr "Просмотр деталей"
 msgid "View FDRS document compliance by country."
 msgstr "Просмотрите документы соответствия FDRS по странам."
 
-#: app/templates/forms/entry_form/entry_form.html:1050
-#: app/templates/forms/entry_form/entry_form.html:1999
+#: app/templates/forms/entry_form/entry_form.html:1051
+#: app/templates/forms/entry_form/entry_form.html:2000
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:107
 msgid "View Full Details"
 msgstr "Просмотр деталей"
@@ -24630,18 +24659,18 @@ msgstr "Водоснабжение и санитария"
 msgid "Water Quality"
 msgstr "Качество воды"
 
-#: app/routes/auth.py:1155
+#: app/routes/auth.py:1373
 msgid ""
 "We could not process the reset request at this time. Please try again later."
 msgstr ""
 "В данный момент мы не смогли обработать запрос на сброс. Пожалуйста, "
 "попробуйте позже."
 
-#: app/routes/auth.py:679
+#: app/routes/auth.py:863
 msgid "We could not retrieve your email from Azure."
 msgstr "Мы не смогли получить ваш email из Azure."
 
-#: app/routes/auth.py:1159
+#: app/routes/auth.py:1377
 msgid ""
 "We could not send the reset email at this time. Please contact support."
 msgstr ""
@@ -24695,7 +24724,7 @@ msgstr "Email пользователя"
 msgid "Welcome to"
 msgstr "Добро пожаловать в"
 
-#: app/templates/auth/login.html:512 app/templates/auth/login.html:719
+#: app/templates/auth/login.html:569 app/templates/auth/login.html:744
 #: app/templates/tours/tours.html:23 app/templates/tours/tours.html:34
 msgid "Welcome to the"
 msgstr "Добро пожаловать в"
@@ -24822,7 +24851,7 @@ msgstr "Ширина"
 msgid "Will be cleared on save"
 msgstr "Будет очищено при сохранении"
 
-#: app/templates/forms/entry_form/entry_form.html:2689
+#: app/templates/forms/entry_form/entry_form.html:2690
 msgid "Will be deleted when you save the form."
 msgstr "Они будут удалены при сохранении формы."
 
@@ -24900,7 +24929,7 @@ msgstr "ГГГГ-ММ-ДД или ГГГГ-ММ-ДДТХ:ММ:СС"
 
 #: app/templates/admin/ai/documents.html:361
 #: app/templates/admin/ai/documents.html:660
-#: app/templates/admin/assignments/manage_assignment.html:95
+#: app/templates/admin/assignments/manage_assignment.html:96
 #: app/templates/admin/data_exploration/explore_data.html:332
 #: app/templates/admin/settings/manage_settings.html:990
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:49
@@ -24909,9 +24938,9 @@ msgstr "ГГГГ-ММ-ДД или ГГГГ-ММ-ДДТХ:ММ:СС"
 msgid "Year"
 msgstr "Год"
 
-#: app/templates/admin/assignments/manage_assignment.html:89
+#: app/templates/admin/assignments/manage_assignment.html:90
 #: app/templates/admin/documents/documents.html:226
-#: app/templates/forms/entry_form/entry_form.html:2801
+#: app/templates/forms/entry_form/entry_form.html:2802
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:42
 #: app/templates/forms/form_builder/partials/_item_modal.html:458
 #: app/templates/forms/form_builder/partials/_item_modal.html:486
@@ -24949,11 +24978,11 @@ msgstr "Жёлтый"
 #: app/templates/components/_form_item_renderer.html:229
 #: app/templates/components/_status_label.html:81
 #: app/templates/components/ag_grid_i18n_js.html:35
-#: app/templates/forms/entry_form/entry_form.html:1221
-#: app/templates/forms/entry_form/entry_form.html:1356
-#: app/templates/forms/entry_form/entry_form.html:1509
-#: app/templates/forms/entry_form/entry_form.html:1634
-#: app/templates/forms/entry_form/entry_form.html:2346
+#: app/templates/forms/entry_form/entry_form.html:1222
+#: app/templates/forms/entry_form/entry_form.html:1357
+#: app/templates/forms/entry_form/entry_form.html:1510
+#: app/templates/forms/entry_form/entry_form.html:1635
+#: app/templates/forms/entry_form/entry_form.html:2347
 #: app/templates/forms/entry_form/partials/disability_questions.html:23
 #: app/templates/forms/entry_form/partials/disability_questions.html:48
 #: app/templates/forms/entry_form/partials/dynamic_indicator_item.html:270
@@ -24988,8 +25017,8 @@ msgstr "Да/Нет"
 msgid "You already have a pending request for: %(country)s"
 msgstr "У вас уже есть ожидающий запрос на: %(country)s"
 
-#: app/templates/core/dashboard.html:3217
-#: app/templates/core/dashboard.html:3293
+#: app/templates/core/dashboard.html:3230
+#: app/templates/core/dashboard.html:3306
 msgid "You already have access"
 msgstr "У тебя уже есть доступ"
 
@@ -25221,7 +25250,7 @@ msgstr ""
 "Ваши запросы на доступ к странам %(count)d уже поданы. Администратор скоро "
 "проверит их."
 
-#: app/routes/auth.py:1106
+#: app/routes/auth.py:1308
 msgid ""
 "Your account has been created. Your country access request is pending admin "
 "approval."
@@ -25229,7 +25258,7 @@ msgstr ""
 "Ваш аккаунт создан. Ваш запрос на доступ в страну ожидает одобрения "
 "администрации."
 
-#: app/routes/auth.py:200 app/routes/auth.py:776
+#: app/routes/auth.py:377 app/routes/auth.py:960
 msgid ""
 "Your account is deactivated. Please contact an administrator to reactivate "
 "it."
@@ -25253,11 +25282,11 @@ msgstr ""
 "Ваш аккаунт пока не привязан к какой-либо стране. У вас рассматриваются "
 "неожиданные запросы."
 
-#: app/templates/auth/login.html:539
+#: app/templates/auth/login.html:596
 msgid "Your account or create an account"
 msgstr "Нет аккаунта?"
 
-#: app/routes/auth.py:1271
+#: app/routes/auth.py:1497
 msgid "Your account settings have been updated successfully."
 msgstr "Настройки вашего аккаунта были успешно обновлены."
 
@@ -25300,7 +25329,7 @@ msgstr ""
 "поставщиками ИИ (например, OpenAI, Gemini, Azure) для генерации ответов. Мы "
 "используем системные трассы и телеметрию для улучшения ассистента."
 
-#: app/routes/auth.py:1232
+#: app/routes/auth.py:1458
 msgid "Your password has been reset. You can now log in."
 msgstr "Ваш пароль сброшен. Теперь вы можете войти."
 
@@ -25355,10 +25384,10 @@ msgstr "Разрешить"
 #: app/templates/admin/api_management.html:617
 #: app/templates/admin/api_management.html:618
 #: app/templates/admin/data_exploration/explore_data.html:3009
-#: app/templates/forms/entry_form/partials/matrix_table.html:280
-#: app/templates/forms/entry_form/partials/matrix_table.html:297
-#: app/templates/forms/entry_form/partials/matrix_table.html:314
-#: app/templates/forms/entry_form/partials/matrix_table.html:326
+#: app/templates/forms/entry_form/partials/matrix_table.html:282
+#: app/templates/forms/entry_form/partials/matrix_table.html:299
+#: app/templates/forms/entry_form/partials/matrix_table.html:316
+#: app/templates/forms/entry_form/partials/matrix_table.html:328
 msgid "and"
 msgstr "и"
 
@@ -25394,11 +25423,11 @@ msgid "at: %(datetime)s"
 msgstr "в: %(datetime)s"
 
 #: app/templates/admin/settings/manage_settings.html:1493
-#: app/templates/forms/entry_form/entry_form.html:3844
+#: app/templates/forms/entry_form/entry_form.html:3845
 msgid "available"
 msgstr "доступно"
 
-#: app/templates/forms/entry_form/entry_form.html:3845
+#: app/templates/forms/entry_form/entry_form.html:3846
 msgid "available in"
 msgstr "доступно в"
 
@@ -25463,7 +25492,7 @@ msgstr "Завершено"
 msgid "countries"
 msgstr "стран"
 
-#: app/templates/admin/assignments/manage_assignment.html:350
+#: app/templates/admin/assignments/manage_assignment.html:351
 msgid "countries enabled for public submission"
 msgstr "страны, доступные для публичной подачи"
 
@@ -25537,7 +25566,7 @@ msgstr "например, 10"
 msgid "e.g. <5, 5-17, 18-49, 50+"
 msgstr "Например, <5, 5-17, 18-49, 50+"
 
-#: app/templates/admin/assignments/manage_assignment.html:176
+#: app/templates/admin/assignments/manage_assignment.html:177
 msgid "e.g. Annual Country Survey 2025 — leave blank to use \"Template – Period\""
 msgstr ""
 "например, Ежегодный опрос стран 2025 — оставить пустым для использования "
@@ -25686,7 +25715,7 @@ msgstr "неудачных"
 msgid "failed."
 msgstr "провал."
 
-#: app/templates/forms/entry_form/entry_form.html:3846
+#: app/templates/forms/entry_form/entry_form.html:3847
 msgid "filtered by"
 msgstr "отфильтровано по"
 
@@ -25696,8 +25725,8 @@ msgid "filtered from"
 msgstr "фильтровано из"
 
 #: app/templates/admin/public/public_form_unavailable.html:38
-#: app/templates/forms/entry_form/entry_form.html:933
-#: app/templates/forms/entry_form/entry_form.html:1894
+#: app/templates/forms/entry_form/entry_form.html:934
+#: app/templates/forms/entry_form/entry_form.html:1895
 msgid "focal point for assistance."
 msgstr "Координаторы для"
 
@@ -25709,7 +25738,7 @@ msgstr "Управление формами и данными"
 msgid "form items loaded"
 msgstr "Шаблоны форм"
 
-#: app/templates/forms/entry_form/entry_form.html:3843
+#: app/templates/forms/entry_form/entry_form.html:3844
 msgid "found"
 msgstr "найдено"
 
@@ -25763,11 +25792,11 @@ msgstr "включает:"
 msgid "indexed"
 msgstr "индексировано"
 
-#: app/templates/forms/entry_form/entry_form.html:3842
+#: app/templates/forms/entry_form/entry_form.html:3843
 msgid "indicators"
 msgstr "индикаторов"
 
-#: app/templates/forms/entry_form/entry_form.html:3840
+#: app/templates/forms/entry_form/entry_form.html:3841
 msgid "indicators available"
 msgstr "индикаторов доступно"
 
@@ -25916,11 +25945,11 @@ msgstr "не бегать"
 #: app/templates/components/ag_grid_i18n_js.html:65
 #: app/templates/components/pagination.html:59
 #: app/templates/core/dashboard.html:1799
-#: app/templates/forms/entry_form/entry_form.html:3801
+#: app/templates/forms/entry_form/entry_form.html:3802
 msgid "of"
 msgstr "из"
 
-#: app/templates/admin/assignments/manage_assignment.html:162
+#: app/templates/admin/assignments/manage_assignment.html:163
 #: app/templates/core/dashboard.html:2796
 #: app/templates/core/dashboard.html:2924
 msgid "optional"
@@ -25930,7 +25959,7 @@ msgstr "Завершение"
 msgid "or"
 msgstr "или"
 
-#: app/templates/forms/entry_form/entry_form.html:2633
+#: app/templates/forms/entry_form/entry_form.html:2634
 msgid "or click to browse — .xlsx only"
 msgstr "Или кликните, чтобы просмотреть — только .xlsx"
 
@@ -26294,7 +26323,7 @@ msgstr "Без документов"
 msgid "unique"
 msgstr "Уникальность"
 
-#: app/templates/forms/entry_form/entry_form.html:3831
+#: app/templates/forms/entry_form/entry_form.html:3832
 msgid "unlimited"
 msgstr "неограниченно"
 

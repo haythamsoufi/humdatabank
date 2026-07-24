@@ -4,7 +4,7 @@
     <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200">
         {% if nss %}
             <div id="nss-table-container" class="overflow-x-auto">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                <div class="ag-grid-header-toolbar flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4" data-ag-grid-toolbar="true">
                     <div class="flex items-center gap-2 flex-wrap min-w-0">
                         <h3 class="text-lg font-semibold text-gray-800">{{ _('National Societies') }}</h3>
                         {% if can_manage_org %}

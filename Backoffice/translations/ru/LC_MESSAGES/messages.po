@@ -242,11 +242,11 @@ msgstr "3. Сжатие отклика"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:967
 msgid "50%"
-msgstr ""
+msgstr "50%"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:966
 msgid "75%"
-msgstr ""
+msgstr "75%"
 
 #: app/templates/admin/indicator_bank/neural_map.html:228
 msgid ""
@@ -312,7 +312,7 @@ msgstr "Создан новый самоотчет."
 #: app/routes/translation_review/__init__.py:109
 #: app/routes/translation_review/__init__.py:148
 msgid "A non-English locale is required"
-msgstr ""
+msgstr "Требуется местонахождение, не являющееся английским языком"
 
 #: app/templates/tours/tours.html:492
 msgid "A quick tour will help you get the most out of the admin tools."
@@ -661,7 +661,7 @@ msgstr "Разделы запросов на доступ"
 
 #: app/templates/admin/analytics/audit_trail.html:435
 msgid "Access requested"
-msgstr ""
+msgstr "Запрос доступа"
 
 #: app/templates/admin/rbac/grants.html:40
 msgid ""
@@ -852,7 +852,7 @@ msgstr "Активные назначения"
 #: app/templates/admin/templates/new_template.html:391
 #: app/templates/admin/templates/new_template.html:1217
 msgid "Active filters:"
-msgstr ""
+msgstr "Активные фильтры:"
 
 #: app/templates/admin/analytics/sessions.html:88
 msgid "Active sessions only"
@@ -1110,7 +1110,7 @@ msgstr "Добавьте распространённое слово"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:1152
 msgid "Add data source"
-msgstr ""
+msgstr "Добавить источник данных"
 
 #: app/templates/admin/assignments/manage_assignment.html:527
 msgid "Add entities by"
@@ -1161,7 +1161,7 @@ msgstr "Добавление порога"
 
 #: app/templates/admin/templates/new_template.html:515
 msgid "Add to self-report"
-msgstr ""
+msgstr "Добавить в самоотчёт"
 
 #: app/templates/admin/assignments/manage_assignment.html:168
 #: app/templates/admin/assignments/manage_assignment.html:169
@@ -1262,6 +1262,9 @@ msgid ""
 "Adds an \"Other (please specify)\" entry to the list. Users can type a "
 "custom value that is stored as their answer."
 msgstr ""
+"Добавляет в список запись «Другое (пожалуйста, уточните)». Пользователи "
+"могут ввести пользовательское значение, которое сохраняется в качестве "
+"ответа."
 
 #: app/templates/admin/settings/manage_settings.html:114
 msgid "Add…"
@@ -1521,7 +1524,7 @@ msgstr "Оповещения"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:955
 msgid "Alignment"
-msgstr ""
+msgstr "Трассировка"
 
 # Ensure All is present for DataTables lengthMenu label
 # Added by indicator bank i18n
@@ -1688,7 +1691,7 @@ msgstr "Все страны"
 #: app/templates/admin/templates/new_template.html:530
 #: app/templates/admin/templates/new_template.html:1225
 msgid "All disaggregation options"
-msgstr ""
+msgstr "Все варианты деагрегации"
 
 #: app/templates/forms/form_builder/field_mapping.html:359
 msgid "All draft fields are linked or marked as new."
@@ -1809,7 +1812,7 @@ msgstr "Не применимо"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:371
 msgid "Allow \"Other\" option"
-msgstr ""
+msgstr "Разрешить опцию «Другое»"
 
 #: app/templates/forms/form_builder/partials/_template_details.html:35
 msgid "Allow Self-Reporting"
@@ -1831,15 +1834,15 @@ msgstr "Вопросы о разрешении инвалидности"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:748
 msgid "Allow manual row total entry"
-msgstr ""
+msgstr "Разрешить ручной ввод рядов"
 
 #: app/templates/admin/templates/new_template.html:531
 msgid "Allow total, sex, age, and sex+age"
-msgstr ""
+msgstr "Разрешить общее количество — пол, возраст и пол+возраст"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:380
 msgid "Allow up to"
-msgstr ""
+msgstr "Позвольте до"
 
 #: app/templates/forms/form_builder/partials/_item_type_picker_modal.html:72
 msgid "Allow users to upload documents (e.g. PDFs). Optional type and period."
@@ -1857,7 +1860,7 @@ msgstr "Разрешённые пользователи"
 
 #: app/templates/admin/templates/new_template.html:539
 msgid "Allowed disaggregation options"
-msgstr ""
+msgstr "Разрешённые варианты разбиения"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:451
 msgid "Allowed period types:"
@@ -1878,11 +1881,11 @@ msgstr "Также:"
 #: app/templates/forms/form_builder/form_builder.html:689
 #: app/templates/forms/form_builder/partials/_sections_container.html:533
 msgid "Alt text"
-msgstr ""
+msgstr "Альтернативный текст"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:950
 msgid "Alt text (optional)"
-msgstr ""
+msgstr "Альтернативный текст (опционально)"
 
 #: app/routes/auth.py:1045
 msgid "An account with this email already exists."
@@ -2126,6 +2129,8 @@ msgid ""
 "Applies to {eligible} of {selected} selected indicators with units that "
 "support sex/age disaggregation."
 msgstr ""
+"Применяется к {eligable} из {выбранных} индикаторов с единицами, "
+"поддерживающими дезагрегацию по полу/возрасту."
 
 #: app/templates/admin/ai/documents.html:466
 #: app/templates/admin/ai/reasoning_traces.html:132
@@ -2162,7 +2167,7 @@ msgstr "Применить как импутируемое значение"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:193
 msgid "Apply colour"
-msgstr ""
+msgstr "Нанеси цвет"
 
 #: app/templates/forms/form_builder/field_mapping.html:91
 #: app/templates/forms/form_builder/field_mapping.html:162
@@ -2171,7 +2176,7 @@ msgstr "Ссылка на заявку"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:194
 msgid "Apply text colour"
-msgstr ""
+msgstr "Применить цвет текста"
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:2073
 msgid "Applying…"
@@ -2416,7 +2421,7 @@ msgstr "Вы уверены, что хотите удалить эту запи�
 
 #: app/templates/forms/form_builder/partials/_sections_container.html:776
 msgid "Are you sure you want to delete this image item?"
-msgstr ""
+msgstr "Вы уверены, что хотите удалить этот элемент с изображением?"
 
 #: app/templates/forms/form_builder/partials/_sections_container.html:629
 msgid "Are you sure you want to delete this indicator instance?"
@@ -2587,6 +2592,9 @@ msgid ""
 "Ask a System Manager to grant Assignment Viewer, Assignment Editor & "
 "Submitter, or Assignment Approver if this user should work with assignments."
 msgstr ""
+"Попросите системного менеджера предоставить Assignment Viewer, Assignment "
+"Editor & Submitter или Assignment Approver, если этот пользователь должен "
+"работать с заданиями."
 
 #: app/templates/admin/ai/documents.html:117
 msgid "Ask a question (AI will answer using the document library)..."
@@ -2620,6 +2628,8 @@ msgstr "Присваивание стран"
 #: app/templates/admin/user_management/user_form.html:370
 msgid "Assign languages this user may edit with the inline translation tool."
 msgstr ""
+"Назначьте языки, которые этот пользователь может редактировать, с помощью "
+"инструмента встроенного перевода."
 
 #: app/templates/admin/assignments/manage_assignment.html:423
 msgid ""
@@ -2740,7 +2750,7 @@ msgstr "Задание отправлено"
 
 #: app/templates/forms/form_builder/form_builder.html:865
 msgid "Assignment Year"
-msgstr ""
+msgstr "Год назначения"
 
 #: app/services/notification/core.py:300
 msgid "Assignment approved"
@@ -2758,7 +2768,7 @@ msgstr "Созданное задание"
 
 #: app/templates/core/dashboard.html:2655
 msgid "Assignment dashboard access requires one of the Assignment roles."
-msgstr ""
+msgstr "Доступ к панели назначения требует одной из ролей Assignment."
 
 #: app/templates/components/_assignment_status_pipeline.html:64
 msgid "Assignment is closed"
@@ -2983,7 +2993,7 @@ msgstr "Уведомления"
 
 #: app/routes/translation_review/__init__.py:73
 msgid "Authentication required"
-msgstr ""
+msgstr "Требуется аутентификация"
 
 #: app/templates/admin/plugin_management.html:133
 #: app/templates/admin/plugin_management.html:238
@@ -3090,6 +3100,8 @@ msgid ""
 "Auto-group selected indicators and rename sections before creating the "
 "template."
 msgstr ""
+"Автоматическая группировка выбранных индикаторов и переименование разделов "
+"перед созданием шаблона."
 
 #: app/templates/admin/indicator_bank/neural_map.html:203
 msgid "Auto-rotate (3D)"
@@ -3378,7 +3390,7 @@ msgstr "Заблокировано WAF для перевода"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:219
 msgid "Blue"
-msgstr ""
+msgstr "Синий"
 
 #: app/templates/forms/form_builder/form_builder.html:627
 #: app/templates/forms/form_builder/partials/_item_modal.html:178
@@ -3388,7 +3400,7 @@ msgstr "Основной текст"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:184
 msgid "Bold"
-msgstr ""
+msgstr "Жирный шрифт"
 
 #: app/utils/form_localization.py:86
 msgid "Boolean"
@@ -3474,7 +3486,7 @@ msgstr "Собрать и применить"
 
 #: app/templates/admin/templates/new_template.html:80
 msgid "Build a template by selecting indicators from the indicator bank"
-msgstr ""
+msgstr "Создайте шаблон, выбрав индикаторы из банка индикаторов"
 
 #: app/templates/admin/templates/upr_excel_import.html:107
 msgid "Building import preview…"
@@ -3538,7 +3550,7 @@ msgstr "По полу:"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:1146
 msgid "By assignment date (most recent submission wins)"
-msgstr ""
+msgstr "По дате присвоения (последние победы в подаче)"
 
 #: app/templates/admin/ai/reasoning_traces.html:129
 msgid "By conversation"
@@ -3554,7 +3566,7 @@ msgstr "По столпам"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:1145
 msgid "By source order (first source with data wins)"
-msgstr ""
+msgstr "По порядку источников (побеждает первый источник с данными)"
 
 #: app/templates/admin/communication/center.html:354
 msgid "CC"
@@ -3761,19 +3773,19 @@ msgstr "Функция перевода, специфичная для стра�
 
 #: app/templates/forms/form_builder/partials/_sections_container.html:530
 msgid "Caption"
-msgstr ""
+msgstr "Подпись"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:942
 msgid "Caption (optional)"
-msgstr ""
+msgstr "Подпись (по желанию)"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:947
 msgid "Caption shown below the image"
-msgstr ""
+msgstr "Подпись показана под изображением"
 
 #: app/templates/forms/form_builder/form_builder.html:688
 msgid "Captions"
-msgstr ""
+msgstr "Субтитры"
 
 #: app/templates/admin/indicator_bank/_panel_sectors_body.html:78
 msgid "Cards"
@@ -3781,11 +3793,11 @@ msgstr "Карты"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:1138
 msgid "Carry forward from previous round"
-msgstr ""
+msgstr "Перенос из предыдущего раунда"
 
 #: app/templates/forms/entry_form/entry_form.html:247
 msgid "Carry-forward data"
-msgstr ""
+msgstr "Данные переноса вперед"
 
 #: app/templates/admin/ai/documents.html:522
 #: app/templates/admin/communication/center.html:666
@@ -3803,7 +3815,7 @@ msgstr "Название категории"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:958
 msgid "Center"
-msgstr ""
+msgstr "Центр"
 
 #: app/utils/form_localization.py:137
 msgid "Centers"
@@ -3997,7 +4009,7 @@ msgstr "Выберите email и push-доставку по типу уведо
 
 #: app/templates/components/_mobile_language_menu.html:28
 msgid "Choose language"
-msgstr ""
+msgstr "Выберите язык"
 
 #: app/templates/admin/user_management/user_form.html:168
 #: app/templates/admin/user_management/user_form.html:1476
@@ -4020,7 +4032,7 @@ msgstr "Выберите источник"
 #: app/templates/forms/form_builder/partials/_item_modal.html:203
 #: app/templates/forms/form_builder/partials/_item_modal.html:212
 msgid "Choose text colour"
-msgstr ""
+msgstr "Выберите цвет текста"
 
 #: app/templates/core/dashboard.html:2687
 msgid "Choose the countries whose data you will be responsible for managing."
@@ -4028,7 +4040,7 @@ msgstr "Выбирайте страны, за управление чьими д
 
 #: app/templates/admin/templates/new_template.html:441
 msgid "Choose the indicators to include in your new template."
-msgstr ""
+msgstr "Выберите индикаторы для вашего нового шаблона."
 
 #: app/templates/forms/form_builder/partials/_item_type_picker_modal.html:52
 msgid "Choose the type of item you want to add"
@@ -4036,7 +4048,7 @@ msgstr "Выберите тип товара, который хотите доб
 
 #: app/templates/admin/templates/new_template.html:536
 msgid "Choose which breakdowns to allow"
-msgstr ""
+msgstr "Выбирайте, какие поломки допускать"
 
 #: app/templates/admin/settings/manage_settings.html:139
 msgid ""
@@ -4161,7 +4173,7 @@ msgstr "Прозрачные фильтры"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:240
 msgid "Clear formatting"
-msgstr ""
+msgstr "Четкое форматирование"
 
 #: app/templates/admin/communication/center.html:531
 msgid "Clear load campaign selection"
@@ -4544,7 +4556,7 @@ msgstr "Свернуть/расширить все разделы и подра�
 
 #: app/templates/admin/templates/new_template.html:526
 msgid "Collect a single total value"
-msgstr ""
+msgstr "Соберите одно общее значение"
 
 #: app/templates/admin/indicator_bank/neural_map.html:189
 msgid "Color"
@@ -4695,7 +4707,7 @@ msgstr "Завершено"
 
 #: app/templates/components/_profile_completion_modal.html:18
 msgid "Complete Your Profile"
-msgstr ""
+msgstr "Заполните свой профиль"
 
 #: app/templates/components/auto_translate_modal_js.html:39
 msgid "Complete — click ▲ to restore"
@@ -4824,7 +4836,7 @@ msgstr "Настройте настройки email, push и звука для �
 
 #: app/templates/admin/templates/new_template.html:349
 msgid "Configure filters"
-msgstr ""
+msgstr "Настройка фильтров"
 
 #: app/templates/admin/user_management/user_form.html:1031
 msgid ""
@@ -5093,10 +5105,13 @@ msgid ""
 "query, then reference it to expand each array (data, form_items, countries, "
 "…)."
 msgstr ""
+"Скопируйте в расширенный редактор (получите данные → пустом запросе). "
+"Используйте это как исходный запрос, затем ссылайтесь на него для расширения"
+" каждого массива (данные, form_items, страны и т.д.)."
 
 #: app/templates/admin/api_management.html:734
 msgid "Copy query"
-msgstr ""
+msgstr "Копировать запрос"
 
 #: app/templates/admin/ai/conversation_traces.html:38
 msgid "Copy summary"
@@ -5161,7 +5176,7 @@ msgstr "Не удалось отправить форму. Попробуйте 
 
 #: app/templates/admin/templates/new_template.html:1207
 msgid "Could not create the template. Please try again."
-msgstr ""
+msgstr "Не удалось создать шаблон. Пожалуйста, попробуйте ещё раз."
 
 #: app/routes/admin/system_admin/indicator_lookups.py:361
 msgid "Could not create type."
@@ -5688,7 +5703,7 @@ msgstr ""
 
 #: app/templates/admin/templates/new_template.html:1208
 msgid "Creating template…"
-msgstr ""
+msgstr "Создание шаблона..."
 
 #: app/templates/admin/analytics/audit_trail.html:346
 msgid "Critical"
@@ -5795,7 +5810,7 @@ msgstr "Custom Fields"
 
 #: app/templates/admin/templates/new_template.html:541
 msgid "Custom age groups (optional)"
-msgstr ""
+msgstr "Индивидуальные возрастные группы (по выбору)"
 
 #: app/templates/forms/form_builder/partials/_item_type_picker_modal.html:88
 msgid "Custom field type from a plugin."
@@ -5803,7 +5818,7 @@ msgstr "Пользовательский тип поля из плагина."
 
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:27
 msgid "Custom period…"
-msgstr ""
+msgstr "Период обычая..."
 
 #: app/templates/forms/form_builder/partials/_item_type_picker_modal.html:64
 msgid "Custom question."
@@ -5856,7 +5871,7 @@ msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:214
 msgid "Dark (default)"
-msgstr ""
+msgstr "Тёмный (по умолчанию)"
 
 #: app/routes/help_docs.py:145 app/routes/help_docs.py:201
 #: app/routes/main/dashboard.py:1023
@@ -6001,7 +6016,7 @@ msgstr "Вопросы по валидации данных"
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:1001
 msgid "Data Values"
-msgstr ""
+msgstr "Значения данных"
 
 #: app/templates/forms/entry_form/partials/matrix_table.html:436
 msgid "Data availability options"
@@ -6039,7 +6054,7 @@ msgstr "Шаблоны качества данных"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:1149
 msgid "Data sources:"
-msgstr ""
+msgstr "Источники данных:"
 
 #: app/templates/admin/templates/data_sync_imputation.html:1382
 msgid "Data status"
@@ -6568,7 +6583,7 @@ msgstr "Опишите нужную форму, и AI-ассистент соз�
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:951
 msgid "Describe the image for screen readers"
-msgstr ""
+msgstr "Опишите изображение для экранных читателей"
 
 #: app/templates/admin/templates/new_template.html:60
 msgid ""
@@ -6637,7 +6652,7 @@ msgstr "Описание (по желанию)"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:622
 msgid "Description (Optional) — supports [assignment_period], etc."
-msgstr ""
+msgstr "Описание (необязательно) — поддерживает [assignment_period] и т.д."
 
 #: app/templates/admin/communication/center.html:248
 #: app/templates/admin/communication/center.html:1074
@@ -6724,7 +6739,7 @@ msgstr "Дайджестные письма появятся здесь посл
 
 #: app/templates/admin/api_management.html:725
 msgid "Dimensional tables for BI (star schema)"
-msgstr ""
+msgstr "Размерные таблицы для BI (схема звёзд)"
 
 #: app/templates/core/dashboard.html:3008
 msgid "Disability"
@@ -6798,11 +6813,11 @@ msgstr ""
 
 #: app/templates/admin/templates/new_template.html:520
 msgid "Disaggregation for eligible indicators"
-msgstr ""
+msgstr "Деагрегация для допустимых индикаторов"
 
 #: app/templates/admin/templates/new_template.html:522
 msgid "Disaggregation preset"
-msgstr ""
+msgstr "Пресет для разложения"
 
 #: app/templates/forms/form_builder/form_builder.html:258
 #: app/templates/forms/form_builder/form_builder.html:267
@@ -6943,6 +6958,8 @@ msgid ""
 "Display an image with optional caption and alt text. Supports per-language "
 "images."
 msgstr ""
+"Покажите изображение с опциональной подписью и альтернативным текстом. "
+"Поддерживает изображения, зависящие от каждого языка."
 
 #: app/templates/admin/settings/_campaign_email_templates_panel.html:143
 msgid "Display label"
@@ -7004,7 +7021,7 @@ msgstr "НЕ делитесь паролями, учетными данными 
 
 #: app/templates/components/_profile_completion_modal.html:77
 msgid "Do it later"
-msgstr ""
+msgstr "Сделай это позже"
 
 #: app/templates/admin/api_keys/create_success.html:74
 msgid "Do not share this key or commit it to version control"
@@ -7377,7 +7394,7 @@ msgstr "Дублирующее поле документа"
 
 #: app/templates/forms/form_builder/partials/_sections_container.html:770
 msgid "Duplicate Image"
-msgstr ""
+msgstr "Дубликат изображения"
 
 #: app/templates/forms/form_builder/partials/_sections_container.html:623
 msgid "Duplicate Indicator"
@@ -7417,7 +7434,7 @@ msgstr ""
 
 #: app/templates/forms/form_builder/partials/_sections_container.html:767
 msgid "Duplicate this image item?"
-msgstr ""
+msgstr "Дублировать этот элемент изображения?"
 
 #: app/templates/forms/form_builder/partials/_sections_container.html:620
 msgid ""
@@ -7631,7 +7648,7 @@ msgstr "Редактировать Встраивать контент"
 
 #: app/templates/forms/form_builder/partials/_sections_container.html:752
 msgid "Edit Image"
-msgstr ""
+msgstr "Редактировать изображение"
 
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:52
 #: app/templates/forms/form_builder/partials/_sections_container.html:592
@@ -7790,7 +7807,7 @@ msgstr "Email HTML"
 
 #: app/templates/admin/communication/center.html:1373
 msgid "Email Logged At"
-msgstr ""
+msgstr "Электронная почта, зарегистрированная по адресу"
 
 #: app/templates/admin/communication/center.html:1383
 msgid "Email Sent At"
@@ -7863,6 +7880,12 @@ msgid ""
 "t.docs_title, t.docs_body, t.docs_btn, t.help_title, t.help_body, t.closing,"
 " t.regards, t.team, t.footer_note)"
 msgstr ""
+"Электронное письмо отправляется новым пользователям при регистрации. "
+"Переменные: user_name, dashboard_url, documentation_url, org_name, "
+"copyright_year, t (прозаический дикт: t.heading, t.greeting, t.intro, "
+"t.getting_started_title, t.getting_started_intro, t.step_1, t.step_2, "
+"t.step_3, t.dashboard_btn, t.docs_title, t.docs_body, t.docs_btn, "
+"t.help_title, t.help_body, t.closing, t.regards, t.team, t.footer_note)"
 
 #: app/templates/admin/settings/manage_settings.html:924
 msgid ""
@@ -7952,7 +7975,7 @@ msgstr "Предпочтения"
 #: app/templates/admin/templates/new_template.html:382
 #: app/templates/admin/templates/new_template.html:1219
 msgid "Emergency only"
-msgstr ""
+msgstr "Только для экстренных ситуаций"
 
 #: app/templates/admin/api_management.html:1157
 msgid "Emergency type"
@@ -8027,7 +8050,7 @@ msgstr "Включите звук для новых уведомлений"
 
 #: app/routes/translation_review/__init__.py:85
 msgid "Enable the translation review tool in Account Settings first"
-msgstr ""
+msgstr "Сначала включите инструмент проверки перевода в настройках аккаунта"
 
 #: app/templates/admin/ai/dashboard.html:36
 #: app/templates/admin/ai/dashboard.html:52
@@ -8043,7 +8066,7 @@ msgstr "Все типы активности"
 
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:82
 msgid "End"
-msgstr ""
+msgstr "Конец"
 
 #: app/templates/admin/assignments/manage_assignment.html:128
 #: app/templates/admin/documents/documents.html:298
@@ -8109,7 +8132,7 @@ msgstr "Английский (en) является исходным языком
 
 #: app/templates/components/_translation_review_modal.html:6
 msgid "English (source, read-only)"
-msgstr ""
+msgstr "Английский (источник, только для чтения)"
 
 #: app/templates/core/dashboard.html:1423
 #: app/templates/core/dashboard.html:1432
@@ -8590,7 +8613,7 @@ msgstr "Для импорта в Excel требуется заголовок с�
 #: app/routes/main/helpers.py:1355
 #, python-format
 msgid "Excel imported: %(count)s values loaded"
-msgstr ""
+msgstr "Импорт в Excel: значения %(count)s загружены"
 
 #: app/templates/forms/entry_form/entry_form.html:2671
 msgid "Excel operations are not available for public submissions."
@@ -8619,7 +8642,7 @@ msgstr "Путь выполнения"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:7
 msgid "Exit fill content area"
-msgstr ""
+msgstr "Область содержания выхода"
 
 #: app/templates/forms/entry_form/entry_form.html:2577
 msgid "Expand Sections Menu"
@@ -8657,7 +8680,7 @@ msgstr "Фильтры расширения или сжатия"
 #: app/templates/forms/form_builder/partials/_item_modal.html:8
 #: app/templates/forms/form_builder/partials/_item_modal.html:9
 msgid "Expand to fill content area"
-msgstr ""
+msgstr "Расширить, чтобы заполнить область содержания"
 
 #: app/routes/admin/utilities/translations.py:1242
 #: app/routes/admin/utilities/translations.py:1282
@@ -8961,7 +8984,7 @@ msgstr "Электронные письма FDS"
 #: app/templates/core/dashboard.html:2485
 #: app/templates/core/dashboard.html:2486
 msgid "FDS: Federation Wide Data Systems"
-msgstr ""
+msgstr "FDS: Системы данных на уровне всей Федерации"
 
 #: app/utils/form_localization.py:136
 msgid "Facilities"
@@ -9129,7 +9152,7 @@ msgstr "Индикатор не удалось сохранить"
 
 #: app/routes/auth.py:1415
 msgid "Failed to save profile. Please try again."
-msgstr ""
+msgstr "Не удалось сохранить профиль. Пожалуйста, попробуйте ещё раз."
 
 #: app/templates/admin/validation_questions.html:276
 msgid "Failed to save question"
@@ -9417,7 +9440,7 @@ msgstr "Фильтр по статусу архива"
 #: app/templates/admin/api_management.html:1103
 #: app/templates/admin/api_management.html:1162
 msgid "Filter by assignment ID"
-msgstr ""
+msgstr "Фильтр по идентификатору назначения"
 
 #: app/templates/components/ag_grid_i18n_js.html:16
 msgid "Filter by condition or search values..."
@@ -9511,19 +9534,23 @@ msgstr "отфильтровано по"
 
 #: app/templates/admin/templates/new_template.html:366
 msgid "Filter indicators"
-msgstr ""
+msgstr "Индикаторы фильтра"
 
 #: app/templates/admin/templates/new_template.html:83
 msgid ""
 "Filter indicators by sector, program, or SPEF area, select them, and auto-"
 "group into sections."
 msgstr ""
+"Фильтруйте индикаторы по сектору, программе или области SPEF, выбирайте их и"
+" автоматически группируйте в секции."
 
 #: app/templates/admin/templates/new_template.html:340
 msgid ""
 "Filter indicators, select the ones you need, group them into sections, then "
 "create the template."
 msgstr ""
+"Отфильтруйте индикаторы, выберите нужные, сгруппируйте их по разделам, затем"
+" создайте шаблон."
 
 #: app/templates/admin/ai/documents.html:226
 msgid "Filter low-relevance chunks"
@@ -9811,7 +9838,7 @@ msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:183
 msgid "Formatting toolbar"
-msgstr ""
+msgstr "Панель форматирования"
 
 #: app/templates/admin/analytics/audit_trail.html:364
 msgid "Forms"
@@ -9872,7 +9899,7 @@ msgstr "Пятница"
 
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:56
 msgid "From"
-msgstr ""
+msgstr "Из"
 
 #: app/services/notification/core.py:370
 #, python-format
@@ -9888,7 +9915,7 @@ msgstr "С даты"
 #: app/templates/admin/templates/new_template.html:82
 #: app/templates/admin/templates/new_template.html:339
 msgid "From Indicator Bank"
-msgstr ""
+msgstr "От Indicator Bank"
 
 #: app/templates/admin/analytics/login_logs.html:55
 msgid "From date"
@@ -9916,7 +9943,7 @@ msgstr "Полный админ"
 
 #: app/templates/components/_profile_completion_modal.html:44
 msgid "Full Name"
-msgstr ""
+msgstr "Полное имя"
 
 #: app/templates/admin/api_keys/details.html:320
 msgid "Full key cannot be retrieved — only the prefix and hash are stored."
@@ -9932,7 +9959,7 @@ msgstr "Полный доступ к системе с пагинированн�
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:965
 msgid "Full width"
-msgstr ""
+msgstr "Полная ширина"
 
 #: app/templates/admin/indicator_bank/neural_map.html:211
 msgid "Fullscreen"
@@ -10100,11 +10127,11 @@ msgstr "Больше чем"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:218
 msgid "Green"
-msgstr ""
+msgstr "Зелёный"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:221
 msgid "Grey"
-msgstr ""
+msgstr "Серый"
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:1210
 msgid "Grid not initialized"
@@ -10143,7 +10170,7 @@ msgstr "Группа"
 
 #: app/templates/admin/templates/new_template.html:357
 msgid "Group & review"
-msgstr ""
+msgstr "Группа и обзор"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:689
 msgid "Group Rows By Column"
@@ -10151,7 +10178,7 @@ msgstr "Группировать строки по столбцам"
 
 #: app/templates/admin/templates/new_template.html:462
 msgid "Group by"
-msgstr ""
+msgstr "Группа по"
 
 #: app/templates/admin/user_management/access_requests.html:230
 msgid "Group by request"
@@ -10163,7 +10190,7 @@ msgstr "Варианты выпадающего списка групп"
 
 #: app/templates/admin/templates/new_template.html:460
 msgid "Group into sections"
-msgstr ""
+msgstr "Группироваться на секции"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:918
 msgid "Group label, e.g. Male"
@@ -10288,7 +10315,7 @@ msgstr "Помогите"
 
 #: app/templates/components/_profile_completion_modal.html:21
 msgid "Help your colleagues know who you are."
-msgstr ""
+msgstr "Помогите коллегам понять, кто вы."
 
 #: app/templates/admin/ai/conversation_traces.html:349
 #: app/templates/admin/ai/trace_detail.html:87
@@ -10592,19 +10619,19 @@ msgstr ""
 #: app/templates/forms/form_builder/partials/_item_type_picker_modal.html:84
 #: app/templates/forms/form_builder/partials/_sections_container.html:528
 msgid "Image"
-msgstr ""
+msgstr "Изображение"
 
 #: app/templates/forms/form_builder/form_builder.html:685
 msgid "Image Item Translations"
-msgstr ""
+msgstr "Переводы изображений элементов"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:996
 msgid "Image URL or site path"
-msgstr ""
+msgstr "URL изображения или путь к сайту"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:991
 msgid "Image file"
-msgstr ""
+msgstr "Файл изображения"
 
 #: app/templates/admin/documents/documents.html:473
 #: app/templates/admin/documents/documents.html:475
@@ -10618,7 +10645,7 @@ msgstr "Только файлы изображений (PNG, JPG и др.) до 
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:973
 msgid "Image source by language"
-msgstr ""
+msgstr "Источник изображения по языкам"
 
 #: app/routes/admin/ai_management.py:1859
 msgid "Image tag in raw text — sometimes used with onerror/onload probes"
@@ -11149,7 +11176,7 @@ msgstr "Индикатор успешно сохранён."
 
 #: app/templates/admin/templates/new_template.html:430
 msgid "Indicator types"
-msgstr ""
+msgstr "Типы индикаторов"
 
 #: app/templates/admin/indicator_bank/measurement_lookups.html:28
 #: app/templates/admin/indicator_bank/measurement_lookups.html:32
@@ -11186,6 +11213,9 @@ msgid ""
 "Indicators linked to multiple programs are placed in “Shared across "
 "programs”. Each indicator still appears only once in the template."
 msgstr ""
+"Индикаторы, связанные с несколькими программами, размещаются в разделе "
+"«Shared between programs». Каждый индикатор появляется в шаблоне только один"
+" раз."
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:1785
 msgid "Indicators updated:"
@@ -11235,7 +11265,7 @@ msgstr "Информация"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:754
 msgid "Informational only (flag conflicts, allow save)"
-msgstr ""
+msgstr "Только для информации (конфликты флагов, разрешённое сохранение)"
 
 #: app/templates/forms/form_builder/partials/_item_type_picker_modal.html:64
 msgid "Informational text or note (no answer)."
@@ -11252,7 +11282,7 @@ msgstr "Входные токены"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:237
 msgid "Insert link"
-msgstr ""
+msgstr "Вставить ссылку"
 
 #: app/templates/admin/plugin_management.html:23
 msgid "Install Plugin"
@@ -11362,7 +11392,7 @@ msgstr "Шаблоны форм"
 #: app/routes/admin/utilities/translations.py:1121
 #: app/routes/translation_review/__init__.py:159
 msgid "Invalid placeholders"
-msgstr ""
+msgstr "Некорректные заполняющие"
 
 #: app/routes/main/assignments.py:183
 msgid "Invalid request. Please try again."
@@ -11419,7 +11449,7 @@ msgstr "Вопросы"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:185
 msgid "Italic"
-msgstr ""
+msgstr "Курсивом"
 
 #: app/templates/admin/templates/data_sync_imputation.html:307
 #: app/templates/admin/templates/data_sync_imputation.html:394
@@ -11515,7 +11545,7 @@ msgstr "Его секторная ссылка будет очищена при 
 
 #: app/routes/translation_review/__init__.py:139
 msgid "JSON request required"
-msgstr ""
+msgstr "Требуется запрос на JSON"
 
 #: app/templates/admin/assignments/manage_assignment.html:112
 #: app/templates/admin/assignments/manage_assignment.html:132
@@ -11536,12 +11566,12 @@ msgstr "JavaScript sink pattern (например, eval() или document.cookie
 
 #: app/templates/components/_profile_completion_modal.html:60
 msgid "Job Title"
-msgstr ""
+msgstr "Должность"
 
 #: app/routes/auth.py:1398
 #: app/templates/components/_profile_completion_modal.html:125
 msgid "Job title is required."
-msgstr ""
+msgstr "Требуется название должности."
 
 #: app/templates/admin/ai/review_detail.html:131
 msgid "Judge Model"
@@ -11738,6 +11768,8 @@ msgid ""
 "Labels shown in the tooltip when a saved variable value differs from the "
 "current lookup."
 msgstr ""
+"Метки, отображаемые в подсказке, когда значение сохраненной переменной "
+"отличается от текущего поиска."
 
 #: app/templates/admin/ai/documents.html:579
 #: app/templates/admin/documents/documents.html:187
@@ -11923,6 +11955,8 @@ msgstr ""
 #: app/templates/admin/templates/new_template.html:1223
 msgid "Leave empty to use platform defaults when age breakdown is allowed."
 msgstr ""
+"Оставьте пустое для использования стандартных параметров платформы, когда "
+"разрешен разбивка по возрасту."
 
 #: app/templates/admin/settings/manage_settings.html:1071
 msgid ""
@@ -12217,7 +12251,7 @@ msgstr "Индикаторы загрузки..."
 #: app/templates/admin/templates/new_template.html:453
 #: app/templates/admin/templates/new_template.html:1203
 msgid "Loading indicators…"
-msgstr ""
+msgstr "Индикаторы загрузки..."
 
 #: app/templates/admin/analytics/login_logs.html:94
 msgid "Loading login logs…"
@@ -12373,7 +12407,7 @@ msgstr "Код локализации (en, fr, es и т.д.)"
 
 #: app/templates/forms/form_builder/partials/_sections_container.html:539
 msgid "Localized images"
-msgstr ""
+msgstr "Локализованные изображения"
 
 #: app/templates/admin/validation_rules.html:124
 msgid ""
@@ -12485,15 +12519,15 @@ msgstr "Ищу информацию о %(country)s..."
 
 #: app/templates/forms/form_builder/form_builder.html:733
 msgid "Lookup Value Label Translations"
-msgstr ""
+msgstr "Переводы значений поиска"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:802
 msgid "Lookup value"
-msgstr ""
+msgstr "Значение поиска"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:797
 msgid "Lookup value label"
-msgstr ""
+msgstr "Метка значения поиска"
 
 #: app/templates/admin/analytics/audit_trail.html:343
 #: app/templates/admin/settings/manage_settings.html:1500
@@ -12634,7 +12668,7 @@ msgstr "Управление переводами страниц"
 
 #: app/templates/admin/data_exploration/explore_data.html:116
 msgid "Manage report"
-msgstr ""
+msgstr "Управление отчетом"
 
 #: app/templates/admin/rbac/grants.html:30
 #: app/templates/admin/rbac/permissions.html:15
@@ -12886,7 +12920,7 @@ msgstr "Макс. индикаторов: %(current)s/%(max)s"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:963
 msgid "Max width"
-msgstr ""
+msgstr "Максимальная ширина"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:421
 msgid "Maximum Documents Allowed"
@@ -13372,6 +13406,9 @@ msgid ""
 "Narrow the indicator bank by sector, program, SPEF area, type, or emergency "
 "status. Leave filters empty to browse all active indicators."
 msgstr ""
+"Сузьте индекс индикаторов по сектору, программе, области SPEF, типу или "
+"статусу чрезвычайной ситуации. Оставьте фильтры пустыми для просмотра всех "
+"активных индикаторов."
 
 #: app/templates/admin/communication/center.html:203
 #: app/templates/admin/organization/_nss_component.html:9
@@ -13519,6 +13556,7 @@ msgstr "Ошибка сети."
 #: app/templates/components/_profile_completion_modal.html:147
 msgid "Network error. Please check your connection and try again."
 msgstr ""
+"Ошибка сети. Пожалуйста, проверьте своё соединение и попробуйте снова."
 
 #: app/templates/admin/indicator_bank/_panel_spef_scripts.html:22
 msgid "Network error. Please try again."
@@ -13690,7 +13728,7 @@ msgstr "Нет"
 #: app/templates/components/entity_dropdown.html:65
 #, python-format
 msgid "No %(label)s found matching your search."
-msgstr ""
+msgstr "%(label)s не найдена, соответствующей вашему поиску."
 
 #: app/templates/admin/api_keys/list.html:190
 msgid "No API keys found"
@@ -13723,15 +13761,17 @@ msgstr "Без импутации"
 
 #: app/templates/components/entity_dropdown.html:40
 msgid "No NS branches found matching your search."
-msgstr ""
+msgstr "Нет филиалов NS, соответствующих вашему поиску."
 
 #: app/templates/components/entity_dropdown.html:50
 msgid "No NS local units found matching your search."
 msgstr ""
+"Ни одного локального подразделения NS не было найдено, соответствующих "
+"вашему поиску."
 
 #: app/templates/components/entity_dropdown.html:45
 msgid "No NS sub-branches found matching your search."
-msgstr ""
+msgstr "Ни одного подотделения NS не найдено, соответствующих вашему поиску."
 
 #: app/templates/admin/organization/_nss_component.html:38
 msgid "No National Societies found."
@@ -13918,7 +13958,7 @@ msgstr "Напоминание о сроке"
 
 #: app/templates/components/entity_dropdown.html:60
 msgid "No departments found matching your search."
-msgstr ""
+msgstr "Ни один отдел, соответствующий вашему поиску, не найдено."
 
 #: app/templates/admin/organization/index.html:227
 msgid "No departments found."
@@ -13942,7 +13982,7 @@ msgstr "Пока не отправляли никаких сводных пис�
 
 #: app/templates/components/entity_dropdown.html:55
 msgid "No divisions found matching your search."
-msgstr ""
+msgstr "Ни одного подразделения, соответствующего вашему поиску."
 
 #: app/templates/admin/organization/index.html:196
 msgid "No divisions found."
@@ -14064,7 +14104,7 @@ msgstr "Индикаторов, нуждающихся в переводе, не
 #: app/templates/admin/templates/new_template.html:456
 #: app/templates/admin/templates/new_template.html:1204
 msgid "No indicators match your filters."
-msgstr ""
+msgstr "Никакие индикаторы не совпадают с фильтрами."
 
 #: app/services/ai_step_ux.py:329
 msgid "No indicators matched these filters."
@@ -14128,6 +14168,8 @@ msgstr "Больше нет доступных индикаторов для э�
 #: app/templates/components/entity_dropdown.html:35
 msgid "No national societies found matching your search."
 msgstr ""
+"Ни одно национальное общество не было найдено, соответствующее вашему "
+"поиску."
 
 #: app/templates/admin/security/event_detail.html:56
 msgid "No notes provided."
@@ -14139,7 +14181,7 @@ msgstr "Нет уведомлений"
 
 #: app/templates/admin/templates/new_template.html:1220
 msgid "No options available"
-msgstr ""
+msgstr "Вариантов нет."
 
 #: app/templates/forms/form_builder/partials/_section_modal.html:18
 #: app/templates/forms/form_builder/partials/_section_modal.html:19
@@ -14692,7 +14734,7 @@ msgstr "Уведомление"
 
 #: app/services/communication_center_service.py:43
 msgid "Notification + email"
-msgstr ""
+msgstr "Уведомление + электронная почта"
 
 #: app/templates/admin/settings/manage_settings.html:943
 msgid "Notification Email Wrapper"
@@ -14741,7 +14783,7 @@ msgstr "Уведомления"
 #: app/templates/admin/communication/center.html:92
 #: app/templates/admin/communication/center.html:101
 msgid "Notifications and email delivery"
-msgstr ""
+msgstr "Уведомления и доставка электронной почты"
 
 #: app/templates/admin/settings/manage_settings.html:1512
 msgid "Notify deployment-wide system managers"
@@ -14877,15 +14919,17 @@ msgstr ""
 
 #: app/templates/admin/templates/new_template.html:471
 msgid "One section per SPEF area"
-msgstr ""
+msgstr "Одна секция на площадь SPEF"
 
 #: app/templates/admin/templates/new_template.html:466
 msgid "One section per primary sector"
-msgstr ""
+msgstr "Один участок на каждый первичный сектор"
 
 #: app/templates/admin/templates/new_template.html:476
 msgid "One section per program; multi-program indicators grouped separately"
 msgstr ""
+"По одному разделу на программу; Многопрограммные индикаторы, сгруппированные"
+" отдельно"
 
 #: app/templates/admin/api_management.html:350
 msgid "Only /api/ai/v2 assistants, tools, and related routes."
@@ -14968,6 +15012,8 @@ msgstr "Библиотека открытого списка"
 #: app/templates/admin/data_exploration/explore_data.html:122
 msgid "Open P&B report management (system managers only)"
 msgstr ""
+"Открытое управление отчётами по убыткам и выплатам (только системные "
+"менеджеры)"
 
 #: app/templates/forms/entry_form/entry_form.html:2515
 msgid "Open Sections Menu"
@@ -15019,7 +15065,7 @@ msgstr "Откройте шаблон в конструкторе форм"
 
 #: app/templates/admin/templates/new_template.html:84
 msgid "Open wizard"
-msgstr ""
+msgstr "Открытый волшебник"
 
 #: app/templates/macros/year_picker.html:12
 msgid "Open year calendar"
@@ -15139,7 +15185,7 @@ msgstr "Источник опций"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:216
 msgid "Orange"
-msgstr ""
+msgstr "Оранжевый"
 
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:123
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:219
@@ -15255,11 +15301,11 @@ msgstr "Другое"
 #: app/templates/forms/entry_form/partials/_question_multiple_choice.html:60
 #: app/templates/forms/entry_form/partials/_question_single_choice.html:48
 msgid "Other (please specify)..."
-msgstr ""
+msgstr "Другие (пожалуйста, уточните)..."
 
 #: app/templates/admin/templates/new_template.html:1213
 msgid "Other areas"
-msgstr ""
+msgstr "Другие районы"
 
 #: app/templates/admin/analytics/audit_trail.html:330
 msgid "Other entity access"
@@ -15271,7 +15317,7 @@ msgstr "Другие пути (агрегированные)"
 
 #: app/templates/admin/templates/new_template.html:1214
 msgid "Other programs"
-msgstr ""
+msgstr "Другие программы"
 
 #: app/templates/forms/entry_form/entry_form.html:2950
 msgid "Others are editing this form"
@@ -15549,7 +15595,7 @@ msgstr "Часть:"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:755
 msgid "Partial breakdown OK (manual total must be ≥ breakdown sum)"
-msgstr ""
+msgstr "Частичный полом OK (ручной итог должен быть ≥ сумме поломки)"
 
 #: app/templates/admin/ai/review_detail.html:157
 msgid "Partially Correct"
@@ -15596,11 +15642,11 @@ msgstr "Прошлые назначения для"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:989
 msgid "Paste"
-msgstr ""
+msgstr "Паста"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:987
 msgid "Paste a screenshot from the clipboard (Ctrl+V)"
-msgstr ""
+msgstr "Вставьте скриншот из буфера обмена (Ctrl+V)"
 
 #: app/templates/admin/api_management.html:661
 msgid "Paste an API key created in API Key Management"
@@ -15608,7 +15654,7 @@ msgstr "Вставьте API-ключ, созданный в API Key Management"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:987
 msgid "Paste image"
-msgstr ""
+msgstr "Вставить изображение"
 
 #: app/templates/admin/embed_content/manage_embed_content.html:167
 msgid "Paste the view or embed URL (HTTPS only)"
@@ -15756,6 +15802,8 @@ msgid ""
 "Period %(period)s: a National Society focal point escalated this assignment "
 "for delegation review."
 msgstr ""
+"Период %(period)s: контактный пункт Национального общества усилил это "
+"задание для рассмотрения делегацией."
 
 #: app/services/notification/core.py:314
 #, python-format
@@ -15869,7 +15917,7 @@ msgstr "Столбец с булавками"
 
 #: app/templates/admin/templates/new_template.html:481
 msgid "Place all indicators in one section"
-msgstr ""
+msgstr "Разместите все индикаторы в одном разделе"
 
 #: app/templates/components/_translation_review_modal.html:14
 #, python-format
@@ -15877,6 +15925,8 @@ msgid ""
 "Placeholders (e.g. %%(name)s, %%(count)s, %%s, %%d) are protected and cannot"
 " be removed or changed."
 msgstr ""
+"Заглушки (например, %%(name)s, %%(count)s, %%s, %%d) ЗАЩИЩЕНЫ И НЕ МОГУТ "
+"БЫТЬ УДАЛЕНЫ ИЛИ ИЗМЕНЕНЫ."
 
 #: app/templates/admin/ai/documents.html:594
 msgid "Plan"
@@ -16028,7 +16078,7 @@ msgstr "Выбрать..."
 #: app/templates/forms/entry_form/partials/_question_multiple_choice.html:73
 #: app/templates/forms/entry_form/partials/_question_single_choice.html:58
 msgid "Please specify..."
-msgstr ""
+msgstr "Пожалуйста, уточните..."
 
 #: app/routes/admin/utilities/translations.py:833
 msgid "Please upload a .po file for PO import."
@@ -16148,7 +16198,7 @@ msgstr "Power BI"
 
 #: app/templates/admin/api_management.html:711
 msgid "Power Query (M)"
-msgstr ""
+msgstr "Power Query (M)"
 
 #: app/templates/core/layout.html:204 app/templates/core/layout.html:432
 msgid "Powered by"
@@ -16178,7 +16228,7 @@ msgstr "Уведомление о предварительно заполнен�
 
 #: app/templates/forms/entry_form/partials/matrix_table.html:46
 msgid "Prefilled value"
-msgstr ""
+msgstr "Предварительно заполненное значение"
 
 #: app/templates/forms/entry_form/entry_form.html:351
 #: app/templates/forms/form_builder/form_builder.html:104
@@ -16328,7 +16378,7 @@ msgstr "Первичная медико-санитарная помощь"
 
 #: app/templates/admin/templates/new_template.html:465
 msgid "Primary sector"
-msgstr ""
+msgstr "Первичный сектор"
 
 #: app/templates/admin/rbac/grants.html:48
 msgid "Principal"
@@ -16448,7 +16498,7 @@ msgstr "Цвет профиля должен быть #RRGGBB значением
 
 #: app/routes/auth.py:1411
 msgid "Profile updated successfully."
-msgstr ""
+msgstr "Профиль успешно обновился."
 
 #: app/templates/admin/indicator_bank/neural_map.html:195
 msgid "Programme"
@@ -16591,7 +16641,7 @@ msgstr "Опубликованный матч"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:220
 msgid "Purple"
-msgstr ""
+msgstr "Фиолетовый"
 
 #: app/templates/components/_ai_policy_modal.html:12
 msgid "Purpose"
@@ -16794,6 +16844,8 @@ msgid ""
 "RBAC role data looks incomplete: %(codes)s missing from the database. "
 "Roles/permissions shown below may be incomplete. Run"
 msgstr ""
+"Данные о ролях RBAC выглядят неполными: %(codes)s отсутствует в базе данных."
+" Роли/права, показанные ниже, могут быть неполными. Беги"
 
 #: app/templates/admin/api_management.html:520
 msgid "RBAC — @mobile_auth_required(permission=…)"
@@ -17070,7 +17122,7 @@ msgstr "Фиксирует метку времени одобрения в эк�
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:215
 msgid "Red"
-msgstr ""
+msgstr "Красный"
 
 #: app/templates/admin/ai/documents.html:617
 msgid "Redetect Country"
@@ -17235,11 +17287,11 @@ msgstr "Связанные программы"
 
 #: app/templates/admin/templates/new_template.html:475
 msgid "Related program"
-msgstr ""
+msgstr "Связанная программа"
 
 #: app/templates/admin/templates/new_template.html:414
 msgid "Related programs"
-msgstr ""
+msgstr "Связанные программы"
 
 #: app/templates/admin/api_management.html:1093
 #: app/templates/admin/api_management.html:1111
@@ -17336,7 +17388,7 @@ msgstr "Удалить группу"
 
 #: app/templates/forms/form_builder/partials/_sections_container.html:779
 msgid "Remove Image"
-msgstr ""
+msgstr "Удалить изображение"
 
 #: app/templates/forms/form_builder/partials/_sections_container.html:632
 msgid "Remove Indicator"
@@ -17431,6 +17483,8 @@ msgid ""
 "Rename this query (e.g. Databank_Source), then reference it from child "
 "queries that expand each array."
 msgstr ""
+"Переименуйте этот запрос (например, Databank_Source), затем ссылайтесь на "
+"него из дочерних запросов, расширяющих каждый массив."
 
 #: app/templates/admin/assignments/assignments.html:126
 #: app/templates/admin/validation_questions.html:285
@@ -17779,7 +17833,7 @@ msgstr "Заметки к резолюции"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:1143
 msgid "Resolution priority"
-msgstr ""
+msgstr "Приоритет разрешения"
 
 #: app/templates/admin/analytics/security_events.html:114
 msgid "Resolve Security Event"
@@ -17926,7 +17980,7 @@ msgstr ""
 
 #: app/templates/core/layout.html:535 app/templates/core/layout.html:555
 msgid "Review mode"
-msgstr ""
+msgstr "Режим обзора"
 
 #: app/templates/admin/security/dashboard.html:95
 msgid "Review needed"
@@ -18251,11 +18305,11 @@ msgstr "Метка SP/EF"
 
 #: app/templates/admin/templates/new_template.html:470
 msgid "SPEF area"
-msgstr ""
+msgstr "Зона SPEF"
 
 #: app/templates/admin/templates/new_template.html:422
 msgid "SPEF areas"
-msgstr ""
+msgstr "Территории SPEF"
 
 #: app/templates/admin/indicator_bank/_indicator_bank_tabs.html:43
 #: app/templates/admin/indicator_bank/indicator_bank.html:2337
@@ -18303,7 +18357,7 @@ msgstr "Сохранить"
 
 #: app/templates/components/_profile_completion_modal.html:86
 msgid "Save & Continue"
-msgstr ""
+msgstr "Сохранить и продолжить"
 
 #: app/templates/admin/templates/data_sync_imputation.html:413
 msgid "Save All Changes"
@@ -18499,7 +18553,7 @@ msgstr "Искать"
 #: app/templates/components/entity_dropdown.html:63
 #, python-format
 msgid "Search %(label)s..."
-msgstr ""
+msgstr "Поиск %(label)s..."
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:290
 msgid "Search Definition"
@@ -18515,11 +18569,11 @@ msgstr "Структура поиска NS"
 
 #: app/templates/components/entity_dropdown.html:38
 msgid "Search NS branches..."
-msgstr ""
+msgstr "Ищите отделения NS..."
 
 #: app/templates/components/entity_dropdown.html:48
 msgid "Search NS local units..."
-msgstr ""
+msgstr "Поиск местных подразделений НС..."
 
 #: app/templates/admin/user_management/user_form.html:931
 msgid "Search NS structure"
@@ -18527,7 +18581,7 @@ msgstr "Структура поиска NS"
 
 #: app/templates/components/entity_dropdown.html:43
 msgid "Search NS sub-branches..."
-msgstr ""
+msgstr "Поиск по филиалам NS..."
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:707
 msgid "Search Placeholder Text"
@@ -18586,7 +18640,7 @@ msgstr "Поиск по электронной почте"
 
 #: app/templates/admin/templates/new_template.html:376
 msgid "Search by indicator name…"
-msgstr ""
+msgstr "Поиск по названию индикатора..."
 
 #: app/templates/admin/api_management.html:1153
 msgid "Search by name or definition"
@@ -18625,7 +18679,7 @@ msgstr "Поиск объектов..."
 
 #: app/templates/components/entity_dropdown.html:58
 msgid "Search departments..."
-msgstr ""
+msgstr "Отделы поиска..."
 
 #: app/templates/admin/analytics/audit_trail.html:270
 msgid "Search description (e.g., template name)"
@@ -18641,7 +18695,7 @@ msgstr "Поиск отделов или отделов..."
 
 #: app/templates/components/entity_dropdown.html:53
 msgid "Search divisions..."
-msgstr ""
+msgstr "Поисковые подразделения..."
 
 #: app/templates/admin/docs/documentation.html:1140
 msgid "Search documentation..."
@@ -18661,7 +18715,7 @@ msgstr "Поиск значений..."
 
 #: app/templates/components/entity_dropdown.html:33
 msgid "Search national societies..."
-msgstr ""
+msgstr "Ищи национальные общества..."
 
 #: app/templates/notifications/center.html:141
 msgid "Search notifications..."
@@ -19153,7 +19207,7 @@ msgstr "Выберите все страны"
 
 #: app/templates/admin/templates/new_template.html:447
 msgid "Select all visible"
-msgstr ""
+msgstr "Выберите все видимые"
 
 #: app/templates/admin/documents/documents.html:121
 #: app/templates/admin/documents/documents.html:173
@@ -19172,7 +19226,7 @@ msgstr ""
 
 #: app/templates/admin/templates/new_template.html:1205
 msgid "Select at least one indicator to continue."
-msgstr ""
+msgstr "Выберите хотя бы один индикатор, чтобы продолжить."
 
 #: app/templates/admin/user_management/user_form.html:1485
 msgid "Select colour"
@@ -19233,7 +19287,7 @@ msgstr "Выберите файлы для загрузки"
 #: app/templates/admin/templates/new_template.html:353
 #: app/templates/admin/templates/new_template.html:440
 msgid "Select indicators"
-msgstr ""
+msgstr "Выбор индикаторов"
 
 #: app/templates/admin/documents/documents.html:189
 #: app/templates/forms/entry_form/entry_form.html:2751
@@ -19588,7 +19642,7 @@ msgstr "Отправлено на рассмотрение"
 #: app/services/notification/core.py:317
 #, python-format
 msgid "Sent for review: %(template)s"
-msgstr ""
+msgstr "Отправлено на рецензию: %(template)s"
 
 #: app/templates/admin/assignments/manage_assignment.html:120
 #: app/templates/admin/assignments/manage_assignment.html:140
@@ -19701,6 +19755,11 @@ msgid ""
 "in system variables in labels, e.g. [assignment_period], [entity_name], "
 "[template_name]."
 msgstr ""
+"Установите английский отображение и переводы для каждого столбца. Код "
+"столбца (используемый для поиска переменных) показан в первом столбце. Если "
+"английская метка не установлена, код используется как запасной вариант для "
+"отбора. Вы можете использовать встроенные системные переменные в метках, "
+"например, [assignment_period], [entity_name], [template_name]."
 
 #: app/templates/admin/templates/new_template.html:113
 msgid "Set the name, access, and options for a new blank template."
@@ -19708,7 +19767,7 @@ msgstr "Задайте имя, доступ и опции для нового п
 
 #: app/templates/admin/templates/new_template.html:490
 msgid "Set the template name, description, and access before creation."
-msgstr ""
+msgstr "Задайте имя шаблона, описание и доступ до создания."
 
 #: app/templates/forms/form_builder/form_builder.html:769
 msgid ""
@@ -19717,6 +19776,11 @@ msgid ""
 "their selected language. You can use built-in system variables in labels, "
 "e.g. [assignment_period], [entity_name], [template_name]."
 msgstr ""
+"Задайте переводы для каждого заголовка строки. Английский текст приведён в "
+"первом столбце как справочник. Переводы будут отображаться пользователям в "
+"зависимости от выбранного ими языка. Вы можете использовать встроенные "
+"системные переменные в метках, например, [assignment_period], [entity_name],"
+" [template_name]."
 
 #: app/templates/admin/settings/manage_settings.html:1259
 msgid "Set via environment variable"
@@ -19804,7 +19868,7 @@ msgstr "Совместный доступ"
 
 #: app/templates/admin/templates/new_template.html:1215
 msgid "Shared across programs"
-msgstr ""
+msgstr "Совместное использование между программами"
 
 #: app/templates/admin/templates/templates.html:84
 #: app/templates/forms/form_builder/partials/_template_details.html:85
@@ -19868,7 +19932,7 @@ msgstr "Показать"
 #: app/templates/components/entity_dropdown.html:64
 #, python-format
 msgid "Show %(label)s"
-msgstr ""
+msgstr "Показать %(label)s"
 
 #: app/templates/forms/entry_form/_validation_questions_panel.html:8
 msgid "Show / hide"
@@ -19906,15 +19970,15 @@ msgstr "Селектор языка шоу"
 
 #: app/templates/components/entity_dropdown.html:39
 msgid "Show NS branches"
-msgstr ""
+msgstr "Показать филиалы NS"
 
 #: app/templates/components/entity_dropdown.html:49
 msgid "Show NS local units"
-msgstr ""
+msgstr "Показать местные подразделения NS"
 
 #: app/templates/components/entity_dropdown.html:44
 msgid "Show NS sub-branches"
-msgstr ""
+msgstr "Показать филиалы NS"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:589
 msgid "Show Public Document checkbox"
@@ -19938,15 +20002,15 @@ msgstr "Показать все сессии"
 
 #: app/templates/components/entity_dropdown.html:29
 msgid "Show countries"
-msgstr ""
+msgstr "Страны шоу"
 
 #: app/templates/components/entity_dropdown.html:59
 msgid "Show departments"
-msgstr ""
+msgstr "Отделы шоу"
 
 #: app/templates/components/entity_dropdown.html:54
 msgid "Show divisions"
-msgstr ""
+msgstr "Дивизионы шоу"
 
 #: app/templates/forms/entry_form/entry_form.html:2974
 msgid "Show editors"
@@ -19954,7 +20018,7 @@ msgstr "Редакторы шоу"
 
 #: app/templates/components/entity_dropdown.html:22
 msgid "Show entities"
-msgstr ""
+msgstr "Сущности шоу"
 
 #: app/templates/forms/form_builder/partials/_section_modal.html:118
 msgid "Show entries in form navigation"
@@ -20002,7 +20066,7 @@ msgstr "Показать больше источников"
 
 #: app/templates/components/entity_dropdown.html:34
 msgid "Show national societies"
-msgstr ""
+msgstr "Выставлять национальные общества"
 
 #: app/templates/core/dashboard.html:1599
 msgid "Show past assignments"
@@ -20147,7 +20211,7 @@ msgstr "Одиночный год"
 
 #: app/templates/admin/templates/new_template.html:480
 msgid "Single section"
-msgstr ""
+msgstr "Односекционный участок"
 
 #: app/templates/admin/ai/documents.html:637
 msgid "Situation Report"
@@ -20217,6 +20281,9 @@ msgid ""
 "(highlighted in yellow). Please review and update any figures that have "
 "changed before saving."
 msgstr ""
+"Некоторые поля показывают данные, передаваемые из настроенного предыдущего "
+"источника данных (выделенных жёлтыми цветами). Пожалуйста, проверьте и "
+"обновите любые изменённые данные перед сохранением."
 
 #: app/routes/admin/utilities/translations.py:1265
 #: app/routes/admin/utilities/translations.py:1300
@@ -20321,7 +20388,7 @@ msgstr "Стандартный участок"
 
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:69
 msgid "Start"
-msgstr ""
+msgstr "Начало"
 
 #: app/templates/admin/assignments/manage_assignment.html:108
 #: app/templates/admin/documents/documents.html:272
@@ -20361,6 +20428,8 @@ msgid ""
 "Start from a blank template, clone an existing one, or import structure from"
 " Kobo XLSForm or Excel."
 msgstr ""
+"Начните с пустого шаблона, клонируйте существующий или импортируйте "
+"структуру из Kobo XLSForm или Excel."
 
 #: app/templates/admin/docs/documentation.html:1224
 msgid "Start interactive tour for this guide"
@@ -20597,11 +20666,12 @@ msgstr "Стратегический план"
 
 #: app/templates/admin/indicator_bank/_metadata_fields.html:30
 msgid "Strategy 2030 area from the IFRC SPEF catalog (SPs & EFs)."
-msgstr ""
+msgstr "Область Стратегии 2030 из каталога IFRC SPEF (SPs и EFs)."
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:756
 msgid "Strict (manual total must equal breakdown sum; blocks submit)"
 msgstr ""
+"Строгий (ручной итог должен равняться сумме разбивания; блоки подаются)"
 
 #: app/templates/forms/form_builder/field_mapping.html:290
 msgid "Structure type"
@@ -20711,7 +20781,7 @@ msgstr "Отправлено"
 
 #: app/templates/forms/form_builder/form_builder.html:744
 msgid "Submitted Value Label Translations"
-msgstr ""
+msgstr "Переводы приглашённых значений Ярлыки"
 
 #: app/templates/core/dashboard.html:1278
 msgid "Submitted by"
@@ -20723,11 +20793,11 @@ msgstr "Отправлено через публичную ссылку"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:812
 msgid "Submitted value"
-msgstr ""
+msgstr "Представленное значение"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:807
 msgid "Submitted value label"
-msgstr ""
+msgstr "Метка отправленного значения"
 
 #: app/templates/admin/settings/manage_settings.html:992
 msgid "Submitter"
@@ -21312,7 +21382,7 @@ msgstr "Название шаблона"
 
 #: app/templates/admin/templates/new_template.html:1206
 msgid "Template name is required."
-msgstr ""
+msgstr "Требуется имя шаблона."
 
 #: app/templates/admin/validation_rules.html:211
 #: app/templates/admin/validation_rules.html:261
@@ -21526,6 +21596,7 @@ msgstr "Запрошенный ресурс не был найден."
 #: app/templates/forms/entry_form/entry_form.html:3847
 msgid "The server is temporarily unavailable. Please try again in a moment."
 msgstr ""
+"Сервер временно недоступен. Пожалуйста, попробуйте снова через минуту."
 
 #: app/templates/tours/tours.html:38
 msgid ""
@@ -21770,7 +21841,7 @@ msgstr "Этот импорт навсегда удалит существующ
 
 #: app/templates/forms/entry_form/entry_form.html:3848
 msgid "This indicator is already added to this section."
-msgstr ""
+msgstr "Этот индикатор уже добавлен в этот раздел."
 
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:64
 msgid "This indicator is currently being used in"
@@ -22489,7 +22560,7 @@ msgstr "Общее количество входов"
 #: app/templates/admin/templates/new_template.html:525
 #: app/templates/admin/templates/new_template.html:1224
 msgid "Total only"
-msgstr ""
+msgstr "Только тотал"
 
 #: app/templates/admin/analytics/_user_detail_partial.html:107
 msgid "Total page views"
@@ -22505,7 +22576,7 @@ msgstr "Общее количество просмотров"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:752
 msgid "Total vs breakdown validation"
-msgstr ""
+msgstr "Валидация полного и поломки"
 
 #: app/templates/admin/data_exploration/explore_data.html:406
 msgid "Total-only reporting"
@@ -22590,7 +22661,7 @@ msgstr "Преобразование строк и сопоставление з
 
 #: app/templates/core/layout.html:535 app/templates/core/layout.html:554
 msgid "Translate"
-msgstr ""
+msgstr "Перевод"
 
 #: app/templates/admin/indicator_bank/measurement_lookups.html:89
 msgid ""
@@ -22690,7 +22761,7 @@ msgstr "Прогресс перевода"
 
 #: app/templates/admin/user_management/user_form.html:349
 msgid "Translation Review"
-msgstr ""
+msgstr "Обзор перевода"
 
 #: app/templates/components/auto_translate_modal.html:371
 msgid "Translation Summary"
@@ -22801,11 +22872,11 @@ msgstr "Перевод возобновлен пользователем."
 
 #: app/templates/core/layout.html:531
 msgid "Translation review"
-msgstr ""
+msgstr "Обзор перевода"
 
 #: app/routes/translation_review/__init__.py:83
 msgid "Translation review is not available for your account or language"
-msgstr ""
+msgstr "Обзор перевода недоступен для вашего аккаунта или на языке"
 
 #: app/templates/admin/translations/manage_translations.html:700
 msgid "Translation saved successfully"
@@ -22829,7 +22900,7 @@ msgstr "Перевод остановлен пользователем."
 
 #: app/routes/translation_review/__init__.py:175
 msgid "Translation updated successfully"
-msgstr ""
+msgstr "Перевод успешно обновлён"
 
 #: app/routes/admin/utilities/translations.py:58
 #, python-format
@@ -23053,7 +23124,7 @@ msgstr "Отчётность по странам UPR"
 #: app/routes/main/helpers.py:1356
 #, python-format
 msgid "UPR Country Reporting Excel imported: %(count)s values staged"
-msgstr ""
+msgstr "UPR Country Reporting Excel импортирован: значения %(count)s поэтапно"
 
 #: app/templates/admin/templates/data_sync_imputation.html:72
 #: app/templates/admin/templates/upr_excel_import.html:26
@@ -23073,7 +23144,7 @@ msgstr "Документы UPR"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:983
 msgid "URL / path"
-msgstr ""
+msgstr "URL / путь"
 
 #: app/utils/form_localization.py:127
 msgid "USD"
@@ -23144,7 +23215,7 @@ msgstr ""
 
 #: app/templates/core/layout.html:553
 msgid "Unexpected placeholders"
-msgstr ""
+msgstr "Неожиданные заполнения"
 
 #: app/services/upr/ux.py:38 app/services/upr/ux.py:45
 #: app/templates/admin/validation_dashboard.html:67
@@ -23153,7 +23224,7 @@ msgstr "Единое планирование и отчетность"
 
 #: app/templates/admin/validation_dashboard.html:76
 msgid "Unified Planning and Reporting templates"
-msgstr ""
+msgstr "Унифицированные шаблоны планирования и отчетности"
 
 #: app/services/upr/ux.py:40 app/services/upr/ux.py:43
 msgid "Unified Plans"
@@ -23959,6 +24030,8 @@ msgid ""
 "Users can add this many additional \"Other\" entries on top of the number of"
 " list options."
 msgstr ""
+"Пользователи могут добавить столько дополнительных «Других» записей поверх "
+"количества опций списка."
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:678
 msgid "Users will be able to select rows from this list during data entry."
@@ -24164,7 +24237,7 @@ msgstr "доступно в"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:794
 msgid "Variable column tooltip labels"
-msgstr ""
+msgstr "Метки подсказок переменных столбцов"
 
 #: app/templates/forms/entry_form/partials/matrix_table.html:280
 msgid "Variable tick for"
@@ -24686,6 +24759,8 @@ msgid ""
 "When empty in a new reporting round, prefill this field from a configured "
 "prior data source for the same entity."
 msgstr ""
+"При опустошении в новом раунде отчётности заранее заполните это поле из "
+"настроенного предыдущего источника данных для той же сущности."
 
 #: app/templates/components/auto_translate_modal.html:434
 msgid ""
@@ -24700,6 +24775,9 @@ msgid ""
 "When enabled, users can override the calculated row total. Breakdown vs "
 "total conflicts can be flagged or block submission."
 msgstr ""
+"При включении пользователи могут переопределить вычисленную сумму строк. "
+"Разрыв между конфликтами и полным конфликтом можно отметить или "
+"заблокировать отправку."
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:469
 msgid ""
@@ -24754,7 +24832,7 @@ msgstr "С разбивкой по возрасту"
 
 #: app/templates/admin/templates/new_template.html:346
 msgid "Wizard steps"
-msgstr ""
+msgstr "Шаги волшебника"
 
 #: app/templates/admin/data_exploration/explore_data.html:343
 #: app/templates/admin/data_exploration/explore_data.html:472
@@ -24850,7 +24928,7 @@ msgstr "Годы (с разделением запятой)"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:217
 msgid "Yellow"
-msgstr ""
+msgstr "Жёлтый"
 
 #: app/routes/admin/communication.py:311 app/routes/main/helpers.py:270
 #: app/templates/admin/ai/review_detail.html:124
@@ -25043,12 +25121,12 @@ msgstr ""
 
 #: app/templates/core/dashboard.html:2641
 msgid "You do not have assignment dashboard access."
-msgstr ""
+msgstr "У вас нет доступа к панели заданий."
 
 #: app/routes/translation_review/__init__.py:112
 #: app/routes/translation_review/__init__.py:151
 msgid "You do not have permission to edit translations for this language"
-msgstr ""
+msgstr "У вас нет разрешения редактировать переводы на этот язык"
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:457
 msgid "You do not have permission to import indicators."
@@ -25060,7 +25138,7 @@ msgstr "У вас нет разрешения возвращать это зад
 
 #: app/routes/translation_review/__init__.py:75
 msgid "You do not have permission to use translation review"
-msgstr ""
+msgstr "У вас нет разрешения использовать обзор переводов"
 
 #: app/templates/core/dashboard.html:2666
 #, python-format
@@ -25232,6 +25310,9 @@ msgid ""
 "focal points identify you. You can update this at any time in your account "
 "settings."
 msgstr ""
+"В вашем профиле отсутствует название должности. Добавление этого помогает "
+"администраторам и координаторам вас определить. Вы можете обновить это в "
+"любое время в настройках аккаунта."
 
 #: app/templates/admin/user_management/user_form.html:777
 msgid "Your session has expired."
@@ -25341,11 +25422,11 @@ msgstr "автор"
 
 #: app/templates/admin/communication/center.html:1378
 msgid "campaign"
-msgstr ""
+msgstr "Кампания"
 
 #: app/templates/admin/communication/center.html:1379
 msgid "campaigns"
-msgstr ""
+msgstr "Кампании"
 
 #: app/templates/admin/organization/index.html:2473
 msgid "cluster offices"
@@ -25363,11 +25444,11 @@ msgstr "Колонки"
 
 #: app/templates/admin/communication/center.html:1376
 msgid "communication"
-msgstr ""
+msgstr "Связь"
 
 #: app/templates/admin/communication/center.html:1377
 msgid "communications"
-msgstr ""
+msgstr "Связь"
 
 #: app/templates/admin/ai/dashboard.html:149
 msgid "completed"
@@ -25454,7 +25535,7 @@ msgstr "например, 10"
 
 #: app/templates/admin/templates/new_template.html:545
 msgid "e.g. <5, 5-17, 18-49, 50+"
-msgstr ""
+msgstr "Например, <5, 5-17, 18-49, 50+"
 
 #: app/templates/admin/assignments/manage_assignment.html:176
 msgid "e.g. Annual Country Survey 2025 — leave blank to use \"Template – Period\""
@@ -25464,7 +25545,7 @@ msgstr ""
 
 #: app/templates/components/_profile_completion_modal.html:69
 msgid "e.g. Data Manager, Focal Point"
-msgstr ""
+msgstr "например, менеджер данных, координатор"
 
 #: app/templates/admin/embed_content/manage_embed_content.html:125
 msgid "e.g. ECHO Programmatic Partnership"
@@ -25472,7 +25553,7 @@ msgstr "например, программное партнёрство ECHO"
 
 #: app/templates/components/_profile_completion_modal.html:52
 msgid "e.g. Jane Smith"
-msgstr ""
+msgstr "например, Джейн Смит"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:875
 msgid "e.g. total_beneficiaries"
@@ -25592,7 +25673,7 @@ msgstr "Обмен(ы)"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:384
 msgid "extra \"Other\" entries (beyond the option count limit)"
-msgstr ""
+msgstr "Дополнительные «Другие» записи (сверх лимита по количеству опционов)"
 
 #: app/templates/admin/ai/documents.html:557
 #: app/templates/admin/analytics/dashboard.html:84
@@ -25725,7 +25806,7 @@ msgstr "Последние 100"
 
 #: app/templates/admin/api_management.html:724
 msgid "layout=star"
-msgstr ""
+msgstr "макет=звезда"
 
 #: app/templates/admin/settings/manage_settings.html:1520
 msgid "left unchanged"
@@ -26140,7 +26221,7 @@ msgstr "к"
 
 #: app/templates/admin/user_management/user_form.html:241
 msgid "to fix."
-msgstr ""
+msgstr "Чтобы исправить."
 
 #: app/templates/admin/indicator_bank/neural_map.html:233
 msgid "to open the indicator detail page"
@@ -26191,7 +26272,7 @@ msgstr "Журнал перевода"
 
 #: app/routes/translation_review/__init__.py:155
 msgid "translation is required"
-msgstr ""
+msgstr "требуется перевод"
 
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:849
 #: app/templates/admin/indicator_bank/_panel_spef_scripts.html:27
@@ -26270,13 +26351,13 @@ msgstr "пока."
 #: app/templates/admin/templates/new_template.html:1210
 #, python-brace-format
 msgid "{count} indicators"
-msgstr ""
+msgstr "{count} индикаторы"
 
 #: app/templates/admin/templates/new_template.html:1209
 #: app/templates/admin/templates/new_template.html:1221
 #, python-brace-format
 msgid "{count} selected"
-msgstr ""
+msgstr "{count} Selected"
 
 #: app/services/notification/core.py:294
 #, python-brace-format
@@ -26327,7 +26408,7 @@ msgstr ""
 
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:23
 msgid "— select period —"
-msgstr ""
+msgstr "— избранный период —"
 
 #: app/templates/admin/indicator_bank/neural_map.html:245
 msgid ""

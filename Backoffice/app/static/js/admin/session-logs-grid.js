@@ -529,6 +529,45 @@
         form.submit();
     }
 
+    function handleSessionGridInteraction(ev, t, config) {
+        if (!ev || !ev.target) return false;
+        var pathBtn = ev.target.closest ? ev.target.closest('.session-path-breakdown-btn') : null;
+        if (pathBtn) {
+            if (ev.preventDefault) ev.preventDefault();
+            if (ev.stopPropagation) ev.stopPropagation();
+            var raw = pathBtn.getAttribute('data-path-counts') || '';
+            var total = parseInt(pathBtn.getAttribute('data-page-views-total') || '0', 10);
+            var sid = pathBtn.getAttribute('data-session-id') || '';
+            var pvc = {};
+            try {
+                if (raw) pvc = JSON.parse(decodeURIComponent(raw));
+            } catch (ePb) {
+                if (window.__clientWarn) window.__clientWarn('session path breakdown parse', ePb);
+            }
+            openPathBreakdownModal(t, pvc, total, sid);
+            return true;
+        }
+        var btn = ev.target.closest ? ev.target.closest('.session-force-logout-btn') : null;
+        if (!btn) return false;
+        if (ev.preventDefault) ev.preventDefault();
+        if (ev.stopPropagation) ev.stopPropagation();
+        var sidLogout = btn.getAttribute('data-session-id');
+        if (!sidLogout) return true;
+        var msg = config.confirmForceLogout || 'Are you sure?';
+        if (!window.confirm(msg)) return true;
+        submitForceLogout(sidLogout, config);
+        return true;
+    }
+
+    function hideSessionGridLoading(loadingEl) {
+        if (typeof AgGridHelper !== 'undefined' && typeof AgGridHelper.hideGridLoadingOverlay === 'function') {
+            AgGridHelper.hideGridLoadingOverlay(loadingEl);
+        } else if (loadingEl) {
+            loadingEl.style.display = 'none';
+            loadingEl.style.pointerEvents = 'none';
+        }
+    }
+
     function init() {
         var config = window.sessionLogsGridConfig;
         if (!config || !config.apiUrl) {
@@ -563,35 +602,7 @@
             if (window.__clientWarn) window.__clientWarn('session logs page param cleanup', ePage);
         }
 
-        gridHost.addEventListener('click', function(ev) {
-            var pathBtn = ev.target && ev.target.closest ? ev.target.closest('.session-path-breakdown-btn') : null;
-            if (pathBtn) {
-                ev.preventDefault();
-                ev.stopPropagation();
-                var raw = pathBtn.getAttribute('data-path-counts') || '';
-                var total = parseInt(pathBtn.getAttribute('data-page-views-total') || '0', 10);
-                var sid = pathBtn.getAttribute('data-session-id') || '';
-                var pvc = {};
-                try {
-                    if (raw) pvc = JSON.parse(decodeURIComponent(raw));
-                } catch (ePb) {
-                    if (window.__clientWarn) window.__clientWarn('session path breakdown parse', ePb);
-                }
-                openPathBreakdownModal(t, pvc, total, sid);
-                return;
-            }
-            var btn = ev.target && ev.target.closest ? ev.target.closest('.session-force-logout-btn') : null;
-            if (!btn) return;
-            ev.preventDefault();
-            var sid = btn.getAttribute('data-session-id');
-            if (!sid) return;
-            var msg = config.confirmForceLogout || 'Are you sure?';
-            if (!window.confirm(msg)) return;
-            submitForceLogout(sid, config);
-        });
-
         async function loadAndRender() {
-            if (loadingEl) loadingEl.style.display = 'flex';
             try {
                 var items = await fetchAllSessionRows(config);
                 var rowData = items.map(mapRow);
@@ -600,9 +611,14 @@
                 var result = AgGridHelper.create('sessionLogsGrid', 'admin-session-logs', columnDefs, rowData, {
                     autoShow: true,
                     gridOptions: {
+                        suppressRowClickSelection: true,
                         getRowClass: function(params) {
                             if (params.data && params.data.is_active) return 'session-log-row--active';
                             return '';
+                        },
+                        onCellClicked: function(params) {
+                            if (!params || !params.event) return;
+                            handleSessionGridInteraction(params.event, t, config);
                         },
                         onGridSizeChanged: function(ev) {
                             if (ev && ev.api && typeof ev.api.sizeColumnsToFit === 'function') {
@@ -615,7 +631,8 @@
                         minHeight: 600,
                         maxHeight: 600,
                         minRowsToShow: 1,
-                        viewportOffset: 0
+                        viewportOffset: 0,
+                        mobilePageScroll: true
                     },
                     columnVisibility: {
                         enableExport: false,
@@ -634,7 +651,8 @@
             } catch (err) {
                 console.error('Session logs grid:', err);
                 window.alert((t.loadError || 'Could not load session logs.') + (err && err.message ? ' ' + err.message : ''));
-                if (loadingEl) loadingEl.style.display = 'none';
+            } finally {
+                hideSessionGridLoading(loadingEl);
             }
         }
 

@@ -35,9 +35,11 @@
 {% if not _matrix_label or not _matrix_label|trim %}
     {% set _matrix_label = field.display_label or field.label %}
 {% endif %}
+{% set _matrix_can_edit = can_edit if can_edit is defined else true %}
 
 <div class="matrix-container disaggregation-inputs{% if matrix_is_imputed %} bg-blue-50 border border-blue-300 rounded-md p-2{% endif %}"
      data-field-id="{{ field.id }}"
+     data-can-edit="{{ 'true' if _matrix_can_edit else 'false' }}"
      data-matrix-config='{{ matrix_config | tojson }}'
      {% if matrix_highlight_prefilled_cells %}data-highlight-prefilled-cells="true"{% endif %}
      {% if matrix_is_carry_forward or matrix_has_carry_forward_ref %}data-carry-forward="true"{% endif %}
@@ -332,7 +334,7 @@
                                 </td>
                             {% endfor %}
                             {% if show_row_totals %}
-                                <td class="border border-gray-300 px-2 py-1 bg-gray-100" role="gridcell">
+                                <td class="border border-gray-300 px-2 py-1{% if not (row_total_manual and _matrix_can_edit) %} bg-gray-100{% endif %}" role="gridcell">
                                     {% if row_total_manual %}
                                         {% set total_cell_key = row_id ~ '_Total' %}
                                         {% set total_cell_value = existing_matrix_data.get(total_cell_key, '') if existing_matrix_data else '' %}
@@ -347,7 +349,7 @@
                                         {% endif %}
                                         <div class="flex items-center w-full gap-1.5 px-1">
                                             <input type="number"
-                                                   class="row-total-input flex-1 min-w-0 px-1 py-1 focus:outline-none focus:ring-2 focus:ring-orange-500 text-center text-sm font-medium{% if _total_prefill.has_value %} bg-yellow-100 border border-yellow-300 rounded-sm{% else %} border-0 bg-transparent{% endif %}"
+                                                   class="row-total-input flex-1 min-w-0 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center text-sm font-medium{% if _total_prefill.has_value %} bg-yellow-100 border border-yellow-300 rounded-sm{% else %} border-0{% endif %}"
                                                    data-row="{{ row_id }}"
                                                    data-row-id="{{ row_id }}"
                                                    data-column="Total"

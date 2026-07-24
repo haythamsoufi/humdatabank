@@ -23,6 +23,22 @@ function __formatInteger(value) {
         return String(Math.round(Number(value || 0)) || 0);
     }
 }
+
+/** Raw integer string for input.value — number inputs reject locale grouping (e.g. "1,042,052"). */
+function __integerInputValue(value) {
+    if (value === '' || value == null) return '';
+    const num = Number(value);
+    if (!isFinite(num)) return '';
+    return String(Math.round(num));
+}
+
+function __setMatrixNumericInputValue(input, value) {
+    if (!input) return;
+    input.value = __integerInputValue(value);
+    if (typeof window.__numericFormatInPlace === 'function') {
+        window.__numericFormatInPlace(input);
+    }
+}
 function __formatNumberForDisplay(value) {
     if (value == null || value === '') return null;
     const raw = (typeof window.__numericUnformat === 'function')
@@ -149,12 +165,26 @@ function __rowTotalConflictMessage(manualVal, autoSum) {
     return `Manual total ${__formatInteger(manualVal)} differs from breakdown sum ${__formatInteger(autoSum)}`;
 }
 
+/** Whether matrix cell values may be edited (mirrors server can_edit / entry form POST availability). */
+function __canEditMatrixContainer(container) {
+    if (container) {
+        const attr = container.getAttribute('data-can-edit');
+        if (attr === 'true') return true;
+        if (attr === 'false') return false;
+    }
+    const jsContext = document.getElementById('entry-form-js-context');
+    if (jsContext?.getAttribute('data-can-edit') === 'false') {
+        return false;
+    }
+    return !!document.getElementById('focalDataEntryForm');
+}
+
 const __ROW_TOTAL_CONFLICT_INDICATOR_BASE =
     'row-total-conflict shrink-0 flex items-center justify-center mr-1.5 pointer-events-none';
 
 const __ROW_TOTAL_INPUT_WRAPPER_CLASS = 'flex items-center w-full gap-1.5 px-1';
 const __ROW_TOTAL_INPUT_CLASS =
-    'row-total-input flex-1 min-w-0 px-1 py-1 border-0 bg-transparent focus:outline-none focus:ring-2 focus:ring-orange-500 text-center text-sm font-medium';
+    'row-total-input flex-1 min-w-0 px-2 py-1 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center text-sm font-medium';
 
 function __rowTotalConflictIndicatorSvg(variant) {
     const colorClass = variant === 'error' ? 'text-red-400' : 'text-amber-400';
@@ -268,32 +298,37 @@ function __populateRowTotalConflictTooltip(tooltip, cell) {
 
     summaryRow.append(manualLine, breakdownLine);
 
-    const restoreRow = document.createElement('div');
-    restoreRow.style.marginTop = '6px';
-    restoreRow.style.paddingTop = '4px';
-    restoreRow.style.borderTop = '1px solid rgba(255,255,255,0.3)';
-    const restoreBtn = document.createElement('button');
-    restoreBtn.type = 'button';
-    restoreBtn.className = 'row-total-restore';
-    restoreBtn.setAttribute('data-cell-key', cellKey);
-    restoreBtn.setAttribute('data-row-id', rowId);
-    restoreBtn.setAttribute('aria-label', 'Restore to calculated');
-    restoreBtn.style.cssText = 'background:#555;color:white;border:none;border-radius:3px;padding:4px 8px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;';
-    restoreBtn.textContent = '↩ Restore to calculated';
-    restoreBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (typeof window.matrixHandler?.handleRowTotalRestore === 'function') {
-            window.matrixHandler.handleRowTotalRestore(restoreBtn);
-        }
-        const currentTooltip = cell._rowTotalTooltipId ? document.getElementById(cell._rowTotalTooltipId) : null;
-        if (currentTooltip) {
-            currentTooltip.style.opacity = '0';
-            currentTooltip.style.pointerEvents = 'none';
-        }
-    });
-    restoreRow.appendChild(restoreBtn);
-    tooltip.append(title, summaryRow, restoreRow);
+    const tooltipChildren = [title, summaryRow];
+    const matrixContainer = input?.closest('.matrix-container');
+    if (__canEditMatrixContainer(matrixContainer)) {
+        const restoreRow = document.createElement('div');
+        restoreRow.style.marginTop = '6px';
+        restoreRow.style.paddingTop = '4px';
+        restoreRow.style.borderTop = '1px solid rgba(255,255,255,0.3)';
+        const restoreBtn = document.createElement('button');
+        restoreBtn.type = 'button';
+        restoreBtn.className = 'row-total-restore';
+        restoreBtn.setAttribute('data-cell-key', cellKey);
+        restoreBtn.setAttribute('data-row-id', rowId);
+        restoreBtn.setAttribute('aria-label', 'Restore to calculated');
+        restoreBtn.style.cssText = 'background:#555;color:white;border:none;border-radius:3px;padding:4px 8px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;';
+        restoreBtn.textContent = '↩ Restore to calculated';
+        restoreBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof window.matrixHandler?.handleRowTotalRestore === 'function') {
+                window.matrixHandler.handleRowTotalRestore(restoreBtn);
+            }
+            const currentTooltip = cell._rowTotalTooltipId ? document.getElementById(cell._rowTotalTooltipId) : null;
+            if (currentTooltip) {
+                currentTooltip.style.opacity = '0';
+                currentTooltip.style.pointerEvents = 'none';
+            }
+        });
+        restoreRow.appendChild(restoreBtn);
+        tooltipChildren.push(restoreRow);
+    }
+    tooltip.append(...tooltipChildren);
 }
 
 function __positionRowTotalConflictTooltip(tooltip, anchorEl) {
@@ -408,8 +443,16 @@ function __setupRowTotalConflictTooltip(cell, input) {
 
 function __syncRowTotalCellHighlight(cell, highlighted) {
     if (!cell) return;
+    const input = cell.querySelector('.row-total-input');
+    const matrixContainer = cell.closest('.matrix-container');
+    const isEditableManualTotal = input && __canEditMatrixContainer(matrixContainer);
+
     cell.classList.toggle('bg-orange-50', !!highlighted);
-    cell.classList.toggle('bg-gray-100', !highlighted);
+    if (isEditableManualTotal) {
+        cell.classList.remove('bg-gray-100');
+    } else {
+        cell.classList.toggle('bg-gray-100', !highlighted);
+    }
 }
 
 function __updateRowTotalConflict(input, autoSum, manualVal, validation, isManuallyModified = false) {
@@ -885,6 +928,64 @@ class MatrixHandler {
     }
 
     /**
+     * Whether matrix cell values may be edited (mirrors server can_edit / entry form POST availability).
+     * @param {HTMLElement|null} container - `.matrix-container` element
+     * @returns {boolean}
+     */
+    _canEditMatrix(container) {
+        return __canEditMatrixContainer(container);
+    }
+
+    /**
+     * Apply disabled/readonly state to a matrix cell input.
+     * @param {HTMLInputElement} input
+     * @param {HTMLElement} container
+     * @param {boolean} variableReadonly
+     */
+    _applyMatrixInputEditability(input, container, variableReadonly = false) {
+        if (!input || !container) return;
+        const shouldDisable = !this._canEditMatrix(container) || variableReadonly;
+        input.disabled = shouldDisable;
+        if (input.type !== 'checkbox') {
+            if (shouldDisable) {
+                input.setAttribute('readonly', 'readonly');
+            } else {
+                input.removeAttribute('readonly');
+            }
+        }
+    }
+
+    /**
+     * Lock all matrix inputs when the form is view-only (submitted/approved/etc.).
+     * @param {HTMLElement} container
+     */
+    _lockMatrixContainerIfReadOnly(container) {
+        if (!container || this._canEditMatrix(container)) return;
+
+        container.querySelectorAll(
+            'input[data-cell-key], input[data-is-row-total="true"], input.row-total-input'
+        ).forEach((input) => {
+            const variableReadonly = input.getAttribute('data-variable-readonly') === 'true';
+            this._applyMatrixInputEditability(input, container, variableReadonly);
+        });
+
+        container.querySelectorAll('.remove-matrix-row-btn').forEach((btn) => {
+            btn.hidden = true;
+        });
+    }
+
+    _lockAllReadOnlyMatrices() {
+        this.matrices.forEach((matrix) => {
+            if (matrix?.container) {
+                this._lockMatrixContainerIfReadOnly(matrix.container);
+            }
+        });
+        document.querySelectorAll('.matrix-container[data-can-edit="false"]').forEach((container) => {
+            this._lockMatrixContainerIfReadOnly(container);
+        });
+    }
+
+    /**
      * Setup event listeners for matrix interactions
      */
     setupEventListeners() {
@@ -1148,7 +1249,9 @@ class MatrixHandler {
             debugLog('matrix-handler', `Initialized matrix for field ${fieldId}`, config);
         });
 
-        return Promise.all(matrixPromises);
+        return Promise.all(matrixPromises).then(() => {
+            this._lockAllReadOnlyMatrices();
+        });
     }
 
     /**
@@ -1185,6 +1288,11 @@ class MatrixHandler {
 
         if (!fieldId) {
             debugError('matrix-handler', 'Could not find fieldId for input', input);
+            return;
+        }
+
+        if (container && !this._canEditMatrix(container)) {
+            debugLog('matrix-handler', 'Ignoring change on read-only matrix', { fieldId });
             return;
         }
 
@@ -1475,7 +1583,10 @@ class MatrixHandler {
 
                     const totalInput = container.querySelector(`input.row-total-input[data-cell-key="${totalCellKey}"]`);
                     if (totalInput) {
-                        totalInput.value = displayVal !== '' && displayVal != null ? __formatInteger(displayVal) : '';
+                        __setMatrixNumericInputValue(
+                            totalInput,
+                            displayVal !== '' && displayVal != null ? displayVal : ''
+                        );
                         totalInput.setAttribute('data-original-value', String(rowTotal));
                         const isConflict = manualScalar != null && manualScalar !== rowTotal;
                         __updateRowTotalConflict(
@@ -1627,6 +1738,8 @@ class MatrixHandler {
         const container = checkbox.closest('.matrix-container');
         if (!container) return;
 
+        if (!this._canEditMatrix(container)) return;
+
         const fieldId = container.dataset.fieldId;
         const matrix = this.matrices.get(fieldId);
         if (!matrix) return;
@@ -1636,9 +1749,12 @@ class MatrixHandler {
         const isDisabled = checkbox.checked;
 
         inputs.forEach(input => {
-            input.disabled = isDisabled;
             if (isDisabled) {
+                input.disabled = true;
                 input.value = '';
+            } else {
+                const variableReadonly = input.getAttribute('data-variable-readonly') === 'true';
+                this._applyMatrixInputEditability(input, container, variableReadonly);
             }
         });
 
@@ -2048,6 +2164,7 @@ class MatrixHandler {
         if (!cellKey) return;
 
         let container = button.closest('.matrix-container');
+        if (container && !this._canEditMatrix(container)) return;
         let input = container?.querySelector(`input.row-total-input[data-cell-key="${cellKey}"]`);
         if (!input) {
             input = document.querySelector(`input.row-total-input[data-cell-key="${cellKey}"]`);
@@ -2060,7 +2177,7 @@ class MatrixHandler {
         if (!matrix) return;
 
         const autoSum = parseFloat(input.getAttribute('data-original-value')) || 0;
-        input.value = autoSum ? __formatInteger(autoSum) : '';
+        __setMatrixNumericInputValue(input, autoSum || '');
         delete matrix.data[cellKey];
         __updateRowTotalConflict(input, autoSum, '', __rowTotalValidation(matrix.config), false);
         if (matrix.hiddenField) {
@@ -2699,6 +2816,9 @@ class MatrixHandler {
      */
     selectRowOption(optionItem) {
         const fieldId = optionItem.dataset.fieldId;
+        const container = document.querySelector(`.matrix-container[data-field-id="${fieldId}"]`);
+        if (container && !this._canEditMatrix(container)) return;
+
         const optionValue = optionItem.dataset.optionValue;
         const optionData = JSON.parse(optionItem.dataset.optionData);
 
@@ -2862,8 +2982,8 @@ class MatrixHandler {
         labelSpan.style.wordWrap = 'break-word';
         labelSpan.style.overflowWrap = 'break-word';
 
-        // Only add remove button for manually added rows (not auto-loaded)
-        if (!isAutoLoaded) {
+        // Only add remove button for manually added rows (not auto-loaded) on editable forms
+        if (!isAutoLoaded && this._canEditMatrix(container)) {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'remove-matrix-row-btn ml-1 text-red-600 hover:text-red-800 text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200';
@@ -2911,7 +3031,6 @@ class MatrixHandler {
                     input.type = 'checkbox';
                     input.className = `w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto${variableReadonly ? ' opacity-50' : ''}`;
                     input.value = '1';
-                    input.disabled = variableReadonly; // Use disabled for checkboxes (readOnly doesn't work)
                     input.setAttribute('data-column-type', 'variable');
                     input.setAttribute('data-variable-name', variableName || '');
                     input.setAttribute('data-variable-save-value', variableSaveValue ? 'true' : 'false');
@@ -2926,7 +3045,6 @@ class MatrixHandler {
                     input.min = '0';
                     input.step = '0.01';
                 input.value = '';
-                input.disabled = variableReadonly; // Use disabled to prevent editing (readOnly can sometimes be bypassed)
                 input.setAttribute('data-column-type', 'variable');
                 input.setAttribute('data-variable-name', variableName || '');
                 input.setAttribute('data-variable-save-value', variableSaveValue ? 'true' : 'false');
@@ -2954,6 +3072,11 @@ class MatrixHandler {
             input.setAttribute('data-column', columnName);
             input.setAttribute('data-cell-key', cellKey);
 
+            const variableReadonlyForCell = isVariable
+                ? (typeof column === 'object' ? (column.variable_readonly !== false) : true)
+                : false;
+            this._applyMatrixInputEditability(input, container, variableReadonlyForCell);
+
             cell.appendChild(input);
             row.appendChild(cell);
         });
@@ -2961,10 +3084,13 @@ class MatrixHandler {
         // Create total cell if needed
         if (matrixInfo.config.show_row_totals !== false) {
             const totalCell = document.createElement('td');
-            totalCell.className = 'border border-gray-300 px-2 py-1 bg-gray-100';
+            const isManualTotal = __rowTotalManualEnabled(matrixInfo.config);
+            totalCell.className = isManualTotal && this._canEditMatrix(container)
+                ? 'border border-gray-300 px-2 py-1'
+                : 'border border-gray-300 px-2 py-1 bg-gray-100';
             totalCell.setAttribute('role', 'gridcell');
 
-            if (__rowTotalManualEnabled(matrixInfo.config)) {
+            if (isManualTotal) {
                 const totalCellKey = __rowTotalCellKey(finalRowId);
                 const wrapper = document.createElement('div');
                 wrapper.className = __ROW_TOTAL_INPUT_WRAPPER_CLASS;
@@ -2982,6 +3108,7 @@ class MatrixHandler {
                 totalInput.setAttribute('aria-label', `Total for row ${rowLabel}`);
                 totalInput.min = '0';
                 totalInput.step = '0.01';
+                this._applyMatrixInputEditability(totalInput, container, false);
 
                 const indicator = __createRowTotalConflictIndicator();
 
@@ -3016,6 +3143,8 @@ class MatrixHandler {
         // Defer variable resolution to batch with other rows
         // This prevents individual API calls for each row
         this.scheduleVariableResolution(fieldIdStr);
+
+        this._lockMatrixContainerIfReadOnly(container);
 
         debugLog('matrix-handler', `Added dynamic row "${rowLabel}" to matrix ${fieldIdStr}`);
     }
@@ -3187,6 +3316,7 @@ class MatrixHandler {
             // Update matrix data and totals once after all rows are processed
             this.calculateMatrixTotals(fieldId);
             this.applyVariableLookupComparison(fieldId);
+            this._lockMatrixContainerIfReadOnly(matrix.container);
 
         } catch (error) {
             debugError('matrix-handler', '[BATCH VARIABLE RESOLUTION] Error in batch resolution:', {
@@ -3626,6 +3756,8 @@ class MatrixHandler {
      */
     handleRemoveRowClick(button) {
         const row = button.closest('tr');
+        const container = row?.closest('.matrix-container');
+        if (container && !this._canEditMatrix(container)) return;
 
         // Check if row is actually connected to the DOM
         if (!row || !row.parentElement || !row.isConnected) {
@@ -3655,7 +3787,6 @@ class MatrixHandler {
         // Mark row as being removed
         this.rowsBeingRemoved.add(rowId);
 
-        const container = row.closest('.matrix-container');
         const fieldId = container?.dataset?.fieldId;
 
         if (!container) {
@@ -4103,47 +4234,51 @@ class MatrixHandler {
                             : '(empty)')
                     ));
 
-                    const restoreRow = document.createElement('div');
-                    restoreRow.style.marginTop = '6px';
-                    restoreRow.style.paddingTop = '4px';
-                    restoreRow.style.borderTop = '1px solid rgba(255,255,255,0.3)';
-                    const restoreBtn = document.createElement('button');
-                    restoreBtn.type = 'button';
-                    restoreBtn.setAttribute('aria-label', `Restore ${resolvedLabels.lookupLabel.toLowerCase()}`);
-                    restoreBtn.style.cssText = 'background:#555;color:white;border:none;border-radius:3px;padding:4px 8px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;';
-                    restoreBtn.innerHTML = `↩ Restore ${resolvedLabels.lookupLabel.toLowerCase()}`;
-                    restoreBtn.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const inp = cell._variableInput;
-                        const lookup = cell._variableLookupValue;
-                        if (!inp || !inp.isConnected) return;
-                        const matrixContainer = inp.closest('.matrix-container') || inp.closest('[data-field-id]');
-                        const restoreFieldId = matrixContainer ? (matrixContainer.getAttribute('data-field-id') || '') : '';
-                        const cellKey = inp.getAttribute('data-cell-key');
-                        const restoreMatrix = restoreFieldId ? this.matrices.get(restoreFieldId) : null;
-                        const restoredDisplay = __formatLookupValueForInput(inp.type, lookup);
-                        if (inp.type === 'checkbox') {
-                            inp.checked = restoredDisplay === '1';
-                        } else {
-                            inp.value = restoredDisplay;
-                            if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(inp);
-                        }
-                        if (restoreMatrix && cellKey) {
-                            restoreMatrix.data[cellKey] = inp.type === 'checkbox'
-                                ? restoredDisplay
-                                : __persistVariableCellScalar(restoredDisplay);
-                            this.sanitizeMatrixData(restoreMatrix);
-                            if (restoreMatrix.hiddenField) {
-                                restoreMatrix.hiddenField.value = __serializeMatrixData(restoreMatrix.data);
+                    const tooltipChildren = [title, lookupRow, submittedRow];
+                    if (this._canEditMatrix(container)) {
+                        const restoreRow = document.createElement('div');
+                        restoreRow.style.marginTop = '6px';
+                        restoreRow.style.paddingTop = '4px';
+                        restoreRow.style.borderTop = '1px solid rgba(255,255,255,0.3)';
+                        const restoreBtn = document.createElement('button');
+                        restoreBtn.type = 'button';
+                        restoreBtn.setAttribute('aria-label', `Restore ${resolvedLabels.lookupLabel.toLowerCase()}`);
+                        restoreBtn.style.cssText = 'background:#555;color:white;border:none;border-radius:3px;padding:4px 8px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;';
+                        restoreBtn.innerHTML = `↩ Restore ${resolvedLabels.lookupLabel.toLowerCase()}`;
+                        restoreBtn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const inp = cell._variableInput;
+                            const lookup = cell._variableLookupValue;
+                            if (!inp || !inp.isConnected) return;
+                            const matrixContainer = inp.closest('.matrix-container') || inp.closest('[data-field-id]');
+                            const restoreFieldId = matrixContainer ? (matrixContainer.getAttribute('data-field-id') || '') : '';
+                            const cellKey = inp.getAttribute('data-cell-key');
+                            const restoreMatrix = restoreFieldId ? this.matrices.get(restoreFieldId) : null;
+                            const restoredDisplay = __formatLookupValueForInput(inp.type, lookup);
+                            if (inp.type === 'checkbox') {
+                                inp.checked = restoredDisplay === '1';
+                            } else {
+                                inp.value = restoredDisplay;
+                                if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(inp);
                             }
-                        }
-                        this.updateVariableModificationIndicator(inp, lookup, restoredDisplay, resolvedLabels);
-                        inp.dispatchEvent(new Event('input', { bubbles: true }));
-                        inp.dispatchEvent(new Event('change', { bubbles: true }));
-                    });
-                    restoreRow.appendChild(restoreBtn);
-                    tooltip.append(title, lookupRow, submittedRow, restoreRow);
+                            if (restoreMatrix && cellKey) {
+                                restoreMatrix.data[cellKey] = inp.type === 'checkbox'
+                                    ? restoredDisplay
+                                    : __persistVariableCellScalar(restoredDisplay);
+                                this.sanitizeMatrixData(restoreMatrix);
+                                if (restoreMatrix.hiddenField) {
+                                    restoreMatrix.hiddenField.value = __serializeMatrixData(restoreMatrix.data);
+                                }
+                            }
+                            this.updateVariableModificationIndicator(inp, lookup, restoredDisplay, resolvedLabels);
+                            inp.dispatchEvent(new Event('input', { bubbles: true }));
+                            inp.dispatchEvent(new Event('change', { bubbles: true }));
+                        });
+                        restoreRow.appendChild(restoreBtn);
+                        tooltipChildren.push(restoreRow);
+                    }
+                    tooltip.append(...tooltipChildren);
 
                     // Calculate position based on cell's bounding box
                     const cellRect = cell.getBoundingClientRect();
@@ -4374,7 +4509,7 @@ class MatrixHandler {
 
                     if (isVariable && column) {
                         const variableReadonly = typeof column === 'object' ? (column.variable_readonly !== false) : true;
-                        input.disabled = variableReadonly;
+                        this._applyMatrixInputEditability(input, updatedMatrix.container, variableReadonly);
                     }
                 } else {
                     debugLog('matrix-handler', `Input not found for cell key: ${cellKey}`);
@@ -4450,7 +4585,7 @@ class MatrixHandler {
 
                     if (isVariable && column) {
                         const variableReadonly = typeof column === 'object' ? (column.variable_readonly !== false) : true;
-                        input.disabled = variableReadonly;
+                        this._applyMatrixInputEditability(input, container, variableReadonly);
                     }
 
                     debugLog('matrix-handler', `Restored value for cell ${cellKey}: ${displayValue}`);
@@ -4463,6 +4598,7 @@ class MatrixHandler {
         // Recalculate totals after restoring values
         this.calculateMatrixTotals(fieldId);
         this.applyPrefilledCellHighlighting(fieldId);
+        this._lockMatrixContainerIfReadOnly(container);
     }
 
     /**
@@ -4583,6 +4719,8 @@ class MatrixHandler {
 
                 // Update legend visibility after restoration
                 this.updateLegendVisibility(fieldId);
+
+                this._lockMatrixContainerIfReadOnly(updatedMatrix.container);
             }
         } catch (error) {
             debugError('matrix-handler', 'Error restoring dynamic rows:', error);
@@ -5394,6 +5532,7 @@ class MatrixHandler {
                 this.applyDuplicateEntityHighlighting(fieldId);
                 // Update legend visibility after auto-load
                 this.updateLegendVisibility(fieldId);
+                this._lockMatrixContainerIfReadOnly(matrix.container);
             }, 100);
 
         } catch (error) {
@@ -5987,7 +6126,9 @@ class MatrixHandler {
                 this.restoreStaticMatrixValues(fieldId);
             }
         });
-        return Promise.all(matrixPromises);
+        return Promise.all(matrixPromises).then(() => {
+            this._lockAllReadOnlyMatrices();
+        });
     }
 }
 

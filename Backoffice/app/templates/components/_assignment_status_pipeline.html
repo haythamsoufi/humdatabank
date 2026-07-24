@@ -37,12 +37,14 @@
                               role="listitem"
                               tabindex="0"
                               data-step-index="{{ step_idx }}"
+                              data-step-key="{{ step }}"
                               data-step-label="{{ localize_status(step) }}"
                               data-step-description="{{ assignment_status_step_description(step) }}"
                               aria-label="{{ localize_status(step) }}">
                             <span class="assignment-status-pipeline-marker" aria-hidden="true">
                                 <span class="assignment-status-pipeline-dot"></span>
                                 <i class="fas fa-check assignment-status-pipeline-check" aria-hidden="true"></i>
+                                <i class="fas fa-arrow-right assignment-status-pipeline-arrow" aria-hidden="true"></i>
                             </span>
                             <span class="assignment-status-pipeline-label">{{ localize_status(step) }}</span>
                         </span>

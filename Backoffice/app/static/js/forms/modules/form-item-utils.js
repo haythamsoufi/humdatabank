@@ -731,7 +731,14 @@ function safeSetNumericInputValue(input, value) {
         input.value = '';
         input.setAttribute('value', '');
     } else {
-        // Regular value, set normally
+        // Strip locale grouping only for type="number" (text/data-numeric inputs display formatted values)
+        if (input.type === 'number' &&
+            typeof processedValue === 'string' &&
+            (processedValue.includes(',') || processedValue.includes("'"))) {
+            processedValue = (typeof window.__numericUnformat === 'function')
+                ? window.__numericUnformat(processedValue)
+                : processedValue.replace(/,/g, '').replace(/'/g, '');
+        }
         input.value = processedValue;
         input.setAttribute('value', processedValue);
     }
@@ -844,6 +851,17 @@ export function setupNumericInputJsonSupport() {
                     }
                     // Invalid JSON structure, clear the value
                     originalValueDescriptor.set.call(this, '');
+                    return;
+                }
+
+                // Strip locale grouping only for type="number" (text/data-numeric inputs keep formatted display)
+                if (this.type === 'number' &&
+                    typeof value === 'string' &&
+                    (value.includes(',') || value.includes("'"))) {
+                    const cleaned = (typeof window.__numericUnformat === 'function')
+                        ? window.__numericUnformat(value)
+                        : value.replace(/,/g, '').replace(/'/g, '');
+                    originalValueDescriptor.set.call(this, cleaned);
                     return;
                 }
 

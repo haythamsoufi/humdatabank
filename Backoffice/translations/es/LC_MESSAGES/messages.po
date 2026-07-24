@@ -18660,7 +18660,7 @@ msgstr "Buscar"
 #: app/templates/components/entity_dropdown.html:63
 #, python-format
 msgid "Search %(label)s..."
-msgstr ""
+msgstr "Busca %(label)s..."
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:290
 msgid "Search Definition"
@@ -18676,11 +18676,11 @@ msgstr "Estructura de búsqueda NS"
 
 #: app/templates/components/entity_dropdown.html:38
 msgid "Search NS branches..."
-msgstr ""
+msgstr "Busca en las sucursales de NS..."
 
 #: app/templates/components/entity_dropdown.html:48
 msgid "Search NS local units..."
-msgstr ""
+msgstr "Registrad unidades locales de NS..."
 
 #: app/templates/admin/user_management/user_form.html:931
 msgid "Search NS structure"
@@ -18688,7 +18688,7 @@ msgstr "Estructura de búsqueda NS"
 
 #: app/templates/components/entity_dropdown.html:43
 msgid "Search NS sub-branches..."
-msgstr ""
+msgstr "Buscar subsucursales de NS..."
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:707
 msgid "Search Placeholder Text"
@@ -18747,7 +18747,7 @@ msgstr "Buscar por correo electrónico"
 
 #: app/templates/admin/templates/new_template.html:376
 msgid "Search by indicator name…"
-msgstr ""
+msgstr "Buscar por nombre indicador..."
 
 #: app/templates/admin/api_management.html:1153
 msgid "Search by name or definition"
@@ -18786,7 +18786,7 @@ msgstr "Buscar entidades..."
 
 #: app/templates/components/entity_dropdown.html:58
 msgid "Search departments..."
-msgstr ""
+msgstr "Departamentos de búsqueda..."
 
 #: app/templates/admin/analytics/audit_trail.html:270
 msgid "Search description (e.g., template name)"
@@ -18802,7 +18802,7 @@ msgstr "Búsquedas divisionales o departamentos..."
 
 #: app/templates/components/entity_dropdown.html:53
 msgid "Search divisions..."
-msgstr ""
+msgstr "Divisiones de búsqueda..."
 
 #: app/templates/admin/docs/documentation.html:1140
 msgid "Search documentation..."
@@ -18822,7 +18822,7 @@ msgstr "Buscar valores..."
 
 #: app/templates/components/entity_dropdown.html:33
 msgid "Search national societies..."
-msgstr ""
+msgstr "Busca en sociedades nacionales..."
 
 #: app/templates/notifications/center.html:141
 msgid "Search notifications..."
@@ -19317,7 +19317,7 @@ msgstr "Seleccionar todos los países"
 
 #: app/templates/admin/templates/new_template.html:447
 msgid "Select all visible"
-msgstr ""
+msgstr "Seleccionar todo visible"
 
 #: app/templates/admin/documents/documents.html:121
 #: app/templates/admin/documents/documents.html:173
@@ -19335,7 +19335,7 @@ msgstr ""
 
 #: app/templates/admin/templates/new_template.html:1205
 msgid "Select at least one indicator to continue."
-msgstr ""
+msgstr "Selecciona al menos un indicador para continuar."
 
 #: app/templates/admin/user_management/user_form.html:1485
 msgid "Select colour"
@@ -19396,7 +19396,7 @@ msgstr "Seleccionar archivos para subir"
 #: app/templates/admin/templates/new_template.html:353
 #: app/templates/admin/templates/new_template.html:440
 msgid "Select indicators"
-msgstr ""
+msgstr "Indicadores de selección"
 
 #: app/templates/admin/documents/documents.html:189
 #: app/templates/forms/entry_form/entry_form.html:2751
@@ -19750,7 +19750,7 @@ msgstr "Enviado para revisión"
 #: app/services/notification/core.py:317
 #, python-format
 msgid "Sent for review: %(template)s"
-msgstr ""
+msgstr "Enviado para reseña: %(template)s"
 
 #: app/templates/admin/assignments/manage_assignment.html:120
 #: app/templates/admin/assignments/manage_assignment.html:140
@@ -19863,6 +19863,12 @@ msgid ""
 "in system variables in labels, e.g. [assignment_period], [entity_name], "
 "[template_name]."
 msgstr ""
+"Establece la etiqueta de visualización en inglés y las traducciones para "
+"cada columna. El código de columna (utilizado para consultas de variables) "
+"se muestra en la primera columna. Si no se establece ninguna etiqueta en "
+"inglés, el código se utiliza como respaldo para la visualización. Puedes "
+"usar variables de sistema integradas en etiquetas, por ejemplo, "
+"[assignment_period], [entity_name], [template_name]."
 
 #: app/templates/admin/templates/new_template.html:113
 msgid "Set the name, access, and options for a new blank template."
@@ -19873,6 +19879,8 @@ msgstr ""
 #: app/templates/admin/templates/new_template.html:490
 msgid "Set the template name, description, and access before creation."
 msgstr ""
+"Establece el nombre de la plantilla, la descripción y el acceso antes de "
+"crearlo."
 
 #: app/templates/forms/form_builder/form_builder.html:769
 msgid ""
@@ -19881,6 +19889,11 @@ msgid ""
 "their selected language. You can use built-in system variables in labels, "
 "e.g. [assignment_period], [entity_name], [template_name]."
 msgstr ""
+"Establece traducciones para cada encabezado de fila. El texto en inglés "
+"aparece en la primera columna como referencia. Las traducciones se mostrarán"
+" a los usuarios según el idioma que hayan elegido. Puedes usar variables de "
+"sistema integradas en etiquetas, por ejemplo, [assignment_period], "
+"[entity_name], [template_name]."
 
 #: app/templates/admin/settings/manage_settings.html:1259
 msgid "Set via environment variable"
@@ -19970,7 +19983,7 @@ msgstr "Acceso compartido"
 
 #: app/templates/admin/templates/new_template.html:1215
 msgid "Shared across programs"
-msgstr ""
+msgstr "Compartido entre programas"
 
 #: app/templates/admin/templates/templates.html:84
 #: app/templates/forms/form_builder/partials/_template_details.html:85
@@ -20034,7 +20047,7 @@ msgstr "Mostrar"
 #: app/templates/components/entity_dropdown.html:64
 #, python-format
 msgid "Show %(label)s"
-msgstr ""
+msgstr "Espectáculo %(label)s"
 
 #: app/templates/forms/entry_form/_validation_questions_panel.html:8
 msgid "Show / hide"
@@ -20071,15 +20084,15 @@ msgstr "Selector de idioma de mostrar"
 
 #: app/templates/components/entity_dropdown.html:39
 msgid "Show NS branches"
-msgstr ""
+msgstr "Mostrar sucursales de NS"
 
 #: app/templates/components/entity_dropdown.html:49
 msgid "Show NS local units"
-msgstr ""
+msgstr "Mostrar unidades locales de NS"
 
 #: app/templates/components/entity_dropdown.html:44
 msgid "Show NS sub-branches"
-msgstr ""
+msgstr "Mostrar subsucursales de NS"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:589
 msgid "Show Public Document checkbox"
@@ -20103,15 +20116,15 @@ msgstr "Mostrar todas las sesiones"
 
 #: app/templates/components/entity_dropdown.html:29
 msgid "Show countries"
-msgstr ""
+msgstr "Países de la exposición"
 
 #: app/templates/components/entity_dropdown.html:59
 msgid "Show departments"
-msgstr ""
+msgstr "Departamentos de exhibición"
 
 #: app/templates/components/entity_dropdown.html:54
 msgid "Show divisions"
-msgstr ""
+msgstr "Divisiones de exhibición"
 
 #: app/templates/forms/entry_form/entry_form.html:2974
 msgid "Show editors"
@@ -20119,7 +20132,7 @@ msgstr "Montadores del programa"
 
 #: app/templates/components/entity_dropdown.html:22
 msgid "Show entities"
-msgstr ""
+msgstr "Entidades del espectáculo"
 
 #: app/templates/forms/form_builder/partials/_section_modal.html:118
 msgid "Show entries in form navigation"
@@ -20167,7 +20180,7 @@ msgstr "Mostrar más fuentes"
 
 #: app/templates/components/entity_dropdown.html:34
 msgid "Show national societies"
-msgstr ""
+msgstr "Sociedades nacionales de exhibición"
 
 #: app/templates/core/dashboard.html:1599
 msgid "Show past assignments"
@@ -20314,7 +20327,7 @@ msgstr "Año único"
 
 #: app/templates/admin/templates/new_template.html:480
 msgid "Single section"
-msgstr ""
+msgstr "Sección única"
 
 #: app/templates/admin/ai/documents.html:637
 msgid "Situation Report"
@@ -20384,6 +20397,9 @@ msgid ""
 "(highlighted in yellow). Please review and update any figures that have "
 "changed before saving."
 msgstr ""
+"Algunos campos muestran datos transportados desde una fuente de datos previa"
+" configurada (resaltados en amarillo). Por favor, revisa y actualiza "
+"cualquier cifra que haya cambiado antes de guardar."
 
 #: app/routes/admin/utilities/translations.py:1265
 #: app/routes/admin/utilities/translations.py:1300
@@ -20488,7 +20504,7 @@ msgstr "Sección Estándar"
 
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:69
 msgid "Start"
-msgstr ""
+msgstr "Comienzo"
 
 #: app/templates/admin/assignments/manage_assignment.html:108
 #: app/templates/admin/documents/documents.html:272
@@ -20529,6 +20545,8 @@ msgid ""
 "Start from a blank template, clone an existing one, or import structure from"
 " Kobo XLSForm or Excel."
 msgstr ""
+"Empieza desde una plantilla en blanco, clona una existente o importa "
+"estructuras desde Kobo XLSForm o Excel."
 
 #: app/templates/admin/docs/documentation.html:1224
 msgid "Start interactive tour for this guide"
@@ -20767,11 +20785,13 @@ msgstr "Plan Estratégico"
 
 #: app/templates/admin/indicator_bank/_metadata_fields.html:30
 msgid "Strategy 2030 area from the IFRC SPEF catalog (SPs & EFs)."
-msgstr ""
+msgstr "Área de Estrategia 2030 del catálogo SPEF de la IFRC (SPs y EFs)."
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:756
 msgid "Strict (manual total must equal breakdown sum; blocks submit)"
 msgstr ""
+"Estricto (el total manual debe ser igual a la suma de desglose; los bloques "
+"se envuelven)"
 
 #: app/templates/forms/form_builder/field_mapping.html:290
 msgid "Structure type"
@@ -20881,7 +20901,7 @@ msgstr "Enviado"
 
 #: app/templates/forms/form_builder/form_builder.html:744
 msgid "Submitted Value Label Translations"
-msgstr ""
+msgstr "Traducciones de etiquetas de valor enviadas"
 
 #: app/templates/core/dashboard.html:1278
 msgid "Submitted by"
@@ -20893,11 +20913,11 @@ msgstr "Presentado a través de enlace público"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:812
 msgid "Submitted value"
-msgstr ""
+msgstr "Valor presentado"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:807
 msgid "Submitted value label"
-msgstr ""
+msgstr "Etiqueta de valor enviada"
 
 #: app/templates/admin/settings/manage_settings.html:992
 msgid "Submitter"
@@ -21484,7 +21504,7 @@ msgstr "Nombre de la plantilla"
 
 #: app/templates/admin/templates/new_template.html:1206
 msgid "Template name is required."
-msgstr ""
+msgstr "Se requiere el nombre de la plantilla."
 
 #: app/templates/admin/validation_rules.html:211
 #: app/templates/admin/validation_rules.html:261
@@ -21707,6 +21727,8 @@ msgstr "El recurso solicitado no fue encontrado."
 #: app/templates/forms/entry_form/entry_form.html:3847
 msgid "The server is temporarily unavailable. Please try again in a moment."
 msgstr ""
+"El servidor está temporalmente inaccesible. Por favor, inténtalo de nuevo en"
+" un momento."
 
 #: app/templates/tours/tours.html:38
 msgid ""
@@ -21957,7 +21979,7 @@ msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:3848
 msgid "This indicator is already added to this section."
-msgstr ""
+msgstr "Este indicador ya se ha añadido a esta sección."
 
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:64
 msgid "This indicator is currently being used in"
@@ -22680,7 +22702,7 @@ msgstr "Total de accesos"
 #: app/templates/admin/templates/new_template.html:525
 #: app/templates/admin/templates/new_template.html:1224
 msgid "Total only"
-msgstr ""
+msgstr "Solo total"
 
 #: app/templates/admin/analytics/_user_detail_partial.html:107
 msgid "Total page views"
@@ -22696,7 +22718,7 @@ msgstr "Total de vistas"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:752
 msgid "Total vs breakdown validation"
-msgstr ""
+msgstr "Total vs validación de la ruptura"
 
 #: app/templates/admin/data_exploration/explore_data.html:406
 msgid "Total-only reporting"
@@ -22782,7 +22804,7 @@ msgstr "Transformar filas y asignaciones emparejar."
 
 #: app/templates/core/layout.html:535 app/templates/core/layout.html:554
 msgid "Translate"
-msgstr ""
+msgstr "Traducir"
 
 #: app/templates/admin/indicator_bank/measurement_lookups.html:89
 msgid ""
@@ -22885,7 +22907,7 @@ msgstr "Progreso de traducción"
 
 #: app/templates/admin/user_management/user_form.html:349
 msgid "Translation Review"
-msgstr ""
+msgstr "Reseña de traducción"
 
 #: app/templates/components/auto_translate_modal.html:371
 msgid "Translation Summary"
@@ -22997,11 +23019,13 @@ msgstr "Traducción reanudada por el usuario."
 
 #: app/templates/core/layout.html:531
 msgid "Translation review"
-msgstr ""
+msgstr "Reseña de traducción"
 
 #: app/routes/translation_review/__init__.py:83
 msgid "Translation review is not available for your account or language"
 msgstr ""
+"La revisión de traducción no está disponible para tu cuenta ni para tu "
+"idioma"
 
 #: app/templates/admin/translations/manage_translations.html:700
 msgid "Translation saved successfully"
@@ -23025,7 +23049,7 @@ msgstr "Traducción detenida por el usuario."
 
 #: app/routes/translation_review/__init__.py:175
 msgid "Translation updated successfully"
-msgstr ""
+msgstr "Traducción actualizada con éxito"
 
 #: app/routes/admin/utilities/translations.py:58
 #, python-format
@@ -23251,6 +23275,7 @@ msgstr "Informes por Países de la RPU"
 #, python-format
 msgid "UPR Country Reporting Excel imported: %(count)s values staged"
 msgstr ""
+"Informes de países UPR importados por excel: valores %(count)s escalonados"
 
 #: app/templates/admin/templates/data_sync_imputation.html:72
 #: app/templates/admin/templates/upr_excel_import.html:26
@@ -23270,7 +23295,7 @@ msgstr "Documentos de la RPU"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:983
 msgid "URL / path"
-msgstr ""
+msgstr "URL / ruta"
 
 #: app/utils/form_localization.py:127
 msgid "USD"
@@ -23341,7 +23366,7 @@ msgstr ""
 
 #: app/templates/core/layout.html:553
 msgid "Unexpected placeholders"
-msgstr ""
+msgstr "Marcadores de posición inesperados"
 
 #: app/services/upr/ux.py:38 app/services/upr/ux.py:45
 #: app/templates/admin/validation_dashboard.html:67
@@ -23350,7 +23375,7 @@ msgstr "Planificación y Reporte Unificados"
 
 #: app/templates/admin/validation_dashboard.html:76
 msgid "Unified Planning and Reporting templates"
-msgstr ""
+msgstr "Plantillas unificadas de planificación e informes"
 
 #: app/services/upr/ux.py:40 app/services/upr/ux.py:43
 msgid "Unified Plans"
@@ -24153,6 +24178,8 @@ msgid ""
 "Users can add this many additional \"Other\" entries on top of the number of"
 " list options."
 msgstr ""
+"Los usuarios pueden añadir esta cantidad de entradas adicionales de "
+"\"Otros\" además del número de opciones de la lista."
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:678
 msgid "Users will be able to select rows from this list during data entry."
@@ -24362,7 +24389,7 @@ msgstr "disponible en"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:794
 msgid "Variable column tooltip labels"
-msgstr ""
+msgstr "Etiquetas de columna variable para descripciones emergentes"
 
 #: app/templates/forms/entry_form/partials/matrix_table.html:280
 msgid "Variable tick for"
@@ -24880,6 +24907,8 @@ msgid ""
 "When empty in a new reporting round, prefill this field from a configured "
 "prior data source for the same entity."
 msgstr ""
+"Cuando esté vacío en una nueva ronda de informes, rellena previamente este "
+"campo desde una fuente de datos previa configurada para la misma entidad."
 
 #: app/templates/components/auto_translate_modal.html:434
 msgid ""
@@ -24894,6 +24923,9 @@ msgid ""
 "When enabled, users can override the calculated row total. Breakdown vs "
 "total conflicts can be flagged or block submission."
 msgstr ""
+"Cuando está habilitado, los usuarios pueden anular el total calculado de "
+"filas. Breakdown vs total conflictos pueden ser marcados o bloquear la "
+"entrega."
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:469
 msgid ""
@@ -24947,7 +24979,7 @@ msgstr "Con desglose por edad"
 
 #: app/templates/admin/templates/new_template.html:346
 msgid "Wizard steps"
-msgstr ""
+msgstr "Pasos de mago"
 
 #: app/templates/admin/data_exploration/explore_data.html:343
 #: app/templates/admin/data_exploration/explore_data.html:472
@@ -25043,7 +25075,7 @@ msgstr "Años (separados por comas)"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:217
 msgid "Yellow"
-msgstr ""
+msgstr "Amarillo"
 
 #: app/routes/admin/communication.py:311 app/routes/main/helpers.py:270
 #: app/templates/admin/ai/review_detail.html:124
@@ -25240,12 +25272,12 @@ msgstr ""
 
 #: app/templates/core/dashboard.html:2641
 msgid "You do not have assignment dashboard access."
-msgstr ""
+msgstr "No tienes acceso al panel de asignación."
 
 #: app/routes/translation_review/__init__.py:112
 #: app/routes/translation_review/__init__.py:151
 msgid "You do not have permission to edit translations for this language"
-msgstr ""
+msgstr "No tienes permiso para editar traducciones para este idioma"
 
 #: app/templates/admin/indicator_bank/indicator_bank.html:457
 msgid "You do not have permission to import indicators."
@@ -25257,7 +25289,7 @@ msgstr "No tienes permiso para devolver esta tarea para su revisión."
 
 #: app/routes/translation_review/__init__.py:75
 msgid "You do not have permission to use translation review"
-msgstr ""
+msgstr "No tienes permiso para usar la revisión de traducción"
 
 #: app/templates/core/dashboard.html:2666
 #, python-format
@@ -25431,6 +25463,9 @@ msgid ""
 "focal points identify you. You can update this at any time in your account "
 "settings."
 msgstr ""
+"Tu perfil no tiene ningún título de trabajo. Añadirlo ayuda a los "
+"administradores y a los puntos de referencia a identificarte. Puedes "
+"actualizar esto en cualquier momento en la configuración de tu cuenta."
 
 #: app/templates/admin/user_management/user_form.html:777
 msgid "Your session has expired."
@@ -25541,11 +25576,11 @@ msgstr "por"
 
 #: app/templates/admin/communication/center.html:1378
 msgid "campaign"
-msgstr ""
+msgstr "Campaña"
 
 #: app/templates/admin/communication/center.html:1379
 msgid "campaigns"
-msgstr ""
+msgstr "Campañas"
 
 #: app/templates/admin/organization/index.html:2473
 msgid "cluster offices"
@@ -25563,11 +25598,11 @@ msgstr "Columnas"
 
 #: app/templates/admin/communication/center.html:1376
 msgid "communication"
-msgstr ""
+msgstr "Comunicación"
 
 #: app/templates/admin/communication/center.html:1377
 msgid "communications"
-msgstr ""
+msgstr "Comunicaciones"
 
 #: app/templates/admin/ai/dashboard.html:149
 msgid "completed"
@@ -25654,7 +25689,7 @@ msgstr "por ejemplo, 10"
 
 #: app/templates/admin/templates/new_template.html:545
 msgid "e.g. <5, 5-17, 18-49, 50+"
-msgstr ""
+msgstr "por ejemplo, <5, 5-17, 18-49, 50+"
 
 #: app/templates/admin/assignments/manage_assignment.html:176
 msgid "e.g. Annual Country Survey 2025 — leave blank to use \"Template – Period\""
@@ -25664,7 +25699,7 @@ msgstr ""
 
 #: app/templates/components/_profile_completion_modal.html:69
 msgid "e.g. Data Manager, Focal Point"
-msgstr ""
+msgstr "por ejemplo, Data Manager, Focal Point"
 
 #: app/templates/admin/embed_content/manage_embed_content.html:125
 msgid "e.g. ECHO Programmatic Partnership"
@@ -25672,7 +25707,7 @@ msgstr "por ejemplo, ECHO Programmatic Partnership"
 
 #: app/templates/components/_profile_completion_modal.html:52
 msgid "e.g. Jane Smith"
-msgstr ""
+msgstr "por ejemplo, Jane Smith"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:875
 msgid "e.g. total_beneficiaries"
@@ -25792,7 +25827,7 @@ msgstr "Intercambio(s)"
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:384
 msgid "extra \"Other\" entries (beyond the option count limit)"
-msgstr ""
+msgstr "entradas adicionales \"Otros\" (más allá del límite de opciones)"
 
 #: app/templates/admin/ai/documents.html:557
 #: app/templates/admin/analytics/dashboard.html:84
@@ -25925,7 +25960,7 @@ msgstr "Últimos 100"
 
 #: app/templates/admin/api_management.html:724
 msgid "layout=star"
-msgstr ""
+msgstr "Diseño=estrella"
 
 #: app/templates/admin/settings/manage_settings.html:1520
 msgid "left unchanged"
@@ -26341,7 +26376,7 @@ msgstr "a"
 
 #: app/templates/admin/user_management/user_form.html:241
 msgid "to fix."
-msgstr ""
+msgstr "para arreglar."
 
 #: app/templates/admin/indicator_bank/neural_map.html:233
 msgid "to open the indicator detail page"
@@ -26392,7 +26427,7 @@ msgstr "Registro de traducción"
 
 #: app/routes/translation_review/__init__.py:155
 msgid "translation is required"
-msgstr ""
+msgstr "Se requiere traducción"
 
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:849
 #: app/templates/admin/indicator_bank/_panel_spef_scripts.html:27
@@ -26471,13 +26506,13 @@ msgstr "aún."
 #: app/templates/admin/templates/new_template.html:1210
 #, python-brace-format
 msgid "{count} indicators"
-msgstr ""
+msgstr "{contador} Indicadores"
 
 #: app/templates/admin/templates/new_template.html:1209
 #: app/templates/admin/templates/new_template.html:1221
 #, python-brace-format
 msgid "{count} selected"
-msgstr ""
+msgstr "{count} seleccionado"
 
 #: app/services/notification/core.py:294
 #, python-brace-format
@@ -26528,7 +26563,7 @@ msgstr ""
 
 #: app/templates/forms/entry_form/partials/_preview_period_builder.html:23
 msgid "— select period —"
-msgstr ""
+msgstr "— periodo selecto —"
 
 #: app/templates/admin/indicator_bank/neural_map.html:245
 msgid ""

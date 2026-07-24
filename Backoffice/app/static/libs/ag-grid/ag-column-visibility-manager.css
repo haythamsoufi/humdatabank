@@ -7,7 +7,8 @@
  * with Backoffice .btn / theme), including pages that do not wrap the grid in .sharp-ui.
  */
 
-/* Unified grid header: title/meta + record count + column controls on one row */
+/* Unified grid header: title/meta + record count + column controls on one row.
+   Use ag_grid_header_toolbar() in templates or data-ag-grid-toolbar="true" on custom headers. */
 .ag-grid-header-toolbar {
     display: flex !important;
     flex-direction: row !important;

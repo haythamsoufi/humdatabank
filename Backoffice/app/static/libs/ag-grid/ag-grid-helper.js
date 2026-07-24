@@ -1332,6 +1332,70 @@
     };
 
     /**
+     * True when an element contains the grid root (must never receive ag-grid-header-toolbar).
+     * @param {Element|null} el
+     * @param {HTMLElement|null} gridDiv
+     * @returns {boolean}
+     */
+    AgGridHelper.elementContainsGrid = function(el, gridDiv) {
+        return !!(gridDiv && el && el !== gridDiv && typeof el.contains === 'function' && el.contains(gridDiv));
+    };
+
+    /**
+     * Resolve the DOM node that should receive ag-grid-header-toolbar styling.
+     * Central rules for standard (ag_grid_container) and custom template layouts.
+     *
+     * @param {AgGridHelper} helper
+     * @param {HTMLElement} placeholder
+     * @param {HTMLElement} placeholderParent
+     * @returns {HTMLElement|null}
+     */
+    AgGridHelper.resolveToolbarRoot = function(helper, placeholder, placeholderParent) {
+        if (!placeholder || !placeholderParent) {
+            return null;
+        }
+
+        const gridDiv = helper && helper.gridDiv;
+        const containsGrid = function(el) {
+            return AgGridHelper.elementContainsGrid(el, gridDiv);
+        };
+
+        // Explicit markers from ag_grid_header_toolbar / ag_grid_container.
+        let node = placeholderParent;
+        while (node && node !== document.body) {
+            if (node.getAttribute && node.getAttribute('data-ag-grid-toolbar') === 'true') {
+                return node;
+            }
+            if (node.classList && node.classList.contains('ag-grid-header-toolbar')) {
+                return node;
+            }
+            node = node.parentElement;
+        }
+
+        const outer = placeholderParent.parentElement;
+        if (outer && !containsGrid(outer)) {
+            if (outer.getAttribute && outer.getAttribute('data-ag-grid-toolbar') === 'true') {
+                return outer;
+            }
+            if (outer.classList && outer.classList.contains('ag-grid-header-toolbar')) {
+                return outer;
+            }
+            const hasMetaSibling = Array.prototype.some.call(outer.children || [], function(child) {
+                return child !== placeholderParent && AgGridHelper.isGridHeaderMetaElement(child);
+            });
+            if (hasMetaSibling) {
+                return outer;
+            }
+        }
+
+        if (!containsGrid(placeholderParent)) {
+            return placeholderParent;
+        }
+
+        return placeholderParent;
+    };
+
+    /**
      * Put title/meta, record count, and column-visibility controls on one toolbar row.
      * @param {AgGridHelper} helper
      * @param {HTMLElement} [countEl]
@@ -1344,21 +1408,15 @@
         }
 
         const placeholderParent = placeholder.parentElement;
-        let headerRow = placeholderParent;
-
-        if (placeholderParent.parentElement) {
-            const outer = placeholderParent.parentElement;
-            const hasMetaSibling = Array.prototype.some.call(outer.children || [], function(child) {
-                return child !== placeholderParent && AgGridHelper.isGridHeaderMetaElement(child);
-            });
-            if (outer.classList && outer.classList.contains('ag-grid-header-toolbar')) {
-                headerRow = outer;
-            } else if (hasMetaSibling || (outer.children && outer.children.length > 1)) {
-                headerRow = outer;
-            }
+        const headerRow = AgGridHelper.resolveToolbarRoot(helper, placeholder, placeholderParent);
+        if (!headerRow || AgGridHelper.elementContainsGrid(headerRow, helper && helper.gridDiv)) {
+            return null;
         }
 
         headerRow.classList.add('ag-grid-header-toolbar');
+        if (headerRow.getAttribute && headerRow.getAttribute('data-ag-grid-toolbar') !== 'true') {
+            headerRow.setAttribute('data-ag-grid-toolbar', 'true');
+        }
 
         let metaEl = null;
         Array.prototype.some.call(headerRow.children || [], function(child) {
@@ -1444,6 +1502,7 @@
                 }
                 const countRow = document.createElement('div');
                 countRow.className = 'ag-grid-result-count-row ag-grid-toolbar-row ag-grid-header-toolbar';
+                countRow.setAttribute('data-ag-grid-toolbar', 'true');
                 countRow.appendChild(countEl);
                 parent.insertBefore(countRow, self.gridDiv);
                 return true;
@@ -3913,6 +3972,23 @@
     };
 
     /**
+     * Hide the standard ag_grid_container loading overlay so it cannot block taps/clicks.
+     * @param {string|HTMLElement} loadingIdOrEl
+     */
+    AgGridHelper.hideGridLoadingOverlay = function(loadingIdOrEl) {
+        var loadingEl = typeof loadingIdOrEl === 'string'
+            ? document.getElementById(loadingIdOrEl)
+            : loadingIdOrEl;
+        if (!loadingEl) {
+            return;
+        }
+        loadingEl.style.display = 'none';
+        loadingEl.style.pointerEvents = 'none';
+        loadingEl.setAttribute('aria-hidden', 'true');
+        loadingEl.classList.add('is-hidden');
+    };
+
+    /**
      * Static factory method for quick grid creation
      * Reduces boilerplate in templates by handling common initialization patterns
      *
@@ -3983,41 +4059,35 @@
         var api = helper.initialize();
 
         // Handle auto-show of grid container
-        if (autoShow && api) {
-            var loadingEl = document.getElementById(loadingId);
-            var containerEl = document.getElementById(containerId);
-
-            setTimeout(function() {
-                if (loadingEl) {
-                    // Try jQuery fadeOut if available, otherwise just hide
-                    if (typeof jQuery !== 'undefined' && jQuery.fn && jQuery.fn.fadeOut) {
-                        jQuery(loadingEl).fadeOut(300);
-                    } else {
-                        loadingEl.style.display = 'none';
-                    }
-                }
-                if (containerEl) {
-                    containerEl.style.display = 'block';
-                }
-
-                // Refresh grid to ensure proper sizing
-                if (helper.isGridVisible()) {
-                    helper.refresh();
-                }
-
-                // Call onReady callback if provided
-                if (typeof options.onReady === 'function') {
-                    options.onReady(api, helper);
-                }
-
-                // Restore user-saved visibility/pin state after onReady (e.g. pinActionsColumn)
-                if (helper.columnVisibilityManager &&
-                    typeof helper.columnVisibilityManager.finishInitialColumnState === 'function') {
-                    helper.columnVisibilityManager.finishInitialColumnState();
-                }
+        var loadingEl = document.getElementById(loadingId);
+        var containerEl = document.getElementById(containerId);
+        var revealGrid = function() {
+            AgGridHelper.hideGridLoadingOverlay(loadingEl);
+            if (containerEl) {
+                containerEl.style.display = 'block';
+            }
+            if (helper.isGridVisible && helper.isGridVisible()) {
+                helper.refresh();
+            }
+            if (typeof options.onReady === 'function' && api) {
+                options.onReady(api, helper);
+            }
+            if (helper.columnVisibilityManager &&
+                typeof helper.columnVisibilityManager.finishInitialColumnState === 'function') {
+                helper.columnVisibilityManager.finishInitialColumnState();
+            }
+            if (api) {
                 AgGridHelper.syncColumnPinningForViewport(api, helper.columnVisibilityManager);
                 AgGridHelper.enforceColumnMinWidths(api);
-            }, 100);
+            }
+        };
+
+        if (autoShow) {
+            if (api) {
+                setTimeout(revealGrid, 100);
+            } else {
+                revealGrid();
+            }
         }
 
         return {
@@ -4152,6 +4222,9 @@
         }
         if (opts.mobilePageScroll === false) {
             return false;
+        }
+        if (opts.mobilePageScroll === true) {
+            return AgGridHelper.isCoarsePointerDevice();
         }
         if (!AgGridHelper.isCoarsePointerDevice()) {
             return false;

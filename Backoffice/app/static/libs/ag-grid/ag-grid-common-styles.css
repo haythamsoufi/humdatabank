@@ -153,6 +153,25 @@
         -webkit-user-select: none !important;
         user-select: none !important;
     }
+
+    .ag-cell a,
+    .ag-cell button,
+    .ag-cell [role="button"],
+    .ag-cell .session-path-breakdown-btn,
+    .ag-cell .session-force-logout-btn {
+        touch-action: manipulation;
+    }
+}
+
+.ag-grid-loading-overlay.is-hidden,
+.ag-grid-loading-overlay[aria-hidden="true"] {
+    display: none !important;
+    pointer-events: none !important;
+}
+
+.ag-grid-body-wrap {
+    position: relative;
+    min-height: 12rem;
 }
 
 /* Loading Spinner Animation */

@@ -69,7 +69,7 @@ from upr_import_warnings import summarize_warnings  # noqa: E402
 UPR_DATA_SHEET = "UPR Data"
 HEADER_ROW_INDEX = 2  # 0-based row 3 in Excel
 ROWS_CACHE_VERSION = 1
-TRANSFORM_CACHE_VERSION = 1
+TRANSFORM_CACHE_VERSION = 3
 
 UPR_TEMPLATE_PROFILES: Dict[int, Dict[str, Any]] = {
     # ── Planning ──────────────────────────────────────────────────────────────
@@ -265,6 +265,9 @@ class UprImportContext:
     indicator_bank_ids: Set[int] = field(default_factory=set)
     core_yes_no_item_ids: List[int] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
+    # PNS assignment AES ids with at least one Excel Funding row where PNS reported = Yes.
+    pns_t22_reported_aes: Set[int] = field(default_factory=set)
+    pns_t23_reported_aes: Set[int] = field(default_factory=set)
 
 
 def round_to_period(round_code: str) -> Optional[str]:
@@ -281,6 +284,9 @@ def round_to_period(round_code: str) -> Optional[str]:
     return None
 
 
+FUNDING_REQUIREMENT_BANK_ID = 2
+
+
 def normalize_indicator_id(raw: Any) -> Optional[int]:
     if raw is None or raw == "":
         return None
@@ -290,6 +296,19 @@ def normalize_indicator_id(raw: Any) -> Optional[int]:
         return None
 
 
+def is_planning_funding_requirement_row(row: Dict[str, Any]) -> bool:
+    """True for planning ``Funding Requirement`` rows (bank id 2) we import to templates 24/22.
+
+    ``Confirmed Funding`` is a separate UPR Master indicator with no backoffice form field yet —
+    those rows are ignored by the import.
+    """
+    indicator = str(row.get("Indicator") or "").strip().lower()
+    if indicator == "confirmed funding":
+        return False
+    indicator_id = normalize_indicator_id(row.get("indicatorId"))
+    return indicator_id == FUNDING_REQUIREMENT_BANK_ID or indicator == "funding requirement"
+
+
 def parse_value_num(raw: Any) -> Optional[float]:
     if raw is None or raw == "":
         return None
@@ -297,6 +316,322 @@ def parse_value_num(raw: Any) -> Optional[float]:
         return float(raw)
     except (ValueError, TypeError):
         return None
+
+
+COL_PNS_REPORTED = "PNS reported"
+
+
+def parse_pns_reported_yes(row: Dict[str, Any]) -> bool:
+    """True when the Excel ``PNS reported`` column is Yes for this Funding row."""
+    raw = row.get(COL_PNS_REPORTED)
+    if raw is None or raw == "":
+        return False
+    return str(raw).strip().lower() in ("yes", "y", "1", "true")
+
+
+def _build_pns_reported_yes_sets(
+    rows: List[Dict[str, Any]],
+    ctx: UprImportContext,
+    template_ids: List[int],
+    *,
+    rounds: Optional[Set[str]] = None,
+) -> Tuple[Set[Tuple[int, str]], Set[Tuple[int, str]]]:
+    """Collect ``(pns_aes_id, host_iso3)`` pairs where Excel ``PNS reported`` is Yes."""
+    t22_yes: Set[Tuple[int, str]] = set()
+    t23_yes: Set[Tuple[int, str]] = set()
+    if 22 not in template_ids and 23 not in template_ids:
+        return t22_yes, t23_yes
+
+    for row in rows:
+        rnd = str(row.get("Round") or "").strip().upper()
+        if rounds and rnd not in rounds:
+            continue
+        if not parse_pns_reported_yes(row):
+            continue
+        if str(row.get("Section") or "").strip() != "Funding":
+            continue
+        if str(row.get("Entity") or "").strip().upper() != "PNS":
+            continue
+        if str(row.get("Round") or "").strip().upper().startswith("P") and not is_planning_funding_requirement_row(
+            row
+        ):
+            continue
+        iso3 = str(row.get("ISO3") or "").strip().upper()
+        rnd = str(row.get("Round") or "").strip().upper()
+        period = round_to_period(rnd)
+        ns_name = str(row.get("NS") or "").strip()
+        if not iso3 or not period or not ns_name or ns_name.lower() == "country":
+            continue
+        pns_iso3 = ctx.ns_home_country_iso3.get(ns_name.lower())
+        if not pns_iso3:
+            continue
+        if rnd.startswith("P") and 22 in template_ids:
+            pns_aes = ctx.assignment_by_template.get(22, {}).get((period, pns_iso3))
+            if pns_aes:
+                t22_yes.add((pns_aes, iso3))
+        elif (rnd.startswith("AR") or rnd.startswith("MYR")) and 23 in template_ids:
+            pns_aes = ctx.assignment_by_template.get(23, {}).get((period, pns_iso3))
+            if pns_aes:
+                t23_yes.add((pns_aes, iso3))
+    return t22_yes, t23_yes
+
+
+def _periods_for_import_rounds(rounds: Optional[Set[str]]) -> Optional[Set[str]]:
+    """Map selected UPR round codes to assignment period names (None = all periods)."""
+    if not rounds:
+        return None
+    periods: Set[str] = set()
+    for rnd in rounds:
+        period = round_to_period(rnd)
+        if period:
+            periods.add(period)
+    return periods or None
+
+
+def plan_non_reported_pns_aes_by_template(
+    ctx: UprImportContext,
+    template_ids: List[int],
+    *,
+    periods: Optional[Set[str]] = None,
+) -> Dict[int, Set[int]]:
+    """Map template id → AES ids with no ``PNS reported = Yes`` in the import scope."""
+    out: Dict[int, Set[int]] = {22: set(), 23: set()}
+    template_reported = (
+        (22, ctx.pns_t22_reported_aes),
+        (23, ctx.pns_t23_reported_aes),
+    )
+    for tpl_id, reported_aes in template_reported:
+        if tpl_id not in template_ids:
+            continue
+        for (period, _iso3), aes_id in ctx.assignment_by_template.get(tpl_id, {}).items():
+            if periods and period not in periods:
+                continue
+            if int(aes_id) in reported_aes:
+                continue
+            out[tpl_id].add(int(aes_id))
+    return out
+
+
+def upr_pns_import_item_ids(ctx: UprImportContext, template_id: int) -> Set[int]:
+    """Form item ids written by the UPR Excel import for a PNS template."""
+    if template_id == 22:
+        return {ITEM_FUNDING_REQUIREMENTS_T22, int(ctx.staff_matrix_item_id)}
+    if template_id == 23:
+        return {int(ctx.pns_funding_item_id)}
+    return set()
+
+
+def plan_pns_assignment_status_updates(
+    ctx: UprImportContext,
+    template_ids: List[int],
+    *,
+    periods: Optional[Set[str]] = None,
+) -> List[Dict[str, Any]]:
+    """Plan ``pending`` status for PNS templates with no ``PNS reported = Yes`` in Excel."""
+    by_template = plan_non_reported_pns_aes_by_template(ctx, template_ids, periods=periods)
+    plan: List[Dict[str, Any]] = []
+    for aes_ids in by_template.values():
+        for aes_id in aes_ids:
+            plan.append(
+                {
+                    "assignment_entity_status_id": int(aes_id),
+                    "status": "pending",
+                }
+            )
+    return plan
+
+
+def clear_non_reported_pns_form_data(
+    ctx: UprImportContext,
+    template_ids: List[int],
+    *,
+    rounds: Optional[Set[str]] = None,
+    dry_run: bool = False,
+) -> Tuple[Dict[str, int], Set[Tuple[int, int]]]:
+    """
+    Delete UPR-imported form_data on PNS assignments with no ``PNS reported = Yes``.
+
+    Returns stats and ``(aes_id, form_item_id)`` source pairs for variable refresh.
+    """
+    from app.extensions import db
+    from app.models.forms import FormData
+
+    stats = {"form_data_deleted": 0, "form_data_delete_skipped": 0, "form_data_delete_errors": 0}
+    updated_sources: Set[Tuple[int, int]] = set()
+    by_template = plan_non_reported_pns_aes_by_template(
+        ctx,
+        template_ids,
+        periods=_periods_for_import_rounds(rounds),
+    )
+
+    for tpl_id, aes_ids in by_template.items():
+        item_ids = upr_pns_import_item_ids(ctx, tpl_id)
+        if not aes_ids or not item_ids:
+            continue
+        for aes_id in aes_ids:
+            try:
+                query = FormData.query.filter(
+                    FormData.assignment_entity_status_id == int(aes_id),
+                    FormData.form_item_id.in_(sorted(item_ids)),
+                )
+                rows = query.all()
+                if not rows:
+                    stats["form_data_delete_skipped"] += 1
+                    continue
+                for row in rows:
+                    updated_sources.add((int(aes_id), int(row.form_item_id)))
+                if dry_run:
+                    stats["form_data_deleted"] += len(rows)
+                    continue
+                deleted = query.delete(synchronize_session=False)
+                stats["form_data_deleted"] += int(deleted or 0)
+            except Exception as exc:
+                stats["form_data_delete_errors"] += 1
+                logger.error(
+                    "PNS form_data clear error (aes_id=%s, template=%s): %s",
+                    aes_id,
+                    tpl_id,
+                    exc,
+                )
+
+    if not dry_run and stats["form_data_deleted"] > 0:
+        db.session.commit()
+    return stats, updated_sources
+
+
+def sync_non_reported_pns_assignments(
+    ctx: UprImportContext,
+    template_ids: List[int],
+    *,
+    rounds: Optional[Set[str]] = None,
+    dry_run: bool = False,
+) -> Dict[str, int]:
+    """Clear stale form_data and reset workflow status for non-reported PNS assignments."""
+    clear_stats, updated_sources = clear_non_reported_pns_form_data(
+        ctx,
+        template_ids,
+        rounds=rounds,
+        dry_run=dry_run,
+    )
+    status_plan = plan_pns_assignment_status_updates(
+        ctx,
+        template_ids,
+        periods=_periods_for_import_rounds(rounds),
+    )
+    status_stats = apply_pns_pending_status_resets(status_plan, dry_run=dry_run)
+
+    if not dry_run and updated_sources:
+        from app.services.variable_resolution_service import VariableResolutionService
+
+        refresh_stats = VariableResolutionService.refresh_stale_variable_matrix_cells(
+            updated_sources
+        )
+        clear_stats.update(
+            {
+                "variable_consumer_rows_checked": refresh_stats.get("consumer_rows_checked", 0),
+                "variable_cells_cleared": refresh_stats.get("cells_cleared", 0),
+                "variable_consumer_rows_updated": refresh_stats.get("rows_updated", 0),
+            }
+        )
+
+    return {
+        **clear_stats,
+        "assignment_status_updated": status_stats.get("updated", 0),
+        "assignment_status_skipped": status_stats.get("skipped", 0),
+        "assignment_status_errors": status_stats.get("errors", 0),
+        "assignment_status_planned": len(status_plan),
+    }
+
+
+def _pns_pending_reset_needs_update(aes: Any, *, assigned_at: Any) -> bool:
+    """True when AES should be reset to pending with assignment-date metadata."""
+    from app.models.enums import AssignmentEntityStatusValue
+
+    current = aes.status.value if hasattr(aes.status, "value") else str(aes.status)
+    if current != AssignmentEntityStatusValue.pending.value:
+        return True
+    if aes.status_timestamp != assigned_at:
+        return True
+    if aes.submitted_at is not None:
+        return True
+    if aes.submitted_by_user_id is not None:
+        return True
+    if aes.approved_by_user_id is not None:
+        return True
+    if aes.sent_for_review_by_user_id is not None:
+        return True
+    if aes.sent_for_review_at is not None:
+        return True
+    return False
+
+
+def _apply_pns_pending_reset_fields(aes: Any, *, assigned_at: Any) -> None:
+    """Reset workflow fields for a non-reported PNS assignment."""
+    from app.models.enums import AssignmentEntityStatusValue
+
+    aes.status = AssignmentEntityStatusValue.pending
+    aes.status_timestamp = assigned_at
+    aes.submitted_at = None
+    aes.submitted_by_user_id = None
+    aes.approved_by_user_id = None
+    aes.sent_for_review_by_user_id = None
+    aes.sent_for_review_at = None
+
+
+def apply_pns_pending_status_resets(
+    plan: List[Dict[str, Any]],
+    *,
+    dry_run: bool = False,
+) -> Dict[str, int]:
+    """Apply pending resets using parent assignment ``assigned_at`` as status date."""
+    from app.extensions import db
+    from app.models.assignments import AssignedForm, AssignmentEntityStatus
+    from app.utils.datetime_helpers import utcnow
+
+    stats = {"updated": 0, "skipped": 0, "errors": 0}
+    if not plan:
+        return stats
+
+    aes_ids = [int(row["assignment_entity_status_id"]) for row in plan]
+    aes_rows = AssignmentEntityStatus.query.filter(AssignmentEntityStatus.id.in_(aes_ids)).all()
+    aes_by_id = {int(row.id): row for row in aes_rows}
+    assigned_form_ids = {int(aes.assigned_form_id) for aes in aes_rows if aes.assigned_form_id}
+    assigned_at_by_form = {
+        int(form.id): form.assigned_at
+        for form in AssignedForm.query.filter(AssignedForm.id.in_(assigned_form_ids)).all()
+    }
+
+    for row in plan:
+        try:
+            aes_id = int(row["assignment_entity_status_id"])
+            aes = aes_by_id.get(aes_id)
+            if aes is None:
+                stats["skipped"] += 1
+                continue
+
+            assigned_at = assigned_at_by_form.get(int(aes.assigned_form_id)) or utcnow()
+            if not _pns_pending_reset_needs_update(aes, assigned_at=assigned_at):
+                stats["skipped"] += 1
+                continue
+
+            if dry_run:
+                stats["updated"] += 1
+                continue
+
+            _apply_pns_pending_reset_fields(aes, assigned_at=assigned_at)
+            db.session.add(aes)
+            stats["updated"] += 1
+        except Exception as exc:
+            stats["errors"] += 1
+            logger.error(
+                "PNS pending status reset error (aes_id=%s): %s",
+                row.get("assignment_entity_status_id"),
+                exc,
+            )
+
+    if not dry_run and stats["updated"] > 0:
+        db.session.commit()
+    return stats
 
 
 def _is_yes_no_indicator_type(type_value: Any) -> bool:
@@ -1760,17 +2095,38 @@ def _filter_rows(
     return out
 
 
+def _t22_pns_import_cell_value(
+    country_val: Optional[float],
+    pns_val: Optional[float],
+) -> Optional[Any]:
+    """Persist T22 funding when ``PNS reported = Yes``.
+
+    - ``pns_val`` present → use PNS self-report (scalar)
+    - ``pns_val`` blank but ``country_val`` present → PNS cleared the lookup
+    - both blank → no cell
+    """
+    if pns_val is not None:
+        return pns_val
+    if country_val is not None:
+        return {
+            "original": country_val,
+            "modified": "",
+            "isModified": True,
+        }
+    return None
+
+
 def _t22_total_only_breakdown_cell(
     pns_t22_staging: Dict[Tuple[int, int, str], Tuple[Optional[float], Optional[float]]],
     pns_aes: int,
     host_cid: int,
     area: str,
 ) -> Optional[Any]:
-    """PNS reported a row total only — store cleared breakdown cell as empty scalar."""
-    cv, _ = pns_t22_staging.get((pns_aes, host_cid, area), (None, None))
-    if cv is None:
+    """PNS reported a row total only — blank breakdown where country reported a value."""
+    cv, pv = pns_t22_staging.get((pns_aes, host_cid, area), (None, None))
+    if cv is None and pv is None:
         return None
-    return ""
+    return _t22_pns_import_cell_value(cv, pv)
 
 
 def transform_to_import_rows(
@@ -1784,6 +2140,11 @@ def transform_to_import_rows(
     tids = template_ids or ctx.template_ids
     filtered = _filter_rows(rows, template_ids=tids, rounds=rounds)
 
+    pns_t22_reported_yes, pns_t23_reported_yes = _build_pns_reported_yes_sets(
+        rows, ctx, tids, rounds=rounds
+    )
+    iso3_by_host_cid = {cid: iso for iso, cid in ctx.country_id_by_iso3.items()}
+
     matrix_cells: Dict[Tuple[int, int], Dict[str, Any]] = defaultdict(dict)
     comment_parts: Dict[int, List[str]] = defaultdict(list)
     import_rows: List[Dict[str, str]] = []
@@ -1796,7 +2157,6 @@ def transform_to_import_rows(
     # Collected across all rows then converted to scalar matrix cells.
     # Keyed by (pns_aes_id, host_country_id, area) → (country_val, pns_val).
     pns_t22_staging: Dict[Tuple[int, int, str], Tuple[Optional[float], Optional[float]]] = {}
-    pns_t22_has_pns: Set[Tuple[int, int]] = set()  # (pns_aes_id, host_country_id) with any pns_val
     # Area=Total rows (PNS reported aggregate only) → row-total column on item 1303.
     pns_t22_total_staging: Dict[Tuple[int, int], Tuple[Optional[float], Optional[float]]] = {}
 
@@ -1878,7 +2238,7 @@ def transform_to_import_rows(
 
         # --- Funding (T24: HNS/IFRC/PNS Country-Value; T22: PNS-reported) ---
         if sec == "Funding" and rnd_is_planning:
-            if indicator_id != 2 and indicator.lower() != "funding requirement":
+            if not is_planning_funding_requirement_row(row):
                 continue
             if year_val in (None, ""):
                 ctx.warnings.append(f"Funding row missing Year for {iso3} {rnd}")
@@ -1898,6 +2258,7 @@ def transform_to_import_rows(
                     and offset == 0
                     and 22 in tids
                     and ent_upper == "PNS"
+                    and parse_pns_reported_yes(row)
                     and (country_val or pns_val)
                 ):
                     pns_iso3 = ctx.ns_home_country_iso3.get(ns_name.lower())
@@ -1922,8 +2283,6 @@ def transform_to_import_rows(
                                     country_val if country_val is not None else prev_cv,
                                     pns_val if pns_val is not None else prev_pv,
                                 )
-                                if pns_val:
-                                    pns_t22_has_pns.add((pns_aes, host_cid))
                 continue
 
             if not area:
@@ -1960,7 +2319,7 @@ def transform_to_import_rows(
                         matrix_cells[(t24_aes, item_map["pns"])][f"{ns_id}_{area}"] = country_val
 
             # T22 item 1303 is the current planning year only (offset 0).
-            if 22 in tids and offset == 0 and (country_val or pns_val):
+            if 22 in tids and offset == 0 and parse_pns_reported_yes(row) and (country_val or pns_val):
                 pns_iso3 = ctx.ns_home_country_iso3.get(ns_name.lower())
                 if not pns_iso3:
                     if pns_val:
@@ -1984,8 +2343,6 @@ def transform_to_import_rows(
                                 country_val if country_val is not None else prev_cv,
                                 pns_val if pns_val is not None else prev_pv,
                             )
-                            if pns_val:
-                                pns_t22_has_pns.add((pns_aes, host_cid))
             continue
 
         # --- Template 24: Reach ---
@@ -2030,6 +2387,8 @@ def transform_to_import_rows(
                 ctx.warnings.append(
                     f"No template 22 assignment for {pns_iso3} {period} (NS: {ns_name!r})"
                 )
+                continue
+            if (pns_aes, iso3) not in pns_t22_reported_yes:
                 continue
             host_ns_id = ctx.iso3_to_hns_id.get(iso3)
             if not host_ns_id:
@@ -2269,6 +2628,8 @@ def transform_to_import_rows(
                     else:
                         pns_aes = ctx.assignment_by_template.get(23, {}).get((period, pns_iso3))
                         if pns_aes:
+                            if (pns_aes, iso3) not in pns_t23_reported_yes:
+                                continue
                             host_ns_id = ctx.iso3_to_hns_id.get(iso3)
                             if host_ns_id:
                                 cell_key = f"{host_ns_id}_{col_name}"
@@ -2296,34 +2657,41 @@ def transform_to_import_rows(
             matrix_cells[(aes_id, support_item)][cell_key] = 1
             continue
 
-    # ── Post-loop: T22 PNS funding → submitted scalar cells ──
+    # ── Post-loop: T22 PNS funding → submitted cells (PNS Value only when reported) ──
     for (pns_aes, host_cid, area), (cv, pv) in pns_t22_staging.items():
-        orig_num = cv or 0
-        submitted = pv if pv is not None else orig_num
-        matrix_cells[(pns_aes, ITEM_FUNDING_REQUIREMENTS_T22)][f"{host_cid}_{area}"] = submitted
+        host_iso3 = iso3_by_host_cid.get(host_cid)
+        if not host_iso3 or (pns_aes, host_iso3) not in pns_t22_reported_yes:
+            continue
+        cell = _t22_pns_import_cell_value(cv, pv)
+        if cell is not None:
+            matrix_cells[(pns_aes, ITEM_FUNDING_REQUIREMENTS_T22)][f"{host_cid}_{area}"] = cell
 
     # ── Post-loop: T22 PNS Total (Excel Area=Total) → row-total column ──
     for (pns_aes, host_cid), (cv, pv) in pns_t22_total_staging.items():
-        pns_reported = (pns_aes, host_cid) in pns_t22_has_pns
-        orig_num = cv or 0
-        submitted = pv if pns_reported and pv is not None else orig_num
-        item_cells = matrix_cells[(pns_aes, ITEM_FUNDING_REQUIREMENTS_T22)]
-        item_cells[f"{host_cid}_{T22_ROW_TOTAL_COLUMN}"] = submitted
-        # PNS reported row totals only (no SP/EF breakdown) — blank current values but
-        # preserve country-reported amounts as empty submitted scalars where needed.
+        host_iso3 = iso3_by_host_cid.get(host_cid)
+        pns_reported = bool(host_iso3 and (pns_aes, host_iso3) in pns_t22_reported_yes)
+        if not pns_reported:
+            continue
+        cell = _t22_pns_import_cell_value(cv, pv)
+        if cell is not None:
+            item_cells = matrix_cells[(pns_aes, ITEM_FUNDING_REQUIREMENTS_T22)]
+            item_cells[f"{host_cid}_{T22_ROW_TOTAL_COLUMN}"] = cell
+        # PNS reported row totals only (no SP/EF breakdown) — blank breakdown cells
+        # where country reported amounts but PNS did not provide SP/EF values.
         has_pns_breakdown = any(
             k[0] == pns_aes
             and k[1] == host_cid
             and pns_t22_staging[k][1] is not None
             for k in pns_t22_staging
         )
-        if pns_reported and not has_pns_breakdown:
+        if not has_pns_breakdown:
+            item_cells = matrix_cells[(pns_aes, ITEM_FUNDING_REQUIREMENTS_T22)]
             for area in T22_BREAKDOWN_AREAS:
-                cell = _t22_total_only_breakdown_cell(
+                breakdown_cell = _t22_total_only_breakdown_cell(
                     pns_t22_staging, pns_aes, host_cid, area
                 )
-                if cell is not None:
-                    item_cells[f"{host_cid}_{area}"] = cell
+                if breakdown_cell is not None:
+                    item_cells[f"{host_cid}_{area}"] = breakdown_cell
 
     # ── Post-loop: reporting country funding staging → NS Total Funding matrix cells ──
     for (aes_id, funding_item_id, row_name), total in reporting_funding_staging.items():
@@ -2376,6 +2744,9 @@ def transform_to_import_rows(
             target_aes_ids=_reporting_aes_ids_from_excel(filtered, ctx, template_ids=tids),
             aes_meta=aes_meta,
         )
+
+    ctx.pns_t22_reported_aes = {int(aes) for aes, _ in pns_t22_reported_yes}
+    ctx.pns_t23_reported_aes = {int(aes) for aes, _ in pns_t23_reported_yes}
 
     return import_rows
 
@@ -2507,6 +2878,15 @@ def run_upr_import(
             dry_run=dry_run,
         )
         upsert_stats.update(dyn_stats)
+        if 22 in tids or 23 in tids:
+            _progress("status", "Clearing non-reported PNS data and syncing status...", 92.0)
+            pns_sync_stats = sync_non_reported_pns_assignments(
+                ctx,
+                tids,
+                rounds=_normalize_round_set(rounds),
+                dry_run=dry_run,
+            )
+            upsert_stats.update(pns_sync_stats)
         upsert_stats.update(summarize_warnings(ctx.warnings))
         upsert_stats["transformed"] = len(import_rows)
         upsert_stats["dynamic_transformed"] = len(ctx.dynamic_indicator_entries)

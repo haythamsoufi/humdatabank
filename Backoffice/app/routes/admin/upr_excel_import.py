@@ -7,7 +7,7 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
-from flask import Blueprint, render_template, request, send_file, current_app
+from flask import Blueprint, redirect, render_template, request, send_file, current_app, url_for
 from flask_login import current_user
 
 from app.routes.admin.shared import admin_permission_required, system_manager_required
@@ -32,7 +32,19 @@ from app.services.async_import_job_store import (
     update_import_job,
 )
 
-bp = Blueprint("upr_excel_import", __name__, url_prefix="/admin/templates/upr-excel-import")
+bp = Blueprint("upr_excel_import", __name__, url_prefix="/admin/upr-excel-import")
+
+# Keep old bookmarks working after the move out of /admin/templates/.
+legacy_bp = Blueprint("upr_excel_import_legacy", __name__, url_prefix="/admin/templates/upr-excel-import")
+
+
+@legacy_bp.route("/", methods=["GET"])
+@legacy_bp.route("/<path:subpath>", methods=["GET"])
+@admin_permission_required("admin.templates.view")
+@system_manager_required
+def legacy_redirect(subpath: str = ""):
+    target = url_for("upr_excel_import.wizard") if not subpath else f"/admin/upr-excel-import/{subpath}"
+    return redirect(target, code=301)
 
 UPR_TEMPLATE_CHOICES = [
     # Planning (rounds P*)
@@ -221,7 +233,9 @@ def run_import():
                     stats=stats,
                     preview_path=preview_file,
                     download_ready=download_ready,
-                    download_url=f"/admin/templates/upr-excel-import/download/{job_id}" if download_ready else None,
+                    download_url=url_for("upr_excel_import.download_preview", job_id=job_id)
+                    if download_ready
+                    else None,
                 )
             except Exception as exc:
                 app.logger.error("UPR async import failed: %s", exc, exc_info=True)

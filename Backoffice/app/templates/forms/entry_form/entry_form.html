@@ -29,7 +29,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="entry-form-root w-full max-w-full mx-auto px-0 sm:px-2 py-4 sm:py-6 min-w-0" data-is-public-submission="{{ 'true' if is_public_submission else 'false' }}" data-public-token="{{ public_token if is_public_submission else '' }}">
+<div class="entry-form-root w-full max-w-full mx-auto px-0 sm:px-2 pb-4 sm:pb-6 min-w-0" data-is-public-submission="{{ 'true' if is_public_submission else 'false' }}" data-public-token="{{ public_token if is_public_submission else '' }}">
 
     {# Template Preview Mode banner (with "view as" + period builder controls) #}
     {% if is_preview_mode %}
@@ -331,6 +331,7 @@
         <div id="entry-form-js-context"
              hidden
              aria-hidden="true"
+             data-can-edit="false"
              {% if template_id is defined %}data-template-id="{{ template_id }}"{% endif %}
              data-assignment-entity-status-id="{{ assignment_entity_status_id }}">
             {% if template_id is defined %}

@@ -75,11 +75,12 @@
     z-index: 12;
 }
 
-.excel-io-dropzone--has-file .excel-io-dropzone__status:not(:empty) {
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
+/* Pending/valid status is single-line or grows naturally — no scroll container.
+   Do NOT set overflow-x: hidden alone here: CSS computes overflow-y to auto when
+   the other axis is non-visible, which shows spurious scrollbar arrows. */
+.excel-io-dropzone--has-file .excel-io-dropzone__status--pending,
+.excel-io-dropzone--has-file .excel-io-dropzone__status--valid {
+    overflow: hidden;
 }
 
 .excel-io-dropzone__overlay {

@@ -14,6 +14,7 @@
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
 {% from "macros/year_picker.html" import year_picker %}
+{% from "components/ag_grid_includes.html" import ag_grid_header_toolbar, ag_grid_element %}
 
 {% set save_label = form.submit.label.text if form.submit and form.submit.label else _('Save') %}
 {% set header_actions = namespace(items=[]) %}
@@ -480,9 +481,7 @@
             {# Manage Existing Entities Tab - only for existing assignments #}
             {% if assignment and assignment_entities %}
             <div class="p-4 rounded-lg bg-gray-50 {% if default_entity_tab != 'manage' %}hidden{% endif %}" id="manage-entities-panel" role="tabpanel" aria-labelledby="manage-entities-tab">
-                <div class="flex justify-end items-center gap-2 mb-4">
-                    <div id="column-visibility-button-placeholder"></div>
-                </div>
+                {{ ag_grid_header_toolbar(placeholder_id='column-visibility-button-placeholder', wrapper_class='mb-4') }}
                 {% if has_countries %}
                 <div class="flex items-center gap-3 flex-wrap mb-4">
                     <span class="text-sm font-bold text-gray-800">{{ _('Part of:') }}</span>
@@ -513,7 +512,7 @@
                     {% endif %}
                 </div>
                 <div class="overflow-x-auto">
-                    <div id="entityManagementGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
+                    {{ ag_grid_element('entityManagementGrid', placeholder_id='column-visibility-button-placeholder', height='600px') }}
                 </div>
             </div>
             {% endif %}

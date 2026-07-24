@@ -18,6 +18,7 @@ from import_upr_excel_data import (  # noqa: E402
     _reporting_indicator_has_import_value,
     _reporting_indicator_import_value,
     _resolve_item_by_bank_and_area,
+    _t22_pns_import_cell_value,
     _t22_total_only_breakdown_cell,
 )
 
@@ -45,11 +46,29 @@ def _ctx(**kwargs: Any) -> UprImportContext:
     return ctx
 
 
-class TestT22TotalOnlyBreakdownCell:
-    def test_returns_empty_scalar_when_country_value_present(self):
-        staging = {(1, 2, "SP1"): (500.0, None)}
-        assert _t22_total_only_breakdown_cell(staging, 1, 2, "SP1") == ""
+class TestT22PnsImportCellValue:
+    def test_uses_pns_value_when_present(self):
+        assert _t22_pns_import_cell_value(50000.0, 123.0) == 123.0
 
+    def test_cleared_when_pns_value_blank(self):
+        assert _t22_pns_import_cell_value(50000.0, None) == {
+            "original": 50000.0,
+            "modified": "",
+            "isModified": True,
+        }
+
+    def test_skips_when_both_blank(self):
+        assert _t22_pns_import_cell_value(None, None) is None
+
+
+class TestT22TotalOnlyBreakdownCell:
+    def test_returns_cleared_cell_when_country_value_present(self):
+        staging = {(1, 2, "SP1"): (500.0, None)}
+        assert _t22_total_only_breakdown_cell(staging, 1, 2, "SP1") == {
+            "original": 500.0,
+            "modified": "",
+            "isModified": True,
+        }
     def test_returns_none_when_no_country_value(self):
         staging = {(1, 2, "SP1"): (None, None)}
         assert _t22_total_only_breakdown_cell(staging, 1, 2, "SP1") is None

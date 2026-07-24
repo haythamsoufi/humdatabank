@@ -57,7 +57,9 @@
     border-radius: 0.5rem !important;
 }
 .sharp-ui .assignment-status-pipeline-check,
-.sharp-ui .assignment-status-pipeline-step.is-passed .assignment-status-pipeline-dot {
+.sharp-ui .assignment-status-pipeline-arrow,
+.sharp-ui .assignment-status-pipeline-dot,
+.sharp-ui .assignment-status-pipeline-connector {
     border-radius: 9999px !important;
 }
 

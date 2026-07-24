@@ -161,6 +161,8 @@ Built once per import run by `build_import_context()`. Caches all DB lookups so 
 
 The `Country Value` and `PNS Value` columns are processed **independently** — a single Excel row can contribute to both templates. The `Source` column is **not** used for routing (it only indicates which column `ValueNum` was derived from in the export).
 
+**Planning funding indicators:** Only rows with `Indicator = Funding Requirement` (`indicatorId = 2`) are imported. **`Confirmed Funding`** appears in UPR Master and on the **`PNS Data`** sheet as a separate indicator, but there is **no backoffice form field for it yet** — those rows are **skipped** (including duplicate `Area = Total` rows that carry confirmed amounts only).
+
 **Zero / blank values:** Matrix imports skip falsy numeric values (`0`, empty) when writing cells — only non-zero amounts are stored. Scalar NS Data still allows zero KPIs.
 
 #### Country Value → Template 24
@@ -217,9 +219,11 @@ Each cell is a **structured dict**, not a plain number:
 | 616,508 | 439,311 | yes | `true` | PNS changed the amount |
 | 200,000 | `""` | yes | `true` | PNS opened the form and cleared the country value |
 | 0 | 696,998 | yes | `true` | PNS added a figure the country did not report |
-| 200,000 | `""` | no | `false` | Country-only data; PNS has not reported for this country |
+| 200,000 | `""` | no | *(not imported to T22)* | Country-only data; PNS has not reported for this country |
 
-**“PNS reported for this host country”** means the PNS has at least one Funding row with a non-zero `PNS Value` for that host country in the Excel (any area). Once true, all staged areas for that `(PNS assignment, host country)` pair participate in per-cell comparison: `isModified = (pns_value_as_number ≠ country_value_as_number)` where blank/`None` counts as `0` for comparison only (stored `modified` remains `""`).
+**Import rule when `PNS reported = Yes` on a row:** the T22 cell uses **`PNS Value` only**. If `PNS Value` is blank but `Country Value` is present, the PNS cleared the looked-up figure → `{ original: country_val, modified: "", isModified: true }`. Country Value is **never** copied to T22 as the submitted amount when `PNS reported = Yes`.
+
+After import, PNS assignments (templates **22** and **23**) in the selected round(s) with **no** `PNS reported = Yes` rows are reset to workflow status **`pending`**, and any **UPR-imported `form_data`** on those assignments (T22 item 1303 + staff matrix; T23 item 952) is **deleted**. The status date (`status_timestamp`) is set to the parent assignment’s **`assigned_at`** date (when the round was assigned), and submission/review metadata is cleared. Variable consumer matrices are refreshed when source funding rows are removed. Assignments where the PNS reported at least once are left unchanged.
 
 **Worked example — Netherlands Red Cross × Uganda (P26):**
 
@@ -294,6 +298,7 @@ Unknown `Comments_*` slugs are title-cased automatically.
 ### 6.6 Staff → Template 22
 
 - Section `Staff`, `Entity = PNS`, non-zero `ValueNum` only
+- Imported **only** when the same `(PNS assignment, host ISO3)` has **`PNS reported = Yes`** on at least one Funding row in the workbook (see §6.2)
 - Target: **item 1367** (`PNS staff contributions` matrix — fixed ID)
 - AES resolved by **PNS home country ISO3** (same path as PNS Funding, via `ns_name → ns_home_country_iso3`)
 - Row key: **host country's `NationalSociety.id`** (`iso3_to_hns_id[host_ISO3]`) — the HNS receiving staff
@@ -376,6 +381,7 @@ Unknown `Comments_*` slugs are title-cased automatically.
 - Single column `NS 2025 Total Funding`; cell key = `{row_name}_NS 2025 Total Funding`
 
 **Template 23 — PNS-reported Funding (matrix, item 952):**
+- Imported **only** when **`PNS reported = Yes`** on the matching Funding row (`Entity = PNS`, same host ISO3)
 - `Entity = PNS`, NS name → home country ISO3 → template 23 AES
 - Row key: `iso3_to_hns_id[host_ISO3]` (the host country's primary NS)
 - Columns: `Total Funding` (iid 733), `Total Expenditure` (iid 734), `Total Transferred to HNS` (iid 5, from `00005`)

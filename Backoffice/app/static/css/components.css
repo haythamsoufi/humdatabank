@@ -912,7 +912,8 @@ button.entity-status-chip.status-label,
     box-sizing: border-box;
 }
 
-.assignment-status-pipeline-check {
+.assignment-status-pipeline-check,
+.assignment-status-pipeline-arrow {
     display: none;
 }
 
@@ -937,8 +938,32 @@ button.entity-status-chip.status-label,
     transition: color 0.12s ease;
 }
 
-/* Pending is a start point, not a completed milestone — show a neutral ring when passed */
+/* Pending / in-progress are waypoints, not milestones — use a light-green arrow when reached */
 .assignment-status-pipeline-step.is-passed .assignment-status-pipeline-check {
+    display: none;
+}
+
+.assignment-status-pipeline-step[data-step-key="pending"].is-passed .assignment-status-pipeline-dot,
+.assignment-status-pipeline-step[data-step-key="in_progress"].is-complete .assignment-status-pipeline-dot {
+    display: none;
+}
+
+.assignment-status-pipeline-step[data-step-key="pending"].is-passed .assignment-status-pipeline-arrow,
+.assignment-status-pipeline-step[data-step-key="in_progress"].is-complete .assignment-status-pipeline-arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.875rem;
+    height: 0.875rem;
+    border-radius: 9999px;
+    background-color: #dcfce7;
+    color: #4ade80;
+    font-size: 0.4375rem;
+    line-height: 1;
+    box-shadow: 0 0 0 2px #ffffff;
+}
+
+.assignment-status-pipeline-step[data-step-key="in_progress"].is-complete .assignment-status-pipeline-check {
     display: none;
 }
 
@@ -951,6 +976,11 @@ button.entity-status-chip.status-label,
 
 .assignment-status-pipeline-step.is-passed .assignment-status-pipeline-label {
     color: #64748b;
+}
+
+.assignment-status-pipeline-step[data-step-key="pending"].is-passed .assignment-status-pipeline-label,
+.assignment-status-pipeline-step[data-step-key="in_progress"].is-complete .assignment-status-pipeline-label {
+    color: #16a34a;
 }
 
 .assignment-status-pipeline-step.is-complete .assignment-status-pipeline-dot {
@@ -987,9 +1017,38 @@ button.entity-status-chip.status-label,
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
 }
 
+.assignment-status-pipeline-step[data-step-key="pending"].is-current .assignment-status-pipeline-dot,
+.assignment-status-pipeline-step[data-step-key="in_progress"].is-current .assignment-status-pipeline-dot {
+    display: none;
+}
+
+.assignment-status-pipeline-step[data-step-key="pending"].is-current .assignment-status-pipeline-arrow,
+.assignment-status-pipeline-step[data-step-key="in_progress"].is-current .assignment-status-pipeline-arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.875rem;
+    height: 0.875rem;
+    border-radius: 9999px;
+    background-color: #bbf7d0;
+    color: #22c55e;
+    font-size: 0.4375rem;
+    line-height: 1;
+    box-shadow: 0 0 0 2px #ffffff;
+}
+
 .assignment-status-pipeline-step.is-current .assignment-status-pipeline-label {
     color: #1d4ed8;
     font-weight: 700;
+}
+
+.assignment-status-pipeline-step[data-step-key="pending"].is-current .assignment-status-pipeline-label,
+.assignment-status-pipeline-step[data-step-key="in_progress"].is-current .assignment-status-pipeline-label {
+    color: #15803d;
+}
+
+.assignment-status-pipeline-tooltip--rtl .assignment-status-pipeline-arrow {
+    transform: scaleX(-1);
 }
 
 .assignment-status-pipeline-step.is-upcoming .assignment-status-pipeline-dot {

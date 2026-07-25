@@ -615,18 +615,24 @@ body.modal-open {
                     {{ form.csrf_token(id="dev_act_as_csrf_token") }}
                     {% endif %}
                     {% if request.args.get('next') %}<input type="hidden" name="next" value="{{ request.args.get('next') }}">{% endif %}
-                    <input type="hidden" name="user_id" id="devActAsUserId" value="">
 
                     <div class="grid grid-cols-1 gap-2">
-                        <button type="submit" name="preset" value="sys_manager" data-dev-act-as-preset="sys_manager" aria-label="{{ _('Act as System Manager')|forceescape }}" class="btn btn-block btn-purple">
+                        <!--
+                            no-submit-guard: FormSubmitGuard disables the clicked submit button
+                            synchronously during its own submit event. A disabled button's
+                            name/value pair is dropped from the browser's form submission, so
+                            these preset buttons must opt out or the server never receives
+                            name="preset" (only csrf_token/user_id would arrive).
+                        -->
+                        <button type="submit" name="preset" value="sys_manager" formnovalidate data-dev-act-as-preset="sys_manager" aria-label="{{ _('Act as System Manager')|forceescape }}" class="btn btn-block btn-purple no-submit-guard">
                             <i class="fa-solid fa-cogs"></i>
                             {{ _('System Manager') }}
                         </button>
-                        <button type="submit" name="preset" value="admin" data-dev-act-as-preset="admin" aria-label="{{ _('Act as Admin')|forceescape }}" class="btn btn-block btn-dark">
+                        <button type="submit" name="preset" value="admin" formnovalidate data-dev-act-as-preset="admin" aria-label="{{ _('Act as Admin')|forceescape }}" class="btn btn-block btn-dark no-submit-guard">
                             <i class="fa-solid fa-user-shield"></i>
                             {{ _('Admin') }}
                         </button>
-                        <button type="submit" name="preset" value="focal" data-dev-act-as-preset="focal" aria-label="{{ _('Act as Focal Point')|forceescape }}" class="btn btn-block btn-primary">
+                        <button type="submit" name="preset" value="focal" formnovalidate data-dev-act-as-preset="focal" aria-label="{{ _('Act as Focal Point')|forceescape }}" class="btn btn-block btn-primary no-submit-guard">
                             <i class="fa-solid fa-user"></i>
                             {{ _('Focal Point') }}
                         </button>
@@ -636,7 +642,7 @@ body.modal-open {
                         <label for="devActAsUserSelect" class="block text-xs font-medium text-yellow-800">
                             {{ _('Or choose a user') }}
                         </label>
-                        <select id="devActAsUserSelect" class="dev-act-as-user-select block w-full px-3 py-2 border border-yellow-300 rounded-md text-sm bg-white text-gray-900">
+                        <select id="devActAsUserSelect" name="user_id" required class="dev-act-as-user-select block w-full px-3 py-2 border border-yellow-300 rounded-md text-sm bg-white text-gray-900">
                             <option value="">{{ _('Select a user…') }}</option>
                             {% for dev_user in dev_act_as_users %}
                             <option value="{{ dev_user.id }}">
@@ -645,7 +651,7 @@ body.modal-open {
                             {% endfor %}
                         </select>
                         <p id="devActAsUserError" class="hidden text-xs text-red-600 m-0">{{ _('Please select a user first.') }}</p>
-                        <button type="button" id="devActAsSelectedUser" aria-label="{{ _('Act as selected user')|forceescape }}" class="btn btn-block btn-warning">
+                        <button type="submit" id="devActAsSelectedUser" data-loading-text="{{ _('Signing in…') }}" aria-label="{{ _('Act as selected user')|forceescape }}" class="btn btn-block btn-warning">
                             <i class="fa-solid fa-right-to-bracket"></i>
                             {{ _('Act as selected user') }}
                         </button>
@@ -703,7 +709,7 @@ body.modal-open {
       {{ register_form.confirm_password(id="register_confirm_password", class="block w-full px-4 py-2 border rounded", placeholder=_('Confirm Password'), autocomplete="new-password") }}
       {% for error in register_form.confirm_password.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
       <p id="register_password_match" class="text-xs mt-1"></p>
-      {{ register_form.submit(id="register_submit", class="btn btn-success btn-block w-full mt-2", value=_('Create Account')) }}
+      {{ register_form.submit(id="register_submit", class="btn btn-success btn-block w-full mt-2", value=_('Create Account'), data_loading_text=_('Creating account…')) }}
     </form>
   </div>
   </div>
@@ -720,7 +726,7 @@ body.modal-open {
       {% endif %}
       {{ forgot_form.email(id="forgot_email", class="block w-full px-4 py-2 border rounded", placeholder=_('Email')) }}
       {% for error in forgot_form.email.errors %}<p class="text-red-600 text-sm">{{ error }}</p>{% endfor %}
-      {{ forgot_form.submit(id="forgot_submit", class="btn btn-success btn-block w-full mt-2", value=_('Send Reset Link')) }}
+      {{ forgot_form.submit(id="forgot_submit", class="btn btn-success btn-block w-full mt-2", value=_('Send Reset Link'), data_loading_text=_('Sending…')) }}
     </form>
   </div>
   </div>
@@ -1109,9 +1115,7 @@ function initDevActAsLogin() {
     const form = document.getElementById('devActAsForm');
     if (!form) return;
 
-    const userIdInput = document.getElementById('devActAsUserId');
     const userSelect = document.getElementById('devActAsUserSelect');
-    const selectedUserBtn = document.getElementById('devActAsSelectedUser');
     const userError = document.getElementById('devActAsUserError');
 
     function hideUserError() {
@@ -1122,23 +1126,23 @@ function initDevActAsLogin() {
         if (userError) userError.classList.remove('hidden');
     }
 
-    if (selectedUserBtn) {
-        selectedUserBtn.addEventListener('click', () => {
-            const userId = getDevActAsSelectedUserId();
-            if (!userId) {
-                showUserError();
-                if (window.jQuery && userSelect) {
-                    window.jQuery(userSelect).select2('open');
-                } else if (userSelect) {
-                    userSelect.focus();
-                }
-                return;
-            }
+    form.addEventListener('submit', (event) => {
+        const submitter = event.submitter;
+        if (submitter && submitter.getAttribute('name') === 'preset') {
             hideUserError();
-            if (userIdInput) userIdInput.value = String(userId);
-            form.submit();
-        });
-    }
+            return;
+        }
+        const userId = getDevActAsSelectedUserId();
+        if (!userId) {
+            event.preventDefault();
+            showUserError();
+            if (window.jQuery && userSelect) {
+                window.jQuery(userSelect).select2('open');
+            } else if (userSelect) {
+                userSelect.focus();
+            }
+        }
+    });
 
     if (userSelect) {
         userSelect.addEventListener('change', hideUserError);

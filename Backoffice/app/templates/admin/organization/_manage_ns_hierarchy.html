@@ -293,7 +293,7 @@
                     '<a href="' + editUrl + '" title="' + {{ _("Edit")|tojson|safe }} + '" class="text-blue-600 hover:text-blue-900"><i class="fas fa-pen fa-fw"></i></a>' +
                     '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">' +
                     '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">' +
-                    '<button type="submit" title="' + {{ _("Delete")|tojson|safe }} + '" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>' +
+                    '<button type="submit" title="' + {{ _("Delete")|tojson|safe }} + '" class="text-red-600 hover:text-red-900" data-loading-text=""><i class="fas fa-trash fa-fw"></i></button>' +
                     '</form>' +
                     '</div>';
             }
@@ -447,7 +447,7 @@
                     '<a href="' + editUrl + '" title="' + {{ _("Edit")|tojson|safe }} + '" class="text-blue-600 hover:text-blue-900"><i class="fas fa-pen fa-fw"></i></a>' +
                     '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">' +
                     '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">' +
-                    '<button type="submit" title="' + {{ _("Delete")|tojson|safe }} + '" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>' +
+                    '<button type="submit" title="' + {{ _("Delete")|tojson|safe }} + '" class="text-red-600 hover:text-red-900" data-loading-text=""><i class="fas fa-trash fa-fw"></i></button>' +
                     '</form>' +
                     '</div>';
             }
@@ -615,7 +615,7 @@
                     '<a href="' + editUrl + '" title="' + {{ _("Edit")|tojson|safe }} + '" class="text-blue-600 hover:text-blue-900"><i class="fas fa-pen fa-fw"></i></a>' +
                     '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">' +
                     '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">' +
-                    '<button type="submit" title="' + {{ _("Delete")|tojson|safe }} + '" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>' +
+                    '<button type="submit" title="' + {{ _("Delete")|tojson|safe }} + '" class="text-red-600 hover:text-red-900" data-loading-text=""><i class="fas fa-trash fa-fw"></i></button>' +
                     '</form>' +
                     '</div>';
             }

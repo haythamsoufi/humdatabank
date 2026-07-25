@@ -29,7 +29,7 @@
                                 {% else %}
                                 <form method="GET" action="{{ url_for('form_builder.edit_template', template_id=template.id) }}" class="inline-flex items-center">
                                     <input type="hidden" name="version_id" value="{{ v.id }}">
-                                    <button type="submit" class="fb-icon-btn fb-icon-btn--primary" title="{{ _('Switch to this version')|forceescape }}" aria-label="{{ _('Switch to this version')|forceescape }}">
+                                    <button type="submit" class="fb-icon-btn fb-icon-btn--primary" title="{{ _('Switch to this version')|forceescape }}" aria-label="{{ _('Switch to this version')|forceescape }}" data-loading-text="">
                                         <i class="fas fa-external-link-alt w-4 h-4"></i>
                                     </button>
                                 </form>
@@ -96,7 +96,8 @@
                                         id="version-note-save-btn-{{ v.id }}"
                                         class="version-note-save-btn fb-icon-btn fb-icon-btn--primary hidden mt-1"
                                         title="{{ _('Save Note')|forceescape }}"
-                                        aria-label="{{ _('Save Note')|forceescape }}">
+                                        aria-label="{{ _('Save Note')|forceescape }}"
+                                        data-loading-text="">
                                     <i class="fas fa-save w-4 h-4"></i>
                                 </button>
                             </form>

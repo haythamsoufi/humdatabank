@@ -274,7 +274,7 @@
                 {% endif %}
                 html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/'/g, "\\'") + '" data-confirm-danger="true">';
                 html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
-                html += '<button type="submit" class="text-red-600 hover:text-red-900 delete-submission-btn" title="' + {{ _("Delete")|tojson|safe }} + '" data-confirm="' + deleteConfirm.replace(/'/g, "\\'") + '"><i class="fas fa-trash fa-fw"></i></button>';
+                html += '<button type="submit" class="text-red-600 hover:text-red-900 delete-submission-btn" title="' + {{ _("Delete")|tojson|safe }} + '" data-confirm="' + deleteConfirm.replace(/'/g, "\\'") + '" data-loading-text=""><i class="fas fa-trash fa-fw"></i></button>';
                 html += '</form>';
                 html += '</div>';
                 return html;

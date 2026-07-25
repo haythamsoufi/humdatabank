@@ -593,7 +593,7 @@ try {
                 if (deleteUrl) {
                     html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm-message="' + deleteConfirm.replace(/'/g, "\\'") + '">';
                     html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
-                    html += '<button type="submit" class="text-red-600 hover:text-red-900 transition-colors" title="' + deleteTitle + '"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '<button type="submit" class="text-red-600 hover:text-red-900 transition-colors" title="' + deleteTitle + '" data-loading-text=""><i class="fas fa-trash fa-fw"></i></button>';
                     html += '</form>';
                 }
                 html += '</div>';
@@ -929,7 +929,7 @@ try {
                 if (deleteUrl) {
                     html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">';
                     html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
-                    html += '<button type="submit" title="' + deleteTitle + '" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '<button type="submit" title="' + deleteTitle + '" class="text-red-600 hover:text-red-900" data-loading-text=""><i class="fas fa-trash fa-fw"></i></button>';
                     html += '</form>';
                 }
                 html += '</div>';
@@ -1458,7 +1458,7 @@ try {
                 if (deleteUrl) {
                     html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">';
                     html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
-                    html += '<button type="submit" title="' + deleteTitle + '" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '<button type="submit" title="' + deleteTitle + '" class="text-red-600 hover:text-red-900" data-loading-text=""><i class="fas fa-trash fa-fw"></i></button>';
                     html += '</form>';
                 }
                 html += '</div>';
@@ -1624,7 +1624,7 @@ try {
                 if (deleteUrl) {
                     html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">';
                     html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
-                    html += '<button type="submit" title="' + deleteTitle + '" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '<button type="submit" title="' + deleteTitle + '" class="text-red-600 hover:text-red-900" data-loading-text=""><i class="fas fa-trash fa-fw"></i></button>';
                     html += '</form>';
                 }
                 html += '</div>';
@@ -1800,7 +1800,7 @@ try {
                 if (deleteUrl) {
                     html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">';
                     html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
-                    html += '<button type="submit" title="' + deleteTitle + '" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '<button type="submit" title="' + deleteTitle + '" class="text-red-600 hover:text-red-900" data-loading-text=""><i class="fas fa-trash fa-fw"></i></button>';
                     html += '</form>';
                 }
                 html += '</div>';
@@ -1956,7 +1956,7 @@ try {
                 if (deleteUrl) {
                     html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">';
                     html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
-                    html += '<button type="submit" title="' + deleteTitle + '" class="text-red-600 hover:text-red-900"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '<button type="submit" title="' + deleteTitle + '" class="text-red-600 hover:text-red-900" data-loading-text=""><i class="fas fa-trash fa-fw"></i></button>';
                     html += '</form>';
                 }
                 html += '</div>';

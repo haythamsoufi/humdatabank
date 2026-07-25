@@ -36,7 +36,7 @@
         {% include "forms/entry_form/partials/_preview_banner.html" %}
     {% endif %}
 
-    {# Module load failures are now communicated via the loading box (#entry-form-loading) only. #}
+    {# Module load failures are communicated via the loading skeleton (#entry-form-loading) status area. #}
 
     {# Offline Mode Banner - Only for public submissions #}
     {% if is_public_submission %}
@@ -156,7 +156,7 @@
                                 {% if assignment_status.status == 'submitted' and can_approve_assignment(assignment_status) %}
                                 <form action="{{ url_for('main.approve_assignment', aes_id=assignment_status.id) }}" method="POST" class="inline-block approve-assignment-form">
                                     {{ csrf_form.csrf_token }}
-                                    <button type="submit" class="professional-action-btn professional-action-btn-green">
+                                    <button type="submit" class="professional-action-btn professional-action-btn-green" data-loading-text="{{ _('Validating…') }}">
                                         <i class="fas fa-check-double"></i>
                                         <span>{{ _('Validate') }}</span>
                                     </button>
@@ -165,7 +165,7 @@
                                 {% if can_reopen_assignment(assignment_status) %}
                                 <form action="{{ url_for('main.reopen_assignment', aes_id=assignment_status.id) }}" method="POST" class="inline-block reopen-assignment-form">
                                     {{ csrf_form.csrf_token }}
-                                    <button type="submit" class="professional-action-btn professional-action-btn-orange">
+                                    <button type="submit" class="professional-action-btn professional-action-btn-orange" data-loading-text="{{ _('Reopening…') }}">
                                         <i class="fas fa-undo"></i>
                                         <span>{{ _('Reopen') }}</span>
                                     </button>
@@ -341,17 +341,118 @@
         </div>
         {% endif %}
 
-        {# Loading overlay (shown until JS signals formInitialized) #}
+        {# Loading skeleton (shown until JS signals formInitialized) #}
         {# IMPORTANT: loader is visible by default, UI is hidden by default (works even if <head> styles don't render) #}
-        <div id="entry-form-loading" class="w-full py-16 flex items-center justify-center" style="display:flex;">
-            <div class="max-w-md w-full bg-white border border-gray-200 rounded-lg p-6 shadow-sm text-center">
-                <div class="flex items-center justify-center mb-3">
-                    <i class="fas fa-spinner fa-spin text-blue-600 text-2xl"></i>
+        <div id="entry-form-loading" class="entry-form-skeleton w-full min-w-0" style="display:block;" aria-busy="true" aria-live="polite">
+            <span class="sr-only">{{ _('Loading form…') }}</span>
+
+            {# Mirrors #entry-form-layout + sections pane + main form area #}
+            <div id="entry-form-skeleton-layout" class="flex flex-col lg:flex-row gap-4 lg:gap-6 min-w-0">
+                {# Sections pane skeleton — same shell classes as #section-navigation-sidebar #}
+                <div id="entry-form-skeleton-sidebar"
+                     class="fixed inset-y-0 left-0 z-40 w-4/5 max-w-xs bg-white pt-6 px-6 pb-0 flex flex-col transform -translate-x-full transition-transform duration-300 ease-in-out shadow-xl border-r border-gray-200
+                            xl:relative xl:translate-x-0 xl:transform-none xl:w-1/5 xl:max-w-xs xl:inset-auto xl:z-auto xl:bg-white xl:pt-6 xl:px-6 xl:pb-0 xl:rounded-lg xl:shadow xl:border xl:border-gray-200 xl:sticky xl:top-4 xl:max-h-[calc(100vh-8rem)] xl:border-r-0 xl:transition-none min-h-0"
+                     aria-hidden="true">
+                    <div class="flex-shrink-0 flex items-center justify-between mb-4">
+                        <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-7 w-28"></div>
+                        <div class="entry-form-skeleton-bar entry-form-skeleton-pulse hidden xl:block w-8 h-8 rounded-md shrink-0"></div>
+                    </div>
+                    <div class="flex-1 min-h-0 overflow-y-auto">
+                        <ul class="space-y-2">
+                            <li class="flex items-center gap-3 px-3 py-2">
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded shrink-0"></div>
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded-full shrink-0"></div>
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 flex-1 max-w-[85%]"></div>
+                            </li>
+                            <li class="flex items-center gap-3 px-3 py-2">
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded shrink-0"></div>
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded-full shrink-0"></div>
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 flex-1 max-w-[70%]"></div>
+                            </li>
+                            <li class="flex items-center gap-3 px-3 py-2">
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded shrink-0"></div>
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded-full shrink-0"></div>
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 flex-1 max-w-[90%]"></div>
+                            </li>
+                            <li class="flex items-center gap-3 px-3 py-2">
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded shrink-0"></div>
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded-full shrink-0"></div>
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 flex-1 max-w-[65%]"></div>
+                            </li>
+                            <li class="flex items-center gap-3 px-3 py-2">
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded shrink-0"></div>
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded-full shrink-0"></div>
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 flex-1 max-w-[80%]"></div>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="sticky bottom-0 z-10 mt-6 pt-6 border-t border-gray-200 bg-white pb-6 -mb-6">
+                        <div class="flex flex-wrap gap-2">
+                            <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-10 flex-1 min-w-[6rem] rounded-md"></div>
+                            <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-10 flex-1 min-w-[6rem] rounded-md"></div>
+                        </div>
+                    </div>
                 </div>
-                <p class="text-gray-900 font-semibold">{{ _('Loading form…') }}</p>
-                <p id="entry-form-loading-detail" class="text-sm text-gray-600 mt-1">{{ _('Preparing components. Please wait.') }}</p>
+
+                {# Main form area skeleton — mirrors #main-form-area + section cards #}
+                <div id="entry-form-skeleton-main" class="lg:flex-1 transition-all duration-300 min-w-0" aria-hidden="true">
+                    <div class="space-y-4 sm:space-y-8 mb-6 sm:mb-8 min-w-0">
+                        <div class="bg-gray-50 p-3 sm:p-6 rounded-lg border border-gray-200 mb-4 sm:mb-6">
+                            <div class="flex items-center gap-2 pb-3 sm:pb-4 mb-3 sm:mb-4 border-b border-gray-200">
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-5 h-5 rounded shrink-0"></div>
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-6 sm:h-7 w-48 max-w-full"></div>
+                            </div>
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <div class="form-item-block border p-3 sm:p-4 rounded-md bg-white">
+                                    <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 w-32 max-w-full mb-3"></div>
+                                    <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-10 w-full rounded-md"></div>
+                                </div>
+                                <div class="form-item-block border p-3 sm:p-4 rounded-md bg-white">
+                                    <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 w-40 max-w-full mb-3"></div>
+                                    <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-10 w-full rounded-md"></div>
+                                </div>
+                                <div class="form-item-block border p-3 sm:p-4 rounded-md bg-white">
+                                    <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 w-28 max-w-full mb-3"></div>
+                                    <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-10 w-full rounded-md"></div>
+                                </div>
+                                <div class="form-item-block border p-3 sm:p-4 rounded-md bg-white">
+                                    <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 w-36 max-w-full mb-3"></div>
+                                    <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-10 w-full rounded-md"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 p-3 sm:p-6 rounded-lg border border-gray-200 mb-4 sm:mb-6">
+                            <div class="flex items-center gap-2 pb-3 sm:pb-4 mb-3 sm:mb-4 border-b border-gray-200">
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-5 h-5 rounded shrink-0"></div>
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-6 sm:h-7 w-56 max-w-full"></div>
+                            </div>
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                <div class="form-item-block border p-3 sm:p-4 rounded-md bg-white">
+                                    <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 w-24 max-w-full mb-3"></div>
+                                    <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-10 w-full rounded-md"></div>
+                                </div>
+                                <div class="form-item-block border p-3 sm:p-4 rounded-md bg-white">
+                                    <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 w-32 max-w-full mb-3"></div>
+                                    <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-10 w-full rounded-md"></div>
+                                </div>
+                                <div class="form-item-block border p-3 sm:p-4 rounded-md bg-white">
+                                    <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 w-28 max-w-full mb-3"></div>
+                                    <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-10 w-full rounded-md"></div>
+                                </div>
+                            </div>
+                            <div class="mt-4 form-item-block border p-3 sm:p-4 rounded-md bg-white">
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 w-44 max-w-full mb-3"></div>
+                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-24 w-full rounded-md"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="entry-form-skeleton-status mt-6 text-center">
+                <p id="entry-form-loading-detail" class="text-sm text-gray-600">{{ _('Preparing components. Please wait.') }}</p>
                 {# display:none inline: .btn sets display:inline-flex and can override Tailwind .hidden if CSS order differs #}
-                <button type="button" id="entry-form-loading-reload" class="btn btn-primary mt-4" style="display: none;" aria-hidden="true">
+                <button type="button" id="entry-form-loading-reload" class="btn btn-primary mt-3" style="display: none;" aria-hidden="true">
                     <i class="fas fa-sync-alt mr-2"></i>
                     {{ _('Reload Page') }}
                 </button>
@@ -568,7 +669,8 @@
                                     class="btn btn-success flex-1"
                                     data-confirm-title="{{ _('Send for Review?')|forceescape }}"
                                     data-confirm-label="{{ _('Send for Review')|forceescape }}"
-                                    data-confirm-message="{{ _('Send this assignment to delegation for review? You will not be able to edit it until they return it for changes.')|forceescape }}">
+                                    data-confirm-message="{{ _('Send this assignment to delegation for review? You will not be able to edit it until they return it for changes.')|forceescape }}"
+                                    data-loading-text="{{ _('Sending…') }}">
                                 <i class="fas fa-user-check w-4 h-4 mr-2"></i>
                                 {{ _('Send for Review') }}
                             </button>
@@ -578,7 +680,8 @@
                                     class="btn btn-success flex-1"
                                     data-confirm-title="{{ _('Submit Form?')|forceescape }}"
                                     data-confirm-label="{{ _('Submit')|forceescape }}"
-                                    data-confirm-message="{{ _('Are you sure you want to submit this form? You will not be able to edit it after submission.')|forceescape }}">
+                                    data-confirm-message="{{ _('Are you sure you want to submit this form? You will not be able to edit it after submission.')|forceescape }}"
+                                    data-loading-text="{{ _('Submitting…') }}">
                                 <i class="fas fa-paper-plane w-4 h-4 mr-2"></i>
                                 {{ _('Submit') }}
                             </button>
@@ -587,7 +690,8 @@
                             <form action="{{ url_for('main.return_assignment_for_revision', aes_id=assignment_status.id) }}" method="POST" class="flex-1 return-for-revision-form min-w-[10rem]">
                                 {{ csrf_form.csrf_token }}
                                 <button type="submit" class="btn btn-warning w-full"
-                                        data-confirm-message="{{ _('Return this assignment to the National Society for changes?')|forceescape }}">
+                                        data-confirm-message="{{ _('Return this assignment to the National Society for changes?')|forceescape }}"
+                                        data-loading-text="{{ _('Returning…') }}">
                                     <i class="fas fa-reply w-4 h-4 mr-2"></i>
                                     {{ _('Request changes') }}
                                 </button>
@@ -3108,7 +3212,7 @@
                     scheduleReloadButtonReveal();
                     // Keep UI hidden in error state, keep loader visible
                     if (uiEl) uiEl.style.display = 'none';
-                    if (loadingEl) loadingEl.style.display = 'flex';
+                    if (loadingEl) loadingEl.style.display = 'block';
                 } catch (e) { /* no-op */ }
             }
             window.__entryFormLoader = window.__entryFormLoader || { setReady, setSlow, setError };

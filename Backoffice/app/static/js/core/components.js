@@ -174,57 +174,58 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }, true);
 
-    // --- Profile Popup Logic ---
+    // --- Shared navbar elements (declared early so closeAllPopups can reference them) ---
     const profileIconButton = document.querySelector('.profile-icon-button');
     const profilePopup = document.getElementById('profile-popup');
-    if (profileIconButton && profilePopup) {
-        profileIconButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isHidden = profilePopup.classList.contains('hidden');
-
-            // Close other popups if open
-            if (languageDropdown && !languageDropdown.classList.contains('hidden')) {
-                languageDropdown.classList.add('hidden');
-                if (languageSelectorButton) {
-                    languageSelectorButton.setAttribute('aria-expanded', 'false');
-                    const dropdownArrow = languageSelectorButton.querySelector('.dropdown-arrow');
-                    if (dropdownArrow) {
-                        dropdownArrow.style.transform = 'rotate(0deg)';
-                    }
-                }
-            }
-            if (notificationsDropdown && !notificationsDropdown.classList.contains('hidden')) {
-                notificationsDropdown.classList.add('hidden');
-            }
-
-            profilePopup.classList.toggle('hidden');
-        });
-        document.addEventListener('click', (e) => {
-            if (!profilePopup.classList.contains('hidden') && !profilePopup.contains(e.target) && !profileIconButton.contains(e.target)) {
-                profilePopup.classList.add('hidden');
-            }
-        });
-    }
-
-    // --- Enhanced Language Selector Logic ---
     const languageSelectorButton = document.getElementById('language-selector-button');
     const languageDropdown = document.getElementById('language-dropdown');
     const dropdownArrow = languageSelectorButton?.querySelector('.dropdown-arrow');
     const notificationsDropdown = document.getElementById('notifications-dropdown');
 
+    // Close all open navbar popups, optionally keeping one open.
+    // Centralises the close-other-dropdowns logic that was previously duplicated
+    // in each button's click handler.
+    function closeAllPopups({ except } = {}) {
+        if (profilePopup && profilePopup !== except && !profilePopup.classList.contains('hidden')) {
+            profilePopup.classList.add('hidden');
+            if (profileIconButton) profileIconButton.setAttribute('aria-expanded', 'false');
+        }
+        if (notificationsDropdown && notificationsDropdown !== except && !notificationsDropdown.classList.contains('hidden')) {
+            notificationsDropdown.classList.add('hidden');
+        }
+        if (languageDropdown && languageDropdown !== except && !languageDropdown.classList.contains('hidden')) {
+            languageDropdown.classList.add('hidden');
+            if (languageSelectorButton) languageSelectorButton.setAttribute('aria-expanded', 'false');
+            if (dropdownArrow) dropdownArrow.style.transform = 'rotate(0deg)';
+        }
+    }
+
+    // --- Profile Popup Logic ---
+    if (profileIconButton && profilePopup) {
+        profileIconButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const willShow = profilePopup.classList.contains('hidden');
+            closeAllPopups({ except: profilePopup });
+            profilePopup.classList.toggle('hidden', !willShow);
+            profileIconButton.setAttribute('aria-expanded', willShow ? 'true' : 'false');
+        });
+        document.addEventListener('click', (e) => {
+            if (!profilePopup.classList.contains('hidden') &&
+                !profilePopup.contains(e.target) &&
+                !profileIconButton.contains(e.target)) {
+                profilePopup.classList.add('hidden');
+                profileIconButton.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+
+    // --- Enhanced Language Selector Logic ---
     if (languageSelectorButton && languageDropdown) {
         // Toggle dropdown on button click
         languageSelectorButton.addEventListener('click', (e) => {
             e.stopPropagation();
             const isHidden = languageDropdown.classList.contains('hidden');
-
-            // Close other dropdowns if open
-            if (notificationsDropdown && !notificationsDropdown.classList.contains('hidden')) {
-                notificationsDropdown.classList.add('hidden');
-            }
-            if (profilePopup && !profilePopup.classList.contains('hidden')) {
-                profilePopup.classList.add('hidden');
-            }
+            closeAllPopups({ except: languageDropdown });
 
             if (isHidden) {
                 languageDropdown.classList.remove('hidden');
@@ -269,10 +270,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
+        // Restore to the correct open/closed state on mouseleave — not always 0deg,
+        // because if the dropdown is already open the arrow should return to 180deg.
         languageSelectorButton.addEventListener('mouseleave', () => {
-            if (dropdownArrow && languageDropdown.classList.contains('hidden')) {
-                dropdownArrow.style.transform = 'rotate(0deg)';
-            }
+            if (!dropdownArrow) return;
+            dropdownArrow.style.transform = languageDropdown.classList.contains('hidden')
+                ? 'rotate(0deg)' : 'rotate(180deg)';
         });
     }
 
@@ -288,21 +291,7 @@ document.addEventListener('DOMContentLoaded', function() {
         notificationsBellButton.addEventListener('click', (e) => {
             e.stopPropagation();
             const isHidden = notificationsDropdown.classList.contains('hidden');
-
-            // Close other popups if open
-            if (profilePopup && !profilePopup.classList.contains('hidden')) {
-                profilePopup.classList.add('hidden');
-            }
-            if (languageDropdown && !languageDropdown.classList.contains('hidden')) {
-                languageDropdown.classList.add('hidden');
-                if (languageSelectorButton) {
-                    languageSelectorButton.setAttribute('aria-expanded', 'false');
-                    const dropdownArrow = languageSelectorButton.querySelector('.dropdown-arrow');
-                    if (dropdownArrow) {
-                        dropdownArrow.style.transform = 'rotate(0deg)';
-                    }
-                }
-            }
+            closeAllPopups({ except: notificationsDropdown });
 
             if (isHidden) {
                 // Load notifications when opening dropdown
@@ -326,6 +315,47 @@ document.addEventListener('DOMContentLoaded', function() {
         if (markAllReadBtn) {
             markAllReadBtn.addEventListener('click', markAllNotificationsRead);
         }
+    }
+
+    // --- Notification sound preferences (in-memory cache) ---
+    // Populated lazily by cacheNotificationPreferences(); avoids re-parsing
+    // localStorage JSON on every sound-play call.
+    let _cachedNotifPrefs = null;
+    try {
+        const stored = localStorage.getItem('notification_preferences');
+        if (stored) _cachedNotifPrefs = JSON.parse(stored);
+    } catch (e) { /* localStorage unavailable or corrupt — ignore */ }
+
+    // --- Mark-read / mark-unread button factories ---
+    // Centralises button construction that was previously duplicated across
+    // displayNotifications, markNotificationRead, markNotificationUnread,
+    // and markAllNotificationsRead.
+    function createMarkReadBtn(id) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('data-notification-id', String(id));
+        btn.className = 'mark-notification-read-btn group ml-2 text-gray-300 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100';
+        btn.setAttribute('title', 'Mark as read');
+        const icon = document.createElement('i');
+        icon.className = 'far fa-envelope-open text-xs text-gray-300 group-hover:text-gray-600';
+        btn.appendChild(icon);
+        btn.addEventListener('mouseenter', () => { icon.classList.replace('far', 'fas'); });
+        btn.addEventListener('mouseleave', () => { icon.classList.replace('fas', 'far'); });
+        return btn;
+    }
+
+    function createMarkUnreadBtn(id) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('data-notification-id', String(id));
+        btn.className = 'mark-notification-unread-btn group ml-2 text-gray-300 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100';
+        btn.setAttribute('title', 'Mark as unread');
+        const icon = document.createElement('i');
+        icon.className = 'far fa-envelope text-xs text-gray-300 group-hover:text-gray-600';
+        btn.appendChild(icon);
+        btn.addEventListener('mouseenter', () => { icon.classList.replace('far', 'fas'); });
+        btn.addEventListener('mouseleave', () => { icon.classList.replace('fas', 'far'); });
+        return btn;
     }
 
     // Load notifications function with retry
@@ -390,41 +420,32 @@ document.addEventListener('DOMContentLoaded', function() {
             // Log detailed error for debugging
             console.error('Error loading notifications:', error.message);
 
-            // Retry mechanism
             if (retries > 0) {
+                // Retry silently — the loading spinner stays visible.
+                // Return without re-throwing so this catch path doesn't produce
+                // an unhandled rejection for the recursive retry's own promise chain.
                 setTimeout(() => loadNotifications(retries - 1), 2000);
-            } else {
-                // Show error with retry button
-                notificationsList.replaceChildren();
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'p-4 text-center';
-                const errorP = document.createElement('p');
-                errorP.className = 'text-red-500 mb-2';
-                errorP.textContent = 'Unable to load notifications';
-                const retryBtn = document.createElement('button');
-                retryBtn.type = 'button';
-                retryBtn.className = 'notifications-retry-btn text-blue-600 hover:underline text-sm';
-                const retryIcon = document.createElement('i');
-                retryIcon.className = 'fas fa-redo mr-1';
-                retryBtn.appendChild(retryIcon);
-                retryBtn.appendChild(document.createTextNode('Retry'));
-                errorDiv.appendChild(errorP);
-                errorDiv.appendChild(retryBtn);
-                notificationsList.appendChild(errorDiv);
+                return;
             }
-            throw error;
+
+            // Final failure: show error UI with manual retry button
+            notificationsList.replaceChildren();
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'p-4 text-center';
+            const errorP = document.createElement('p');
+            errorP.className = 'text-red-500 mb-2';
+            errorP.textContent = 'Unable to load notifications';
+            const retryBtn = document.createElement('button');
+            retryBtn.type = 'button';
+            retryBtn.className = 'notifications-retry-btn text-blue-600 hover:underline text-sm';
+            const retryIcon = document.createElement('i');
+            retryIcon.className = 'fas fa-redo mr-1';
+            retryBtn.appendChild(retryIcon);
+            retryBtn.appendChild(document.createTextNode('Retry'));
+            errorDiv.appendChild(errorP);
+            errorDiv.appendChild(retryBtn);
+            notificationsList.appendChild(errorDiv);
         });
-    }
-
-    // Make loadNotifications available globally for retry button
-    window.loadNotifications = loadNotifications;
-
-    // HTML escaping function for security
-    function escapeHtml(text) {
-        if (typeof text !== 'string') return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 
     // Display notifications in dropdown
@@ -507,6 +528,9 @@ document.addEventListener('DOMContentLoaded', function() {
             notificationItem.setAttribute('data-notification-id', id.toString());
             notificationItem.setAttribute('data-related-url', relatedUrl);
             notificationItem.setAttribute('data-priority', priority || 'normal');
+            // Authoritative read/unread state stored in data attribute — avoids relying
+            // on background colour classes as application state.
+            notificationItem.setAttribute('data-is-read', notification.is_read ? 'true' : 'false');
 
             const mainFlex = document.createElement('div');
             mainFlex.className = 'flex items-start justify-between';
@@ -631,32 +655,7 @@ document.addEventListener('DOMContentLoaded', function() {
             contentDiv.appendChild(metaDiv);
 
             mainFlex.appendChild(contentDiv);
-
-            if (!notification.is_read) {
-                const markReadBtn = document.createElement('button');
-                markReadBtn.type = 'button';
-                markReadBtn.setAttribute('data-notification-id', id.toString());
-                markReadBtn.className = 'mark-notification-read-btn group ml-2 text-gray-300 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100';
-                markReadBtn.setAttribute('title', 'Mark as read');
-                const openIcon = document.createElement('i');
-                openIcon.className = 'far fa-envelope-open text-xs text-gray-300 group-hover:text-gray-600';
-                markReadBtn.appendChild(openIcon);
-                markReadBtn.addEventListener('mouseenter', () => { openIcon.classList.replace('far', 'fas'); });
-                markReadBtn.addEventListener('mouseleave', () => { openIcon.classList.replace('fas', 'far'); });
-                mainFlex.appendChild(markReadBtn);
-            } else {
-                const markUnreadBtn = document.createElement('button');
-                markUnreadBtn.type = 'button';
-                markUnreadBtn.setAttribute('data-notification-id', id.toString());
-                markUnreadBtn.className = 'mark-notification-unread-btn group ml-2 text-gray-300 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100';
-                markUnreadBtn.setAttribute('title', 'Mark as unread');
-                const closedIcon = document.createElement('i');
-                closedIcon.className = 'far fa-envelope text-xs text-gray-300 group-hover:text-gray-600';
-                markUnreadBtn.appendChild(closedIcon);
-                markUnreadBtn.addEventListener('mouseenter', () => { closedIcon.classList.replace('far', 'fas'); });
-                markUnreadBtn.addEventListener('mouseleave', () => { closedIcon.classList.replace('fas', 'far'); });
-                mainFlex.appendChild(markUnreadBtn);
-            }
+            mainFlex.appendChild(notification.is_read ? createMarkUnreadBtn(id) : createMarkReadBtn(id));
 
             notificationItem.appendChild(mainFlex);
             notificationsList.appendChild(notificationItem);
@@ -695,21 +694,21 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Mark as read if not already read
+        // Mark as read if not already read (check data attribute, not CSS classes)
         const notificationElement = document.querySelector(`[data-notification-id="${id}"]`);
-        if (notificationElement && (notificationElement.classList.contains('bg-blue-50') ||
-                                    notificationElement.classList.contains('bg-red-50') ||
-                                    notificationElement.classList.contains('bg-orange-50'))) {
+        if (notificationElement && notificationElement.getAttribute('data-is-read') === 'false') {
             markNotificationRead(id);
         }
 
         // Navigate to related URL if available and safe
         if (relatedUrl && typeof relatedUrl === 'string' && relatedUrl !== 'None' && relatedUrl !== '') {
-            // Basic URL validation to prevent javascript: or data: URLs
+            // Validate that the URL is same-origin. new URL() will set origin to "null"
+            // for non-http(s) schemes (javascript:, data:, etc.), so the origin check
+            // alone is sufficient — no secondary protocol string-scan needed.
             try {
                 const url = new URL(relatedUrl, window.location.origin);
-                if (url.origin === window.location.origin && !relatedUrl.toLowerCase().includes('javascript:')) {
-                    window.location.href = relatedUrl;
+                if (url.origin === window.location.origin) {
+                    window.location.assign(url.href);
                 }
             } catch (error) {
                 console.error('Invalid URL:', relatedUrl);
@@ -763,46 +762,33 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             if (data.success) {
-                // Update UI: swap mark-read for mark-unread button
-                const notificationElement = document.querySelector(`[data-notification-id="${id}"]`);
-                if (notificationElement) {
-                    notificationElement.classList.remove('bg-blue-50', 'bg-red-50', 'bg-orange-50');
-                    notificationElement.style.borderLeft = '';
-                    const unreadDot = notificationElement.querySelector('.notification-dropdown-unread-dot');
+                const el = document.querySelector(`[data-notification-id="${id}"]`);
+                if (el) {
+                    el.setAttribute('data-is-read', 'true');
+                    el.classList.remove('bg-blue-50', 'bg-red-50', 'bg-orange-50');
+                    el.style.borderLeft = '';
+                    const unreadDot = el.querySelector('.notification-dropdown-unread-dot');
                     if (unreadDot) unreadDot.remove();
-                    const markReadBtn = notificationElement.querySelector('.mark-notification-read-btn');
-                    if (markReadBtn) {
-                        const markUnreadBtn = document.createElement('button');
-                        markUnreadBtn.type = 'button';
-                        markUnreadBtn.setAttribute('data-notification-id', id.toString());
-                        markUnreadBtn.className = 'mark-notification-unread-btn group ml-2 text-gray-300 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100';
-                        markUnreadBtn.setAttribute('title', 'Mark as unread');
-                        const closedIcon = document.createElement('i');
-                        closedIcon.className = 'far fa-envelope text-xs text-gray-300 group-hover:text-gray-600';
-                        markUnreadBtn.appendChild(closedIcon);
-                        markUnreadBtn.addEventListener('mouseenter', () => { closedIcon.classList.replace('far', 'fas'); });
-                        markUnreadBtn.addEventListener('mouseleave', () => { closedIcon.classList.replace('fas', 'far'); });
-                        markReadBtn.replaceWith(markUnreadBtn);
+                    const markReadBtn = el.querySelector('.mark-notification-read-btn');
+                    if (markReadBtn) markReadBtn.replaceWith(createMarkUnreadBtn(id));
+                    const titleEl = el.querySelector('h4');
+                    if (titleEl) {
+                        titleEl.classList.remove('font-semibold');
+                        titleEl.style.color = '#4b5563';
                     }
-                    const titleElement = notificationElement.querySelector('h4');
-                    if (titleElement) {
-                        titleElement.classList.remove('font-semibold');
-                        titleElement.style.color = '#4b5563';
-                    }
-                    const messageEl = notificationElement.querySelector('.notification-message-text');
+                    const messageEl = el.querySelector('.notification-message-text');
                     if (messageEl) messageEl.style.color = '#6b7280';
-                    const contentArea = notificationElement.querySelector('.flex-1');
-                    const headerIcons = contentArea ? contentArea.querySelectorAll('i') : [];
-                    headerIcons.forEach(icon => {
+                    const contentArea = el.querySelector('.flex-1');
+                    (contentArea ? contentArea.querySelectorAll('i') : []).forEach(icon => {
                         icon.classList.remove('text-red-600', 'text-orange-600', 'text-blue-600', 'text-red-900', 'text-orange-900');
                         icon.classList.add('text-gray-500');
                     });
-                    const priorityBadge = notificationElement.querySelector('.notification-priority-badge');
+                    const priorityBadge = el.querySelector('.notification-priority-badge');
                     if (priorityBadge) {
                         priorityBadge.style.backgroundColor = '#e5e7eb';
                         priorityBadge.style.color = '#6b7280';
                     }
-                    const entityBadge = notificationElement.querySelector('.notification-entity-badge');
+                    const entityBadge = el.querySelector('.notification-entity-badge');
                     if (entityBadge) {
                         entityBadge.style.backgroundColor = '#f3f4f6';
                         entityBadge.style.color = '#6b7280';
@@ -814,8 +800,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     updateNotificationsBadge(data.unread_count);
                 }
 
-                // Hide mark all read button if no more unread
-                const hasUnread = document.querySelectorAll('.notification-item.bg-blue-50, .notification-item.bg-red-50, .notification-item.bg-orange-50').length > 0;
+                // Hide mark all read button if no more unread (use data attribute, not CSS classes)
+                const hasUnread = document.querySelectorAll('[data-is-read="false"].notification-item').length > 0;
                 if (markAllReadBtn) {
                     markAllReadBtn.classList.toggle('hidden', !hasUnread);
                 }
@@ -858,17 +844,18 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(data => {
             if (data && data.success) {
-                const notificationElement = document.querySelector(`[data-notification-id="${id}"]`);
-                if (notificationElement) {
-                    const priority = notificationElement.getAttribute('data-priority') || 'normal';
+                const el = document.querySelector(`[data-notification-id="${id}"]`);
+                if (el) {
+                    el.setAttribute('data-is-read', 'false');
+                    const priority = el.getAttribute('data-priority') || 'normal';
                     const isUrgent = priority === 'urgent';
                     const isHighPriority = priority === 'high' || isUrgent;
                     const bgClass = isHighPriority ? (isUrgent ? 'bg-red-50' : 'bg-orange-50') : 'bg-blue-50';
                     const stripeColor = isUrgent ? '#dc2626' : (isHighPriority ? '#f97316' : '#3b82f6');
                     const dotClass = isUrgent ? 'bg-red-500' : (isHighPriority ? 'bg-orange-500' : 'bg-blue-500');
-                    notificationElement.classList.add(bgClass);
-                    notificationElement.style.borderLeft = `4px solid ${stripeColor}`;
-                    const titleH4 = notificationElement.querySelector('h4');
+                    el.classList.add(bgClass);
+                    el.style.borderLeft = `4px solid ${stripeColor}`;
+                    const titleH4 = el.querySelector('h4');
                     if (titleH4 && !titleH4.querySelector('.notification-dropdown-unread-dot')) {
                         const dot = document.createElement('span');
                         dot.className = `notification-dropdown-unread-dot ml-1.5 w-2 h-2 ${dotClass} rounded-full inline-block align-middle flex-shrink-0`;
@@ -879,38 +866,25 @@ document.addEventListener('DOMContentLoaded', function() {
                         titleH4.classList.add('font-semibold');
                         titleH4.style.color = isUrgent ? '#b91c1c' : (isHighPriority ? '#c2410c' : '#111827');
                     }
-                    const messageEl = notificationElement.querySelector('.notification-message-text');
+                    const messageEl = el.querySelector('.notification-message-text');
                     if (messageEl) {
                         messageEl.style.color = isUrgent ? '#991b1b' : (isHighPriority ? '#7c2d12' : '#4b5563');
                     }
-                    const markUnreadBtn = notificationElement.querySelector('.mark-notification-unread-btn');
-                    if (markUnreadBtn) {
-                        const markReadBtn = document.createElement('button');
-                        markReadBtn.type = 'button';
-                        markReadBtn.setAttribute('data-notification-id', id.toString());
-                        markReadBtn.className = 'mark-notification-read-btn group ml-2 text-gray-300 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100';
-                        markReadBtn.setAttribute('title', 'Mark as read');
-                        const openIcon = document.createElement('i');
-                        openIcon.className = 'far fa-envelope-open text-xs text-gray-300 group-hover:text-gray-600';
-                        markReadBtn.appendChild(openIcon);
-                        markReadBtn.addEventListener('mouseenter', () => { openIcon.classList.replace('far', 'fas'); });
-                        markReadBtn.addEventListener('mouseleave', () => { openIcon.classList.replace('fas', 'far'); });
-                        markUnreadBtn.replaceWith(markReadBtn);
-                    }
-                    const priorityBadge = notificationElement.querySelector('.notification-priority-badge');
+                    const markUnreadBtn = el.querySelector('.mark-notification-unread-btn');
+                    if (markUnreadBtn) markUnreadBtn.replaceWith(createMarkReadBtn(id));
+                    const priorityBadge = el.querySelector('.notification-priority-badge');
                     if (priorityBadge) {
                         priorityBadge.style.backgroundColor = isUrgent ? '#dc2626' : (isHighPriority ? '#f97316' : '#e5e7eb');
                         priorityBadge.style.color = isHighPriority ? '#ffffff' : '#6b7280';
                     }
-                    const entityBadge = notificationElement.querySelector('.notification-entity-badge');
+                    const entityBadge = el.querySelector('.notification-entity-badge');
                     if (entityBadge) {
                         entityBadge.style.backgroundColor = '#f0f9ff';
                         entityBadge.style.color = '#0369a1';
                     }
-                    const contentArea = notificationElement.querySelector('.flex-1');
-                    const headerIcons = contentArea ? contentArea.querySelectorAll('i') : [];
+                    const contentArea = el.querySelector('.flex-1');
                     const iconColorClass = isUrgent ? 'text-red-600' : (isHighPriority ? 'text-orange-600' : 'text-blue-600');
-                    headerIcons.forEach(icon => {
+                    (contentArea ? contentArea.querySelectorAll('i') : []).forEach(icon => {
                         icon.classList.remove('text-gray-500', 'text-red-600', 'text-orange-600', 'text-blue-600');
                         icon.classList.add(iconColorClass);
                     });
@@ -930,10 +904,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Mark all notifications as read
     function markAllNotificationsRead() {
-        const unreadElements = document.querySelectorAll('.notification-item.bg-blue-50, .notification-item.bg-red-50, .notification-item.bg-orange-50');
-        const notificationIds = Array.from(unreadElements).map(el =>
-            parseInt(el.getAttribute('data-notification-id'))
-        );
+        // Use data attribute to find unread items (not CSS background classes)
+        const unreadElements = document.querySelectorAll('[data-is-read="false"].notification-item');
+        const notificationIds = Array.from(unreadElements)
+            .map(el => parseInt(el.getAttribute('data-notification-id')))
+            .filter(id => Number.isFinite(id) && id > 0);
 
         if (notificationIds.length === 0) return;
 
@@ -965,45 +940,35 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 // Update all unread notifications
-                unreadElements.forEach(notificationElement => {
-                    notificationElement.classList.remove('bg-blue-50', 'bg-red-50', 'bg-orange-50');
-                    notificationElement.style.borderLeft = '';
-                    const unreadDot = notificationElement.querySelector('.notification-dropdown-unread-dot');
+                unreadElements.forEach(el => {
+                    const id = parseInt(el.getAttribute('data-notification-id'));
+                    el.setAttribute('data-is-read', 'true');
+                    el.classList.remove('bg-blue-50', 'bg-red-50', 'bg-orange-50');
+                    el.style.borderLeft = '';
+                    const unreadDot = el.querySelector('.notification-dropdown-unread-dot');
                     if (unreadDot) unreadDot.remove();
-                    const markReadBtn = notificationElement.querySelector('.mark-notification-read-btn');
-                    if (markReadBtn) {
-                        const id = notificationElement.getAttribute('data-notification-id');
-                        const markUnreadBtn = document.createElement('button');
-                        markUnreadBtn.type = 'button';
-                        markUnreadBtn.setAttribute('data-notification-id', id);
-                        markUnreadBtn.className = 'mark-notification-unread-btn group ml-2 text-gray-300 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100';
-                        markUnreadBtn.setAttribute('title', 'Mark as unread');
-                        const closedIcon = document.createElement('i');
-                        closedIcon.className = 'far fa-envelope text-xs text-gray-300 group-hover:text-gray-600';
-                        markUnreadBtn.appendChild(closedIcon);
-                        markUnreadBtn.addEventListener('mouseenter', () => { closedIcon.classList.replace('far', 'fas'); });
-                        markUnreadBtn.addEventListener('mouseleave', () => { closedIcon.classList.replace('fas', 'far'); });
-                        markReadBtn.replaceWith(markUnreadBtn);
+                    const markReadBtn = el.querySelector('.mark-notification-read-btn');
+                    if (markReadBtn && Number.isFinite(id) && id > 0) {
+                        markReadBtn.replaceWith(createMarkUnreadBtn(id));
                     }
-                    const titleElement = notificationElement.querySelector('h4');
+                    const titleElement = el.querySelector('h4');
                     if (titleElement) {
                         titleElement.classList.remove('font-semibold');
                         titleElement.style.color = '#4b5563';
                     }
-                    const messageEl = notificationElement.querySelector('.notification-message-text');
+                    const messageEl = el.querySelector('.notification-message-text');
                     if (messageEl) messageEl.style.color = '#6b7280';
-                    const contentArea = notificationElement.querySelector('.flex-1');
-                    const headerIcons = contentArea ? contentArea.querySelectorAll('i') : [];
-                    headerIcons.forEach(icon => {
+                    const contentArea = el.querySelector('.flex-1');
+                    (contentArea ? contentArea.querySelectorAll('i') : []).forEach(icon => {
                         icon.classList.remove('text-red-600', 'text-orange-600', 'text-blue-600', 'text-red-900', 'text-orange-900');
                         icon.classList.add('text-gray-500');
                     });
-                    const priorityBadge = notificationElement.querySelector('.notification-priority-badge');
+                    const priorityBadge = el.querySelector('.notification-priority-badge');
                     if (priorityBadge) {
                         priorityBadge.style.backgroundColor = '#e5e7eb';
                         priorityBadge.style.color = '#6b7280';
                     }
-                    const entityBadge = notificationElement.querySelector('.notification-entity-badge');
+                    const entityBadge = el.querySelector('.notification-entity-badge');
                     if (entityBadge) {
                         entityBadge.style.backgroundColor = '#f3f4f6';
                         entityBadge.style.color = '#6b7280';
@@ -1011,11 +976,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 // Update badge and hide mark all button
-                if (data.unread_count !== undefined) {
-                    updateNotificationsBadge(data.unread_count);
-                } else {
-                    updateNotificationsBadge(0);
-                }
+                updateNotificationsBadge(data.unread_count !== undefined ? data.unread_count : 0);
                 if (markAllReadBtn) {
                     markAllReadBtn.classList.add('hidden');
                 }
@@ -1077,21 +1038,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Play notification sound
     function playNotificationSound() {
-        // Check preferences from localStorage (cached from API)
-        const preferences = localStorage.getItem('notification_preferences');
-        if (preferences) {
-            try {
-                const prefs = JSON.parse(preferences);
-                if (prefs.sound_enabled) {
-                    // Create audio element for notification sound
-                    const soundUrl = (window.getStaticUrl && window.getStaticUrl('sounds/notification.mp3')) || '/static/sounds/notification.mp3';
-                    const audio = new Audio(soundUrl);
-                    audio.volume = 0.5;
-                    audio.play().catch(e => console.debug('Sound play failed:', e));
-                }
-            } catch (e) {
-                console.debug('Error parsing preferences:', e);
-            }
+        // Use in-memory cached prefs (populated once by cacheNotificationPreferences)
+        // to avoid re-parsing localStorage JSON on every notification.
+        if (_cachedNotifPrefs && _cachedNotifPrefs.sound_enabled) {
+            const soundUrl = (window.getStaticUrl && window.getStaticUrl('sounds/notification.mp3')) || '/static/sounds/notification.mp3';
+            const audio = new Audio(soundUrl);
+            audio.volume = 0.5;
+            audio.play().catch(e => console.debug('Sound play failed:', e));
         }
     }
 
@@ -1140,7 +1093,7 @@ document.addEventListener('DOMContentLoaded', function() {
             wsConnection = new WebSocket(wsUrl);
 
             // Handle connection open
-            wsConnection.onopen = function(event) {
+            wsConnection.onopen = function() {
                 console.debug('WebSocket connection established');
                 // Reset reconnect attempts only if the socket survives for a bit.
                 // This avoids endless "attempt 1" loops on immediately dropped links.
@@ -1356,7 +1309,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function checkWebSocketStatusOnce() {
         // Prefer server-injected config (layout.html) so we never need GET /stream/status.
         if (typeof window.NOTIFY_WS_ENABLED !== 'undefined') {
-            const enabled = !!window.NOTIFY_WS_ENABLED;
+            const enabled = Boolean(window.NOTIFY_WS_ENABLED);
             _writeCachedWsStatus(enabled);
             _setWsPermanentlyDisabled(!enabled);
             if (!enabled) {
@@ -1406,9 +1359,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Phase 2: Real-time notifications via WebSocket
     function connectWebSocket() {
-        // Close existing connection if any
+        // Disarm the old socket's handlers before closing so its async onclose
+        // does not race against the new connection and trigger a spurious reconnect cycle.
         if (wsConnection) {
-            wsConnection.close();
+            const old = wsConnection;
+            old.onclose = null;
+            old.onerror = null;
+            old.close();
             wsConnection = null;
         }
         if (pingIntervalId !== null) {
@@ -1513,6 +1470,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const cachedAt = parseInt(localStorage.getItem(NOTIFICATION_PREFS_CACHED_AT_KEY), 10) || 0;
         const isFresh = !force && (Date.now() - cachedAt) < NOTIFICATION_PREFS_CACHE_TTL_MS && localStorage.getItem('notification_preferences') !== null;
         if (isFresh) {
+            // Populate in-memory cache from storage so playNotificationSound doesn't
+            // have to parse localStorage on every call.
+            try { _cachedNotifPrefs = JSON.parse(localStorage.getItem('notification_preferences')); } catch (e) { /* ignore */ }
             return;
         }
 
@@ -1529,6 +1489,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success && data.preferences) {
+                _cachedNotifPrefs = data.preferences;
                 localStorage.setItem('notification_preferences', JSON.stringify(data.preferences));
                 localStorage.setItem(NOTIFICATION_PREFS_CACHED_AT_KEY, String(Date.now()));
                 console.info('[notif-prefs] fetched and cached (next fetch in ' + Math.round(NOTIFICATION_PREFS_CACHE_TTL_MS / 60000) + 'm)');
@@ -1597,17 +1558,22 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Global Escape-to-close for open popups ---
+    // --- Global Escape-to-close for open popups (restores focus to trigger button) ---
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
 
         if (profilePopup && !profilePopup.classList.contains('hidden')) {
             profilePopup.classList.add('hidden');
+            if (profileIconButton) {
+                profileIconButton.setAttribute('aria-expanded', 'false');
+                profileIconButton.focus();
+            }
         }
         if (languageDropdown && !languageDropdown.classList.contains('hidden')) {
             languageDropdown.classList.add('hidden');
             if (languageSelectorButton) {
                 languageSelectorButton.setAttribute('aria-expanded', 'false');
+                languageSelectorButton.focus();
             }
             if (dropdownArrow) {
                 dropdownArrow.style.transform = 'rotate(0deg)';
@@ -1615,6 +1581,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (notificationsDropdown && !notificationsDropdown.classList.contains('hidden')) {
             notificationsDropdown.classList.add('hidden');
+            if (notificationsBellButton) {
+                notificationsBellButton.focus();
+            }
         }
     });
 });

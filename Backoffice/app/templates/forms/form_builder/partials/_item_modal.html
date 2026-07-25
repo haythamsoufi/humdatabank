@@ -16,7 +16,7 @@
             <i class="fas fa-plus-circle w-6 h-6 mr-2 text-green-600"></i>
             {{ _('Add Item to') }} <span id="item-modal-section-name" class="font-bold ml-1">{{ _('Section') }}</span>
         </h3>
-        <form id="item-modal-form" method="POST" action="">
+        <form id="item-modal-form" method="POST" action="" data-loading-text="{{ _('Saving…') }}">
             {# CSRF token - pre-populated server-side; JS may refresh it if the session token rotates #}
             <div id="item-modal-csrf-container">
                 <input id="section-csrf_token-item-modal" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">

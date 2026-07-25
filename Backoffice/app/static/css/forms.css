@@ -1250,8 +1250,65 @@ a.btn.entry-form-doc-library-btn {
 
 /* Entry form page-scoped UI (moved from entry_form.html inline styles) */
 .entry-form-loading #entry-form-ui { display: none !important; }
-.entry-form-loading #entry-form-loading { display: flex !important; }
+.entry-form-loading #entry-form-loading { display: block !important; }
 #entry-form-loading { display: none; }
+
+/* Entry form loading skeleton */
+@keyframes entry-form-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.entry-form-skeleton {
+  pointer-events: none;
+  user-select: none;
+}
+
+.entry-form-skeleton-bar {
+  background: #e2e8f0;
+  border-radius: 0.375rem;
+}
+
+.entry-form-skeleton-pulse {
+  animation: entry-form-skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.entry-form-skeleton-status {
+  pointer-events: auto;
+}
+
+/* Skeleton sections pane — mirrors #section-navigation-sidebar responsive rules (1100px breakpoint) */
+@media (min-width: 1100px) {
+  #entry-form-skeleton-sidebar {
+    position: sticky !important;
+    top: 1rem !important;
+    width: 20% !important;
+    max-width: 20rem !important;
+    max-height: calc(100vh - 8rem) !important;
+    overflow-y: auto !important;
+    transform: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    opacity: 1 !important;
+    inset: auto !important;
+    border-radius: 0.5rem !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
+    border: 1px solid #e5e7eb !important;
+    border-right: 1px solid #e5e7eb !important;
+  }
+}
+
+@media (max-width: 1099px) {
+  #entry-form-skeleton-sidebar {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry-form-skeleton-pulse {
+    animation: none;
+  }
+}
 
 .form-item-block.ai-opinion-processing {
   position: relative;

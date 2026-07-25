@@ -120,7 +120,7 @@
                                       class="inline-block"
                                       data-confirm="{{ _('Delete this grant?')|forceescape }}">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button type="submit" class="text-red-600 hover:text-red-900" title="{{ _('Delete')|forceescape }}">
+                                    <button type="submit" class="text-red-600 hover:text-red-900" title="{{ _('Delete')|forceescape }}" data-loading-text="">
                                         <i class="fas fa-trash fa-fw"></i>
                                     </button>
                                 </form>

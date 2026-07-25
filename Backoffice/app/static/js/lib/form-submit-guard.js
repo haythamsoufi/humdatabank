@@ -10,7 +10,11 @@
  * - Include this script in your page
  * - Forms with class 'no-submit-guard' will be excluded
  * - Submit buttons with class 'no-submit-guard' will be excluded
- * - Set data-loading-text="" on icon-only buttons for spinner-only (no "Saving..." label)
+ * - The generic default label is "Processing..." — it applies to any submit action
+ *   (save, delete, login, send, etc.), so prefer it when no better label is set.
+ * - Set data-loading-text="" on icon-only buttons for spinner-only (no label)
+ * - Set data-loading-text="Some action..." to show an action-specific label
+ *   (e.g. "Signing in...", "Sending...") instead of the generic default
  * - Call FormSubmitGuard.reset(form) to manually reset a form's submission state
  */
 
@@ -147,8 +151,10 @@
                         Array.from(button.childNodes).map(function(n) { return n.cloneNode(true); })
                     );
 
-                    // Default label; use data-loading-text="" on icon-only buttons for spinner-only.
-                    let loadingText = 'Saving...';
+                    // Generic default label (works for any action); override with
+                    // data-loading-text for action-specific wording, or data-loading-text=""
+                    // on icon-only buttons for spinner-only.
+                    let loadingText = 'Processing...';
                     if (button.hasAttribute('data-loading-text')) {
                         loadingText = button.getAttribute('data-loading-text') || '';
                     }

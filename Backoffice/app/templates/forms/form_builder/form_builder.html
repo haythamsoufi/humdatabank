@@ -199,6 +199,7 @@
                 const message = {{ _("Deploy this version? This will publish it as the live version.") | tojson }};
                 const doSubmit = () => {
                     form.dataset.confirmed = 'true';
+                    form.dataset.loadingText = {{ _('Deploying version…') | tojson }};
                     if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
                         window.FormBuilderAjax.submit(form);
                     } else if (typeof form.requestSubmit === 'function') {
@@ -242,6 +243,7 @@
                     || {{ _("Discard this draft? All changes will be lost and cannot be undone.") | tojson }};
                 const doSubmit = () => {
                     form.dataset.confirmed = 'true';
+                    form.dataset.loadingText = {{ _('Discarding draft…') | tojson }};
                     if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
                         window.FormBuilderAjax.submit(form);
                     } else if (typeof form.requestSubmit === 'function') {
@@ -318,6 +320,7 @@
                 const message = {{ _("Deploy this archived version? This will publish it as the live version.") | tojson }};
                 const doSubmit = () => {
                     form.dataset.confirmed = 'true';
+                    form.dataset.loadingText = {{ _('Deploying version…') | tojson }};
                     if (window.FormBuilderAjax && typeof window.FormBuilderAjax.submit === 'function') {
                         window.FormBuilderAjax.submit(form);
                     } else if (typeof form.requestSubmit === 'function') {
@@ -1216,6 +1219,12 @@
                 section: {{ _('Duplicate this section? This will copy the section, all sub-sections, and their items.') | tojson | safe }},
                 item: {{ _('Duplicate this item? This will copy the item and all of its configuration.') | tojson | safe }}
             };
+            const loadingTexts = {
+                duplicateSection: {{ _('Duplicating section…') | tojson }},
+                duplicateItem: {{ _('Duplicating item…') | tojson }},
+                deleteSection: {{ _('Deleting section…') | tojson }},
+                deleteItem: {{ _('Deleting item…') | tojson }}
+            };
             const deleteDataWarningTemplate = {{ _('This will permanently delete __count__ data entries.') | tojson }};
 
             const deleteSectionSingleNoData = {{ _('This will permanently delete this section and all its contents. Are you sure?') | tojson }};
@@ -1278,6 +1287,7 @@
                     const message = form.getAttribute('data-confirm-message') || duplicateConfirmDefaults.section;
                     showConfirmModal(message, function() {
                         form.dataset.duplicateConfirmed = 'true';
+                        form.dataset.loadingText = loadingTexts.duplicateSection;
                         doSubmit(form);
                     });
                     return;
@@ -1293,6 +1303,7 @@
                     const message = form.getAttribute('data-confirm-message') || duplicateConfirmDefaults.item;
                     showConfirmModal(message, function() {
                         form.dataset.duplicateConfirmed = 'true';
+                        form.dataset.loadingText = loadingTexts.duplicateItem;
                         doSubmit(form);
                     });
                     return;
@@ -1313,6 +1324,7 @@
                     function proceedDeleteItem(deleteData) {
                         setDeleteData(form, deleteData);
                         form.dataset.deleteConfirmed = 'true';
+                        form.dataset.loadingText = loadingTexts.deleteItem;
                         doSubmit(form);
                     }
 
@@ -1355,6 +1367,7 @@
                     function proceedDeleteSection(deleteData) {
                         setDeleteData(form, deleteData);
                         form.dataset.deleteConfirmed = 'true';
+                        form.dataset.loadingText = loadingTexts.deleteSection;
                         doSubmit(form);
                     }
 

@@ -269,7 +269,7 @@
                 if (data.duplicate_url) {
                     html += '<form action="' + data.duplicate_url + '" method="POST" class="inline-block" data-confirm="' + data.duplicate_confirm.replace(/'/g, "\\'") + '">';
                     html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
-                    html += '<button type="submit" class="text-gray-600 hover:text-gray-900" title="' + {{ _("Duplicate")|tojson|safe }} + '"><i class="fas fa-copy fa-fw"></i></button>';
+                    html += '<button type="submit" class="text-gray-600 hover:text-gray-900" title="' + {{ _("Duplicate")|tojson|safe }} + '" data-loading-text=""><i class="fas fa-copy fa-fw"></i></button>';
                     html += '</form>';
                 }
                 html += '<a href="' + data.preview_url + '" target="_blank" class="text-green-600 hover:text-green-900" title="' + {{ _("Preview Template")|tojson|safe }} + '"><i class="fas fa-eye fa-fw"></i></a>';

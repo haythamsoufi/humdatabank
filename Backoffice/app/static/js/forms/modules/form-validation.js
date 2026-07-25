@@ -88,7 +88,7 @@ class FormValidator {
                 e.preventDefault();
                 e.stopPropagation();
 
-                // Reset submit button state if FormSubmitGuard changed it to "Saving..."
+                // Reset submit button state if FormSubmitGuard put it into a loading state
                 // Use full-form reset (submitter can be missing with requestSubmit()/programmatic submits)
                 if (window.FormSubmitGuard) {
                     try {

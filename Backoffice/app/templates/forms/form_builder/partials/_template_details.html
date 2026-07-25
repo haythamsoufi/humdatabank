@@ -104,7 +104,7 @@
 
     {# Edit Template Details Form (remains hidden by default) #}
     <div id="edit-template-details-form-container" class="hidden mt-6 border-t border-gray-200 pt-6">
-       <form method="POST" action="{{ url_for('form_builder.edit_template', template_id=template.id) }}" class="mb-0" id="template-details-form">
+       <form method="POST" action="{{ url_for('form_builder.edit_template', template_id=template.id) }}" class="mb-0" id="template-details-form" data-loading-text="{{ _('Saving…') }}">
             {{ form.csrf_token }}
             <input type="hidden" name="submit" value="Save Template">
             <input type="hidden" name="version_id" value="{{ active_version_id }}">

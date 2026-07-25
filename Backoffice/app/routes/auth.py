@@ -272,10 +272,11 @@ def dev_act_as_login():
     preset = (request.form.get('preset') or '').strip().lower()
 
     user = None
-    if user_id:
-        user = User.query.filter_by(id=user_id, active=True).first()
-    elif preset:
+    # Preset buttons send name="preset"; honor that before a stale/empty user_id field.
+    if preset:
         user = _resolve_dev_act_as_preset(preset)
+    if not user and user_id:
+        user = User.query.filter_by(id=user_id, active=True).first()
 
     if not user:
         flash(_("User not found."), "warning")

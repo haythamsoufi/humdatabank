@@ -112,7 +112,7 @@
                             <a href="{{ url_for('content_management.edit_resource', resource_id=resource.id) }}" class="text-indigo-600 hover:text-indigo-900" title="Edit {{ resource.default_title }}"><i class="fas fa-pen"></i></a>
                             <form action="{{ url_for('content_management.delete_resource', resource_id=resource.id) }}" method="POST" class="inline-block" data-confirm="Are you sure you want to delete '{{ resource.default_title|e }}'? This action cannot be undone." data-confirm-danger="true">
                                 {{ delete_form.csrf_token }}
-                                <button type="submit" class="text-red-600 hover:text-red-900" title="Delete {{ resource.default_title }}"><i class="fas fa-trash-alt"></i></button>
+                                <button type="submit" class="text-red-600 hover:text-red-900" title="Delete {{ resource.default_title }}" data-loading-text=""><i class="fas fa-trash-alt"></i></button>
                             </form>
                         {% endif %}
                         {% if available_languages %}

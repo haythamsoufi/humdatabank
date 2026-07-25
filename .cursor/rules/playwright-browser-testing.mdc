@@ -9,7 +9,7 @@ alwaysApply: true
 
 Project config (`.cursor/mcp.json`) runs Playwright MCP with **`--isolated`**: each `browser_close` wipes cookies, cache, and service workers. Prefer that over persistent profiles.
 
-If you also enable Playwright MCP in user-level Cursor config, disable the duplicate entry or align `--output-dir` with `.playwright-mcp/screenshots`.
+If you also enable Playwright MCP in user-level Cursor config, **disable that entry** when working in this repo — `.cursor/mcp.json` here is canonical. Two servers launch two Chromes; older `@playwright/mcp` 0.0.x builds also showed a `--no-sandbox` warning banner on Windows (fixed in current releases).
 
 **Base URL:** `http://127.0.0.1:5000` (matches the Flask dev server bind address).
 

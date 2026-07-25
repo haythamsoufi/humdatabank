@@ -68,7 +68,7 @@ export const FormSubmitUI = {
       return true;
     };
 
-    this.showSaving = (text = 'Saving…', detail = '') => {
+    this.showSaving = (text = 'Processing…', detail = '') => {
       if (!ensureBanner()) return;
       if (this._bannerUI && this._bannerUI.update) {
         this._bannerUI.show();
@@ -471,7 +471,9 @@ export const FormSubmitUI = {
 
         // Close any edit modal immediately so the user can see changes behind the banner.
         closeContainingModal();
-        this.showSaving('Saving…');
+        // Action-specific wording (e.g. "Deleting…", "Duplicating…") is set by the caller via
+        // form.dataset.loadingText; a save-neutral default covers any form we don't special-case.
+        this.showSaving(form.dataset && form.dataset.loadingText ? form.dataset.loadingText : 'Processing…');
         const fetchFn = (window.getFetch && window.getFetch()) || fetch;
         const jsonBody = window.snapshotToJson ? JSON.stringify(window.snapshotToJson(snapshot)) : null;
         // Wrap in base64 to avoid WAF false positives on JSON-encoded matrix config strings.
@@ -706,12 +708,20 @@ export const FormSubmitUI = {
         });
         submitButton.dataset.originalText = submitButton.innerHTML;
 
+        // Prefer an action-specific label (button or form data-loading-text, same convention
+        // as FormSubmitGuard) over a generic "Saving..." that doesn't fit every action.
+        const loadingText = submitButton.hasAttribute('data-loading-text')
+          ? (submitButton.getAttribute('data-loading-text') || '')
+          : ((form.dataset && form.dataset.loadingText) || 'Processing...');
+
         // Build loading state with DOM construction
         submitButton.replaceChildren();
         const spinner = document.createElement('i');
-        spinner.className = 'fas fa-spinner fa-spin mr-2';
+        spinner.className = loadingText ? 'fas fa-spinner fa-spin mr-2' : 'fas fa-spinner fa-spin';
         submitButton.appendChild(spinner);
-        submitButton.appendChild(document.createTextNode('Saving...'));
+        if (loadingText) {
+          submitButton.appendChild(document.createTextNode(loadingText));
+        }
       }
     });
   }

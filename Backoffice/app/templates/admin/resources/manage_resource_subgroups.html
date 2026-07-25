@@ -54,7 +54,7 @@
                         <a href="{{ url_for('content_management.edit_resource_subgroup', subgroup_id=s.id) }}" class="text-indigo-600 hover:text-indigo-900" title="Edit"><i class="fas fa-pen"></i></a>
                         <form action="{{ url_for('content_management.delete_resource_subgroup', subgroup_id=s.id) }}" method="POST" class="inline-block" data-confirm="Delete subcategory “{{ s.name|e }}”? Resources will be unassigned from this subcategory." data-confirm-danger="true">
                             {{ delete_form.csrf_token }}
-                            <button type="submit" class="text-red-600 hover:text-red-900" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                                <button type="submit" class="text-red-600 hover:text-red-900" title="Delete" data-loading-text=""><i class="fas fa-trash-alt"></i></button>
                         </form>
                     </td>
                 </tr>

@@ -1037,7 +1037,7 @@
                     const safeConfirm = String(deleteConfirm || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                     html += '<form action="' + deleteUrl + '" method="POST" class="inline-block delete-indicator-form" data-confirm="' + safeConfirm + '">';
                     html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
-                    html += '<button type="submit" title="' + escapeHtmlAttr(' + {{ _("Delete")|js|tojson|safe }} + ') + '" class="text-gray-500 hover:text-red-600 transition-colors"><i class="fas fa-trash fa-fw"></i></button>';
+                    html += '<button type="submit" title="' + escapeHtmlAttr(' + {{ _("Delete")|js|tojson|safe }} + ') + '" class="text-gray-500 hover:text-red-600 transition-colors" data-loading-text=""><i class="fas fa-trash fa-fw"></i></button>';
                     html += '</form>';
                 }
                 html += '</div>';

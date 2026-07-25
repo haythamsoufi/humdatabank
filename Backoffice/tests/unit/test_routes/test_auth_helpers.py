@@ -188,6 +188,28 @@ class TestDevActAsHelpers:
         assert mock_complete.call_args.args[0].id == user.id
         assert resp.status_code == 302
 
+    def test_dev_act_as_route_prefers_preset_over_invalid_user_id(self, app, db_session, monkeypatch):
+        from app.routes.auth import dev_act_as_login
+
+        monkeypatch.setenv('FLASK_CONFIG', 'development')
+        app.config['DEBUG'] = True
+        user = create_test_user(db_session, email='test_admin@humdatabank.org', name='Preset Admin')
+
+        with app.test_request_context(
+            '/login/dev-act-as',
+            method='POST',
+            data={'user_id': '999999', 'preset': 'admin'},
+            environ_base={'REMOTE_ADDR': '127.0.0.1'},
+        ):
+            with patch('app.routes.auth._resolve_dev_act_as_preset', return_value=user) as mock_resolve, \
+                 patch('app.routes.auth._complete_dev_act_as_login') as mock_complete, \
+                 patch('app.routes.auth.safe_redirect', return_value=make_response('', 302)):
+                resp = dev_act_as_login()
+        mock_resolve.assert_called_once_with('admin')
+        mock_complete.assert_called_once()
+        assert mock_complete.call_args.args[0].id == user.id
+        assert resp.status_code == 302
+
     def test_dev_act_as_route_404_in_production(self, app, monkeypatch):
         from app.routes.auth import dev_act_as_login
         from werkzeug.exceptions import NotFound

@@ -1214,7 +1214,7 @@
                                 {% if item.type == 'assigned' and item.item_object.assigned_form.period_name == 'Self-Reported' %}
                                     <form action="{{ url_for('forms.delete_self_report_assignment', aes_id=item.item_object.id) }}" method="POST" class="absolute top-2 right-2 delete-self-report-form">
                                         {{ delete_form.csrf_token }} {# Include CSRF token #}
-                                        <button type="submit" class="btn btn-icon btn-sm btn-ghost-danger" title="{{ _('Delete Self-Reported Assignment')|forceescape }}">
+                                        <button type="submit" class="btn btn-icon btn-sm btn-ghost-danger" title="{{ _('Delete Self-Reported Assignment')|forceescape }}" data-loading-text="">
                                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                         </button>
                                     </form>
@@ -1444,7 +1444,7 @@
                                         {# Changed from <a> to <form> and <button> #}
                                         <form action="{{ url_for('main.approve_assignment', aes_id=aes.id) }}" method="POST" class="inline-block approve-assignment-form">
                                             {{ approve_form.csrf_token }} {# Include CSRF token #}
-                                            <button type="submit" class="btn btn-success btn-sm">
+                                            <button type="submit" class="btn btn-success btn-sm" data-loading-text="{{ _('Approving…') }}">
                                                  <i class="fas fa-check-circle mr-1 -ml-0.5"></i> {{ _('Approve') }}
                                             </button>
                                         </form>
@@ -1454,7 +1454,7 @@
                                         {% if item.item_object.assigned_form.is_effectively_closed and can_reopen_closed_assignment(aes.assigned_form) %}
                                         <form action="{{ url_for('assignment_management.reopen_closed_assignment', assignment_id=aes.assigned_form_id) }}" method="POST" class="inline-block reopen-assignment-form">
                                             {{ reopen_form.csrf_token }} {# Include CSRF token #}
-                                            <button type="submit" class="btn btn-warning btn-sm">
+                                            <button type="submit" class="btn btn-warning btn-sm" data-loading-text="{{ _('Reopening…') }}">
                                                 <i class="fas fa-undo mr-1 -ml-0.5"></i> {{ _('Reopen') }}
                                             </button>
                                         </form>
@@ -1462,7 +1462,7 @@
                                         {# "Reopen" button for submitted/approved/requires revision / sent for review #}
                                         <form action="{{ url_for('main.reopen_assignment', aes_id=aes.id) }}" method="POST" class="inline-block reopen-assignment-form">
                                             {{ reopen_form.csrf_token }} {# Include CSRF token #}
-                                            <button type="submit" class="btn btn-warning btn-sm">
+                                            <button type="submit" class="btn btn-warning btn-sm" data-loading-text="{{ _('Reopening…') }}">
                                                 <i class="fas fa-undo mr-1 -ml-0.5"></i> {{ _('Reopen') }}
                                             </button>
                                         </form>
@@ -1472,7 +1472,8 @@
                                         <form action="{{ url_for('main.return_assignment_for_revision', aes_id=aes.id) }}" method="POST" class="inline-block return-for-revision-form">
                                             {{ reopen_form.csrf_token }}
                                             <button type="submit" class="btn btn-warning btn-sm"
-                                                    data-confirm-message="{{ _('Return this assignment to the National Society for changes?')|forceescape }}">
+                                                    data-confirm-message="{{ _('Return this assignment to the National Society for changes?')|forceescape }}"
+                                                    data-loading-text="{{ _('Returning…') }}">
                                                 <i class="fas fa-reply mr-1 -ml-0.5"></i> {{ _('Request changes') }}
                                             </button>
                                         </form>
@@ -1759,14 +1760,14 @@
                                                     {% if item.item_object.assigned_form.is_effectively_closed and can_reopen_closed_assignment(aes.assigned_form) %}
                                                     <form action="{{ url_for('assignment_management.reopen_closed_assignment', assignment_id=aes.assigned_form_id) }}" method="POST" class="inline-block reopen-assignment-form">
                                                         {{ reopen_form.csrf_token }}
-                                                        <button type="submit" class="btn btn-warning btn-sm">
+                                                        <button type="submit" class="btn btn-warning btn-sm" data-loading-text="{{ _('Reopening…') }}">
                                                             <i class="fas fa-undo mr-1 -ml-0.5"></i> {{ _('Reopen') }}
                                                         </button>
                                                     </form>
                                                     {% elif item.status in ["submitted", "approved", "requires_revision"] and can_reopen_assignment(aes) %}
                                                     <form action="{{ url_for('main.reopen_assignment', aes_id=aes.id) }}" method="POST" class="inline-block reopen-assignment-form">
                                                         {{ reopen_form.csrf_token }}
-                                                        <button type="submit" class="btn btn-warning btn-sm">
+                                                        <button type="submit" class="btn btn-warning btn-sm" data-loading-text="{{ _('Reopening…') }}">
                                                             <i class="fas fa-undo mr-1 -ml-0.5"></i> {{ _('Reopen') }}
                                                         </button>
                                                     </form>

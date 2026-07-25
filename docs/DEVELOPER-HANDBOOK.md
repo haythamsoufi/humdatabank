@@ -151,7 +151,7 @@ npm run lint
 - **Project config:** `.cursor/mcp.json` runs with `--isolated` (fresh browser context each session — no stale cookies, HTTP cache, or service workers) and `--output-dir` `.playwright-mcp/screenshots/` (parent `.playwright-mcp/` is gitignored). Screenshots and related artifacts should land there, not in the repository root.
 - **Dev login:** Backoffice at `http://127.0.0.1:5000/login` — yellow **Act as (dev only)** preset buttons when `DEBUG=true` and request is loopback. See `.cursor/rules/playwright-browser-testing.mdc`.
 - **Tool calls:** Use **relative** screenshot filenames only. An absolute path in the filename can bypass `--output-dir` and write under that path instead.
-- **Global MCP:** If you also enable Playwright MCP in user-level Cursor config, align `--output-dir` (or env `PLAYWRIGHT_MCP_OUTPUT_DIR`) with the same folder—and prefer disabling the duplicate server entry to avoid conflicting persistent profiles.
+- **Global MCP:** This repo owns Playwright MCP in `.cursor/mcp.json`. Remove or disable any user-level `playwright` entry in Cursor MCP settings — duplicates launch a second Chromium (often with mismatched versions) and can show a `--no-sandbox` stability banner. Use `@playwright/mcp@latest` (not 0.0.x); older releases disabled the sandbox by default on Windows.
 
 ## Key Application Structure
 

@@ -374,7 +374,7 @@
           action="{{ url_for('user_management.send_access_requests_digest_now') }}"
           data-confirm="{{ _('Send digest emails now to all FDS members with pending requests? Manual sends ignore the daily schedule and once-per-day limit.')|forceescape }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="btn btn-secondary w-full">
+      <button type="submit" class="btn btn-secondary w-full" data-loading-text="{{ _('Sending…') }}">
         <i class="fas fa-paper-plane mr-1.5"></i>{{ _('Send digest now') }}
       </button>
       <p class="text-xs text-gray-500 mt-2 leading-relaxed">
@@ -652,14 +652,14 @@
                 '<form action="' + approveAllUrl + '" method="POST" data-confirm="' +
                 AgGridRenderers.escapeHtmlAttr(approveConfirm) + '">' +
                 '<input type="hidden" name="csrf_token" value="' + CSRF_TOKEN + '">' +
-                '<button type="submit" class="btn btn-success btn-sm">' +
+                '<button type="submit" class="btn btn-success btn-sm" data-loading-text="' + {{ _('Approving…')|tojson|safe }} + '">' +
                 '<i class="fas fa-check-double mr-1"></i> ' + {{ _('Approve all')|tojson|safe }} +
                 '</button>' +
                 '</form>' +
                 '<form action="' + rejectAllUrl + '" method="POST" data-confirm="' +
                 AgGridRenderers.escapeHtmlAttr(rejectConfirm) + '" data-confirm-danger="true">' +
                 '<input type="hidden" name="csrf_token" value="' + CSRF_TOKEN + '">' +
-                '<button type="submit" class="btn btn-danger btn-sm">' +
+                '<button type="submit" class="btn btn-danger btn-sm" data-loading-text="' + {{ _('Rejecting…')|tojson|safe }} + '">' +
                 '<i class="fas fa-times-circle mr-1"></i> ' + {{ _('Reject all')|tojson|safe }} +
                 '</button>' +
                 '</form>' +

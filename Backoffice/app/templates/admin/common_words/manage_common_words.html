@@ -824,7 +824,7 @@
                 html += '<form method="POST" action="' + deleteUrl + '" ';
                 html += 'class="inline delete-common-word-form" data-confirm="' + deleteConfirm.replace(/'/g, "\\'") + '">';
                 html += '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">';
-                html += '<button type="submit" title="Delete" class="text-red-600 hover:text-red-800 transition-colors">';
+                html += '<button type="submit" title="Delete" class="text-red-600 hover:text-red-800 transition-colors" data-loading-text="">';
                 html += '<i class="fas fa-trash"></i></button>';
                 html += '</form>';
                 html += '</div>';

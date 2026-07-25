@@ -20,23 +20,10 @@
      * @returns {string} Translated string
      */
     function getTranslation(key, defaultValue) {
-        // Try to get from window.agGridTranslations (set by templates)
-        if (window.agGridTranslations && window.agGridTranslations[key]) {
-            return window.agGridTranslations[key];
+        if (typeof AgGridUtils !== 'undefined' && typeof AgGridUtils.getTranslation === 'function') {
+            return AgGridUtils.getTranslation(key, defaultValue);
         }
-        // Try to get from i18n-json script tag
-        try {
-            const i18nEl = document.getElementById('i18n-json');
-            if (i18nEl) {
-                const i18n = JSON.parse(i18nEl.textContent);
-                if (i18n[key]) {
-                    return i18n[key];
-                }
-            }
-        } catch (e) {
-            // Ignore parsing errors
-        }
-        // Fallback to default English value
+        // Fallback when utils not loaded (should not happen via ag_grid_js())
         return defaultValue;
     }
 

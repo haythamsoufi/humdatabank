@@ -615,19 +615,18 @@ body.modal-open {
                     {{ form.csrf_token(id="dev_act_as_csrf_token") }}
                     {% endif %}
                     {% if request.args.get('next') %}<input type="hidden" name="next" value="{{ request.args.get('next') }}">{% endif %}
-                    <input type="hidden" name="preset" id="devActAsPreset" value="">
                     <input type="hidden" name="user_id" id="devActAsUserId" value="">
 
                     <div class="grid grid-cols-1 gap-2">
-                        <button type="button" data-dev-act-as-preset="sys_manager" aria-label="{{ _('Act as System Manager')|forceescape }}" class="btn btn-block btn-purple">
+                        <button type="submit" name="preset" value="sys_manager" data-dev-act-as-preset="sys_manager" aria-label="{{ _('Act as System Manager')|forceescape }}" class="btn btn-block btn-purple">
                             <i class="fa-solid fa-cogs"></i>
                             {{ _('System Manager') }}
                         </button>
-                        <button type="button" data-dev-act-as-preset="admin" aria-label="{{ _('Act as Admin')|forceescape }}" class="btn btn-block btn-dark">
+                        <button type="submit" name="preset" value="admin" data-dev-act-as-preset="admin" aria-label="{{ _('Act as Admin')|forceescape }}" class="btn btn-block btn-dark">
                             <i class="fa-solid fa-user-shield"></i>
                             {{ _('Admin') }}
                         </button>
-                        <button type="button" data-dev-act-as-preset="focal" aria-label="{{ _('Act as Focal Point')|forceescape }}" class="btn btn-block btn-primary">
+                        <button type="submit" name="preset" value="focal" data-dev-act-as-preset="focal" aria-label="{{ _('Act as Focal Point')|forceescape }}" class="btn btn-block btn-primary">
                             <i class="fa-solid fa-user"></i>
                             {{ _('Focal Point') }}
                         </button>
@@ -1110,7 +1109,6 @@ function initDevActAsLogin() {
     const form = document.getElementById('devActAsForm');
     if (!form) return;
 
-    const presetInput = document.getElementById('devActAsPreset');
     const userIdInput = document.getElementById('devActAsUserId');
     const userSelect = document.getElementById('devActAsUserSelect');
     const selectedUserBtn = document.getElementById('devActAsSelectedUser');
@@ -1124,19 +1122,6 @@ function initDevActAsLogin() {
         if (userError) userError.classList.remove('hidden');
     }
 
-    function submitDevActAs({ preset, userId }) {
-        hideUserError();
-        if (presetInput) presetInput.value = preset || '';
-        if (userIdInput) userIdInput.value = userId ? String(userId) : '';
-        form.submit();
-    }
-
-    form.querySelectorAll('[data-dev-act-as-preset]').forEach((button) => {
-        button.addEventListener('click', () => {
-            submitDevActAs({ preset: button.getAttribute('data-dev-act-as-preset') || '' });
-        });
-    });
-
     if (selectedUserBtn) {
         selectedUserBtn.addEventListener('click', () => {
             const userId = getDevActAsSelectedUserId();
@@ -1149,7 +1134,9 @@ function initDevActAsLogin() {
                 }
                 return;
             }
-            submitDevActAs({ userId });
+            hideUserError();
+            if (userIdInput) userIdInput.value = String(userId);
+            form.submit();
         });
     }
 

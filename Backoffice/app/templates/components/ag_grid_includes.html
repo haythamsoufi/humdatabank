@@ -41,8 +41,14 @@ IDs with ag_grid_container / ag_grid_body_wrap (matches AgGridHelper.create auto
 <link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-column-visibility-manager.css') }}">
 <link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-grid-common-styles.css') }}">
 <script src="{{ static_url('libs/ag-grid/ag-grid-community.min.js') }}"></script>
+<script src="{{ static_url('libs/ag-grid/ag-grid-utils.js') }}"></script>
 <script src="{{ static_url('libs/ag-grid/ag-set-filter-community.js') }}"></script>
 <script src="{{ static_url('libs/ag-grid/ag-column-visibility-manager.js') }}"></script>
+<script src="{{ static_url('libs/ag-grid/ag-grid-helper-core.js') }}"></script>
+<script src="{{ static_url('libs/ag-grid/ag-grid-helper-viewport.js') }}"></script>
+<script src="{{ static_url('libs/ag-grid/ag-grid-helper-columns.js') }}"></script>
+<script src="{{ static_url('libs/ag-grid/ag-grid-helper-toolbar.js') }}"></script>
+<script src="{{ static_url('libs/ag-grid/ag-grid-helper-export.js') }}"></script>
 <script src="{{ static_url('libs/ag-grid/ag-grid-helper.js') }}"></script>
 {# DateTimeUtils must load before cell-renderers so renderers can use it #}
 <script src="{{ static_url('js/lib/datetime-utils.js') }}"></script>
@@ -147,16 +153,7 @@ Grid element only (for use inside custom containers)
 <div id="{{ grid_id }}" class="ag-theme-alpine" style="{{ style }}" data-placeholder-id="{{ placeholder }}"></div>
 {% endmacro %}
 
-{#
-Standard grid initialization script
-Parameters:
-  - grid_id: The grid element ID
-  - template_id: Unique template identifier for persistence
-  - column_defs_var: JavaScript variable name containing column definitions
-  - row_data_var: JavaScript variable name containing row data
-  - options: Additional grid options (as JS object literal string)
-  - on_ready: JavaScript code to run after grid is ready (optional)
-#}
+
 {#
 Bootstrap AG Grid page config + translations for external grid JS modules.
 Usage:
@@ -182,37 +179,6 @@ Usage:
     window.{{ config_var }} = data;
     window.{{ translations_var }} = translations;
   } catch (e) {}
-})();
-</script>
-{% endmacro %}
-
-{% macro ag_grid_init_script(grid_id, template_id, column_defs_var='columnDefs', row_data_var='rowData', options='{}', on_ready='') %}
-<script nonce="{{ csp_nonce() }}">
-(function() {
-    'use strict';
-
-    function initializeGrid() {
-        var result = AgGridHelper.create(
-            '{{ grid_id }}',
-            '{{ template_id }}',
-            {{ column_defs_var }},
-            {{ row_data_var }},
-            {{ options }}
-        );
-
-        window.gridHelper = result.helper;
-        window.gridApi = result.api;
-
-        {% if on_ready %}
-        {{ on_ready }}
-        {% endif %}
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeGrid);
-    } else {
-        initializeGrid();
-    }
 })();
 </script>
 {% endmacro %}

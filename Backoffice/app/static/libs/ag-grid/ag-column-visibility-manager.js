@@ -151,14 +151,8 @@
         }
 
         // Try to get from window.agGridTranslations (set by templates) - highest priority
-        if (window.agGridTranslations && window.agGridTranslations[key]) {
-            return window.agGridTranslations[key];
-        }
-
-        // Try to get from i18n-json script tag (cached for performance)
-        const i18n = getCachedI18n();
-        if (i18n && i18n[key] !== null && i18n[key] !== undefined && i18n[key] !== '') {
-            return i18n[key];
+        if (typeof AgGridUtils !== 'undefined' && typeof AgGridUtils.getTranslation === 'function') {
+            return AgGridUtils.getTranslation(key, defaultValue);
         }
 
         // Fallback to default English value
@@ -934,7 +928,9 @@
             updateButtonText();
         }, 100);
 
-        button.addEventListener('click', this.togglePanel.bind(this));
+        button.addEventListener('click', function() {
+            self.togglePanel();
+        });
 
         this.panelButton = button;
 

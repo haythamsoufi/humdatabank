@@ -73,7 +73,7 @@
 
         window.__layoutConfig = {
             mobileAppEmbedded: {{ mobile_app_embedded|default(false)|tojson }},
-            swRegister: {{ (current_user.is_authenticated and not mobile_app_embedded|default(false))|tojson }}
+            swRegister: {{ (current_user.is_authenticated and not mobile_app_embedded|default(false) and not config.DEBUG)|tojson }}
         };
         // Used by csrf.js to route token refresh to the lightweight /api/v1/csrf-token endpoint
         // instead of re-fetching the full page HTML (which can be ~1.9 MB on large entry forms).

@@ -5,6 +5,7 @@
       "args": [
         "-y",
         "@playwright/mcp@^0.0.48",
+        "--isolated",
         "--output-dir",
         ".playwright-mcp/screenshots"
       ]

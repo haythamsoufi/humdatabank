@@ -14,6 +14,11 @@
 
 /* Column visibility toolbar (Columns + Clear filters): ag-column-visibility-manager.css */
 
+/* Marker class applied by AgGridHelper.styleColumnVisibilityButton — styling lives in ag-column-visibility-manager.css */
+.ag-grid-toolbar-btn {
+    font-family: inherit;
+}
+
 /* Row selection column — no vertical rule between checkboxes and the next column */
 .ag-theme-alpine .ag-selection-column-cell,
 .ag-theme-balham .ag-selection-column-cell,
@@ -467,20 +472,49 @@ html[dir="rtl"] .ag-theme-alpine .ag-floating-filter-input input.ag-number-field
     padding-right: 26px !important;
 }
 
-/* After sizeColumnsToFit, header labels can overlap the filter trigger; keep it on top. */
+/* After sizeColumnsToFit, header labels can overlap the filter trigger.
+   Keep the label from stealing pointer events so filter icon clicks are reliable.
+   Sorting still works via clicks on the header cell area not covered by the filter button. */
+.ag-theme-alpine .ag-header-cell-label,
+.ag-theme-balham .ag-header-cell-label,
+.ag-theme-quartz .ag-header-cell-label,
+.ag-theme-material .ag-header-cell-label,
 .ag-header-cell .ag-header-cell-label {
+    flex: 1 1 auto;
+    min-width: 0;
     max-width: calc(100% - 36px);
     overflow: hidden;
     text-overflow: ellipsis;
+    pointer-events: none;
 }
 
+.ag-theme-alpine .ag-header-cell-filter-button,
+.ag-theme-balham .ag-header-cell-filter-button,
+.ag-theme-quartz .ag-header-cell-filter-button,
+.ag-theme-material .ag-header-cell-filter-button,
 .ag-header-cell-filter-button {
     position: relative;
-    z-index: 2;
+    z-index: 3;
+    flex: 0 0 auto;
     flex-shrink: 0;
+    pointer-events: auto;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     min-width: 28px;
     min-height: 28px;
+    margin-right: 4px;
+    box-sizing: border-box;
     cursor: pointer;
+}
+
+/* AG Grid hover uses a 4px spread box-shadow; inset from the cell edge so it is not clipped. */
+.ag-theme-alpine .ag-header-cell-filter-button:hover,
+.ag-theme-balham .ag-header-cell-filter-button:hover,
+.ag-theme-quartz .ag-header-cell-filter-button:hover,
+.ag-theme-material .ag-header-cell-filter-button:hover,
+.ag-header-cell-filter-button:hover {
+    box-shadow: none !important;
 }
 
 /* ===================================================================

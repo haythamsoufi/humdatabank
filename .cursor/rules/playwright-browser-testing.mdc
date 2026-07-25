@@ -1,52 +1,54 @@
 ---
-description: Playwright browser testing conventions - quick test logins and hard refresh after code changes
+description: Playwright browser testing conventions - quick test logins and fresh assets after code changes
 alwaysApply: true
 ---
 
 # Playwright Browser Testing
 
+## MCP setup
+
+Project config (`.cursor/mcp.json`) runs Playwright MCP with **`--isolated`**: each `browser_close` wipes cookies, cache, and service workers. Prefer that over persistent profiles.
+
+If you also enable Playwright MCP in user-level Cursor config, disable the duplicate entry or align `--output-dir` with `.playwright-mcp/screenshots`.
+
+**Base URL:** `http://127.0.0.1:5000` (matches the Flask dev server bind address).
+
 ## Logging In (Local Dev)
 
-The Backoffice runs at `http://localhost:5000`. In development config with `DEBUG=true`, the login page (`/login`) shows a yellow **"Act as (dev only)"** box (no credentials needed):
+In development with `DEBUG=true`, `/login` shows a yellow **"Act as (dev only)"** box (loopback only — panel hidden if `FLASK_CONFIG` is not `development`/`default` or request is not from `127.0.0.1` / `::1`).
 
 | Control | Logs in as |
 |---|---|
-| Preset button `[data-dev-act-as-preset="sys_manager"]` | System Manager (`test_sys@<org-domain>`) |
-| Preset button `[data-dev-act-as-preset="admin"]` | Admin (`test_admin@<org-domain>`) |
-| Preset button `[data-dev-act-as-preset="focal"]` | Focal Point (`test_focal@<org-domain>`) |
-| `#devActAsUserSelect` + `#devActAsSelectedUser` | Any active user from the database |
+| Submit button `[data-dev-act-as-preset="sys_manager"]` | System Manager (`test_sys@<org-domain>`) |
+| Submit button `[data-dev-act-as-preset="admin"]` | Admin (`test_admin@<org-domain>`) |
+| Submit button `[data-dev-act-as-preset="focal"]` | Focal Point (`test_focal@<org-domain>`) |
+| `#devActAsUserSelect` + `#devActAsSelectedUser` | Any active user (Select2; prefer presets for automation) |
 
-Use these controls whenever a test session is needed — never ask the user for credentials. To switch roles, navigate to `/logout` first, then act as a different user.
+Preset buttons are native **form submits** — click and wait for navigation (admin pages can take >5s; use `browser_wait_for` if a click times out but the URL may already have changed).
 
-## Hard Refresh After Code Changes
+**Workflow:**
 
-After making code changes to static files (JS, CSS, HTML templates), always perform a **hard refresh** before testing in the browser via Playwright MCP.
+1. Navigate to `http://127.0.0.1:5000/login`
+2. Click a preset (e.g. **Act as Admin**)
+3. To switch roles: go to `/logout` first, then act as another user
+4. Never ask the user for credentials when presets are available
 
-## Hard Refresh
+## Fresh assets after JS/CSS/template changes
 
-After navigating to the page, force-reload to bypass the browser cache:
+`location.reload(true)` does **not** bypass cache in modern browsers. In DEBUG mode the app also skips service worker registration, but stale MCP sessions still happen without isolated mode.
 
-```js
-// Hard refresh via keyboard shortcut
-await page.keyboard.down('Control');
-await page.keyboard.press('F5');
-await page.keyboard.up('Control');
+**Preferred (isolated MCP):** `browser_close`, then navigate to the page again.
 
-// Or via evaluate (most reliable)
-await page.evaluate(() => location.reload(true));
+**Mid-session refresh** (e.g. non-isolated profile): clear service worker + Cache API, then reload:
 
-// Or navigate with cache bypass
-await page.goto(url, { waitUntil: 'networkidle' });
-await page.evaluate(() => location.reload(true));
-```
-
-Or using the MCP `browser_evaluate` tool:
 ```json
-{ "function": "() => { location.reload(true); return 'hard refreshing'; }" }
+{
+  "function": "async () => { if ('serviceWorker' in navigator) { for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); } for (const k of await caches.keys()) await caches.delete(k); location.reload(); return 'cache cleared'; }"
+}
 ```
 
-Then wait for the page to be ready before interacting.
+Wait for the page to be ready before interacting.
 
-## Why
+## Why stale assets happen
 
-The browser caches JS/CSS files. Without a hard refresh, Playwright will test against the **old cached version** of modified files, giving misleading results.
+Production uses a service worker with cache-first `/static/` handling. DEBUG disables SW registration in `layout.html`, and the dev static route sends `no-cache`. Persistent Playwright profiles without `--isolated` can still serve old files until the browser context is closed.

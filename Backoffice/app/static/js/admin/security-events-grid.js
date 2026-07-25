@@ -270,18 +270,14 @@
         window.securityEventsGridApi = null;
         window.securityEventsGridHelper = null;
     } else {
-        var gridHelper = new AgGridHelper({
-            containerId: 'securityEventsGrid',
-            templateId: (cfg.templateId || 'security-events-analytics') + '-v2',
-            columnDefs: columnDefs,
-            rowData: eventsData,
-            columnVisibilityOptions: {
+        var result = AgGridHelper.create('securityEventsGrid', (cfg.templateId || 'security-events-analytics') + '-v2', columnDefs, eventsData, {
+            columnVisibility: {
                 persistOnChange: true,
                 showPanelButton: true,
                 enableExport: true,
                 enableReset: true
             },
-            options: {
+            gridOptions: {
                 pagination: true,
                 paginationPageSize: 25,
                 paginationPageSizeSelector: [10, 25, 50, 100],
@@ -307,13 +303,8 @@
             }
         });
 
-        var gridApi = gridHelper.initialize();
-        if (loadingEl) loadingEl.style.display = 'none';
-        if (containerEl) containerEl.style.display = 'block';
-        if (emptyEl) emptyEl.style.display = 'none';
-
-        window.securityEventsGridApi = gridApi;
-        window.securityEventsGridHelper = gridHelper;
+        window.securityEventsGridApi = result.api;
+        window.securityEventsGridHelper = result.helper;
 
         // Modal wiring via ModalUtils
         var resolveForm = document.getElementById('resolveForm');

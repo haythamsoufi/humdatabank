@@ -19,36 +19,18 @@
      * @returns {string} Translated string
      */
     function getTranslation(key, defaultValue) {
-        // Try window.agGridTranslations first
-        if (window.agGridTranslations && window.agGridTranslations[key]) {
-            return window.agGridTranslations[key];
+        if (typeof AgGridUtils !== 'undefined' && typeof AgGridUtils.getTranslation === 'function') {
+            return AgGridUtils.getTranslation(key, defaultValue);
         }
-
-        // Try i18n-json element
-        try {
-            var i18nEl = document.getElementById('i18n-json');
-            if (i18nEl && i18nEl.textContent) {
-                var i18n = JSON.parse(i18nEl.textContent);
-                if (i18n[key]) {
-                    return i18n[key];
-                }
-            }
-        } catch (e) {
-            // Ignore
-        }
-
         return defaultValue;
     }
 
-    /**
-     * Escape HTML to prevent XSS
-     * @param {*} text - Value to escape
-     * @returns {string} Escaped HTML string
-     */
     function escapeHtml(text) {
+        if (typeof AgGridUtils !== 'undefined' && typeof AgGridUtils.escapeHtml === 'function') {
+            return AgGridUtils.escapeHtml(text);
+        }
         if (text === null || text === undefined) return '';
-        var str = String(text);
-        return str
+        return String(text)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
@@ -875,14 +857,13 @@
     };
 
     function isMobileActionsLayout() {
+        if (typeof AgGridUtils !== 'undefined' && typeof AgGridUtils.isCoarsePointerDevice === 'function') {
+            return AgGridUtils.isCoarsePointerDevice();
+        }
         if (typeof AgGridHelper !== 'undefined' && typeof AgGridHelper.isCoarsePointerDevice === 'function') {
             return AgGridHelper.isCoarsePointerDevice();
         }
-        try {
-            return window.matchMedia('(max-width: 768px)').matches;
-        } catch (e) {
-            return (window.innerWidth || 0) <= 768;
-        }
+        return (window.innerWidth || 0) <= 768;
     }
 
     function labelFromIconClasses(className) {

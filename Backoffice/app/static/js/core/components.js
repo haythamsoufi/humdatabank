@@ -1513,7 +1513,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const cachedAt = parseInt(localStorage.getItem(NOTIFICATION_PREFS_CACHED_AT_KEY), 10) || 0;
         const isFresh = !force && (Date.now() - cachedAt) < NOTIFICATION_PREFS_CACHE_TTL_MS && localStorage.getItem('notification_preferences') !== null;
         if (isFresh) {
-            console.info('[notif-prefs] cache hit, skipping fetch (age=' + Math.round((Date.now() - cachedAt) / 1000) + 's)');
             return;
         }
 

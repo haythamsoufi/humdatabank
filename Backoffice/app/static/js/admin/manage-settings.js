@@ -40,20 +40,10 @@
       .replace(/>/g, '&gt;');
   }
 
-  function waitForAg(cb, tries) {
-    tries = tries || 0;
-    if (typeof AgGridHelper !== 'undefined') {
-      cb();
-      return;
-    }
-    if (tries > 80) return;
-    setTimeout(function () { waitForAg(cb, tries + 1); }, 50);
-  }
-
-    function setupNotificationSettingsGrid() {
+  function setupNotificationSettingsGrid() {
     var jsonEl = document.getElementById('notification-settings-grid-rows');
     var gridEl = document.getElementById('notificationSettingsGrid');
-    if (!jsonEl || !gridEl || typeof AgGridHelper === 'undefined' || !AgGridHelper.create) return;
+    if (!jsonEl || !gridEl || typeof AgGridHelper === 'undefined' || !AgGridHelper.createTabAware) return;
 
     var rows = [];
     try {
@@ -232,7 +222,7 @@
       }
     ];
 
-    var result = AgGridHelper.create(
+    var gridResult = AgGridHelper.createTabAware(
       'notificationSettingsGrid',
       'system-notification-settings',
       columnDefs,
@@ -281,32 +271,26 @@
             fitNotificationColumnsIfVisible(api);
           }, 50);
         }
+      },
+      {
+        eventName: 'settings-tab-activated',
+        tabId: 'notifications',
+        onTabActivated: function (api) {
+          window.__notificationSettingsGridApi = api;
+          setTimeout(function () {
+            fitNotificationColumnsIfVisible(api);
+          }, 80);
+        }
       }
     );
 
-    if (result && result.api) {
-      window.__notificationSettingsGridApi = result.api;
+    if (gridResult && gridResult.api) {
+      window.__notificationSettingsGridApi = gridResult.api;
     }
   }
 
-  function onTabActivated(ev) {
-    if (!ev || !ev.detail || ev.detail.tab !== 'notifications') return;
-    var api = window.__notificationSettingsGridApi;
-    var gel = document.getElementById('notificationSettingsGrid');
-    if (!api || !gel) return;
-    setTimeout(function () {
-      var w = gel.clientWidth || gel.getBoundingClientRect().width;
-      if (w < 200) return;
-      try {
-        if (typeof api.doLayout === 'function') api.doLayout();
-        if (typeof api.sizeColumnsToFit === 'function') api.sizeColumnsToFit();
-      } catch (e) {}
-    }, 80);
-  }
-
-  document.addEventListener('settings-tab-activated', onTabActivated);
-
-  waitForAg(function () {
+  function bootstrapNotificationSettingsGrid() {
+    if (typeof AgGridHelper === 'undefined' || !AgGridHelper.createTabAware) return;
     setupNotificationSettingsGrid();
     var hash = (location.hash || '').replace('#', '');
     if (hash === 'notifications' && window.__notificationSettingsGridApi) {
@@ -320,7 +304,13 @@
         } catch (e) {}
       }, 100);
     }
-  });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootstrapNotificationSettingsGrid);
+  } else {
+    bootstrapNotificationSettingsGrid();
+  }
 })();
 
     // --- Block 2 (original lines 1721-1747) ---

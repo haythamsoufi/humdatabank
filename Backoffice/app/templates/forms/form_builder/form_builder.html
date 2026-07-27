@@ -730,6 +730,17 @@
     auto_translate_permission_code='admin.templates.edit'
 ) }}
 
+{# Matrix Number Format Hint Translation Modal #}
+{{ translation_modal(
+    modal_id='matrix-format-hint-text-translation-modal',
+    modal_title=_('Number Format Hint Translations'),
+    context='form_item',
+    show_auto_translate=true,
+    css_prefix='matrix-format-hint-text',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
 {# Matrix Variable Lookup Tooltip Label Translation Modal #}
 {{ translation_modal(
     modal_id='matrix-variable-lookup-tooltip-label-translation-modal',

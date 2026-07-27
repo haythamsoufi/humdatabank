@@ -44,16 +44,40 @@ ENFORCEMENT_MARKERS = (
     "enforce_api_or_csrf_protection",
     "mobile_auth_required",
     "require_api_key",
+    "_require_compat_api_key",  # indicator_bank_compat.py's own API-key decorator
     "_enforce_ai_csrf",
     "csrf.protect",
     "validate_csrf",
+    "decode_mobile_token",  # inline bearer-token validation (e.g. refresh rotation logic)
 )
 
 # (blueprint_name, rule) -> justification. Only add an entry here with a real
 # reason a route legitimately needs no CSRF/auth-token check (e.g. it is
 # read-only despite the HTTP method, or it is itself the login/token-issuance
-# endpoint that a CSRF/auth token cannot yet exist for).
-EXPLICITLY_ALLOWED_UNPROTECTED_ROUTES = {}
+# endpoint that a CSRF/auth token cannot yet exist for). None of these carry
+# an ambient session cookie a cross-site request could ride on, so CSRF does
+# not apply to them the way it does to cookie-authenticated Backoffice routes.
+EXPLICITLY_ALLOWED_UNPROTECTED_ROUTES = {
+    ("api", "/api/v1/platform-error"): (
+        "Public, unauthenticated telemetry sink for client-side error reporting "
+        "(no session, no user-specific state mutated). Rate-limited."
+    ),
+    ("mobile_api", "/api/mobile/v1/auth/token"): (
+        "Login endpoint itself — issues the JWT the rest of the blueprint checks "
+        "via mobile_auth_required, so no token can exist yet to check. Guarded by "
+        "auth_rate_limit() instead."
+    ),
+    ("mobile_api", "/api/mobile/v1/data/indicator-suggestions"): (
+        "Intentionally public/unauthenticated per app/routes/api/mobile/__init__.py "
+        "docstring ('Public data endpoints ... unauthenticated but rate-limited')."
+    ),
+    ("mobile_api", "/api/mobile/v1/data/unified-planning-thumbnail"): (
+        "Functionally read-only (renders/proxies a PDF thumbnail, no state mutation) "
+        "despite accepting POST — POST exists only so the URL can be sent as a JSON "
+        "body instead of a query string to avoid WAF blocking. Intentionally public "
+        "per the mobile blueprint's docstring."
+    ),
+}
 
 
 def _iter_unsafe_exempt_rules(flask_app):

@@ -125,11 +125,16 @@ _ITEM_SCHEMA: Dict[str, Any] = {
             "type": "object",
             "description": (
                 "Required for item_type=matrix. {row_mode: 'manual'|'list_library', "
-                "columns: [{name (stable code/slug), type: 'number'|'tick', "
+                "columns: [{name (stable code/slug), type: 'number_whole'|'number_decimal'|'tick', "
+                "decimals (int, only for number_decimal, default 2), "
                 "name_translations: {en: 'Column label', ...}, optional group}], "
                 "rows: [{text, name_translations?}] (manual mode), "
                 "lookup_list_id + list_display_column (list_library mode), "
-                "show_row_totals, show_column_totals}."
+                "show_row_totals, show_column_totals, "
+                "show_format_hint (bool, default false; when true, shows a highlighted note above the matrix table "
+                "when it has number columns), "
+                "format_hint_text (string, optional custom hint; default explains ',' / '.' separators), "
+                "format_hint_text_translations ({en: '...', ...}, optional localized hint text)}."
             ),
         },
         "relevance": {**_RULE_SCHEMA, "description": "Skip logic: show this field only when the rule passes."},

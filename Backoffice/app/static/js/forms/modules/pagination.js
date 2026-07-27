@@ -290,7 +290,7 @@ function initPagination() {
             // Scroll to top of sections container for better UX, accounting for navbar height
             // Try multiple selectors to find the navbar
             const navbar = document.querySelector('nav.sticky, nav[class*="sticky"], #navContainer')?.closest('nav') ||
-                          document.querySelector('nav.bg-red-700, nav.nav-focal-point');
+                          document.querySelector('nav.nav-system-manager');
             const navbarHeight = navbar ? navbar.offsetHeight : 64; // Default to 4rem (64px) if navbar not found
 
             const containerRect = sectionsContainer.getBoundingClientRect();

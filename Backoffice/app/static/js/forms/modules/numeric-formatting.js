@@ -40,7 +40,40 @@ const IS_COARSE = (function() {
     } catch (_) { return false; }
 })();
 
-function unformat(value) {
+/**
+ * Parse a numeric string using explicit decimal precision.
+ * Standard rules: "." is always the decimal separator; "," is thousands (removed).
+ * When both appear, the rightmost separator is the decimal point.
+ */
+function __unformatWithMaxDecimals(str, _maxDecimals) {
+    const hasComma = str.includes(',');
+    const hasDot = str.includes('.');
+    const removeAll = (s, ch) => s.split(ch).join('');
+
+    if (!hasComma && !hasDot) return str;
+
+    if (hasComma && hasDot) {
+        const lastComma = str.lastIndexOf(',');
+        const lastDot = str.lastIndexOf('.');
+        const decIsComma = lastComma > lastDot;
+        const groupChar = decIsComma ? '.' : ',';
+        str = removeAll(str, groupChar);
+        if (decIsComma) str = str.replace(/,/g, '.');
+        return str;
+    }
+
+    const sep = hasComma ? ',' : '.';
+    const sepCount = (str.match(new RegExp(__escapeForRegex(sep), 'g')) || []).length;
+    if (sepCount > 1) return removeAll(str, sep);
+
+    if (hasComma) {
+        return removeAll(str, ',');
+    }
+
+    return str;
+}
+
+function unformat(value, maxDecimals) {
     if (value == null) return '';
     // Normalize sentinel strings
     const rawStr = String(value).trim();
@@ -51,6 +84,18 @@ function unformat(value) {
 
     // Always remove apostrophes (common grouping separator, e.g. de-CH: 12'345)
     str = str.replace(/'/g, '');
+
+    // Remove locale-specific grouping sep early (when it's not one of the two main separators)
+    if (__groupSep && __groupSep !== ',' && __groupSep !== '.' && __groupSep !== "'") {
+        const groupEsc = __escapeForRegex(__groupSep);
+        if (groupEsc) str = str.replace(new RegExp(groupEsc, 'g'), '');
+    }
+
+    // When the caller knows how many decimal places are valid for this field (e.g. a matrix
+    // column configured as whole/decimal), use standard separator rules above.
+    if (typeof maxDecimals === 'number' && isFinite(maxDecimals) && maxDecimals >= 0) {
+        return __unformatWithMaxDecimals(str, maxDecimals);
+    }
 
     /**
      * Heuristic normalization that tolerates pasted values from other locales.
@@ -66,12 +111,6 @@ function unformat(value) {
     const hasDot = str.includes('.');
 
     const removeAll = (s, ch) => s.split(ch).join('');
-
-    // Remove locale-specific grouping sep early (when it's not one of the two main separators)
-    if (__groupSep && __groupSep !== ',' && __groupSep !== '.' && __groupSep !== "'") {
-        const groupEsc = __escapeForRegex(__groupSep);
-        if (groupEsc) str = str.replace(new RegExp(groupEsc, 'g'), '');
-    }
 
     if (hasComma && hasDot) {
         const lastComma = str.lastIndexOf(',');
@@ -125,18 +164,37 @@ function unformat(value) {
     return str;
 }
 
-function isNumericString(value) {
+function isNumericString(value, maxDecimals) {
     if (value == null || value === '') return false;
-    const raw = unformat(value);
+    const raw = unformat(value, maxDecimals);
     if (raw === '' || raw === '-' || raw === '+') return false;
     return !isNaN(Number(raw));
 }
 
+/** Read an input's `data-max-decimals` attribute, if any (e.g. set by matrix number/whole columns). */
+function __readMaxDecimals(input) {
+    const attr = input && input.dataset ? input.dataset.maxDecimals : undefined;
+    if (attr === undefined || attr === null || attr === '') return undefined;
+    const n = parseInt(attr, 10);
+    return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+
 function formatInPlace(input) {
-    const raw = unformat(input.value);
-    if (raw === '' || !isNumericString(raw)) return;
+    const maxDecimals = __readMaxDecimals(input);
+    const raw = unformat(input.value, maxDecimals);
+    if (raw === '' || !isNumericString(raw, maxDecimals)) return;
     const num = Number(raw);
-    input.value = formatter.format(num);
+    if (typeof maxDecimals === 'number' && maxDecimals === 0 && input.closest?.('.matrix-container')) {
+        if (isFinite(num) && Math.abs(num - Math.round(num)) > 1e-9) {
+            input.value = raw;
+            return;
+        }
+    }
+    if (typeof maxDecimals === 'number') {
+        input.value = new Intl.NumberFormat(undefined, { maximumFractionDigits: maxDecimals }).format(num);
+    } else {
+        input.value = formatter.format(num);
+    }
 }
 
 function markNumeric(input) {
@@ -167,7 +225,7 @@ function setupNumericFormatting() {
         // Clean up the value IMMEDIATELY to prevent HTML5 validation errors
         const currentValue = input.value;
         if (currentValue && (currentValue.includes(',') || currentValue.includes("'") || currentValue === 'None' || currentValue === 'null' || currentValue === 'undefined')) {
-            const cleanValue = unformat(currentValue);
+            const cleanValue = unformat(currentValue, __readMaxDecimals(input));
             input.value = cleanValue;
         }
 
@@ -181,13 +239,13 @@ function setupNumericFormatting() {
         }
 
         // Initial pretty display if a value is present (non-mobile)
-        if (!IS_COARSE && isNumericString(input.value)) formatInPlace(input);
+        if (!IS_COARSE && isNumericString(input.value, __readMaxDecimals(input))) formatInPlace(input);
 
         // On mobile, avoid formatting on focus/blur to keep native number behavior
         if (!IS_COARSE) {
             input.addEventListener('focus', () => {
                 // Show raw digits for editing
-                input.value = unformat(input.value);
+                input.value = unformat(input.value, __readMaxDecimals(input));
             });
 
             // Apply formatting when the user leaves the field in various ways
@@ -305,7 +363,7 @@ function scheduleGlobalFormat(target) {
 document.addEventListener('focus', (e) => {
     const target = e.target;
     if (shouldFormatInput(target)) {
-        try { target.value = unformat(target.value); } catch (_) { /* no-op */ }
+        try { target.value = unformat(target.value, __readMaxDecimals(target)); } catch (_) { /* no-op */ }
     }
 }, true);
 

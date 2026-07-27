@@ -2,6 +2,7 @@
 
 import { TranslationModal } from '/static/js/components/translation-modal.js';
 import { TranslationMatrix } from '/static/js/components/translation-matrix.js';
+import { MatrixItem } from '../items/matrix.js';
 import '/static/js/components/translation-utils.js';
 
 function attachQuestionModal() {
@@ -438,6 +439,52 @@ function attachMatrixSearchPlaceholderModal() {
       }
       if (window.TranslationModalUtils) {
         window.TranslationModalUtils.populateFields('matrix-search-placeholder', translations);
+      }
+    }
+  });
+}
+
+function attachMatrixFormatHintTextModal() {
+  const defaultHintText =
+    'Number format: Use "." for decimals and "," for thousands (e.g. 1,234.56). Values are rounded to each column\'s allowed decimal places.';
+  if (!window.TranslationModal || !document.getElementById('matrix-format-hint-text-translations-btn')) return;
+  window.TranslationModal.attach({
+    openButtonId: 'matrix-format-hint-text-translations-btn',
+    modalId: 'matrix-format-hint-text-translation-modal',
+    cssPrefix: 'matrix-format-hint-text',
+    resolveEnglishText: () => (document.getElementById('matrix-format-hint-text')?.value || defaultHintText),
+    onSaveHiddenFields: (collected) => {
+      const input = document.getElementById('matrix-format-hint-text-translations');
+      if (input) input.value = JSON.stringify(collected || {});
+      const btn = document.getElementById('matrix-format-hint-text-translations-btn');
+      if (btn) {
+        const originalNodes = Array.from(btn.childNodes).map(n => n.cloneNode(true));
+        const restore = () => {
+          btn.replaceChildren(...originalNodes.map(n => n.cloneNode(true)));
+        };
+        btn.replaceChildren();
+        {
+          const icon = document.createElement('i');
+          icon.className = 'fas fa-check w-4 h-4 mr-1';
+          btn.append(icon, document.createTextNode('Saved'));
+        }
+        btn.classList.add('text-green-600');
+        setTimeout(() => { restore(); btn.classList.remove('text-green-600'); }, 2000);
+      }
+      if (MatrixItem?.updateConfig) {
+        const modalElement = document.getElementById('item-modal');
+        if (modalElement) MatrixItem.updateConfig(modalElement);
+      }
+    },
+    autoTranslateType: 'form_item',
+    onModalOpen: () => {
+      const input = document.getElementById('matrix-format-hint-text-translations');
+      let translations = {};
+      if (input && input.value) {
+        try { translations = JSON.parse(input.value); } catch (e) {}
+      }
+      if (window.TranslationModalUtils) {
+        window.TranslationModalUtils.populateFields('matrix-format-hint-text', translations);
       }
     }
   });
@@ -1065,6 +1112,7 @@ export function attachFormBuilderTranslation() {
     attachMatrixLabelModal();
     attachMatrixLegendTextModal();
     attachMatrixSearchPlaceholderModal();
+    attachMatrixFormatHintTextModal();
     attachMatrixVariableTooltipLabelModals();
     attachMatrixColumnHeadersModal();
     attachMatrixRowHeadersModal();

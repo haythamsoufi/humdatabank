@@ -192,36 +192,42 @@ async function refreshCSRFTokenViaSessionApi() {
 }
 
 // Function to refresh CSRF token
-async function refreshCSRFToken() {
-    if (csrfSessionExpired) return null;
+function refreshCSRFToken() {
+    if (csrfSessionExpired) return Promise.resolve(null);
     if (csrfRefreshPromise) return csrfRefreshPromise;
 
+    // IMPORTANT: the try/catch lives *inside* this IIFE so csrfRefreshPromise itself
+    // never rejects. Multiple call sites (waitForPendingCsrfRefresh(), the periodic
+    // setInterval refresh, and this function's own early-return above) all read/await
+    // the same shared promise; if it could reject, every concurrent fire-and-forget
+    // caller that doesn't attach its own .catch() would produce an unhandled promise
+    // rejection the moment a refresh genuinely fails (e.g. a transient 500).
     csrfRefreshPromise = (async () => {
-        if (shouldUseAdminCsrfRefresh()) {
-            return await refreshCSRFTokenViaAdminApi();
+        try {
+            if (shouldUseAdminCsrfRefresh()) {
+                return await refreshCSRFTokenViaAdminApi();
+            }
+            // For authenticated non-admin sessions use the lightweight JSON endpoint to avoid
+            // re-fetching the full page HTML (~1.9 MB on large assignment forms).
+            if (window.__userIsAuthenticated) {
+                return await refreshCSRFTokenViaSessionApi();
+            }
+            // Fallback for anonymous public form sessions (no login, /api/v1/csrf-token not available).
+            if (typeof refreshCsrfFromCurrentPage === 'function') {
+                return await refreshCsrfFromCurrentPage();
+            }
+            return null;
+        } catch (error) {
+            if (!csrfSessionExpired) {
+                console.warn('Error refreshing CSRF token:', error);
+            }
+            return null;
+        } finally {
+            csrfRefreshPromise = null;
         }
-        // For authenticated non-admin sessions use the lightweight JSON endpoint to avoid
-        // re-fetching the full page HTML (~1.9 MB on large assignment forms).
-        if (window.__userIsAuthenticated) {
-            return await refreshCSRFTokenViaSessionApi();
-        }
-        // Fallback for anonymous public form sessions (no login, /api/v1/csrf-token not available).
-        if (typeof refreshCsrfFromCurrentPage === 'function') {
-            return await refreshCsrfFromCurrentPage();
-        }
-        return null;
     })();
 
-    try {
-        return await csrfRefreshPromise;
-    } catch (error) {
-        if (!csrfSessionExpired) {
-            console.warn('Error refreshing CSRF token:', error);
-        }
-        return null;
-    } finally {
-        csrfRefreshPromise = null;
-    }
+    return csrfRefreshPromise;
 }
 
 // Cross-tab-aware "last refreshed at": another tab may have refreshed more

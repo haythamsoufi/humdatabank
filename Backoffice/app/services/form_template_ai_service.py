@@ -59,7 +59,9 @@ DISAGGREGATION_OPTIONS = {"total", "sex", "age", "sex_age", "disability"}
 
 SYSTEM_LOOKUP_LISTS = {"country_map", "indicator_bank", "national_society", "emergency_operations"}
 
-MATRIX_COLUMN_TYPES = {"number", "tick"}
+# "number" is accepted as a legacy alias for "number_whole" for backward compatibility with
+# older AI prompts/specs; it is normalized to the explicit type below.
+MATRIX_COLUMN_TYPES = {"number", "number_whole", "number_decimal", "tick"}
 
 # Per-target-type condition types. Restricted to what the data-entry runtime
 # evaluator actually implements (contains/starts_with/ends_with are offered by
@@ -1387,15 +1389,23 @@ class FormTemplateAIService:
                 raise FormTemplateAIError(
                     f"Matrix '{label}': each column needs a 'name' (and optional 'type')."
                 )
-            col_type = str(c.get("type") or "number").strip().lower()
+            col_type = str(c.get("type") or "number_whole").strip().lower()
             if col_type not in MATRIX_COLUMN_TYPES:
                 raise FormTemplateAIError(
                     f"Matrix '{label}': column type '{col_type}' invalid. Allowed: {sorted(MATRIX_COLUMN_TYPES)}"
                 )
+            if col_type == "number":
+                col_type = "number_whole"
             col_entry: Dict[str, Any] = {
                 "name": _clean_str(c.get("name"), 200),
                 "type": col_type,
             }
+            if col_type == "number_decimal":
+                try:
+                    decimals = int(c.get("decimals", 2))
+                except (TypeError, ValueError):
+                    decimals = 2
+                col_entry["decimals"] = min(max(decimals, 0), 6)
             name_translations = _normalize_name_translations(c.get("name_translations"))
             if not name_translations:
                 fallback_label = _clean_str(c.get("label"), 500)
@@ -1414,7 +1424,17 @@ class FormTemplateAIService:
             "columns": columns,
             "show_row_totals": _as_bool(value.get("show_row_totals")),
             "show_column_totals": _as_bool(value.get("show_column_totals")),
+            "show_format_hint": _as_bool(value.get("show_format_hint")),
         }
+
+        format_hint_text = _clean_str(value.get("format_hint_text"), 500)
+        if format_hint_text:
+            config["format_hint_text"] = format_hint_text
+        format_hint_translations = _normalize_name_translations(
+            value.get("format_hint_text_translations"), max_len=500
+        )
+        if format_hint_translations:
+            config["format_hint_text_translations"] = format_hint_translations
 
         if row_mode == "manual":
             rows_in = value.get("rows")

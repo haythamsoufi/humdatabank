@@ -95,7 +95,7 @@ function __inputValueForMatrixCompare(input) {
         return input.checked ? '1' : '0';
     }
     return (typeof window.__numericUnformat === 'function')
-        ? window.__numericUnformat(String(input.value || ''))
+        ? window.__numericUnformat(String(input.value || ''), __readMatrixMaxDecimals(input))
         : String(input.value || '').trim().replace(/,/g, '');
 }
 
@@ -508,6 +508,142 @@ function __updateRowTotalConflict(input, autoSum, manualVal, validation, isManua
  * Treats "true"/"1"/"yes"/"on" as true and "false"/"0"/"no"/"off" as false.
  * Uses defaultWhenMissing only when value is null/undefined.
  */
+/**
+ * Resolve the maximum decimal places for a matrix column (rounding on save/display).
+ * Returns null for legacy columns (bare 'number') so they keep open-ended parsing.
+ */
+function __resolveColumnMaxDecimals(column) {
+    if (!column || typeof column !== 'object') return null;
+    if (column.type === 'number_whole') return 0;
+    if (column.type === 'number_decimal') {
+        const parsed = parseInt(column.decimals, 10);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 2;
+    }
+    return null;
+}
+
+/** Read the max-decimals hint stashed on a matrix cell input (see __resolveColumnMaxDecimals). */
+function __readMatrixMaxDecimals(input) {
+    const raw = input && input.dataset ? input.dataset.maxDecimals : undefined;
+    if (raw === undefined || raw === null || raw === '') return undefined;
+    const parsed = parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+const __WHOLE_NUMBER_VIOLATION_INPUT_CLASSES = [
+    'bg-red-100', 'border', 'border-red-400', 'rounded-sm', 'ring-1', 'ring-red-300',
+];
+const __WHOLE_NUMBER_VIOLATION_CELL_CLASS = 'bg-red-50';
+
+function __rawValueHasNonZeroFraction(rawValue) {
+    if (rawValue === null || rawValue === undefined || rawValue === '') return false;
+    const unformatFn = typeof window !== 'undefined' ? window.__numericUnformat : null;
+    const rawString = (typeof unformatFn === 'function')
+        ? unformatFn(String(rawValue), undefined)
+        : String(rawValue).trim().replace(/,/g, '');
+    if (!rawString) return false;
+    const num = parseFloat(rawString);
+    if (!isFinite(num)) return false;
+    return Math.abs(num - Math.round(num)) > 1e-9;
+}
+
+function __applyWholeNumberViolationHighlight(input, violated) {
+    if (!input || input.type === 'checkbox') return;
+    const cell = input.closest('td');
+    const titleKey = 'whole-number-violation';
+
+    if (violated) {
+        input.classList.remove('border-0', 'bg-transparent', 'bg-yellow-100', 'border-yellow-300', 'ring-yellow-300');
+        input.classList.add(...__WHOLE_NUMBER_VIOLATION_INPUT_CLASSES);
+        if (cell) {
+            cell.classList.remove('bg-yellow-100');
+            cell.classList.add(__WHOLE_NUMBER_VIOLATION_CELL_CLASS);
+        }
+        input.setAttribute('data-whole-number-violation', 'true');
+        input.setAttribute('aria-invalid', 'true');
+        input.dataset.violationTitleKey = titleKey;
+        input.setAttribute(
+            'title',
+            typeof _t === 'function'
+                ? _t('This column requires a whole number. Please correct the decimal value.')
+                : 'This column requires a whole number. Please correct the decimal value.'
+        );
+        return;
+    }
+
+    input.classList.remove(...__WHOLE_NUMBER_VIOLATION_INPUT_CLASSES);
+    input.removeAttribute('data-whole-number-violation');
+    input.removeAttribute('aria-invalid');
+    if (input.dataset.violationTitleKey === titleKey) {
+        input.removeAttribute('title');
+        delete input.dataset.violationTitleKey;
+    }
+    if (cell) cell.classList.remove(__WHOLE_NUMBER_VIOLATION_CELL_CLASS);
+    if (!input.classList.contains('bg-yellow-100') && !input.classList.contains('bg-gray-100')) {
+        input.classList.add('border-0');
+    }
+}
+
+function __syncWholeNumberViolationHighlight(input) {
+    if (!input || input.type === 'checkbox') return false;
+    if (input.getAttribute('data-is-row-total') === 'true') return false;
+    const maxDecimals = __readMatrixMaxDecimals(input);
+    const violated = maxDecimals === 0 && __rawValueHasNonZeroFraction(input.value);
+    __applyWholeNumberViolationHighlight(input, violated);
+    return violated;
+}
+
+/** Display a matrix numeric cell; preserve fractional values on whole-number columns and highlight them. */
+function __setMatrixNumericCellDisplay(input, rawValue) {
+    if (!input || input.type === 'checkbox') return;
+
+    if (rawValue !== undefined && rawValue !== null) {
+        input.value = rawValue;
+    }
+
+    const maxDecimals = __readMatrixMaxDecimals(input);
+    const violated = maxDecimals === 0 && __rawValueHasNonZeroFraction(input.value);
+
+    if (violated) {
+        const unformatFn = typeof window !== 'undefined' ? window.__numericUnformat : null;
+        const normalized = typeof unformatFn === 'function'
+            ? unformatFn(String(input.value), undefined)
+            : String(input.value).trim().replace(/,/g, '');
+        if (normalized !== '') input.value = normalized;
+        __applyWholeNumberViolationHighlight(input, true);
+        return;
+    }
+
+    __applyWholeNumberViolationHighlight(input, false);
+    if (typeof window.__numericFormatInPlace === 'function') {
+        window.__numericFormatInPlace(input);
+    }
+}
+
+/**
+ * Parse a matrix numeric cell: unformat with standard separator rules, then round to column precision.
+ */
+function __parseMatrixNumericCellValue(rawValue, maxDecimals) {
+    if (rawValue === null || rawValue === undefined) return rawValue;
+    if (typeof rawValue === 'string' && rawValue.trim() === '') return rawValue;
+
+    const unformatFn = typeof window !== 'undefined' ? window.__numericUnformat : null;
+    const rawString = (typeof unformatFn === 'function')
+        ? unformatFn(String(rawValue), maxDecimals)
+        : String(rawValue).trim().replace(/,/g, '');
+
+    if (rawString === '' || rawString === '-' || rawString === '+') return rawValue;
+
+    const num = parseFloat(rawString);
+    if (!isFinite(num)) return rawValue;
+
+    if (typeof maxDecimals === 'number' && isFinite(maxDecimals) && maxDecimals >= 0) {
+        const factor = Math.pow(10, maxDecimals);
+        return Math.round(num * factor) / factor;
+    }
+    return num;
+}
+
 function __configFlag(value, defaultWhenMissing = false) {
     if (value === undefined || value === null) return defaultWhenMissing;
     if (typeof value === 'boolean') return value;
@@ -1026,10 +1162,21 @@ class MatrixHandler {
             }
         });
 
-        // Listen for blur events for validation
+        // Listen for blur events for validation and numeric finalization
         document.addEventListener('blur', (e) => {
             if (e.target.matches('.matrix-container input[type="number"], .matrix-container input[data-numeric="true"]') ||
                 e.target.matches('.matrix-container input[data-column-type="variable"]')) {
+                const container = e.target.closest('.matrix-container');
+                const fieldId = container?.dataset?.fieldId;
+                if (fieldId && e.target.matches('.matrix-container input[type="number"], .matrix-container input[data-numeric="true"]')) {
+                    this.updateMatrixData(fieldId, e.target);
+                    __setMatrixNumericCellDisplay(e.target);
+                    requestAnimationFrame(() => {
+                        if (this.matrices.has(fieldId)) {
+                            this.calculateMatrixTotals(fieldId);
+                        }
+                    });
+                }
                 this.validateMatrixInput(e.target);
             }
         }, true);
@@ -1206,6 +1353,7 @@ class MatrixHandler {
                             setTimeout(() => {
                                 this.autoLoadEntities(fieldId).then(() => {
                                     this.applyManualRowHighlighting(fieldId);
+                                    this.applyWholeNumberViolationHighlighting(fieldId);
                                     this.applyPrefilledCellHighlighting(fieldId);
                                     resolve();
                                 }).catch((err) => {
@@ -1225,7 +1373,10 @@ class MatrixHandler {
                     matrixPromises.push(
                         Promise.resolve()
                             .then(() => this.resolveVariablesForAllRows(fieldId))
-                            .then(() => this.applyPrefilledCellHighlighting(fieldId))
+                            .then(() => {
+                                this.applyWholeNumberViolationHighlighting(fieldId);
+                                this.applyPrefilledCellHighlighting(fieldId);
+                            })
                     );
                 } else {
                     this.applyPrefilledCellHighlighting(fieldId);
@@ -1236,6 +1387,7 @@ class MatrixHandler {
             if (matrixConfig.row_mode !== 'list_library') {
                 setTimeout(() => {
                     this.applyManualRowHighlighting(fieldId);
+                    this.applyWholeNumberViolationHighlighting(fieldId);
                     this.applyPrefilledCellHighlighting(fieldId);
                 }, 50);
             }
@@ -1307,6 +1459,10 @@ class MatrixHandler {
         // Clear any existing validation errors for this input
         this.clearInputError(input);
 
+        if (input.type !== 'checkbox') {
+            __syncWholeNumberViolationHighlight(input);
+        }
+
         // Debounce the calculation
         if (this.debounceTimers.has(fieldId)) {
             clearTimeout(this.debounceTimers.get(fieldId));
@@ -1352,6 +1508,9 @@ class MatrixHandler {
             }
 
             this.updateMatrixData(fieldId, input);
+            if (!input.getAttribute('data-whole-number-violation')) {
+                this.applyPrefilledCellHighlighting(fieldId);
+            }
             // Use requestAnimationFrame to ensure DOM is updated before calculation
             requestAnimationFrame(() => {
                 // Double-check matrix still exists before calculating
@@ -1432,8 +1591,20 @@ class MatrixHandler {
                 this.applyVariableLookupComparisonForInput(fieldId, input);
             }
         } else {
-            const rawString = (window.__numericUnformat ? window.__numericUnformat(input.value) : String(input.value || ''));
-            value = parseFloat(rawString) || 0;
+            const maxDecimals = __readMatrixMaxDecimals(input);
+            const trimmed = String(input.value || '').trim();
+            if (trimmed === '') {
+                value = 0;
+            } else if (maxDecimals === 0 && __rawValueHasNonZeroFraction(input.value)) {
+                const unformatFn = typeof window.__numericUnformat === 'function' ? window.__numericUnformat : null;
+                const rawString = unformatFn
+                    ? unformatFn(trimmed, undefined)
+                    : trimmed.replace(/,/g, '');
+                const parsed = parseFloat(rawString);
+                value = isFinite(parsed) ? parsed : trimmed;
+            } else {
+                value = __parseMatrixNumericCellValue(input.value, maxDecimals);
+            }
         }
 
         debugLog('matrix-handler', `Input value: "${input.value}", checked: ${input.checked}, parsed: ${value}, cellKey: ${cellKey}, columnType: ${columnType}`);
@@ -1799,6 +1970,20 @@ class MatrixHandler {
     }
 
     /**
+     * Re-read all cell inputs into matrix.data before submit/draft save.
+     * Display formatting alone does not update matrix.data — this ensures saved values
+     * match what the user sees (including normalization of legacy mis-parsed numbers).
+     */
+    syncMatrixDataFromInputs(fieldId) {
+        const matrix = this.matrices.get(fieldId);
+        if (!matrix || !matrix.container?.isConnected) return;
+
+        matrix.container.querySelectorAll('input[data-cell-key]').forEach((input) => {
+            this.updateMatrixData(fieldId, input);
+        });
+    }
+
+    /**
      * Collect matrix data for form submission
      */
     collectMatrixData() {
@@ -1809,6 +1994,8 @@ class MatrixHandler {
                 this.cleanupMatrix(fieldId);
                 return;
             }
+
+            this.syncMatrixDataFromInputs(fieldId);
 
             // Remove metadata keys before collection.
             this.sanitizeMatrixData(matrix);
@@ -1915,8 +2102,7 @@ class MatrixHandler {
                     const checked = displayValue === '1' || displayValue === 1 || displayValue === 'true' || displayValue === true;
                     input.checked = checked;
                 } else {
-                    input.value = displayValue != null ? String(displayValue) : '';
-                    if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
+                    __setMatrixNumericCellDisplay(input, displayValue != null ? String(displayValue) : '');
                 }
             }
         });
@@ -2051,7 +2237,7 @@ class MatrixHandler {
         const matrix = this.matrices.get(fieldId);
         if (!matrix) return;
 
-        const value = parseFloat(window.__numericUnformat ? window.__numericUnformat(input.value) : input.value);
+        const value = parseFloat(window.__numericUnformat ? window.__numericUnformat(input.value, __readMatrixMaxDecimals(input)) : input.value);
         const errors = [];
 
         // Check if value is valid number
@@ -2062,6 +2248,11 @@ class MatrixHandler {
         // Check if value is negative
         if (!isNaN(value) && value < 0) {
             errors.push(_t('Value cannot be negative'));
+        }
+
+        const maxDecimals = __readMatrixMaxDecimals(input);
+        if (maxDecimals === 0 && input.value && __rawValueHasNonZeroFraction(input.value)) {
+            errors.push(_t('This column requires a whole number. Please correct the decimal value.'));
         }
 
         // TODO: Enforce per-cell min/max (and other numeric rules) from matrix item config
@@ -3021,6 +3212,7 @@ class MatrixHandler {
             // Use row ID instead of row label for the cell key
             const cellKey = `${finalRowId}_${columnName}`;
             const input = document.createElement('input');
+            const columnMaxDecimals = __resolveColumnMaxDecimals(typeof column === 'object' ? column : null);
 
             if (isVariable) {
                 // Variable column - type can be number or tick, will be resolved via API
@@ -3051,6 +3243,7 @@ class MatrixHandler {
                 input.setAttribute('data-variable-name', variableName || '');
                 input.setAttribute('data-variable-save-value', variableSaveValue ? 'true' : 'false');
                 input.setAttribute('data-variable-readonly', variableReadonly ? 'true' : 'false');
+                if (columnMaxDecimals !== null) input.setAttribute('data-max-decimals', String(columnMaxDecimals));
                 input.setAttribute('aria-label', `Variable value for ${rowLabel} and ${columnDisplayName}`);
                 }
             } else if (columnType === 'tick') {
@@ -3066,6 +3259,7 @@ class MatrixHandler {
                 input.step = '0.01';
                 input.value = '';
                 input.setAttribute('data-column-type', 'number');
+                if (columnMaxDecimals !== null) input.setAttribute('data-max-decimals', String(columnMaxDecimals));
                 input.setAttribute('aria-label', `Value for ${rowLabel} and ${columnDisplayName}`);
             }
 
@@ -3360,8 +3554,7 @@ class MatrixHandler {
                 if (input.type === 'checkbox') {
                     input.checked = lookupValue === '1';
                 } else {
-                    input.value = lookupValue;
-                    if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
+                    __setMatrixNumericCellDisplay(input, lookupValue);
                 }
                 this.updateVariableModificationIndicator(input, '', '', labels);
                 return;
@@ -3382,15 +3575,13 @@ class MatrixHandler {
                 if (input.type === 'checkbox') {
                     input.checked = display === '1';
                 } else {
-                    input.value = display;
-                    if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
+                    __setMatrixNumericCellDisplay(input, display);
                 }
             } else if (variableName && Object.prototype.hasOwnProperty.call(resolvedVariables, variableName)) {
                 if (input.type === 'checkbox') {
                     input.checked = lookupValue === '1';
                 } else {
-                    input.value = lookupValue;
-                    if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
+                    __setMatrixNumericCellDisplay(input, lookupValue);
                 }
                 savedScalar = lookupValue;
                 if (cellKey && saveValue) {
@@ -4261,8 +4452,7 @@ class MatrixHandler {
                             if (inp.type === 'checkbox') {
                                 inp.checked = restoredDisplay === '1';
                             } else {
-                                inp.value = restoredDisplay;
-                                if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(inp);
+                                __setMatrixNumericCellDisplay(inp, restoredDisplay);
                             }
                             if (restoreMatrix && cellKey) {
                                 restoreMatrix.data[cellKey] = inp.type === 'checkbox'
@@ -4505,8 +4695,7 @@ class MatrixHandler {
                         const checkedValue = displayValue == '1' || displayValue == 1 || displayValue === 'true' || displayValue === true;
                         input.checked = checkedValue;
                     } else {
-                        input.value = displayValue;
-                        if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
+                        __setMatrixNumericCellDisplay(input, displayValue);
                     }
 
                     if (isVariable && column) {
@@ -4581,8 +4770,7 @@ class MatrixHandler {
                         const checkedValue = displayValue == '1' || displayValue == 1 || displayValue === 'true' || displayValue === true;
                         input.checked = checkedValue;
                     } else {
-                        input.value = displayValue;
-                        if (typeof window.__numericFormatInPlace === 'function') window.__numericFormatInPlace(input);
+                        __setMatrixNumericCellDisplay(input, displayValue);
                     }
 
                     if (isVariable && column) {
@@ -4599,8 +4787,13 @@ class MatrixHandler {
 
         // Recalculate totals after restoring values
         this.calculateMatrixTotals(fieldId);
+        this.applyWholeNumberViolationHighlighting(fieldId);
         this.applyPrefilledCellHighlighting(fieldId);
         this._lockMatrixContainerIfReadOnly(container);
+
+        if (matrix.hiddenField) {
+            matrix.hiddenField.value = __serializeMatrixData(matrix.data);
+        }
     }
 
     /**
@@ -4717,6 +4910,7 @@ class MatrixHandler {
                 // Check for and highlight duplicates
                 this.applyDuplicateEntityHighlighting(fieldId);
 
+                this.applyWholeNumberViolationHighlighting(fieldId);
                 this.applyPrefilledCellHighlighting(fieldId);
 
                 // Update legend visibility after restoration
@@ -5700,6 +5894,20 @@ class MatrixHandler {
     }
 
     /**
+     * Highlight whole-number column cells that still contain a decimal fraction.
+     */
+    applyWholeNumberViolationHighlighting(fieldId) {
+        const matrix = this.matrices.get(fieldId);
+        if (!matrix?.container) return;
+
+        matrix.container.querySelectorAll('input[data-cell-key]').forEach((input) => {
+            if (input.type === 'checkbox') return;
+            if (input.getAttribute('data-is-row-total') === 'true') return;
+            __syncWholeNumberViolationHighlight(input);
+        });
+    }
+
+    /**
      * Highlight individual matrix cells that contain prefilled/carry-forward values.
      */
     applyPrefilledCellHighlighting(fieldId) {
@@ -5757,6 +5965,9 @@ class MatrixHandler {
         };
 
         inputs.forEach((input) => {
+            if (input.getAttribute('data-whole-number-violation') === 'true') {
+                return;
+            }
             if (input.getAttribute('data-variable-readonly') === 'true') {
                 return;
             }

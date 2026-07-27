@@ -261,7 +261,8 @@ class TestCreateTemplate:
         mc = item.config["matrix_config"]
         assert mc["row_mode"] == "manual"
         assert mc["rows"] == [{"text": "North"}, {"text": "South"}]
-        assert mc["columns"] == [{"name": "Staff", "type": "number"}]
+        # Legacy "number" is normalized to the explicit "number_whole" type.
+        assert mc["columns"] == [{"name": "Staff", "type": "number_whole"}]
 
     def test_matrix_column_name_translations_preserved(
         self, db_session, app, service, user, grant_all_rbac

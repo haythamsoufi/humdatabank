@@ -4,6 +4,9 @@
 const truthyMatrixValues = new Set(['true', '1', 'yes', 'on']);
 const falsyMatrixValues = new Set(['false', '0', 'no', 'off', '']);
 
+const DEFAULT_FORMAT_HINT_TEXT =
+    'Number format: Use "." for decimals and "," for thousands (e.g. 1,234.56). Values are rounded to each column\'s allowed decimal places.';
+
 const isTruthyMatrixValue = (value) => {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'number') return value !== 0;
@@ -146,6 +149,9 @@ export const MatrixItem = {
         const legendTextInput = modalElement.querySelector('#matrix-legend-text');
         const legendTextTranslationsInput = modalElement.querySelector('#matrix-legend-text-translations');
         const legendHideInput = modalElement.querySelector('#matrix-legend-hide');
+        const formatHintCheckbox = modalElement.querySelector('#matrix-show-format-hint');
+        const formatHintTextInput = modalElement.querySelector('#matrix-format-hint-text');
+        const formatHintTextTranslationsInput = modalElement.querySelector('#matrix-format-hint-text-translations');
 
         if (rowsContainer) rowsContainer.replaceChildren();
         if (columnsContainer) columnsContainer.replaceChildren();
@@ -194,6 +200,9 @@ export const MatrixItem = {
         }
         if (legendTextTranslationsInput) legendTextTranslationsInput.value = '{}';
         if (legendHideInput) legendHideInput.value = 'false';
+        if (formatHintCheckbox) formatHintCheckbox.checked = false;
+        if (formatHintTextInput) formatHintTextInput.value = DEFAULT_FORMAT_HINT_TEXT;
+        if (formatHintTextTranslationsInput) formatHintTextTranslationsInput.value = '{}';
         const lookupTooltipLabelInput = modalElement.querySelector('#matrix-variable-lookup-tooltip-label');
         const lookupTooltipLabelTranslationsInput = modalElement.querySelector('#matrix-variable-lookup-tooltip-label-translations');
         const submittedTooltipLabelInput = modalElement.querySelector('#matrix-variable-submitted-tooltip-label');
@@ -216,8 +225,8 @@ export const MatrixItem = {
             this.addRow(modalElement, 'Row 2');
         }
         if (columnsContainer.children.length === 0) {
-            this.addColumn(modalElement, 'Column 1', 'number');
-            this.addColumn(modalElement, 'Column 2', 'number');
+            this.addColumn(modalElement, 'Column 1', 'number_whole');
+            this.addColumn(modalElement, 'Column 2', 'number_whole');
         }
     },
 
@@ -257,9 +266,15 @@ export const MatrixItem = {
                 e.target.classList.contains('column-text') ||
                 e.target.classList.contains('group-label-text') ||
                 e.target.classList.contains('column-type') ||
+                e.target.classList.contains('column-decimals') ||
                 e.target.classList.contains('column-variable-select') ||
                 e.target.classList.contains('column-is-variable')
             ) {
+                // Show the "Decimals" input only for columns configured as Number (Decimal)
+                if (e.target.classList.contains('column-type')) {
+                    const columnDiv = e.target.closest('.matrix-column');
+                    this.updateColumnDecimalsVisibility(columnDiv);
+                }
                 // Handle "Is Variable" checkbox change to show/hide variable selector and save/readonly options
                 if (e.target.classList.contains('column-is-variable')) {
                     const columnDiv = e.target.closest('.matrix-column');
@@ -341,7 +356,7 @@ export const MatrixItem = {
                 const groupDiv = target.closest('.matrix-group');
                 if (groupDiv) {
                     const groupColumnsContainer = groupDiv.querySelector('.matrix-group-columns');
-                    this.addColumn(modalElement, '', 'number', false, '', true, true, {}, groupColumnsContainer);
+                    this.addColumn(modalElement, '', 'number_whole', false, '', true, true, {}, groupColumnsContainer);
                     this.updateConfig(modalElement);
                 }
             } else if (target.classList.contains('remove-group-btn')) {
@@ -383,7 +398,30 @@ export const MatrixItem = {
         rowsContainer.appendChild(clone);
     },
 
-    addColumn(modalElement, text = '', type = 'number', isVariable = false, variableName = '', variableSaveValue = true, variableReadonly = true, nameTranslations = {}, targetContainer = null) {
+    /**
+     * Show the "Decimals" input only when the column is configured as Number (Decimal).
+     */
+    updateColumnDecimalsVisibility(columnDiv) {
+        if (!columnDiv) return;
+        const typeSelect = columnDiv.querySelector('.column-type');
+        const decimalsLabel = columnDiv.querySelector('.column-decimals-label');
+        if (!decimalsLabel) return;
+        decimalsLabel.style.display = (typeSelect?.value === 'number_decimal') ? 'flex' : 'none';
+    },
+
+    /**
+     * Normalize a stored/legacy column type to one of the explicit dropdown values.
+     * Legacy configs (and the old 'variable' type marker, now represented via is_variable)
+     * stored a generic 'number' type with no decimal-place limit; those default to Whole
+     * in the UI. Saving the item persists the explicit type going forward.
+     */
+    _normalizeColumnTypeForUi(type) {
+        if (type === 'tick') return 'tick';
+        if (type === 'number_decimal') return 'number_decimal';
+        return 'number_whole';
+    },
+
+    addColumn(modalElement, text = '', type = 'number_whole', isVariable = false, variableName = '', variableSaveValue = true, variableReadonly = true, nameTranslations = {}, targetContainer = null, decimals = 2) {
         const columnsContainer = Utils.getElementById('matrix-columns-container');
         const template = Utils.getElementById('matrix-column-template');
         if (!template) {
@@ -391,10 +429,12 @@ export const MatrixItem = {
             return;
         }
         const clone = template.content.cloneNode(true);
+        const columnDiv = clone.querySelector('.matrix-column');
         const input = clone.querySelector('.column-text');
         const translationsInput = clone.querySelector('.column-name-translations');
         const translateBtn = clone.querySelector('.matrix-column-translate-btn');
         const typeSelect = clone.querySelector('.column-type');
+        const decimalsInput = clone.querySelector('.column-decimals');
         const variableSelect = clone.querySelector('.column-variable-select');
         const variableOptions = clone.querySelector('.column-variable-options');
         const isVariableCheckbox = clone.querySelector('.column-is-variable');
@@ -416,9 +456,13 @@ export const MatrixItem = {
             }
         }
         if (typeSelect) {
-            // Set type (number or tick) - but don't use 'variable' as type anymore
-            typeSelect.value = (type === 'variable') ? 'number' : (type || 'number');
+            typeSelect.value = this._normalizeColumnTypeForUi(type);
         }
+        if (decimalsInput) {
+            const parsedDecimals = parseInt(decimals, 10);
+            decimalsInput.value = String((Number.isFinite(parsedDecimals) && parsedDecimals >= 0) ? parsedDecimals : 2);
+        }
+        this.updateColumnDecimalsVisibility(columnDiv);
 
         // Check if template has variables defined
         const templateVariables = window.templateVariables || {};
@@ -534,10 +578,11 @@ export const MatrixItem = {
         const textInput = columnDiv.querySelector('.column-text');
         const translationsInput = columnDiv.querySelector('.column-name-translations');
         const typeSelect = columnDiv.querySelector('.column-type');
+        const decimalsInput = columnDiv.querySelector('.column-decimals');
         const isVariableCheckbox = columnDiv.querySelector('.column-is-variable');
         const variableSelect = columnDiv.querySelector('.column-variable-select');
         const columnName = textInput?.value?.trim();
-        const columnType = typeSelect?.value || 'number';
+        const columnType = typeSelect?.value || 'number_whole';
         const isVariable = isVariableCheckbox?.checked || false;
 
         if (!columnName && !isVariable) return null;
@@ -546,6 +591,11 @@ export const MatrixItem = {
             name: columnName || '',
             type: columnType
         };
+
+        if (columnType === 'number_decimal') {
+            const parsedDecimals = parseInt(decimalsInput?.value, 10);
+            columnConfig.decimals = (Number.isFinite(parsedDecimals) && parsedDecimals >= 0) ? parsedDecimals : 2;
+        }
 
         if (translationsInput && translationsInput.value) {
             try {
@@ -804,6 +854,8 @@ export const MatrixItem = {
         const legendTextWrapper = Utils.getElementById('matrix-legend-text-wrapper');
         const legendHideBtn = Utils.getElementById('matrix-legend-hide-btn');
         const legendHideInput = Utils.getElementById('matrix-legend-hide');
+        const formatHintCheckbox = Utils.getElementById('matrix-show-format-hint');
+        const formatHintTextInput = Utils.getElementById('matrix-format-hint-text');
 
         if (rowTotalsCheckbox) {
             if (!rowTotalsCheckbox._matrixConfigListenerAdded) {
@@ -833,6 +885,22 @@ export const MatrixItem = {
             if (!columnTotalsCheckbox._matrixConfigListenerAdded) {
                 columnTotalsCheckbox.addEventListener('change', () => this.updateConfig(modalElement));
                 columnTotalsCheckbox._matrixConfigListenerAdded = true;
+            }
+        }
+        if (formatHintCheckbox) {
+            if (!formatHintCheckbox._matrixConfigListenerAdded) {
+                formatHintCheckbox.addEventListener('change', () => {
+                    this.updateFormatHintTextVisibility(modalElement);
+                    this.updateConfig(modalElement);
+                });
+                formatHintCheckbox._matrixConfigListenerAdded = true;
+            }
+        }
+        if (formatHintTextInput) {
+            if (!formatHintTextInput._matrixFormatHintListenerAdded) {
+                formatHintTextInput.addEventListener('input', () => this.updateConfig(modalElement));
+                formatHintTextInput.addEventListener('change', () => this.updateConfig(modalElement));
+                formatHintTextInput._matrixFormatHintListenerAdded = true;
             }
         }
         if (autoLoadCheckbox) {
@@ -872,6 +940,7 @@ export const MatrixItem = {
 
         // Update legend text visibility on initial load
         this.updateLegendTextVisibility(modalElement);
+        this.updateFormatHintTextVisibility(modalElement);
 
         // Initialize legend hide button state
         this.initializeLegendHideButton(modalElement);
@@ -941,6 +1010,19 @@ export const MatrixItem = {
                 legendTextWrapper.classList.remove('hidden');
             } else {
                 legendTextWrapper.classList.add('hidden');
+            }
+        }
+    },
+
+    updateFormatHintTextVisibility(modalElement) {
+        const formatHintCheckbox = Utils.getElementById('matrix-show-format-hint');
+        const formatHintTextWrapper = Utils.getElementById('matrix-format-hint-text-wrapper');
+
+        if (formatHintCheckbox && formatHintTextWrapper) {
+            if (formatHintCheckbox.checked) {
+                formatHintTextWrapper.classList.remove('hidden');
+            } else {
+                formatHintTextWrapper.classList.add('hidden');
             }
         }
     },
@@ -1452,6 +1534,9 @@ export const MatrixItem = {
         });
         const showRowTotals = Utils.getElementById('matrix-show-row-totals')?.checked !== false;
         const showColumnTotals = Utils.getElementById('matrix-show-column-totals')?.checked !== false;
+        const showFormatHint = Utils.getElementById('matrix-show-format-hint')?.checked === true;
+        const formatHintTextInput = Utils.getElementById('matrix-format-hint-text');
+        const formatHintTextTranslationsInput = Utils.getElementById('matrix-format-hint-text-translations');
         const rowTotalManualEnabled = Utils.getElementById('matrix-row-total-manual-enabled')?.checked === true;
         const rowTotalValidation = Utils.getElementById('matrix-row-total-validation')?.value || 'none';
         const autoLoadEntities = Utils.getElementById('matrix-auto-load-entities')?.checked === true;
@@ -1466,6 +1551,7 @@ export const MatrixItem = {
             columns: columns,
             show_row_totals: showRowTotals,
             show_column_totals: showColumnTotals,
+            show_format_hint: showFormatHint,
             row_mode: selectedMode,
             highlight_manual_rows: highlightManualRows
         };
@@ -1474,6 +1560,21 @@ export const MatrixItem = {
             config.row_total_manual_enabled = rowTotalManualEnabled;
             if (rowTotalManualEnabled) {
                 config.row_total_validation = rowTotalValidation;
+            }
+        }
+
+        if (showFormatHint) {
+            config.format_hint_text = formatHintTextInput?.value?.trim() || DEFAULT_FORMAT_HINT_TEXT;
+            if (formatHintTextTranslationsInput?.value) {
+                try {
+                    const translations = JSON.parse(formatHintTextTranslationsInput.value);
+                    if (translations && typeof translations === 'object' &&
+                        Object.values(translations).some(v => String(v || '').trim())) {
+                        config.format_hint_text_translations = translations;
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse format hint text translations:', e);
+                }
             }
         }
 
@@ -1805,23 +1906,24 @@ export const MatrixItem = {
                             item.columns.forEach(colData => {
                                 if (!colData || typeof colData !== 'object') return;
                                 const isVariable = colData.is_variable || colData.type === 'variable';
-                                const columnType = (colData.type === 'variable') ? 'number' : (colData.type || 'number');
-                                this.addColumn(modalElement, colData.name || '', columnType, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, groupColumnsContainer);
+                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, groupColumnsContainer, colData.decimals);
                             });
                         } else {
                             const colData = item.data;
                             if (typeof colData === 'string') {
-                                this.addColumn(modalElement, colData, 'number');
+                                this.addColumn(modalElement, colData, 'number_whole');
                             } else if (colData && typeof colData === 'object' && (colData.name || colData.is_variable || colData.type === 'variable')) {
                                 const isVariable = colData.is_variable || colData.type === 'variable';
-                                const columnType = (colData.type === 'variable') ? 'number' : (colData.type || 'number');
-                                this.addColumn(modalElement, colData.name || '', columnType, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {});
+                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, null, colData.decimals);
                             }
                         }
                     });
                 }
                 const rowTotalsCheckbox = Utils.getElementById('matrix-show-row-totals');
                 const columnTotalsCheckbox = Utils.getElementById('matrix-show-column-totals');
+                const formatHintCheckbox = Utils.getElementById('matrix-show-format-hint');
+                const formatHintTextInput = Utils.getElementById('matrix-format-hint-text');
+                const formatHintTextTranslationsInput = Utils.getElementById('matrix-format-hint-text-translations');
                 const autoLoadCheckbox = Utils.getElementById('matrix-auto-load-entities');
                 const highlightManualRowsCheckbox = Utils.getElementById('matrix-highlight-manual-rows');
                 const legendTextInput = Utils.getElementById('matrix-legend-text');
@@ -1839,6 +1941,14 @@ export const MatrixItem = {
                 }
                 this.updateRowTotalOptionsVisibility(modalElement);
                 if (columnTotalsCheckbox) columnTotalsCheckbox.checked = matrixConfig.show_column_totals !== false;
+                if (formatHintCheckbox) formatHintCheckbox.checked = matrixConfig.show_format_hint === true;
+                if (formatHintTextInput) {
+                    formatHintTextInput.value = matrixConfig.format_hint_text || DEFAULT_FORMAT_HINT_TEXT;
+                }
+                if (formatHintTextTranslationsInput && matrixConfig.format_hint_text_translations) {
+                    formatHintTextTranslationsInput.value = JSON.stringify(matrixConfig.format_hint_text_translations);
+                }
+                this.updateFormatHintTextVisibility(modalElement);
                 if (autoLoadCheckbox) autoLoadCheckbox.checked = matrixConfig.auto_load_entities === true;
                 if (highlightManualRowsCheckbox) highlightManualRowsCheckbox.checked = matrixConfig.highlight_manual_rows === true;
                 if (legendTextInput) {

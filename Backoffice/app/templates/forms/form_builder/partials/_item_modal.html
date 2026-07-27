@@ -762,6 +762,30 @@
                                         <input type="checkbox" id="matrix-show-column-totals" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
                                         <span class="ml-2 text-sm text-gray-700">{{ _('Show Column Totals') }}</span>
                                     </label>
+                                    <div>
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="matrix-show-format-hint" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+                                            <span class="ml-2 text-sm text-gray-700">{{ _('Show number format hint') }}</span>
+                                            <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help')|forceescape }}">
+                                                <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
+                                                <span class="tooltip-text">{{ _('Shows a highlighted note above the matrix table in the entry form. Only shown when the matrix has at least one number column.') }}</span>
+                                            </span>
+                                        </label>
+                                        <div id="matrix-format-hint-text-wrapper" class="mt-2 ml-6 hidden">
+                                            <div class="flex items-center gap-2 flex-wrap mb-1">
+                                                <label for="matrix-format-hint-text" class="text-sm font-medium text-gray-700">{{ _('Hint text') }}</label>
+                                                <button type="button" id="matrix-format-hint-text-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                            <textarea id="matrix-format-hint-text"
+                                                      name="matrix_format_hint_text"
+                                                      rows="2"
+                                                      class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">{{ _('Number format: Use "." for decimals and "," for thousands (e.g. 1,234.56). Values are rounded to each column\'s allowed decimal places.') }}</textarea>
+                                            <input type="hidden" id="matrix-format-hint-text-translations" value="{}">
+                                            <p class="mt-1 text-xs text-gray-500">{{ _('Customize the message shown above the matrix table.') }}</p>
+                                        </div>
+                                    </div>
                                     <label class="inline-flex items-center hidden" id="matrix-auto-load-entities-wrapper">
                                         <input type="checkbox" id="matrix-auto-load-entities" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
                                         <span class="ml-2 text-sm text-gray-700">{{ _('Auto Load Entities') }}</span>
@@ -874,10 +898,19 @@
                                     </span>
                                     <input type="text" class="column-text shadow-sm focus:ring-orange-500 focus:border-orange-500 flex-1 min-w-[120px] sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g. total_beneficiaries')|forceescape }}">
                                     <input type="hidden" class="column-name-translations" value="{}">
-                                    <select class="column-type shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-28 shrink-0 sm:text-sm border-gray-300 rounded-md">
-                                        <option value="number">{{ _('Number') }}</option>
+                                    <select class="column-type shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-36 shrink-0 sm:text-sm border-gray-300 rounded-md">
+                                        <option value="number_whole">{{ _('Number (Whole)') }}</option>
+                                        <option value="number_decimal">{{ _('Number (Decimal)') }}</option>
                                         <option value="tick">{{ _('Tick (✓)') }}</option>
                                     </select>
+                                    <label class="column-decimals-label flex items-center text-xs text-gray-600 whitespace-nowrap shrink-0" style="display: none;">
+                                        <span class="mr-1">{{ _('Decimals') }}</span>
+                                        <input type="number" class="column-decimals shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-14 sm:text-sm border-gray-300 rounded-md" min="0" max="6" step="1" value="2">
+                                        <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help')|forceescape }}">
+                                            <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
+                                            <span class="tooltip-text">{{ _('Maximum decimal places accepted for this column. Values are rounded on save; use "." for decimals and "," for thousands when entering or pasting.') }}</span>
+                                        </span>
+                                    </label>
                                     <select class="column-variable-select shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-36 shrink-0 sm:text-sm border-gray-300 rounded-md" style="display: none;">
                                         <option value="">{{ _('Select Variable...') }}</option>
                                     </select>

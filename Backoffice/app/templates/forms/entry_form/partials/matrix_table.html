@@ -36,6 +36,26 @@
     {% set _matrix_label = field.display_label or field.label %}
 {% endif %}
 {% set _matrix_can_edit = can_edit if can_edit is defined else true %}
+{% set _matrix_has_numeric_col = namespace(value=false) %}
+{% for _col in matrix_columns %}
+    {% if not (_col is mapping and _col.get('type') == 'tick') %}{% set _matrix_has_numeric_col.value = true %}{% endif %}
+{% endfor %}
+{% set _matrix_format_hint_visible = _matrix_has_numeric_col.value and matrix_config.get('show_format_hint') is sameas true %}
+{% set _default_format_hint = _('Number format: Use "." for decimals and "," for thousands (e.g. 1,234.56). Values are rounded to each column\'s allowed decimal places.') %}
+{% set _format_hint_text = none %}
+{% set _format_hint_translations = matrix_config.get('format_hint_text_translations', {}) or {} %}
+{% if _format_hint_translations %}
+    {% set _format_hint_cand = _format_hint_translations.get(translation_key) or _format_hint_translations.get('en') %}
+    {% if _format_hint_cand and _format_hint_cand|trim %}{% set _format_hint_text = _format_hint_cand %}{% endif %}
+{% endif %}
+{% if not _format_hint_text or not _format_hint_text|trim %}
+    {% set _format_hint_custom = matrix_config.get('format_hint_text') %}
+    {% if _format_hint_custom and _format_hint_custom|trim %}
+        {% set _format_hint_text = _format_hint_custom %}
+    {% else %}
+        {% set _format_hint_text = _default_format_hint %}
+    {% endif %}
+{% endif %}
 
 <div class="matrix-container disaggregation-inputs{% if matrix_is_imputed %} bg-blue-50 border border-blue-300 rounded-md p-2{% endif %}"
      data-field-id="{{ field.id }}"
@@ -48,7 +68,7 @@
      {% if matrix_highlight_prefilled_cells %}data-prefilled-legend-text="{{ _('Prefilled value')|forceescape }}"{% endif %}
      role="group"
      aria-labelledby="field-{{ field.id }}"
-     aria-describedby="matrix-error-{{ field.id }}"
+     aria-describedby="matrix-error-{{ field.id }}{% if _matrix_format_hint_visible %} matrix-format-hint-{{ field.id }}{% endif %}"
      style="position: relative; overflow: visible;">
 
     {% if matrix_is_imputed %}
@@ -59,6 +79,17 @@
 
     {# Error Message Container #}
     <div id="matrix-error-{{ field.id }}" class="text-red-600 text-sm mt-1 mb-2" style="display: none;" role="alert" aria-live="polite"></div>
+
+    {% if _matrix_format_hint_visible %}
+        <div class="matrix-number-format-hint flex items-center gap-2.5 text-sm text-amber-950 bg-amber-50 border border-amber-300 border-l-4 border-l-amber-500 rounded-md px-3 py-2.5 mb-3 shadow-sm"
+             id="matrix-format-hint-{{ field.id }}"
+             role="note">
+            <span class="inline-flex shrink-0 items-center justify-center text-amber-600 leading-none" aria-hidden="true">
+                <i class="fas fa-info-circle text-base"></i>
+            </span>
+            <span class="font-medium leading-normal">{{ _format_hint_text }}</span>
+        </div>
+    {% endif %}
 
     {# Title for Advanced Mode - Removed to prevent duplicate labels #}
     {# The field label should be handled by the parent form template #}
@@ -247,11 +278,28 @@
                                 {% set outer_loop = loop %}
                                 {% set column_name = column.name if column.name else column %}
                                 {% set column_type = column.type if column.type else 'number' %}
+                                {# Explicit whole/decimal types disambiguate pasted "," vs "." by declared precision
+                                   instead of guessing from locale; legacy 'number' columns keep the old behaviour
+                                   (data-max-decimals omitted) until the form builder re-saves them with a new type. #}
+                                {% set column_max_decimals = none %}
+                                {% if column_type == 'number_whole' %}
+                                    {% set column_max_decimals = 0 %}
+                                {% elif column_type == 'number_decimal' %}
+                                    {% set column_max_decimals = column.decimals if (column.decimals is defined and column.decimals is not none) else 2 %}
+                                {% endif %}
                                 {% set is_variable = column.is_variable if column.is_variable is defined else (column.type == 'variable' if column.type else False) %}
                                 {% set column_variable = column.variable_name if column.variable_name else (column.variable if column.variable else None) %}
                                 {# Use row_id as the stable key (rowId_columnName format) #}
                                 {% set cell_key = row_id ~ '_' ~ column_name %}
                                 {% set cell_value = existing_matrix_data.get(cell_key, '') if existing_matrix_data else '' %}
+                                {% set _cell_display_scalar = '' %}
+                                {% if cell_value is mapping %}
+                                    {% if cell_value.get('modified') not in (none, '') %}{% set _cell_display_scalar = cell_value.get('modified') %}
+                                    {% elif cell_value.get('original') not in (none, '') %}{% set _cell_display_scalar = cell_value.get('original') %}{% endif %}
+                                {% elif cell_value not in (none, '') %}
+                                    {% set _cell_display_scalar = cell_value %}
+                                {% endif %}
+                                {% set _whole_number_violation = column_max_decimals == 0 and _cell_display_scalar not in (none, '') and ('.' in (_cell_display_scalar|string)) %}
                                 {% set _cell_prefill = namespace(has_value=false) %}
                                 {% if matrix_highlight_prefilled_cells and not matrix_has_carry_forward_ref and not (is_variable and (column.variable_readonly if column.variable_readonly is defined else True)) %}
                                     {% if cell_value is mapping and (cell_value.get('modified') not in (none, '') or cell_value.get('original') not in (none, '')) %}
@@ -260,7 +308,7 @@
                                         {% set _cell_prefill.has_value = true %}
                                     {% endif %}
                                 {% endif %}
-                                <td class="border border-gray-300 px-2 py-1{% if column_type == 'tick' %} text-center{% endif %}{% if _cell_prefill.has_value %} bg-yellow-100{% endif %}" role="gridcell">
+                                <td class="border border-gray-300 px-2 py-1{% if column_type == 'tick' %} text-center{% endif %}{% if _whole_number_violation %} bg-red-50{% elif _cell_prefill.has_value %} bg-yellow-100{% endif %}" role="gridcell">
                                     {% if is_variable and column_variable %}
                                         {# Variable column - type can be number or tick, will be resolved via JavaScript with row entity context #}
                                         {% set variable_readonly = column.variable_readonly if column.variable_readonly is defined else True %}
@@ -295,9 +343,10 @@
                                                    data-variable-save-value="{{ 'true' if variable_save_value else 'false' }}"
                                                    data-variable-readonly="{{ 'true' if variable_readonly else 'false' }}"
                                                    value="{{ cell_value }}"
-                                                   class="w-full px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500{% if _cell_prefill.has_value %} bg-yellow-100 border border-yellow-300 rounded-sm{% elif variable_readonly %} border-0 bg-gray-100{% else %} border-0{% endif %}"
+                                                   {% if column_max_decimals is not none %}data-max-decimals="{{ column_max_decimals }}"{% endif %}
+                                                   class="w-full px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500{% if _whole_number_violation %} bg-red-100 border border-red-400 rounded-sm ring-1 ring-red-300{% elif _cell_prefill.has_value %} bg-yellow-100 border border-yellow-300 rounded-sm{% elif variable_readonly %} border-0 bg-gray-100{% else %} border-0{% endif %}"
                                                    aria-label="{{ _('Variable value for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
-                                                   {% if _cell_prefill.has_value and can_edit and not variable_readonly %}title="{{ _matrix_prefilled_title }}"{% endif %}
+                                                   {% if _whole_number_violation and can_edit %}title="{{ _('This column requires a whole number. Please correct the decimal value.')|forceescape }}" aria-invalid="true"{% elif _cell_prefill.has_value and can_edit and not variable_readonly %}title="{{ _matrix_prefilled_title }}"{% endif %}
                                                    min="0"
                                                    step="0.01"
                                                    {% if variable_readonly %}readonly{% endif %}
@@ -324,9 +373,10 @@
                                                data-cell-key="{{ cell_key }}"
                                                data-column-type="number"
                                                value="{{ cell_value }}"
-                                               class="w-full px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500{% if _cell_prefill.has_value %} bg-yellow-100 border border-yellow-300 rounded-sm{% else %} border-0{% endif %}"
+                                               {% if column_max_decimals is not none %}data-max-decimals="{{ column_max_decimals }}"{% endif %}
+                                               class="w-full px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500{% if _whole_number_violation %} bg-red-100 border border-red-400 rounded-sm ring-1 ring-red-300{% elif _cell_prefill.has_value %} bg-yellow-100 border border-yellow-300 rounded-sm{% else %} border-0{% endif %}"
                                                aria-label="{{ _('Value for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
-                                               {% if _cell_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% endif %}
+                                               {% if _whole_number_violation and can_edit %}title="{{ _('This column requires a whole number. Please correct the decimal value.')|forceescape }}" aria-invalid="true"{% elif _cell_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% endif %}
                                                min="0"
                                                step="0.01"
                                                {% if not can_edit %}disabled{% endif %}>

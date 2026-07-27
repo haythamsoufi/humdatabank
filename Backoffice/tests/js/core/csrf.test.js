@@ -25,8 +25,24 @@ function mockCsrfRefresh(token = 'refreshed-token-value-1234567890') {
 
 async function loadCsrfModule() {
     vi.resetModules();
+    // csrf.js registers its init logic via a plain (non-idempotent)
+    // document.addEventListener('DOMContentLoaded', ...) with no cleanup. Since
+    // vitest's jsdom `document` persists across `it()` blocks in this file,
+    // vi.resetModules() + import() gives each test a *fresh module instance*
+    // but does NOT remove *previous* tests' stale DOMContentLoaded listeners —
+    // a plain dispatchEvent() would re-run every prior test's init closure too
+    // (re-registering their own periodic refresh timers against the *current*
+    // fake clock, using their own long-stale fetch mocks), corrupting shared
+    // state (localStorage timestamps, the DOM token) in later tests. Instead,
+    // capture only the listener just registered by *this* import and invoke it
+    // directly, leaving old listeners dormant.
+    const addEventListenerSpy = vi.spyOn(document, 'addEventListener');
     await import('../../../app/static/js/core/csrf.js');
-    document.dispatchEvent(new Event('DOMContentLoaded'));
+    const domReadyCall = addEventListenerSpy.mock.calls.find(([eventName]) => eventName === 'DOMContentLoaded');
+    addEventListenerSpy.mockRestore();
+    if (domReadyCall) {
+        domReadyCall[1]();
+    }
 }
 
 describe('csrf.js long-idle refresh handling', () => {
@@ -166,5 +182,115 @@ describe('csrf.js long-idle refresh handling', () => {
         })).rejects.toThrow('CSRF token unavailable');
 
         expect(fetchMock.mock.calls.some((call) => call[0] === '/api/example')).toBe(false);
+    });
+
+    it('does NOT permanently latch session-expired after a transient (non-redirected) server error', async () => {
+        // A single 500/502/503 returning an HTML error page (deploy hiccup, proxy blip)
+        // must not be conflated with an actually-expired session — a later retry should
+        // still be able to refresh successfully.
+        await loadCsrfModule();
+
+        fetchMock.mockResolvedValueOnce({
+            ok: false,
+            status: 500,
+            redirected: false,
+            headers: { get: () => 'text/html' },
+        });
+        const first = await window.refreshCSRFToken();
+        expect(first).toBeNull();
+
+        fetchMock.mockResolvedValueOnce(mockCsrfRefresh('recovered-token-value-1234567890'));
+        const second = await window.refreshCSRFToken();
+        expect(second).toBe('recovered-token-value-1234567890');
+    });
+
+    it('latches session-expired on a 401/403 refresh response and short-circuits further attempts', async () => {
+        await loadCsrfModule();
+
+        fetchMock.mockResolvedValueOnce({
+            ok: false,
+            status: 401,
+            redirected: false,
+            headers: { get: () => 'application/json' },
+        });
+        const first = await window.refreshCSRFToken();
+        expect(first).toBeNull();
+
+        fetchMock.mockClear();
+        const second = await window.refreshCSRFToken();
+        expect(second).toBeNull();
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('latches session-expired when the refresh request was redirected (e.g. to /login)', async () => {
+        await loadCsrfModule();
+
+        fetchMock.mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            redirected: true,
+            headers: { get: () => 'text/html' },
+        });
+        const first = await window.refreshCSRFToken();
+        expect(first).toBeNull();
+
+        fetchMock.mockClear();
+        const second = await window.refreshCSRFToken();
+        expect(second).toBeNull();
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+});
+
+describe('csrf.js legacy XMLHttpRequest shim', () => {
+    let originalXhrOpen;
+    let originalXhrSend;
+    let originalXhrSetRequestHeader;
+
+    beforeEach(() => {
+        localStorage.clear();
+        setupDom();
+        window.__userIsAuthenticated = true;
+
+        // Replace the *pre-patch* prototype methods with no-op mocks so csrf.js's
+        // DOMContentLoaded patch captures these (not jsdom's real implementations)
+        // as its "original" fallbacks — avoids real network I/O in jsdom.
+        originalXhrOpen = XMLHttpRequest.prototype.open;
+        originalXhrSend = XMLHttpRequest.prototype.send;
+        originalXhrSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
+        XMLHttpRequest.prototype.open = vi.fn();
+        XMLHttpRequest.prototype.send = vi.fn();
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        XMLHttpRequest.prototype.open = originalXhrOpen;
+        XMLHttpRequest.prototype.send = originalXhrSend;
+        XMLHttpRequest.prototype.setRequestHeader = originalXhrSetRequestHeader;
+        delete window.__userIsAuthenticated;
+        delete window.getCSRFToken;
+    });
+
+    it('attaches X-CSRFToken to a same-origin legacy XHR request', async () => {
+        await loadCsrfModule();
+        const setHeaderMock = vi.fn();
+        XMLHttpRequest.prototype.setRequestHeader = setHeaderMock;
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/v1/something');
+        xhr.send();
+
+        expect(setHeaderMock).toHaveBeenCalledWith('X-CSRFToken', 'initial-token-value-1234567890');
+    });
+
+    it('does NOT attach X-CSRFToken to a cross-origin legacy XHR request (token-leak regression guard)', async () => {
+        await loadCsrfModule();
+        const setHeaderMock = vi.fn();
+        XMLHttpRequest.prototype.setRequestHeader = setHeaderMock;
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'https://evil.example.com/steal');
+        xhr.send();
+
+        expect(setHeaderMock).not.toHaveBeenCalled();
     });
 });

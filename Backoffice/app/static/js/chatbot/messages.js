@@ -3,8 +3,6 @@
  * Centralized location for all chatbot text content
  */
 
-const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
-
 /** English UI string keys — resolved via window.t when messages.js loads. */
 const DEFAULT_UI_STRINGS = {
     newChat: 'New chat',
@@ -47,7 +45,7 @@ const DEFAULT_UI_STRINGS = {
 function resolveDefaultUiStrings() {
     const resolved = {};
     for (const [key, val] of Object.entries(DEFAULT_UI_STRINGS)) {
-        resolved[key] = _t(val);
+        resolved[key] = window.t(val);
     }
     return resolved;
 }

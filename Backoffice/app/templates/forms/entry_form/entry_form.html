@@ -4062,6 +4062,9 @@
                 if (!form.classList.contains('approve-assignment-form') && !form.classList.contains('reopen-assignment-form')) return;
                 if (form.dataset.confirmed === 'true') { delete form.dataset.confirmed; return; }
                 e.preventDefault();
+                if (window.FormSubmitGuard && typeof window.FormSubmitGuard.reset === 'function') {
+                    window.FormSubmitGuard.reset(form);
+                }
 
                 var submitBtn = form.querySelector('[type="submit"]');
                 if (submitBtn && submitBtn.disabled) return;

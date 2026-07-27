@@ -27,7 +27,10 @@ def select_country(country_id):
 @login_required
 def reopen_assignment(aes_id):
     """
-    Reopens an assignment by changing its status to 'in_progress'.
+    Reopens an assignment.  For submitted/validated statuses this rolls the
+    status back to 'in_progress'.  For pending/in_progress assignments that
+    are only blocked because the global round is closed, the status is left
+    unchanged — only the closed-round exception flag is set.
     Uses AuthorizationService for granular RBAC checks.
     """
     from app.services.authorization_service import AuthorizationService
@@ -55,8 +58,20 @@ def reopen_assignment(aes_id):
                 and assigned_form.is_effectively_closed
                 and not assignment_entity_status.reopened_after_close
             )
-            assignment_entity_status.status = AssignmentEntityStatusValue.in_progress
-            assignment_entity_status.status_timestamp = utcnow()  # Set timestamp when status changes
+            # Only roll back to in_progress when the current status is one of
+            # the terminal/submitted states.  Pending and in_progress assignments
+            # that are blocked purely because the round is closed should keep
+            # their existing status — the admin is lifting the restriction, not
+            # undoing a submission.
+            _submitted_statuses = {
+                AssignmentEntityStatusValue.submitted,
+                AssignmentEntityStatusValue.approved,
+                AssignmentEntityStatusValue.requires_revision,
+                AssignmentEntityStatusValue.sent_for_review,
+            }
+            if assignment_entity_status.status in _submitted_statuses:
+                assignment_entity_status.status = AssignmentEntityStatusValue.in_progress
+                assignment_entity_status.status_timestamp = utcnow()
             if round_was_closed:
                 assignment_entity_status.reopened_after_close = True
             db.session.flush()

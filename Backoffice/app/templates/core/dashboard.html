@@ -1255,7 +1255,7 @@
                                             <span class="whitespace-nowrap">{{ _('Status') }}:</span>
                                             {{ assignment_status_pipeline_badge(
                                                 item.status,
-                                                item.item_object.assigned_form.is_effectively_closed,
+                                                item.item_object.is_round_closed_for_entity(),
                                                 _ui_language,
                                                 item.item_object
                                             ) }}
@@ -1408,7 +1408,7 @@
                                                 or is_delegation_user
                                             )
                                         ) %}
-                                        {% if current_user_has_role('assignment_editor_submitter') and item.item_object.assigned_form.is_effectively_closed %}
+                                        {% if current_user_has_role('assignment_editor_submitter') and aes.is_round_closed_for_entity() %}
                                         <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id) }}" class="btn btn-secondary btn-sm">
                                             <i class="fas fa-eye mr-1 -ml-0.5"></i>
                                             {{ _('View') }}
@@ -1449,18 +1449,21 @@
                                         </form>
                                         {% endif %}
 
-                                        {# "Reopen" for closed assignment (admin only) #}
-                                        {% if item.item_object.assigned_form.is_effectively_closed and can_reopen_closed_assignment(aes.assigned_form) %}
-                                        <form action="{{ url_for('assignment_management.reopen_closed_assignment', assignment_id=aes.assigned_form_id) }}" method="POST" class="inline-block reopen-assignment-form">
-                                            {{ reopen_form.csrf_token }} {# Include CSRF token #}
+                                        {# "Reopen" button: entity-level reopen takes priority.
+                                           can_reopen_assignment covers submitted/approved/etc. AND
+                                           pending/in_progress when the global round is closed but this
+                                           entity has not yet been individually reopened. #}
+                                        {% if can_reopen_assignment(aes) %}
+                                        <form action="{{ url_for('main.reopen_assignment', aes_id=aes.id) }}" method="POST" class="inline-block reopen-assignment-form">
+                                            {{ reopen_form.csrf_token }}
                                             <button type="submit" class="btn btn-warning btn-sm" data-loading-text="{{ _('Reopening…') }}">
                                                 <i class="fas fa-undo mr-1 -ml-0.5"></i> {{ _('Reopen') }}
                                             </button>
                                         </form>
-                                        {% elif aes.status in ["submitted", "approved", "requires_revision", "sent_for_review"] and can_reopen_assignment(aes) %}
-                                        {# "Reopen" button for submitted/approved/requires revision / sent for review #}
-                                        <form action="{{ url_for('main.reopen_assignment', aes_id=aes.id) }}" method="POST" class="inline-block reopen-assignment-form">
-                                            {{ reopen_form.csrf_token }} {# Include CSRF token #}
+                                        {% elif item.item_object.assigned_form.is_effectively_closed and not aes.reopened_after_close and can_reopen_closed_assignment(aes.assigned_form) %}
+                                        {# Fallback: reopen the entire round (admin only, only when entity reopen is not applicable) #}
+                                        <form action="{{ url_for('assignment_management.reopen_closed_assignment', assignment_id=aes.assigned_form_id) }}" method="POST" class="inline-block reopen-assignment-form">
+                                            {{ reopen_form.csrf_token }}
                                             <button type="submit" class="btn btn-warning btn-sm" data-loading-text="{{ _('Reopening…') }}">
                                                 <i class="fas fa-undo mr-1 -ml-0.5"></i> {{ _('Reopen') }}
                                             </button>
@@ -1722,7 +1725,7 @@
                                                 {% if item.type == 'assigned' %}
                                                     {{ assignment_status_pipeline_badge(
                                                         item.status,
-                                                        item.item_object.assigned_form.is_effectively_closed,
+                                                        item.item_object.is_round_closed_for_entity(),
                                                         _ui_language,
                                                         item.item_object
                                                     ) }}
@@ -1744,16 +1747,16 @@
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                 {% if item.type == 'assigned' %}
                                                     {% set aes = item.item_object %}
-                                                    {# Reopen for closed assignment (admin only) #}
-                                                    {% if item.item_object.assigned_form.is_effectively_closed and can_reopen_closed_assignment(aes.assigned_form) %}
-                                                    <form action="{{ url_for('assignment_management.reopen_closed_assignment', assignment_id=aes.assigned_form_id) }}" method="POST" class="inline-block reopen-assignment-form">
+                                                    {# Entity reopen takes priority; global round reopen only as fallback #}
+                                                    {% if can_reopen_assignment(aes) %}
+                                                    <form action="{{ url_for('main.reopen_assignment', aes_id=aes.id) }}" method="POST" class="inline-block reopen-assignment-form">
                                                         {{ reopen_form.csrf_token }}
                                                         <button type="submit" class="btn btn-warning btn-sm" data-loading-text="{{ _('Reopening…') }}">
                                                             <i class="fas fa-undo mr-1 -ml-0.5"></i> {{ _('Reopen') }}
                                                         </button>
                                                     </form>
-                                                    {% elif item.status in ["submitted", "approved", "requires_revision"] and can_reopen_assignment(aes) %}
-                                                    <form action="{{ url_for('main.reopen_assignment', aes_id=aes.id) }}" method="POST" class="inline-block reopen-assignment-form">
+                                                    {% elif item.item_object.assigned_form.is_effectively_closed and not aes.reopened_after_close and can_reopen_closed_assignment(aes.assigned_form) %}
+                                                    <form action="{{ url_for('assignment_management.reopen_closed_assignment', assignment_id=aes.assigned_form_id) }}" method="POST" class="inline-block reopen-assignment-form">
                                                         {{ reopen_form.csrf_token }}
                                                         <button type="submit" class="btn btn-warning btn-sm" data-loading-text="{{ _('Reopening…') }}">
                                                             <i class="fas fa-undo mr-1 -ml-0.5"></i> {{ _('Reopen') }}

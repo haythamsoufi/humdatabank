@@ -788,11 +788,13 @@ def dashboard():
 
             for item in all_forms_for_display:
                 if item['type'] == 'assigned':
-                    # Closed assignments always go to past (with Reopen for admins)
+                    # Closed assignments always go to past (with Reopen for admins),
+                    # unless the entity has been individually reopened while the global
+                    # round remains closed (reopened_after_close=True).
                     try:
                         aes = item['item_object']
                         af = aes.assigned_form if aes else None
-                        if af and af.is_effectively_closed:
+                        if af and af.is_effectively_closed and not (aes and aes.reopened_after_close):
                             past_assignments.append(item)
                             continue
                     except (AttributeError, TypeError):

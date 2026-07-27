@@ -20,6 +20,7 @@ from app.routes.auth import (
     _get_test_passwords,
     _is_dev_act_as_enabled,
     _resolve_dev_act_as_preset,
+    _dev_preset_email,
     _get_dev_act_as_users,
     _generate_pkce_pair,
     _decode_jwt_payload_unverified,
@@ -167,6 +168,34 @@ class TestDevActAsHelpers:
             resolved = _resolve_dev_act_as_preset('admin')
         assert resolved is not None
         assert resolved.id == user.id
+
+    def test_resolve_preset_does_not_fall_back_to_real_rbac_users(self, app, db_session, monkeypatch):
+        """SECURITY: when the named test account doesn't exist, seeding is attempted
+        but we must never silently return a real production user via RBAC lookup."""
+        monkeypatch.setenv('FLASK_CONFIG', 'development')
+        # No test_sys@ user exists; seeding is stubbed to do nothing.
+        with app.test_request_context('/'):
+            with patch('app.seeding.create_default_data', side_effect=RuntimeError('db unavail')):
+                resolved = _resolve_dev_act_as_preset('sys_manager')
+        # Must return None rather than a real user picked by RBAC role.
+        assert resolved is None
+
+    def test_resolve_preset_auto_seeds_when_user_missing(self, app, db_session, monkeypatch):
+        """When the test account doesn't exist, _resolve_dev_act_as_preset calls
+        create_default_data and then retries the lookup."""
+        monkeypatch.setenv('FLASK_CONFIG', 'development')
+
+        def fake_seed(app_obj):
+            # Create the test user that the preset expects.
+            from app.extensions import db as _db
+            create_test_user(db_session, email='test_admin@humdatabank.org', name='Seeded Admin')
+            _db.session.commit()
+
+        with app.test_request_context('/'):
+            with patch('app.seeding.create_default_data', side_effect=fake_seed):
+                resolved = _resolve_dev_act_as_preset('admin')
+        assert resolved is not None
+        assert resolved.email == 'test_admin@humdatabank.org'
 
     def test_dev_act_as_route_logs_in_user(self, app, db_session, monkeypatch):
         from app.routes.auth import dev_act_as_login

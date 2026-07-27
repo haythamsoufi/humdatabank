@@ -67,14 +67,16 @@ class TestCsrfErrorHandler:
         assert data["error"] == "CSRF validation failed"
         assert data["csrf_refresh_required"] is True
 
-    def test_html_response_shows_reload_action(self, client):
+    def test_html_response_redirects_without_error_page(self, client):
         resp = client.post(
             "/test-error/csrf",
             headers={**HTML_HEADERS, "Referer": "http://localhost/form-page"},
+            follow_redirects=False,
         )
-        assert resp.status_code == 400
-        assert b"Page Needs Refresh" in resp.data
-        assert b"Reload Form" in resp.data
+        assert resp.status_code == 302
+        assert resp.headers["Location"] == "http://localhost/form-page"
+        assert b"Page Needs Refresh" not in resp.data
+        assert b"csrf-retry-form" not in resp.data
 
 
 # ===========================================================================

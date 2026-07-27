@@ -1,9 +1,10 @@
 """HTTP error handlers for the Flask application."""
 
 from contextlib import suppress
+
 from flask import render_template, request, session, current_app, url_for, redirect
 from flask_login import current_user
-from flask_wtf.csrf import CSRFError
+from flask_wtf.csrf import CSRFError, generate_csrf
 
 from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_not_found, json_server_error
 from app.utils.csp_nonce import get_style_nonce
@@ -35,26 +36,18 @@ def register_error_handlers(app):
 
         if is_json_request():
             return json_bad_request(
-                "Your form security token expired. Refresh the page and try again.",
+                "Please try again.",
                 success=False,
                 error="CSRF validation failed",
                 error_code=400,
                 csrf_refresh_required=True,
             )
 
-        return render_template(
-            'errors/error.html',
-            error_code=400,
-            error_title='Page Needs Refresh',
-            error_message='Your form security token expired or was missing. Reload the form to get a fresh token, then try again.',
-            error_details=str(error) if app.config.get('DEBUG') else None,
-            primary_action_label='Reload Form',
-            primary_action_url=_safe_csrf_reload_url(),
-            secondary_action_label='Go to Dashboard',
-            secondary_action_url=url_for("main.dashboard"),
-            current_user=current_user,
-            style_nonce=get_style_nonce(),
-        ), 400
+        # Client-side csrf.js refreshes tokens before submit/fetch; if we still
+        # get here, mint a new session token and send the user back to the form.
+        with suppress(Exception):
+            generate_csrf()
+        return redirect(_safe_csrf_reload_url())
 
     @app.errorhandler(400)
     def bad_request(error):

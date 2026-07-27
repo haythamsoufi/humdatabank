@@ -159,38 +159,48 @@ def _get_dev_act_as_users() -> list[dict]:
     return result
 
 
-def _resolve_dev_act_as_preset(preset: str):
-    """Resolve a preset key (sys_manager, admin, focal) to a User, or None."""
+def _dev_preset_email(preset: str) -> str | None:
+    """Return the expected test-account e-mail for a preset key, or None."""
     from app.utils.organization_helpers import get_org_email_domain
-    from app.models.rbac import RbacUserRole, RbacRole
-
-    preset = (preset or '').strip().lower()
     domain = get_org_email_domain()
-    email_map = {
+    return {
         'sys_manager': f'test_sys@{domain}',
         'admin': f'test_admin@{domain}',
         'focal': f'test_focal@{domain}',
-    }
-    if preset in email_map:
-        user = User.query.filter_by(email=email_map[preset], active=True).first()
-        if user:
-            return user
+    }.get((preset or '').strip().lower())
 
-    role_map = {
-        'sys_manager': 'system_manager',
-        'admin': 'admin_core',
-        'focal': 'assignment_editor_submitter',
-    }
-    role_code = role_map.get(preset)
-    if not role_code:
+
+def _resolve_dev_act_as_preset(preset: str):
+    """Resolve a preset key (sys_manager, admin, focal) to the named test User.
+
+    SECURITY: Only resolves to the explicitly-seeded test accounts
+    (test_sys@…, test_admin@…, test_focal@…).  There is intentionally NO
+    fallback to "first user with that RBAC role" — that path would silently
+    return a real production account when a prod DB is restored to dev.
+
+    If the test account does not exist yet, create_default_data is called once
+    to seed all three test users, and then the lookup is retried.
+    """
+    email = _dev_preset_email(preset)
+    if not email:
         return None
-    return (
-        User.query.join(RbacUserRole, User.id == RbacUserRole.user_id)
-        .join(RbacRole, RbacUserRole.role_id == RbacRole.id)
-        .filter(User.active.is_(True), RbacRole.code == role_code)
-        .order_by(User.id.asc())
-        .first()
-    )
+
+    user = User.query.filter_by(email=email, active=True).first()
+    if user:
+        return user
+
+    # Test user missing — seed all test accounts, then retry once.
+    try:
+        from app.seeding import create_default_data
+        current_app.logger.info(
+            "Dev act-as: test user '%s' not found — running create_default_data to seed test accounts.",
+            email,
+        )
+        create_default_data(current_app._get_current_object())
+    except Exception as exc:
+        current_app.logger.warning("Dev act-as: seeding failed: %s", exc, exc_info=True)
+
+    return User.query.filter_by(email=email, active=True).first()
 
 
 def _complete_dev_act_as_login(user: User) -> None:
@@ -279,7 +289,19 @@ def dev_act_as_login():
         user = User.query.filter_by(id=user_id, active=True).first()
 
     if not user:
-        flash(_("User not found."), "warning")
+        if preset:
+            # Preset resolution failed even after auto-seeding — tell the developer.
+            expected_email = _dev_preset_email(preset)
+            if expected_email:
+                flash(
+                    f"Dev act-as: test account '{expected_email}' could not be found or created. "
+                    "Run 'flask seed-test-data' to seed test accounts, then try again.",
+                    "warning",
+                )
+            else:
+                flash(f"Dev act-as: unknown preset '{preset}'.", "warning")
+        else:
+            flash(_("User not found."), "warning")
         next_page = request.form.get('next')
         if next_page and is_safe_redirect_url(next_page):
             return redirect(url_for("auth.login", next=next_page))

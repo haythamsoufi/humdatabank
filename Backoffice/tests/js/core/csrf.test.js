@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-const CSRF_TOKEN_STORAGE_KEY = 'csrf_token_value';
 const CSRF_REFRESH_AT_STORAGE_KEY = 'csrf_last_refresh_at';
 
 let fetchMock;
@@ -50,26 +49,32 @@ describe('csrf.js long-idle refresh handling', () => {
         delete window.csrfFetch;
     });
 
-    it('stores the server token in localStorage on DOMContentLoaded', async () => {
+    it('stores only the refresh timestamp in localStorage on DOMContentLoaded (never the token value)', async () => {
         await loadCsrfModule();
-        expect(localStorage.getItem(CSRF_TOKEN_STORAGE_KEY)).toBe('initial-token-value-1234567890');
+        expect(localStorage.getItem(CSRF_REFRESH_AT_STORAGE_KEY)).not.toBeNull();
+        // Regression guard: a cached token value must never live in localStorage,
+        // since it can outlive the session/SECRET_KEY it was minted for and get
+        // replayed into a later, unrelated session's forms.
+        expect(localStorage.getItem('csrf_token_value')).toBeNull();
     });
 
-    it('syncs a fresher token from localStorage into the DOM', async () => {
-        await loadCsrfModule();
-        localStorage.setItem(CSRF_TOKEN_STORAGE_KEY, 'shared-token-value-1234567890');
+    it('never overwrites a fresh, correctly-rendered form with an unrelated cached token', async () => {
+        // Simulate leftover localStorage state from a completely different
+        // session/server-restart (e.g. dev SECRET_KEY rotated on file save).
+        localStorage.setItem('csrf_token_value', 'stale-foreign-token-value-1234567890');
         localStorage.setItem(CSRF_REFRESH_AT_STORAGE_KEY, String(Date.now()));
 
-        window.dispatchEvent(new StorageEvent('storage', {
-            key: CSRF_TOKEN_STORAGE_KEY,
-            newValue: 'shared-token-value-1234567890',
-            storageArea: localStorage,
-        }));
+        await loadCsrfModule();
 
-        expect(document.querySelector('meta[name="csrf-token"]').getAttribute('content'))
-            .toBe('shared-token-value-1234567890');
+        // A freshly loaded page's own token is authoritative and must survive
+        // a programmatic form.submit() untouched, since it isn't stale.
+        const form = document.getElementById('test-form');
+        form.submit();
+
         expect(document.querySelector('input[name="csrf_token"]').value)
-            .toBe('shared-token-value-1234567890');
+            .toBe('initial-token-value-1234567890');
+        expect(document.querySelector('meta[name="csrf-token"]').getAttribute('content'))
+            .toBe('initial-token-value-1234567890');
     });
 
     it('refreshes before stale form submit after long idle', async () => {

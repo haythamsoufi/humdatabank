@@ -17,7 +17,6 @@ const CSRF_PRE_SUBMIT_REFRESH_AFTER_MS = 25 * 60 * 1000;
 const CSRF_WAKE_REFRESH_AFTER_MS = 5 * 60 * 1000;
 // Server WTF_CSRF_TIME_LIMIT is 3600s; refresh well before that hard cutoff.
 const CSRF_SERVER_MAX_AGE_MS = 55 * 60 * 1000;
-const CSRF_TOKEN_STORAGE_KEY = 'csrf_token_value';
 const CSRF_REFRESH_AT_STORAGE_KEY = 'csrf_last_refresh_at';
 
 let csrfRefreshTimerId = null;
@@ -38,6 +37,16 @@ function handleCsrfSessionExpired() {
     }
 }
 
+// IMPORTANT: localStorage is used ONLY to coordinate refresh *timing* across tabs
+// (so N open tabs don't each redundantly hit the refresh endpoint). It must NEVER
+// be used to push a cached token *value* into the DOM: localStorage persists across
+// logins/logouts and (on a dev box that restarts on every file save) across
+// SECRET_KEY rotations, so a stored value can belong to a completely different
+// session than the one the browser's current cookie carries. Writing such a value
+// into an already-correct, freshly-rendered form silently corrupts a valid token
+// and produces "The CSRF tokens do not match." The only token values that may ever
+// be written into the DOM are (a) the one the server rendered into this exact page,
+// or (b) one this tab obtained itself via a real network refresh call.
 function applyCsrfToken(token) {
     if (!token) return null;
 
@@ -46,40 +55,8 @@ function applyCsrfToken(token) {
     csrfLastRefreshAt = Date.now();
     try {
         localStorage.setItem(CSRF_REFRESH_AT_STORAGE_KEY, String(csrfLastRefreshAt));
-        localStorage.setItem(CSRF_TOKEN_STORAGE_KEY, token);
     } catch (_) { /* localStorage unavailable */ }
     return token;
-}
-
-function getStoredCsrfToken() {
-    try {
-        const token = localStorage.getItem(CSRF_TOKEN_STORAGE_KEY);
-        return token && token.length >= 10 ? token : null;
-    } catch (_) {
-        return null;
-    }
-}
-
-function syncCsrfTokenFromStorage() {
-    const stored = getStoredCsrfToken();
-    if (!stored) return null;
-
-    const storedAt = _crossTabLastRefreshAt();
-    if (storedAt > csrfLastRefreshAt) {
-        csrfLastRefreshAt = storedAt;
-    }
-
-    const current = getCSRFToken();
-    if (current === stored) return stored;
-
-    _applyCsrfTokenToDom(stored);
-    return stored;
-}
-
-function handleCrossTabCsrfStorage(event) {
-    if (!event || event.storageArea !== localStorage) return;
-    if (event.key !== CSRF_TOKEN_STORAGE_KEY && event.key !== CSRF_REFRESH_AT_STORAGE_KEY) return;
-    syncCsrfTokenFromStorage();
 }
 
 function effectiveCsrfLastRefreshAt() {
@@ -273,13 +250,11 @@ function _applyCsrfTokenToDom(token) {
 
 function refreshCSRFTokenIfStale(maxAgeMs = CSRF_PRE_SUBMIT_REFRESH_AFTER_MS) {
     if (csrfSessionExpired) return Promise.resolve(null);
-    syncCsrfTokenFromStorage();
     if (!isCsrfTokenStale(maxAgeMs)) return Promise.resolve(getCSRFToken());
     return refreshCSRFToken();
 }
 
 function ensureFreshCsrfTokenForSubmit() {
-    syncCsrfTokenFromStorage();
     if (csrfSessionExpired) {
         redirectToLoginAfterSessionExpiry();
         return Promise.resolve(null);
@@ -349,7 +324,6 @@ function handleStaleCsrfFormSubmit(event) {
         return;
     }
 
-    syncCsrfTokenFromStorage();
     if (!csrfWakeRefreshPromise && !isCsrfTokenStale()) return;
 
     event.preventDefault();
@@ -369,8 +343,6 @@ function refreshCsrfOnPageWake(event) {
         csrfTabHiddenAt = Date.now();
         return;
     }
-
-    syncCsrfTokenFromStorage();
 
     let maxAge = forceRefresh ? 0 : CSRF_WAKE_REFRESH_AFTER_MS;
     if (csrfTabHiddenAt && (Date.now() - csrfTabHiddenAt) >= CSRF_WAKE_REFRESH_AFTER_MS) {
@@ -399,7 +371,6 @@ function patchProgrammaticFormSubmit() {
             return;
         }
 
-        syncCsrfTokenFromStorage();
         if (!csrfWakeRefreshPromise && !isCsrfTokenStale()) {
             originalSubmit.call(form);
             return;
@@ -505,7 +476,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (initialToken) {
         applyCsrfToken(initialToken);
     }
-    window.addEventListener('storage', handleCrossTabCsrfStorage);
     patchProgrammaticFormSubmit();
 
     // Add CSRF token to non-GET forms only

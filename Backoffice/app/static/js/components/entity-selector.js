@@ -4,6 +4,8 @@
  * Can be used for user permissions and assignment management
  */
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 class EntitySelector {
     constructor(config) {
         this.containerId = config.containerId;
@@ -500,9 +502,9 @@ class EntitySelector {
         }
         };
         if (window.showDangerConfirmation) {
-            window.showDangerConfirmation(msg, () => { void doRemove(); }, null, 'Remove', 'Cancel', 'Remove Entity?');
+            window.showDangerConfirmation(msg, () => { void doRemove(); }, null, _t('Remove'), _t('Cancel'), _t('Remove Entity?'));
         } else if (window.showConfirmation) {
-            window.showConfirmation(msg, () => { void doRemove(); }, null, 'Remove', 'Cancel', 'Remove Entity?');
+            window.showConfirmation(msg, () => { void doRemove(); }, null, _t('Remove'), _t('Cancel'), _t('Remove Entity?'));
         } else {
             console.warn('Confirmation dialog not available:', msg);
         }

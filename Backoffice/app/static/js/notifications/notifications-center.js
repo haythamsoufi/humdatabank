@@ -1,5 +1,7 @@
 // Notification Center - Comprehensive notification management interface
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 async function _ncFetch(url, options = {}) {
     const fn = (window.getApiFetch && window.getApiFetch()) || window.apiFetch || fetch;
     if (options.body && !options.headers) options.headers = { 'Content-Type': 'application/json' };
@@ -192,7 +194,7 @@ class NotificationCenter {
         spinner.className = 'fas fa-spinner loading-spinner';
         const loadingP = document.createElement('p');
         loadingP.className = 'mt-3 text-gray-600';
-        loadingP.textContent = 'Loading notifications...';
+        loadingP.textContent = this.getTranslation('Loading notifications...');
         loadingDiv.appendChild(spinner);
         loadingDiv.appendChild(loadingP);
         container.appendChild(loadingDiv);
@@ -255,10 +257,10 @@ class NotificationCenter {
             errorIcon.className = 'fas fa-exclamation-triangle empty-state-icon';
             const errorTitle = document.createElement('h3');
             errorTitle.className = 'empty-state-title';
-            errorTitle.textContent = 'Unable to Load Notifications';
+            errorTitle.textContent = this.getTranslation('Unable to Load Notifications');
             const errorMessage = document.createElement('p');
             errorMessage.className = 'empty-state-message';
-            errorMessage.textContent = error.message || 'Please try again later';
+            errorMessage.textContent = error.message || this.getTranslation('Please try again later');
             const retryBtn = document.createElement('button');
             retryBtn.type = 'button';
             retryBtn.setAttribute('data-action', 'notifications-center:retry');
@@ -266,7 +268,7 @@ class NotificationCenter {
             const retryIcon = document.createElement('i');
             retryIcon.className = 'fas fa-redo mr-2';
             retryBtn.appendChild(retryIcon);
-            retryBtn.appendChild(document.createTextNode('Retry'));
+            retryBtn.appendChild(document.createTextNode(this.getTranslation('Retry')));
             errorDiv.appendChild(errorIcon);
             errorDiv.appendChild(errorTitle);
             errorDiv.appendChild(errorMessage);
@@ -516,17 +518,11 @@ class NotificationCenter {
     }
 
     getTranslation(key) {
-        // Get translation from window object, fallback to key if not found
-        if (!window.NOTIFICATION_TRANSLATIONS) {
-            console.warn('NOTIFICATION_TRANSLATIONS not loaded yet');
-            return key;
+        if (window.NOTIFICATION_TRANSLATIONS) {
+            const translation = window.NOTIFICATION_TRANSLATIONS[key];
+            if (translation) return translation;
         }
-        const translation = window.NOTIFICATION_TRANSLATIONS[key];
-        if (!translation) {
-            console.warn(`Translation not found for key: ${key}`);
-            return key;
-        }
-        return translation;
+        return _t(key);
     }
 
     updateEmptyState() {
@@ -563,27 +559,27 @@ class NotificationCenter {
     getEmptyStateMessage() {
         if (this.filters.search) {
             return {
-                title: 'No Results Found',
-                message: `No notifications match "${this.filters.search}". Try adjusting your search terms.`,
+                title: this.getTranslation('No Results Found'),
+                message: `${this.getTranslation('No notifications match')} "${this.filters.search}". ${this.getTranslation('Try adjusting your search terms.')}`,
                 actionKey: 'notifications-center:clear-filters',
-                actionText: 'Clear Search'
+                actionText: this.getTranslation('Clear Search')
             };
         } else if (this.currentTab === 'unread') {
             return {
-                title: 'All Caught Up!',
-                message: 'You have no unread notifications. Great job staying on top of things!',
+                title: this.getTranslation('All Caught Up!'),
+                message: this.getTranslation('You have no unread notifications. Great job staying on top of things!'),
                 actionKey: null
             };
         } else if (this.currentTab === 'archived') {
             return {
-                title: 'No Archived Notifications',
-                message: 'You haven\'t archived any notifications yet.',
+                title: this.getTranslation('No Archived Notifications'),
+                message: this.getTranslation('You haven\'t archived any notifications yet.'),
                 actionKey: null
             };
         } else {
             return {
-                title: 'No Notifications',
-                message: 'You\'re all caught up!',
+                title: this.getTranslation('No Notifications'),
+                message: this.getTranslation('You\'re all caught up!'),
                 actionKey: null
             };
         }
@@ -761,7 +757,7 @@ class NotificationCenter {
             viewedIndicator.className = 'notification-viewed-indicator';
             viewedIndicator.style.color = '#6b7280';
             viewedIndicator.style.fontSize = '0.7rem';
-            viewedIndicator.setAttribute('title', 'Viewed');
+            viewedIndicator.setAttribute('title', this.getTranslation('Viewed'));
             const eyeIcon = document.createElement('i');
             eyeIcon.className = 'fas fa-eye mr-1';
             viewedIndicator.appendChild(eyeIcon);
@@ -979,7 +975,7 @@ class NotificationCenter {
         // Total count
         const totalSpan = document.createElement('span');
         totalSpan.className = 'pagination-info';
-        totalSpan.textContent = `${data.total_count} total`;
+        totalSpan.textContent = `${data.total_count} ${this.getTranslation('total')}`;
         container.appendChild(totalSpan);
     }
 
@@ -1024,7 +1020,7 @@ class NotificationCenter {
         const ids = Array.from(this.selectedNotifications);
 
         if (ids.length === 0) {
-            window.showAlert('Please select notifications first', 'warning');
+            window.showAlert(this.getTranslation('Please select notifications first'), 'warning');
             return;
         }
 
@@ -1037,18 +1033,18 @@ class NotificationCenter {
                     this.loadNotifications();
                 } catch (error) {
                     console.error('Error deleting notifications:', error);
-                    window.showAlert('Failed to delete notifications. Please try again.', 'error');
+                    window.showAlert(this.getTranslation('Failed to delete notifications. Please try again.'), 'error');
                 }
             };
 
             if (window.showDangerConfirmation) {
                 window.showDangerConfirmation(
-                    `Are you sure you want to delete ${ids.length} notification(s)?`,
+                    `${this.getTranslation('Are you sure you want to delete')} ${ids.length} ${this.getTranslation('notification(s)?')}`,
                     performDelete,
                     null,
-                    'Delete',
-                    'Cancel',
-                    'Delete Notifications?'
+                    this.getTranslation('Delete'),
+                    this.getTranslation('Cancel'),
+                    this.getTranslation('Delete Notifications?')
                 );
                 return;
             } else {
@@ -1077,7 +1073,7 @@ class NotificationCenter {
             this.updateBulkActionsBar();
         } catch (error) {
             console.error(`Error performing ${action}:`, error);
-            window.showAlert(`Failed to ${action} notifications. Please try again.`, 'error');
+            window.showAlert(this.getTranslation('Failed to update notifications. Please try again.'), 'error');
         }
     }
 
@@ -1106,7 +1102,7 @@ class NotificationCenter {
             }
         } catch (error) {
             console.error('Error marking notifications as unread:', error);
-            window.showAlert('Failed to mark notifications as unread. Please try again.', 'error');
+            window.showAlert(this.getTranslation('Failed to mark notifications as unread. Please try again.'), 'error');
         }
     }
 
@@ -1135,7 +1131,7 @@ class NotificationCenter {
             }
         } catch (error) {
             console.error('Error marking notifications as read:', error);
-            window.showAlert('Failed to mark notifications as read. Please try again.', 'error');
+            window.showAlert(this.getTranslation('Failed to mark notifications as read. Please try again.'), 'error');
         }
     }
 
@@ -1238,7 +1234,7 @@ class NotificationCenter {
             }
         } catch (error) {
             console.error('Error archiving notifications:', error);
-            window.showAlert('Failed to archive notifications. Please try again.', 'error');
+            window.showAlert(this.getTranslation('Failed to archive notifications. Please try again.'), 'error');
         }
     }
 
@@ -1271,7 +1267,7 @@ class NotificationCenter {
             }
         } catch (error) {
             console.error('Error deleting notifications:', error);
-            window.showAlert('Failed to delete notifications. Please try again.', 'error');
+            window.showAlert(this.getTranslation('Failed to delete notifications. Please try again.'), 'error');
         }
     }
 
@@ -1416,14 +1412,14 @@ class NotificationCenter {
                         window.location.href = data.endpoint;
                     }
                 } else {
-                    window.showAlert('Action recorded successfully', 'success');
+                    window.showAlert(this.getTranslation('Action recorded successfully'), 'success');
                 }
             } else {
                 throw new Error(data.error || 'Action failed');
             }
         } catch (error) {
             console.error('Error handling action:', error);
-            window.showAlert('Failed to process action. Please try again.', 'error');
+            window.showAlert(this.getTranslation('Failed to process action. Please try again.'), 'error');
         }
     }
 
@@ -1431,16 +1427,16 @@ class NotificationCenter {
         if (window.showConfirmation) {
             // Use custom dialog for format selection
             window.showConfirmation(
-                'Export as CSV? (Click Confirm for CSV, Cancel for JSON)',
+                this.getTranslation('Export as CSV? (Click Confirm for CSV, Cancel for JSON)'),
                 () => this.performExport('csv'),
                 () => this.performExport('json'),
-                'CSV',
-                'JSON',
-                'Export Format'
+                this.getTranslation('CSV'),
+                this.getTranslation('JSON'),
+                this.getTranslation('Export Format')
             );
         } else {
             if (window.showConfirmation) {
-                window.showConfirmation('Export as CSV? (Click OK for CSV, Cancel for JSON)', () => this.performExport('csv'), () => this.performExport('json'), 'CSV', 'JSON', 'Export Format');
+                window.showConfirmation(this.getTranslation('Export as CSV? (Click OK for CSV, Cancel for JSON)'), () => this.performExport('csv'), () => this.performExport('json'), this.getTranslation('CSV'), this.getTranslation('JSON'), this.getTranslation('Export Format'));
             } else {
                 this.performExport('csv');
             }

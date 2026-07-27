@@ -477,6 +477,16 @@ body.overflow-hidden { overflow: hidden; }
   transition-delay: calc(var(--fab-hover-stagger, 55ms) * 2);
 }
 
+/* Mobile overlay: tap opens sections list only — Save/Submit live in the sidebar */
+@media (max-width: 1099px) {
+  #fab-menu {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+}
+
 /* Ensure it's hidden on larger screens unless forced mobile overlay is active */
 @media (min-width: 1100px) {
   #fab-menu:not(.force-visible) {
@@ -1005,6 +1015,13 @@ button.force-visible,
   html:not([data-mobile-app="true"]):not(.mobile-app) body:has(#mobileMenuFAB) #mobile-nav-toggle-button,
   html:not([data-mobile-app="true"]):not(.mobile-app) body:has(#mobileMenuFAB) #mobile-nav-toggle-button.force-visible {
     bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px) + 3.5rem + 0.75rem) !important;
+  }
+
+  /* Hide admin menu FAB while entry-form sections drawer is open */
+  html:not([data-mobile-app="true"]):not(.mobile-app) body.entry-sections-nav-open #mobileMenuFAB {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
   }
 }
 

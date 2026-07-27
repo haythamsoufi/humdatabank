@@ -5,6 +5,8 @@
 import { DataManager } from './data-manager.js';
 import { CsrfHandler } from './csrf-handler.js';
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 export const DynamicSections = {
     indicatorFieldsConfig: {},
 
@@ -358,7 +360,7 @@ export const DynamicSections = {
                 saveBtn = document.createElement('button');
                 saveBtn.type = 'button';
                 saveBtn.className = 'save-dynamic-config-btn bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-3 py-1 rounded text-xs disabled:opacity-50';
-                saveBtn.textContent = 'Save';
+                saveBtn.textContent = _t('Save');
                 this.setBtnDisabled(saveBtn, true);
                 Utils.debugLog('[DynamicSections] Injected Save button (new) for form', form.id);
 
@@ -397,12 +399,12 @@ export const DynamicSections = {
         Utils.debugLog('[DynamicSections] Saving dynamic config via AJAX', form.id);
 
         const saveBtn = form.querySelector('.save-dynamic-config-btn');
-        const originalText = saveBtn ? (saveBtn.textContent || 'Save') : 'Save';
+        const originalText = saveBtn ? (saveBtn.textContent || _t('Save')) : _t('Save');
 
         // Show loading state
         if (saveBtn) {
             saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving...';
+            saveBtn.textContent = _t('Saving...');
         }
 
         const body = new FormData(form);
@@ -427,16 +429,16 @@ export const DynamicSections = {
                 }
 
                 try {
-                    Utils.showSuccess(data.message || 'Saved');
+                    Utils.showSuccess(data.message || _t('Saved'));
                 } catch (_e) { /* no-op */ }
 
                 if (saveBtn) {
-                    saveBtn.textContent = 'Saved';
+                    saveBtn.textContent = _t('Saved');
                     // Keep it disabled until another change occurs.
                     this.setBtnDisabled(saveBtn, true);
                     setTimeout(() => {
                         // Only restore if it still shows "Saved" (avoid clobbering future saves)
-                        if (saveBtn.textContent === 'Saved') {
+                        if (saveBtn.textContent === _t('Saved')) {
                             saveBtn.textContent = originalText;
                         }
                     }, 1200);

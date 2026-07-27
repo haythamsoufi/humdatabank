@@ -5,6 +5,7 @@
 {% from "components/_status_label.html" import status_label, status_label_for_access_request, status_label_for_public_submission, status_label_for_change_type %}
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
+{% from "macros/localized_entity_phrase.html" import entity_scope_phrase, entity_scope_phrase_with_suffix %}
 {% block content %}
 <div class="sharp-ui {% if not user_countries %}dashboard-no-access dashboard-no-access-bleed{% else %}py-2{% endif %}">
 
@@ -1184,12 +1185,10 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2 text-black-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                 </svg>
-                {{ _('Assignments for') -}}
-                {%- if selected_entity_type and selected_entity_type != 'country' %}
-                    {# Show entity with hierarchy #}
-                    {{ status_label(selected_entity_display_name|default('', true), 'info', 'mr-1') }}
+                {%- if selected_entity_type and selected_entity_type != 'country' -%}
+                    {{ _('Assignments for') }} {{ status_label(selected_entity_display_name|default('', true), 'info', 'mr-1') }}
                 {%- elif selected_country -%}
-                    {{- get_localized_national_society_name(selected_country) -}}
+                    {{- join_localized_entity_phrase(_('Assignments for'), get_localized_national_society_name(selected_country), _ui_language) -}}
                 {%- endif %}
             </h2>
                     {# Loop through the current assignments list #}
@@ -1553,13 +1552,7 @@
                               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <p class="mt-2 text-sm font-medium text-gray-600">
-                                {{ _('All clear! No active assignments for') -}}
-                                {%- if selected_entity_type and selected_entity_type != 'country' -%}
-                                    {{- selected_entity_display_name|default('', true) -}}
-                                {%- elif selected_country -%}
-                                    {{- get_localized_national_society_name(selected_country) -}}
-                                {%- endif -%}
-                                {{ _('at this time.') }}
+                                {{ entity_scope_phrase_with_suffix('All clear! No active assignments for', 'at this time.', _ui_language, selected_entity_type, selected_entity_display_name, selected_country) }}
                             </p>
                             <p class="text-xs text-gray-500 mt-1">{{ _('New assignments will appear here when available.') }}</p>
                         </div>
@@ -1581,12 +1574,7 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
-                        {{ _('Past Assignments for') -}}
-                        {%- if selected_entity_type and selected_entity_type != 'country' -%}
-                            {{- selected_entity_display_name|default('', true) -}}
-                        {%- elif selected_country -%}
-                            {{- get_localized_national_society_name(selected_country) -}}
-                        {%- endif %}
+                        {{ entity_scope_phrase('Past Assignments for', _ui_language, selected_entity_type, selected_entity_display_name, selected_country) }}
                         <span id="approved-assignments-hint" class="ml-2 text-sm font-normal text-gray-500 hidden md:inline">
                             {{ _('Click to expand') }}
                         </span>
@@ -1823,13 +1811,7 @@
                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                              </svg>
                             <p class="mt-2 text-sm font-medium text-gray-600">
-                                {{ _('No past assignments for') -}}
-                                {%- if selected_entity_type and selected_entity_type != 'country' -%}
-                                    {{- selected_entity_display_name|default('', true) -}}
-                                {%- elif selected_country -%}
-                                    {{- get_localized_national_society_name(selected_country) -}}
-                                {%- endif -%}
-                                {{ _('yet.') }}
+                                {{ entity_scope_phrase_with_suffix('No past assignments for', 'yet.', _ui_language, selected_entity_type, selected_entity_display_name, selected_country) }}
                             </p>
                         </div>
                     {% endif %}
@@ -1848,12 +1830,7 @@
                              <path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
                              <path stroke-linecap="round" stroke-linejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
                          </svg>
-                         {{ _('Submission History and Data Quality for') -}}
-                         {%- if selected_entity_type and selected_entity_type != 'country' -%}
-                             {{- selected_entity_display_name|default('', true) -}}
-                         {%- elif selected_country -%}
-                             {{- get_localized_national_society_name(selected_country) -}}
-                         {%- endif %}
+                         {{ entity_scope_phrase('Submission History and Data Quality for', _ui_language, selected_entity_type, selected_entity_display_name, selected_country) }}
                      </h2>
 
                      {% if data_quality_dashboard_enabled and data_quality_templates %}
@@ -2341,13 +2318,7 @@
                                 </svg>
                                 <p class="mt-2 text-sm font-medium text-gray-600">{{ _('No recent activities') }}</p>
                                 <p class="text-xs text-gray-500 mt-1">
-                                    {{ _('Activities from other focal points in') -}}
-                                    {%- if selected_entity_type and selected_entity_type != 'country' -%}
-                                        {{- selected_entity_display_name|default('', true) -}}
-                                    {%- elif selected_country -%}
-                                        {{- get_localized_national_society_name(selected_country) -}}
-                                    {%- endif -%}
-                                    {{ _('will appear here') }}
+                                    {{ entity_scope_phrase_with_suffix('Activities from other focal points in', 'will appear here', _ui_language, selected_entity_type, selected_entity_display_name, selected_country) }}
                                 </p>
                             </div>
                         {% endif %}
@@ -2359,12 +2330,7 @@
                 <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
                     <h2 class="text-xl font-semibold mb-4 text-gray-700">
                         <i class="fas fa-user-friends inline-block mr-2 text-green-700" aria-hidden="true"></i>
-                        {{ _('Focal Points for') -}}
-                        {%- if selected_entity_type and selected_entity_type != 'country' -%}
-                            {{- selected_entity_display_name|default('', true) -}}
-                        {%- elif selected_country -%}
-                            {{- get_localized_national_society_name(selected_country) -}}
-                        {%- endif %}
+                        {{ entity_scope_phrase('Focal Points for', _ui_language, selected_entity_type, selected_entity_display_name, selected_country) }}
                     </h2>
                     {% set country_fds_member = selected_country.fds_member_user if selected_country and selected_country.fds_member_user else none %}
                     {% set org_focal_point_ids = org_focal_points | map(attribute='id') | list %}
@@ -2534,13 +2500,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5.121 17.804A7 7 0 0112 15a7 7 0 016.879 2.804M15 11a3 3 0 10-6 0 3 3 0 006 0z" />
                             </svg>
                             <p class="mt-2 text-sm font-medium text-gray-600">
-                                {{ _('No focal points assigned to') -}}
-                                {%- if selected_entity_type and selected_entity_type != 'country' -%}
-                                    {{- selected_entity_display_name|default('', true) -}}
-                                {%- elif selected_country -%}
-                                    {{- get_localized_national_society_name(selected_country) -}}
-                                {%- endif -%}
-                                {{ _('yet.') }}
+                                {{ entity_scope_phrase_with_suffix('No focal points assigned to', 'yet.', _ui_language, selected_entity_type, selected_entity_display_name, selected_country) }}
                             </p>
                         </div>
                     {% endif %}

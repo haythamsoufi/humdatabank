@@ -39,3 +39,20 @@ def validate_placeholders(source_text: str | None, translation_text: str | None)
             'message': '. '.join(message_parts),
         }
     return {'valid': True, 'missing': [], 'extra': []}
+
+
+def localized_validation_message(validation: Dict[str, Any]) -> str:
+    """Return a gettext-wrapped user message for a failed validation result."""
+    try:
+        from flask_babel import _
+    except ImportError:
+        return validation.get('message') or 'Invalid placeholders'
+
+    parts: list[str] = []
+    missing = validation.get('missing') or []
+    extra = validation.get('extra') or []
+    if missing:
+        parts.append(_('Missing placeholders: %(placeholders)s', placeholders=', '.join(missing)))
+    if extra:
+        parts.append(_('Unexpected placeholders: %(placeholders)s', placeholders=', '.join(extra)))
+    return '. '.join(parts) if parts else _('Invalid placeholders')

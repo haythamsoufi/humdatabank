@@ -1202,6 +1202,12 @@ def get_localized_national_society_name(country):
         return country.name if country else _("Unknown")
 
 @bp.app_template_global()
+def join_localized_entity_phrase(prefix, entity_name, locale=None):
+    """Jinja helper for locale-aware prefix + entity labels (dashboard headings)."""
+    from app.utils.form_localization import join_localized_entity_phrase as _join
+    return _join(prefix, entity_name, locale)
+
+@bp.app_template_global()
 def render_activity_summary(activity):
     from flask_babel import _ as babel_
     from flask_babel import ngettext as babel_ngettext

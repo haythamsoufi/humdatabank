@@ -315,8 +315,9 @@ python scripts/seed_low_quality_review.py --trace-id 99999999 --create-trace-if-
 
 ### AI review queue scripts (Backoffice)
 - `scripts/trigger_automated_trace_review.py` – exports pending/in-review trace packets from `ai_trace_reviews`/`ai_reasoning_traces` for automated terminal processing (`text` or `jsonl`), with paging and optional `--claim-in-review`.
-- `scripts/export_trace_reviews.py` – compatibility wrapper (deprecated); forwards to `trigger_automated_trace_review.py`.
 - `scripts/seed_low_quality_review.py` – marks a trace as low-quality (`llm_needs_review=True`) and creates/resets a pending review row; use for deterministic end-to-end testing of review queue workflows.
+- `scripts/archive/` – completed one-offs (record-specific probes, incident scripts); not used in CI.
+- `scripts/codemods/` – template/JS bulk refactors; CI guardrails remain in `scripts/check_*` and `scripts/gate_template_console_calls.py`.
 
 ### Website Testing  
 ```bash

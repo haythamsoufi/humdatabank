@@ -3,9 +3,11 @@
  * @module chatbot/dlp-policy
  */
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 export const DlpPolicyMixin = {
     _makeDlpError(dlpPayload) {
-        const err = new Error((dlpPayload && (dlpPayload.error || dlpPayload.message)) || 'Sensitive information detected');
+        const err = new Error((dlpPayload && (dlpPayload.error || dlpPayload.message)) || _t('Sensitive information detected'));
         err.name = 'DlpConfirmationRequired';
         err.dlp = dlpPayload || null;
         return err;
@@ -55,12 +57,12 @@ export const DlpPolicyMixin = {
 
         const header = document.createElement('div');
         header.className = 'humdb-dlp-modal-header';
-        header.textContent = title || 'Sensitive information detected';
+        header.textContent = title || _t('Sensitive information detected');
 
         const body = document.createElement('div');
         body.className = 'humdb-dlp-modal-body';
         const p = document.createElement('p');
-        p.textContent = 'Your message appears to include sensitive information. Choose how to proceed:';
+        p.textContent = _t('Your message appears to include sensitive information. Choose how to proceed:');
         body.appendChild(p);
         if (Array.isArray(bodyLines) && bodyLines.length) {
             const ul = document.createElement('ul');
@@ -83,7 +85,7 @@ export const DlpPolicyMixin = {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'humdb-dlp-btn ' + (a.variant === 'primary' ? 'humdb-dlp-btn-primary' : a.variant === 'danger' ? 'humdb-dlp-btn-danger' : '');
-            btn.textContent = a.label || 'OK';
+            btn.textContent = a.label || _t('OK');
             btn.addEventListener('click', () => {
                 close();
                 try { if (typeof a.onClick === 'function') a.onClick(); } catch (_) {}
@@ -105,9 +107,9 @@ export const DlpPolicyMixin = {
 
     _handleDlpChallenge(originalMessage, sendOptions, dlpPayload) {
         const findings = this._formatDlpFindings(dlpPayload);
-        const title = this._uiString('sensitiveInfoTitle') || 'Sensitive information detected';
-        const sendAnyway = this._uiString('sendAnyway') || 'Send anyway';
-        const cancel = this._uiString('cancel') || 'Cancel';
+        const title = this._uiString('sensitiveInfoTitle') || _t('Sensitive information detected');
+        const sendAnyway = this._uiString('sendAnyway') || _t('Send anyway');
+        const cancel = this._uiString('cancel') || _t('Cancel');
 
         this._showDlpModal({
             title,
@@ -195,7 +197,7 @@ export const DlpPolicyMixin = {
         const sendBtn = this.elements && this.elements.sendBtn;
         if (input) {
             input.disabled = disabled;
-            input.placeholder = disabled ? (this._uiString('aiPolicyAckRequired') || 'Please acknowledge the AI policy to continue.') : 'Ask anything';
+            input.placeholder = disabled ? (this._uiString('aiPolicyAckRequired') || _t('Please acknowledge the AI policy to continue.')) : _t('Ask anything');
         }
         if (sendBtn) sendBtn.disabled = disabled;
         const addBtn = document.getElementById('chatImmersiveAddBtn');
@@ -247,7 +249,7 @@ export const DlpPolicyMixin = {
         const disabled = !acked;
         if (input) {
             input.disabled = disabled;
-            input.placeholder = disabled ? (this._uiString('aiPolicyAckRequired') || 'Please acknowledge the AI policy to continue.') : 'Ask anything';
+            input.placeholder = disabled ? (this._uiString('aiPolicyAckRequired') || _t('Please acknowledge the AI policy to continue.')) : _t('Ask anything');
         }
         if (sendBtn) sendBtn.disabled = disabled;
         if (attachBtn) {

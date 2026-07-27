@@ -61,10 +61,13 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy application code
 COPY . /app
 
-# Compile translation catalogs (.po -> .mo) so gettext works out of the box,
-# then keep a baseline copy for the persistent-volume sync script (the live
-# translations/ dir may be shadowed by a Docker volume or symlinked).
-RUN python scripts/compile_translations.py && \
+# Extract translatable strings from source, update PO files, compile .mo,
+# then snapshot as translations_base/ for the persistent-volume sync script.
+# Running extraction here ensures translations_base/ always matches the source
+# code in the image, even when developers forget to commit updated .po files
+# before building — preventing newly-added strings from being incorrectly
+# marked as obsolete by sync_persistent_translations.py on next deploy.
+RUN python scripts/extract_update_translations.py --compile && \
     cp -a /app/translations /app/translations_base
 
 # Ensure static files are properly accessible

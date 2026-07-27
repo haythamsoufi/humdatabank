@@ -2,6 +2,10 @@
 // - Global "saving" banner for the Form Builder
 // - AJAX submit + partial DOM refresh to avoid full page reloads
 
+// Lazily resolves translations via the server-injected catalog (window.t).
+// Falls back to the English string when the shim is absent.
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 export const FormSubmitUI = {
   init() {
     if (this._initialized) return;
@@ -98,7 +102,7 @@ export const FormSubmitUI = {
       clearTimeout(this._bannerHideTimer);
     };
 
-    this.showSuccess = (text = 'Saved', detail = '') => {
+    this.showSuccess = (text = _t('Saved'), detail = '') => {
       if (!ensureBanner()) return;
       if (this._bannerUI && this._bannerUI.update) {
         this._bannerUI.show();
@@ -129,7 +133,7 @@ export const FormSubmitUI = {
       this._bannerHideTimer = setTimeout(() => this.hideBanner(), 1800);
     };
 
-    this.showError = (text = 'Save failed', detail = '', retryFn = null) => {
+    this.showError = (text = _t('Save failed'), detail = '', retryFn = null) => {
       if (!ensureBanner()) return;
       this._lastRetry = typeof retryFn === 'function' ? retryFn : null;
       if (this._bannerUI && this._bannerUI.update) {
@@ -540,7 +544,7 @@ export const FormSubmitUI = {
             const cur = this._inflightByForm.get(form);
             if (cur && cur.reqId !== reqId) return;
           } catch (_e) {}
-          this.showSuccess(data.message || 'Saved');
+          this.showSuccess(data.message || _t('Saved'));
           if (form && form.id === 'template-details-form') {
             try {
               if (typeof window.exitTemplateDetailsEditMode === 'function') {
@@ -576,7 +580,7 @@ export const FormSubmitUI = {
           if (cur && cur.reqId !== reqId) return;
         } catch (_e) {}
         refreshFromHtml(text);
-        this.showSuccess('Saved');
+        this.showSuccess(_t('Saved'));
 
         // Template details form: exit edit mode (hide Save/Cancel, show Edit Details) since we don't reload
         if (form && form.id === 'template-details-form') {
@@ -643,7 +647,7 @@ export const FormSubmitUI = {
             }
           } catch (_e) {}
         }
-        this.showError('Save failed', err?.message || 'Please try again.', retryFn);
+        this.showError(_t('Save failed'), err?.message || _t('Please try again.'), retryFn);
         throw err;
       } finally {
         // Clear in-flight state if this is still the latest request.

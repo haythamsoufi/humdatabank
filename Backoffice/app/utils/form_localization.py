@@ -543,3 +543,53 @@ def get_localized_national_society_name(country):
     except Exception as e:
         logger.debug("get_localized_national_society_name failed: %s", e)
         return getattr(country, 'name', _('Unknown'))
+
+
+ATTACHED_PREPOSITION_LANGS = frozenset({'ar', 'fa', 'he', 'ur'})
+_LAM_TATWEEL_SUFFIXES = ('ل\u0640', 'لـ')
+
+
+def _split_trailing_lam(prefix: str) -> tuple:
+    """Return (base, has_trailing_lam) for prefixes ending in ل or لـ."""
+    for suffix in _LAM_TATWEEL_SUFFIXES:
+        if prefix.endswith(suffix):
+            return prefix[:-len(suffix)], True
+    if prefix.endswith('ل'):
+        return prefix[:-1], True
+    return prefix, False
+
+
+def join_localized_entity_phrase(prefix: str, entity_name: str, locale: Optional[str] = None) -> str:
+    """
+    Join a translated prefix to an entity name with locale-aware spacing.
+
+    LTR languages keep a word space ("Past Assignments for Netherlands").
+    RTL attach languages omit the space and apply lam assimilation before
+    definite nouns: ل + ال → لل ("… للهلال" not "… لالهلال").
+    """
+    prefix = (prefix or '').rstrip()
+    entity_name = (entity_name or '').strip()
+    if not entity_name:
+        return prefix
+    if not prefix:
+        return entity_name
+
+    lang = get_translation_key(locale)
+    if lang not in ATTACHED_PREPOSITION_LANGS:
+        return f"{prefix} {entity_name}"
+
+    base, has_lam = _split_trailing_lam(prefix)
+    if not has_lam:
+        return prefix + entity_name
+
+    if entity_name.startswith('ال') and len(entity_name) > 2:
+        return base + 'لل' + entity_name[2:]
+    return prefix + entity_name
+
+
+def normalize_arabic_lam_definite_assimilation(text: str) -> str:
+    """Fix lam + definite article after string interpolation: لال → لل."""
+    if not text:
+        return text
+    import re
+    return re.sub(r'لال([\u0600-\u06FF])', r'لل\1', text)

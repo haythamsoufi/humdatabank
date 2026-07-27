@@ -98,6 +98,7 @@ def enforce_csrf_json(*, methods: Optional[Iterable[str]] = None):
             getattr(exc, "description", None) or "CSRF token missing or invalid",
             success=False,
             error="CSRF validation failed",
+            csrf_refresh_required=True,
         )
 
 

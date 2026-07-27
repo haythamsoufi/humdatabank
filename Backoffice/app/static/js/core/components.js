@@ -1,5 +1,8 @@
 // Components JavaScript - Profile popup, Language selector, Notifications
 
+// Lazily resolves translations via the server-injected catalog (window.t).
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 document.addEventListener('DOMContentLoaded', function() {
 
     // --- Global image error handler (replaces inline onerror for CSP) ---
@@ -143,9 +146,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 },
                 () => { /* User cancelled */ },
-                'Delete',
-                'Cancel',
-                'Confirm Delete'
+                _t('Delete'),
+                _t('Cancel'),
+                _t('Confirm Delete')
             );
             return;
         }
@@ -335,7 +338,7 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.type = 'button';
         btn.setAttribute('data-notification-id', String(id));
         btn.className = 'mark-notification-read-btn group ml-2 text-gray-300 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100';
-        btn.setAttribute('title', 'Mark as read');
+        btn.setAttribute('title', _t('Mark as read'));
         const icon = document.createElement('i');
         icon.className = 'far fa-envelope-open text-xs text-gray-300 group-hover:text-gray-600';
         btn.appendChild(icon);
@@ -349,7 +352,7 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.type = 'button';
         btn.setAttribute('data-notification-id', String(id));
         btn.className = 'mark-notification-unread-btn group ml-2 text-gray-300 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100';
-        btn.setAttribute('title', 'Mark as unread');
+        btn.setAttribute('title', _t('Mark as unread'));
         const icon = document.createElement('i');
         icon.className = 'far fa-envelope text-xs text-gray-300 group-hover:text-gray-600';
         btn.appendChild(icon);
@@ -369,7 +372,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const loadingSpinner = document.createElement('i');
         loadingSpinner.className = 'fas fa-spinner fa-spin mr-2';
         loadingDiv.appendChild(loadingSpinner);
-        loadingDiv.appendChild(document.createTextNode('Loading...'));
+        loadingDiv.appendChild(document.createTextNode(_t('Loading...')));
         notificationsList.appendChild(loadingDiv);
 
         // Get CSRF token with validation
@@ -379,7 +382,7 @@ document.addEventListener('DOMContentLoaded', function() {
             notificationsList.replaceChildren();
             const errorDiv = document.createElement('div');
             errorDiv.className = 'p-4 text-center text-red-500';
-            errorDiv.textContent = 'Security error. Please refresh the page.';
+            errorDiv.textContent = _t('Security error. Please refresh the page.');
             notificationsList.appendChild(errorDiv);
             return Promise.reject(new Error('CSRF token not found'));
         }
@@ -434,14 +437,14 @@ document.addEventListener('DOMContentLoaded', function() {
             errorDiv.className = 'p-4 text-center';
             const errorP = document.createElement('p');
             errorP.className = 'text-red-500 mb-2';
-            errorP.textContent = 'Unable to load notifications';
+            errorP.textContent = _t('Unable to load notifications');
             const retryBtn = document.createElement('button');
             retryBtn.type = 'button';
             retryBtn.className = 'notifications-retry-btn text-blue-600 hover:underline text-sm';
             const retryIcon = document.createElement('i');
             retryIcon.className = 'fas fa-redo mr-1';
             retryBtn.appendChild(retryIcon);
-            retryBtn.appendChild(document.createTextNode('Retry'));
+            retryBtn.appendChild(document.createTextNode(_t('Retry')));
             errorDiv.appendChild(errorP);
             errorDiv.appendChild(retryBtn);
             notificationsList.appendChild(errorDiv);
@@ -463,7 +466,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const emptyP = document.createElement('p');
             emptyP.className = 'text-sm text-gray-500';
             // Use translated message from layout if available
-            const emptyMsg = (notificationsList.getAttribute && notificationsList.getAttribute('data-empty-message')) || 'No notifications';
+            const emptyMsg = (notificationsList.getAttribute && notificationsList.getAttribute('data-empty-message')) || _t('No notifications');
             emptyP.textContent = emptyMsg;
             emptyDiv.appendChild(emptyIcon);
             emptyDiv.appendChild(emptyP);
@@ -486,7 +489,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            const rawTitle = notification.title || 'Notification';
+            const rawTitle = notification.title || _t('Notification');
             const rawMessage = notification.message || '';
             const primaryIsMessage = notification.primary_is_message === true;
             let primaryText = rawTitle;

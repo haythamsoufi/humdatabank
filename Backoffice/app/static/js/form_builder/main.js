@@ -16,6 +16,8 @@ import { initFormBuilderDebug } from './modules/debug.js';
 import { TranslationModal } from '../components/translation-modal.js';
 import { TranslationMatrix } from '../components/translation-matrix.js';
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 // Expose key modules for AJAX refresh hooks (safe in this admin-only page).
 window.DataManager = DataManager;
 window.DynamicSections = DynamicSections;
@@ -516,7 +518,7 @@ function initializeTemplateDetails() {
         editBtn.replaceChildren();
         const icon = document.createElement('i');
         icon.className = 'fas fa-times w-4 h-4 mr-2';
-        editBtn.append(icon, document.createTextNode('Cancel'));
+        editBtn.append(icon, document.createTextNode(_t('Cancel')));
         editBtn.className = 'inline-flex items-center bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-2 px-4 rounded-lg shadow text-sm transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400';
     }
 
@@ -665,7 +667,7 @@ function initializeSectionManagement() {
                 {
                     const icon = document.createElement('i');
                     icon.className = 'fas fa-spinner fa-spin mr-2';
-                    submitButton.append(icon, document.createTextNode('Saving...'));
+                    submitButton.append(icon, document.createTextNode(_t('Saving...')));
                 }
             }
 
@@ -722,7 +724,7 @@ function initializeSectionManagement() {
                 const html = await resp.text();
                 if (window.FormBuilderAjax && typeof window.FormBuilderAjax.refreshFromHtml === 'function') {
                     window.FormBuilderAjax.refreshFromHtml(html);
-                    if (typeof window.FormBuilderAjax.showSuccess === 'function') window.FormBuilderAjax.showSuccess('Saved');
+                    if (typeof window.FormBuilderAjax.showSuccess === 'function') window.FormBuilderAjax.showSuccess(_t('Saved'));
                 } else {
                     window.location.reload();
                 }
@@ -730,7 +732,7 @@ function initializeSectionManagement() {
                 console.error('Section save failed:', err);
                 resetButton();
                 if (window.FormBuilderAjax && typeof window.FormBuilderAjax.showError === 'function') {
-                    window.FormBuilderAjax.showError('Failed to save section. Please try again.');
+                    window.FormBuilderAjax.showError(_t('Failed to save section. Please try again.'));
                 }
             }
         });
@@ -1531,7 +1533,7 @@ function showSectionModal(mode, sectionData = null) {
         {
             const iconEl = document.createElement('i');
             iconEl.className = 'fas fa-plus-circle mr-1';
-            relevanceRuleBtn.append(iconEl, document.createTextNode(' Add Relevance Rule'));
+            relevanceRuleBtn.append(iconEl, document.createTextNode(' ' + _t('Add Relevance Rule')));
         }
     }
 
@@ -1585,14 +1587,14 @@ function showSectionModal(mode, sectionData = null) {
             if (title && icon && submitBtn) {
                 if (isAddMode) {
                     if (hasParent) {
-                        title.textContent = 'Add Subsection';
+                        title.textContent = _t('Add Subsection');
                         icon.className = 'fas fa-indent w-6 h-6 mr-2 text-teal-600';
-                        submitBtn.textContent = 'Add Subsection';
+                        submitBtn.textContent = _t('Add Subsection');
                         submitBtn.className = 'btn btn-success';
                     } else {
-                        title.textContent = 'Add Section';
+                        title.textContent = _t('Add Section');
                         icon.className = 'fas fa-plus-circle w-6 h-6 mr-2 text-sky-600';
-                        submitBtn.textContent = 'Add Section';
+                        submitBtn.textContent = _t('Add Section');
                         submitBtn.className = 'btn btn-success';
                     }
                 }
@@ -1611,10 +1613,10 @@ function showSectionModal(mode, sectionData = null) {
 
         // Configure for add mode
         if (isSubsection) {
-            title.textContent = 'Add Subsection';
+            title.textContent = _t('Add Subsection');
             icon.className = 'fas fa-indent w-6 h-6 mr-2 text-teal-600';
         } else {
-            title.textContent = 'Add Section';
+            title.textContent = _t('Add Section');
             icon.className = 'fas fa-plus-circle w-6 h-6 mr-2 text-sky-600';
         }
 
@@ -1625,10 +1627,10 @@ function showSectionModal(mode, sectionData = null) {
         }
 
         if (isSubsection) {
-            submitBtn.textContent = 'Add Subsection';
+            submitBtn.textContent = _t('Add Subsection');
             submitBtn.className = 'btn btn-success';
         } else {
-            submitBtn.textContent = 'Add Section';
+            submitBtn.textContent = _t('Add Section');
             submitBtn.className = 'btn btn-success';
         }
 
@@ -1695,10 +1697,10 @@ function showSectionModal(mode, sectionData = null) {
 
     } else if (mode === 'edit' && sectionData) {
         // Configure for edit mode
-        title.textContent = 'Edit Section';
+        title.textContent = _t('Edit Section');
         icon.className = 'fas fa-pen w-6 h-6 mr-2 text-blue-600';
         form.action = `/admin/sections/edit/${sectionData.id}`;
-        submitBtn.textContent = 'Save Changes';
+        submitBtn.textContent = _t('Save Changes');
         submitBtn.className = 'btn btn-success';
 
         // Populate form fields with existing data
@@ -1799,7 +1801,7 @@ function showSectionModal(mode, sectionData = null) {
                 {
                     const iconEl = document.createElement('i');
                     iconEl.className = 'fas fa-minus-circle mr-1';
-                    relevanceRuleBtn.append(iconEl, document.createTextNode(' Hide Relevance Rule'));
+                    relevanceRuleBtn.append(iconEl, document.createTextNode(' ' + _t('Hide Relevance Rule')));
                 }
 
                 // Show the right half and switch to two-column layout for the modal
@@ -1833,7 +1835,7 @@ function showSectionModal(mode, sectionData = null) {
                 {
                     const iconEl = document.createElement('i');
                     iconEl.className = 'fas fa-plus-circle mr-1';
-                    relevanceRuleBtn.append(iconEl, document.createTextNode(' Add Relevance Rule'));
+                    relevanceRuleBtn.append(iconEl, document.createTextNode(' ' + _t('Add Relevance Rule')));
                 }
 
                 // Clear the rule builder initialization

@@ -6,6 +6,8 @@
 import { initExcelImportDropzone } from '../../components/excel-import-dropzone.js';
 import { initExcelIoModal } from '../../components/excel-io-modal.js';
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 // Submit a builder form in the most reliable way:
 // - Prefer the AJAX helper when available (covers cases where form.submit() bypasses submit events)
 // - Fall back to requestSubmit (fires submit events + native validation)
@@ -80,7 +82,7 @@ function confirmDeploy(form, baseMessage) {
             doDeploy();
         };
         if (window.showConfirmation) {
-            window.showConfirmation(message, onConfirm, null, 'Deploy', 'Cancel', 'Deploy Version?');
+            window.showConfirmation(message, onConfirm, null, _t('Deploy'), _t('Cancel'), _t('Deploy Version?'));
         } else if (window.confirm(message)) {
             onConfirm();
         }
@@ -139,9 +141,9 @@ export function wireVersionsModal() {
                 'Delete this version? This cannot be undone.';
             const doDelete = () => { if (form) submitBuilderForm(form); };
             if (window.showDangerConfirmation) {
-                window.showDangerConfirmation(deleteMessage, doDelete, null, 'Delete', 'Cancel', 'Delete Version?');
+                window.showDangerConfirmation(deleteMessage, doDelete, null, _t('Delete'), _t('Cancel'), _t('Delete Version?'));
             } else if (window.showConfirmation) {
-                window.showConfirmation(deleteMessage, doDelete, null, 'Delete', 'Cancel', 'Delete Version?');
+                window.showConfirmation(deleteMessage, doDelete, null, _t('Delete'), _t('Cancel'), _t('Delete Version?'));
             }
         });
     });
@@ -228,13 +230,13 @@ export function initPageSectionsToggle() {
                     sectionsContainer.style.opacity = '1';
                     sectionsContainer.style.maxHeight = 'none';
                     if (icon) icon.style.transform = 'rotate(0deg)';
-                    if (text) text.textContent = 'Hide Sections';
+                    if (text) text.textContent = _t('Hide Sections');
                 } else {
                     sectionsContainer.style.display = 'none';
                     sectionsContainer.style.opacity = '0';
                     sectionsContainer.style.maxHeight = '0';
                     if (icon) icon.style.transform = 'rotate(-90deg)';
-                    if (text) text.textContent = 'Show Sections';
+                    if (text) text.textContent = _t('Show Sections');
                 }
             }
         };
@@ -573,7 +575,7 @@ export function initArchivedItemsToggle() {
                     toggleSlider.style.transform = 'translateX(1.125rem)';
 
                     // Update text
-                    toggleText.textContent = 'Archived Shown';
+                    toggleText.textContent = _t('Archived Shown');
                     toggleText.classList.remove('text-gray-700');
                     toggleText.classList.add('text-blue-700');
                 } else {
@@ -593,7 +595,7 @@ export function initArchivedItemsToggle() {
                     toggleSlider.style.transform = 'translateX(0)';
 
                     // Update text
-                    toggleText.textContent = 'Archived Hidden';
+                    toggleText.textContent = _t('Archived Hidden');
                     toggleText.classList.remove('text-blue-700');
                     toggleText.classList.add('text-gray-700');
                 }
@@ -666,7 +668,7 @@ export function initSectionSubsectionToggle() {
                 const isCollapsed = sectionItem.classList.toggle('section-collapsed');
                 if (icon) icon.style.transform = isCollapsed ? 'rotate(-90deg)' : '';
                 btn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
-                btn.setAttribute('title', isCollapsed ? 'Expand section' : 'Collapse section');
+                btn.setAttribute('title', isCollapsed ? _t('Expand section') : _t('Collapse section'));
             });
         });
 
@@ -695,7 +697,7 @@ export function initSectionSubsectionToggle() {
                 });
                 if (icon) icon.style.transform = isCollapsed ? 'rotate(-90deg)' : '';
                 btn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
-                btn.setAttribute('title', isCollapsed ? 'Expand subsection' : 'Collapse subsection');
+                btn.setAttribute('title', isCollapsed ? _t('Expand subsection') : _t('Collapse subsection'));
             });
         });
 
@@ -732,13 +734,13 @@ function enhance() {
                     sectionsContainer.style.opacity = '1';
                     sectionsContainer.style.maxHeight = 'none';
                     if (icon) icon.style.transform = 'rotate(0deg)';
-                    if (text) text.textContent = 'Hide Sections';
+                    if (text) text.textContent = _t('Hide Sections');
                 } else {
                     sectionsContainer.style.display = 'none';
                     sectionsContainer.style.opacity = '0';
                     sectionsContainer.style.maxHeight = '0';
                     if (icon) icon.style.transform = 'rotate(-90deg)';
-                    if (text) text.textContent = 'Show Sections';
+                    if (text) text.textContent = _t('Show Sections');
                 }
             }
         });
@@ -766,7 +768,7 @@ function enhance() {
             const isCollapsed = sectionItem.classList.toggle('section-collapsed');
             if (icon) icon.style.transform = isCollapsed ? 'rotate(-90deg)' : '';
             btn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
-            btn.setAttribute('title', isCollapsed ? 'Expand section' : 'Collapse section');
+            btn.setAttribute('title', isCollapsed ? _t('Expand section') : _t('Collapse section'));
         });
     });
 
@@ -799,7 +801,7 @@ function enhance() {
             });
             if (icon) icon.style.transform = isCollapsed ? 'rotate(-90deg)' : '';
             btn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
-            btn.setAttribute('title', isCollapsed ? 'Expand subsection' : 'Collapse subsection');
+            btn.setAttribute('title', isCollapsed ? _t('Expand subsection') : _t('Collapse subsection'));
         });
     });
 
@@ -839,7 +841,7 @@ function enhance() {
             };
             buildDeployConfirmMessage(message, form).then((fullMessage) => {
                 if (window.showConfirmation) {
-                    window.showConfirmation(fullMessage, doSubmit, null, 'Deploy', 'Cancel', 'Deploy Version?');
+                    window.showConfirmation(fullMessage, doSubmit, null, _t('Deploy'), _t('Cancel'), _t('Deploy Version?'));
                 } else if (window.confirm(fullMessage)) {
                     doSubmit();
                 }
@@ -866,9 +868,9 @@ function enhance() {
                 }
             };
             if (window.showDangerConfirmation) {
-                window.showDangerConfirmation(message, doSubmit, null, 'Discard', 'Cancel', 'Discard Draft?');
+                window.showDangerConfirmation(message, doSubmit, null, _t('Discard'), _t('Cancel'), _t('Discard Draft?'));
             } else if (window.showConfirmation) {
-                window.showConfirmation(message, doSubmit, null, 'Discard', 'Cancel', 'Discard Draft?');
+                window.showConfirmation(message, doSubmit, null, _t('Discard'), _t('Cancel'), _t('Discard Draft?'));
             } else {
                 if (window.confirm(message)) doSubmit();
             }
@@ -946,13 +948,13 @@ export function initBulkCollapseExpandControls() {
                     container.style.opacity = '0';
                     container.style.maxHeight = '0';
                     if (icon) icon.style.transform = 'rotate(-90deg)';
-                    if (text) text.textContent = 'Show Sections';
+                    if (text) text.textContent = _t('Show Sections');
                 } else {
                     container.style.display = 'block';
                     container.style.opacity = '1';
                     container.style.maxHeight = 'none';
                     if (icon) icon.style.transform = 'rotate(0deg)';
-                    if (text) text.textContent = 'Hide Sections';
+                    if (text) text.textContent = _t('Hide Sections');
                 }
             });
         };
@@ -968,7 +970,7 @@ export function initBulkCollapseExpandControls() {
                 if (icon) icon.style.transform = collapsed ? 'rotate(-90deg)' : '';
                 if (toggleBtn) {
                     toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-                    toggleBtn.setAttribute('title', collapsed ? 'Expand section' : 'Collapse section');
+                    toggleBtn.setAttribute('title', collapsed ? _t('Expand section') : _t('Collapse section'));
                 }
             });
 
@@ -989,7 +991,7 @@ export function initBulkCollapseExpandControls() {
                 if (icon) icon.style.transform = collapsed ? 'rotate(-90deg)' : '';
                 if (toggleBtn) {
                     toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-                    toggleBtn.setAttribute('title', collapsed ? 'Expand subsection' : 'Collapse subsection');
+                    toggleBtn.setAttribute('title', collapsed ? _t('Expand subsection') : _t('Collapse subsection'));
                 }
             });
         };

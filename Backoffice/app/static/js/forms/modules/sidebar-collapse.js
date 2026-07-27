@@ -177,6 +177,7 @@ class SidebarCollapseController {
       mobiletoggle.classList.remove('sidebar-open');
     }
     document.body.classList.remove('overflow-hidden');
+    document.body.classList.remove('entry-sections-nav-open');
     this.adjustFloatingButtonPosition();
   }
 
@@ -193,6 +194,7 @@ class SidebarCollapseController {
       mobiletoggle.classList.add('sidebar-open');
     }
     document.body.classList.add('overflow-hidden');
+    document.body.classList.add('entry-sections-nav-open');
   }
 
   /**

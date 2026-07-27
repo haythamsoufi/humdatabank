@@ -741,7 +741,7 @@
     const columnDefs = [
         {
             field: 'term',
-            headerName: 'Term',
+            headerName: {{ _("Term")|tojson|safe }},
             width: 200,
             minWidth: 150,
             maxWidth: 300,
@@ -751,7 +751,7 @@
         },
         {
             field: 'meaning',
-            headerName: 'Meaning',
+            headerName: {{ _("Meaning")|tojson|safe }},
             width: 400,
             minWidth: 250,
             maxWidth: 600,
@@ -769,7 +769,7 @@
         },
         {
             field: 'is_active',
-            headerName: 'Status',
+            headerName: {{ _("Status")|tojson|safe }},
             width: 120,
             minWidth: 100,
             maxWidth: 150,
@@ -787,7 +787,7 @@
         },
         {
             field: 'created_at',
-            headerName: 'Created',
+            headerName: {{ _("Created")|tojson|safe }},
             width: 150,
             minWidth: 120,
             maxWidth: 200,
@@ -797,7 +797,7 @@
         },
         {
             field: 'actions',
-            headerName: 'Actions',
+            headerName: {{ _("Actions")|tojson|safe }},
             width: 120,
             minWidth: 100,
             maxWidth: 150,

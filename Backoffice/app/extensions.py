@@ -49,11 +49,23 @@ def resolve_translations_directory(app) -> str:
 
 
 def ensure_translation_mo_files(app, translations_dir: str) -> None:
-    """Compile messages.po -> messages.mo when .mo is missing or older (gettext loads .mo only)."""
+    """Compile messages.po -> messages.mo when .mo is missing or older (gettext loads .mo only).
+
+    Skipped when entrypoint already compiled catalogs (BACKOFFICE_TRANSLATIONS_COMPILED=1)
+    to avoid redundant concurrent compiles across Gunicorn workers on shared storage.
+    """
+    import os
+
+    if os.environ.get("BACKOFFICE_TRANSLATIONS_COMPILED") == "1":
+        app.logger.debug("Skipping per-worker MO compile (entrypoint already compiled)")
+        return
+
     try:
         import polib  # type: ignore
     except ImportError:
         return
+
+    from app.utils.po_lock import po_file_lock
 
     root = Path(translations_dir)
     if not root.is_dir():
@@ -71,7 +83,8 @@ def ensure_translation_mo_files(app, translations_dir: str) -> None:
             need = not mo.is_file() or po.stat().st_mtime > mo.stat().st_mtime
             if not need:
                 continue
-            polib.pofile(str(po)).save_as_mofile(str(mo))
+            with po_file_lock(str(po)):
+                polib.pofile(str(po)).save_as_mofile(str(mo))
             app.logger.info("Compiled gettext catalog: %s", mo)
         except Exception as e:
             app.logger.warning("Could not compile %s: %s", po, e)

@@ -503,6 +503,10 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
                             result = translated.format(**format_params)
                         else:
                             result = translated % format_params
+                        locale_key = get_translation_key(locale_to_use)
+                        if locale_key in {'ar', 'fa', 'he', 'ur'}:
+                            from app.utils.form_localization import normalize_arabic_lam_definite_assimilation
+                            result = normalize_arabic_lam_definite_assimilation(result)
                         return result
                     except (KeyError, TypeError) as e:
                         params_keys = list(format_params.keys())

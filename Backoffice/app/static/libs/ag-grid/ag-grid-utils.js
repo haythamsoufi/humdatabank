@@ -30,6 +30,12 @@
             // Ignore parsing errors
         }
 
+        // Use the server-injected catalog (window.t) if available.
+        // defaultValue is the English source string, which is also the msgid.
+        if (typeof global.t === 'function' && defaultValue) {
+            return global.t(defaultValue);
+        }
+
         return defaultValue;
     };
 

@@ -1,3 +1,5 @@
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 /**
  * Multiselect Dropdown Component
  * A reusable searchable multiselect dropdown component for any data type
@@ -24,8 +26,8 @@ class MultiselectDropdown {
         this.options = {
             containerId: null,
             name: 'multiselect',
-            placeholder: 'Select items...',
-            searchPlaceholder: 'Search items...',
+            placeholder: _t('Select items...'),
+            searchPlaceholder: _t('Search items...'),
             data: [],
             selectedValues: [],
             onSelectionChange: null,
@@ -116,12 +118,12 @@ class MultiselectDropdown {
             const selectAllBtn = document.createElement('button');
             selectAllBtn.type = 'button';
             selectAllBtn.className = 'multiselect-select-all text-xs text-blue-600 hover:text-blue-800 font-medium';
-            selectAllBtn.textContent = 'Select All';
+            selectAllBtn.textContent = _t('Select All');
 
             const deselectAllBtn = document.createElement('button');
             deselectAllBtn.type = 'button';
             deselectAllBtn.className = 'multiselect-deselect-all text-xs text-blue-600 hover:text-blue-800 font-medium';
-            deselectAllBtn.textContent = 'Deselect All';
+            deselectAllBtn.textContent = _t('Deselect All');
 
             buttonsDiv.appendChild(selectAllBtn);
             buttonsDiv.appendChild(deselectAllBtn);
@@ -393,7 +395,7 @@ class MultiselectDropdown {
             const selectedItem = this.options.data.find(item => item.value === selectedValue);
             this.elements.selectedText.textContent = selectedItem ? selectedItem.label : selectedValue;
         } else {
-            this.elements.selectedText.textContent = `${selectedCount} items selected`;
+            this.elements.selectedText.textContent = `${selectedCount} ${_t('items selected')}`;
         }
     }
 

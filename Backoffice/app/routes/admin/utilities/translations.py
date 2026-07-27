@@ -19,7 +19,7 @@ from app.forms.content import TranslationForm
 from app.routes.admin.shared import admin_required, permission_required, permission_required_any
 from app.utils.request_utils import is_json_request, get_request_data
 from app.services.translation.auto_translator import translate_text as auto_translate_text
-from app.services.translation.placeholder_validator import validate_placeholders
+from app.services.translation.placeholder_validator import validate_placeholders, localized_validation_message
 from app.extensions import limiter
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.error_handling import handle_json_view_exception
@@ -27,6 +27,8 @@ from app.utils.api_responses import json_bad_request, json_error, json_forbidden
 
 from app.routes.admin.utilities import bp
 from app.routes.admin.utilities.helpers import _translations_dir, _translations_po_path, _translations_pot_path, _entry_to_display_msgstr, _extract_page_name
+from app.utils.po_lock import po_file_lock, touch_translation_sentinel
+from app.utils.po_persistence import finalize_translation_writes
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +71,78 @@ def _translation_added_success_message(updated_langs):
     return _('Translation added successfully for: %(languages)s', languages=labels)
 
 
+def ensure_language_catalogs(languages: list[str]) -> list[str]:
+    """Create PO catalog files for newly-enabled languages.
+
+    Seeds msgids from ``messages.pot`` when available so the admin grid is
+    immediately usable.  Compiles MO and notifies peer workers when done.
+    """
+    try:
+        import polib  # type: ignore
+    except ImportError:
+        return []
+
+    created = []
+    pot_path = _translations_pot_path()
+    pot_entries: list = []
+    if os.path.exists(pot_path):
+        with suppress(Exception):
+            pot_po = polib.pofile(pot_path)
+            pot_entries = [
+                e for e in pot_po
+                if e.msgid and not getattr(e, "obsolete", False)
+            ]
+
+    for lang in languages:
+        if lang == "en":
+            continue
+        po_path = _translations_po_path(lang)
+        if os.path.exists(po_path):
+            continue
+
+        try:
+            os.makedirs(os.path.dirname(po_path), exist_ok=True)
+        except OSError as exc:
+            logger.warning("Could not create PO directory for %s: %s", lang, exc)
+            continue
+
+        po = polib.POFile()
+        en_path = _translations_po_path("en")
+        if os.path.exists(en_path):
+            with suppress(Exception):
+                en_po = polib.pofile(en_path)
+                if getattr(en_po, "metadata", None):
+                    po.metadata = dict(en_po.metadata)
+        if not getattr(po, "metadata", None):
+            po.metadata = {}
+        po.metadata["Content-Type"] = "text/plain; charset=utf-8"
+        po.metadata["Content-Transfer-Encoding"] = "8bit"
+        po.metadata["Language"] = lang
+
+        for entry in pot_entries:
+            if getattr(entry, "msgid_plural", None):
+                po.append(polib.POEntry(
+                    msgid=entry.msgid,
+                    msgid_plural=entry.msgid_plural,
+                    msgstr_plural={0: "", 1: ""},
+                ))
+            else:
+                po.append(polib.POEntry(msgid=entry.msgid, msgstr=""))
+
+        try:
+            with po_file_lock(po_path):
+                po.save(po_path)
+            created.append(lang)
+            logger.info("Created new PO catalog for locale %s at %s", lang, po_path)
+        except OSError as exc:
+            logger.warning("Could not write PO file for %s: %s", lang, exc)
+
+    if created:
+        finalize_translation_writes(created, refresh=True)
+
+    return created
+
+
 def _update_po_translations(msgid, lang_to_msgstr):
     """Update PO translation files for the given msgid across languages.
 
@@ -88,21 +162,24 @@ def _update_po_translations(msgid, lang_to_msgstr):
         if not os.path.exists(po_file_path):
             continue
         try:
-            po = polib.pofile(po_file_path)
-            entry = po.find(msgid)
-            changed = False
-            if entry is None:
-                if str(msgstr).strip():
-                    po.append(polib.POEntry(msgid=msgid, msgstr=msgstr))
+            with po_file_lock(po_file_path):
+                po = polib.pofile(po_file_path)
+                entry = po.find(msgid)
+                changed = False
+                if entry is None:
+                    if str(msgstr).strip():
+                        po.append(polib.POEntry(msgid=msgid, msgstr=msgstr))
+                        changed = True
+                elif entry.msgstr != msgstr:
+                    entry.msgstr = msgstr
                     changed = True
-            elif entry.msgstr != msgstr:
-                entry.msgstr = msgstr
-                changed = True
-            if changed:
-                po.save(po_file_path)
-                updated_langs.append(lang)
+                if changed:
+                    po.save(po_file_path)
+                    updated_langs.append(lang)
         except Exception as e:
             current_app.logger.error("Failed to update translation for %s: %s", lang, e)
+    if updated_langs:
+        finalize_translation_writes(updated_langs, refresh=True)
     return len(updated_langs), updated_langs
 
 
@@ -726,6 +803,7 @@ def import_translations():
             total_updated = 0
             total_missing = 0
             total_empty = 0
+            modified_locales = []
 
             per_lang = {}
 
@@ -768,18 +846,18 @@ def import_translations():
                         f.write(member_bytes)
 
                     incoming = polib.pofile(temp_po_path)
-                    current = polib.pofile(po_path)
-
-                    updated, skipped_missing, skipped_empty = _apply_incoming_po(current, incoming)
-                    per_lang[lang] = {
-                        "updated": updated,
-                        "skipped_missing": skipped_missing,
-                        "skipped_empty": skipped_empty,
-                    }
-
-                    if updated > 0:
-                        _backup(po_path)
-                        current.save(po_path)
+                    with po_file_lock(po_path):
+                        current = polib.pofile(po_path)
+                        updated, skipped_missing, skipped_empty = _apply_incoming_po(current, incoming)
+                        per_lang[lang] = {
+                            "updated": updated,
+                            "skipped_missing": skipped_missing,
+                            "skipped_empty": skipped_empty,
+                        }
+                        if updated > 0:
+                            _backup(po_path)
+                            current.save(po_path)
+                            modified_locales.append(lang)
 
                     processed_locales += 1
                     total_updated += updated
@@ -795,6 +873,9 @@ def import_translations():
                     "warning",
                 )
                 return redirect(url_for("utilities.manage_translations"))
+
+            if modified_locales:
+                finalize_translation_writes(modified_locales, refresh=True)
 
             flash(
                 _(
@@ -850,13 +931,13 @@ def import_translations():
             file.save(temp_path)
 
             incoming = polib.pofile(temp_path)
-            current = polib.pofile(po_path)
-
-            updated, skipped_missing, skipped_empty = _apply_incoming_po(current, incoming)
-
-            if updated > 0:
-                _backup(po_path)
-                current.save(po_path)
+            with po_file_lock(po_path):
+                current = polib.pofile(po_path)
+                updated, skipped_missing, skipped_empty = _apply_incoming_po(current, incoming)
+                if updated > 0:
+                    _backup(po_path)
+                    current.save(po_path)
+                    finalize_translation_writes([lang], refresh=True)
 
             flash(
                 _(
@@ -955,6 +1036,7 @@ def import_translations():
 
         total_updated = 0
         total_missing = 0
+        modified_locales = []
 
         for lang, updates in updates_by_lang.items():
             if not updates:
@@ -963,34 +1045,39 @@ def import_translations():
             if not os.path.exists(po_path):
                 continue
 
-            po = polib.pofile(po_path)
-            entry_map = {}
-            for e in po:
-                if getattr(e, "obsolete", False):
-                    continue
-                if not e.msgid:
-                    continue
-                entry_map[(e.msgctxt or None, e.msgid)] = e
+            with po_file_lock(po_path):
+                po = polib.pofile(po_path)
+                entry_map = {}
+                for e in po:
+                    if getattr(e, "obsolete", False):
+                        continue
+                    if not e.msgid:
+                        continue
+                    entry_map[(e.msgctxt or None, e.msgid)] = e
 
-            updated_lang = 0
-            missing_lang = 0
-            for msgid, msgstr in updates.items():
-                cur = entry_map.get((None, msgid))
-                if cur is None:
-                    missing_lang += 1
-                    continue
-                if getattr(cur, "msgid_plural", None):
-                    cur.msgstr_plural[0] = "" if msgstr is None else str(msgstr)
-                else:
-                    cur.msgstr = "" if msgstr is None else str(msgstr)
-                updated_lang += 1
+                updated_lang = 0
+                missing_lang = 0
+                for msgid, msgstr in updates.items():
+                    cur = entry_map.get((None, msgid))
+                    if cur is None:
+                        missing_lang += 1
+                        continue
+                    if getattr(cur, "msgid_plural", None):
+                        cur.msgstr_plural[0] = "" if msgstr is None else str(msgstr)
+                    else:
+                        cur.msgstr = "" if msgstr is None else str(msgstr)
+                    updated_lang += 1
 
-            if updated_lang > 0:
-                _backup(po_path)
-                po.save(po_path)
+                if updated_lang > 0:
+                    _backup(po_path)
+                    po.save(po_path)
+                    modified_locales.append(lang)
 
             total_updated += updated_lang
             total_missing += missing_lang
+
+        if modified_locales:
+            finalize_translation_writes(modified_locales, refresh=True)
 
         flash(
             _(
@@ -1087,7 +1174,7 @@ def edit_translation():
                 continue
             validation = validate_placeholders(msgid, msgstr)
             if not validation.get('valid'):
-                return json_bad_request(validation.get('message') or _('Invalid placeholders'))
+                return json_bad_request(localized_validation_message(validation))
 
         updated_count, updated_langs = _update_po_translations(msgid, lang_to_msgstr)
 
@@ -1118,7 +1205,7 @@ def edit_translation():
                 continue
             validation = validate_placeholders(msgid, msgstr)
             if not validation.get('valid'):
-                flash(validation.get('message') or _('Invalid placeholders'), 'danger')
+                flash(localized_validation_message(validation), 'danger')
                 return redirect(url_for('utilities.manage_translations'))
 
         updated_count, updated_langs = _update_po_translations(msgid, lang_to_msgstr)
@@ -1208,28 +1295,34 @@ def _purge_obsolete_po_entries(msgid=None):
     files_updated = 0
     entries_removed = 0
     file_errors = []
+    modified_langs = []
 
     for lang in languages:
         po_file_path = _translations_po_path(lang)
         if not os.path.exists(po_file_path):
             continue
         try:
-            po = polib.pofile(po_file_path)
-            removed_here = 0
-            for entry in list(po):
-                if not getattr(entry, "obsolete", False):
-                    continue
-                if msgid is not None and entry.msgid != msgid:
-                    continue
-                po.remove(entry)
-                removed_here += 1
-            if removed_here:
-                po.save(po_file_path)
-                files_updated += 1
-                entries_removed += removed_here
+            with po_file_lock(po_file_path):
+                po = polib.pofile(po_file_path)
+                removed_here = 0
+                for entry in list(po):
+                    if not getattr(entry, "obsolete", False):
+                        continue
+                    if msgid is not None and entry.msgid != msgid:
+                        continue
+                    po.remove(entry)
+                    removed_here += 1
+                if removed_here:
+                    po.save(po_file_path)
+                    files_updated += 1
+                    entries_removed += removed_here
+                    modified_langs.append(lang)
         except Exception as ex:
             logger.warning("_purge_obsolete_po_entries failed for %s: %s", po_file_path, ex)
             file_errors.append(lang)
+
+    if modified_langs:
+        finalize_translation_writes(modified_langs, refresh=True)
 
     return files_updated, entries_removed, file_errors
 
@@ -1324,9 +1417,12 @@ def compile_translations():
                               capture_output=True, text=True, cwd=scripts_dir)
 
         if result.returncode == 0:
-            # Force reload of translations
+            # Force reload of translations on this worker, then signal all peer
+            # workers via the sentinel file so their TranslationWatcher picks up
+            # the new .mo files without waiting a full poll cycle.
             from flask_babel import refresh
             refresh()
+            touch_translation_sentinel(_translations_dir())
 
             # Check if restart was requested
             restart_requested = request.form.get('restart') == '1'
@@ -1385,6 +1481,7 @@ def reload_translations():
     try:
         from flask_babel import refresh
         refresh()
+        touch_translation_sentinel(_translations_dir())
         flash(_('Translations reloaded successfully!'), 'success')
     except Exception as e:
         flash(_("An error occurred. Please try again."), "danger")
@@ -1427,9 +1524,9 @@ def extract_update_translations():
                 if 'obsolete' in line.lower() and '/' in line:
                     obsolete_info.append(line.strip())
 
-            # Force reload of translations
             from flask_babel import refresh
             refresh()
+            touch_translation_sentinel(_translations_dir())
 
             # Build success message
             success_msg = _('Translations extracted and updated successfully!')
@@ -1587,7 +1684,7 @@ def api_auto_translate():
         if _ttype == 'translation':
             text = _raw_text if isinstance(_raw_text, str) else str(_raw_text)
             if not text.strip():
-                return json_bad_request('Text is required')
+                return json_bad_request(_('Text is required'))
         else:
             text = _raw_text.strip()
         definition = (_decode_b64_field('definition_b64') or data.get('definition') or '').strip()
@@ -1619,14 +1716,14 @@ def api_auto_translate():
         service_name = translation_service  # Map to existing parameter for backward compatibility
 
         if not text:
-            return json_bad_request('Text is required')
+            return json_bad_request(_('Text is required'))
 
         auto_translator = get_auto_translator()
 
         # Check if any translation services are available
         available_services = auto_translator.get_available_services()
         if not available_services:
-            return json_bad_request('No translation service available. Please configure translation API keys. Set IFRC_TRANSLATE_API_KEY, GOOGLE_TRANSLATE_API_KEY, or LIBRE_TRANSLATE_URL environment variables.')
+            return json_bad_request(_('No translation service available. Please configure translation API keys.'))
 
         # If a specific service was requested but is not available, try to use a fallback
         if service_name and service_name not in available_services:
@@ -1757,19 +1854,20 @@ def api_auto_translate():
             # Get message ID for the translation (exact string; do not strip — gettext msgids are exact)
             _mid = data.get('id')
             if _mid is None:
-                return json_bad_request('Message ID is required for translation type')
+                return json_bad_request(_('Message ID is required for translation type'))
             message_id = _mid if isinstance(_mid, str) else str(_mid)
             if not message_id.strip():
-                return json_bad_request('Message ID is required for translation type')
+                return json_bad_request(_('Message ID is required for translation type'))
 
             # Check if polib is available for file updates
             if polib is None:
-                return json_bad_request('Translation file updates are not available. Please install polib package.')
+                return json_bad_request(_('Translation file updates are not available. Please install polib package.'))
 
             # Translate the text to the target languages
             translations = {}
             success_count = 0
             skipped_untranslatable = 0
+            modified_locales = []
 
             from config import Config as _TransCfg
             _supported_locales = set(current_app.config.get('SUPPORTED_LANGUAGES', _TransCfg.LANGUAGES))
@@ -1812,57 +1910,59 @@ def api_auto_translate():
                             with suppress(Exception):
                                 os.makedirs(po_dir, exist_ok=True)
 
-                            # Load existing PO or create a new one
-                            if os.path.exists(po_file_path):
-                                po = polib.pofile(po_file_path)
-                            else:
-                                po = polib.POFile()
-                                en_po_path = _translations_po_path('en')
-                                if os.path.exists(en_po_path):
-                                    with suppress(Exception):
-                                        en_po = polib.pofile(en_po_path)
-                                        if getattr(en_po, "metadata", None):
-                                            po.metadata = dict(en_po.metadata)
-                                # Minimal metadata fallback
-                                if not getattr(po, "metadata", None):
-                                    po.metadata = {}
-                                po.metadata.setdefault('Content-Type', 'text/plain; charset=utf-8')
-                                po.metadata.setdefault('Content-Transfer-Encoding', '8bit')
-                                po.metadata.setdefault('Language', target_locale)
-
-                            entry = po.find(message_id)
-                            if entry:
-                                # Update existing entry (plural or non-plural)
-                                if hasattr(entry, 'msgid_plural') and entry.msgid_plural:
-                                    if not hasattr(entry, 'msgstr_plural') or not entry.msgstr_plural:
-                                        entry.msgstr_plural = {}
-                                    entry.msgstr_plural[0] = translated_text
-                                    # If plural forms exist, mirror into second form as a simple fallback
-                                    if len(entry.msgstr_plural) > 1:
-                                        entry.msgstr_plural[1] = translated_text
+                            with po_file_lock(po_file_path):
+                                # Load existing PO or create a new one
+                                if os.path.exists(po_file_path):
+                                    po = polib.pofile(po_file_path)
                                 else:
-                                    entry.msgstr = translated_text
-                            else:
-                                en_po_path = _translations_po_path('en')
-                                is_plural = False
-                                msgid_plural = None
-                                if os.path.exists(en_po_path):
-                                    with suppress(Exception):
-                                        en_po = polib.pofile(en_po_path)
-                                        en_entry = en_po.find(message_id)
-                                        if en_entry and hasattr(en_entry, 'msgid_plural') and en_entry.msgid_plural:
-                                            is_plural = True
-                                            msgid_plural = en_entry.msgid_plural
+                                    po = polib.POFile()
+                                    en_po_path = _translations_po_path('en')
+                                    if os.path.exists(en_po_path):
+                                        with suppress(Exception):
+                                            en_po = polib.pofile(en_po_path)
+                                            if getattr(en_po, "metadata", None):
+                                                po.metadata = dict(en_po.metadata)
+                                    # Minimal metadata fallback
+                                    if not getattr(po, "metadata", None):
+                                        po.metadata = {}
+                                    po.metadata.setdefault('Content-Type', 'text/plain; charset=utf-8')
+                                    po.metadata.setdefault('Content-Transfer-Encoding', '8bit')
+                                    po.metadata.setdefault('Language', target_locale)
 
-                                if is_plural:
-                                    entry = polib.POEntry(msgid=message_id, msgid_plural=msgid_plural or message_id)
-                                    entry.msgstr_plural = {0: translated_text, 1: translated_text}
+                                entry = po.find(message_id)
+                                if entry:
+                                    # Update existing entry (plural or non-plural)
+                                    if hasattr(entry, 'msgid_plural') and entry.msgid_plural:
+                                        if not hasattr(entry, 'msgstr_plural') or not entry.msgstr_plural:
+                                            entry.msgstr_plural = {}
+                                        entry.msgstr_plural[0] = translated_text
+                                        # If plural forms exist, mirror into second form as a simple fallback
+                                        if len(entry.msgstr_plural) > 1:
+                                            entry.msgstr_plural[1] = translated_text
+                                    else:
+                                        entry.msgstr = translated_text
                                 else:
-                                    entry = polib.POEntry(msgid=message_id, msgstr=translated_text)
-                                po.append(entry)
+                                    en_po_path = _translations_po_path('en')
+                                    is_plural = False
+                                    msgid_plural = None
+                                    if os.path.exists(en_po_path):
+                                        with suppress(Exception):
+                                            en_po = polib.pofile(en_po_path)
+                                            en_entry = en_po.find(message_id)
+                                            if en_entry and hasattr(en_entry, 'msgid_plural') and en_entry.msgid_plural:
+                                                is_plural = True
+                                                msgid_plural = en_entry.msgid_plural
 
-                            po.save(po_file_path)
+                                    if is_plural:
+                                        entry = polib.POEntry(msgid=message_id, msgid_plural=msgid_plural or message_id)
+                                        entry.msgstr_plural = {0: translated_text, 1: translated_text}
+                                    else:
+                                        entry = polib.POEntry(msgid=message_id, msgstr=translated_text)
+                                    po.append(entry)
+
+                                po.save(po_file_path)
                             success_count += 1
+                            modified_locales.append(target_locale)
                         except Exception as e:
                             current_app.logger.error(f"Error updating/creating po file for {target_locale}: {e}", exc_info=True)
 
@@ -1871,6 +1971,7 @@ def api_auto_translate():
                     continue
 
             if success_count > 0:
+                finalize_translation_writes(modified_locales, refresh=True)
                 return json_ok(
                     translations={'label_translations': translations},
                     updated_count=success_count,
@@ -1893,7 +1994,7 @@ def api_auto_translate():
                 return json_server_error('Failed to translate or update translation files')
 
         else:
-            return json_bad_request('Invalid translation type')
+            return json_bad_request(_('Invalid translation type'))
 
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
@@ -1989,7 +2090,7 @@ def api_bulk_update_translations():
 
         items = data.get('items', [])
         if not items:
-            return json_bad_request('No items provided')
+            return json_bad_request(_('No items provided'))
 
         success_count = 0
         error_count = 0

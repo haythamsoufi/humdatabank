@@ -5,6 +5,8 @@
 
 import { debugLog, debugError, debugWarn } from './debug.js';
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 function _mhFetch(url, opts = {}) {
     const fn = (window.getFetch && window.getFetch()) || fetch;
     return fn(url, opts);
@@ -284,17 +286,17 @@ function __populateRowTotalConflictTooltip(tooltip, cell) {
     const title = document.createElement('div');
     title.style.fontWeight = 'bold';
     title.style.marginBottom = '4px';
-    title.textContent = conflictType === 'error' ? 'Total mismatch' : 'Manual total';
+    title.textContent = conflictType === 'error' ? _t('Total mismatch') : _t('Manual total');
 
     const summaryRow = document.createElement('div');
     summaryRow.style.lineHeight = '1.4';
     summaryRow.style.marginBottom = '2px';
 
     const manualLine = document.createElement('div');
-    manualLine.textContent = `Manual total: ${__formatInteger(manualVal)}`;
+    manualLine.textContent = `${_t('Manual total:')} ${__formatInteger(manualVal)}`;
 
     const breakdownLine = document.createElement('div');
-    breakdownLine.textContent = `Breakdown sum: ${__formatInteger(autoSum)}`;
+    breakdownLine.textContent = `${_t('Breakdown sum:')} ${__formatInteger(autoSum)}`;
 
     summaryRow.append(manualLine, breakdownLine);
 
@@ -310,9 +312,9 @@ function __populateRowTotalConflictTooltip(tooltip, cell) {
         restoreBtn.className = 'row-total-restore';
         restoreBtn.setAttribute('data-cell-key', cellKey);
         restoreBtn.setAttribute('data-row-id', rowId);
-        restoreBtn.setAttribute('aria-label', 'Restore to calculated');
+        restoreBtn.setAttribute('aria-label', _t('Restore to calculated'));
         restoreBtn.style.cssText = 'background:#555;color:white;border:none;border-radius:3px;padding:4px 8px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;';
-        restoreBtn.textContent = '↩ Restore to calculated';
+        restoreBtn.textContent = `↩ ${_t('Restore to calculated')}`;
         restoreBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -2054,12 +2056,12 @@ class MatrixHandler {
 
         // Check if value is valid number
         if (input.value && isNaN(value)) {
-            errors.push('Please enter a valid number');
+            errors.push(_t('Please enter a valid number'));
         }
 
         // Check if value is negative
         if (!isNaN(value) && value < 0) {
-            errors.push('Value cannot be negative');
+            errors.push(_t('Value cannot be negative'));
         }
 
         // TODO: Enforce per-cell min/max (and other numeric rules) from matrix item config
@@ -2103,7 +2105,7 @@ class MatrixHandler {
             if (matrix.config.is_required) {
                 const hasData = this.hasMatrixData(fieldId);
                 if (!hasData) {
-                    this.showMatrixError(fieldId, 'This field is required. Please enter at least one value.');
+                    this.showMatrixError(fieldId, _t('This field is required. Please enter at least one value.'));
                     allValid = false;
                 } else {
                     this.clearMatrixError(fieldId);
@@ -2148,8 +2150,8 @@ class MatrixHandler {
 
         if (!matrixValid) {
             const msg = validation === 'partial'
-                ? 'One or more manual row totals are lower than the breakdown sum.'
-                : 'One or more row totals do not match their breakdown sums. Correct the totals or use “Restore to calculated”.';
+                ? _t('One or more manual row totals are lower than the breakdown sum.')
+                : _t('One or more row totals do not match their breakdown sums. Correct the totals or use “Restore to calculated”.');
             this.showMatrixError(fieldId, msg);
         }
 
@@ -2467,11 +2469,11 @@ class MatrixHandler {
         const filters = JSON.parse(searchInput.dataset.filters || '[]');
 
         if (!lookupListId || !displayColumn) {
-            this.showDropdownMessage(fieldId, 'Matrix configuration is incomplete');
+            this.showDropdownMessage(fieldId, _t('Matrix configuration is incomplete'));
             return;
         }
 
-        this.showDropdownMessage(fieldId, 'Loading...', true);
+        this.showDropdownMessage(fieldId, _t('Loading...'), true);
         await this.searchListOptions(fieldId, lookupListId, displayColumn, filters, '');
     }
 
@@ -2562,7 +2564,7 @@ class MatrixHandler {
 
             const data = await response.json();
             if (!data.success) {
-                throw new Error(data.message || 'Error loading options');
+                throw new Error(data.message || _t('Error loading options'));
             }
 
             return Array.isArray(data.options) ? data.options : [];
@@ -2587,7 +2589,7 @@ class MatrixHandler {
     async searchListOptions(fieldId, lookupListId, displayColumn, filters, searchTerm) {
         if (!lookupListId || !displayColumn) {
             debugError('matrix-handler', 'Missing required parameters for search', { lookupListId, displayColumn });
-            this.showDropdownMessage(fieldId, 'Matrix configuration is incomplete');
+            this.showDropdownMessage(fieldId, _t('Matrix configuration is incomplete'));
             return;
         }
 
@@ -2648,11 +2650,11 @@ class MatrixHandler {
         } catch (error) {
             if (error && error.message === 'CSRF_TOKEN_MISSING') {
                 debugError('matrix-handler', 'CSRF token missing for API request');
-                this.showDropdownMessage(fieldId, 'Authentication error. Please refresh the page.');
+                this.showDropdownMessage(fieldId, _t('Authentication error. Please refresh the page.'));
                 return;
             }
             debugError('matrix-handler', 'Error searching list options:', error);
-            this.showDropdownMessage(fieldId, 'Error loading options. Please try again.');
+            this.showDropdownMessage(fieldId, _t('Error loading options. Please try again.'));
         }
     }
 
@@ -2669,7 +2671,7 @@ class MatrixHandler {
         }
 
         if (options.length === 0) {
-            this.showDropdownMessage(fieldId, 'No options found');
+            this.showDropdownMessage(fieldId, _t('No options found'));
             return;
         }
 
@@ -2987,7 +2989,7 @@ class MatrixHandler {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'remove-matrix-row-btn ml-1 text-red-600 hover:text-red-800 text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200';
-            btn.title = 'Remove row';
+            btn.title = _t('Remove row');
 
             const icon = document.createElement('i');
             icon.className = 'fas fa-times w-3 h-3';
@@ -3771,9 +3773,9 @@ class MatrixHandler {
         if (!rowId) {
             debugError('matrix-handler', 'Cannot remove row: missing data-row-id attribute', { rowLabel });
             if (window.showAlert) {
-                window.showAlert('Error: Cannot remove row. Please refresh the page and try again.', 'error');
+                window.showAlert(_t('Error: Cannot remove row. Please refresh the page and try again.'), 'error');
             } else {
-                (window.__clientWarn || console.warn)('Error: Cannot remove row. Please refresh the page and try again.');
+                (window.__clientWarn || console.warn)(_t('Error: Cannot remove row. Please refresh the page and try again.'));
             }
             return;
         }
@@ -3860,7 +3862,7 @@ class MatrixHandler {
         };
 
         // Confirm removal (avoid native confirm)
-        const confirmMessage = `Are you sure you want to remove the row "${rowLabel}"?`;
+        const confirmMessage = `${_t('Are you sure you want to remove the row')} "${rowLabel}"?`;
         const cleanupTracking = () => this.rowsBeingRemoved.delete(rowId);
         const onConfirm = () => {
             try {
@@ -3872,11 +3874,11 @@ class MatrixHandler {
         const onCancel = () => cleanupTracking();
 
         if (window.showDangerConfirmation) {
-            window.showDangerConfirmation(confirmMessage, onConfirm, onCancel, 'Remove', 'Cancel', 'Remove Row?');
+            window.showDangerConfirmation(confirmMessage, onConfirm, onCancel, _t('Remove'), _t('Cancel'), _t('Remove Row?'));
             return;
         }
         if (window.showConfirmation) {
-            window.showConfirmation(confirmMessage, onConfirm, onCancel, 'Remove', 'Cancel', 'Remove Row?');
+            window.showConfirmation(confirmMessage, onConfirm, onCancel, _t('Remove'), _t('Cancel'), _t('Remove Row?'));
             return;
         }
 
@@ -4019,13 +4021,13 @@ class MatrixHandler {
                 config,
                 'variable_lookup_tooltip_label',
                 'variable_lookup_tooltip_label_translations',
-                'Lookup value'
+                _t('Lookup value')
             ),
             submittedLabel: __resolveMatrixLocalizedLabel(
                 config,
                 'variable_submitted_tooltip_label',
                 'variable_submitted_tooltip_label_translations',
-                'Submitted value'
+                _t('Submitted value')
             ),
         };
     }
@@ -4216,14 +4218,14 @@ class MatrixHandler {
                     const title = document.createElement('div');
                     title.style.fontWeight = 'bold';
                     title.style.marginBottom = '4px';
-                    title.textContent = 'Modified value';
+                    title.textContent = _t('Modified value');
 
                     const lookupRow = document.createElement('div');
                     lookupRow.appendChild(document.createTextNode(`${resolvedLabels.lookupLabel}: `));
                     const lookupText =
                         (currentLookupValue !== null && currentLookupValue !== undefined && currentLookupValue !== '')
                             ? (__formatNumberForDisplay(currentLookupValue) ?? String(currentLookupValue))
-                            : '(empty)';
+                            : _t('(empty)');
                     lookupRow.appendChild(document.createTextNode(lookupText));
 
                     const submittedRow = document.createElement('div');
@@ -4231,7 +4233,7 @@ class MatrixHandler {
                     submittedRow.appendChild(document.createTextNode(
                         String(currentSavedValue !== null && currentSavedValue !== undefined && currentSavedValue !== ''
                             ? (__formatNumberForDisplay(currentSavedValue) ?? String(currentSavedValue))
-                            : '(empty)')
+                            : _t('(empty)'))
                     ));
 
                     const tooltipChildren = [title, lookupRow, submittedRow];
@@ -5958,7 +5960,7 @@ class MatrixHandler {
 
             const legendTextSpan = document.createElement('span');
             legendTextSpan.className = 'text-gray-700 matrix-legend-text';
-            legendTextSpan.textContent = 'Duplicate entity';
+            legendTextSpan.textContent = _t('Duplicate entity');
 
             legendItem.appendChild(legendColor);
             legendItem.appendChild(legendTextSpan);

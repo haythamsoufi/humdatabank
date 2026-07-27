@@ -35,17 +35,20 @@ function hasConfirm(el) {
   return !!getConfirmMessage(el);
 }
 
+// Bridge to the server-injected catalog (layout.html).  Falls back to the
+// identity function so dialogs still render correctly on pages without layout.
+const _t = (typeof window.t === 'function') ? window.t : (k) => k;
+
 const LOADING_HTML = '<i class="fas fa-spinner fa-spin mr-2"></i>';
-const LOADING_TEXT = 'Loading...';
 
 function setConfirmButtonLoading(btn, loading, originalText) {
     if (loading) {
         btn.disabled = true;
         btn.dataset.confirmOriginalText = originalText;
-        btn.innerHTML = LOADING_HTML + LOADING_TEXT;
+        btn.innerHTML = LOADING_HTML + _t('Loading...');
     } else {
         btn.disabled = false;
-        btn.textContent = originalText || 'Confirm';
+        btn.textContent = originalText || _t('Confirm');
         delete btn.dataset.confirmOriginalText;
     }
 }
@@ -248,7 +251,7 @@ function _showConfirmationWithButtons(message, onConfirm, onCancel, confirmText,
  * @param {string} cancelText - Optional text for the cancel button (default: "Cancel")
  * @param {string} title - Optional title for the dialog (default: "Confirm Action")
  */
-function showConfirmation(message, onConfirm, onCancel = null, confirmText = 'Confirm', cancelText = 'Cancel', title = 'Confirm Action') {
+function showConfirmation(message, onConfirm, onCancel = null, confirmText = _t('Confirm'), cancelText = _t('Cancel'), title = _t('Confirm Action')) {
     _showConfirmationWithButtons(message, onConfirm, onCancel, confirmText, cancelText, title, 'warning',
         'btn btn-success', false);
 }
@@ -262,7 +265,7 @@ function showConfirmation(message, onConfirm, onCancel = null, confirmText = 'Co
  * @param {string} cancelText - Optional text for the cancel button (default: "Cancel")
  * @param {string} title - Optional title for the dialog (default: "Submit Form?")
  */
-function showSubmitConfirmation(message, onConfirm, onCancel = null, confirmText = 'Submit', cancelText = 'Cancel', title = 'Submit Form?') {
+function showSubmitConfirmation(message, onConfirm, onCancel = null, confirmText = _t('Submit'), cancelText = _t('Cancel'), title = _t('Submit Form?')) {
     _showConfirmationWithButtons(message, onConfirm, onCancel, confirmText, cancelText, title, 'warning',
         'btn btn-success', true);
 }
@@ -276,7 +279,7 @@ function showSubmitConfirmation(message, onConfirm, onCancel = null, confirmText
  * @param {string} cancelText - Optional text for the cancel button (default: "Cancel")
  * @param {string} title - Optional title for the dialog (default: "Confirm Delete")
  */
-function showDangerConfirmation(message, onConfirm, onCancel = null, confirmText = 'Delete', cancelText = 'Cancel', title = 'Confirm Delete') {
+function showDangerConfirmation(message, onConfirm, onCancel = null, confirmText = _t('Delete'), cancelText = _t('Cancel'), title = _t('Confirm Delete')) {
     _showConfirmationWithButtons(message, onConfirm, onCancel, confirmText, cancelText, title, 'danger',
         'btn btn-danger', true);
 }
@@ -292,23 +295,22 @@ function showDangerConfirmation(message, onConfirm, onCancel = null, confirmText
  * @param {object} translations - Optional object with translation strings
  */
 function showDeleteDataConfirmation(message, dataCount, onDeleteData, onKeepData, onCancel = null, itemType = 'item', translations = {}) {
-    // Default translations (English)
     const t = {
-        delete: translations.delete || 'Delete',
-        this: translations.this || 'This',
-        has: translations.has || 'has',
-        savedDataEntries: translations.savedDataEntries || 'saved data entries.',
-        mayHaveAssociatedData: translations.mayHaveAssociatedData || 'may have associated data.',
-        chooseOption: translations.chooseOption || 'Choose an option:',
-        deleteDataAndRemove: translations.deleteDataAndRemove || 'Delete Data and Remove',
-        permanentlyDelete: translations.permanentlyDelete || 'Permanently delete all associated data entries and remove the',
-        fromTemplate: translations.fromTemplate || 'from the template.',
-        keepDataAndRemoveItem: translations.keepDataAndRemoveItem || 'Keep Data and Archive Item',
-        keepDataButRemove: translations.keepDataButRemove || 'Keep the data entries but archive the',
-        itemWillBeArchived: translations.itemWillBeArchived || '(The item will be archived and hidden from the template)',
-        sectionWillBeArchived: translations.sectionWillBeArchived || '(The section and its items will be archived and hidden from the template)',
-        cancel: translations.cancel || 'Cancel',
-        continue: translations.continue || 'Continue'
+        delete: translations.delete || _t('Delete'),
+        this: translations.this || _t('This'),
+        has: translations.has || _t('has'),
+        savedDataEntries: translations.savedDataEntries || _t('saved data entries.'),
+        mayHaveAssociatedData: translations.mayHaveAssociatedData || _t('may have associated data.'),
+        chooseOption: translations.chooseOption || _t('Choose an option:'),
+        deleteDataAndRemove: translations.deleteDataAndRemove || _t('Delete Data and Remove'),
+        permanentlyDelete: translations.permanentlyDelete || _t('Permanently delete all associated data entries and remove the'),
+        fromTemplate: translations.fromTemplate || _t('from the template.'),
+        keepDataAndRemoveItem: translations.keepDataAndRemoveItem || _t('Keep Data and Archive Item'),
+        keepDataButRemove: translations.keepDataButRemove || _t('Keep the data entries but archive the'),
+        itemWillBeArchived: translations.itemWillBeArchived || _t('(The item will be archived and hidden from the template)'),
+        sectionWillBeArchived: translations.sectionWillBeArchived || _t('(The section and its items will be archived and hidden from the template)'),
+        cancel: translations.cancel || _t('Cancel'),
+        continue: translations.continue || _t('Continue')
     };
 
     const itemTypeCapitalized = itemType.charAt(0).toUpperCase() + itemType.slice(1);
@@ -470,7 +472,6 @@ function showDeleteDataConfirmation(message, dataCount, onDeleteData, onKeepData
 }
 
 const ALERT_ICON_TYPES = { error: 'danger', warning: 'warning', success: 'success', info: 'info' };
-const ALERT_TITLES = { error: 'Error', warning: 'Warning', success: 'Success', info: 'Information' };
 
 /**
  * Show a blocking alert dialog (replaces native alert)
@@ -481,7 +482,8 @@ const ALERT_TITLES = { error: 'Error', warning: 'Warning', success: 'Success', i
  */
 function showAlert(message, type = 'info', title = null, onClose = null) {
     const iconType = ALERT_ICON_TYPES[type] || 'info';
-    const alertTitle = title || ALERT_TITLES[type] || 'Information';
+    const alertTitles = { error: _t('Error'), warning: _t('Warning'), success: _t('Success'), info: _t('Information') };
+    const alertTitle = title || alertTitles[type] || _t('Information');
 
     const { contentDiv, closeModal } = createModalShell(alertTitle, {
         iconType,
@@ -503,7 +505,7 @@ function showAlert(message, type = 'info', title = null, onClose = null) {
     okBtn.type = 'button';
     okBtn.id = 'alert-ok';
     okBtn.className = 'btn btn-success';
-    okBtn.textContent = 'OK';
+    okBtn.textContent = _t('OK');
 
     buttonsDiv.appendChild(okBtn);
     contentDiv.appendChild(messageDiv);

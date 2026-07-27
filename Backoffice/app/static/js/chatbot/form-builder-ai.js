@@ -3,6 +3,8 @@
  * @module chatbot/form-builder-ai
  */
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 const FB_AI_IMAGE_MIME_RE = /^image\/(png|jpe?g|webp|gif)$/i;
 const FB_AI_IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif)$/i;
 
@@ -607,13 +609,13 @@ export const FormBuilderAiMixin = {
 
             const label = document.createElement('span');
             label.className = 'fb-ai-chat-attachments-label';
-            label.textContent = 'Attachments';
+            label.textContent = _t('Attachments');
 
             const clearBtn = document.createElement('button');
             clearBtn.type = 'button';
             clearBtn.id = 'fb-ai-chat-attachments-clear';
             clearBtn.className = 'fb-ai-chat-attachments-clear';
-            clearBtn.textContent = 'Clear all';
+            clearBtn.textContent = _t('Clear all');
 
             header.append(label, clearBtn);
 
@@ -651,8 +653,8 @@ export const FormBuilderAiMixin = {
             closeBtn.type = 'button';
             closeBtn.id = 'fb-ai-lightbox-close';
             closeBtn.className = 'fb-ai-lightbox-close';
-            closeBtn.title = 'Close';
-            closeBtn.setAttribute('aria-label', 'Close');
+            closeBtn.title = _t('Close');
+            closeBtn.setAttribute('aria-label', _t('Close'));
             closeBtn.innerHTML = '<i class="fas fa-times" aria-hidden="true"></i>';
 
             const lightboxImg = document.createElement('img');

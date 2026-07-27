@@ -3,6 +3,7 @@ import { triggerSave, saveFormBeforeSubmit } from './ajax-save.js';
 import { debugLog } from './debug.js';
 
 const MODULE_NAME = 'form-events';
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
 
 export function initFormEvents() {
   const form = document.getElementById('focalDataEntryForm');
@@ -10,19 +11,19 @@ export function initFormEvents() {
 
   function showSubmittingMessage() {
     if (typeof window.showFlashMessage === 'function') {
-      window.showFlashMessage('Submitting form…', 'info');
+      window.showFlashMessage(_t('Submitting form…'), 'info');
     }
   }
 
   function showSavingBeforeSubmitMessage() {
     if (typeof window.showFlashMessage === 'function') {
-      window.showFlashMessage('Saving your latest changes…', 'info');
+      window.showFlashMessage(_t('Saving your latest changes…'), 'info');
     }
   }
 
   function showSavedBeforeSubmitMessage() {
     if (typeof window.showFlashMessage === 'function') {
-      window.showFlashMessage('Changes saved.', 'info');
+      window.showFlashMessage(_t('Changes saved.'), 'info');
     }
   }
 
@@ -40,12 +41,12 @@ export function initFormEvents() {
 
   function getConfirmDialogOptions(button) {
     if (!button) {
-      return { message: null, title: 'Submit Form?', confirmText: 'Submit', action: 'submit' };
+      return { message: null, title: _t('Submit Form?'), confirmText: _t('Submit'), action: 'submit' };
     }
     return {
       message: button.getAttribute('data-confirm-message'),
-      title: button.getAttribute('data-confirm-title') || 'Submit Form?',
-      confirmText: button.getAttribute('data-confirm-label') || 'Submit',
+      title: button.getAttribute('data-confirm-title') || _t('Submit Form?'),
+      confirmText: button.getAttribute('data-confirm-label') || _t('Submit'),
       action: button.value || 'submit',
     };
   }
@@ -150,7 +151,7 @@ export function initFormEvents() {
       // Make the submit button text clearer on the final submit.
       try {
         if (submitBtn && submitBtn.dataset) {
-          submitBtn.dataset.loadingText = 'Submitting...';
+          submitBtn.dataset.loadingText = _t('Submitting...');
         }
       } catch (_) { /* no-op */ }
 
@@ -195,8 +196,8 @@ export function initFormEvents() {
       debugLog(MODULE_NAME, '🧩 presave: failed', e);
       // Leave the user on the page; explicit Save still works.
       if (typeof window.showFlashMessage === 'function') {
-        const msg = (e && e.message) ? String(e.message) : 'Unknown error';
-        window.showFlashMessage('Could not save changes before submitting: ' + msg, 'danger');
+        const msg = (e && e.message) ? String(e.message) : _t('Unknown error');
+        window.showFlashMessage(_t('Could not save changes before submitting: ') + msg, 'danger');
       }
     } finally {
       delete form.dataset.ifrcPresaveInProgress;
@@ -263,7 +264,7 @@ export function initFormEvents() {
               button.dataset.confirmInProgress = 'false';
             },
             confirmText,
-            'Cancel',
+            _t('Cancel'),
             title
           );
         } else if (window.showConfirmation) {
@@ -275,7 +276,7 @@ export function initFormEvents() {
               button.dataset.confirmInProgress = 'false';
             },
             confirmText,
-            'Cancel',
+            _t('Cancel'),
             title
           );
         } else {
@@ -475,7 +476,7 @@ export function initFormEvents() {
             doSubmit,
             () => { window.__clientLog && window.__clientLog('Submit cancelled by user'); },
             confirmLabel,
-            'Cancel',
+            _t('Cancel'),
             confirmTitle
           );
           return; // Exit early, submission will happen in callback if confirmed
@@ -486,7 +487,7 @@ export function initFormEvents() {
             doSubmit,
             () => { window.__clientLog && window.__clientLog('Submit cancelled by user'); },
             confirmLabel,
-            'Cancel',
+            _t('Cancel'),
             confirmTitle
           );
           return; // Exit early; submission will happen in callback if confirmed

@@ -872,7 +872,7 @@ document.addEventListener('click', function(e) {
     var columnDefs = [
         {
             field: 'id',
-            headerName: 'Country ID',
+            headerName: {{ _("Country ID")|tojson|safe }},
             hide: true,
             exportAlways: true,
             width: 100,
@@ -883,7 +883,7 @@ document.addEventListener('click', function(e) {
         },
         {
             field: 'iso3',
-            headerName: 'ISO3',
+            headerName: {{ _("ISO3")|tojson|safe }},
             hide: true,
             exportAlways: true,
             width: 90,
@@ -898,7 +898,7 @@ document.addEventListener('click', function(e) {
         },
         {
             field: '_coverageSort',
-            headerName: 'Coverage',
+            headerName: {{ _("Coverage")|tojson|safe }},
             minWidth: 170,
             sortable: true,
             sort: 'asc',
@@ -927,7 +927,7 @@ document.addEventListener('click', function(e) {
         },
         {
             field: 'name',
-            headerName: 'Country',
+            headerName: {{ _("Country")|tojson|safe }},
             minWidth: 180,
             flex: 1,
             sortable: true,
@@ -944,8 +944,8 @@ document.addEventListener('click', function(e) {
         },
         {
             field: 'org_focal_points',
-            headerName: orgName + ' FPs',
-            headerTooltip: orgName + ' focal points (count)',
+            headerName: orgName + ' ' + {{ _("FPs")|tojson|safe }},
+            headerTooltip: {{ _("%(org)s focal points (count)")|tojson|safe }}.replace('%(org)s', orgName),
             width: 110,
             minWidth: 90,
             sortable: true,
@@ -959,8 +959,8 @@ document.addEventListener('click', function(e) {
         },
         {
             field: '_orgNamesText',
-            headerName: orgName + ' Names',
-            headerTooltip: orgName + ' focal point names',
+            headerName: orgName + ' ' + {{ _("Names")|tojson|safe }},
+            headerTooltip: {{ _("%(org)s focal point names")|tojson|safe }}.replace('%(org)s', orgName),
             hide: true,
             minWidth: 200,
             sortable: true,
@@ -979,8 +979,8 @@ document.addEventListener('click', function(e) {
         },
         {
             field: 'non_org_focal_points',
-            headerName: 'NS FPs',
-            headerTooltip: 'National Society focal points (count)',
+            headerName: {{ _("NS FPs")|tojson|safe }},
+            headerTooltip: {{ _("National Society focal points (count)")|tojson|safe }},
             width: 90,
             minWidth: 80,
             sortable: true,
@@ -994,8 +994,8 @@ document.addEventListener('click', function(e) {
         },
         {
             field: '_nsNamesText',
-            headerName: 'NS Names',
-            headerTooltip: 'National Society focal point names',
+            headerName: {{ _("NS Names")|tojson|safe }},
+            headerTooltip: {{ _("National Society focal point names")|tojson|safe }},
             hide: true,
             minWidth: 200,
             sortable: true,
@@ -1014,7 +1014,7 @@ document.addEventListener('click', function(e) {
         },
         {
             field: 'total_focal_points',
-            headerName: 'Total',
+            headerName: {{ _("Total")|tojson|safe }},
             width: 85,
             minWidth: 75,
             sortable: true,
@@ -1023,8 +1023,8 @@ document.addEventListener('click', function(e) {
         },
         {
             field: '_fdsMemberText',
-            headerName: 'FDS Member',
-            headerTooltip: 'Federated Data Sharing member assigned to this country',
+            headerName: {{ _("FDS Member")|tojson|safe }},
+            headerTooltip: {{ _("Federated Data Sharing member assigned to this country")|tojson|safe }},
             hide: true,
             minWidth: 200,
             sortable: true,

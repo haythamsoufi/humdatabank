@@ -1214,7 +1214,7 @@ class AutoTranslator:
             }
         """
         if not target_languages:
-            target_languages = [Config.LANGUAGE_MODEL_KEY[code] for code in Config.TRANSLATABLE_LANGUAGES]
+            target_languages = [Config.LANGUAGE_MODEL_KEY.get(code, code) for code in Config.TRANSLATABLE_LANGUAGES]
 
         result = {
             'label_translations': {},
@@ -1252,7 +1252,7 @@ class AutoTranslator:
             {'fr': '...', 'es': '...', ...}
         """
         if not target_languages:
-            target_languages = [Config.LANGUAGE_MODEL_KEY[code] for code in Config.TRANSLATABLE_LANGUAGES]
+            target_languages = [Config.LANGUAGE_MODEL_KEY.get(code, code) for code in Config.TRANSLATABLE_LANGUAGES]
 
         result = {}
 
@@ -1276,7 +1276,7 @@ class AutoTranslator:
             {'fr': '...', 'es': '...', ...}
         """
         if not target_languages:
-            target_languages = [Config.LANGUAGE_MODEL_KEY[code] for code in Config.TRANSLATABLE_LANGUAGES]
+            target_languages = [Config.LANGUAGE_MODEL_KEY.get(code, code) for code in Config.TRANSLATABLE_LANGUAGES]
 
         result = {}
 
@@ -1300,7 +1300,7 @@ class AutoTranslator:
             {'fr': '...', 'es': '...', ...}
         """
         if not target_languages:
-            target_languages = [Config.LANGUAGE_MODEL_KEY[code] for code in Config.TRANSLATABLE_LANGUAGES]
+            target_languages = [Config.LANGUAGE_MODEL_KEY.get(code, code) for code in Config.TRANSLATABLE_LANGUAGES]
 
         result = {}
 
@@ -1324,7 +1324,7 @@ class AutoTranslator:
             {'fr': '...', 'es': '...', ...}
         """
         if not target_languages:
-            target_languages = [Config.LANGUAGE_MODEL_KEY[code] for code in Config.TRANSLATABLE_LANGUAGES]
+            target_languages = [Config.LANGUAGE_MODEL_KEY.get(code, code) for code in Config.TRANSLATABLE_LANGUAGES]
 
         result = {}
 

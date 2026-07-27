@@ -59,8 +59,9 @@ def _write_settings_json_file(settings: Dict) -> bool:
     """Persist settings to legacy JSON file (no DB / no app context)."""
     settings_path = _get_settings_path()
     try:
-        with open(settings_path, "w", encoding="utf-8") as f:
-            json.dump(settings, f, ensure_ascii=False, indent=2)
+        from app.utils.file_lock import atomic_json_write
+
+        atomic_json_write(settings_path, settings)
         return True
     except Exception as e:
         logger.debug("JSON settings write failed: %s", e)

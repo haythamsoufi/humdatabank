@@ -39,6 +39,21 @@
         window.TRANSLATABLE_LANGUAGES = {{ (TRANSLATABLE_LANGUAGES or []) | tojson | safe }};
         // Workflow tour debug logging (disabled by default)
         window.WORKFLOW_TOUR_DEBUG = false;
+        // Client-side translation shim.
+        // window.t(key) returns the UI-locale translation for a gettext msgid,
+        // or the key itself as a fallback (which is the English source string).
+        // Usage: window.t('Cancel') → 'Annuler' (fr), 'إلغاء' (ar), etc.
+        // Strings are sourced from the server-side Flask-Babel catalog — no
+        // extra requests, no separate catalog file.
+        (function () {
+            var _i18n = {{ inject_js_translations() | tojson | safe }};
+            window.t = function (key, fallback) {
+                if (_i18n && Object.prototype.hasOwnProperty.call(_i18n, key) && _i18n[key]) {
+                    return _i18n[key];
+                }
+                return (fallback !== undefined) ? fallback : key;
+            };
+        }());
     </script>
     {% if current_user.is_authenticated and not skip_layout_chatbot|default(false) %}
     <script src="{{ static_url('js/chatbot/messages.js') }}" defer></script>

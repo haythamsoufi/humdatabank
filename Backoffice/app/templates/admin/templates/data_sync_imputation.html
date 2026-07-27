@@ -1714,7 +1714,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const previewColumnDefs = [
         {
             field: 'country',
-            headerName: 'Country',
+            headerName: {{ _("Country")|tojson|safe }},
             width: 150,
             minWidth: 120,
             maxWidth: 250,
@@ -1723,7 +1723,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         {
             field: 'item_label',
-            headerName: 'Item',
+            headerName: {{ _("Item")|tojson|safe }},
             width: 300,
             minWidth: 200,
             maxWidth: 500,
@@ -1733,7 +1733,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         {
             field: 'current_value',
-            headerName: 'Current Value',
+            headerName: {{ _("Current Value")|tojson|safe }},
             width: 120,
             minWidth: 100,
             maxWidth: 200,
@@ -1748,7 +1748,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         {
             field: 'imputed_value',
-            headerName: 'Imputed Value',
+            headerName: {{ _("Imputed Value")|tojson|safe }},
             width: 120,
             minWidth: 100,
             maxWidth: 200,
@@ -1763,7 +1763,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         {
             field: 'method',
-            headerName: 'Method',
+            headerName: {{ _("Method")|tojson|safe }},
             width: 180,
             minWidth: 150,
             maxWidth: 250,
@@ -1772,7 +1772,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         {
             field: 'source',
-            headerName: 'Source',
+            headerName: {{ _("Source")|tojson|safe }},
             width: 200,
             minWidth: 150,
             maxWidth: 300,

@@ -66,6 +66,12 @@ jobs:
             python Backoffice/scripts/check_unsafe_gettext_embedding.py --base-ref "$BASE"
           fi
 
+      - name: Translations catalog is current and all .po files compile cleanly
+        working-directory: Backoffice
+        run: |
+          pip install polib babel --quiet
+          python scripts/check_translations_current.py
+
   # ── Bandit static security analysis ────────────────────────────────────────
   bandit:
     name: Bandit (Python security)

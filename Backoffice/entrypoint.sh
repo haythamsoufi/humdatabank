@@ -62,6 +62,7 @@ if [ -n "$TRANSLATIONS_PERSISTENT_PATH" ]; then
   echo "=========================================="
   mkdir -p "$TRANSLATIONS_PERSISTENT_PATH"
   python scripts/sync_persistent_translations.py "$TRANSLATIONS_PERSISTENT_PATH"
+  export BACKOFFICE_TRANSLATIONS_COMPILED=1
 
   # Point /app/translations at the persistent path.  When the persistent
   # path is already mounted directly at /app/translations (e.g. Docker

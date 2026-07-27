@@ -838,22 +838,22 @@
     }
 
     var ICON_ACTION_LABELS = {
-        'fa-pen': 'Edit',
-        'fa-edit': 'Edit',
-        'fa-pencil-alt': 'Edit',
-        'fa-eye': 'View',
-        'fa-trash': 'Delete',
-        'fa-pause-circle': 'Deactivate',
-        'fa-play-circle': 'Activate',
-        'fa-undo': 'Reopen',
-        'fa-lock': 'Close',
-        'fa-unlock': 'Unlock',
-        'fa-copy': 'Copy',
-        'fa-download': 'Download',
-        'fa-external-link-alt': 'Open',
-        'fa-check': 'Approve',
-        'fa-times': 'Reject',
-        'fa-ban': 'Revoke'
+        'fa-pen': ['edit', 'Edit'],
+        'fa-edit': ['edit', 'Edit'],
+        'fa-pencil-alt': ['edit', 'Edit'],
+        'fa-eye': ['view', 'View'],
+        'fa-trash': ['delete', 'Delete'],
+        'fa-pause-circle': ['deactivate', 'Deactivate'],
+        'fa-play-circle': ['activate', 'Activate'],
+        'fa-undo': ['reopen', 'Reopen'],
+        'fa-lock': ['close', 'Close'],
+        'fa-unlock': ['unlock', 'Unlock'],
+        'fa-copy': ['copy', 'Copy'],
+        'fa-download': ['download', 'Download'],
+        'fa-external-link-alt': ['open', 'Open'],
+        'fa-check': ['approve', 'Approve'],
+        'fa-times': ['reject', 'Reject'],
+        'fa-ban': ['revoke', 'Revoke']
     };
 
     function isMobileActionsLayout() {
@@ -874,7 +874,8 @@
         for (var i = 0; i < classes.length; i++) {
             var cls = classes[i];
             if (ICON_ACTION_LABELS[cls]) {
-                return ICON_ACTION_LABELS[cls];
+                var labelPair = ICON_ACTION_LABELS[cls];
+                return getTranslation(labelPair[0], labelPair[1]);
             }
         }
         return '';

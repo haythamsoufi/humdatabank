@@ -1,6 +1,8 @@
 // Local drafts (IndexedDB) for authenticated (non-public) entry forms.
 // Goal: allow users to keep filling the form offline and "save" locally, then submit when online.
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 const DB_NAME = 'ifrc_forms';
 const LAST_SUFFIX_KEY = 'ifrc_auth_drafts_version';
 const IDB_SCHEMA_KEY = 'ifrc_auth_drafts_idb_schema_v2';
@@ -354,7 +356,7 @@ async function loadDraft(key) {
 function showCustomConfirm(message) {
   return new Promise((resolve) => {
     if (typeof window.showConfirmation === 'function') {
-      window.showConfirmation(message, () => resolve(true), () => resolve(false), 'Restore', 'Cancel', 'Restore Draft?');
+      window.showConfirmation(message, () => resolve(true), () => resolve(false), _t('Restore'), _t('Cancel'), _t('Restore Draft?'));
     } else {
       authDraftLog('confirm', { ok: false, err: 'showConfirmation not available' });
       resolve(false);
@@ -490,7 +492,7 @@ export function initAuthDrafts() {
       el.style.boxShadow = '0 -2px 8px rgba(0,0,0,.15)';
       el.style.display = 'none';
       el.style.textAlign = 'center';
-      el.textContent = 'You are offline. You can keep working; drafts will be saved locally.';
+      el.textContent = _t('You are offline. You can keep working; drafts will be saved locally.');
       document.body.appendChild(el);
     }
     return el;
@@ -533,7 +535,7 @@ export function initAuthDrafts() {
         return;
       }
       await waitForFormInitialized();
-      const shouldRestore = isOffline || await showCustomConfirm('A local draft is available for this form. Restore it?');
+      const shouldRestore = isOffline || await showCustomConfirm(_t('A local draft is available for this form. Restore it?'));
       if (!shouldRestore) {
         authDraftLog('restore_skip', { ok: true, reason: 'user_declined' });
         return;
@@ -555,7 +557,7 @@ export function initAuthDrafts() {
         });
       } catch (_) { /* no-op */ }
       authDraftLog('restore_done', { ok: true });
-      if (typeof window.showFlashMessage === 'function') window.showFlashMessage('Draft restored', 'info');
+      if (typeof window.showFlashMessage === 'function') window.showFlashMessage(_t('Draft restored'), 'info');
     } catch (e) {
       authDraftLog('restore_chain', { ok: false, err: (e && e.message) || String(e), name: e && e.name });
     }
@@ -591,7 +593,7 @@ export function initAuthDrafts() {
       if (window.matrixHandler && typeof window.matrixHandler.collectMatrixData === 'function') {
         window.matrixHandler.collectMatrixData();
       }
-      saveDraft(key, collectFormData(form)).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage('Draft saved', 'success'); });
+      saveDraft(key, collectFormData(form)).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage(_t('Draft saved'), 'success'); });
     });
   }
 
@@ -656,7 +658,7 @@ export function initAuthDrafts() {
       window.matrixHandler.collectMatrixData();
     }
     authDraftLog('intercept_save', { ok: true, source: 'button_or_submit' });
-    saveDraft(key, collectFormData(form)).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage('You are offline. Draft saved locally.', 'warning'); });
+    saveDraft(key, collectFormData(form)).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage(_t('You are offline. Draft saved locally.'), 'warning'); });
   };
 
   const submitBtn = document.querySelector('button[name="action"][value="submit"]');
@@ -670,6 +672,6 @@ export function initAuthDrafts() {
       window.matrixHandler.collectMatrixData();
     }
     authDraftLog('intercept_save', { ok: true, source: 'form_submit' });
-    saveDraft(key, collectFormData(form)).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage('You are offline. Draft saved locally.', 'warning'); });
+    saveDraft(key, collectFormData(form)).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage(_t('You are offline. Draft saved locally.'), 'warning'); });
   }, true);
 }

@@ -874,6 +874,22 @@ def manage_settings():
                 selected = selected_list or ["en"]
             langs_ok = set_supported_languages(selected, user_id=user_id)
 
+            # Create a minimal PO catalog for any newly-enabled locales that
+            # don't have one yet, so the translation grid and pybabel tools
+            # work immediately without requiring a manual file-creation step.
+            if langs_ok:
+                try:
+                    from app.routes.admin.utilities.translations import ensure_language_catalogs
+                    new_langs = set(selected) - previous_supported
+                    if new_langs:
+                        created = ensure_language_catalogs(list(new_langs))
+                        if created:
+                            current_app.logger.info(
+                                "Created PO catalogs for new locale(s): %s", ", ".join(created)
+                            )
+                except Exception as _e:
+                    current_app.logger.warning("ensure_language_catalogs failed: %s", _e)
+
             # Show/hide flags in language selectors
             # Checkbox posts value only when checked; default to off when missing.
             show_flags = data.get("show_language_flags") == "1"

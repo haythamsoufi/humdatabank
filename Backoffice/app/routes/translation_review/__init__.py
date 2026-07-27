@@ -15,7 +15,11 @@ from app.i18n import get_locale, resolve_supported_language
 from app.routes.admin.shared import permission_required
 from app.routes.admin.utilities.helpers import _translations_po_path
 from app.routes.admin.utilities.translations import _msgid_from_payload, _update_po_translations
-from app.services.translation.placeholder_validator import extract_placeholders, validate_placeholders
+from app.services.translation.placeholder_validator import (
+    extract_placeholders,
+    localized_validation_message,
+    validate_placeholders,
+)
 from app.services.translation_review.assignment_service import (
     user_can_edit_locale,
     user_can_use_translation_review,
@@ -156,7 +160,7 @@ def save_review_string():
 
     validation = validate_placeholders(msgid, translation)
     if not validation.get('valid'):
-        return json_bad_request(validation.get('message') or _('Invalid placeholders'))
+        return json_bad_request(localized_validation_message(validation))
 
     old_value = _read_po_msgstr(msgid, locale)
     updated_count, updated_langs = _update_po_translations(msgid, {locale: translation})

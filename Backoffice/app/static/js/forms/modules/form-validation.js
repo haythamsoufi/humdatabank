@@ -4,6 +4,7 @@ import { getCurrentFieldValue } from './field-management.js';
 import { closeEntryFormMobileNav } from './sidebar-collapse.js';
 
 const MODULE_NAME = 'form_validation';
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
 
 /**
  * Parse validation condition from attribute (may be double-encoded by template).
@@ -191,7 +192,7 @@ class FormValidator {
 
         // If allow_over_100 is false and value > 100, show warning (but allow input)
         if (!allowOver100 && value > 100) {
-            this.showPercentageWarning(field, 'Values above 100% are not allowed for this field. Please enter a value between 0 and 100.');
+            this.showPercentageWarning(field, _t('Values above 100% are not allowed for this field. Please enter a value between 0 and 100.'));
             field.classList.add('border-yellow-500', 'focus:border-yellow-500', 'focus:ring-yellow-500');
             field.classList.remove('border-gray-300', 'border-red-500', 'focus:border-blue-500', 'focus:ring-blue-500', 'focus:border-red-500', 'focus:ring-red-500');
             // Don't add to errorFields here - we'll validate on submit
@@ -271,7 +272,7 @@ class FormValidator {
 
             // If allow_over_100 is false and value > 100, show warning
             if (!allowOver100 && value > 100) {
-                this.showPercentageWarning(field, 'Values above 100% are not allowed for this field. Please enter a value between 0 and 100.');
+                this.showPercentageWarning(field, _t('Values above 100% are not allowed for this field. Please enter a value between 0 and 100.'));
                 field.classList.add('border-yellow-500', 'focus:border-yellow-500', 'focus:ring-yellow-500');
                 field.classList.remove('border-gray-300', 'border-red-500', 'focus:border-blue-500', 'focus:ring-blue-500', 'focus:border-red-500', 'focus:ring-red-500');
             }
@@ -347,7 +348,7 @@ class FormValidator {
                 this.errors.push({
                     field: null,
                     container: null,
-                    message: 'One or more matrix row totals conflict with their breakdown sums.',
+                    message: _t('One or more matrix row totals conflict with their breakdown sums.'),
                     type: 'row_total'
                 });
             }
@@ -379,7 +380,7 @@ class FormValidator {
                     const error = {
                         field: primaryField || container,
                         container: container,
-                        message: `${fieldLabel} is required`,
+                        message: `${fieldLabel} ${_t('is required')}`,
                         type: 'required'
                     };
 
@@ -419,7 +420,7 @@ class FormValidator {
                 const error = {
                     field: field,
                     container: field.closest('.form-group') || field.parentElement,
-                    message: `${fieldLabel} is required`,
+                    message: `${fieldLabel} ${_t('is required')}`,
                     type: 'required'
                 };
 
@@ -454,11 +455,11 @@ class FormValidator {
                 // Only enforce "at least one entry" when a required field would actually be shown/validated
                 const visibleRequiredTemplateFields = Array.from(originalFields).filter(f => !this.isFieldHidden(f) && !f.disabled);
                 if (visibleRequiredTemplateFields.length > 0) {
-                    const sectionName = section.querySelector('h3, h4')?.textContent?.trim() || 'Repeat Section';
+                    const sectionName = section.querySelector('h3, h4')?.textContent?.trim() || _t('Repeat Section');
                     this.errors.push({
                         field: section,
                         container: section,
-                        message: `${sectionName} requires at least one entry`,
+                        message: `${sectionName} ${_t('requires at least one entry')}`,
                         type: 'repeat_empty'
                     });
                     debugLog(MODULE_NAME, `❌ Empty repeat section: ${sectionName}`);
@@ -476,7 +477,7 @@ class FormValidator {
                         const error = {
                             field: field,
                             container: entry,
-                            message: `${fieldLabel} is required in entry ${index + 1}`,
+                            message: `${fieldLabel} ${_t('is required in entry')} ${index + 1}`,
                             type: 'repeat_required'
                         };
 
@@ -515,7 +516,7 @@ class FormValidator {
                     const error = {
                         field: field,
                         container: fieldContainer,
-                        message: `${fieldLabel} is required`,
+                        message: `${fieldLabel} ${_t('is required')}`,
                         type: 'dynamic_required'
                     };
 
@@ -548,7 +549,7 @@ class FormValidator {
                 const error = {
                     field: field,
                     container: field.closest('.form-item-block'),
-                    message: `${fieldLabel} is required`,
+                    message: `${fieldLabel} ${_t('is required')}`,
                     type: 'submitter_required'
                 };
 
@@ -571,11 +572,11 @@ class FormValidator {
 
                 // Check if it's a valid number
                 if (isNaN(value) || value === '') {
-                    const label = this.getFieldLabel(field) || 'Indirect reach';
+                    const label = this.getFieldLabel(field) || _t('Indirect reach');
                     this.errors.push({
                         field: field,
                         container: field.closest('.form-item-block'),
-                        message: `${label} must be a valid number.`,
+                        message: `${label} ${_t('must be a valid number.')}`,
                         type: 'indirect_reach_validation'
                     });
                     this.errorFields.add(field.name || field.id);
@@ -617,11 +618,11 @@ class FormValidator {
 
             // If allow_over_100 is false and value > 100, show error
             if (!allowOver100 && value > 100) {
-                const label = this.getFieldLabel(field) || 'Percentage field';
+                const label = this.getFieldLabel(field) || _t('Percentage field');
                 this.errors.push({
                     field: field,
                     container: field.closest('.form-item-block') || field.parentElement,
-                    message: `${label} cannot exceed 100%.`,
+                    message: `${label} ${_t('cannot exceed 100%.')}`,
                     type: 'percentage_max_validation'
                 });
                 this.errorFields.add(field.name || field.id);
@@ -687,7 +688,7 @@ class FormValidator {
                     const primaryField = this.getPrimaryField(container);
 
                     // Get custom validation message or use default
-                    let message = validationMessage || `${fieldLabel} validation failed`;
+                    let message = validationMessage || `${fieldLabel} ${_t('validation failed')}`;
                     try {
                         // Try to parse if it's JSON (might be escaped)
                         const parsedMessage = JSON.parse(validationMessage);
@@ -771,7 +772,7 @@ class FormValidator {
                 // If condition is false, validation is violated - show warning
                 if (!conditionPassed) {
                     // Get custom validation message or use default
-                    let message = validationMessage || 'This value does not meet the validation requirements';
+                    let message = validationMessage || _t('This value does not meet the validation requirements');
                     try {
                         const parsedMessage = JSON.parse(validationMessage);
                         if (typeof parsedMessage === 'string') {
@@ -1383,7 +1384,7 @@ class FormValidator {
 
             // Method 3: Field name or placeholder
             if (!label) {
-                label = field.name || field.placeholder || field.id || 'Field';
+                label = field.name || field.placeholder || field.id || _t('Field');
             }
         }
 
@@ -1395,7 +1396,7 @@ class FormValidator {
             label = label.substring(0, 57) + '...';
         }
 
-        return label || 'Field';
+        return label || _t('Field');
     }
 
     displayErrors() {
@@ -1428,7 +1429,9 @@ class FormValidator {
 
     showValidationFlashMessage() {
         const errorCount = this.errors.length;
-        const message = `Form submission failed: ${errorCount} required field${errorCount > 1 ? 's are' : ' is'} missing. Please correct the highlighted errors below.`;
+        const message = errorCount > 1
+            ? _t('Form submission failed: %(count)s required fields are missing. Please correct the highlighted errors below.').replace('%(count)s', errorCount)
+            : _t('Form submission failed: 1 required field is missing. Please correct the highlighted errors below.');
         this.showFlashMessage(message, 'danger');
     }
 
@@ -1464,7 +1467,7 @@ class FormValidator {
 
         const heading = document.createElement('h3');
         heading.className = 'text-sm font-medium text-red-800';
-        heading.textContent = 'Please correct the following errors:';
+        heading.textContent = _t('Please correct the following errors:');
 
         const listContainer = document.createElement('div');
         listContainer.className = 'mt-2 text-sm text-red-700';
@@ -1527,7 +1530,7 @@ class FormValidator {
         field.classList.remove('border-gray-300', 'focus:border-blue-500', 'focus:ring-blue-500');
 
         // Show error message - use generic message for field display, but keep original message for summary
-        this.showFieldErrorMessage(field, 'This field is required');
+        this.showFieldErrorMessage(field, _t('This field is required'));
     }
 
     showFieldErrorMessage(field, message) {

@@ -1,5 +1,6 @@
 (function() {
   'use strict';
+  const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
   var cfg = window.pluginManagementConfig || {};
   /* block 1 */
 // Plugin Management JavaScript
@@ -323,7 +324,7 @@
 
     function reloadAllPlugins() {
         if (window.showConfirmation) {
-            window.showConfirmation(i18n.confirm_reload_all, () => { void _reloadAllPlugins(); }, null, 'Reload', 'Cancel', 'Reload All Plugins?');
+            window.showConfirmation(i18n.confirm_reload_all, () => { void _reloadAllPlugins(); }, null, _t('Reload'), _t('Cancel'), _t('Reload All Plugins?'));
         } else {
             void _reloadAllPlugins();
         }
@@ -495,7 +496,7 @@
         const displayName = plugin ? getPluginDisplayName(plugin) : pluginId;
         const msg = i18n.confirm_reload_plugin.replace('%(plugin)s', displayName);
         if (window.showConfirmation) {
-            window.showConfirmation(msg, () => { void _reloadPlugin(pluginId); }, null, 'Reload', 'Cancel', 'Reload Plugin?');
+            window.showConfirmation(msg, () => { void _reloadPlugin(pluginId); }, null, _t('Reload'), _t('Cancel'), _t('Reload Plugin?'));
         } else {
             void _reloadPlugin(pluginId);
         }
@@ -537,7 +538,7 @@
         const displayName = plugin ? getPluginDisplayName(plugin) : pluginId;
         const msg = i18n.confirm_activate_plugin.replace('%(plugin)s', displayName);
         if (window.showConfirmation) {
-            window.showConfirmation(msg, () => { void _activatePlugin(pluginId); }, null, 'Activate', 'Cancel', 'Activate Plugin?');
+            window.showConfirmation(msg, () => { void _activatePlugin(pluginId); }, null, _t('Activate'), _t('Cancel'), _t('Activate Plugin?'));
         } else {
             void _activatePlugin(pluginId);
         }
@@ -593,7 +594,7 @@
                 } else {
                     const msg = i18n.confirm_uninstall_plugin.replace('%(plugin)s', displayName);
                     if (window.showDangerConfirmation) {
-                        window.showDangerConfirmation(msg, () => { void uninstallPlugin(pluginId); }, null, 'Uninstall', 'Cancel', 'Uninstall Plugin?');
+                        window.showDangerConfirmation(msg, () => { void uninstallPlugin(pluginId); }, null, _t('Uninstall'), _t('Cancel'), _t('Uninstall Plugin?'));
                     } else {
                         void uninstallPlugin(pluginId);
                     }
@@ -601,7 +602,7 @@
             } else {
                 const msg = i18n.confirm_uninstall_plugin.replace('%(plugin)s', displayName);
                 if (window.showDangerConfirmation) {
-                    window.showDangerConfirmation(msg, () => { void uninstallPlugin(pluginId); }, null, 'Uninstall', 'Cancel', 'Uninstall Plugin?');
+                    window.showDangerConfirmation(msg, () => { void uninstallPlugin(pluginId); }, null, _t('Uninstall'), _t('Cancel'), _t('Uninstall Plugin?'));
                 } else {
                     void uninstallPlugin(pluginId);
                 }
@@ -610,7 +611,7 @@
             console.error('Error getting cleanup info:', error);
             const msg = i18n.confirm_uninstall_plugin.replace('%(plugin)s', displayName);
             if (window.showDangerConfirmation) {
-                window.showDangerConfirmation(msg, () => { void uninstallPlugin(pluginId); }, null, 'Uninstall', 'Cancel', 'Uninstall Plugin?');
+                window.showDangerConfirmation(msg, () => { void uninstallPlugin(pluginId); }, null, _t('Uninstall'), _t('Cancel'), _t('Uninstall Plugin?'));
             } else {
                 void uninstallPlugin(pluginId);
             }

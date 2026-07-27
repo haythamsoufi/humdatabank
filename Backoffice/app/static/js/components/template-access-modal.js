@@ -1,6 +1,8 @@
 // Template Access Management Modal
 // Modal for managing template ownership and shared access, styled like confirm-dialogs.js
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 /**
  * Show template access management modal
  * @param {Object} options - Configuration options for the modal
@@ -204,7 +206,7 @@ function showTemplateAccessModal(options = {}) {
     cancelBtn.type = 'button';
     cancelBtn.id = 'template-access-cancel';
     cancelBtn.className = 'px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500';
-    cancelBtn.textContent = 'Cancel';
+    cancelBtn.textContent = _t('Cancel');
 
     const saveBtn = document.createElement('button');
     saveBtn.type = 'button';

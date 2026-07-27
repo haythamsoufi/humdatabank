@@ -1,5 +1,7 @@
 // Minimal public drafts (IndexedDB) for offline-friendly public forms (text/select/checkbox only)
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 const DB_NAME = 'ifrc_public_forms';
 // Get version from ASSET_VERSION or CACHE_VERSION, fallback to 'v1' for backward compatibility
 function getDraftVersion() {
@@ -228,7 +230,7 @@ export function initPublicDrafts({ publicToken }) {
       el.style.boxShadow = '0 -2px 8px rgba(0,0,0,.15)';
       el.style.display = 'none';
       el.style.textAlign = 'center';
-      el.textContent = 'You are offline. Working in offline mode; drafts are saved locally.';
+      el.textContent = _t('You are offline. Working in offline mode; drafts are saved locally.');
       document.body.appendChild(el);
     }
     return el;
@@ -266,7 +268,7 @@ export function initPublicDrafts({ publicToken }) {
           el.value = value;
         }
       });
-      if (typeof window.showFlashMessage === 'function') window.showFlashMessage('Draft restored', 'info');
+      if (typeof window.showFlashMessage === 'function') window.showFlashMessage(_t('Draft restored'), 'info');
     }).catch((e) => {
       // Silently ignore - drafts are optional
     });
@@ -305,7 +307,7 @@ export function initPublicDrafts({ publicToken }) {
   if (btn) {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
-      saveDraft(key, collectData()).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage('Draft saved', 'success'); });
+      saveDraft(key, collectData()).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage(_t('Draft saved'), 'success'); });
     });
   }
 
@@ -313,7 +315,7 @@ export function initPublicDrafts({ publicToken }) {
   form.addEventListener('submit', (e) => {
     if (!navigator.onLine) {
       e.preventDefault();
-      saveDraft(key, collectData()).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage('You are offline. Draft saved; submit when online.', 'warning'); });
+      saveDraft(key, collectData()).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage(_t('You are offline. Draft saved; submit when online.'), 'warning'); });
     }
   });
 }

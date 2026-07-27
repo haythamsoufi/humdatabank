@@ -19,6 +19,8 @@ import { debugLog, debugWarn, debugError } from './debug.js';
 import { initializeFieldListeners } from './form-item-utils.js';
 import { applyLayoutToSection } from './layout.js';
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 let isInitialized = false;
 
 function toString(value) {
@@ -224,12 +226,12 @@ function setupDynamicIndicatorDeletion() {
                             confirmMessage,
                             removePending,
                             null,
-                            'Remove',
-                            'Cancel',
-                            'Remove Indicator?'
+                            _t('Remove'),
+                            _t('Cancel'),
+                            _t('Remove Indicator?')
                         );
                     } else if (window.showConfirmation) {
-                        window.showConfirmation(confirmMessage, removePending, null, 'Remove', 'Cancel', 'Remove Indicator?');
+                        window.showConfirmation(confirmMessage, removePending, null, _t('Remove'), _t('Cancel'), _t('Remove Indicator?'));
                     } else {
                         (window.__clientWarn || console.warn)('Confirmation dialog not available:', confirmMessage);
                     }
@@ -272,9 +274,9 @@ function setupDynamicIndicatorDeletion() {
                 };
 
                 if (window.showDangerConfirmation) {
-                    window.showDangerConfirmation(confirmMessage, deferDelete, null, 'Remove', 'Cancel', 'Remove Indicator?');
+                    window.showDangerConfirmation(confirmMessage, deferDelete, null, _t('Remove'), _t('Cancel'), _t('Remove Indicator?'));
                 } else if (window.showConfirmation) {
-                    window.showConfirmation(confirmMessage, deferDelete, null, 'Remove', 'Cancel', 'Remove Indicator?');
+                    window.showConfirmation(confirmMessage, deferDelete, null, _t('Remove'), _t('Cancel'), _t('Remove Indicator?'));
                 } else {
                     (window.__clientWarn || console.warn)('Confirmation dialog not available:', confirmMessage);
                 }

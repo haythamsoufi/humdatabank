@@ -3,6 +3,8 @@
  * Handles creation, editing, deletion, and display of template variables
  */
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 const _fetchJson = (window.getApiFetch && window.getApiFetch()) || window.apiFetch || fetch;
 
 export class TemplateVariablesManager {
@@ -1019,7 +1021,7 @@ export class TemplateVariablesManager {
                 _saveBtnEl.disabled = true;
                 const _spinEl = document.createElement('i');
                 _spinEl.className = 'fas fa-spinner fa-spin mr-2';
-                _saveBtnEl.replaceChildren(_spinEl, document.createTextNode(' Saving...'));
+                _saveBtnEl.replaceChildren(_spinEl, document.createTextNode(' ' + _t('Saving...')));
             }
 
             try {
@@ -1033,7 +1035,7 @@ export class TemplateVariablesManager {
             if (variableType === 'metadata') {
                 const metadataType = formData.get('metadata_type');
                 if (!metadataType) {
-                    window.showAlert('Please select a metadata type.', 'warning');
+                    window.showAlert(_t('Please select a metadata type.'), 'warning');
                     const metadataTypeSelect = modal.querySelector('#metadata-type-select');
                     if (metadataTypeSelect) {
                         metadataTypeSelect.focus();
@@ -1053,7 +1055,7 @@ export class TemplateVariablesManager {
                 const matrixColumnName = useRowTotal ? '_row_total' : (formData.get('matrix_column_name') || '').trim();
 
                 if (!sourceTemplateId || !sourceAssignmentPeriod || (!matchByBank && !sourceFormItemId)) {
-                    window.showAlert('Please fill in all required lookup fields (Source Template, Source Assignment Period, and Source Form Item — or enable indicator bank matching).', 'warning');
+                    window.showAlert(_t('Please fill in all required lookup fields (Source Template, Source Assignment Period, and Source Form Item — or enable indicator bank matching).'), 'warning');
                     return;
                 }
 
@@ -1070,7 +1072,7 @@ export class TemplateVariablesManager {
                             '\n\nMatrix column / row total only work with matrix form items. The variable may not work as expected.\n\nDo you want to continue anyway?';
                         const confirmed = await new Promise((resolve) => {
                         if (window.showConfirmation) {
-                            window.showConfirmation(msg, () => resolve(true), () => resolve(false), 'Continue', 'Cancel', 'Continue anyway?');
+                            window.showConfirmation(msg, () => resolve(true), () => resolve(false), _t('Continue'), _t('Cancel'), _t('Continue anyway?'));
                         } else {
                             resolve(false);
                         }
@@ -1086,7 +1088,7 @@ export class TemplateVariablesManager {
                 const specificEntityId = formData.get('specific_entity_id');
 
                 if (!specificEntityType || !specificEntityId) {
-                    window.showAlert('Please specify both Entity Type and Entity ID when using "Specific Entity" scope.', 'warning');
+                    window.showAlert(_t('Please specify both Entity Type and Entity ID when using "Specific Entity" scope.'), 'warning');
                     // Highlight missing fields
                     if (!specificEntityType && specificEntityTypeSelect) {
                         specificEntityTypeSelect.focus();
@@ -1102,7 +1104,7 @@ export class TemplateVariablesManager {
                 // Validate entity ID is a positive integer
                 const entityIdNum = parseInt(specificEntityId);
                 if (isNaN(entityIdNum) || entityIdNum <= 0 || !Number.isInteger(parseFloat(specificEntityId))) {
-                    window.showAlert('Entity ID must be a positive whole number (integer).', 'warning');
+                    window.showAlert(_t('Entity ID must be a positive whole number (integer).'), 'warning');
                     if (specificEntityIdInput) {
                         specificEntityIdInput.focus();
                         specificEntityIdInput.classList.add('border-red-500');
@@ -1115,7 +1117,7 @@ export class TemplateVariablesManager {
             if (variableType === 'lookup' && lookupType === 'reverse') {
                 const returnFormat = formData.get('return_format');
                 if (!returnFormat) {
-                    window.showAlert('Please select a return format for reverse lookup.', 'warning');
+                    window.showAlert(_t('Please select a return format for reverse lookup.'), 'warning');
                     const returnFormatSelect = modal.querySelector('#return-format-select');
                     if (returnFormatSelect) {
                         returnFormatSelect.focus();
@@ -1133,7 +1135,7 @@ export class TemplateVariablesManager {
                     const msg = 'Warning: Reverse lookup is designed to work with matrix form items.\n\nIt searches through matrix data to find entities that contain the current assignment\'s entity ID in their matrix keys.\n\nIf the source form item is not a matrix, this variable may not work as expected.\n\nDo you want to continue anyway?';
                     const confirmed = await new Promise((resolve) => {
                         if (window.showConfirmation) {
-                            window.showConfirmation(msg, () => resolve(true), () => resolve(false), 'Continue', 'Cancel', 'Continue anyway?');
+                            window.showConfirmation(msg, () => resolve(true), () => resolve(false), _t('Continue'), _t('Cancel'), _t('Continue anyway?'));
                         } else {
                             resolve(false);
                         }
@@ -1149,7 +1151,7 @@ export class TemplateVariablesManager {
                     const msg = 'Warning: Using "Any Entity" scope with matrix lookups requires that the source matrix contains rows for all entities that appear in your current matrix.\n\nIf a row_entity_id from your current matrix doesn\'t exist in the source matrix, the lookup will fail for that row.\n\nAre you sure you want to continue?';
                     const confirmed = await new Promise((resolve) => {
                         if (window.showConfirmation) {
-                            window.showConfirmation(msg, () => resolve(true), () => resolve(false), 'Continue', 'Cancel', 'Continue anyway?');
+                            window.showConfirmation(msg, () => resolve(true), () => resolve(false), _t('Continue'), _t('Cancel'), _t('Continue anyway?'));
                         } else {
                             resolve(false);
                         }
@@ -1263,15 +1265,15 @@ export class TemplateVariablesManager {
                 // Show success message
                 const alert = document.createElement('div');
                 alert.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg z-50';
-                alert.textContent = 'Variables saved successfully';
+                alert.textContent = _t('Variables saved successfully');
                 document.body.appendChild(alert);
                 setTimeout(() => alert.remove(), 3000);
             } else {
-                window.showAlert('Error saving variables: ' + (data.message || 'Unknown error'), 'error');
+                window.showAlert(_t('Error saving variables: ') + (data.message || _t('Unknown error')), 'error');
             }
         } catch (error) {
             console.error('Error saving variables:', error);
-            window.showAlert('Error saving variables: ' + error.message, 'error');
+            window.showAlert(_t('Error saving variables: ') + error.message, 'error');
         }
     }
 
@@ -1312,9 +1314,9 @@ export class TemplateVariablesManager {
             this.updateVariablesButton();
         };
         if (window.showDangerConfirmation) {
-            window.showDangerConfirmation(msg, () => { void doDelete(); }, null, 'Delete', 'Cancel', 'Confirm Delete');
+            window.showDangerConfirmation(msg, () => { void doDelete(); }, null, _t('Delete'), _t('Cancel'), _t('Confirm Delete'));
         } else if (window.showConfirmation) {
-            window.showConfirmation(msg, () => { void doDelete(); }, null, 'Delete', 'Cancel', 'Confirm Delete');
+            window.showConfirmation(msg, () => { void doDelete(); }, null, _t('Delete'), _t('Cancel'), _t('Confirm Delete'));
         } else {
             console.warn('Confirmation dialog not available:', msg);
         }

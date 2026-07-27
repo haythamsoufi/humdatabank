@@ -2,6 +2,8 @@
  * Admin Communication Center - Send communications and view all notifications
  */
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 async function _anFetch(url, options = {}) {
     const fn = (window.getApiFetch && window.getApiFetch()) || window.apiFetch || fetch;
     if (options.body && !options.headers) options.headers = { 'Content-Type': 'application/json' };
@@ -112,7 +114,7 @@ class AdminNotifications {
                 this.updateSelectedEntitiesDisplay();
             };
             if (window.showConfirmation) {
-                window.showConfirmation('Clear all selected entities?', doClear, null, 'Clear', 'Cancel', 'Clear Entities?');
+                window.showConfirmation(_t('Clear all selected entities?'), doClear, null, _t('Clear'), _t('Cancel'), _t('Clear Entities?'));
             }
         });
 
@@ -305,15 +307,15 @@ class AdminNotifications {
         document.getElementById('clear-all-users')?.addEventListener('click', () => {
             if (window.showConfirmation) {
                 window.showConfirmation(
-                    'Clear all selected users?',
+                    _t('Clear all selected users?'),
                     () => {
                         this.selectedUsers.clear();
                         this.updateSelectedUsersDisplay();
                     },
                     null,
-                    'Clear',
-                    'Cancel',
-                    'Clear Users?'
+                    _t('Clear'),
+                    _t('Cancel'),
+                    _t('Clear Users?')
                 );
             } else {
                 this.selectedUsers.clear();
@@ -1645,9 +1647,9 @@ class AdminNotifications {
                 _deleteCampaignMsg,
                 () => { this.performDeleteCampaign(campaignId); },
                 null,
-                'Delete',
-                'Cancel',
-                'Delete Campaign?'
+                _t('Delete'),
+                _t('Cancel'),
+                _t('Delete Campaign?')
             );
         } else {
             if (window.confirm(_deleteCampaignMsg)) this.performDeleteCampaign(campaignId);

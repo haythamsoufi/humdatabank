@@ -3,6 +3,55 @@
  * Centralized location for all chatbot text content
  */
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
+/** English UI string keys — resolved via window.t when messages.js loads. */
+const DEFAULT_UI_STRINGS = {
+    newChat: 'New chat',
+    loading: 'Loading…',
+    noConversationsMatch: 'No conversations match your search.',
+    deleteChat: 'Delete chat',
+    deleteConversationConfirm: 'Delete this conversation? This cannot be undone.',
+    deleteConversationTitle: 'Delete conversation?',
+    clearAllConversationsConfirm: 'Delete all conversations? This cannot be undone.',
+    clearAllConversationsTitle: 'Clear all conversations?',
+    clearAll: 'Clear all',
+    clearConversationConfirm: 'Are you sure you want to clear the entire conversation? This action cannot be undone.',
+    clearConversationTitle: 'Clear Conversation?',
+    clear: 'Clear',
+    delete: 'Delete',
+    cancel: 'Cancel',
+    send: 'Send',
+    stop: 'Stop',
+    copy: 'Copy',
+    copied: 'Copied!',
+    like: 'Like',
+    dislike: 'Dislike',
+    feedbackReceived: 'Thanks, feedback received.',
+    feedbackUnavailable: "Feedback isn't available for this message.",
+    feedbackSendFailed: "Couldn't send feedback.",
+    retry: 'Retry',
+    edit: 'Edit',
+    editMessage: 'Edit message',
+    cancelEdit: 'Cancel edit',
+    assistantIsTyping: 'Assistant is typing',
+    preparingQuery: 'Preparing query…',
+    stepsInProgress: 'Steps in progress',
+    endTour: 'End Tour',
+    serverError: 'Server error',
+    requestCancelled: 'Request cancelled',
+    aiPolicyAckRequired: 'Please acknowledge the AI policy to continue.',
+    iUnderstand: 'I understand'
+};
+
+function resolveDefaultUiStrings() {
+    const resolved = {};
+    for (const [key, val] of Object.entries(DEFAULT_UI_STRINGS)) {
+        resolved[key] = _t(val);
+    }
+    return resolved;
+}
+
 const ChatbotMessages = {
     // Greeting messages by language (short; used only when user says hi in fallback mode)
     greetings: {
@@ -34,45 +83,9 @@ const ChatbotMessages = {
     // UI strings (progress, tours, delete confirmation, message actions)
     // NOTE: When running inside the immersive chat page, server-side translations
     // are injected via window.CHAT_UI_STRINGS (Flask-Babel) and take precedence.
-    // These English entries serve as the ultimate fallback.
+    // DEFAULT_UI_STRINGS resolves via window.t at init; English entries are the fallback.
     ui: {
-        en: {
-            newChat: 'New chat',
-            loading: 'Loading…',
-            noConversationsMatch: 'No conversations match your search.',
-            deleteChat: 'Delete chat',
-            deleteConversationConfirm: 'Delete this conversation? This cannot be undone.',
-            deleteConversationTitle: 'Delete conversation?',
-            clearAllConversationsConfirm: 'Delete all conversations? This cannot be undone.',
-            clearAllConversationsTitle: 'Clear all conversations?',
-            clearAll: 'Clear all',
-            clearConversationConfirm: 'Are you sure you want to clear the entire conversation? This action cannot be undone.',
-            clearConversationTitle: 'Clear Conversation?',
-            clear: 'Clear',
-            delete: 'Delete',
-            cancel: 'Cancel',
-            send: 'Send',
-            stop: 'Stop',
-            copy: 'Copy',
-            copied: 'Copied!',
-            like: 'Like',
-            dislike: 'Dislike',
-            feedbackReceived: 'Thanks, feedback received.',
-            feedbackUnavailable: "Feedback isn't available for this message.",
-            feedbackSendFailed: "Couldn't send feedback.",
-            retry: 'Retry',
-            edit: 'Edit',
-            editMessage: 'Edit message',
-            cancelEdit: 'Cancel edit',
-            assistantIsTyping: 'Assistant is typing',
-            preparingQuery: 'Preparing query…',
-            stepsInProgress: 'Steps in progress',
-            endTour: 'End Tour',
-            serverError: 'Server error',
-            requestCancelled: 'Request cancelled',
-            aiPolicyAckRequired: 'Please acknowledge the AI policy to continue.',
-            iUnderstand: 'I understand'
-        }
+        en: resolveDefaultUiStrings()
     },
 
     // Local knowledge base for fallback responses
@@ -281,4 +294,7 @@ if (typeof module !== 'undefined' && module.exports) {
 // Also make it globally available
 if (typeof window !== 'undefined') {
     window.ChatbotMessages = ChatbotMessages;
+    if (!window.CHAT_UI_STRINGS) {
+        window.CHAT_UI_STRINGS = ChatbotMessages.ui.en;
+    }
 }

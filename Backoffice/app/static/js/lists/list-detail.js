@@ -2,6 +2,8 @@
 // Assumes lookupListId is defined globally
 // Uses apiFetch/fetchJson and confirm-dialogs from core layout (load api-fetch.js)
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 const fetchJson = (url, options) => (window.fetchJson || window.apiFetch)(url, options);
 
 // Drag and drop functionality
@@ -336,9 +338,9 @@ function deleteRow(rowId) {
         }).catch(error => console.error('Error deleting row:', error));
     };
     if (window.showDangerConfirmation) {
-        window.showDangerConfirmation('Are you sure you want to delete this row?', doDelete, null, 'Delete', 'Cancel', 'Confirm Delete');
+        window.showDangerConfirmation(_t('Are you sure you want to delete this row?'), doDelete, null, _t('Delete'), _t('Cancel'), _t('Confirm Delete'));
     } else if (window.showConfirmation) {
-        window.showConfirmation('Are you sure you want to delete this row?', doDelete, null, 'Delete', 'Cancel', 'Confirm Delete');
+        window.showConfirmation(_t('Are you sure you want to delete this row?'), doDelete, null, _t('Delete'), _t('Cancel'), _t('Confirm Delete'));
     }
 }
 

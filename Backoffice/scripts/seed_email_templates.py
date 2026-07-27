@@ -13,7 +13,7 @@ Alternatively, via Flask CLI (from Backoffice/):
     flask seed-email-templates --force
 
 After editing HTML here, sync inline fallbacks in ``app/services/email/service.py`` and
-``app/routes/admin/notifications.py`` (or run ``python scripts/_apply_email_fallbacks.py``).
+``app/routes/admin/notifications.py`` (or run ``python scripts/archive/_apply_email_fallbacks.py``).
 """
 
 import argparse

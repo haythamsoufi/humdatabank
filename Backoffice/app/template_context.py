@@ -58,6 +58,44 @@ def register_template_context(app, config_class):
     app.jinja_env.globals['TRANSLATABLE_LANGUAGES'] = app.config.get('TRANSLATABLE_LANGUAGES', [])
     app.jinja_env.globals['SHOW_LANGUAGE_FLAGS'] = bool(app.config.get('SHOW_LANGUAGE_FLAGS', True))
 
+    # Msgids longer than this are usually email bodies / notifications — exclude
+    # from the inline JS catalog to keep layout.html payload small (~50 KB vs ~400 KB).
+    _JS_CATALOG_MAX_LEN = 150
+
+    def inject_js_translations() -> dict:
+        """Return a msgid→msgstr dict for the current locale for client-side use.
+
+        Uses the already-loaded Flask-Babel translation catalog (no extra I/O).
+        Only short UI strings are included; long notification/email copy stays
+        server-side.  English returns {} (the JS shim falls back to the msgid).
+        """
+        try:
+            from flask_babel import get_translations
+            from app.i18n import get_locale
+            if get_locale() == "en":
+                return {}
+            translations = get_translations()
+            if translations is None:
+                return {}
+            catalog = getattr(translations, "_catalog", {})
+            return {
+                k: v
+                for k, v in catalog.items()
+                if (
+                    isinstance(k, str)
+                    and k
+                    and isinstance(v, str)
+                    and v
+                    and "\n" not in k
+                    and len(k) <= _JS_CATALOG_MAX_LEN
+                )
+            }
+        except Exception as exc:
+            current_app.logger.debug("inject_js_translations failed: %s", exc)
+            return {}
+
+    app.jinja_env.globals["inject_js_translations"] = inject_js_translations
+
     @app.context_processor
     def inject_staging_environment_banner():
         """Expose whether to show the staging-environment warning banner."""

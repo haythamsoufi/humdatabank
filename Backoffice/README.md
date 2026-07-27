@@ -14,7 +14,8 @@ Backoffice/
 │   └── ...                    # Setup, workflows, diagrams, etc.
 ├── ⚙️ config/                 # Configuration (e.g. config.py)
 ├── 🔧 scripts/                # Utility and maintenance scripts
-├── 🛠️ tools/                  # Development and debugging tools
+│   ├── archive/               # Completed one-offs (reference only)
+│   └── codemods/              # Template/JS bulk refactors
 ├── 📱 app/                    # Main Flask application
 ├── 🗄️ migrations/             # Database migrations (Flask-Migrate)
 ├── 📊 instance/               # Instance-specific data (e.g. uploads, logs)
@@ -64,12 +65,12 @@ Backoffice/
 - `docs/` – User guides, getting started, and engineering runbooks
 - See `docs/README.md` for the full documentation index
 
-### Scripts and Tools
-- `scripts/` - Database migration and maintenance scripts
+### Scripts
+- `scripts/` – Database migration and maintenance scripts
   - `scripts/trigger_automated_trace_review.py` – export pending/in-review/completed trace review packets to terminal or JSONL for automated batch triage.
-  - `scripts/export_trace_reviews.py` – compatibility wrapper (deprecated) for the command above.
   - `scripts/seed_low_quality_review.py` – seed deterministic low-quality traces into the review queue for test/repro workflows.
-- `tools/` - Development and debugging utilities
+- `scripts/archive/` – completed one-offs and incident probes (reference only)
+- `scripts/codemods/` – template/JS bulk refactors (inline-JS extraction, button migrations, etc.)
 
 ## 🔧 Development
 

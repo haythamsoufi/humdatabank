@@ -21,6 +21,8 @@ import { reinitializeDisaggregationCalculator } from './disaggregation-calculato
 import { setupPerEntryDynamicInterface } from './dynamic-indicators.js';
 import { initializeFieldListeners } from './form-item-utils.js';
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 /**
  * Parse a field value that might contain data availability flags in various formats
  * @param {*} fieldData - The field data from the backend
@@ -1125,9 +1127,9 @@ function createRepeatEntry(sectionId, isInitialEntry = false) {
                         debugLog('repeat-sections', `Deleted repeat entry #${instanceNumber} for section ${sectionId}`);
                     },
                     null,
-                    'Delete',
-                    'Cancel',
-                    'Delete Entry?'
+                    _t('Delete'),
+                    _t('Cancel'),
+                    _t('Delete Entry?')
                 );
             } else if (window.showConfirmation) {
                 window.showConfirmation(
@@ -1138,9 +1140,9 @@ function createRepeatEntry(sectionId, isInitialEntry = false) {
                         debugLog('repeat-sections', `Deleted repeat entry #${instanceNumber} for section ${sectionId}`);
                     },
                     null,
-                    'Delete',
-                    'Cancel',
-                    'Delete Entry?'
+                    _t('Delete'),
+                    _t('Cancel'),
+                    _t('Delete Entry?')
                 );
             } else {
                 (window.__clientWarn || console.warn)('Confirmation dialog not available:', confirmMessage);

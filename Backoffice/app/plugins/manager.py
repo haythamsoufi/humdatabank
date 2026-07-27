@@ -103,13 +103,13 @@ class PluginManager:
     def _save_discovery_cache(self):
         """Save plugin discovery cache to persistent storage."""
         try:
-            self._discovery_cache_file.parent.mkdir(parents=True, exist_ok=True)
+            from app.utils.file_lock import atomic_json_write
+
             cache_data = {
                 'cache': self._discovery_cache,
                 'last_updated': utcnow().isoformat()
             }
-            with open(self._discovery_cache_file, 'w') as f:
-                json.dump(cache_data, f, indent=2)
+            atomic_json_write(self._discovery_cache_file, cache_data)
         except Exception as e:
             self.logger.warning(f"Error saving discovery cache: {e}")
 
@@ -144,24 +144,19 @@ class PluginManager:
         """Save plugin activation states to persistent storage with batching."""
         with self._state_update_lock:
             try:
-                # Process any pending updates
                 if self._pending_state_updates:
                     for update in self._pending_state_updates:
                         plugin_name, action = update
                         # Process update logic here if needed
                     self._pending_state_updates.clear()
 
-                # Ensure the instance directory exists
-                self.state_file_path.parent.mkdir(parents=True, exist_ok=True)
+                from app.utils.file_lock import atomic_json_write
 
                 state_data = {
-                    # Canonical
                     'active_plugin_ids': sorted(list(self.active_plugins)),
                     'last_updated': utcnow().isoformat()
                 }
-
-                with open(self.state_file_path, 'w') as f:
-                    json.dump(state_data, f, indent=2)
+                atomic_json_write(self.state_file_path, state_data)
 
                 self.logger.info(f"Saved plugin states: {len(self.active_plugins)} active plugins")
             except Exception as e:

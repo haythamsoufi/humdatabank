@@ -2,6 +2,8 @@
 import { DataManager } from '../data-manager.js';
 // Utils is available globally from utils.js
 
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 // Mapping of condition types based on item input types – ported from the legacy builder
 const conditionTypesMap = {
     'Number': [
@@ -454,7 +456,7 @@ export const RuleBuilder = {
         {
             const opt = document.createElement('option');
             opt.value = '';
-            opt.textContent = 'Select Item...';
+            opt.textContent = _t('Select Item...');
             itemSelect.appendChild(opt);
         }
 
@@ -562,7 +564,7 @@ export const RuleBuilder = {
         {
             const placeholder = document.createElement('option');
             placeholder.value = '';
-            placeholder.textContent = 'Select Item...';
+            placeholder.textContent = _t('Select Item...');
             selectElement.appendChild(placeholder);
         }
 
@@ -949,13 +951,13 @@ export const RuleBuilder = {
 
             const yesOpt = document.createElement('option');
             yesOpt.value = 'yes';
-            yesOpt.textContent = 'Yes';
+            yesOpt.textContent = _t('Yes');
             if (existingValue === 'yes') yesOpt.selected = true;
             valueInput.appendChild(yesOpt);
 
             const noOpt = document.createElement('option');
             noOpt.value = 'no';
-            noOpt.textContent = 'No';
+            noOpt.textContent = _t('No');
             if (existingValue === 'no') noOpt.selected = true;
             valueInput.appendChild(noOpt);
         } else if (itemModel === 'question' && (itemType === 'single_choice' || itemType === 'multiple_choice')) {

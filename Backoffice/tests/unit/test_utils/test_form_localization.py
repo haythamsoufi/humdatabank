@@ -1006,3 +1006,34 @@ class TestGetLocalizedNationalSocietyName:
             result = get_localized_national_society_name(country)
         # ns2 has lower display_order so it should be selected first
         assert result == "First"
+
+
+# ---------------------------------------------------------------------------
+# join_localized_entity_phrase
+# ---------------------------------------------------------------------------
+
+class TestJoinLocalizedEntityPhrase:
+    def test_ltr_adds_space(self, app_ctx):
+        from app.utils.form_localization import join_localized_entity_phrase
+        result = join_localized_entity_phrase('Past Assignments for', 'Netherlands Red Cross', 'en')
+        assert result == 'Past Assignments for Netherlands Red Cross'
+
+    def test_arabic_lam_assimilates_with_definite_article(self, app_ctx):
+        from app.utils.form_localization import join_localized_entity_phrase
+        result = join_localized_entity_phrase('المهام السابقة ل', 'الهلال الأحمر الأفغاني', 'ar')
+        assert result == 'المهام السابقة للهلال الأحمر الأفغاني'
+
+    def test_arabic_lam_without_definite_article(self, app_ctx):
+        from app.utils.form_localization import join_localized_entity_phrase
+        result = join_localized_entity_phrase('المهام السابقة ل', 'لبنان', 'ar')
+        assert result == 'المهام السابقة للبنان'
+
+    def test_arabic_lam_tatweel_suffix(self, app_ctx):
+        from app.utils.form_localization import join_localized_entity_phrase
+        result = join_localized_entity_phrase('لا توجد مهام سابقة ل\u0640', 'الهلال الأحمر', 'ar')
+        assert result == 'لا توجد مهام سابقة للهلال الأحمر'
+
+    def test_normalize_interpolated_lam(self, app_ctx):
+        from app.utils.form_localization import normalize_arabic_lam_definite_assimilation
+        assert normalize_arabic_lam_definite_assimilation('أنت الآن نقطة اتصال لالهلال.') == 'أنت الآن نقطة اتصال للهلال.'
+

@@ -1,3 +1,5 @@
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
+
 function getSecureConfirmMessage(key, fallback = 'Are you sure?') {
     try {
         if (typeof confirmMessages === 'object' && confirmMessages !== null) {
@@ -1087,7 +1089,7 @@ async function loadDataQualityScore(templateId, period, entityType, entityId) {
 
     if (!templateId || !period || !entityType || entityId == null || entityId === '') {
         if (panelContent) {
-            panelContent.innerHTML = '<p class="text-gray-500 text-sm py-6 text-center">No reporting period available for this template.</p>';
+            panelContent.innerHTML = '<p class="text-gray-500 text-sm py-6 text-center">' + _t('No reporting period available for this template.') + '</p>';
         }
         return;
     }
@@ -1112,19 +1114,19 @@ async function loadDataQualityScore(templateId, period, entityType, entityId) {
             const text = await resp.text();
             console.error('Data quality API returned non-JSON response', resp.status, text.slice(0, 200));
             if (panelContent) {
-                panelContent.innerHTML = '<p class="text-red-600 text-sm">Failed to load data quality score. Please refresh or contact support.</p>';
+                panelContent.innerHTML = '<p class="text-red-600 text-sm">' + _t('Failed to load data quality score. Please refresh or contact support.') + '</p>';
             }
             return;
         }
         if (!resp.ok) {
-            if (panelContent) panelContent.innerHTML = `<p class="text-red-600 text-sm">${sanitizeTextContent(data.error || 'Failed to load score')}</p>`;
+            if (panelContent) panelContent.innerHTML = `<p class="text-red-600 text-sm">${sanitizeTextContent(data.error || _t('Failed to load score'))}</p>`;
             return;
         }
         renderDataQualityPanel(data);
     } catch (err) {
         console.error('Data quality fetch failed', err);
         if (panelContent) {
-            panelContent.innerHTML = '<p class="text-red-600 text-sm">Failed to load data quality score. Please refresh or contact support.</p>';
+            panelContent.innerHTML = '<p class="text-red-600 text-sm">' + _t('Failed to load data quality score. Please refresh or contact support.') + '</p>';
         }
     }
 }
@@ -1513,9 +1515,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const msg = getSecureConfirmMessage('deleteSelfReport', 'Are you sure you want to delete this self-report?');
             const _dsrRestore = () => { if (_dsrBtn) _dsrBtn.disabled = false; };
             if (window.showDangerConfirmation) {
-                window.showDangerConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, _dsrRestore, 'Delete', 'Cancel', 'Confirm Delete');
+                window.showDangerConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, _dsrRestore, _t('Delete'), _t('Cancel'), _t('Confirm Delete'));
             } else if (window.showConfirmation) {
-                window.showConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, _dsrRestore, 'Delete', 'Cancel', 'Confirm Delete');
+                window.showConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, _dsrRestore, _t('Delete'), _t('Cancel'), _t('Confirm Delete'));
             } else {
                 _dsrRestore();
                 console.warn('Confirmation dialog not available:', msg);
@@ -1534,7 +1536,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const msg = getSecureConfirmMessage('approveAssignment', 'Are you sure you want to approve this assignment?');
             const _aaRestore = () => { if (_aaBtn) _aaBtn.disabled = false; };
             if (window.showConfirmation) {
-                window.showConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, _aaRestore, 'Approve', 'Cancel', 'Approve Assignment?');
+                window.showConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, _aaRestore, _t('Approve'), _t('Cancel'), _t('Approve Assignment?'));
             } else {
                 _aaRestore();
                 console.warn('Confirmation dialog not available:', msg);
@@ -1553,7 +1555,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const msg = getSecureConfirmMessage('reopenAssignment', 'Are you sure you want to reopen this assignment?');
             const _raRestore = () => { if (_raBtn) _raBtn.disabled = false; };
             if (window.showConfirmation) {
-                window.showConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, _raRestore, 'Reopen', 'Cancel', 'Reopen Assignment?');
+                window.showConfirmation(msg, () => { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); }, _raRestore, _t('Reopen'), _t('Cancel'), _t('Reopen Assignment?'));
             } else {
                 _raRestore();
                 console.warn('Confirmation dialog not available:', msg);

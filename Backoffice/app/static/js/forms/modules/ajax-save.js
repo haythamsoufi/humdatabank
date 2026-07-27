@@ -2,6 +2,7 @@
 import { debugLog } from './debug.js';
 
 const MODULE_NAME = 'ajax-save';
+const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
 
 let isSaving = false;
 let drainPromise = null; // drains queued save requests
@@ -115,7 +116,7 @@ async function saveFormOnce(options = {}) {
             try { _savingFlashHandle.dismiss(); } catch (_) { /* no-op */ }
         }
         if (window.FlashMessages && typeof window.FlashMessages.show === 'function') {
-            _savingFlashHandle = window.FlashMessages.show('Saving…', 'info');
+            _savingFlashHandle = window.FlashMessages.show(_t('Saving…'), 'info');
         }
     }
 
@@ -201,10 +202,10 @@ async function saveFormOnce(options = {}) {
 
         if (result === null && !response.ok) {
             const friendly403 = response.status === 403
-                ? 'Save was rejected (403). Refresh the page and try again. If the problem continues, your session or security token may have expired.'
-                : `Save failed (${response.status}). Refresh the page and try again, or contact support if it persists.`;
+                ? _t('Save was rejected (403). Refresh the page and try again. If the problem continues, your session or security token may have expired.')
+                : _t('Save failed (%(status)s). Refresh the page and try again, or contact support if it persists.').replace('%(status)s', response.status);
             debugLog(MODULE_NAME, '❌ Save failed:', friendly403);
-            showSaveMessage('❌ Save failed: ' + friendly403, 'error');
+            showSaveMessage('❌ ' + _t('Save failed') + ': ' + friendly403, 'error');
             throw new Error(friendly403);
         }
 
@@ -214,7 +215,7 @@ async function saveFormOnce(options = {}) {
             // Server returned an error status, but we have the JSON response
             const errorMessage = result?.message || result?.error || `HTTP error! status: ${response.status}`;
             debugLog(MODULE_NAME, '❌ Save failed:', errorMessage);
-            showSaveMessage('❌ Save failed: ' + errorMessage, 'error');
+            showSaveMessage('❌ ' + _t('Save failed') + ': ' + errorMessage, 'error');
             throw (window.httpErrorSync && window.httpErrorSync(response, errorMessage)) || new Error(errorMessage);
         }
 
@@ -224,7 +225,7 @@ async function saveFormOnce(options = {}) {
             const toastEnabled = (toastOpt === undefined) ? true : !!toastOpt;
             if (toastEnabled) {
                 // Allow custom toast payload, otherwise default
-                const msg = (toastOpt && typeof toastOpt === 'object' && toastOpt.message) ? toastOpt.message : 'Progress saved successfully!';
+                const msg = (toastOpt && typeof toastOpt === 'object' && toastOpt.message) ? toastOpt.message : _t('Progress saved successfully!');
                 const type = (toastOpt && typeof toastOpt === 'object' && toastOpt.type) ? toastOpt.type : 'success';
                 showSaveMessage(msg, type);
             }
@@ -247,8 +248,8 @@ async function saveFormOnce(options = {}) {
             return { success: true, result };
         } else {
             debugLog(MODULE_NAME, '❌ Save failed:', result.message);
-            showSaveMessage('❌ Save failed: ' + (result.message || 'Unknown error'), 'error');
-            throw new Error(result.message || 'Save failed');
+            showSaveMessage('❌ ' + _t('Save failed') + ': ' + (result.message || _t('Unknown error')), 'error');
+            throw new Error(result.message || _t('Save failed'));
         }
 
     } catch (error) {
@@ -267,13 +268,13 @@ async function saveFormOnce(options = {}) {
                     window.__ifrcAuthDrafts.setOffline(true);
                 }
                 await window.__ifrcAuthDrafts.saveNow();
-                showSaveMessage('You are offline. Draft saved locally.', 'warning');
+                showSaveMessage(_t('You are offline. Draft saved locally.'), 'warning');
                 return { success: true, offline: true };
             } catch (e) {
                 // fall through to error
             }
         }
-        showSaveMessage('❌ Save failed: ' + msg, 'error');
+        showSaveMessage('❌ ' + _t('Save failed') + ': ' + msg, 'error');
         throw error;
     } finally {
         // Dismiss the "Saving…" toast now that we have a result (success / error already shown above)
@@ -389,7 +390,7 @@ function updateSaveButtonState(saving) {
             // Update text content while preserving structure
             const textNode = Array.from(text.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
             if (textNode) {
-                textNode.textContent = textNode.textContent.includes('Save') ? 'Saving...' : textNode.textContent;
+                textNode.textContent = textNode.textContent.includes('Save') ? _t('Saving...') : textNode.textContent;
             }
         } else {
             saveButton.disabled = false;
@@ -399,7 +400,7 @@ function updateSaveButtonState(saving) {
             // Restore text content
             const textNode = Array.from(text.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
             if (textNode) {
-                textNode.textContent = textNode.textContent.replace('Saving...', 'Save');
+                textNode.textContent = textNode.textContent.replace(_t('Saving...'), _t('Save'));
             }
         }
     }

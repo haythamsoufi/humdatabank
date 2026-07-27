@@ -22,7 +22,7 @@
             const items = [];
     
             items.push({
-                name: 'Copy cell',
+                name: self.getTranslation('copyCell', 'Copy cell'),
                 action: function() {
                     const value = params.value;
                     const text = value == null ? '' : String(value);
@@ -37,7 +37,7 @@
             });
     
             items.push({
-                name: 'Export table to Excel',
+                name: self.getTranslation('exportTableToExcel', 'Export table to Excel'),
                 action: function() {
                     const api = params.api || self.gridApi;
                     if (api) {
@@ -159,7 +159,8 @@
     
                 const endpointLink = ev.target.closest && ev.target.closest('a.api-endpoint-link');
                 if (endpointLink && endpointLink.href) {
-                    const copyUrlLabel = (self.config.contextMenuLabels && self.config.contextMenuLabels.copyUrl) || 'Copy URL';
+                    const copyUrlLabel = (self.config.contextMenuLabels && self.config.contextMenuLabels.copyUrl)
+                        || self.getTranslation('copyUrl', 'Copy URL');
                     addItem(copyUrlLabel, function() {
                         const url = endpointLink.href;
                         if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
@@ -172,7 +173,7 @@
                     });
                 }
     
-                addItem('Copy cell', function() {
+                addItem(self.getTranslation('copyCell', 'Copy cell'), function() {
                     const text = cellValue;
                     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
                         navigator.clipboard.writeText(text).catch(function() {
@@ -183,7 +184,7 @@
                     }
                 });
     
-                addItem('Export table to Excel', function() {
+                addItem(self.getTranslation('exportTableToExcel', 'Export table to Excel'), function() {
                     var exportName = (self.config && self.config.templateId)
                         ? (String(self.config.templateId).replace(/[^a-z0-9_-]+/gi, '_') + '.csv')
                         : 'export.csv';

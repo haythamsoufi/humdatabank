@@ -97,10 +97,29 @@ def merge(persistent_path: str) -> None:
     """Merge new msgids from the image into the persistent .po files."""
     logger.info("Merging image translations into %s", persistent_path)
 
-    # Copy .pot catalogue so extract-update works from the persistent path
-    image_pot = os.path.join(IMAGE_TRANSLATIONS_DIR, "messages.pot")
-    if os.path.isfile(image_pot):
-        shutil.copy2(image_pot, os.path.join(persistent_path, "messages.pot"))
+    # Copy .pot catalogue so extract-update works from the persistent path.
+    image_pot_path = os.path.join(IMAGE_TRANSLATIONS_DIR, "messages.pot")
+    persistent_pot_path = os.path.join(persistent_path, "messages.pot")
+    if os.path.isfile(image_pot_path):
+        shutil.copy2(image_pot_path, persistent_pot_path)
+
+    # Load the set of (msgctxt, msgid) keys from messages.pot as the authoritative
+    # reference for which strings are currently active in the source code.
+    # Using the POT rather than the image PO files prevents strings from being
+    # wrongly obsoleted when an admin ran "Extract & Update" on the live server
+    # after a deploy where PO files were not regenerated in the image — those
+    # entries exist in Azure Files PO but not in the image PO, so comparing
+    # against image PO would incorrectly mark them obsolete on the next deploy.
+    pot_keys: set[tuple] = set()
+    if os.path.isfile(persistent_pot_path):
+        try:
+            pot_po = polib.pofile(persistent_pot_path)
+            for entry in pot_po:
+                if not getattr(entry, "obsolete", False) and entry.msgid:
+                    pot_keys.add((getattr(entry, "msgctxt", None) or None, entry.msgid))
+            logger.info("  Loaded %d active keys from messages.pot", len(pot_keys))
+        except Exception as exc:
+            logger.warning("Could not load messages.pot for merge reference: %s", exc)
 
     for locale, image_locale_dir in _locale_dirs(IMAGE_TRANSLATIONS_DIR):
         image_po_path = os.path.join(image_locale_dir, "LC_MESSAGES", "messages.po")
@@ -118,19 +137,32 @@ def merge(persistent_path: str) -> None:
             logger.info("  %s: new locale copied from image", locale)
             continue
 
-        _merge_locale(locale, image_po_path, persistent_po_path)
+        _merge_locale(locale, image_po_path, persistent_po_path, pot_keys)
 
     # Handle locales present on persistent volume but removed from image:
     # leave them in place (admin may have added them manually).
     logger.info("Merge complete")
 
 
-def _merge_locale(locale: str, image_po_path: str, persistent_po_path: str) -> None:
-    """Merge a single locale's .po file."""
+def _merge_locale(
+    locale: str,
+    image_po_path: str,
+    persistent_po_path: str,
+    pot_keys: set | None = None,
+) -> None:
+    """Merge a single locale's .po file.
+
+    pot_keys, when supplied, is the set of (msgctxt, msgid) tuples extracted
+    from messages.pot and used as the authoritative reference for which strings
+    are still active in the source code.  This is more reliable than image_keys
+    (the PO file's active entries) because it reflects what pybabel extract
+    actually found in the source tree, even when PO files were not regenerated
+    before the Docker image was built.  Falls back to image_keys when absent.
+    """
     image_po = polib.pofile(image_po_path)
     persistent_po = polib.pofile(persistent_po_path)
 
-    # Build lookup of persistent entries by (msgctxt, msgid) for O(1) access.
+    # Build lookup of currently-active persistent entries.
     persistent_map: dict[tuple, "polib.POEntry"] = {}
     for entry in persistent_po:
         if getattr(entry, "obsolete", False):
@@ -138,8 +170,18 @@ def _merge_locale(locale: str, image_po_path: str, persistent_po_path: str) -> N
         key = (getattr(entry, "msgctxt", None) or None, entry.msgid)
         persistent_map[key] = entry
 
+    # Index of previously-obsoleted entries so translations can be recovered
+    # if the string is restored to active status (e.g. a string incorrectly
+    # obsoleted by a prior deploy can be reactivated with its msgstr intact).
+    obsolete_map: dict[tuple, "polib.POEntry"] = {}
+    for entry in persistent_po.obsolete_entries():
+        key = (getattr(entry, "msgctxt", None) or None, entry.msgid)
+        if key not in obsolete_map:
+            obsolete_map[key] = entry
+
     image_keys: set[tuple] = set()
     added = 0
+    reactivated = 0
     preserved = 0
     backfilled = 0
 
@@ -151,10 +193,20 @@ def _merge_locale(locale: str, image_po_path: str, persistent_po_path: str) -> N
 
         existing = persistent_map.get(key)
         if existing is None:
-            # New msgid from the image — add it.
+            # String is in the new image but not currently active in the
+            # persistent PO.  Recover the translated msgstr from a previously-
+            # obsoleted entry so we don't lose work done by translators.
+            prev_obsolete = obsolete_map.get(key)
+            recovered_msgstr = ""
+            recovered_plural: dict | None = None
+            if prev_obsolete:
+                recovered_msgstr = (prev_obsolete.msgstr or "").strip()
+                if getattr(prev_obsolete, "msgstr_plural", None):
+                    recovered_plural = dict(prev_obsolete.msgstr_plural)
+
             new_entry = polib.POEntry(
                 msgid=img_entry.msgid,
-                msgstr=img_entry.msgstr,
+                msgstr=recovered_msgstr or img_entry.msgstr,
                 msgctxt=getattr(img_entry, "msgctxt", None),
                 msgid_plural=getattr(img_entry, "msgid_plural", None) or "",
                 occurrences=img_entry.occurrences,
@@ -162,10 +214,15 @@ def _merge_locale(locale: str, image_po_path: str, persistent_po_path: str) -> N
                 tcomment=img_entry.tcomment,
                 flags=img_entry.flags,
             )
-            if getattr(img_entry, "msgstr_plural", None):
+            if recovered_plural:
+                new_entry.msgstr_plural = recovered_plural
+            elif getattr(img_entry, "msgstr_plural", None):
                 new_entry.msgstr_plural = dict(img_entry.msgstr_plural)
             persistent_po.append(new_entry)
-            added += 1
+            if prev_obsolete:
+                reactivated += 1
+            else:
+                added += 1
         else:
             # Entry exists — keep persistent msgstr (admin edits).
             # Update metadata from image (occurrences, comments) so
@@ -186,17 +243,26 @@ def _merge_locale(locale: str, image_po_path: str, persistent_po_path: str) -> N
                     existing.msgstr_plural = merged_plural
             preserved += 1
 
-    # Mark entries that were removed from the image as obsolete.
+    # Determine which strings are still active in the source code.
+    # Prefer pot_keys (from messages.pot) over image_keys (from image PO) because
+    # the POT reflects the actual source scan and is correct even when PO files
+    # were not regenerated before the image was built.
+    active_source_keys = pot_keys if pot_keys else image_keys
+
+    # Mark entries that are no longer present in the source code as obsolete.
     obsoleted = 0
     for key, entry in persistent_map.items():
-        if key not in image_keys:
+        if key not in active_source_keys:
             entry.obsolete = True
             obsoleted += 1
 
-    persistent_po.save()
+    from app.utils.po_lock import po_file_lock
+
+    with po_file_lock(persistent_po_path):
+        persistent_po.save()
     logger.info(
-        "  %s: +%d new, %d backfilled, %d preserved, %d obsoleted",
-        locale, added, backfilled, preserved, obsoleted,
+        "  %s: +%d new, %d reactivated, %d backfilled, %d preserved, %d obsoleted",
+        locale, added, reactivated, backfilled, preserved, obsoleted,
     )
 
 
@@ -206,6 +272,8 @@ def _merge_locale(locale: str, image_po_path: str, persistent_po_path: str) -> N
 
 def compile_all(translations_dir: str) -> None:
     """Compile every .po under *translations_dir* to .mo."""
+    from app.utils.po_lock import po_file_lock
+
     logger.info("Compiling .mo files in %s", translations_dir)
     compiled = 0
     for locale, locale_dir in _locale_dirs(translations_dir):
@@ -214,8 +282,9 @@ def compile_all(translations_dir: str) -> None:
         if not os.path.isfile(po_path):
             continue
         try:
-            po = polib.pofile(po_path)
-            po.save_as_mofile(mo_path)
+            with po_file_lock(po_path):
+                po = polib.pofile(po_path)
+                po.save_as_mofile(mo_path)
             compiled += 1
         except Exception as exc:
             logger.error("  %s: compile failed: %s", locale, exc)
@@ -243,6 +312,9 @@ def main() -> None:
         merge(persistent_path)
 
     compile_all(persistent_path)
+
+    from app.utils.po_lock import touch_translation_sentinel
+    touch_translation_sentinel(persistent_path)
 
     logger.info("Translation sync finished (%s)", persistent_path)
 

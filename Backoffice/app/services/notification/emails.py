@@ -147,8 +147,9 @@ def _retry_digest_email_log(user, log) -> bool:
 
 
 def _retry_instant_notification_email_log(user, log, notification) -> bool:
-    subject = f"New Notification: {notification.title}"
-    body = render_instant_email(user, notification)
+    locale = _user_locale(user)
+    subject = _instant_notification_subject(notification, locale)
+    body = render_instant_email(user, notification, locale=locale)
 
     try:
         success = send_email(
@@ -201,6 +202,128 @@ def _get_instant_template():
             if _compiled_instant_template is None:
                 _compiled_instant_template = current_app.jinja_env.from_string(_INSTANT_TEMPLATE_SRC)
     return _compiled_instant_template
+
+
+def _user_locale(user) -> str:
+    return getattr(user, 'preferred_language', None) or 'en'
+
+
+def _with_user_locale(locale: str, callback):
+    """Run *callback(gettext)* under *locale*, falling back to English."""
+    from flask_babel import force_locale, gettext as _g
+
+    try:
+        with force_locale(locale):
+            return callback(_g)
+    except Exception:
+        try:
+            with force_locale('en'):
+                return callback(_g)
+        except Exception:
+            return None
+
+
+def _digest_subject(frequency: str, count: int, locale: str) -> str:
+    freq_lower = frequency.lower()
+    msgid = (
+        'Weekly Notification Digest - %(count)d new notification(s)'
+        if freq_lower == 'weekly'
+        else 'Daily Notification Digest - %(count)d new notification(s)'
+    )
+
+    def _make(_g):
+        return _g(msgid, count=count)
+
+    translated = _with_user_locale(locale, _make)
+    if translated is not None:
+        return translated
+    return f"{frequency} Notification Digest - {count} new notification(s)"
+
+
+def _instant_notification_subject(notification, locale: str) -> str:
+    if notification.priority in ('high', 'urgent'):
+        return notification.title
+
+    def _make(_g):
+        return _g('New Notification: %(title)s', title=notification.title)
+
+    translated = _with_user_locale(locale, _make)
+    if translated is not None:
+        return translated
+    return f"New Notification: {notification.title}"
+
+
+def _build_digest_email_i18n(locale: str, user_name: str, notification_count: int, frequency: str) -> dict:
+    freq_lower = frequency.lower()
+
+    def _make(_g):
+        freq_label = _g('Weekly') if freq_lower == 'weekly' else _g('Daily')
+        return {
+            'digest_heading': _g('%(frequency)s notification digest', frequency=freq_label),
+            'digest_subtitle': _g(
+                '%(count)d new notification(s) for %(name)s',
+                count=notification_count,
+                name=user_name,
+            ),
+            'greeting': _g('Hello %(name)s,', name=user_name),
+            'intro': _g("Here's your %(frequency)s notification digest:", frequency=freq_label.lower()),
+            'view_details': _g('View details'),
+            'view_all': _g('View all notifications'),
+            'footer_note': _g("You're receiving this email because you have email notifications enabled."),
+            'manage_prefs': _g('Manage your notification preferences'),
+        }
+
+    translated = _with_user_locale(locale, _make)
+    if translated is not None:
+        return translated
+    return {
+        'digest_heading': f'{frequency} notification digest',
+        'digest_subtitle': f'{notification_count} new notification(s) for {user_name}',
+        'greeting': f'Hello {user_name},',
+        'intro': f"Here's your {frequency.lower()} notification digest:",
+        'view_details': 'View details',
+        'view_all': 'View all notifications',
+        'footer_note': "You're receiving this email because you have email notifications enabled.",
+        'manage_prefs': 'Manage your notification preferences',
+    }
+
+
+def _build_instant_email_i18n(
+    locale: str,
+    user_name: str,
+    is_action_required: bool,
+    notification_type_value: str,
+) -> dict:
+    def _make(_g):
+        if notification_type_value in ('assignment_submitted', 'assignment_reopened'):
+            button_label = _g('View Submission')
+        else:
+            button_label = _g('View Details')
+        return {
+            'greeting': _g('Hello %(name)s,', name=user_name),
+            'header_label': _g('Action Required') if is_action_required else _g('Notification'),
+            'header_subtitle': '' if is_action_required else _g('For your information'),
+            'button_label': button_label,
+            'view_all': _g('View all notifications'),
+            'manage_prefs': _g('Manage preferences'),
+        }
+
+    translated = _with_user_locale(locale, _make)
+    if translated is not None:
+        return translated
+    button_label = (
+        'View Submission'
+        if notification_type_value in ('assignment_submitted', 'assignment_reopened')
+        else 'View Details'
+    )
+    return {
+        'greeting': f'Hello {user_name},',
+        'header_label': 'Action Required' if is_action_required else 'Notification',
+        'header_subtitle': '' if is_action_required else 'For your information',
+        'button_label': button_label,
+        'view_all': 'View all notifications',
+        'manage_prefs': 'Manage preferences',
+    }
 
 
 def sanitize_for_email(text: str) -> str:
@@ -544,8 +667,8 @@ def send_daily_digest(user, preferences, retry_count=0, max_retries=3, existing_
             db.session.rollback()
 
     # Send email — translate digest content into the user's preferred language
-    user_locale = getattr(user, 'preferred_language', None) or 'en'
-    subject = f"Daily Notification Digest - {len(notifications)} new notification(s)"
+    user_locale = _user_locale(user)
+    subject = _digest_subject('Daily', len(notifications), user_locale)
     body = render_digest_email(user, notifications, 'Daily', locale=user_locale)
 
     log = _resolve_digest_email_log(
@@ -647,8 +770,8 @@ def send_weekly_digest(user, preferences, retry_count=0, max_retries=3, existing
             db.session.rollback()
 
     # Send email — translate digest content into the user's preferred language
-    user_locale = getattr(user, 'preferred_language', None) or 'en'
-    subject = f"Weekly Notification Digest - {len(notifications)} new notification(s)"
+    user_locale = _user_locale(user)
+    subject = _digest_subject('Weekly', len(notifications), user_locale)
     body = render_digest_email(user, notifications, 'Weekly', locale=user_locale)
 
     log = _resolve_digest_email_log(
@@ -798,12 +921,12 @@ def send_instant_notification_email(user, notification, override_preferences=Fal
             if notification.notification_type.value not in preferences.notification_types_enabled:
                 return
 
-    # Send email - use title as full subject for high/urgent (already action-oriented)
+    user_locale = _user_locale(user)
     if notification.priority in ('high', 'urgent'):
         subject = notification.title
     else:
-        subject = f"New Notification: {notification.title}"
-    body = render_instant_email(user, notification)
+        subject = _instant_notification_subject(notification, user_locale)
+    body = render_instant_email(user, notification, locale=user_locale)
 
     # Determine email importance: pass actual priority so subject shows [URGENT] vs [HIGH PRIORITY]
     importance = (notification.priority or 'normal').lower() if notification.priority in ('high', 'urgent') else None
@@ -927,12 +1050,12 @@ _DIGEST_TEMPLATE_SRC = """
         <div class="email-outer">
             <div class="email-card">
                 <div style="background-color:#0d9488;color:#ffffff;padding:28px 36px;text-align:center;">
-                    <h1 style="margin:0 0 8px;font-size:24px;font-weight:600;line-height:1.3;color:#ffffff;">{{ frequency }} notification digest</h1>
-                    <p style="margin:0;font-size:15px;line-height:1.4;opacity:0.95;color:#ffffff;">{{ notifications|length }} new notification(s) for {{ user.name }}</p>
+                    <h1 style="margin:0 0 8px;font-size:24px;font-weight:600;line-height:1.3;color:#ffffff;">{{ digest_heading }}</h1>
+                    <p style="margin:0;font-size:15px;line-height:1.4;opacity:0.95;color:#ffffff;">{{ digest_subtitle }}</p>
                 </div>
                 <div class="email-body">
-                    <p>Hello {{ user.name }},</p>
-                    <p>Here's your {{ frequency.lower() }} notification digest:</p>
+                    <p>{{ greeting }}</p>
+                    <p>{{ intro }}</p>
                     {% for notification in notifications %}
                     <div class="notification {% if not notification.is_read %}unread{% endif %}">
                         <h3>{{ notification.title }}</h3>
@@ -947,17 +1070,17 @@ _DIGEST_TEMPLATE_SRC = """
                             {% endif %}
                         </div>
                         {% if notification.related_url %}
-                        <a href="{{ (base_url ~ notification.related_url) | e }}" class="action-button">View details</a>
+                        <a href="{{ (base_url ~ notification.related_url) | e }}" class="action-button">{{ view_details }}</a>
                         {% endif %}
                     </div>
                     {% endfor %}
                     <div style="text-align: center; margin-top: 28px;">
-                        <a href="{{ (base_url ~ '/notifications') | e }}" class="action-button">View all notifications</a>
+                        <a href="{{ (base_url ~ '/notifications') | e }}" class="action-button">{{ view_all }}</a>
                     </div>
                 </div>
                 <div class="email-footer">
-                    <p>You're receiving this email because you have email notifications enabled.</p>
-                    <p><a href="{{ (base_url ~ '/notifications') | e }}">Manage your notification preferences</a></p>
+                    <p>{{ footer_note }}</p>
+                    <p><a href="{{ (base_url ~ '/notifications') | e }}">{{ manage_prefs }}</a></p>
                     <p>{{ org_name | e }}</p>
                 </div>
             </div>
@@ -970,13 +1093,16 @@ _DIGEST_TEMPLATE_SRC = """
 def render_digest_email(user, notifications, frequency, locale: Optional[str] = None):
     """Render HTML email template for notification digest."""
     base_url = (current_app.config.get('BASE_URL') or 'http://localhost:5000').rstrip('/')
+    user_locale = locale or _user_locale(user)
+    user_name = sanitize_for_email(user.name or user.email)
+    i18n = _build_digest_email_i18n(user_locale, user_name, len(notifications), frequency)
 
     # Sanitize (and translate) notification content for safe rendering.
     # Translate at send time using the user's preferred locale so digest emails
     # respect the user's language, not just the stored English fallback.
     sanitized_notifications = []
     for notif in notifications:
-        translated_title, translated_message = _translate_notification_for_email(notif, locale)
+        translated_title, translated_message = _translate_notification_for_email(notif, user_locale)
         sanitized_notifications.append({
             'title': sanitize_for_email(translated_title or notif.title),
             'message': sanitize_for_email(translated_message or notif.message),
@@ -991,11 +1117,11 @@ def render_digest_email(user, notifications, frequency, locale: Optional[str] = 
     org_name = get_org_name()
 
     return _get_digest_template().render(
-        user={'name': sanitize_for_email(user.name or user.email), 'email': user.email},
+        user={'name': user_name, 'email': user.email},
         notifications=sanitized_notifications,
-        frequency=sanitize_for_email(frequency),
         base_url=base_url,
         org_name=org_name,
+        **i18n,
     )
 
 
@@ -1039,7 +1165,7 @@ _INSTANT_TEMPLATE_SRC = """
                     {% if header_subtitle %}<p style="margin:8px 0 0;font-size:15px;font-weight:500;line-height:1.4;opacity:0.95;color:#ffffff;">{{ header_subtitle }}</p>{% endif %}
                 </div>
                 <div class="email-body">
-                    <p>Hello {{ user.name }},</p>
+                    <p>{{ greeting }}</p>
                     <div class="message-panel {% if is_action_required %}action-required{% endif %}">
                         <h2>{{ notification.title }}</h2>
                         <p>{{ notification.message }}</p>
@@ -1057,9 +1183,9 @@ _INSTANT_TEMPLATE_SRC = """
                 </div>
                 <div class="email-footer">
                     <p>
-                        <a href="{{ (base_url ~ '/notifications') | e }}">View all notifications</a>
+                        <a href="{{ (base_url ~ '/notifications') | e }}">{{ view_all }}</a>
                         &nbsp;|&nbsp;
-                        <a href="{{ (base_url ~ '/notifications') | e }}">Manage preferences</a>
+                        <a href="{{ (base_url ~ '/notifications') | e }}">{{ manage_prefs }}</a>
                     </p>
                     <p>{{ org_name | e }}</p>
                 </div>
@@ -1070,21 +1196,18 @@ _INSTANT_TEMPLATE_SRC = """
     """
 
 
-def render_instant_email(user, notification):
+def render_instant_email(user, notification, locale: Optional[str] = None):
     """Render HTML email template for instant notification."""
-    # Determine header style: action-required for high/urgent, informational for normal
     is_action_required = (notification.priority or 'normal') in ('high', 'urgent')
-    header_label = 'Action Required' if is_action_required else 'Notification'
-    header_subtitle = '' if is_action_required else 'For your information'
+    user_locale = locale or _user_locale(user)
+    user_name = sanitize_for_email(user.name or user.email)
+    nt_val = getattr(notification.notification_type, 'value', str(notification.notification_type))
+    i18n = _build_instant_email_i18n(user_locale, user_name, is_action_required, nt_val)
 
     base_url = (current_app.config.get('BASE_URL') or 'http://localhost:5000').rstrip('/')
 
     # Get organization branding
     org_name = get_org_name()
-
-    # Button label: "View Submission" for assignment submit/reopen, "View Details" otherwise
-    nt_val = getattr(notification.notification_type, 'value', str(notification.notification_type))
-    button_label = 'View Submission' if nt_val in ('assignment_submitted', 'assignment_reopened') else 'View Details'
 
     # Sanitize notification content for safe rendering
     sanitized_notification = {
@@ -1096,12 +1219,10 @@ def render_instant_email(user, notification):
     }
 
     return _get_instant_template().render(
-        user={'name': sanitize_for_email(user.name or user.email), 'email': user.email},
+        user={'name': user_name, 'email': user.email},
         notification=sanitized_notification,
         base_url=base_url,
         org_name=org_name,
-        button_label=button_label,
         is_action_required=is_action_required,
-        header_label=header_label,
-        header_subtitle=header_subtitle,
+        **i18n,
     )

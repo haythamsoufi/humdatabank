@@ -27,7 +27,8 @@ def compile_locale_catalog(locale: str) -> bool:
 
     mo_path = po_path.replace('.po', '.mo')
     try:
-        polib.pofile(po_path).save_as_mofile(mo_path)
+        with po_file_lock(po_path):
+            polib.pofile(po_path).save_as_mofile(mo_path)
         return True
     except Exception as exc:
         logger.error('Failed to compile translations for %s: %s', locale, exc)
@@ -36,12 +37,9 @@ def compile_locale_catalog(locale: str) -> bool:
 
 def compile_and_refresh_locale(locale: str) -> bool:
     """Compile a locale catalog and refresh Flask-Babel in the current process."""
+    from app.utils.po_persistence import finalize_translation_writes
+
     if not compile_locale_catalog(locale):
         return False
-    try:
-        from flask_babel import refresh
-
-        refresh()
-    except Exception as exc:
-        logger.warning('flask_babel.refresh failed after compile for %s: %s', locale, exc)
+    finalize_translation_writes([locale], refresh=True)
     return True

@@ -81,6 +81,10 @@ class FormValidator {
             // Clear previous errors
             this.clearErrors();
 
+            if (window.matrixHandler && typeof window.matrixHandler.collectMatrixData === 'function') {
+                window.matrixHandler.collectMatrixData();
+            }
+
             // Validate form (including percentage fields)
             const isValid = this.validateForm();
 
@@ -342,14 +346,16 @@ class FormValidator {
         // Validate validation conditions
         this.validateValidationConditions();
 
-        // Matrix row-total vs breakdown (strict / partial modes block submit)
-        if (window.matrixHandler && typeof window.matrixHandler.validateRowTotalConflicts === 'function') {
-            if (!window.matrixHandler.validateRowTotalConflicts()) {
+        // Matrix validation (cell values, required matrices, row-total conflicts)
+        if (window.matrixHandler && typeof window.matrixHandler.collectMatrixValidationErrors === 'function') {
+            window.matrixHandler.collectMatrixValidationErrors().forEach((err) => this.errors.push(err));
+        } else if (window.matrixHandler && typeof window.matrixHandler.validateAllMatrices === 'function') {
+            if (!window.matrixHandler.validateAllMatrices()) {
                 this.errors.push({
                     field: null,
                     container: null,
-                    message: _t('One or more matrix row totals conflict with their breakdown sums.'),
-                    type: 'row_total'
+                    message: _t('One or more matrix cells contain invalid values. Please correct the highlighted cells.'),
+                    type: 'matrix_cell',
                 });
             }
         }
@@ -1407,11 +1413,13 @@ class FormValidator {
             debugLog(MODULE_NAME, `\nError ${index + 1}:`);
             debugLog(MODULE_NAME, `   Type: ${error.type}`);
             debugLog(MODULE_NAME, `   Message: "${error.message}"`);
-            debugLog(MODULE_NAME, `   Field: ${error.field.tagName || 'Container'}[${error.field.type || 'unknown'}]`);
-            debugLog(MODULE_NAME, `   Field ID: "${error.field.id || 'no-id'}"`);
-            debugLog(MODULE_NAME, `   Field Name: "${error.field.name || 'no-name'}"`);
-            if (error.field.getAttribute && error.field.getAttribute('data-item-id')) {
-                debugLog(MODULE_NAME, `   data-item-id: "${error.field.getAttribute('data-item-id')}"`);
+            if (error.field) {
+                debugLog(MODULE_NAME, `   Field: ${error.field.tagName || 'Container'}[${error.field.type || 'unknown'}]`);
+                debugLog(MODULE_NAME, `   Field ID: "${error.field.id || 'no-id'}"`);
+                debugLog(MODULE_NAME, `   Field Name: "${error.field.name || 'no-name'}"`);
+                if (error.field.getAttribute && error.field.getAttribute('data-item-id')) {
+                    debugLog(MODULE_NAME, `   data-item-id: "${error.field.getAttribute('data-item-id')}"`);
+                }
             }
         });
 
@@ -1430,8 +1438,8 @@ class FormValidator {
     showValidationFlashMessage() {
         const errorCount = this.errors.length;
         const message = errorCount > 1
-            ? _t('Form submission failed: %(count)s required fields are missing. Please correct the highlighted errors below.').replace('%(count)s', errorCount)
-            : _t('Form submission failed: 1 required field is missing. Please correct the highlighted errors below.');
+            ? _t('Form submission failed: %(count)s validation issues need your attention. Please review the errors below.').replace('%(count)s', errorCount)
+            : _t('Form submission failed: please review the validation error below.');
         this.showFlashMessage(message, 'danger');
     }
 
@@ -1478,9 +1486,16 @@ class FormValidator {
             const li = document.createElement('li');
             const errorBtn = document.createElement('button');
             errorBtn.type = 'button';
-            errorBtn.className = 'text-red-600 hover:text-red-800 underline error-link';
-            errorBtn.setAttribute('data-field-id', error.field.id || error.field.name || '');
+            errorBtn.className = 'text-red-600 hover:text-red-800 underline error-link text-left';
             errorBtn.textContent = error.message;
+            if (error.field?.id) {
+                errorBtn.setAttribute('data-field-id', error.field.id);
+            } else if (error.field?.name) {
+                errorBtn.setAttribute('data-field-id', error.field.name);
+            }
+            if (error.field?.getAttribute?.('data-cell-key')) {
+                errorBtn.setAttribute('data-matrix-cell-key', error.field.getAttribute('data-cell-key'));
+            }
             li.appendChild(errorBtn);
             ul.appendChild(li);
         });
@@ -1506,11 +1521,20 @@ class FormValidator {
         // Add click handlers for error links
         summary.querySelectorAll('.error-link').forEach(link => {
             link.addEventListener('click', (e) => {
-                const fieldId = e.target.dataset.fieldId;
-                const field = document.getElementById(fieldId) || document.querySelector(`[name="${fieldId}"]`);
+                const btn = e.currentTarget;
+                const fieldId = btn.dataset.fieldId;
+                const cellKey = btn.dataset.matrixCellKey;
+                let field = fieldId
+                    ? (document.getElementById(fieldId) || document.querySelector(`[name="${fieldId}"]`))
+                    : null;
+                if (!field && cellKey) {
+                    field = document.querySelector(`input[data-cell-key="${cellKey}"]`);
+                }
                 if (field) {
                     this.scrollToField(field);
-                    field.focus();
+                    if (typeof field.focus === 'function') field.focus();
+                } else if (summary) {
+                    summary.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             });
         });
@@ -1519,22 +1543,24 @@ class FormValidator {
     highlightFieldError(error) {
         const { field, container, message } = error;
 
-        // Add error styling to container
-        if (container) {
+        if (container && container.classList) {
             container.classList.add('border-red-500', 'bg-red-50');
             container.classList.remove('border-gray-200');
         }
 
-        // Add error styling to field
+        if (!field || !field.classList) {
+            return;
+        }
+
         field.classList.add('border-red-500', 'focus:border-red-500', 'focus:ring-red-500');
         field.classList.remove('border-gray-300', 'focus:border-blue-500', 'focus:ring-blue-500');
 
-        // Show error message - use generic message for field display, but keep original message for summary
-        this.showFieldErrorMessage(field, _t('This field is required'));
+        this.showFieldErrorMessage(field, message || _t('This field is required'));
     }
 
     showFieldErrorMessage(field, message) {
-        const errorId = `error-${field.id || field.name}`;
+        const cellKey = field.getAttribute?.('data-cell-key');
+        const errorId = cellKey ? `error-matrix-${cellKey.replace(/[^\w-]/g, '_')}` : `error-${field.id || field.name}`;
         let errorDiv = document.getElementById(errorId);
 
         if (!errorDiv) {
@@ -1565,7 +1591,8 @@ class FormValidator {
         field.classList.add('border-gray-300', 'focus:border-blue-500', 'focus:ring-blue-500');
 
         // Hide error message
-        const errorId = `error-${field.id || field.name}`;
+        const cellKey = field.getAttribute?.('data-cell-key');
+        const errorId = cellKey ? `error-matrix-${cellKey.replace(/[^\w-]/g, '_')}` : `error-${field.id || field.name}`;
         const errorDiv = document.getElementById(errorId);
         if (errorDiv) {
             errorDiv.style.display = 'none';
@@ -1618,12 +1645,22 @@ class FormValidator {
     scrollToFirstError() {
         if (this.errors.length === 0) return;
 
-        const firstError = this.errors[0];
+        const firstError = this.errors.find((e) => e.field && e.field.isConnected !== false) || this.errors[0];
+        if (!firstError?.field || firstError.field.isConnected === false) {
+            const summary = document.getElementById('validation-error-summary');
+            if (summary) {
+                this.ensurePaginatedPageVisibleForElement(summary);
+                summary.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            return;
+        }
+
         this.scrollToField(firstError.field);
 
-        // Focus the field after scrolling
         setTimeout(() => {
-            firstError.field.focus();
+            if (typeof firstError.field.focus === 'function') {
+                firstError.field.focus();
+            }
         }, 500);
     }
 

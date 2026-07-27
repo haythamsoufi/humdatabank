@@ -1158,7 +1158,6 @@ class MatrixHandler {
         document.addEventListener('submit', (e) => {
             if (e.target.matches('form')) {
                 this.collectMatrixData();
-                this.validateAllMatrices();
             }
         });
 
@@ -2227,25 +2226,26 @@ class MatrixHandler {
     }
 
     /**
-     * Validate a single matrix input
+     * Return the first validation message for a matrix cell, or null if valid.
      */
-    validateMatrixInput(input) {
+    getMatrixInputValidationMessage(input) {
+        if (!input || input.type === 'checkbox') return null;
+        if (input.getAttribute('data-is-row-total') === 'true') return null;
+
         const container = input.closest('.matrix-container');
         const fieldId = container?.dataset?.fieldId;
-        if (!fieldId) return;
+        if (!fieldId || !this.matrices.get(fieldId)) return null;
 
-        const matrix = this.matrices.get(fieldId);
-        if (!matrix) return;
-
-        const value = parseFloat(window.__numericUnformat ? window.__numericUnformat(input.value, __readMatrixMaxDecimals(input)) : input.value);
+        const value = parseFloat(
+            window.__numericUnformat
+                ? window.__numericUnformat(input.value, __readMatrixMaxDecimals(input))
+                : input.value
+        );
         const errors = [];
 
-        // Check if value is valid number
         if (input.value && isNaN(value)) {
             errors.push(_t('Please enter a valid number'));
         }
-
-        // Check if value is negative
         if (!isNaN(value) && value < 0) {
             errors.push(_t('Value cannot be negative'));
         }
@@ -2255,14 +2255,124 @@ class MatrixHandler {
             errors.push(_t('This column requires a whole number. Please correct the decimal value.'));
         }
 
-        // TODO: Enforce per-cell min/max (and other numeric rules) from matrix item config
-        // configured in the form builder (see TODO in form_builder.html). No hardcoded cap here.
+        return errors[0] || null;
+    }
 
-        if (errors.length > 0) {
-            this.showInputError(input, errors[0]);
-            return false;
+    buildMatrixValidationError(input, message, type = 'matrix_cell') {
+        const matrixContainer = input?.closest?.('.matrix-container');
+        const formItemBlock = matrixContainer?.closest('.form-item-block');
+        const fieldId = matrixContainer?.dataset?.fieldId;
+
+        let matrixLabel = '';
+        if (fieldId) {
+            const labelEl = document.getElementById(`field-${fieldId}`);
+            if (labelEl) matrixLabel = labelEl.textContent.replace(/\*/g, '').trim();
+        }
+        if (!matrixLabel && formItemBlock) {
+            const labelEl = formItemBlock.querySelector('label');
+            if (labelEl) matrixLabel = labelEl.textContent.replace(/\*/g, '').trim();
         }
 
+        const rowLabel = input.getAttribute('data-row') || input.getAttribute('data-row-id') || '';
+        const columnLabel = input.getAttribute('data-column') || '';
+
+        let fullMessage = message;
+        const locationParts = [];
+        if (matrixLabel) locationParts.push(matrixLabel);
+        if (rowLabel && columnLabel) locationParts.push(`${rowLabel} / ${columnLabel}`);
+        else if (columnLabel) locationParts.push(columnLabel);
+        if (locationParts.length) {
+            fullMessage = `${locationParts.join(' — ')}: ${message}`;
+        }
+
+        return {
+            field: input,
+            container: formItemBlock || matrixContainer || input,
+            message: fullMessage,
+            type,
+        };
+    }
+
+    /**
+     * Collect matrix validation errors for the form-level error summary.
+     */
+    collectMatrixValidationErrors() {
+        const errors = [];
+
+        this.matrices.forEach((matrix, fieldId) => {
+            if (!matrix.container.isConnected) {
+                this.cleanupMatrix(fieldId);
+                return;
+            }
+
+            const container = matrix.container;
+            const formItemBlock = container.closest('.form-item-block');
+            const inputs = container.querySelectorAll('input[type="number"], input[data-numeric="true"]');
+
+            inputs.forEach((input) => {
+                const message = this.getMatrixInputValidationMessage(input);
+                if (message) {
+                    errors.push(this.buildMatrixValidationError(input, message));
+                    this.showInputError(input, message);
+                } else {
+                    this.clearInputError(input);
+                }
+            });
+
+            if (matrix.config.is_required) {
+                const hasData = this.hasMatrixData(fieldId);
+                if (!hasData) {
+                    const msg = _t('This field is required. Please enter at least one value.');
+                    this.showMatrixError(fieldId, msg);
+                    const fallbackField = container.querySelector('input[data-cell-key]') || container;
+                    let matrixLabel = '';
+                    const labelEl = fieldId ? document.getElementById(`field-${fieldId}`) : null;
+                    if (labelEl) matrixLabel = labelEl.textContent.replace(/\*/g, '').trim();
+                    errors.push({
+                        field: fallbackField,
+                        container: formItemBlock || container,
+                        message: matrixLabel ? `${matrixLabel}: ${msg}` : msg,
+                        type: 'matrix_required',
+                    });
+                } else {
+                    this.clearMatrixError(fieldId);
+                }
+            } else {
+                this.clearMatrixError(fieldId);
+            }
+
+            if (__rowTotalManualEnabled(matrix.config) && !this.validateRowTotalConflictsForMatrix(fieldId)) {
+                const validation = __rowTotalValidation(matrix.config);
+                const msg = validation === 'partial'
+                    ? _t('One or more manual row totals are lower than the breakdown sum.')
+                    : _t('One or more row totals do not match their breakdown sums. Correct the totals or use “Restore to calculated”.');
+                const fallbackField = container.querySelector('input.row-total-input')
+                    || container.querySelector('input[data-cell-key]')
+                    || container;
+                let matrixLabel = '';
+                const labelEl = fieldId ? document.getElementById(`field-${fieldId}`) : null;
+                if (labelEl) matrixLabel = labelEl.textContent.replace(/\*/g, '').trim();
+                errors.push({
+                    field: fallbackField,
+                    container: formItemBlock || container,
+                    message: matrixLabel ? `${matrixLabel}: ${msg}` : msg,
+                    type: 'matrix_row_total',
+                });
+            }
+        });
+
+        return errors;
+    }
+
+    /**
+     * Validate a single matrix input
+     */
+    validateMatrixInput(input) {
+        const message = this.getMatrixInputValidationMessage(input);
+        if (message) {
+            this.showInputError(input, message);
+            return false;
+        }
         this.clearInputError(input);
         return true;
     }
@@ -2271,48 +2381,7 @@ class MatrixHandler {
      * Validate all matrices
      */
     validateAllMatrices() {
-        let allValid = true;
-
-        this.matrices.forEach((matrix, fieldId) => {
-            // Skip validation if container is no longer in DOM
-            if (!matrix.container.isConnected) {
-                debugLog('matrix-handler', `Matrix container for ${fieldId} is no longer in DOM, cleaning up and skipping validation`);
-                this.cleanupMatrix(fieldId);
-                return;
-            }
-
-            const container = matrix.container;
-            const inputs = container.querySelectorAll('input[type="number"], input[data-numeric="true"]');
-            let matrixValid = true;
-
-            inputs.forEach(input => {
-                if (!this.validateMatrixInput(input)) {
-                    matrixValid = false;
-                    allValid = false;
-                }
-            });
-
-            // Check if required matrix has any data
-            if (matrix.config.is_required) {
-                const hasData = this.hasMatrixData(fieldId);
-                if (!hasData) {
-                    this.showMatrixError(fieldId, _t('This field is required. Please enter at least one value.'));
-                    allValid = false;
-                } else {
-                    this.clearMatrixError(fieldId);
-                }
-            } else {
-                this.clearMatrixError(fieldId);
-            }
-
-            if (__rowTotalManualEnabled(matrix.config)) {
-                if (!this.validateRowTotalConflictsForMatrix(fieldId)) {
-                    allValid = false;
-                }
-            }
-        });
-
-        return allValid;
+        return this.collectMatrixValidationErrors().length === 0;
     }
 
     /**

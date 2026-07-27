@@ -47,12 +47,12 @@
     {% set breadcrumb_parent = {'name': 'Security', 'url': url_for('security.security_dashboard')} if is_security_route else {'name': 'Analytics', 'url': url_for('analytics.analytics_dashboard')} %}
 
     {{ page_header(
-        title='Security Events',
+        title=_('Security Events'),
         icon='fas fa-shield-alt',
         breadcrumbs=[
-            {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
+            {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
             breadcrumb_parent,
-            {'name': 'Security Events'}
+            {'name': _('Security Events')}
         ]
     ) }}
 

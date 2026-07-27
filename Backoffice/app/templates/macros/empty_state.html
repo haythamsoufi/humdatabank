@@ -1,4 +1,4 @@
-{% macro empty_state(icon="fas fa-inbox", title="No items found", message="", action_url="", action_text="") %}
+{% macro empty_state(icon="fas fa-inbox", title=_('No items found'), message="", action_url="", action_text="") %}
 <div class="text-center py-12">
     <i class="{{ icon }} fa-3x text-gray-300 mb-4"></i>
     <p class="text-gray-500 text-lg">{{ title }}</p>

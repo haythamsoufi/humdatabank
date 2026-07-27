@@ -2,7 +2,8 @@
 
 from contextlib import suppress
 
-from flask import render_template, request, session, current_app, url_for, redirect
+from flask import render_template, request, session, current_app, url_for, redirect, flash, jsonify
+from flask_babel import _
 from flask_login import current_user
 from flask_wtf.csrf import CSRFError, generate_csrf
 
@@ -35,16 +36,32 @@ def register_error_handlers(app):
         )
 
         if is_json_request():
-            return json_bad_request(
-                "Please try again.",
-                success=False,
-                error="CSRF validation failed",
-                error_code=400,
-                csrf_refresh_required=True,
-            )
+            # NOTE: deliberately not using json_bad_request()/json_error() here.
+            # Both take the human message as their first positional arg named
+            # `message` and build body = {'error': <that message>, **extra} — so
+            # there is no way to pass both a fixed 'error' type string (which
+            # responseIndicatesCsrfFailure() in csrf.js matches on) *and* a
+            # distinct human-readable 'message' through that helper without one
+            # silently clobbering the other or a duplicate-argument TypeError.
+            response = jsonify({
+                "success": False,
+                "error": "CSRF validation failed",
+                "message": "Your session needed a refresh. Please try again.",
+                "error_code": 400,
+                "csrf_refresh_required": True,
+            })
+            response.status_code = 400
+            return response
 
         # Client-side csrf.js refreshes tokens before submit/fetch; if we still
         # get here, mint a new session token and send the user back to the form.
+        # Flash a visible notice first — otherwise the redirect silently drops
+        # whatever the user just submitted with no explanation at all.
+        with suppress(Exception):
+            flash(
+                _("Your session needed a refresh, so your last submission was not saved. Please try again."),
+                "warning",
+            )
         with suppress(Exception):
             generate_csrf()
         return redirect(_safe_csrf_reload_url())

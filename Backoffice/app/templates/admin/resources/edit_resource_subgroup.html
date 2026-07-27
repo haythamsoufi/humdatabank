@@ -1,20 +1,20 @@
 {% extends "core/layout.html" %}
 
 {% from "components/_page_header.html" import page_header %}
-{% block title %}{% if subgroup %}Edit subcategory{% else %}New subcategory{% endif %}{% endblock %}
+{% block title %}{% if subgroup %}{{ _('Edit subcategory') }}{% else %}{{ _('New subcategory') }}{% endif %}{% endblock %}
 
 {% block content %}
 
 {% set manage_url = url_for('content_management.manage_resource_subgroups') %}
 
 {{ page_header(
-    title='Edit subcategory' if subgroup else 'New subcategory',
+    title=_('Edit subcategory') if subgroup else _('New subcategory'),
     icon='fas fa-layer-group',
     breadcrumbs=[
-        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
-        {'name': 'Resource Management', 'url': url_for('content_management.manage_resources')},
-        {'name': 'Subcategories', 'url': manage_url},
-        {'name': 'Edit' if subgroup else 'New'}
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Resource Management'), 'url': url_for('content_management.manage_resources')},
+        {'name': _('Subcategories'), 'url': manage_url},
+        {'name': _('Edit') if subgroup else _('New')}
     ],
     actions=[
         {

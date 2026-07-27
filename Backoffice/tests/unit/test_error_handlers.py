@@ -66,6 +66,19 @@ class TestCsrfErrorHandler:
         assert data["success"] is False
         assert data["error"] == "CSRF validation failed"
         assert data["csrf_refresh_required"] is True
+        # The message shown to a human must stay specific/actionable, not a bare "Please try again."
+        assert "session" in data["message"].lower() or "refresh" in data["message"].lower()
+
+    def test_json_response_message_survives_error_kwarg_collision(self, client):
+        """Regression guard: json_error() builds {'error': message, **extra}, so a
+        naive call passing error='CSRF validation failed' as an extra kwarg would
+        silently discard the descriptive message. Verify both keys are present and
+        distinct."""
+        resp = client.post("/test-error/csrf", headers=JSON_HEADERS)
+        data = resp.get_json()
+        assert data["error"] == "CSRF validation failed"
+        assert data["message"] != data["error"]
+        assert len(data["message"]) > 0
 
     def test_html_response_redirects_without_error_page(self, client):
         resp = client.post(
@@ -77,6 +90,34 @@ class TestCsrfErrorHandler:
         assert resp.headers["Location"] == "http://localhost/form-page"
         assert b"Page Needs Refresh" not in resp.data
         assert b"csrf-retry-form" not in resp.data
+
+    def test_html_response_flashes_warning_before_redirect(self, client):
+        """A silent redirect with no explanation would drop the user's form data
+        with zero feedback — a flash message must be queued before the redirect."""
+        resp = client.post(
+            "/test-error/csrf",
+            headers={**HTML_HEADERS, "Referer": "http://localhost/form-page"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+        with client.session_transaction() as sess:
+            flashes = sess.get("_flashes", [])
+        assert len(flashes) == 1
+        category, message = flashes[0]
+        assert category == "warning"
+        assert "refresh" in message.lower()
+        assert "not saved" in message.lower()
+
+    def test_html_response_flash_failure_is_suppressed(self, client):
+        """If flash() itself raises (e.g. no request context edge case), the
+        redirect must still succeed rather than turning into a 500."""
+        with patch("app.error_handlers.flash", side_effect=RuntimeError("flash failed")):
+            resp = client.post(
+                "/test-error/csrf",
+                headers={**HTML_HEADERS, "Referer": "http://localhost/form-page"},
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
 
 
 # ===========================================================================

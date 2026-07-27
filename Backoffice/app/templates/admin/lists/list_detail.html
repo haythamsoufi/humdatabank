@@ -188,7 +188,7 @@
 
 <!-- Import Data Modal (only for non-system lists) -->
 {% if not lookup_list.is_system_list %}
-{% call modal_shell('importDataModal', 'Import Data', max_width='max-w-lg', close_id='close-import-data-modal-btn') %}
+{% call modal_shell('importDataModal', _('Import Data'), max_width='max-w-lg', close_id='close-import-data-modal-btn') %}
         <form action="{{ url_for('system_admin.import_into_lookup_list', list_id=lookup_list.id) }}" method="post" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="mb-4">

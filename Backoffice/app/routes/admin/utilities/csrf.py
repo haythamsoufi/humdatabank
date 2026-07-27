@@ -1,4 +1,5 @@
 from flask_wtf import csrf
+from app.extensions import limiter
 from app.routes.admin.shared import admin_required, permission_required_any
 from app.services.translation.auto_translator import get_auto_translator
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
@@ -9,8 +10,12 @@ from app.routes.admin.utilities import bp
 
 
 # === CSRF Routes ===
+# generate_csrf() itself is cheap and both routes require an authenticated admin
+# session, but rate-limit for consistency with the rest of app/routes/admin/ and
+# to bound log/DB noise from a compromised or scripted session hammering these.
 @bp.route("/api/refresh_csrf_token", methods=["POST"])
 @admin_required
+@limiter.limit("30 per minute")
 def refresh_csrf_token():
     """Refresh CSRF token for AJAX requests"""
     try:
@@ -21,6 +26,7 @@ def refresh_csrf_token():
 
 @bp.route("/api/refresh-csrf-token", methods=["GET"])
 @admin_required
+@limiter.limit("30 per minute")
 def refresh_csrf_token_get():
     try:
         token = csrf.generate_csrf()

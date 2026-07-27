@@ -133,7 +133,7 @@
 </div>
 
 <!-- Import Modal -->
-{% call modal_shell('importModal', 'Import List from File', max_width='max-w-xl', close_id='close-import-modal-btn') %}
+{% call modal_shell('importModal', _('Import List from File'), max_width='max-w-xl', close_id='close-import-modal-btn') %}
             <form action="{{ url_for('system_admin.import_lookup_list') }}" method="post" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
@@ -188,7 +188,7 @@
 {% endcall %}
 
 <!-- Create Manual List Modal -->
-{% call modal_shell('createModal', 'Create Manual List', max_width='max-w-lg', close_id='close-create-modal-btn') %}
+{% call modal_shell('createModal', _('Create Manual List'), max_width='max-w-lg', close_id='close-create-modal-btn') %}
             <form action="{{ url_for('system_admin.create_lookup_list') }}" method="post">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
@@ -225,7 +225,7 @@
 {% endcall %}
 
 <!-- Edit List Modal -->
-{% call modal_shell('editModal', 'Edit List', max_width='max-w-lg', close_id='close-edit-modal-btn') %}
+{% call modal_shell('editModal', _('Edit List'), max_width='max-w-lg', close_id='close-edit-modal-btn') %}
             <form id="editForm" action="" method="post">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 

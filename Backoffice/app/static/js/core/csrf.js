@@ -117,6 +117,48 @@ function redirectToLoginAfterSessionExpiry() {
     window.location.href = '/login?next=' + encodeURIComponent(next);
 }
 
+/**
+ * Interpret a CSRF-refresh-endpoint response.
+ *
+ * IMPORTANT: only treat the session as *actually* expired (latching
+ * csrfSessionExpired, which permanently blocks further refresh attempts and
+ * eventually forces a redirect to /login) when we have a reliable signal:
+ * - 401/403 status, or
+ * - fetch followed a redirect (response.redirected) — this is what happens
+ *   when @login_required / @admin_required redirects an anonymous request
+ *   to the login page; fetch transparently follows it and lands on login
+ *   HTML with a 200 status.
+ *
+ * A bare non-JSON/non-ok response that was NOT redirected (e.g. a transient
+ * 500/502/503 rendering an HTML error page during a deploy or proxy hiccup)
+ * is NOT a session-expiry signal — it's thrown instead so the caller treats
+ * it as a recoverable failure and can retry on the next stale check, rather
+ * than permanently disabling CSRF refresh and force-logging the user out for
+ * an unrelated infrastructure blip.
+ */
+async function _parseCsrfRefreshResponse(response, label) {
+    if (response.status === 401 || response.status === 403) {
+        handleCsrfSessionExpired();
+        return null;
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!response.ok || !contentType.includes('application/json')) {
+        if (response.redirected) {
+            handleCsrfSessionExpired();
+            return null;
+        }
+        throw new Error(`${label} returned non-JSON response (status ${response.status})`);
+    }
+
+    const data = await response.json();
+    if (data.csrf_token) {
+        return applyCsrfToken(data.csrf_token);
+    }
+
+    throw new Error(`Failed to refresh CSRF token (${label})`);
+}
+
 async function refreshCSRFTokenViaAdminApi() {
     const response = await _nativeFetch('/admin/api/refresh-csrf-token', {
         method: 'GET',
@@ -128,26 +170,7 @@ async function refreshCSRFTokenViaAdminApi() {
         cache: 'no-cache'
     });
 
-    if (response.status === 401 || response.status === 403) {
-        handleCsrfSessionExpired();
-        return null;
-    }
-
-    const contentType = response.headers.get('content-type') || '';
-    if (!response.ok || !contentType.includes('application/json')) {
-        if (response.redirected || contentType.includes('text/html')) {
-            handleCsrfSessionExpired();
-            return null;
-        }
-        throw new Error('Admin CSRF refresh returned non-JSON response');
-    }
-
-    const data = await response.json();
-    if (data.csrf_token) {
-        return applyCsrfToken(data.csrf_token);
-    }
-
-    throw new Error('Failed to refresh CSRF token');
+    return _parseCsrfRefreshResponse(response, 'Admin CSRF refresh');
 }
 
 /**
@@ -165,26 +188,7 @@ async function refreshCSRFTokenViaSessionApi() {
         cache: 'no-cache'
     });
 
-    if (response.status === 401 || response.status === 403) {
-        handleCsrfSessionExpired();
-        return null;
-    }
-
-    const contentType = response.headers.get('content-type') || '';
-    if (!response.ok || !contentType.includes('application/json')) {
-        if (response.redirected || contentType.includes('text/html')) {
-            handleCsrfSessionExpired();
-            return null;
-        }
-        throw new Error('Session CSRF refresh returned non-JSON response');
-    }
-
-    const data = await response.json();
-    if (data.csrf_token) {
-        return applyCsrfToken(data.csrf_token);
-    }
-
-    throw new Error('Failed to refresh CSRF token via session API');
+    return _parseCsrfRefreshResponse(response, 'Session CSRF refresh');
 }
 
 // Function to refresh CSRF token
@@ -492,11 +496,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Add CSRF token to same-origin XHR requests only; skip if token unavailable
     // to avoid sending a literal "null" header to third-party services.
+    // NOTE: send() alone doesn't see the URL, so open() must capture it first —
+    // without this, the origin check below is a no-op and the token leaks to
+    // any third-party endpoint called via XHR (maps, translation APIs, etc.).
+    let originalOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url) {
+        this._csrfRequestUrl = url;
+        return originalOpen.apply(this, arguments);
+    };
+
     let originalSend = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.send = function(data) {
-        var token = getCSRFToken();
-        if (token) {
-            try { this.setRequestHeader('X-CSRFToken', token); } catch (_) {}
+        if (isSameOriginRequest(this._csrfRequestUrl)) {
+            var token = getCSRFToken();
+            if (token) {
+                try { this.setRequestHeader('X-CSRFToken', token); } catch (_) {}
+            }
         }
         originalSend.apply(this, arguments);
     };

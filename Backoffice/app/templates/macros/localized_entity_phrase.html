@@ -6,22 +6,23 @@
 
   join_localized_entity_phrase() in form_localization.py implements the rules.
 -#}
-{% macro entity_scope_phrase(prefix_msgid, language, selected_entity_type, selected_entity_display_name, selected_country) -%}
+{# Call sites must pass _(literal) so pybabel can extract msgids from templates. #}
+{% macro entity_scope_phrase(translated_prefix, language, selected_entity_type, selected_entity_display_name, selected_country) -%}
   {%- set entity_name = '' -%}
   {%- if selected_entity_type and selected_entity_type != 'country' -%}
     {%- set entity_name = selected_entity_display_name|default('', true) -%}
   {%- elif selected_country -%}
     {%- set entity_name = get_localized_national_society_name(selected_country) -%}
   {%- endif -%}
-  {{- join_localized_entity_phrase(_(prefix_msgid), entity_name, language) -}}
+  {{- join_localized_entity_phrase(translated_prefix, entity_name, language) -}}
 {%- endmacro %}
 
-{% macro entity_scope_phrase_with_suffix(prefix_msgid, suffix_msgid, language, selected_entity_type, selected_entity_display_name, selected_country) -%}
+{% macro entity_scope_phrase_with_suffix(translated_prefix, translated_suffix, language, selected_entity_type, selected_entity_display_name, selected_country) -%}
   {%- set entity_name = '' -%}
   {%- if selected_entity_type and selected_entity_type != 'country' -%}
     {%- set entity_name = selected_entity_display_name|default('', true) -%}
   {%- elif selected_country -%}
     {%- set entity_name = get_localized_national_society_name(selected_country) -%}
   {%- endif -%}
-  {{- join_localized_entity_phrase(_(prefix_msgid), entity_name, language) -}} {{ _(suffix_msgid) }}
+  {{- join_localized_entity_phrase(translated_prefix, entity_name, language) -}} {{ translated_suffix }}
 {%- endmacro %}

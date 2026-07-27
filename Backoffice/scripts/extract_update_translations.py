@@ -65,7 +65,11 @@ def main() -> int:
     backoffice_dir = Path(__file__).resolve().parent.parent
     babel_cfg = backoffice_dir / "config" / "babel.cfg"
     babel_ignore = backoffice_dir / "config" / ".babelignore"
-    translations_dir = backoffice_dir / "translations"
+    env_translations = (os.environ.get("BACKOFFICE_TRANSLATIONS_DIR") or "").strip()
+    if env_translations:
+        translations_dir = Path(os.path.abspath(os.path.normpath(env_translations)))
+    else:
+        translations_dir = backoffice_dir / "translations"
     pot_file = translations_dir / "messages.pot"
 
     if not babel_cfg.exists():

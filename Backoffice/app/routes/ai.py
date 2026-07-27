@@ -31,6 +31,7 @@ from app.utils.ai_pricing import estimate_chat_cost
 from app.utils.ai_utils import sanitize_page_context, openai_model_supports_sampling_params
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.api_responses import json_auth_required, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
+from app.utils.request_validation import enforce_csrf_json
 from app.services.ai_chat_request import (
     parse_chat_request,
     resolve_conversation_and_history,
@@ -124,6 +125,29 @@ def _ai_beta_denied_response(identity):
     except Exception as e:
         logger.debug("_ai_beta_denied_response check failed: %s", e, exc_info=True)
     return None
+
+
+def _enforce_ai_csrf(identity):
+    """
+    CSRF-protect unsafe (POST/PUT/PATCH/DELETE) ai_bp requests authenticated via
+    the Backoffice session cookie.
+
+    ai_bp is registered with csrf.exempt() so Website/Mobile Bearer-token clients
+    (identity.auth_source == "bearer") and the anonymous public-proxy path
+    (auth_source == "anonymous", gated by a shared-secret header, not a cookie)
+    can call it without a Flask-WTF CSRF token — neither carries an ambient
+    session cookie for a cross-site request to ride on.
+
+    Cookie-authenticated requests (Backoffice browser tabs) DO carry an ambient
+    session cookie, so — unlike the Bearer/anonymous paths — they need an
+    explicit CSRF check rather than relying solely on SESSION_COOKIE_SAMESITE.
+
+    Returns a Flask response to return immediately on CSRF failure, or None
+    when the request may proceed.
+    """
+    if identity.auth_source != "cookie":
+        return None
+    return enforce_csrf_json()
 
 
 def _ai_chat_rate_limit_key() -> str:
@@ -482,6 +506,9 @@ def cancel_chat_stream():
         return beta_denied
     if not identity.is_authenticated:
         return json_auth_required("Authentication required")
+    csrf_error = _enforce_ai_csrf(identity)
+    if csrf_error:
+        return csrf_error
 
     data = get_json_safe()
     request_id = (data.get("request_id") or "").strip()
@@ -854,6 +881,9 @@ def chat():
     # Anonymous access is only allowed via the Website proxy (shared-secret header).
     if not identity.is_authenticated and not _is_allowed_public_proxy_request():
         return json_auth_required("Authentication required")
+    csrf_error = _enforce_ai_csrf(identity)
+    if csrf_error:
+        return csrf_error
     # Ensure current_user reflects Bearer auth so existing RBAC helpers (used by tools) work.
     did_login = False
     try:
@@ -1340,6 +1370,9 @@ def chat_stream():
     # Anonymous access is only allowed via the Website proxy (shared-secret header).
     if not identity.is_authenticated and not _is_allowed_public_proxy_request():
         return json_auth_required("Authentication required")
+    csrf_error = _enforce_ai_csrf(identity)
+    if csrf_error:
+        return csrf_error
     did_login = False
     try:
         if identity.user and identity.auth_source == "bearer" and not current_user.is_authenticated:
@@ -2159,6 +2192,9 @@ def submit_feedback():
         return beta_denied
     if not identity.is_authenticated or not identity.user:
         return json_auth_required("Authentication required")
+    csrf_error = _enforce_ai_csrf(identity)
+    if csrf_error:
+        return csrf_error
 
     data = get_json_safe()
     trace_id = data.get("trace_id")
@@ -2257,6 +2293,9 @@ def clear_conversation_inflight(conversation_id: str):
         return beta_denied
     if not identity.is_authenticated or not identity.user:
         return json_auth_required("Authentication required")
+    csrf_error = _enforce_ai_csrf(identity)
+    if csrf_error:
+        return csrf_error
 
     convo = AIConversation.query.filter_by(id=conversation_id, user_id=identity.user.id).first()
     if not convo:
@@ -2284,6 +2323,10 @@ def get_or_delete_conversation(conversation_id: str):
         return beta_denied
     if not identity.is_authenticated or not identity.user:
         return json_auth_required("Authentication required")
+    # _enforce_ai_csrf() is a no-op for GET (enforce_csrf_json only checks unsafe methods).
+    csrf_error = _enforce_ai_csrf(identity)
+    if csrf_error:
+        return csrf_error
 
     convo = AIConversation.query.filter_by(id=conversation_id, user_id=identity.user.id).first()
     if not convo:
@@ -2468,6 +2511,9 @@ def export_table_as_excel():
         return beta_denied
     if not identity.is_authenticated or not identity.user:
         return json_auth_required("Authentication required")
+    csrf_error = _enforce_ai_csrf(identity)
+    if csrf_error:
+        return csrf_error
 
     # Ensure current_user reflects Bearer auth for consistency with the rest of ai_v2.
     try:
@@ -2568,6 +2614,9 @@ def delete_all_conversations():
         return beta_denied
     if not identity.is_authenticated or not identity.user:
         return json_auth_required("Authentication required")
+    csrf_error = _enforce_ai_csrf(identity)
+    if csrf_error:
+        return csrf_error
 
     confirm = (request.args.get("confirm") or "").strip().lower() == "true"
     body = get_json_safe()
@@ -2603,6 +2652,9 @@ def append_conversation_message(conversation_id: str):
         return beta_denied
     if not identity.is_authenticated or not identity.user:
         return json_auth_required("Authentication required")
+    csrf_error = _enforce_ai_csrf(identity)
+    if csrf_error:
+        return csrf_error
 
     convo = AIConversation.query.filter_by(id=conversation_id, user_id=identity.user.id).first()
     if not convo:
@@ -2659,6 +2711,9 @@ def import_conversation_messages(conversation_id: str):
         return beta_denied
     if not identity.is_authenticated or not identity.user:
         return json_auth_required("Authentication required")
+    csrf_error = _enforce_ai_csrf(identity)
+    if csrf_error:
+        return csrf_error
 
     data = get_json_safe()
     raw_messages = data.get("messages") or []

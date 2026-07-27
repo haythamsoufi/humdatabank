@@ -1,7 +1,7 @@
 {# Subcategory manager for resource edit/create: modal_shell + table + add form + edit modal (same pattern as admin/lists/manage_lists.html). #}
 {% from "macros/modal_shell.html" import modal_shell %}
 
-{% call modal_shell('resource-subcategories-modal', 'Resource subcategories', max_width='max-w-4xl', z_index=100, content_class='flex flex-col min-h-0 max-h-[85vh] overflow-y-auto') %}
+{% call modal_shell('resource-subcategories-modal', _('Resource subcategories'), max_width='max-w-4xl', z_index=100, content_class='flex flex-col min-h-0 max-h-[85vh] overflow-y-auto') %}
     <div class="border-b border-gray-100 pb-4 mb-4">
         <h4 class="text-sm font-semibold text-gray-700 mb-3">Add subcategory</h4>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -62,7 +62,7 @@
     </div>
 {% endcall %}
 
-{% call modal_shell('resource-subcategory-edit-modal', 'Edit subcategory', max_width='max-w-md', z_index=110) %}
+{% call modal_shell('resource-subcategory-edit-modal', _('Edit subcategory'), max_width='max-w-md', z_index=110) %}
     <div class="space-y-3">
         <input type="hidden" id="subcat-edit-id" value=""/>
         <div>

@@ -5,7 +5,7 @@
 
 {% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
 {% from "components/_page_header.html" import page_header %}
-{% block title %}Import KoBo Data{% endblock %}
+{% block title %}{{ _('Import KoBo Data') }}{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -66,11 +66,11 @@
 {% block content %}
 
 {{ page_header(
-    title='Import KoBo Data',
+    title=_('Import KoBo Data'),
     icon='fas fa-database',
     breadcrumbs=[
-        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
-        {'name': 'Import KoBo Data'}
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Import KoBo Data')}
     ]
 ) }}
 

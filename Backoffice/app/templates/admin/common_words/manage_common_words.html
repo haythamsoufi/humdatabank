@@ -132,7 +132,7 @@
 {% block content %}
 
     {{ page_header(
-        title='Common Words',
+        title=_('Common Words'),
         icon='fas fa-book',
         breadcrumbs=[
             {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
@@ -217,7 +217,7 @@
     </div>
 
     <!-- Import Modal -->
-    {% call modal_shell('importModal', 'Import Common Words from Excel', max_width='max-w-2xl', close_id='close-import-modal-btn') %}
+    {% call modal_shell('importModal', _('Import Common Words from Excel'), max_width='max-w-2xl', close_id='close-import-modal-btn') %}
                     <div class="mb-6">
                         <h3 class="text-lg font-medium text-gray-900 mb-3">Instructions</h3>
                         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -276,7 +276,7 @@
     {% endcall %}
 
     <!-- Add/Edit Common Word Modal -->
-    {% call modal_shell('editModal', 'Edit Common Word', max_width='max-w-4xl', close_id='close-edit-modal-btn') %}
+    {% call modal_shell('editModal', _('Edit Common Word'), max_width='max-w-4xl', close_id='close-edit-modal-btn') %}
                     <p id="modalSubtitle" class="text-sm text-gray-600 mb-4">Editing: <span id="editTermDisplay" class="font-medium"></span></p>
                     {# no-submit-guard: see _panel_common_words_body.html for rationale. #}
                     <form id="editForm" class="no-submit-guard" method="POST">

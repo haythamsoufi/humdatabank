@@ -4,7 +4,7 @@
 
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_status_label.html" import status_label %}
-{% block title %}Manage Resources{% endblock %}
+{% block title %}{{ _('Manage Resources') }}{% endblock %}
 
 {% block extra_js %}
 <script nonce="{{ csp_nonce() }}">
@@ -32,11 +32,11 @@
 {% set can_manage_resources = current_is_system_manager or has_permission('admin.resources.manage') %}
 
 {{ page_header(
-    title='Manage Resources',
+    title=_('Manage Resources'),
     icon='fas fa-folder-open',
     breadcrumbs=[
-        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
-        {'name': 'Resource Management'}
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Resource Management')}
     ],
     actions=[
         {

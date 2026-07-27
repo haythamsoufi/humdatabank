@@ -5,7 +5,7 @@ Part of the /api/v1 blueprint.
 """
 
 from flask import request, current_app
-from flask_login import login_required
+from flask_login import login_required, current_user
 from flask_wtf.csrf import generate_csrf
 
 # Import the API blueprint from parent
@@ -14,7 +14,7 @@ from app.routes.api import api_bp
 # Import models
 from app.models import CommonWord
 from app.utils.auth import require_api_key
-from app.utils.rate_limiting import api_rate_limit
+from app.utils.rate_limiting import api_rate_limit, rate_limit
 
 # Import utility functions
 from app.utils.api_helpers import json_response, api_error
@@ -63,12 +63,17 @@ def get_common_words():
 
 @api_bp.route('/csrf-token', methods=['GET'])
 @login_required
+@rate_limit(requests_per_minute=30, key_func=lambda: f"csrf_token_{current_user.get_id()}")
 def get_csrf_token():
     """
     Issue a CSRF token for session-authenticated clients (e.g. MobileApp).
 
     The mobile app can call this once after login and send it back on unsafe
     requests via X-CSRFToken.
+
+    generate_csrf() is cheap and the route requires an authenticated session,
+    but rate-limited per-user for consistency with other API endpoints and to
+    bound log/DB noise from a compromised or scripted session.
     """
     try:
         token = generate_csrf()

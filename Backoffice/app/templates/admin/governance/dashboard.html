@@ -189,11 +189,11 @@ section[id] { scroll-margin-top: 80px; }
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
 
         {% set fp_pct = ((o.countries_with_focal_point / o.total_countries * 100) | round(0) | int) if o.total_countries else 0 %}
-        {{ kpi('Focal Point %', fp_pct ~ '%', 'fas fa-flag', 'kpi-ok' if fp_pct >= 80 else 'kpi-bad') }}
-        {{ kpi('Active without Owner', o.active_assignments_without_data_owner | default(0), 'fas fa-user-slash', 'kpi-ok' if o.active_assignments_without_data_owner == 0 else 'kpi-bad') }}
-        {{ kpi('Ghost Access', ac.inactive_users_with_role | default(0), 'fas fa-ghost', 'kpi-ok' if ac.inactive_users_with_role == 0 else 'kpi-bad', tooltip='Deactivated users who still hold RBAC roles. Their access should be revoked to prevent unauthorized data exposure.') }}
-        {{ kpi('Submission Rate', q.submission_rate_pct | default(0) | round(0) | int ~ '%', 'fas fa-paper-plane', 'kpi-ok' if q.submission_rate_pct >= 70 else 'kpi-bad') }}
-        {{ kpi('Compliance', c.compliance_rate_pct | default(0) | round(0) | int ~ '%', 'fas fa-file-contract', 'kpi-ok' if c.compliance_rate_pct >= 70 else 'kpi-bad') }}
+        {{ kpi(_('Focal Point %'), fp_pct ~ '%', 'fas fa-flag', 'kpi-ok' if fp_pct >= 80 else 'kpi-bad') }}
+        {{ kpi(_('Active without Owner'), o.active_assignments_without_data_owner | default(0), 'fas fa-user-slash', 'kpi-ok' if o.active_assignments_without_data_owner == 0 else 'kpi-bad') }}
+        {{ kpi(_('Ghost Access'), ac.inactive_users_with_role | default(0), 'fas fa-ghost', 'kpi-ok' if ac.inactive_users_with_role == 0 else 'kpi-bad', tooltip=_('Deactivated users who still hold RBAC roles. Their access should be revoked to prevent unauthorized data exposure.')) }}
+        {{ kpi(_('Submission Rate'), q.submission_rate_pct | default(0) | round(0) | int ~ '%', 'fas fa-paper-plane', 'kpi-ok' if q.submission_rate_pct >= 70 else 'kpi-bad') }}
+        {{ kpi(_('Compliance'), c.compliance_rate_pct | default(0) | round(0) | int ~ '%', 'fas fa-file-contract', 'kpi-ok' if c.compliance_rate_pct >= 70 else 'kpi-bad') }}
       </div>
     </section>
 

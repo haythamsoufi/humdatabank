@@ -10,17 +10,17 @@
 <link rel="stylesheet" href="{{ static_url('css/notifications.css') }}">
 {% endblock %}
 
-{% block title %}Account Settings{% endblock %}
+{% block title %}{{ _('Account Settings') }}{% endblock %}
 
 {% block content %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
 {{ page_header(
-    title='Account Settings',
+    title=_('Account Settings'),
     icon='fas fa-cog',
     breadcrumbs=[
-        {'name': 'Dashboard', 'url': url_for('main.dashboard')},
-        {'name': 'Account Settings'}
+        {'name': _('Dashboard'), 'url': url_for('main.dashboard')},
+        {'name': _('Account Settings')}
     ]
 ) }}
 

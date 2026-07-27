@@ -2,19 +2,19 @@
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 
 {% from "components/_page_header.html" import page_header %}
-{% block title %}Resource subcategories{% endblock %}
+{% block title %}{{ _('Resource subcategories') }}{% endblock %}
 
 {% block content %}
 
 {% set new_sub_url = url_for('content_management.new_resource_subgroup') %}
 
 {{ page_header(
-    title='Resource subcategories',
+    title=_('Resource subcategories'),
     icon='fas fa-layer-group',
     breadcrumbs=[
-        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
-        {'name': 'Resource Management', 'url': url_for('content_management.manage_resources')},
-        {'name': 'Subcategories'}
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Resource Management'), 'url': url_for('content_management.manage_resources')},
+        {'name': _('Subcategories')}
     ],
     actions=[
         {

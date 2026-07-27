@@ -334,14 +334,14 @@ Usage:
             <div style="padding-right: 6.5rem;">
                 <h3 class="autotrans-modal-header-title">
                     {% if auto_translate_config and auto_translate_config.title %}
-                        {{ _(auto_translate_config.title) }}
+                        {{ auto_translate_config.title }}
                     {% else %}
                         {{ _('Auto-Translate All Items') }}
                     {% endif %}
                 </h3>
                 <p class="autotrans-modal-header-desc">
                     {% if auto_translate_config and auto_translate_config.description %}
-                        {{ _(auto_translate_config.description) }}
+                        {{ auto_translate_config.description }}
                     {% else %}
                         {{ _('Translate all blank items to all languages') }}
                     {% endif %}

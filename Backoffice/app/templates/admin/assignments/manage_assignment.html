@@ -3,7 +3,7 @@
 {% from "components/_status_label.html" import status_label_for_active %}
 {% from "macros/translation_modal.html" import translation_modal %}
 
-{% block title %}{{ 'Edit Assignment' if assignment else 'Create New Assignment' }}{% endblock %}
+{% block title %}{{ _('Edit Assignment') if assignment else _('Create New Assignment') }}{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -26,12 +26,12 @@
 }) %}
 
 {{ page_header(
-    title='Edit Assignment' if assignment else 'Create New Assignment',
+    title=_('Edit Assignment') if assignment else _('Create New Assignment'),
     icon='fas fa-pen' if assignment else 'fas fa-plus-circle',
     breadcrumbs=[
-        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
-        {'name': 'Assignment Management', 'url': url_for('assignment_management.manage_assignments')},
-        {'name': 'Edit Assignment' if assignment else 'Create New Assignment'}
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Assignment Management'), 'url': url_for('assignment_management.manage_assignments')},
+        {'name': _('Edit Assignment') if assignment else _('Create New Assignment')}
     ],
     actions=header_actions.items,
     pin_actions_on_scroll=True
@@ -776,7 +776,7 @@
 {% endif %}
 
 {% if assignment %}
-{% call modal_shell('edit-status-modal', 'Edit Status for <span id="edit-status-modal-entity-name" class="font-bold ml-1">Entity</span>', aria_label=_('Edit Status'), max_width='max-w-md', title_safe=true) %}
+{% call modal_shell('edit-status-modal', (_('Edit Status for') ~ ' <span id="edit-status-modal-entity-name" class="font-bold ml-1">Entity</span>'), aria_label=_('Edit Status'), max_width='max-w-md', title_safe=true) %}
         <form id="edit-status-actual-form" method="POST" action="">
             {{ edit_aes_form.csrf_token }}
             <input type="hidden" name="aes_id" id="edit-status-modal-aes-id">

@@ -3,7 +3,7 @@
 {% from "macros/breadcrumbs.html" import breadcrumb %}
 
 {% from "components/_page_header.html" import page_header %}
-{% block title %}{% if resource %}Edit Resource{% else %}Upload New Resource{% endif %}{% endblock %}
+{% block title %}{% if resource %}{{ _('Edit Resource') }}{% else %}{{ _('Upload New Resource') }}{% endif %}{% endblock %}
 
 {% block extra_css %}
 <style nonce="{{ csp_style_nonce() }}">
@@ -78,12 +78,12 @@ img[data-thumbnail-preview]:hover { opacity:.8; }
 {% block content %}
 
 {{ page_header(
-    title="Edit Resource" if resource else "Upload New Resource",
+    title=_("Edit Resource") if resource else _("Upload New Resource"),
     icon='fas fa-' + ('edit' if resource else 'plus'),
     breadcrumbs=[
-        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
-        {'name': 'Resource Management', 'url': url_for('content_management.manage_resources')},
-        {'name': 'Edit Resource' if resource else 'Upload New Resource'}
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Resource Management'), 'url': url_for('content_management.manage_resources')},
+        {'name': _('Edit Resource') if resource else _('Upload New Resource')}
     ],
     actions=[
         {

@@ -369,7 +369,8 @@ export const WidgetUiMixin = {
      *
      * Blocking controls (worth jumping): design-system CTAs (.btn-primary, .btn-success, …),
      * submit inputs, entry-form #fab-menu actions, or explicit data-fab-overlap-block.
-     * Generic buttons, ghost toggles, and [role="button"] disclosure headers are ignored.
+     * Generic buttons, ghost toggles, section collapse toggles, and [role="button"] disclosure
+     * headers are ignored.
      *
      * Stabilization rules (prevents up/down bouncing):
      * - Never remeasure while an avoidance transition is in flight (rest-rect math is wrong mid-tween).
@@ -452,6 +453,12 @@ export const WidgetUiMixin = {
             if (control.classList.contains('fb-icon-btn') || control.closest('.fb-icon-btn')) return false;
             if (control.matches('#toggle-all-pages-btn, #toggle-all-sections-btn, .page-toggle-btn')) return false;
             if (control.closest('#form-builder-ui') && control.matches('button, a') && !control.classList.contains('btn')) {
+                return false;
+            }
+
+            // Entry-form section/sub-section collapse and nav chrome — not primary actions
+            if (control.classList.contains('collapse-toggle') || control.closest('.collapse-toggle')) return false;
+            if (control.matches('#sidebar-collapse-toggle, #sidebar-expand-button, #presence-collapse-btn, #presence-expand-btn, #mobile-nav-toggle-button, #mobile-nav-close-button')) {
                 return false;
             }
 
@@ -687,10 +694,20 @@ export const WidgetUiMixin = {
         document.addEventListener('scroll', scheduleCheck, { capture: true, passive: true });
         window.addEventListener('resize', scheduleCheckDebounced, { passive: true });
 
+        const isCollapsibleLayoutMutation = (mutation) => {
+            const target = mutation.target;
+            if (!(target instanceof Element)) return false;
+            return !!target.closest(
+                '[data-collapsible-id], [data-collapsible-content], #section-navigation-sidebar, #presence-bar'
+            );
+        };
+
         const domObs = new MutationObserver((mutations) => {
             // Avoidance itself mutates FAB class/style — ignore those or we re-enter forever.
             const onlyFab = mutations.every((m) => m.target === fab || (fab.contains && fab.contains(m.target)));
             if (onlyFab) return;
+            // Section/nav collapse only reshuffles form layout — do not nudge the chatbot FAB.
+            if (mutations.every(isCollapsibleLayoutMutation)) return;
             scheduleCheckDebounced();
         });
         if (document.body) {

@@ -72,7 +72,7 @@ Scrubbing is applied to:
 
 Implementation:
 
-- `app/services/ai_providers.py`: `scrub_pii_text`, `scrub_pii_context`
+- `app/services/ai/providers/formatting.py`: `scrub_pii_text`, `scrub_pii_context`
 - `app/services/ai_chat_engine.py`: applies scrubbing before provider calls
 
 ### 3) Page context minimization
@@ -82,7 +82,7 @@ The frontend can send page context to help answer UI-related questions. The back
 Implementation:
 
 - `app/utils/ai_utils.py`: shared helpers such as context sanitization
-- `app/services/ai_providers.py`: recursive context scrubbing
+- `app/services/ai/providers/formatting.py`: recursive context scrubbing
 
 ### 4) Audit logging for DLP events (without storing message content)
 
@@ -140,7 +140,7 @@ To filter for AI DLP events, look for:
 | AI chat endpoint (WebSocket) | `app/routes/ai_ws.py` |
 | Chat orchestration | `app/services/ai_chat_engine.py` |
 | DLP guard + audit events | `app/services/ai_dlp.py` |
-| PII scrubbing helpers | `app/services/ai_providers.py` |
+| PII scrubbing helpers | `app/services/ai/providers/formatting.py` |
 | Security events model | `app/models/system.py` |
 | Admin security pages | `app/routes/admin/security_dashboard.py` |
 

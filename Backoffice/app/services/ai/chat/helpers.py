@@ -24,7 +24,7 @@ from app.services.data_retrieval_service import (
 )
 from app.services.ai.chat.fastpath import try_answer_value_question
 from app.services.ai.chat.integration import AIChatIntegration
-from app.services.chatbot_telemetry import track_chatbot_interaction, get_chatbot_analytics
+from app.services.ai.chat.telemetry import track_chatbot_interaction, get_chatbot_analytics
 from app.services.app_settings_service import get_organization_name
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.sql_utils import safe_ilike_pattern
@@ -51,14 +51,14 @@ def _get_workflow_service():
             return None
     return _workflow_service
 
-# AI helpers: OpenAI integration + prompt builders.
-# Chat API is /api/ai/v2; this module is used by ai.py, ai_ws.py, ai_chat_engine.py, ai_chat_integration.py.
+# AI chat helpers: OpenAI integration, prompts, language/workflow fast paths.
+# Used by ai/chat/engine.py, routes/ai.py, and legacy integration paths.
 
 # Configure logging - use module-specific logger
 logger = logging.getLogger(__name__)
 
-# PII and response formatting live in ai_providers to avoid duplication
-from app.services.ai_providers import (
+# PII and response formatting live in ai.providers
+from app.services.ai.providers import (
     scrub_pii_text,
     scrub_pii_context,
     format_ai_response_for_html,
@@ -2318,7 +2318,7 @@ def format_page_context(page_context):
 
     return context_text
 
-# format_ai_response_for_html and format_provenance_block moved to app.services.ai_providers
+# format_ai_response_for_html and format_provenance_block live in app.services.ai.providers
 
 def format_user_data(user_data, role):
     """Format user-specific data for the prompt"""

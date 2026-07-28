@@ -1,8 +1,5 @@
 """
 PII scrubbing and AI response formatting for chat routes and services.
-
-Moved from app.services.ai_providers (legacy module) into the ai_providers package
-so imports from app.services.ai_providers resolve correctly.
 """
 
 from __future__ import annotations

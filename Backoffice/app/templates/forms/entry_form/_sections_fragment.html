@@ -83,7 +83,7 @@
                                         {% if template_structure.display_order_visible %}<span class="text-xl font-semibold text-gray-700 mr-1">{{ section.display_order }}.</span>{% endif %}
                                         {% set section_display_name = section._display_name_resolved if hasattr(section, '_display_name_resolved') and section._display_name_resolved else section.display_name %}
                                         {{ section_display_name }}
-                                        <button type="button" class="collapse-toggle btn btn-icon btn-sm btn-secondary ml-auto" aria-expanded="true" aria-controls="collapsible-content-{{ section.id }}" title="{{ _('Collapse/Expand')|forceescape }}">
+                                        <button type="button" class="collapse-toggle btn btn-icon btn-sm ml-auto" aria-expanded="true" aria-controls="collapsible-content-{{ section.id }}" title="{{ _('Collapse/Expand')|forceescape }}">
                                             <i class="fas fa-chevron-up"></i>
                                         </button>
                                     </h3>
@@ -1229,7 +1229,7 @@
                                                         {% if template_structure.display_order_visible %}<span class="text-gray-700 mr-1">{{ sub_section.display_order }}.</span>{% endif %}
                                                         {% set sub_section_display_name = sub_section._display_name_resolved if hasattr(sub_section, '_display_name_resolved') and sub_section._display_name_resolved else sub_section.display_name %}
                                                         <span class="text-gray-600 font-medium">↳ {{ sub_section_display_name }}</span>
-                                                        <button type="button" class="collapse-toggle btn btn-icon btn-sm btn-secondary ml-auto" aria-expanded="true" aria-controls="collapsible-content-sub-{{ sub_section.id }}" title="{{ _('Collapse/Expand')|forceescape }}">
+                                                        <button type="button" class="collapse-toggle btn btn-icon btn-sm ml-auto" aria-expanded="true" aria-controls="collapsible-content-sub-{{ sub_section.id }}" title="{{ _('Collapse/Expand')|forceescape }}">
                                                             <i class="fas fa-chevron-up"></i>
                                                         </button>
                                                     </h4>

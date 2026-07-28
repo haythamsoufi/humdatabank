@@ -72,7 +72,7 @@ El fregado se aplica a:
 
 Implementación:
 
-- `app/services/ai_providers.py`: `scrub_pii_text`, `scrub_pii_context`
+- `app/services/ai/providers/formatting.py`: `scrub_pii_text`, `scrub_pii_context`
 - `app/services/ai_chat_engine.py`: aplica el scrubbing antes de que el proveedor llame
 
 ### 3) Minimización del contexto de la página
@@ -82,7 +82,7 @@ El frontend puede enviar contexto de página para ayudar a responder preguntas r
 Implementación:
 
 - `app/utils/ai_utils.py`: ayudantes compartidos como la sanitización del contexto
-- `app/services/ai_providers.py`: limpieza recursiva de contexto
+- `app/services/ai/providers/formatting.py`: limpieza recursiva de contexto
 
 ### 4) Auditoría del registro para eventos DLP (sin almacenar contenido de mensajes)
 
@@ -140,7 +140,7 @@ Para filtrar eventos DLP de IA, busca:
 | Endpoint de chat de IA (WebSocket) | `app/routes/ai_ws.py` |
 | Orquestación por chat | `app/services/ai_chat_engine.py` |
 | DLP guardia + eventos de auditoría | `app/services/ai_dlp.py` |
-| Ayudantes de limpieza de información personal | `app/services/ai_providers.py` |
+| Ayudantes de limpieza de información personal | `app/services/ai/providers/formatting.py` |
 | Modelo de eventos de seguridad | `app/models/system.py` |
 | Páginas de seguridad de administrador | `app/routes/admin/security_dashboard.py` |
 

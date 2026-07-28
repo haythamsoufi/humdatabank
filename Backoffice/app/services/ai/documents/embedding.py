@@ -10,7 +10,7 @@ from typing import List, Tuple, Optional, Dict, Any, TYPE_CHECKING
 from flask import current_app
 
 if TYPE_CHECKING:
-    from app.services.ai_providers.base import EmbeddingProvider
+    from app.services.ai.providers.base import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class AIEmbeddingService:
             if provider is not None:
                 self._provider = provider
             else:
-                from app.services.ai_providers import get_embedding_provider
+                from app.services.ai.providers import get_embedding_provider
                 self._provider = get_embedding_provider()
         except Exception as e:
             logger.error("Failed to initialize embedding provider: %s", e)

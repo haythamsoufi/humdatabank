@@ -16,14 +16,14 @@ For configuration (providers, limits, telemetry), see [`../../setup/ai-configura
 
 ### 5B (Done)
 
-- **`app/services/ai_providers/`**: `EmbeddingProvider`, `ChatCompletionProvider`; `OpenAIEmbeddingProvider`, `LocalEmbeddingProvider`, `OpenAIChatCompletionProvider`; `get_embedding_provider()`.
+- **`app/services/ai/providers/`**: `EmbeddingProvider`, `ChatCompletionProvider`; `OpenAIEmbeddingProvider`, `LocalEmbeddingProvider`, `OpenAIChatCompletionProvider`; `get_embedding_provider()`.
 - **`AIEmbeddingService`** uses provider from config; supports `AI_EMBEDDING_PROVIDER=openai|local`.
 
 ### 5C (Done)
 
 - **`app/utils/ai_pricing.py`**: Central defaults for chat and embedding (per 1M tokens); `get_chat_pricing()`, `get_embedding_pricing()`, `estimate_chat_cost()`.
 - **Config**: Optional `AI_MODEL_PRICING` (JSON) overrides: `{"chat": {"model": {"input": 0.25, "output": 2.0}}, "embedding": {"model": 0.02}}`.
-- **Wired**: `ai_runtime_utils.estimate_openai_cost`, `AIEmbeddingService.estimate_cost`, `OpenAIEmbeddingProvider` cost, `routes/ai.py` telemetry cost, `chatbot_telemetry.estimate_cost`.
+- **Wired**: `ai.runtime.runtime_utils.estimate_openai_cost`, `ai.documents.embedding` cost, `OpenAIEmbeddingProvider` cost, `routes/ai.py` telemetry cost, `ai.chat.telemetry` estimate_cost.
 
 ### 5D (Done)
 

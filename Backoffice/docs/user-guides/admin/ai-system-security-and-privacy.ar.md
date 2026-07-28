@@ -72,7 +72,7 @@
 
 التنفيذ:
 
-- `app/services/ai_providers.py`: `scrub_pii_text`, `scrub_pii_context`
+- `app/services/ai/providers/formatting.py`: `scrub_pii_text`, `scrub_pii_context`
 - `app/services/ai_chat_engine.py`: يطبق التنظيف قبل مكالمات مقدم الخدمة
 
 ### 3) تقليل سياق الصفحة
@@ -82,7 +82,7 @@
 التنفيذ:
 
 - `app/utils/ai_utils.py`: مساعدات مشتركة مثل تنظيف السياق
-- `app/services/ai_providers.py`: فرك السياق التكراري
+- `app/services/ai/providers/formatting.py`: فرك السياق التكراري
 
 ### 4) تسجيل التدقيق لأحداث DLP (دون تخزين محتوى الرسائل)
 
@@ -140,7 +140,7 @@
 | نقطة نهاية دردشة الذكاء الاصطناعي (WebSocket) | `app/routes/ai_ws.py` |
 | توزيع الدردشة | `app/services/ai_chat_engine.py` |
 | حراس DLP + أحداث التدقيق | `app/services/ai_dlp.py` |
-| مساعدو تنظيف PII | `app/services/ai_providers.py` |
+| مساعدو تنظيف PII | `app/services/ai/providers/formatting.py` |
 | نموذج أحداث الأمن | `app/models/system.py` |
 | صفحات أمان الإدارة | `app/routes/admin/security_dashboard.py` |
 

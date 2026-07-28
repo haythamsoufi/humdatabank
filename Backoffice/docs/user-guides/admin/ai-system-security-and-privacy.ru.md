@@ -72,7 +72,7 @@ DLP настраивается напрямую в коде (не в перем�
 
 Реализация:
 
-- `app/services/ai_providers.py`: `scrub_pii_text`, `scrub_pii_context`
+- `app/services/ai/providers/formatting.py`: `scrub_pii_text`, `scrub_pii_context`
 - `app/services/ai_chat_engine.py`: применяет очистку перед вызовами провайдера
 
 ### 3) Минимизация контекста страницы
@@ -82,7 +82,7 @@ DLP настраивается напрямую в коде (не в перем�
 Реализация:
 
 - `app/utils/ai_utils.py`: общие помощники, такие как очистка контекста
-- `app/services/ai_providers.py`: рекурсивная контекстная очистка
+- `app/services/ai/providers/formatting.py`: рекурсивная контекстная очистка
 
 ### 4) Логирование аудита событий DLP (без сохранения содержимого сообщения)
 
@@ -140,7 +140,7 @@ DLP настраивается напрямую в коде (не в перем�
 | AI-чат (WebSocket) | `app/routes/ai_ws.py` |
 | Оркестровка чата | `app/services/ai_chat_engine.py` |
 | DLP guard + аудитские мероприятия | `app/services/ai_dlp.py` |
-| Помощники по чистке личных данных | `app/services/ai_providers.py` |
+| Помощники по чистке личных данных | `app/services/ai/providers/formatting.py` |
 | Модель событий безопасности | `app/models/system.py` |
 | Страницы безопасности администратора | `app/routes/admin/security_dashboard.py` |
 

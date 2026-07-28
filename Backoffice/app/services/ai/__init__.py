@@ -2,7 +2,8 @@
 ai – AI chatbot, RAG documents, agent, tools, and data retrieval.
 
 Subpackages:
-    ai.chat          – chat engine, integration, request parsing, retention, DLP, fastpath
+    ai.providers      – embedding/chat provider interfaces and PII/formatting helpers
+    ai.chat           – chat engine, helpers, telemetry, integration, DLP, retention, fastpath
     ai.documents     – document processing, chunking, embeddings, vector store
     ai.planning      – query planner, rewriter, intent helpers, payload inference
     ai.policies      – prompt/response/tool-routing policies

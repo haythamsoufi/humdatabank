@@ -12,7 +12,7 @@ from flask import current_app
 from flask_babel import force_locale, gettext as _
 
 from app.utils.ai_utils import openai_model_supports_sampling_params
-from app.services.chatbot_helpers import (
+from app.services.ai.chat.helpers import (
     build_lightweight_system_prompt,
     format_ai_response_for_html,
     integrate_openai_with_telemetry,
@@ -98,7 +98,7 @@ def _coerce_history_messages(
             is_user = role == "user"
         # Privacy: scrub obvious PII from any stored history before sending to providers.
         try:
-            from app.services.ai_providers import scrub_pii_text
+            from app.services.ai.providers import scrub_pii_text
             content = scrub_pii_text(content)
         except Exception as e:
             logger.debug("PII scrubbing failed: %s", e)
@@ -538,7 +538,7 @@ def _generate_greeting_reply_llm(
     """
     Short assistant reply for greeting-only messages. Avoids listing URLs or admin capabilities.
     """
-    from app.services.ai_providers import scrub_pii_text
+    from app.services.ai.providers import scrub_pii_text
 
     safe = scrub_pii_text((user_message or "").strip()) or "Hello"
     lang = (preferred_language or "en").split("-")[0]
@@ -592,7 +592,7 @@ def _generate_out_of_scope_reply_llm(
     Short refusal when the message is not about databank data, documents, or platform usage
     (replaces answering arbitrary general chat).
     """
-    from app.services.ai_providers import scrub_pii_text
+    from app.services.ai.providers import scrub_pii_text
 
     safe = scrub_pii_text((user_message or "").strip()) or ""
     lang = (preferred_language or "en").split("-")[0]
@@ -987,7 +987,7 @@ class AIChatEngine:
 
         # Privacy: minimize obvious PII before sending to third-party LLMs.
         # (DB persistence still stores the original user message for authenticated users.)
-        from app.services.ai_providers import scrub_pii_text, scrub_pii_context
+        from app.services.ai.providers import scrub_pii_text, scrub_pii_context
 
         safe_message = scrub_pii_text((message or "").strip())
         safe_page_context = scrub_pii_context(page_context or {})

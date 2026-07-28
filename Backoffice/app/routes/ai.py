@@ -52,7 +52,7 @@ from app.services.ai.chat.dlp import evaluate_ai_message, log_dlp_audit_event
 from app.services.ai.chat.fastpath import try_answer_value_question
 
 # Telemetry tracking
-from app.services.chatbot_telemetry import ChatbotTelemetryService, ChatbotMetrics
+from app.services.ai.chat.telemetry import ChatbotTelemetryService, ChatbotMetrics
 from app.services.user_analytics_service import get_client_ip
 
 # AI Agent integration (RAG + agentic reasoning)

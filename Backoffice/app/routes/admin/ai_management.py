@@ -2421,7 +2421,7 @@ def ai_chat_analytics():
     Optional query params: days (7|30|90), breakdown_by_path (bool).
     """
     try:
-        from app.services.chatbot_telemetry import get_chatbot_analytics
+        from app.services.ai.chat.telemetry import get_chatbot_analytics
         analytics = get_chatbot_analytics()
 
         # Enhance with quality metrics

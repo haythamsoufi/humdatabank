@@ -9,7 +9,7 @@ import hashlib
 import logging
 from typing import List, Tuple
 
-from app.services.ai_providers.base import EmbeddingProvider
+from app.services.ai.providers.base import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
 

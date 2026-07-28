@@ -72,7 +72,7 @@ Le frottement s’applique à :
 
 Mise en œuvre :
 
-- `app/services/ai_providers.py` : `scrub_pii_text`, `scrub_pii_context`
+- `app/services/ai/providers/formatting.py` : `scrub_pii_text`, `scrub_pii_context`
 - `app/services/ai_chat_engine.py` : applique le nettoyage avant les appels du fournisseur
 
 ### 3) Minimisation du contexte de la page
@@ -82,7 +82,7 @@ La interface peut envoyer le contexte de la page pour aider à répondre aux que
 Mise en œuvre :
 
 - `app/utils/ai_utils.py` : aides partagées telles que la salubrisation du contexte
-- `app/services/ai_providers.py` : nettoyage récursif du contexte
+- `app/services/ai/providers/formatting.py` : nettoyage récursif du contexte
 
 ### 4) Audit de la journalisation des événements DLP (sans stocker le contenu du message)
 
@@ -140,7 +140,7 @@ Pour filtrer les événements DLP liés à l’IA, recherchez :
 | Point de terminaison de chat IA (WebSocket) | `app/routes/ai_ws.py` |
 | Orchestration par chat | `app/services/ai_chat_engine.py` |
 | DLP garde + événements d’audit | `app/services/ai_dlp.py` |
-| Aides à la récure des PII | `app/services/ai_providers.py` |
+| Aides à la récure des PII | `app/services/ai/providers/formatting.py` |
 | Modèle des événements de sécurité | `app/models/system.py` |
 | Pages de sécurité admin | `app/routes/admin/security_dashboard.py` |
 

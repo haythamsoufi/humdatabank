@@ -346,7 +346,7 @@ class AIChatIntegration:
     ) -> Tuple[str, str, List[str], Dict[str, Any]]:
         """Process query using existing LLM integration (without agent)."""
         try:
-            from app.services.chatbot_helpers import integrate_openai_with_telemetry
+            from app.services.ai.chat.helpers import integrate_openai_with_telemetry
 
             if not current_app.config.get("OPENAI_API_KEY"):
                 raise RuntimeError("OPENAI_API_KEY not configured")

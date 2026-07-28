@@ -95,7 +95,7 @@ function toggleInput(btn) {
     }
 }
 
-// Convert a markdown table block to HTML (same logic as ai_providers._markdown_table_to_html)
+// Convert a markdown table block to HTML (same logic as ai.providers.formatting._markdown_table_to_html)
 function traceMarkdownTableToHtml(block) {
     function esc(s) {
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -313,7 +313,7 @@ function traceSanitizeHtml(html) {
     }
 }
 
-// Parse "## Sources" section from raw final answer (same logic as ai_providers.format_ai_response_for_html)
+// Parse "## Sources" section from raw final answer (same logic as ai.providers.format_ai_response_for_html)
 function traceParseSourcesFromRaw(text) {
     if (!text || typeof text !== 'string') { return { mainText: String(text || ''), sourcesBlockRaw: null }; }
     var re = /^(#{2,3}\s*Sources\s*)\s*$([\s\S]+?)(?=\n\s*\n\s*(?:If you want, I can|If you'd like|Which would you prefer\?|Which format do you prefer\?|\*\*Notes?\s*\/\s*next steps\b)|\n\s*(?:If you want, I can|If you'd like)|$)/im;

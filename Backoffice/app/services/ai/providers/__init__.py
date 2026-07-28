@@ -3,7 +3,7 @@ AI providers – abstract interfaces and implementations for embeddings and anci
 
 Embedding usage::
 
-    from app.services.ai_providers import get_embedding_provider, EmbeddingProvider
+    from app.services.ai.providers import get_embedding_provider, EmbeddingProvider
     provider = get_embedding_provider()
     embedding, cost = provider.generate_embedding("hello")
 
@@ -13,14 +13,14 @@ the agent loop while keeping SDK access via ``sdk_client`` for legacy helpers/pl
 
 import os
 
-from app.services.ai_providers.base import (
+from app.services.ai.providers.base import (
     ChatCompletionProvider,
     EmbeddingProvider,
 )
-from app.services.ai_providers.openai_embedding import OpenAIEmbeddingProvider
-from app.services.ai_providers.openai_chat import OpenAIChatCompletionProvider
-from app.services.ai_providers.local_embedding import LocalEmbeddingProvider
-from app.services.ai_providers.formatting import (
+from app.services.ai.providers.openai_embedding import OpenAIEmbeddingProvider
+from app.services.ai.providers.openai_chat import OpenAIChatCompletionProvider
+from app.services.ai.providers.local_embedding import LocalEmbeddingProvider
+from app.services.ai.providers.formatting import (
     scrub_pii_text,
     scrub_pii_context,
     format_provenance_block,

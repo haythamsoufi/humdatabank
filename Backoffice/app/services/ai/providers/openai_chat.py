@@ -5,7 +5,7 @@ OpenAI implementation of the chat completion provider interface.
 import logging
 from typing import Any, Dict, List, Optional
 
-from app.services.ai_providers.base import ChatCompletionProvider
+from app.services.ai.providers.base import ChatCompletionProvider
 
 logger = logging.getLogger(__name__)
 

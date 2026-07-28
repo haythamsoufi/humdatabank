@@ -9,7 +9,7 @@ from typing import List, Optional, Tuple
 
 from flask import current_app
 
-from app.services.ai_providers.base import EmbeddingProvider
+from app.services.ai.providers.base import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
 

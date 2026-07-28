@@ -204,6 +204,23 @@ select.calculated-select--stale-saved {
   padding-top: 0;
 }
 
+/* Section/sub-section disclosure toggles — chrome, not CTAs (do not use .btn-secondary). */
+.collapse-toggle.btn {
+  background-color: var(--btn-secondary-bg, #ffffff);
+  color: var(--btn-secondary-color, #374151);
+  border: 1px solid var(--btn-secondary-border, #d1d5db);
+}
+.collapse-toggle.btn:hover {
+  background-color: var(--btn-secondary-bg-hover, #f9fafb);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+}
+.collapse-toggle.btn:active {
+  background-color: #f3f4f6;
+}
+.collapse-toggle.btn:focus-visible {
+  box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.2);
+}
+
 /* Full-width repeat-section "Add Entry" call-to-action */
 .repeat-add-entry-btn {
   display: flex;

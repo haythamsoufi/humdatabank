@@ -4,7 +4,7 @@
  * Required HTML structure:
  * <div data-collapsible-id="unique-id" [data-aes-id="optional-id"] class="p-6">
  *   <h3 class="border-b"> or <h4 class="border-b">
- *     <button class="collapse-toggle" aria-expanded="true">
+ *     <button class="collapse-toggle btn btn-icon btn-sm" aria-expanded="true">
  *       <i class="fa fa-chevron-up"></i>
  *       Title
  *     </button>

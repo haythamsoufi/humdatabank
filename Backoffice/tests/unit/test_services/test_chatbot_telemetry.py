@@ -1,5 +1,5 @@
 """
-Comprehensive tests for app/services/chatbot_telemetry.py.
+Comprehensive tests for app.services.ai.chat.telemetry.
 
 Covers:
   - ChatbotMetrics dataclass
@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from app.services.chatbot_telemetry import (
+from app.services.ai.chat.telemetry import (
     ChatbotMetrics,
     ChatbotTelemetryService,
     get_chatbot_analytics,
@@ -174,7 +174,7 @@ class TestFlushMetrics:
             svc = ChatbotTelemetryService()
             svc.metrics_buffer = []
             # Should not raise and not call DB
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 svc._flush_metrics()
                 mock_db.session.execute.assert_not_called()
 
@@ -184,7 +184,7 @@ class TestFlushMetrics:
             svc.metrics_buffer = [_make_metrics()]
             ChatbotTelemetryService._table_ensured = True  # Skip table creation
 
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.session.execute = MagicMock()
                 mock_db.session.commit = MagicMock()
                 svc._flush_metrics()
@@ -198,7 +198,7 @@ class TestFlushMetrics:
             svc.metrics_buffer = list(metrics)
             ChatbotTelemetryService._table_ensured = True
 
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.session.execute = MagicMock(side_effect=Exception("db error"))
                 mock_db.session.rollback = MagicMock()
                 svc._flush_metrics()
@@ -211,7 +211,7 @@ class TestFlushMetrics:
             svc.metrics_buffer = [_make_metrics()]
             ChatbotTelemetryService._table_ensured = True
 
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.session.execute = MagicMock(side_effect=Exception("insert fail"))
                 mock_db.session.rollback = MagicMock(side_effect=Exception("rollback fail"))
                 # Should not raise
@@ -225,7 +225,7 @@ class TestEnsureTelemetryTable:
     def test_sqlite_dialect_creates_table(self, app):
         with app.app_context():
             svc = ChatbotTelemetryService()
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_engine = MagicMock()
                 mock_dialect = MagicMock()
                 mock_dialect.name = "sqlite"
@@ -239,7 +239,7 @@ class TestEnsureTelemetryTable:
     def test_postgres_dialect_creates_table(self, app):
         with app.app_context():
             svc = ChatbotTelemetryService()
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_engine = MagicMock()
                 mock_dialect = MagicMock()
                 mock_dialect.name = "postgresql"
@@ -253,7 +253,7 @@ class TestEnsureTelemetryTable:
     def test_exception_during_create_handled(self, app):
         with app.app_context():
             svc = ChatbotTelemetryService()
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.engine = MagicMock()
                 mock_db.engine.dialect = MagicMock()
                 mock_db.engine.dialect.name = "sqlite"
@@ -265,7 +265,7 @@ class TestEnsureTelemetryTable:
     def test_dialect_detection_exception_handled(self, app):
         with app.app_context():
             svc = ChatbotTelemetryService()
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.engine = None  # triggers getattr chain to fail
                 mock_db.session.execute = MagicMock()
                 mock_db.session.commit = MagicMock()
@@ -294,7 +294,7 @@ class TestGetUsageStats:
                 "function_calls_total": 2,
             }
 
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.session.execute.return_value.fetchone.return_value = fake_row
                 result = svc.get_usage_stats(days=7)
                 assert result["total_interactions"] == 10
@@ -304,7 +304,7 @@ class TestGetUsageStats:
     def test_returns_empty_dict_when_no_rows(self, app):
         with app.app_context():
             svc = ChatbotTelemetryService()
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.session.execute.return_value.fetchone.return_value = None
                 result = svc.get_usage_stats()
                 assert result == {}
@@ -312,7 +312,7 @@ class TestGetUsageStats:
     def test_returns_empty_dict_on_exception(self, app):
         with app.app_context():
             svc = ChatbotTelemetryService()
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.session.execute.side_effect = Exception("db error")
                 result = svc.get_usage_stats()
                 assert result == {}
@@ -333,7 +333,7 @@ class TestGetUsageStats:
                 "avg_response_length": None,
                 "function_calls_total": 0,
             }
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.session.execute.return_value.fetchone.return_value = fake_row
                 result = svc.get_usage_stats()
                 # total is 0, uses "or 1" fallback
@@ -352,7 +352,7 @@ class TestGetErrorAnalysis:
             fake_row.error_count = 3
             fake_row.avg_response_time = 5000.0
 
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.session.execute.return_value.fetchall.return_value = [fake_row]
                 result = svc.get_error_analysis()
                 assert result["errors"][0]["error_type"] == "timeout"
@@ -361,7 +361,7 @@ class TestGetErrorAnalysis:
     def test_empty_result_returns_empty_list(self, app):
         with app.app_context():
             svc = ChatbotTelemetryService()
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.session.execute.return_value.fetchall.return_value = []
                 result = svc.get_error_analysis()
                 assert result == {"errors": []}
@@ -369,7 +369,7 @@ class TestGetErrorAnalysis:
     def test_exception_returns_empty_errors(self, app):
         with app.app_context():
             svc = ChatbotTelemetryService()
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.session.execute.side_effect = Exception("db fail")
                 result = svc.get_error_analysis()
                 assert result == {"errors": []}
@@ -385,7 +385,7 @@ class TestGetFunctionUsageStats:
             fake_row = MagicMock()
             fake_row.function_calls_made = json.dumps(["search_indicators", "get_data", "search_indicators"])
 
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.session.execute.return_value.fetchall.return_value = [fake_row]
                 result = svc.get_function_usage_stats()
                 assert result["total_function_calls"] == 3
@@ -398,7 +398,7 @@ class TestGetFunctionUsageStats:
             fake_row = MagicMock()
             fake_row.function_calls_made = "invalid_json{{{"
 
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.session.execute.return_value.fetchall.return_value = [fake_row]
                 result = svc.get_function_usage_stats()
                 assert result["total_function_calls"] == 0
@@ -407,7 +407,7 @@ class TestGetFunctionUsageStats:
     def test_empty_results_returns_none_for_most_used(self, app):
         with app.app_context():
             svc = ChatbotTelemetryService()
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.session.execute.return_value.fetchall.return_value = []
                 result = svc.get_function_usage_stats()
                 assert result["most_used_function"] is None
@@ -415,7 +415,7 @@ class TestGetFunctionUsageStats:
     def test_exception_returns_empty_dict(self, app):
         with app.app_context():
             svc = ChatbotTelemetryService()
-            with patch("app.services.chatbot_telemetry.db") as mock_db:
+            with patch("app.services.ai.chat.telemetry.db") as mock_db:
                 mock_db.session.execute.side_effect = Exception("db fail")
                 result = svc.get_function_usage_stats()
                 assert result == {}
@@ -432,8 +432,8 @@ class TestTrackChatbotInteraction:
             mock_user.id = 42
             mock_user.session_id = "session-abc"
 
-            with patch("app.services.chatbot_telemetry.current_user", mock_user):
-                with patch("app.services.chatbot_telemetry.telemetry_service") as mock_svc:
+            with patch("app.services.ai.chat.telemetry.current_user", mock_user):
+                with patch("app.services.ai.chat.telemetry.telemetry_service") as mock_svc:
                     track_chatbot_interaction(
                         message="Hello",
                         response="Hi there",
@@ -451,8 +451,8 @@ class TestTrackChatbotInteraction:
             mock_user = MagicMock()
             mock_user.is_authenticated = False
 
-            with patch("app.services.chatbot_telemetry.current_user", mock_user):
-                with patch("app.services.chatbot_telemetry.telemetry_service") as mock_svc:
+            with patch("app.services.ai.chat.telemetry.current_user", mock_user):
+                with patch("app.services.ai.chat.telemetry.telemetry_service") as mock_svc:
                     track_chatbot_interaction(
                         message="Query",
                         response="Answer",
@@ -471,8 +471,8 @@ class TestTrackChatbotInteraction:
             mock_user.id = 1
             mock_user.session_id = "s1"
 
-            with patch("app.services.chatbot_telemetry.current_user", mock_user):
-                with patch("app.services.chatbot_telemetry.telemetry_service") as mock_svc:
+            with patch("app.services.ai.chat.telemetry.current_user", mock_user):
+                with patch("app.services.ai.chat.telemetry.telemetry_service") as mock_svc:
                     track_chatbot_interaction(
                         message="Tell me about X",
                         response="X is ...",
@@ -494,7 +494,7 @@ class TestTrackChatbotInteraction:
     def test_exception_in_tracking_logged(self, app):
         with app.app_context():
             with patch(
-                "app.services.chatbot_telemetry.telemetry_service",
+                "app.services.ai.chat.telemetry.telemetry_service",
                 side_effect=Exception("crash"),
             ):
                 # Should not raise
@@ -510,8 +510,8 @@ class TestTrackChatbotInteraction:
             mock_user.id = 1
             del mock_user.session_id  # no session_id attribute
 
-            with patch("app.services.chatbot_telemetry.current_user", mock_user):
-                with patch("app.services.chatbot_telemetry.telemetry_service") as mock_svc:
+            with patch("app.services.ai.chat.telemetry.current_user", mock_user):
+                with patch("app.services.ai.chat.telemetry.telemetry_service") as mock_svc:
                     track_chatbot_interaction(
                         message="m", response="r", llm_provider="openai",
                         model_name=None, response_time_ms=1, success=True,
@@ -526,7 +526,7 @@ class TestTrackChatbotInteraction:
 class TestGetChatbotAnalytics:
     def test_returns_combined_analytics(self, app):
         with app.app_context():
-            with patch("app.services.chatbot_telemetry.telemetry_service") as mock_svc:
+            with patch("app.services.ai.chat.telemetry.telemetry_service") as mock_svc:
                 mock_svc.get_usage_stats.return_value = {"total_interactions": 5}
                 mock_svc.get_error_analysis.return_value = {"errors": []}
                 mock_svc.get_function_usage_stats.return_value = {"total_function_calls": 2}
@@ -538,7 +538,7 @@ class TestGetChatbotAnalytics:
 
     def test_exception_returns_empty_dict(self, app):
         with app.app_context():
-            with patch("app.services.chatbot_telemetry.telemetry_service") as mock_svc:
+            with patch("app.services.ai.chat.telemetry.telemetry_service") as mock_svc:
                 mock_svc.get_usage_stats.side_effect = Exception("analytics crash")
                 result = get_chatbot_analytics()
                 assert result == {}

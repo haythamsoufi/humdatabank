@@ -345,7 +345,7 @@ def init_flask_extensions(app, config_class, startup_start):
 
     validate_email_configuration(app)
     try:
-        from app.services.ai_providers import warn_if_local_embeddings_in_prod
+        from app.services.ai.providers import warn_if_local_embeddings_in_prod
         warn_if_local_embeddings_in_prod(app)
     except Exception as e:
         app.logger.debug("AI embedding provider startup check skipped: %s", e)
